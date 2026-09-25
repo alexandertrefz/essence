@@ -6189,9 +6189,9 @@ c"::quote())
 		threes::set(3/1, to "rational"),
 	)
 
-	§ A key with no canonical encoding — a Record — is found by asking the
-	§ Record's own `is` of every key the Dictionary holds. It costs a walk
-	§ rather than a lookup, and nothing about it is visible from here.
+	§ A Record key whose members all encode is found under a text spelled
+	§ from them, in one step, as a String key is. Nothing about that is
+	§ visible from here.
 	constant seats: Dictionary<{ row: Integer, seat: Integer }, String> = [
 		{ row = 1, seat = 2 } = "alex",
 		{ row = 4, seat = 1 } = "sam",

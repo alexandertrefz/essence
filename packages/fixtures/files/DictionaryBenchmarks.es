@@ -57,16 +57,12 @@ implementation {
 	§     read out, `value(at:defaultingTo:)`           140 µs    140 ns/key
 	§   A payload-free Choice, ten thousand reads of three keys
 	§     read out, `value(at:defaultingTo:)`           344 µs   34.4 ns/read
-	§   A key with no encoding — the scan path
-	§     set in, `set(_:to:)`                         6.98 ms   6.98 µs/key
-	§     read out, `value(at:defaultingTo:)`          7.97 ms   7.97 µs/key
 	§
-	§ A Record key and a Case are encoded by their parts now, so each is
-	§ found in one step as a String is, at a few times a String's cost for
-	§ the text the parts are spelled into. The same Record-key suite
-	§ recorded 7.48 ms to set and 8.00 ms to read out before the encoding,
-	§ which is the scan path's cost at a thousand entries: a Record holding
-	§ a List still pays it, and the last suite keeps that number on record.
+	§ A Record key and a Case are encoded by their parts, so each is found in
+	§ one step as a String is, at a few times a String's cost for the text the
+	§ parts are spelled into. A key with no encoding is found by a walk that
+	§ asks the key's own `is` of each entry, the scan path. A Record or a Case
+	§ holding a List encodes as well, so no suite here measures the scan path.
 
 	§ An entry as the baseline holds it. It is the Record a Dictionary hands
 	§ every callback, written down as the Type of a List's items.
@@ -93,10 +89,8 @@ implementation {
 		Right,
 	}
 
-	§ A key with no canonical encoding: a member holding a List has none, so
-	§ the Record has none. It is found by asking the Record's own `is` over
-	§ the entries rather than by one step into an index — the scan path,
-	§ measured for what it is.
+	§ A Record key holding a List. The List has a canonical encoding, so the
+	§ Record has one too, and it is found in one step as `Seat` is.
 	type Tagged = { row: Integer, tags: List<String> }
 
 	§ One row of a season, for the Methods that turn a List into a
@@ -374,9 +368,8 @@ tests {
 		}
 	}
 
-	§ A key the runtime has no encoding for is found by asking the key's own
-	§ `is` over the entries the box can see. It is correct for every key Type
-	§ the language has, and it is a walk.
+	§ Despite the name, these keys take the encoded path: `Tagged` holds a
+	§ List, and a List has a canonical encoding.
 	suite "Scan-path keys" {
 		benchmark "builds a thousand" {
 			constant filled = tagged::reduce(

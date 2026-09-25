@@ -51,8 +51,8 @@ They average 15/7 points a game — 2.14 to two places — and have won 57% of t
   to a Dictionary — `update(at:with:)` records a result, and it answers the
   table unchanged where the key holds nothing, which is what makes a fixture
   between teams this table is not about change nothing. A `Team` is a Record,
-  and a Record is a key like any other: it is found by asking the Record's own
-  `is`. The rows are then read back through the teams, which is what carries
+  and a Record is a key like any other: its members encode, so it is found in
+  one step. The rows are then read back through the teams, which is what carries
   the proof that the table has rows. [`Season.tests.es`](Season.tests.es)
   indexes the finished table by team code the same way, so a test asks for a
   row by name and gets an `Optional`.

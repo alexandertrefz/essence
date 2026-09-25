@@ -212,8 +212,8 @@ implementation {
 			from fixtures: List<Fixture>,
 			among teams: NonEmptyList<Team>,
 		) -> NonEmptyList<Standing> {
-			§ A Team is a Record, and a Record is a key like any other: it is
-			§ found by asking the Record's own `is`. `index(on:)` is the
+			§ A Team is a Record, and a Record is a key like any other: its
+			§ members encode, so it is found in one step. `index(on:)` is the
 			§ crossing from a List to a Dictionary keyed one to one — one
 			§ blank row per team, under the team it is about, in the order
 			§ they were given.
