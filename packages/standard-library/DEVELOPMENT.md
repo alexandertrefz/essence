@@ -11,8 +11,9 @@ pass — a changed value means a body is wrong.
 An entry appended to a refined Namespace can move a harness call onto it while
 every printed value stays the same, because a written receiver proves what it
 can and the capture holds values. The label beside each line names the Namespace
-the call resolved to and is checked against it, but two Overloads of one Method
-share a label. So after appending a refined entry, read the harness calls that
+the call resolved to and is checked against it, but the check reads only the
+Namespace and the Method's name, so it can not tell two Overloads of one Method
+apart. So after appending a refined entry, read the harness calls that
 reach that Method, and give the ones that have to keep exercising the base entry
 a computed operand.
 
@@ -47,8 +48,9 @@ Two rules the loader enforces, both by throwing:
 
 Writing an import is not optional for a Namespace you only DISPATCH through:
 `length::subtract(…)` needs `Integer` imported even though the call never spells
-it. Naming `Integer` as a *Type* needs no import — the eight bare Type tags live
-one Scope out, and are the only names that do.
+it. Naming `Integer` as a *Type* needs no import — the bare Type tags of
+`packages/compiler/src/enricher/primitives.ts` live one Scope out, and are the
+only names that do.
 
 ### The prelude
 
@@ -119,8 +121,10 @@ found in.
 
 The load happens once per process and is cached; `loadStdlib()` hands every
 consumer — the Enricher's top level Scope, the Language Server's builtin
-listings, the test suite — the same object. It costs on the order of 60 ms,
-most of it enrichment, since each group hoists to its own fixed point.
+listings, the test suite — the same object. Most of what it costs is
+enrichment, since each group hoists to its own fixed point; the figures are
+under [What to weigh before writing the next
+one](#what-to-weigh-before-writing-the-next-one).
 
 The ORDER the builtins are listed in is the one thing a source file can not say
 about itself, because each declares only its own name. It is stated in
@@ -138,8 +142,7 @@ inside `packages/standard-library/sources` works normally.
 
 ## Native and Essence in one Namespace
 
-Every Namespace here is part native and part Essence — three of every five
-declared Method entries are written in Essence — and emitted user code can not
+The library is part native and part Essence, and emitted user code can not
 tell the two apart. `packages/compiler/src/rewriter/stdlibPrelude.ts` simplifies the enriched
 sources once per process, and the Rewriter emits each Essence-implemented
 Method as its OWN top-level const:
@@ -270,13 +273,14 @@ Composition is not free, and four costs are easy to miss because no test fails:
   is never zero); Transcendental declares no ordering to write either of its
   two on, so both went native. `Number.es` is out of the cycle entirely.
 - **Two Namespaces can end up written on each other.** `String` routes through
-  `List` wherever a body needs the pieces `split` answers, and `replaceEvery` —
-  `split(on part)::join(with replacement)` — is the one body left that does:
-  `lines` and `repeat` are native, and `replaceFirst` is written on `firstIndex`
-  and `slice` instead. `List::toString` was written on `String::append`, the one
-  call back. It is native now, so the edge points one way. Interpolating would
-  not have helped: a hole renders through its value's `Printable` conformance,
-  and for a String that is `String::toString`, the same edge under another name.
+  `List` wherever a body needs the pieces `split` answers. The bodies that still
+  do are `replaceEvery`, which is `split(on part)::join(with replacement)`, and
+  `indent`, which maps the `lines()` and joins them back. `repeat` is native,
+  and `replaceFirst` is written on `firstIndex` and `slice` instead.
+  `List::toString` was written on `String::append`, the one call back. It is
+  native now, so the edge points one way. Interpolating would not have helped:
+  a hole renders through its value's `Printable` conformance, and for a String
+  that is `String::toString`, the same edge under another name.
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
@@ -295,11 +299,11 @@ Composition is not free, and four costs are easy to miss because no test fails:
   characters throws that view away, and segmenting the joined text again can
   re-pair three regional indicators into characters the original never had. The
   native reverses the view instead, which is what makes `reverse` its own
-  inverse. Nothing in `String.es` says the view exists, so a body written from
-  the Essence side alone looks equivalent and is not.
+  inverse. Only the notes in `String.es` mention the view, so a body written
+  from the Essence side alone looks equivalent and is not.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
-guards six Programs, but it is a floor, not a substitute for measuring.
+guards a handful of Programs, but it is a floor, not a substitute for measuring.
 
 What the library costs to LOAD is the other figure a wave moves, and nothing
 asserts it. Every Program pays it once: the sources are parsed and enriched
@@ -308,8 +312,8 @@ the ordinary edit-and-run from paying it twice.
 `ESSENCE_COMPILER_CACHE=off esc check --verbose` over a hello-world reports the
 cold figure, and the same command without the variable reports the warm one.
 These sources measured 9,262 lines and 145 ms cold before the completeness
-wave, and measure 12,474 lines and 200 ms after it — 34.7% more source for 38%
-more time, at 16 microseconds a line. Warm is 21 ms either way, because the
+wave, and 12,474 lines and 200 ms after it — 34.7% more source for 38% more
+time, at 16 microseconds a line. Warm was 21 ms either way, because the
 snapshot is what is read.
 A ceiling over a clock is not the guard for this: five idle runs on one machine
 spread 66%, so a ceiling tight enough to catch a drift of that size fails on an
@@ -426,13 +430,13 @@ rung.** `Equatable` writes `isNot`, `Comparable` writes four Methods and
 conformer answers them without declaring anything. A Namespace that declares a
 Method of the same name replaces the provided one entirely for its own target —
 no entry is merged in — and it has to hold an entry the provided signature
-accepts, which is the same check a requirement gets. Eleven declarations here do
-it, over five names, and each says why at its own site: `Optional::isNot` takes
-a bare item as well as an Optional; `Integer::isNot` and `Rational::isNot` carry
-the contrary of an equality entry over the OTHER numeric kind, which a provided
-Method over `Self` alone has no entry for; and each numeric kind's four
-inequalities hold an entry for the other kind and are written on their own
-`compare` rather than on the cross-kind table.
+accepts, which is the same check a requirement gets. The declarations here that
+do it each say why at their own site: `Optional::isNot` and `Result::isNot` take
+a bare item as well as a whole carrier; `Integer::isNot` and `Rational::isNot`
+carry the contrary of an equality entry over the OTHER numeric kind, which a
+provided Method over `Self` alone has no entry for; and `Integer`'s and
+`Rational`'s four inequalities hold an entry for the other kind and are written
+on their own `compare` rather than on the cross-kind table.
 
 It replaces nothing on another Namespace's rung. A provided Method is a candidate
 of every Namespace whose conformance offers it, ranked by that Namespace's target
@@ -443,8 +447,8 @@ offer all six, and a call Integer's rung rejects falls to Number's.
 An override answers a bounded call too. The witness a `<Item is Orderable>` bound
 is handed names the conformer's override where it wrote one and the Protocol's
 shared const where it did not, so `1::isLessThan(2)` and the same call inside a
-bounded Function run the same Method. The library's eleven overrides all say
-over `Self` what the provided body says — faster, or with an entry for a kind the
+bounded Function run the same Method. Every override in the library says over
+`Self` what the provided body says — faster, or with an entry for a kind the
 provided signature has no room for — which is now a promise about the library
 rather than one the language leans on.
 
@@ -460,9 +464,10 @@ Printing is derived for a Choice whose Cases all carry no payload, and answers
 the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
 unit Cases declares `is Equatable, is Printable` and writes neither Method:
 `Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat`,
-`Rounding`, `SignStyle`, `Division`, `SortOrder` and `Stream` are all that
-shape, and nine of the ten have an empty body besides. `Ordering` is the one
-that does not: `then` is a Method of its own, and no conformance offers it.
+`Rounding`, `SignStyle`, `Division`, `SortOrder`, `Stream`, `HttpMethod` and
+`Redirects` are all that shape, and every one but `Ordering` has an empty body
+besides. `Ordering` does not: `then` is a Method of its own, and no conformance
+offers it.
 
 `Enumerable` follows equality rather than printing: nothing in here declares it,
 and every Choice of payload-free Cases answers `cases()` on its own name —
@@ -479,10 +484,10 @@ whatever anyone says, but how it READS is a decision, so a Choice whose
 Namespace does not say `is Printable` prints through nothing. A Choice that
 carries a payload anywhere writes its own `toString` or conforms to nothing:
 there is no name to answer with, and a Namespace declaring `is Printable`
-without writing one is a `nonconforming-namespace` error. `Optional` is that
-case, and it is the exception for equality too, as it says at its own
-declaration: its `is` takes a bare item as well as another Optional, which no
-derived conformance offers.
+without writing one is a `nonconforming-namespace` error. `Optional` and
+`Result` are that case, and they are the exception for equality too, as each
+says at its own declaration: its `is` takes a bare item as well as a whole
+carrier, which no derived conformance offers.
 
 **An Overload is selected by the first entry the Arguments match.** Two orders
 are in play. The order the entries are WRITTEN numbers them, and that number is
@@ -495,13 +500,9 @@ knowing: `Optional::is` declares the whole Optional entry FIRST, so
 its refined entry after the general one, so it is numbered second of the three
 and still read first. Appending is the rule, because it leaves every earlier
 number alone — so the `defaultingTo:` entry is last only where nothing has been
-written since. Twenty-one Overloads carry a refined entry written after one,
-and each of those is read first all the same: `String::split`, `Integer::divide`,
-`remainder`, `quotient`, `raise` and `toString`, `NonZeroInteger::raise`,
-`Rational::of`, `divide` and `raise`, `Algebraic::multiply` and `divide`,
-`Transcendental::multiply` and `divide`, `List.repeat`, `Number.average`, the
-two `Number` extrema, and `Randomness::drawInteger`, `drawRational` and
-`shuffle`.
+written since. Many Overloads carry a refined entry written after one, and each
+of those is read first all the same: `String::split`, `Integer::divide`,
+`Rational::of`, `List.repeat` and `Randomness::shuffle` are among them.
 
 **A predicate written as one call on `@` IS that call.** A Method answering a
 Boolean whose whole body is one call on `@` — optionally negated — is read off
@@ -718,12 +719,12 @@ rule stated there.
   says.
 - **A receiver narrowed by EVIDENCE is the same rule with a refinement as the
   target.** `NonEmptyList<ItemType>` is a checked refinement of `List<ItemType>`,
-  and `namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType>` holds the three
-  Methods the proof changes the answer of — `firstItem` and `lastItem` answer an
-  item where `List`'s own answer an Optional, and `length` answers a
-  `NonZeroInteger` where `List`'s answers an Integer. The rest of that Namespace
-  carries the proof forward instead: a `map` or a `reverse` of a List with
-  something in it still has something in it. A refined receiver reaches every
+  and `namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType>` holds the
+  Methods the proof changes the answer of. Among them, `firstItem` and
+  `lastItem` answer an item where `List`'s own answer an Optional, and `length`
+  answers a `PositiveInteger` where `List`'s answers a `NonNegativeInteger`.
+  Most of the rest of that Namespace carries the proof forward instead: a `map`
+  or a `reverse` of a List with something in it still has something in it. A refined receiver reaches every
   Namespace its base reaches and this one besides, so the refined target beats
   the base target for a Method both declare; a List nothing proved anything
   about does not reach it at all. A receiver WRITTEN where it stands proves the
@@ -731,12 +732,14 @@ rule stated there.
   entries ONE proof unlocks are reached by a literal as much as by a narrowed
   name. A proof about the items is the exception: a written receiver is asked
   for its own predicate and its written items are asked for none. Two refined targets neither of which is narrower than the other leave
-  the call `ambiguous-namespace`, exactly as two unrefined ones do. None of the
-  three can be written in Essence, which is the point rather than a gap: a
+  the call `ambiguous-namespace`, exactly as two unrefined ones do. None of
+  those three can be written in Essence, which is the point rather than a gap: a
   refinement erases before anything runs, so a native is what spending the
   evidence looks like. `length` is the plainest case — an Essence body could
   only write `@::length()`, which is that same Method on a receiver that still
   carries the proof, and the Validator refuses it as `infinite-recursion`.
+  `reduce`, `lowestItem` and `highestItem` spend the proof in Essence bodies all
+  the same, by reading it off the native `firstItem`.
 - **The two rules meet in one Namespace where a target is narrower both
   ways.** `NonEmptyNestedList<infer ItemType> for NonEmptyList<NonEmptyList<ItemType>>`
   targets a List proven to have something in it whose items are Lists proven the
@@ -751,9 +754,10 @@ rule stated there.
   literal are never asked for a predicate of their own.
 - **A refined Method that CARRIES the proof forward is a trap for a witness
   written over that refinement.** `NonEmptyString::uppercase`, `lowercase`,
-  `reverse` and `repeat` each answer a `NonEmptyString`, and so does
-  `NonEmptyList::reverse`. So a witness body that transforms its receiver and
-  then compares — `@::lowercase()::is(other::lowercase())` inside a
+  `reverse` and `repeat` each answer a `NonEmptyString`, and
+  `NonEmptyList::reverse` answers a `NonEmptyList`. So a witness body that
+  transforms its receiver and then compares —
+  `@::lowercase()::is(other::lowercase())` inside a
   `namespace Fold for NonEmptyString is Equatable` — asks a proven String for
   `is`, which is the very Method being written, and calls itself. Name the base
   Namespace at the call to stop it: `@::lowercase()::<String>is(…)`. Nothing
@@ -795,10 +799,10 @@ second list to cross-check against). A Method it PROVIDES is emitted like any
 other Essence body, so it is also a call-graph Node — `Orderable.clamp` — and
 belongs in `stdlibCallGraph.spec.ts`'s list with the rest. A Method the COMPILER
 answers for a whole kind of Type is a fourth kind of registration: the three
-derives are named in `enricher/resolvers.ts` (`Choice_Equatable`,
-`Choice_Printable`, `Choice_Enumerable`), fabricated there as Namespaces nobody
-wrote, and redirected to a runtime helper in the Rewriter's `namespaceMember`
-— which is also where `stdlibGolden.spec.ts` has to be told to expect them.
+derives are named in `helpers/conformance.ts` (`Choice_Equatable`,
+`Choice_Printable`, `Choice_Enumerable`), fabricated in `enricher/resolvers.ts`
+as Namespaces nobody wrote, and redirected to a runtime helper in the Rewriter's
+`namespaceMember`. `stdlibGolden.spec.ts` has to be told to expect them too.
 
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
