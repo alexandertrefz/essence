@@ -1,13 +1,15 @@
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
-// NOTE: This module is the only one here the Compiler imports as a module. The
-// rest are the language's runtime — the native halves of the standard library —
-// and they reach a Program the other way round: the Rewriter writes absolute
-// paths to them into the JavaScript it emits, and the Bundler inlines and
-// tree-shakes what the Program actually touched. So what the Compiler needs
-// from this package is not its values but its LOCATION, and that is what this
-// file exports.
+// NOTE: What the Compiler needs of this package is mostly its LOCATION, and
+// that is what this file exports. The other modules here are the language's
+// runtime, the native halves of the standard library, and they reach a Program
+// the other way round: in a bundle the Rewriter writes absolute paths to them
+// into the JavaScript it emits and the Bundler inlines and tree-shakes what the
+// Program touched, and in a host's build every emitted Module imports them by
+// package specifier. The values the Compiler does import are for work it does
+// itself: `bigRational`'s arithmetic for constant folding, and `DEFAULT_CASES`
+// from `Testing` for the test runner.
 //
 // NOTE: Resolved off this module's own location rather than the working
 // directory, so `esc` finds the runtime from any cwd. Computed here, in the
