@@ -14,9 +14,7 @@ export type Comment = {
 	endLine: number
 	// NOTE: A Comment with nothing but whitespace before it on its line belongs
 	// to whatever comes below it; one that follows code belongs to the line it
-	// is on. That distinction is the whole of comment attachment here, because
-	// 1,543 of the corpus's 1,548 Comments sit in a Statement list and the rest
-	// sit above a Parameter.
+	// is on.
 	ownLine: boolean
 }
 
