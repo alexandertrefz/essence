@@ -671,7 +671,7 @@ function targetCoversAsPattern(
 // generic `List<ItemType>`, and the deeper `List<List<ItemType>>` beats the
 // shallower `List<ItemType>`. Everything else is a tie the callers report: the
 // same target twice, and equally a pair the cover fails both ways for — a
-// `List<Integer> | Nothing` is no case of a `List<ItemType>` and no `List<…>`
+// `List<Integer> | String` is no case of a `List<ItemType>` and no `List<…>`
 // is a case of that Union, so a receiver matching both has no narrower
 // Namespace to be dispatched to.
 function isStrictlyMoreSpecificTarget(
@@ -1226,8 +1226,8 @@ function restoreBindings(
 
 // NOTE: Members that would bind a still-unbound Generic are tried last, so
 // that a Union member with a concrete counterpart does not get eaten by a
-// greedy first-occurrence binding (`Nothing` must match the `Nothing` member
-// of `Value | Nothing`, not bind `Value`).
+// greedy first-occurrence binding (`String` must match the `String` member
+// of `Value | String`, not bind `Value`).
 function orderUnionMembersForMatching(
 	types: Array<common.Type>,
 	context: GenericInferenceContext | null,

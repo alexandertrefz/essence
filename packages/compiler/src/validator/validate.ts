@@ -1718,7 +1718,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				// A Case shadowed by a Type that covers it is a Case nobody
 				// needed; a Case shadowed by a Type the source says it is
 				// unrelated to is a Program answering with the wrong value —
-				// `case Value` above `case Nothing` returned the Nothing where
+				// `case Value` above `case String` returned the String where
 				// the Signature promised a Value, and a Warning let that build.
 				let erased = false
 
@@ -2452,7 +2452,7 @@ function graftRequirement(
 // it with nothing here to say so. A Generic Matcher (and the wildcard's Unknown,
 // which is the same answer spelled differently) has no Type left to check, so
 // `isValueOfType` returns true unconditionally — `case Value` above `case
-// Nothing` left the second Case dead, and the Program answered the Nothing where
+// String` left the second Case dead, and the Program answered the String where
 // its own Signature promised a `Value`. A Function's Signature is equally gone:
 // the emitted check can only ask whether the value is callable, so a Record
 // Matcher naming a callback member accepts every Record carrying one, whatever
@@ -2587,7 +2587,7 @@ export function overlapsAtRuntime(
 
 	// NOTE: A member Type that is still a Type Parameter is NOT counted as an
 	// overlap, though its Argument could be anything: every Match over a
-	// `Value | Nothing` would report one, and a Type Parameter's values are
+	// `Value | String` would report one, and a Type Parameter's values are
 	// exactly what the Handlers around it are written to sort out. What this
 	// answers about is the values a Type NAMES, which is what the emitted
 	// check is written from.
