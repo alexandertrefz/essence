@@ -177,9 +177,9 @@ tests {
 				::is(table::length()::add(3))
 		}
 
-		§ Every rate stays exact until it is written down, and this is the one
-		§ place a number is rounded. A count below one place writes the whole
-		§ number, with no point after it.
+		§ Every rate stays exact until it is written down, and writing it down
+		§ is the only place a number is rounded. A count below one place writes
+		§ the whole number, with no point after it.
 		test "rounds a rate once, at the very end" {
 			expect leader
 				::pointsPerGame()

@@ -62,8 +62,9 @@ They average 15/7 points a game — 2.14 to two places — and have won 57% of t
   inside the `if` that proved it non-zero, where the quotient is bare.
 - **Exact until the last step.** A rate is a `Rational` — `15/7`, not
   `2.142857…` — and the whole league's mean is `average` over a List of exact
-  rates. [`Main.es`](Main.es) holds the one place a number is rounded:
-  `rate::toString(as #Decimal, toPlaces 2)`, when a value becomes text.
+  rates. [`Main.es`](Main.es) rounds a number only where it becomes text:
+  `rate::toString(as #Decimal, toPlaces 2)`, and the win rate beside it to no
+  places.
 - **A table that measures itself.** [`Table.es`](Table.es) declares its ten
   columns — a heading and which end the cell is padded at — and `render`
   measures each one against every cell that stands in it, headings included,
