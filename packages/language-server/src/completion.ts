@@ -182,8 +182,9 @@ const probeMemberName = "lspProbeMember"
 // answered by a key.
 const probeKeyName = "lspProbeKey"
 
-// NOTE: Mirrors `forbiddenIdentifierCharacters` in rename.ts — anything the
-// Lexer would not produce as part of a single Identifier Token.
+// NOTE: The characters `forbiddenIdentifierCharacters` in rename.ts lists, less
+// `#`: anything the Lexer would not produce as part of a single Identifier
+// Token, except that a `#` does not end the word here.
 const identifierTail = /[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 const identifierCharacter = /[^\s"§(){}[\]<>|/@,.:=~_-]/
 // NOTE: A whole `is` Token rather than the tail of an Identifier — `axis`
@@ -209,9 +210,10 @@ const caseTriggerPattern =
 // parses and its expected Type and Choices in scope can be read back.
 const probeCaseName = "LspProbeCase"
 
-// NOTE: The Keywords `parseImplementationNode` dispatches a Statement on,
-// plus the two that open a block of their own — `static` inside a Namespace
-// body and `implementation` around the whole Program.
+// NOTE: The Keywords offered where a Statement starts: the declaration and `if`
+// Keywords `parseImplementationNode` dispatches on, `match`, and the two that
+// open a block of their own, `static` inside a Namespace body and
+// `implementation` around the whole Program.
 const statementKeywords = [
 	"constant",
 	"variable",
@@ -241,11 +243,10 @@ const statementKeywords = [
 // already answered: it is offered by whatever declared it, the way every other
 // name in Scope is.
 //
-// NOTE: `start` and `complete` are Identifiers as well — they are Keywords
-// exactly where an Expression follows them — and they are offered here all the
-// same, for the reason the list declines to be careful anywhere else: a word
-// offered where it was wanted as a name is one the reader accepts and carries
-// on typing, since accepting it writes the same word either way.
+// NOTE: `start` and `complete` are Identifiers as well, and Keywords only where
+// an Expression follows them. They are offered all the same: a word offered
+// where it was wanted as a name is accepted and typed on, since accepting it
+// writes the same word either way.
 const expressionKeywords = [
 	"match",
 	"define",
@@ -1915,8 +1916,8 @@ function analyseCaseProbe(program: common.typed.Program): {
 				return
 			case "RecordValue":
 				// NOTE: Each member is read against the Type the position
-				// EXPECTS of it, exactly as a List's items are just above —
-				// the literal's own Type says what was written, which for a
+				// EXPECTS of it, exactly as a List's items are: the
+				// literal's own Type says what was written, which for a
 				// half-typed `#Sta` is an Error and no Choice at all. It is
 				// what gives a `#` standing as a member's value a Choice to
 				// offer, in a Case payload's default and in a body alike.
@@ -2489,13 +2490,11 @@ function isAtStatementStart(headText: string): boolean {
 // will not parse costs one Parser Diagnostic on the next keystroke; the
 // alternative is a second, approximate model of where each Keyword may stand,
 // which would be wrong in subtler ways.
-// NOTE: `start` and `complete` are added to the STATEMENT list rather than put
-// in it, because that list is what `parseImplementationNode` dispatches on and
-// neither word is one of those: a Statement opening with either is an ordinary
-// Expression Statement. Both are legal there all the same — `complete f()` at
-// Statement position analyses clean and `start f()` is the deliberate
-// Information — so a reader typing `comp` at the head of a line was being
-// offered nothing while the same prefix inside an Expression offered both.
+//
+// NOTE: `start` and `complete` are offered where a Statement starts as well. A
+// Statement opening with either is an ordinary Expression Statement, and both
+// are legal there: `complete f()` analyses clean and `start f()` is the
+// deliberate Information.
 function keywordCompletions(headText: string): Array<CompletionEntry> {
 	return (
 		isAtStatementStart(headText)
