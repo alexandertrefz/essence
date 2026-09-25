@@ -100,8 +100,8 @@ export function asynchronyMismatch(
 
 // NOTE: A structural walk over a Type, visiting each object it is built from
 // exactly once. Types are plain data, so walking them covers every shape —
-// including ones added later — without enumerating any, which is why the four
-// questions below are all asked this way.
+// including ones added later — without enumerating any, which is why the
+// questions asked of a whole Type are asked this way.
 //
 // A resolved Type is a DAG, though, not a tree: `type Nested = Box<Inner> |
 // Box<List<Inner>>` names the ONE `Inner` object from four places, its Type
@@ -516,12 +516,13 @@ export type NamespaceTarget = {
 // The pattern's Generics are alpha-renamed before the match, exactly as
 // `createFreshenedInference` does for a call's Parameters, and the bindings are
 // translated back afterwards. The rename itself is remembered per Namespace —
-// see `renamedNamespaceTarget`, which is where the reason one set of fresh names
-// serves every receiver is written down. Namespaces spell their Generics alike (`ItemType`
-// throughout the stdlib, `Item` in a Program) and Generic identity is by NAME,
-// so without the rename the pattern's bindable `ItemType` and the subject's
-// opaque one are a single symbol. Two things go wrong then, and both are why
-// this is one function rather than a rename each caller remembers:
+// see `renamedNamespaceTarget`, which is where the reason one set of fresh
+// names serves every receiver is written down. Namespaces spell their Generics
+// alike (`ItemType` throughout the stdlib, `Item` in a Program) and Generic
+// identity is by NAME, so without the rename the pattern's bindable `ItemType`
+// and the subject's opaque one are a single symbol. Two things go wrong then,
+// and both are why this is one function rather than a rename each caller
+// remembers:
 //
 //   • `List<List<ItemType>>` binds `ItemType` to a Type mentioning itself, reads
 //     as covering `List<ItemType>`, and the two targets tie in the specificity
@@ -530,10 +531,9 @@ export type NamespaceTarget = {
 //     from a `via<infer Item>(_ pair: { left: List<Item>, right: List<Item> })`
 //     binds `Item := List<Item>` off the FIRST member; the second re-checks
 //     `Item` against that binding, and chasing the name through itself never
-//     ends. On master that Program spun the Enricher for 363 million
-//     `matchGenericUse` turns and never returned. `isOpenBindable`'s occurs
-//     check is what makes any such binding terminate; the rename here is what
-//     keeps it from arising, so the Namespace is FOUND and the call resolves.
+//     ends. `isOpenBindable`'s occurs check is what makes any such binding
+//     terminate; the rename here is what keeps it from arising, so the
+//     Namespace is FOUND and the call resolves.
 export function bindNamespaceTarget(
 	pattern: NamespaceTarget,
 	subject: common.Type,
@@ -2169,10 +2169,8 @@ export function resolveUnknownSlots(
 		// its own Dictionary. An author who wants the proof in the slot annotates,
 		// which is the one place a Type is stated rather than inferred.
 		//
-		// This reverses the reading inherited from master, where a slot took the
-		// written Type whole. That reading was invisible while an undecided slot
-		// accepted everything; a slot that now refuses what does not fit it has to
-		// hold the Type the name can keep writing, not the Type one write proved.
+		// A slot refuses a write that does not fit it, so it has to hold the Type
+		// the name can keep writing, not the Type one write proved.
 		if (stored.type === "Unknown") {
 			return decidesAnUndecidedSlot(written)
 				? withoutRefinements(written)
@@ -2930,18 +2928,16 @@ function bindingCyclesBackTo(
 // NOTE: The occurs check is the whole rule, not just the `X := X` shape it was
 // first written for, and it is asked of the binding GRAPH — see
 // `bindingCyclesBackTo`. `Item := List<Item>` is the same collision one level
-// down —
-// a `namespace Pairing<infer Item> for { left: Item, right: Item }` reached from
-// a Function whose own Parameter is also spelled `Item`, over a receiver of
-// `{ left: List<Item>, right: List<Item> }`. The FIRST member records the
-// binding, the SECOND re-checks `Item` against it, and chasing `Item` through
-// `List<Item>` never ends: on master that program spun the Enricher for
-// 363 million `matchGenericUse` turns with flat memory and never returned. No
-// finite Type satisfies `Item = List<Item>`, so treating the Parameter as the
-// opaque symbol it was pinned to is both terminating and the honest reading; the
-// collision itself is kept from arising in the first place by alpha-renaming a
-// Namespace's Generics before its target is matched, and this is the backstop
-// that holds for every spelling, including ones no rule anticipates.
+// down — a `namespace Pairing<infer Item> for { left: Item, right: Item }`
+// reached from a Function whose own Parameter is also spelled `Item`, over a
+// receiver of `{ left: List<Item>, right: List<Item> }`. The FIRST member
+// records the binding, the SECOND re-checks `Item` against it, and chasing
+// `Item` through `List<Item>` never ends. No finite Type satisfies
+// `Item = List<Item>`, so treating the Parameter as the opaque symbol it was
+// pinned to is both terminating and the honest reading; the collision itself is
+// kept from arising in the first place by alpha-renaming a Namespace's Generics
+// before its target is matched, and this is the backstop that holds for every
+// spelling, including ones no rule anticipates.
 function isOpenBindable(
 	name: string,
 	context: GenericInferenceContext | null,

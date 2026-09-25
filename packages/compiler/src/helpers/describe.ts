@@ -1293,11 +1293,12 @@ export function booleanQuestionFor(type: common.Type): string {
 }
 
 // NOTE: What a Future or a Started IS, in the clause every report about a
-// forgotten `complete` opens with. Three reports say it now — a Type mismatch in
-// an ordinary position, one in return position, and a Method call on the
-// wrapper instead of on the value — and each of them goes on differently,
-// because what a reader should DO about it is different in each. What they must
-// not differ about is the state of the work, which is this.
+// forgotten `complete` opens with. Several reports say it — a Type mismatch in
+// an ordinary position, one in return position, a Method call on the wrapper
+// instead of on the value, and work standing where a value was wanted — and
+// each of them goes on differently, because what a reader should DO about it is
+// different in each. What they must not differ about is the state of the work,
+// which is this.
 export function asynchronyState(mismatch: AsynchronyMismatch): string {
 	return mismatch === "unstarted"
 		? "This describes work that has not run"
