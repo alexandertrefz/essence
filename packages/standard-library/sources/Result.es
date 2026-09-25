@@ -11,9 +11,9 @@ declarations {
 
 	§ Result is what a Method that can fail answers when the failure carries a
 	§ reason. An Optional says that there is nothing. A Result says why.
-	§ Otherwise the two are one shape, so every Method Optional offers over its
-	§ payload is offered here over the value. The names and the Argument labels
-	§ are the same.
+	§ Otherwise the two are one shape, so Optional's Methods over its payload
+	§ are offered here over the value, with the same names and Argument
+	§ labels. README.md names the few places where the two part.
 	§
 	§ The Cases are `#Value` and `#Failure`. Their payload members are `item`
 	§ and `reason`, and `#Value { item }` is Optional's Case spelled again. The
