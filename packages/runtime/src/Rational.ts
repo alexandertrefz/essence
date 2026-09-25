@@ -146,8 +146,8 @@ function createReducedRational(parts: BigRational): RationalType {
 
 // #region Arithmetic
 
-// NOTE: The four same-kind operations, each one cross-multiplication and one
-// reduction on the parts themselves. The Essence bodies they replace read
+// NOTE: The four same-kind operations, each a few products of the parts and
+// one reduction on the parts themselves. The Essence bodies they replace read
 // `numerator()` and `denominator()` off both operands — four Integers built
 // only to be unwrapped — did the same arithmetic through four more boxes, and
 // handed the parts to `Rational.of`, whose answer was UNREDUCED and charged its
@@ -292,12 +292,11 @@ export function raise__overload$3(
 
 // #endregion
 
-// NOTE: Exported for `getStringRepresentation` in `Terminal.ts` — the
-// no-Argument `toString` is written in Essence now, so the universal printer
-// renders a Rational off this helper rather than calling a native that no
-// longer exists. This is the STRUCTURAL form, and `Terminal.inspect` is the one
-// reader that asks for it: a whole Rational shows as `5/1`, because what
-// `inspect` shows is what a value IS.
+// NOTE: Exported for `getStringRepresentation` in `Terminal.ts`, which renders
+// a Rational off this helper. This is the STRUCTURAL form, which
+// `Terminal.inspect`, `Terminal.describe` and the test runtime's difference
+// ask for: a whole Rational shows as `5/1`, because what `inspect` shows is
+// what a value is.
 export function formatAsRational(rational: RationalType): string {
 	let parts = reducedParts(rational)
 
