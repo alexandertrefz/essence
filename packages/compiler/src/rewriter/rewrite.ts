@@ -867,11 +867,12 @@ function rewriteImplementationSection(
 
 // #region Statements
 
-// NOTE: One Statement in, the Statements it emits out — plural, because exactly
-// one shape needs two: a Variable Declaration whose value a lowered Match or a
-// lowered dispatch computes declares its name BEFORE the block that computes it,
-// so the name outlives the block. Every other Statement is one, and each of them
-// carries the Position of the Node it came from.
+// NOTE: One Statement in, the Statements it emits out — plural, because two
+// shapes emit more than one. A Variable Declaration whose value a lowered
+// Statement computes declares its name BEFORE the block that computes it, so the
+// name outlives the block; the other is a turn of a looped Function. Every other
+// Statement is one, and each of them carries the Position of the Node it came
+// from.
 function rewriteStatements(
 	node: common.typedSimple.ImplementationNode,
 ): Array<estree.Statement> {
@@ -5644,10 +5645,10 @@ function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
 
 // #region Lowered Statements
 
-// NOTE: The Statement half of the intrinsic family — a Match and a compiled
-// Union dispatch written where they stand, with the Function that used to hold
-// their Statements gone. `lower-matches-to-statements` is the one pass that
-// produces these, and everything below is what it means.
+// NOTE: The Statement half of the intrinsic family: a Match, a compiled Union
+// dispatch and an inlined loop written where they stand, with no Function
+// around their Statements. `lower-matches-to-statements` writes a Match's and a
+// dispatch's, and `inline-loops` a loop's.
 //
 // NOTE: Two Statements come out of exactly one shape: a Variable Declaration.
 // Its name has to outlive the block that computes its value, so the declaration
