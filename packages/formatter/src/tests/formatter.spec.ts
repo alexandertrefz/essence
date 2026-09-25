@@ -11,11 +11,13 @@ import {
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"
 
-// NOTE: Every `.es` source in the repository, which is what a formatter has to
-// survive before it is allowed anywhere near a source tree. The Diagnostic
-// showcase files are included deliberately: all but the ones in `REFUSED`
-// carry no Parser error at all and only fail later, so a formatter must handle
-// them like any other file.
+// NOTE: Every `.es` source in the standard library, the fixtures and the
+// examples, which is what a formatter has to survive before it is allowed
+// anywhere near a source tree. The client's own test Modules are not read.
+//
+// The Diagnostic showcase files are included deliberately: all but the ones in
+// `REFUSED` carry no Parser error at all and only fail later, so a formatter
+// must handle them like any other file.
 function corpus(): Array<{ name: string; filePath: string; source: string }> {
 	let files = readStdlibFiles().map((file) => ({
 		name: "stdlib/" + path.basename(file.filePath),
@@ -82,11 +84,10 @@ const CORPUS = corpus()
 
 // NOTE: The showcase files the formatter must REFUSE — every one of them
 // carries an error the Parser itself reported, and formatting a file the Parser
-// could not read whole is exactly what the gate is there to prevent. Four of
+// could not read whole is exactly what the gate is there to prevent. Some of
 // them genuinely do not parse; the rest parse and are refused all the same,
-// because a `default-on-function-literal`, a `shorthand-in-combination`, a
-// `shorthand-on-path-key`, a `test-outside-tests` and a malformed `\u{…}` are
-// errors like any other and the formatter asks only whether there were any.
+// because the Parser reports an error in each of them, and the formatter asks
+// only whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
