@@ -20,8 +20,9 @@ import { validate } from "../validator/index"
 // fixtures that reach an Essence-implemented Method AND a large runtime module
 // — both use `Number`, whose module drags in the numeric tower — and each
 // carried ~13 kB it never used before the change. Dictionary.es holds the
-// other side of the claim, the fourth prices one Method that reaches for it,
-// and the last holds the claim across a bundle of several Modules.
+// other side of the claim, the `removeDuplicates`, `mode` and `Http.get`
+// Programs price one call each, and the prelude test holds the claim across a
+// bundle of several Modules.
 //
 // NOTE: Every ceiling here is held about a kilobyte above the measurement and
 // moves in BOTH directions — a ceiling several kilobytes clear stops catching
@@ -158,8 +159,8 @@ describe("Bundle Size", () => {
 	// its own canonical term order. The Map that derived that order was a
 	// top-level call no bundler can prove pure, so every Program linked the
 	// module and the two series behind it whether it named a constant or not —
-	// which is what the floor below measures. A file that genuinely uses the
-	// tower pays these 67 for the shape that shakes.
+	// which is what the `HelloWorld.es` floor measures. A file that genuinely
+	// uses the tower pays these 67 for the shape that shakes.
 	//
 	// NOTE: 834 of those bytes are the four inequalities moving from
 	// `Orderable` to `Comparable`. A witness carries its Protocol's provided
@@ -417,8 +418,8 @@ describe("Bundle Size", () => {
 	// esbuild naming the imports of a larger module graph.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
-		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals
-		// it, which is where this file meets them.
+		// for; `Dictionary.of` walks a List of entry Records and seals it, which
+		// is where this file meets them.
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(63_900)
 	})
 
@@ -556,18 +557,18 @@ describe("Bundle Size", () => {
 	// NOTE: The same claim for a bundle of several Modules, where it is far
 	// easier to lose: rewriting each Module on its own would give every one of
 	// them its own copy of every Essence-implemented standard library Method it
-	// reaches, and the bundle would carry as many `Optional::otherwise` as there
-	// are Modules that call it. The Module fixtures reach two of them from two
-	// files each, so a per-Module prelude shows up here as four consts and as
-	// about a kilobyte.
+	// reaches. The Module fixtures reach `Rational::round` from two files, so a
+	// per-Module prelude shows up here as a second copy of it and of what it
+	// reaches.
 	//
 	// NOTE: Counted as well as measured. The count is what the claim actually
 	// IS — one const per Method, whatever it weighs — and it is taken against
 	// the ONE prelude Module rather than against itself, because a second copy
 	// would not be spelled alike: esbuild renames a colliding top-level name,
-	// so two `$es_List_sorted` become `$es_List_sorted` and `$es_List_sorted2`
-	// and a test that only deduplicated the names would pass. The ceiling
-	// catches a copy that arrives by some other route.
+	// so two `$es_Rational_isWholeNumber` become `$es_Rational_isWholeNumber`
+	// and `$es_Rational_isWholeNumber2`, and a test that only deduplicated the
+	// names would pass. The ceiling catches a copy that arrives by some other
+	// route.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
