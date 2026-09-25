@@ -21,10 +21,10 @@ declarations {
 	§
 	§ The body is positional where it runs the walk to its end, and labelled
 	§ `step` where it answers with a `Step`. That is how `List::reduce`
-	§ separates its own two entries. The label is the whole of the difference at
-	§ four of the counted entries. An earlier family labelled every body `step`,
-	§ so the counted early exit had no spelling at all. A callback's answer Type
-	§ is not what an Overload is chosen by.
+	§ separates its own two entries. The label is the whole of the difference
+	§ between the two entries of each count. An earlier family labelled every
+	§ body `step`, so the counted early exit had no spelling at all. A
+	§ callback's answer Type is not what an Overload is chosen by.
 
 	§§ Answers the State the loop settles on, or the answer a step stops with.
 	§§
