@@ -1206,9 +1206,24 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 			enrichedProgram = enriched.program
 			annotations = enriched.annotations
-		} catch {}
+		} catch (error) {
+			logInternalError(filePath, error)
+		}
 
 		return { program, enrichedProgram, annotations, index: null }
+	}
+
+	// NOTE: A Compiler throw that a request answers around without the typed
+	// Program. The log is the only place it shows; a stack's first line carries
+	// the message.
+	function logInternalError(filePath: string, error: unknown): void {
+		connection.console.error(
+			`essence: the Compiler threw while enriching ${filePath}: ${
+				error instanceof Error
+					? (error.stack ?? error.message)
+					: String(error)
+			}`,
+		)
 	}
 
 	// NOTE: A request that has to compile pays for the graph the WINDOW behind it
@@ -2118,6 +2133,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			// NOTE: The unmodified document, which every one of the three
 			// listings below the probe used to derive again for itself.
 			workspace.documentOf(filePath),
+			(error) => logInternalError(filePath, error),
 		)
 
 		return entries.map(toLspCompletionItem)

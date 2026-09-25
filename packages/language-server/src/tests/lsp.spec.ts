@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import {
 	existsSync,
 	mkdirSync,
@@ -35,7 +35,10 @@ import {
 } from "vscode-languageserver"
 import {
 	CodeActionRequest,
+	CompletionRequest,
 	HoverRequest,
+	LogMessageNotification,
+	MessageType,
 	RenameRequest,
 	WillRenameFilesRequest,
 } from "vscode-languageserver/node"
@@ -46,6 +49,7 @@ import {
 	findCodeActions,
 	isRequestedKind,
 } from "../codeActions"
+import * as compilation from "../compilation"
 import { type CompletionEntry, findCompletions } from "../completion"
 import { toLspDiagnostic, toLspRange, toRange } from "../conversion"
 import { findHover } from "../hover"
@@ -2202,6 +2206,110 @@ describe("LSP in a standard library source", () => {
 				fileName,
 				analyse(readFileSync(filePath, "utf-8"), filePath),
 			]).toEqual([fileName, []])
+		}
+	})
+})
+
+// NOTE: The Workspace holds nothing for a standard library source, so a request
+// over one enriches the document itself. A Compiler throw there degrades the
+// answer, and the throw has to reach the Server's log.
+describe("A Compiler throw while a request enriches a document", () => {
+	const source = [
+		"implementation {",
+		"\tconstant answer = 42",
+		"\tconstant doubled = ans",
+		"}",
+		"",
+	].join("\n")
+	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
+
+	// NOTE: Every enrichment through the Server's compilation seam throws while
+	// `run` is in flight and only then, so opening and settling the document
+	// are untouched.
+	async function withEnrichmentThrowing<Result>(
+		session: LspSession,
+		run: () => Promise<Result>,
+	): Promise<{ result: Result; errors: Array<string> }> {
+		let errors: Array<string> = []
+
+		session.client.onNotification(LogMessageNotification.type, (params) => {
+			if (params.type === MessageType.Error) {
+				errors.push(params.message)
+			}
+		})
+
+		let enrichment = spyOn(
+			compilation,
+			"enrichDocument",
+		).mockImplementation(() => {
+			throw new Error("the enrichment exploded")
+		})
+
+		try {
+			return { result: await run(), errors }
+		} finally {
+			enrichment.mockRestore()
+		}
+	}
+
+	it("should log the throw and still answer a Hover", async () => {
+		let session = startSession()
+
+		try {
+			await session.initialize([])
+			await session.open(stdlibPath, source)
+			await session.settle()
+
+			let { result, errors } = await withEnrichmentThrowing(
+				session,
+				async () =>
+					(
+						await session.request<unknown>(HoverRequest.type, {
+							textDocument: { uri: uriOf(stdlibPath) },
+							position: { line: 1, character: 11 },
+						})
+					).result,
+			)
+
+			expect(result).toBeNull()
+			expect(errors).toHaveLength(1)
+			expect(errors[0]).toContain(stdlibPath)
+			expect(errors[0]).toContain("the enrichment exploded")
+			expect(errors[0]).toMatch(/\n\s+at /)
+		} finally {
+			await session.dispose()
+		}
+	})
+
+	it("should log the throw and still offer the names in Scope", async () => {
+		let session = startSession()
+
+		try {
+			await session.initialize([])
+			await session.open(stdlibPath, source)
+			await session.settle()
+
+			let { result, errors } = await withEnrichmentThrowing(
+				session,
+				async () =>
+					(
+						await session.request<Array<{ label: string }>>(
+							CompletionRequest.type,
+							{
+								textDocument: { uri: uriOf(stdlibPath) },
+								position: { line: 2, character: 23 },
+							},
+						)
+					).result,
+			)
+
+			expect(result.map((item) => item.label)).toContain("answer")
+			expect(errors).toHaveLength(1)
+			expect(errors[0]).toContain(stdlibPath)
+			expect(errors[0]).toContain("the enrichment exploded")
+			expect(errors[0]).toMatch(/\n\s+at /)
+		} finally {
+			await session.dispose()
 		}
 	})
 })

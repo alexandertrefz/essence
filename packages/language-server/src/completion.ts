@@ -261,6 +261,9 @@ export function findCompletions(
 	documentPath?: string,
 	workspace: WorkspaceCompletions = { offers: [], namespaces: [] },
 	analysis: DocumentAnalysis | null = null,
+	// NOTE: Told of a Compiler throw the list is answered around, so the Server
+	// can log it.
+	onInternalError: (error: unknown) => void = () => {},
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
@@ -468,6 +471,7 @@ export function findCompletions(
 		documentPath,
 		workspace.offers,
 		document,
+		onInternalError,
 	)
 
 	// NOTE: Record member names and Argument labels are offered *alongside*
@@ -2009,6 +2013,7 @@ function scopeCompletions(
 	documentPath?: string,
 	offers: Array<WorkspaceOffer> = [],
 	document: DocumentAnalysis | null = null,
+	onInternalError: (error: unknown) => void = () => {},
 ): Array<CompletionEntry> {
 	// NOTE: The unmodified document, which is what the Workspace holds parsed,
 	// enriched and indexed. Derived here only for a caller that has no Workspace
@@ -2023,7 +2028,9 @@ function scopeCompletions(
 			enrichedProgram = enrichDocument(program, documentPath, {
 				tests: true,
 			}).program
-		} catch {}
+		} catch (error) {
+			onInternalError(error)
+		}
 	}
 
 	let { scopes } = document?.index ?? indexProgram(program, enrichedProgram)
