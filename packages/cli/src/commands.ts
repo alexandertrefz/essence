@@ -1,8 +1,9 @@
 // NOTE: Commands and their Options are described once, here, and everything
 // else is derived from that description: the parseArgs configuration, the help
 // screens, the "unknown option" suggestions and the shell-facing usage lines.
-// A flag that exists but is undocumented — or documented but unparsed — is not
-// possible by construction.
+// A flag that exists but is undocumented, or documented but unparsed, is not
+// possible by construction, except for a passthrough Command: its Options are
+// documented here and parsed by the tool it hands its arguments to.
 
 // NOTE: The same table is rendered under several names — the binary is
 // installed as `essence` and as `esc`, and user-facing text has to say the one
