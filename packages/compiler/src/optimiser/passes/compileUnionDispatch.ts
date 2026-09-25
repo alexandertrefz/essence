@@ -353,10 +353,10 @@ function holdPlan(
 		(_, index) =>
 			index === 0 || !isOverriddenEverywhere(branches, index - 1),
 	)
-	// NOTE: Nothing is written out where the chain is one untested branch: there
-	// is one place each operand is used and one order to use them in, so a name
-	// for it would say what the call already says. An operand no branch reads
-	// has no such place, so that stops being true of it.
+	// NOTE: Every read operand is written out where the chain is one untested
+	// branch: there is one place each operand is used and one order to use them
+	// in, so a name for it would say what the call already says. An operand no
+	// branch reads has no such place, so that stops being true of it.
 	let writesOperandsOut =
 		branches.length === 1 && branches[0]!.residual === null
 	let isHeld = operands.map((operand, index) => {
