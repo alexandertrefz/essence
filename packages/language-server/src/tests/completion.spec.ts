@@ -4,6 +4,9 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 
 import { canonicalPath } from "@essence-lang/compiler/documents"
+import { Lexer } from "@essence-lang/compiler/lexer"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import { lexer } from "@essence-lang/interfaces"
 
 import { buildCallSnippet } from "../callSnippets"
 import { findCompletions } from "../completion"
@@ -1671,8 +1674,39 @@ describe("Completion", () => {
 				"complete",
 				"true",
 				"false",
-				"nothing",
 			])
+		})
+
+		// NOTE: A word the Lexer reads as a name is written as an unknown name
+		// when accepted, and a Keyword the Parser refuses is reported where the
+		// word stands.
+		it("should offer only Keywords the Parser starts an Expression with", () => {
+			let head = "\tconstant value = "
+			let source = ["implementation {", head, "}"].join("\n")
+
+			let unparsed = keywordsOf(source, {
+				line: 2,
+				column: head.length + 1,
+			}).filter((keyword) => {
+				let reader = new Lexer()
+
+				reader.reset(keyword)
+
+				let refused = parseWithDiagnostics(
+					["implementation {", head + keyword, "}"].join("\n"),
+				).diagnostics.some(
+					(diagnostic) =>
+						diagnostic.position?.start.line === 2 &&
+						diagnostic.position.start.column === head.length + 1,
+				)
+
+				return (
+					reader.next()?.type === lexer.TokenType.Identifier ||
+					refused
+				)
+			})
+
+			expect(unparsed).toEqual([])
 		})
 
 		// NOTE: Both asynchrony words are legal at the head of a Statement —

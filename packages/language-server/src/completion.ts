@@ -245,7 +245,7 @@ const statementKeywords = [
 // exactly where an Expression follows them — and they are offered here all the
 // same, for the reason the list declines to be careful anywhere else: a word
 // offered where it was wanted as a name is one the reader accepts and carries
-// on typing, since accepting it writes the same eight characters either way.
+// on typing, since accepting it writes the same word either way.
 const expressionKeywords = [
 	"match",
 	"define",
@@ -253,7 +253,6 @@ const expressionKeywords = [
 	"complete",
 	"true",
 	"false",
-	"nothing",
 ]
 
 export function findCompletions(
