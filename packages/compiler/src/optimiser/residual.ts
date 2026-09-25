@@ -7,28 +7,25 @@ import type { common } from "@essence-lang/interfaces"
 // and at almost every site the Compiler already knows which of its branches can
 // be taken. The residual is the part it does not know.
 //
-// NOTE: It is asked by three places and computed in one: `compile-type-tests`
-// rewrites a Match Handler's check into it, `elide-final-match-test` asks
-// whether a Handler's check is decided by tags at all, and `compile-union-dispatch`
-// asks the same question of a dispatch case's member Type. One answer, so the
-// three can not drift apart — which matters, because two of them REMOVE a check
-// on the strength of what the third emits.
+// NOTE: Asked by several passes and computed here, once, because what a Matcher
+// can and can not accept is one reading of `isValueOfType`, and two readings
+// would be two chances to disagree with it:
 //
-// NOTE: And a fifth question, asked of the same rules by
-// `compile-record-members`: what is left of a check the three above could only
-// answer `descriptor` for. `recordMatcherTests` is that answer — the members of
-// a Record Matcher that a value's static Type does NOT already decide, which is
-// a decision tree rather than a residual and is therefore its own function
-// rather than a fourth `MatcherResidual`. The three above go on reading exactly
-// what they read before, which is what keeps the pass that emits the tree
-// something a reader can turn off on its own.
+//   - `compile-type-tests` rewrites a Match Handler's check into
+//     `matcherResidual`'s answer, and each of its member requirements into
+//     `matcherResidualOverMembers`'s;
+//   - `elide-final-match-test` asks `matcherResidual` whether a Handler's check
+//     is decided by tags at all;
+//   - `compile-union-dispatch` asks `matcherResidualOverMembers` the same of a
+//     dispatch case's member Type;
+//   - `compile-record-members` reads `recordMatcherTests`, the members of a
+//     Record Matcher its value's static Type does not already decide: a decision
+//     tree for a check the others answer `descriptor` for;
+//   - `prune-dead-match-arms` reads `matcherIsRefuted`, which proves a check
+//     false rather than reducing it.
 //
-// NOTE: A fourth pass asks the opposite question of the same rules —
-// `prune-dead-match-arms` reads `matcherIsRefuted` below, which proves a check
-// FALSE rather than reducing it. It is written here rather than beside that pass
-// for the same reason the three above share one function: what a Matcher can and
-// can not accept is one reading of `isValueOfType`, and two readings would be
-// two chances to disagree with it.
+// `elide-final-match-test`, `compile-union-dispatch` and `prune-dead-match-arms`
+// each remove a check on the strength of these answers.
 //
 // NOTE: Conservative in one direction only. Every rule here narrows a check the
 // runtime would have performed to a cheaper one that answers the same, and where
@@ -421,9 +418,8 @@ function costOf(test: MatcherMemberTest): number {
 // `prune-dead-match-arms` is what takes it out of the chain.
 //
 // NOTE: It is asked separately from `matcherResidual` rather than added to it as
-// a fourth answer, so that the three passes reading that function keep reading
-// exactly what they read before: a refuted Matcher still compiles to the test it
-// always compiled to, and the arm is dropped by the pass whose question this is.
+// a fourth answer, so that a refuted Matcher compiles to the same test as any
+// other and the arm is dropped only by the pass whose question this is.
 export function matcherIsRefuted(
 	matcher: common.Type,
 	valueType: common.Type,
@@ -540,20 +536,21 @@ function runtimeTagOf(type: common.Type): string | null {
 // A Function Matcher is left alone because callability, not a key, is what the
 // runtime asks of one.
 //
-// NOTE: A Record Matcher IS offered here, and the two rules above decide it the
-// same way they decide anything else. Its tag says only that the value is a
-// Record, so `checkIsTagAlone` refuses one naming any member at all and the tag
-// stands alone only for `{}`, the unit Type. What settles the rest is
-// `soleClaimantOf`: where exactly ONE member of what can arrive carries the
-// Record tag and that member implies the Matcher, every value reaching the test
-// either carries the tag and passes the whole check or carries another and fails
-// it before a member is read. `{ x: Integer, y: Integer } | String` is that
-// shape, and it is the common one — a Record beside Types of other kinds.
+// NOTE: A Record Matcher IS offered here, and `checkIsTagAlone` and
+// `soleClaimantOf` decide it the same way they decide anything else. Its tag
+// says only that the value is a Record, so `checkIsTagAlone` refuses one naming
+// any member at all and the tag stands alone only for `{}`, the unit Type. What
+// settles the rest is `soleClaimantOf`: where exactly ONE member of what can
+// arrive carries the Record tag and that member implies the Matcher, every value
+// reaching the test either carries the tag and passes the whole check or carries
+// another and fails it before a member is read. `{ x: Integer, y: Integer } |
+// String` is that shape, and it is the common one — a Record beside Types of
+// other kinds.
 //
 // NOTE: Two Records in one Union are NOT that shape: both claim the tag, so
 // there is no sole claimant, and what tells them apart is their members.
-// `compile-record-members` is what reads those, and `recordMatcherTests` below
-// is what decides which of them it may read.
+// `compile-record-members` is what reads those, and `recordMatcherTests` is
+// what decides which of them it may read.
 function lowerableTagOf(matcher: common.Type): string | null {
 	if (matcher.type === "Function") {
 		return null
@@ -651,10 +648,9 @@ function soleClaimantOf(
 // `isValueOfType` reads a value's members with it: a members map is an ordinary
 // JavaScript object, so `members["toString"]` finds a function on
 // `Object.prototype` for a Type that names no such member, and every rule here
-// would then be reasoning about a member the value need not carry. A Matcher
-// naming `toString` whose requirement is a Type Parameter was answered `always`
-// by `checkIsImplied` because of it, which is the answer two passes DROP a check
-// on.
+// would then be reasoning about a member the value need not carry: a Matcher
+// naming `toString` whose requirement is a Type Parameter would be answered
+// `always`, which is an answer a check is dropped on.
 export function declaredMemberOf(
 	members: Record<string, common.Type>,
 	name: string,
