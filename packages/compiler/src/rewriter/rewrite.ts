@@ -5205,8 +5205,6 @@ export function namespaceMemberName(name: string): string {
 	return forbiddenClassMemberNames.has(name) ? mangleName(name) : name
 }
 
-// NOTE: One member read, `computed` iff the key had to become a Literal — the
-// dotted form for every ordinary name, the bracketed one for the rest.
 // NOTE: A spine before the spines it is a prefix of, so a requirement about
 // `payload` is tested before one about `payload.origin` — the second reads
 // through what the first established. Sorted by depth rather than by text,
@@ -5217,6 +5215,8 @@ function shallowestFirst(spines: Array<string>): Array<string> {
 	)
 }
 
+// NOTE: One member read, `computed` iff the key had to become a Literal — the
+// dotted form for every ordinary name, the bracketed one for the rest.
 function memberRead(
 	object: estree.Expression,
 	name: string,
@@ -5270,7 +5270,6 @@ function callIsValueOfType(
 	value: estree.Expression,
 	matcher: common.Type,
 ): estree.CallExpression {
-	// TODO: Handle Record Types
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -5337,15 +5336,6 @@ function handlerTest(
 		test = callIsValueOfType(value, handler.matcher)
 	}
 
-	// NOTE: The member comparisons come after the Matcher's own check and
-	// rely on `&&` short-circuiting — that check is what guarantees the
-	// value is a Record carrying every member named here, so reading them
-	// is only safe once it has passed.
-	//
-	// A key is the DOTTED SPINE that reaches the member, so a Pattern that
-	// constrains a nested member by value — `{ origin as { x = 0 } }` — reads
-	// its way down. A member name can hold no dot, so splitting on one can not
-	// mistake anything else for a spine.
 	// NOTE: What a Case Matcher's payload Pattern requires of a member, tested
 	// behind the Matcher's own check and BEFORE any member comparison. The
 	// order is load-bearing rather than tidy: a value comparison may read down
@@ -5373,6 +5363,15 @@ function handlerTest(
 		}
 	}
 
+	// NOTE: The member comparisons come after the Matcher's own check and the
+	// member requirements, and rely on `&&` short-circuiting: those are what
+	// guarantee the value carries every member named here, so reading them is
+	// only safe once they have passed.
+	//
+	// A key is the DOTTED SPINE that reaches the member, so a Pattern that
+	// constrains a nested member by value — `{ origin as { x = 0 } }` — reads
+	// its way down. A member name can hold no dot, so splitting on one can not
+	// mistake anything else for a spine.
 	if (handler.memberLiterals !== null) {
 		for (let [path, literal] of Object.entries(handler.memberLiterals)) {
 			let read = path.split(".").reduce(memberRead, value)
