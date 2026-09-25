@@ -302,3 +302,30 @@ describe("Selection Ranges around start and complete", () => {
 		})
 	})
 })
+
+describe("Selection Ranges inside a Protocol-provided Method body", () => {
+	it("should widen from a name in the body out through the Method", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+			"\t\t\tconstant flipped = @::isAbove(mark)::negate()",
+			"\t\t\t<- flipped",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 6, column: 34 })).toEqual([
+			{ start: { line: 6, column: 34 }, end: { line: 6, column: 38 } },
+			{ start: { line: 6, column: 23 }, end: { line: 6, column: 39 } },
+			{ start: { line: 6, column: 23 }, end: { line: 6, column: 49 } },
+			{ start: { line: 6, column: 4 }, end: { line: 6, column: 49 } },
+			{ start: { line: 5, column: 11 }, end: { line: 8, column: 4 } },
+			{ start: { line: 2, column: 2 }, end: { line: 9, column: 3 } },
+			{ start: { line: 1, column: 1 }, end: { line: 10, column: 2 } },
+		])
+	})
+})

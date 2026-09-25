@@ -199,6 +199,34 @@ function collectFromNode(
 
 			return
 		}
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let signatures =
+					member.nodeType === "OverloadedProtocolMethod" ||
+					member.nodeType === "OverloadedStaticProtocolMethod"
+						? member.signatures
+						: [member.signature]
+
+				for (let { body } of signatures) {
+					if (body !== null && contains(body.position, cursor)) {
+						chain.push(body.position)
+
+						if (
+							!collectFromDefaults(
+								body.value.parameters,
+								cursor,
+								chain,
+							)
+						) {
+							collectFromBody(body.value.body, cursor, chain)
+						}
+
+						return
+					}
+				}
+			}
+
+			return
 		case "ChoiceDeclarationStatement":
 			// NOTE: A Case payload's `= { … }` is a span inside no body, like a
 			// Parameter's — without this, expanding a selection from inside one
