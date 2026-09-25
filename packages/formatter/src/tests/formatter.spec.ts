@@ -3247,10 +3247,6 @@ describe("formatter", () => {
 		})
 	})
 
-	// NOTE: What the anchor comparison in `format` exists for. Every bug it
-	// caught was one the AST comparison and a plain comment-text comparison
-	// both passed: each Comment present, in order, and the code meaning the
-	// same thing — only the Comments had moved.
 	// NOTE: `= { … }` at the end of a Case's payload shape — the second place a
 	// default is written, and the same gate protects it: the AST comparison
 	// carries `defaultValue`, so a printer that dropped one would refuse rather
@@ -3637,6 +3633,10 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: What the anchor comparison in `format` exists for. Every bug it
+	// caught was one the AST comparison and a plain comment-text comparison
+	// both passed: each Comment present, in order, and the code meaning the
+	// same thing — only the Comments had moved.
 	describe("the safety gate", () => {
 		it("holds every comment in place among the tokens around it", () => {
 			let source =

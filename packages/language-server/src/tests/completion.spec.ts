@@ -2106,9 +2106,6 @@ describe("Completion of a converted standard library Namespace", () => {
 	})
 })
 
-// NOTE: A label a call may leave out is still offered — the writer is being
-// shown what CAN be written — but it says so, and it sorts below the labels the
-// call still has to write.
 // NOTE: `cases` is declared by no Namespace — the Compiler derives it for a
 // Choice whose Cases carry no payload — so a listing built from the written
 // members alone would offer less than `Side.` answers. It is a static, and
@@ -2288,12 +2285,6 @@ describe("Completion of a Choice's derived Case listing", () => {
 	})
 })
 
-// NOTE: The other half of the same rail, and the half that answered with
-// nothing at all. A Protocol-bounded Type Parameter reads its members off the
-// Namespace the Enricher fabricates for the bound — `Kind.label()` and
-// `Item.is(a, b)` compile and run — and only `cases` was ever offered, because
-// the Case listing was the one real member a probe could be spelled with. The
-// NAME in front of the dot is read instead, which asks nothing of a member.
 // NOTE: The Editor asks "does this Namespace target that value" through the very
 // door the Enricher does, and this is the guard on THAT — see `targetTypeMatches`
 // in `../namespaces`. The receiver below is written in a Function Parameter
@@ -2329,6 +2320,10 @@ describe("Completion through a Parameter spelled like a Namespace's", () => {
 	})
 })
 
+// NOTE: A Protocol-bounded Type Parameter reads its members off the Namespace
+// the Enricher fabricates for the bound, so `Kind.label()` and `Item.is(a, b)`
+// compile and run. Completion reads the name in front of the dot, which asks
+// nothing of a member.
 describe("Completion of a Protocol-bounded Type Parameter", () => {
 	it("should offer a static the bound requires", () => {
 		let source = [
@@ -2540,6 +2535,9 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 	})
 })
 
+// NOTE: A label a call may leave out is still offered — the writer is being
+// shown what CAN be written — but it says so, and it sorts below the labels the
+// call still has to write.
 describe("Completion of a label a call may leave out", () => {
 	let source = [
 		"implementation {",

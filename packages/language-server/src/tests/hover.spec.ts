@@ -578,9 +578,6 @@ describe("Hover", () => {
 	})
 })
 
-// NOTE: The typed AST erases annotations — a resolved Type carries no Position
-// — so before the annotation index every one of these answered with the
-// enclosing declaration, whatever it was aimed at.
 // NOTE: A line's margins have no hover — its indentation, the blank after its
 // last character, a blank line — while a space BETWEEN two tokens belongs to
 // whatever spans them and answers as that.
@@ -624,6 +621,10 @@ describe("Hover in a line's margins", () => {
 	})
 })
 
+// NOTE: The typed AST erases annotations, since a resolved Type carries no
+// Position, so these are answered from the annotations the Enricher lists
+// beside the Program. Without them the enclosing declaration would answer,
+// whatever the cursor is aimed at.
 describe("Hover of Type annotations", () => {
 	it("should describe a Function's Parameter and return annotations", () => {
 		let source = [
