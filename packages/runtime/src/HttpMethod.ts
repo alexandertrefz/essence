@@ -8,8 +8,8 @@ import { typeKeySymbol } from "./type"
 //
 // NOTE: No shared instances, for the reason `Stream` keeps none. Nothing native
 // ANSWERS with a method — one only ever travels from a call site into
-// `Http.send` — so the singletons `Side` and `Ordering` keep for the natives
-// that answer them would have no caller here. The Compiler builds the value at
+// `Http.send` — so singletons like the ones `Ordering` keeps for the natives
+// that answer it would have no caller here. The Compiler builds the value at
 // the site that writes `#Get`, the way it builds any other payload-less Case.
 export type GetType = { [typeKeySymbol]: "HttpMethod#Get" }
 export type PostType = { [typeKeySymbol]: "HttpMethod#Post" }

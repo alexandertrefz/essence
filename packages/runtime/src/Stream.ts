@@ -8,9 +8,9 @@ import { typeKeySymbol } from "./type"
 //
 // NOTE: No shared instances, unlike `Side` and `Ordering`. Nothing native
 // ANSWERS with a Stream — a Stream only ever travels from a call site into
-// `write` — so the singletons those Choices keep for their `compare` Methods
-// would have no caller here. The Compiler builds the value at the site that
-// writes `#Output`, the way it builds any other payload-less Case.
+// `write` — so singletons like the ones `Ordering` keeps for its `compare`
+// Methods would have no caller here. The Compiler builds the value at the site
+// that writes `#Output`, the way it builds any other payload-less Case.
 export type OutputType = { [typeKeySymbol]: "Stream#Output" }
 export type ErrorType = { [typeKeySymbol]: "Stream#Error" }
 export type StreamType = OutputType | ErrorType

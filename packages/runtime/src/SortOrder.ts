@@ -4,9 +4,10 @@ import { typeKeySymbol } from "./type"
 // tags (`"SortOrder#Descending"`) exactly as user-declared Cases do, and `is`,
 // `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/List.es` declares the conformances beside
-// the Method that takes one). So nothing but the tags lives here. The Method
-// that READS a SortOrder belongs to the Namespace that declares it, which makes
-// `List.sort__overload$1`'s native the one place the tag is asked about.
+// the Method that takes one). So nothing but the tags lives here. The Methods
+// that READ a SortOrder belong to the Namespace that declares them, so its tag
+// is asked about by the `sort` and `isSorted` natives in `List.ts` and by
+// `sort` in `Dictionary.ts`.
 export type AscendingType = { [typeKeySymbol]: "SortOrder#Ascending" }
 export type DescendingType = { [typeKeySymbol]: "SortOrder#Descending" }
 export type SortOrderType = AscendingType | DescendingType
