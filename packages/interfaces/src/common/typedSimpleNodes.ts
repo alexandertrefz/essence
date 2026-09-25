@@ -1671,8 +1671,8 @@ export interface FunctionStatementNode {
 // not an Expression either. Where such an Expression stands in a Statement
 // position, none of that is needed: the Statements can simply be written.
 //
-// NOTE: `lower-matches-to-statements` is the one pass that produces these, and
-// what it needs to know is where the ANSWER goes — which is what `result` says.
+// NOTE: `lower-matches-to-statements` and `inline-loops` produce these, and what
+// each needs to know is where the ANSWER goes — which is what `result` says.
 // Nothing downstream may move one into an Expression position: these are
 // Statements, and a Statement is not an Expression here as it is not one in
 // JavaScript.

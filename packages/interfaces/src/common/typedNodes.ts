@@ -505,10 +505,11 @@ export type RecordValueNode = {
 // written value keeps the kind it is written as, and a refinement is erased
 // before emission, so `typedSimple`'s twins of these Nodes carry the kind alone.
 //
-// The four kinds a refinement may be written ON are the four that carry one:
-// `Integer`, `Rational`, `String` and an applied `List`. A written Boolean is
-// read by the admission table — it can stand as a written List's ITEM — and is
-// still never refined itself, because no `where` clause may be written on one.
+// The kinds a refinement may be written ON are the ones that carry one:
+// `Integer`, `Rational`, `String`, an applied `List` and an applied
+// `Dictionary`. A written Boolean is read by the admission table — it can stand
+// as a written List's ITEM — and is still never refined itself, because no
+// `where` clause may be written on one.
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
@@ -1197,11 +1198,11 @@ export interface FunctionDefinitionNode {
 	// line in its body is answered by nothing rather than by the whole thing.
 	headPosition: Position
 	// NOTE: Carried up from the Parser's own Node — this body writes a
-	// `complete` of its own, so it SUSPENDS. Three readers ask: the Enricher,
-	// which reads `<-` against the inner Type of the declared `Future<T>` rather
-	// than against the Future itself; the Validator, which holds the declaration
-	// to being a Future at all; and the Rewriter, which emits such a body as a
-	// Function returning `$future.of(async ($ctx) => …)`.
+	// `complete` of its own, so it SUSPENDS. The Enricher reads `<-` against
+	// the inner Type of the declared `Future<T>` rather than against the Future
+	// itself; the Validator holds the declaration to being a Future at all; and
+	// the Rewriter emits such a body as a Function returning
+	// `$future.of(async ($ctx) => …)`.
 	//
 	// NOTE: Absent rather than `false`, like the Parser's.
 	completing?: true

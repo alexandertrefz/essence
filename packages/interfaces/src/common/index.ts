@@ -700,7 +700,7 @@ export type StartedType = {
 // write `{ type: "Record", members }` out rather than spreading the Record they
 // came from, and the one that does spread clears the fields where it spreads.
 //
-// NOTE: Absent rather than empty, for the reason `UnionType.unitChoice` is: a
+// NOTE: Absent rather than empty, for the reason `CaseType.unitChoice` is: a
 // Type nothing named stays structurally what it was, which is what keeps
 // `matchTypes`' `lhs === rhs` fast path and the snapshot cache undisturbed.
 export type RecordType = {
@@ -833,7 +833,7 @@ export type Parameter = {
 	// Parameter Node the Declaration owns; what a caller may omit is all a
 	// Type needs to say.
 	//
-	// NOTE: Absent rather than `false`, like `UnionType.unitChoice`, so that
+	// NOTE: Absent rather than `false`, like `CaseType.unitChoice`, so that
 	// every Type that has no default stays structurally what it was — which is
 	// what keeps `matchTypes`' `lhs === rhs` fast path and the snapshot cache
 	// undisturbed.
