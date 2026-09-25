@@ -259,6 +259,8 @@ function symbolsOfNode(
 		case "Start":
 		case "Complete":
 			return symbolsOfNode(node.expression)
+		case "RefusedValue":
+			return symbolsOfNode(node.base)
 		case "Combination":
 			return [...symbolsOfNode(node.lhs), ...symbolsOfNode(node.rhs)]
 		case "RecordValue":
@@ -769,6 +771,9 @@ function collectDetail(
 		case "Start":
 		case "Complete":
 			collectDetail(node.expression, details)
+			return
+		case "RefusedValue":
+			collectDetail(node.base, details)
 			return
 		case "Combination":
 			collectDetail(node.lhs, details)

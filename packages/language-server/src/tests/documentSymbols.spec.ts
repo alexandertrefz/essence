@@ -600,3 +600,25 @@ describe("Document Symbols inside a Protocol-provided Method body", () => {
 		expect(detailOf(detailedSymbolsOf(source), "flipped")).toBe("Boolean")
 	})
 })
+
+describe("Document Symbols inside a refused value", () => {
+	let source = [
+		"implementation {",
+		"\tconstant kept = [1]::removeEvery(where (item) {",
+		"\t\tconstant inner = item::isGreaterThan(0)",
+		"",
+		"\t\t<- inner",
+		"\t})[0]",
+		"}",
+	].join("\n")
+
+	it("should list what a body in front of the brackets declares", () => {
+		expect(flatten(symbolsOf(source)).map((symbol) => symbol.name)).toEqual(
+			["kept", "inner"],
+		)
+	})
+
+	it("should put the inferred Type beside it", () => {
+		expect(detailOf(detailedSymbolsOf(source), "inner")).toBe("Boolean")
+	})
+})
