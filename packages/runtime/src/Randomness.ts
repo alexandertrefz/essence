@@ -46,7 +46,7 @@ type EntropyRandomnessType = {
 	seeded: false
 }
 
-// NOTE: sfc32 — four words of state, one shift and three adds per answer. It is
+// NOTE: sfc32 — four words of state, a few shifts and adds per answer. It is
 // chosen over a 64 bit generator because a bigint per draw costs a heap
 // allocation, and a property run draws hundreds of thousands of times. It
 // passes PractRand at the sizes a test run reaches, which is the whole of what
@@ -88,8 +88,8 @@ function scramble(state: number): { state: number; word: number } {
 // NOTE: A seed is a hexadecimal String — what `essence test` prints on a failure
 // and what `--seed` reads back — so the mapping from text to state has to be
 // exact and has to accept any text at all, since a reader can type one. Every
-// character is folded in, so two seeds that differ anywhere give two different
-// sources.
+// character is folded into a 32 bit FNV-1a hash, so two seeds that differ
+// anywhere almost certainly give two different sources.
 export function seedOf(text: string): number {
 	let hash = 0x811c9dc5
 
@@ -172,7 +172,7 @@ export function below(source: RandomnessType, bound: number): number {
 	// NOTE: A bound WIDER than a word has no whole multiple inside one, so the
 	// rejection below would reject every draw and loop for ever. `bigBetween`
 	// is the same rule over as many words as the span needs, and it is reached
-	// from `string(upTo:)`, whose bound is whatever a caller wrote.
+	// from `drawString(upTo:)`, whose bound is whatever a caller wrote.
 	if (bound > 4294967296) {
 		return Number(bigBetween(source, 0n, BigInt(bound) - 1n))
 	}
@@ -231,7 +231,8 @@ export function bigBetween(
 }
 
 // NOTE: A fraction in `[0, 1)` with 32 bits of resolution, for the weighted
-// choices the generator makes about shapes rather than about values.
+// coin the property runner tosses between a fresh case and a neighbour of one
+// it kept.
 export function fraction(source: RandomnessType): number {
 	return nextWord(source) / 4294967296
 }
@@ -383,9 +384,11 @@ function overDenominator(
 	return createRational(bigBetween(source, lowest, highest), denominator)
 }
 
-// NOTE: The alphabet a String is drawn from. It is ASCII plus four characters
-// that are not, because the assumptions a String Method breaks are about
-// combining marks, surrogate pairs and case folding rather than about letters.
+// NOTE: The alphabet a String is drawn from: ASCII plus four characters that
+// are not, because the assumptions a String Method breaks are not about
+// letters. `é` is one precomposed code point, `ß` changes length when its
+// case changes, `👋` is a surrogate pair and `🇩🇪` is one character of two
+// code points.
 const CHARACTERS = [
 	..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ",
 	"é",
@@ -426,8 +429,8 @@ export function drawString(
 
 // NOTE: One item of the List, each equally likely. The List is a
 // `NonEmptyList`, so the refinement is what promises there is one to answer
-// with; the fallback below is unreachable and is what TypeScript is told
-// instead, since a refinement erases before anything runs.
+// with; it erases before anything runs, so nothing here checks for an empty
+// List.
 export function pick__overload$1<ItemType extends AnyType>(
 	source: RandomnessType,
 	items: ListType<ItemType>,
@@ -470,9 +473,9 @@ export function pick__overload$2<ItemType extends AnyType>(
 	count: IntegerType,
 	items: ListType<ItemType>,
 ): ListType<ItemType> {
-	// NOTE: Read through `runsOf` rather than `viewOf`, because nothing here
-	// walks the whole receiver and `viewOf` writes its trimmed runs back. The
-	// front run is stored reversed, which is what the indexing below undoes.
+	// NOTE: Read through `runsOf` rather than `viewOf`, because the receiver
+	// is read once here and `viewOf` writes its trimmed runs back. The front run
+	// is stored reversed, which is what the indexing below undoes.
 	let view = runsOf(items)
 	let total = view.total
 	let wanted = Number(count.value)
