@@ -7386,6 +7386,50 @@ describe("Enricher", () => {
 				expect(alias.type).toEqual({ type: "Integer" })
 			})
 
+			// NOTE: A Namespace over the Alias targets the object the refusal
+			// rewrites into its base, so it answers for that base afterwards,
+			// through a receiver typed by the base or by the Alias alike.
+			it("should let a Namespace over a refused Alias answer for its base", () => {
+				let codes = [
+					`implementation {
+						constant limit = 10
+
+						type Small = Integer where @::isLessThan(limit)
+
+						namespace SmallOps for Small {
+							negated() -> Integer {
+								<- @::negate()
+							}
+						}
+
+						constant n: Integer = 3
+						constant x = n::negated()
+					}`,
+					`implementation {
+						constant limit = 10
+
+						type Holding = List<Integer> where @::contains(limit)
+
+						namespace HoldingOps for Holding {
+							size() -> Integer {
+								<- @::length()
+							}
+						}
+
+						function sizeOf(_ items: Holding) -> Integer {
+							<- items::size()
+						}
+					}`,
+				].map((source) =>
+					diagnosticsFor(source).map((diagnostic) => diagnostic.code),
+				)
+
+				expect(codes).toEqual([
+					["invalid-refinement-predicate"],
+					["invalid-refinement-predicate"],
+				])
+			})
+
 			// NOTE: A Matcher narrows by TYPE, and a refinement's predicate is
 			// not a runtime question — the emitted check could only ask about
 			// the base, and the arm would run for values the predicate refuses,

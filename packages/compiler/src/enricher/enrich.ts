@@ -40,6 +40,7 @@ import {
 import { exampleSuite, exampleTestsOf } from "./examples"
 import {
 	collectDerivedTypeNames,
+	forgetNamespaceTargets,
 	invalidateNamespacesInScope,
 	referencedTypeNames,
 	resolveChoiceDeclarationStatementType,
@@ -745,6 +746,10 @@ function poisonRefinementToBase(refinement: common.RefinementType): void {
 	}
 
 	Object.assign(record, base)
+
+	// NOTE: The object may already be a receiver or a Namespace target that
+	// Method resolution has indexed and answered for as a refinement.
+	forgetNamespaceTargets()
 }
 
 // NOTE: One declaration still waiting for a round, with the Scope it resolves and

@@ -8397,14 +8397,12 @@ function mergeCandidateBuckets(
 // carries per-call inference state.
 //
 // NOTE: Keyed by identity twice over, which is what makes it hit. The outer
-// key is the namespaces Map — `getAllNamespacesInScope` hands the same Map
-// object to every Scope in a subtree that neither declares nor shadows a
-// Namespace, so a whole file's invocations share one entry (`namespaceIndexes`
-// above already leans on exactly this). The inner key is the receiver Type,
-// where a fresh structural Type is a MISS that simply recomputes: the memo is
-// an optimisation, never a correctness requirement. Types are never mutated
-// after construction anywhere in the Enricher, which is what lets one be a key
-// at all.
+// key is the namespaces Map, which `getAllNamespacesInScope` shares across a
+// subtree; the inner key is the receiver Type, where a fresh structural Type
+// is a miss that recomputes. A receiver or a Namespace target changes in place
+// in two ways only: the fill writes a pending predicate, which no answer can
+// have read because reading one throws, and poisoning turns a refinement into
+// its base, which calls `forgetNamespaceTargets`.
 type TargetingAnswers = {
 	// NOTE: A Type whose whole identity is its tag can not be told apart from
 	// another of the same tag, so all of them share one answer — which is what
@@ -8438,6 +8436,14 @@ let namespacesTargetingMemos = new WeakMap<
 	Map<string, common.NamespaceType>,
 	TargetingAnswers
 >()
+
+// NOTE: Drops every candidate index and remembered answer. The index files a
+// Namespace by the kind of its target, so a target rewritten in place leaves
+// it in the wrong bucket as well as leaving the answers stale.
+export function forgetNamespaceTargets(): void {
+	namespaceIndexes = new WeakMap()
+	namespacesTargetingMemos = new WeakMap()
+}
 
 // NOTE: Which of the given Namespaces target `baseType`, in the order they were
 // given in. Separated from the Scope walk above because the graph-aware half of
