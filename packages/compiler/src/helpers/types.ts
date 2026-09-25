@@ -1354,7 +1354,7 @@ function signatureMatches(
 	return matchTypes(expected.returnType, actual.returnType, context, NESTED)
 }
 
-// #region Protocol Conformance
+// #region Type Walks, Proofs and Slots
 
 // NOTE: Whether a Type mentions a Generic anywhere in its tree. Types are
 // plain data, so a structural walk covers every shape — including ones added
@@ -1768,8 +1768,7 @@ export function canonicalPredicateConjuncts(
 // Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
 // walk that reads every field would call every bare `List` undecided. Only the
 // places a Type ARGUMENT can end up in are looked at — a List's items, a
-// Dictionary's keys and values, a Record's members, a Union's arms — which is
-// also what keeps a Choice's self-referential payload from looping.
+// Dictionary's keys and values, a Record's members, a Union's arms.
 export function typeContainsUnknown(type: common.Type): boolean {
 	switch (type.type) {
 		case "Unknown":
@@ -1825,10 +1824,10 @@ export function decidesAnUndecidedSlot(written: common.Type): boolean {
 // NOTE: The Type with every proof taken off it, however deep one sits — the
 // shape a decision is allowed to be. It enumerates the places a Type ARGUMENT
 // can stand, the same list `typeContainsUnknown` walks and for the same reason:
-// those are the positions a value's own Type reaches, and stopping there is what
-// keeps a Choice that names itself from looping. A Type holding no refinement at
-// all comes back as itself, so a decision that changes nothing is recognisable
-// by identity, which is how every caller here tells a pin from a no-op.
+// those are the positions a value's own Type reaches. A Type holding no
+// refinement at all comes back as itself, so a decision that changes nothing is
+// recognisable by identity, which is how every caller here tells a pin from a
+// no-op.
 function withoutRefinements(type: common.Type): common.Type {
 	switch (type.type) {
 		case "Refinement":
@@ -1878,9 +1877,9 @@ function withoutRefinements(type: common.Type): common.Type {
 
 			return stripped ? { type: "Record", members } : type
 		}
-		// NOTE: The name and the alias go with the arm they described, exactly as
-		// they do wherever else an arm is rebuilt — `NonEmptyList<String> | X` is
-		// not what a Union whose first arm is now a plain List is called.
+		// NOTE: The name and the alias go with the arm they described:
+		// `NonEmptyList<String> | X` is not what a Union whose first arm is now
+		// a plain List is called.
 		case "UnionType": {
 			let types = type.types.map(withoutRefinements)
 
@@ -2447,6 +2446,10 @@ function agreedDecisions(
 
 	return stored
 }
+
+// #endregion
+
+// #region Protocol Conformance
 
 // NOTE: A Simple requirement is fulfilled by a Simple Method or by the first
 // matching overload of an Overloaded one — mirroring how invocations resolve
