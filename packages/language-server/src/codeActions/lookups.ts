@@ -13,10 +13,11 @@ import { isSamePosition } from "../positions"
 import { programBodies } from "../sections"
 import { containsRange, isBefore } from "./geometry"
 
-// NOTE: Which Node of the Parser AST stands at — or around — a Position. The
+// NOTE: Which Node of the Parser AST stands at a Position, or around it. Most
 // finders a Quick Fix starts from ask the first question, since a Diagnostic
-// names the Node it was reported against; the two a refactoring starts from
-// ask the second, since a selection sits inside what it selects.
+// names the Node it was reported against. The ones a refactoring starts from
+// ask the second, since a selection sits inside what it selects, and so do the
+// Quick Fix finders whose Diagnostic is reported inside what they look for.
 
 export type Handler = parser.MatchNode["handlers"][number]
 
@@ -740,11 +741,11 @@ function genericsOf(
 	}
 }
 
-// NOTE: The smallest Node whose Position CONTAINS the range, where every
-// finder above matches a Position exactly. A Diagnostic names the Node it was
-// reported against and a SELECTION does not: what a reader drags over is a
-// span inside an Expression, or one that covers it and a little whitespace
-// besides, and what an extraction lifts is the Node around it.
+// NOTE: The smallest Node whose Position CONTAINS the range. A Diagnostic
+// names the Node it was reported against and a SELECTION does not: what a
+// reader drags over is a span inside an Expression, or one that covers it and
+// a little whitespace besides, and what an extraction lifts is the Node around
+// it.
 //
 // The last containing Node the walk reaches is the innermost one. A Node is
 // visited before the Nodes it holds, so a container is passed on the way in;
