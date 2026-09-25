@@ -422,8 +422,8 @@ function isOverriddenEverywhere(
 // `compile-type-tests` writes a Match Handler's check into, so a dispatch and a
 // Match ask the same question in the same way. The descriptor stands in an
 // Expression position for the same reason it does there: it is where
-// `pool-constants` can reach it, and a descriptor rebuilt per test, per turn of
-// whatever loop the call sits in, was the second thing it was paying for.
+// `pool-constants` can reach it, so it is not rebuilt per test, per turn of
+// whatever loop the call sits in.
 function testOf(
 	residual: MatcherResidual,
 	value: common.typedSimple.ExpressionNode,
