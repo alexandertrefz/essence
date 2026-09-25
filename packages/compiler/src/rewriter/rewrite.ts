@@ -4474,14 +4474,6 @@ function rewriteStringValue(
 	}
 }
 
-// NOTE: An interpolated String folds into one `String.createString(<concat>)`,
-// where the concatenation `+`-joins the text runs (plain JS string Literals)
-// with each hole rendered by its witness — `<witness>.toString(<hole>).value`,
-// the JS string the Printable conformance produces. The whole thing is string
-// concatenation because `segments` always begins with a text run (`""` when the
-// first thing written is a hole), so the fold starts from a Literal. No runtime
-// helper is added: this is the same `toString` call `List::join` makes at run
-// time, inlined per hole.
 // NOTE: What renders one hole — `<witness>.toString` read off the method map,
 // and the Method ITSELF where `devirtualise-witnesses` has already said which
 // one it is. This is the one emission site that consumes a witness rather than
@@ -4496,6 +4488,14 @@ function holeRenderer(
 	return memberRead(rewriteExpression(witness), "toString")
 }
 
+// NOTE: An interpolated String folds into one `String.createString(<concat>)`,
+// where the concatenation `+`-joins the text runs (plain JS string Literals)
+// with each hole rendered by its witness — `<witness>.toString(<hole>).value`,
+// the JS string the Printable conformance produces. The whole thing is string
+// concatenation because `segments` always begins with a text run (`""` when the
+// first thing written is a hole), so the fold starts from a Literal. No runtime
+// helper is added: this is the same `toString` call `List::join` makes at run
+// time, inlined per hole.
 function rewriteInterpolatedStringValue(
 	node: common.typedSimple.InterpolatedStringValueNode,
 ): estree.CallExpression {
@@ -5533,6 +5533,7 @@ function boundTagTest(
 // body is emitted as written; in a Statement position it is whatever the
 // Statement's own answer is, and the caller hands in a body that writes it
 // there.
+//
 // NOTE: A run of Statements rather than one, because a chain that asks about the
 // matched value's tag more than once binds it first — see `selfTagName`. The
 // callers splice them into the block they are already building, so the binding
