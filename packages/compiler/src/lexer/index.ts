@@ -145,7 +145,7 @@ const symbols = [
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 // NOTE: `\r` is here so a file with Windows line endings lexes as its Unix
 // twin — the `\n` alone is the line break, and the `\r` before it is never
-// part of an Identifier, a Number or a Comment. `﻿` is here for the
+// part of an Identifier, a Number or a Comment. `\uFEFF` is here for the
 // same reason: a byte order mark is invisible whitespace, not the first
 // letter of `implementation`.
 const whitespaces = [" ", "\t", "\r", "﻿"]
@@ -164,7 +164,7 @@ const backslashCode = "\\".charCodeAt(0)
 // answered by one table lookup on the character's code. `endsWord` is what
 // STOPS an Identifier or a Number — whitespace, the line break, a Symbol, and
 // the Comment and String sigils, which end an Identifier exactly as a Symbol
-// does — `isDigit` is what a Number keeps, and `isWhitespace` is what the
+// does — `isDigit` is what a Number keeps, and `isSpace` is what the
 // skipping loops eat.
 //
 // NOTE: Built from the same Arrays the constants above are, so the two
@@ -174,7 +174,7 @@ const isDigit = 2
 const isSpace = 4
 // NOTE: Hexadecimal is not a spelling the language has anywhere else — there is
 // no `0xFF` Number Literal, and `invalid-number` exists to say so — so this flag
-// is read by `readUnicodeEscape` and by nothing else.
+// is read by the `\u` escape readers and by nothing else.
 const isHexDigit = 8
 
 const characterClasses = new Uint8Array(128)
@@ -914,14 +914,6 @@ export class Lexer {
 
 	// #region Strings
 
-	// NOTE: A String Literal reads as one `LiteralString` Token when it holds no
-	// `{…}` hole, exactly as before. A hole makes it interpolated: the text before
-	// the first hole becomes a `LiteralStringStart` Token, each hole's own Tokens
-	// are lexed in place (by driving `lexToken`, so a nested String, Record or even
-	// a nested interpolation inside a hole needs no special case), the text between
-	// holes becomes `LiteralStringMiddle` and the text after the last hole becomes
-	// `LiteralStringEnd`. The head Token is returned; the rest are appended to
-	// `extra`, which the Lexer drains before it lexes anything more.
 	// NOTE: A String that never closes takes everything found inside it with
 	// it — the bad escapes, the Comments written in its holes, the Tokens its
 	// holes produced. It used to happen by itself, because all of that was
@@ -944,6 +936,15 @@ export class Lexer {
 		}
 	}
 
+	// NOTE: A String Literal reads as one `LiteralString` Token when it holds
+	// no `{…}` hole. A hole makes it interpolated: the text before the first
+	// hole becomes a `LiteralStringStart` Token, each hole's own Tokens are
+	// lexed in place (by driving `lexToken`, so a nested String, Record or even
+	// a nested interpolation inside a hole needs no special case), the text
+	// between holes becomes `LiteralStringMiddle` and the text after the last
+	// hole becomes `LiteralStringEnd`. The head Token is returned; the rest are
+	// appended to `extra`, which the Lexer drains before it lexes anything
+	// more.
 	protected lexStringChunks(extra: Array<Token>): Token {
 		let stringStart = this.cursor()
 		let stringStartOffset = this.index
@@ -1440,7 +1441,7 @@ export class Lexer {
 	// and where a `}` stands directly behind them the `{` alone was lost, so the
 	// whole of `\u1B}` is rewritten.
 	//
-	// The shape that is neither is the SURROGATE PAIR — `😀`, how
+	// The shape that is neither is the SURROGATE PAIR — `\uD83D\uDE00`, how
 	// JavaScript writes an astral character. Neither half names a character, so
 	// neither half has a rewrite of its own; the two together do, and that one
 	// escape is what the Help offers.
