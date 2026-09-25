@@ -239,7 +239,7 @@ export function guardEmptyAction(
 		isPreferred: false,
 		// NOTE: The arm goes first and the Guards follow in source order, so
 		// every Position is still measured against the text it was computed
-		// from — the same back-to-front rule every multi-edit fix here follows.
+		// from.
 		edits: [
 			...(arm === null ? [] : [arm]),
 			...guarded.map((handler) => ({
