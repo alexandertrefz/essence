@@ -1,10 +1,5 @@
 import type { parser } from "@essence-lang/interfaces"
 
-// NOTE: One binding a Pattern makes. `path` is the spine from the value being
-// taken apart down to what this name stands for, so `{ origin as { x } }`
-// gives `["origin", "x"]` and a Pattern's own `as` binder gives `[]` — the
-// value itself. `type` is what the source wrote for the member, where it wrote
-// anything: a bare `{ x }` leaves it null and takes its Type from the value.
 // NOTE: One step of a binding's spine, as the source wrote it — the member
 // Identifier and the Type annotation beside it, where there was one.
 //
@@ -18,6 +13,11 @@ export type PatternStep = {
 	type: parser.TypeDeclarationNode | null
 }
 
+// NOTE: One binding a Pattern makes. `path` is the spine from the value being
+// taken apart down to what this name stands for, so `{ origin as { x } }`
+// gives `["origin", "x"]` and a Pattern's own `as` binder gives `[]` — the
+// value itself. `type` is what the source wrote for the member, where it wrote
+// anything: a bare `{ x }` leaves it null and takes its Type from the value.
 export type PatternBinding = {
 	name: parser.IdentifierNode
 	path: Array<string>
