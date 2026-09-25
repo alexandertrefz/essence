@@ -69,7 +69,8 @@ export type TestsNode = TestNode | SuiteNode | ImplementationNode
 // `name` is the TEMPLATE rather than the rendering: the text as written, with
 // every interpolation reduced to `{name}` where it names something and `{}`
 // where it is worked out. `suitePath` holds the same for every enclosing suite,
-// outermost first. A table test appends its row index to this in phase 4.
+// outermost first. Every row of a table test shares this identity; each row's
+// key appends its row index as a last step (`testIdentityKey`).
 export type TestIdentity = {
 	// NOTE: Null where the Program is no Module, which is every single file
 	// compile — two files compiled apart have no path to tell them apart by.

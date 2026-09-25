@@ -10,9 +10,9 @@ import { closestMatch } from "../helpers/suggest"
 
 // #region Modifiers
 
-// NOTE: The three Modifiers phase 1 knows, in the order a Diagnostic lists
-// them. `across` and `for any` are not Modifiers: they take a body's shape
-// apart rather than annotating it, and they come after the Modifiers.
+// NOTE: The Modifiers, in the order a Diagnostic lists them. `across` and
+// `for any` are not Modifiers: they take a body's shape apart rather than
+// annotating it, and they come after the Modifiers.
 const MODIFIERS = ["focused", "skipped", "tagged"] as const
 
 // NOTE: The Modifiers that take bare names, which is what `regrouped` is about.

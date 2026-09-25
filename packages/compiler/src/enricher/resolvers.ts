@@ -388,14 +388,13 @@ function typeDeclarationNamesChoice(
 
 // NOTE: A generic Choice's Case payload, resolved with the Choice's Type
 // Parameters in scope so a member may mention them (`Done { value: Result }`).
-// The recursion restriction (decision e) is applied member by member and
-// syntactically: a member that names the Choice being declared would, when
-// substituted eagerly at a use site, never finish substituting, so it is
-// diagnosed and resolved to Error rather than to a real Type. This owns the
-// DIRECT self-naming of a generic Choice and nothing else — every other
-// recursive shape is caught before the hoist rounds by the cycle pre-pass in
-// `enricher/enrich.ts`, which reports `recursive-type-declaration` and leaves
-// this one shape alone.
+// The recursion restriction is applied member by member and syntactically: a
+// member that names the Choice being declared would, when substituted eagerly
+// at a use site, never finish substituting, so it is diagnosed and resolved to
+// Error rather than to a real Type. This owns the DIRECT self-naming of a
+// generic Choice and nothing else — every other recursive shape is caught
+// before the hoist rounds by the cycle pre-pass in `enricher/enrich.ts`, which
+// reports `recursive-type-declaration` and leaves this one shape alone.
 function resolveGenericCaseMembers(
 	payload: parser.RecordTypeDeclarationNode | null,
 	choice: parser.ChoiceDeclarationStatementNode,
@@ -2800,12 +2799,12 @@ type ScopeConformanceState = {
 	versions: Array<{ scope: enricher.Scope; version: number }>
 }
 
-// NOTE: Memoised per exact Scope, not per root Scope (R3): `where` conditions
-// are solved against whatever Namespaces are visible, and
-// `getAllNamespacesInScope` walks the parent chain — a function-local
-// Namespace is visible only in its own subtree, so two Scopes can legitimately
-// solve the same (Type, Protocol) differently. The Scope is constant down one
-// recursion tree, so the `inProgress` set still guards cycles within it.
+// NOTE: Memoised per exact Scope, not per root Scope: `where` conditions are
+// solved against whatever Namespaces are visible, and `getAllNamespacesInScope`
+// walks the parent chain — a function-local Namespace is visible only in its
+// own subtree, so two Scopes can legitimately solve the same (Type, Protocol)
+// differently. The Scope is constant down one recursion tree, so the
+// `inProgress` set still guards cycles within it.
 let conformanceStates = new WeakMap<enricher.Scope, ScopeConformanceState>()
 
 // NOTE: One Scope's visible Namespaces change over the course of enrichment as
@@ -3255,14 +3254,12 @@ function describeMember(
 	generics: Set<string>,
 	bindings: GenericBindings,
 	position: common.Position | null,
-	// NOTE: DECISION 3 — one rule for every derived composite: it asks its
-	// members. A member naming no Type Parameter used to be the end of the walk
-	// and is now the one place it can begin again: a `tag: Tag` compares by
-	// whatever `Tags` writes, a `children: List<Tag>` itemwise through that same
-	// `is`, and a `price: Money` through the Record routing one level down. The
-	// router answers the slot such a member's witness arrives in, or null where
-	// the member really is compared structurally — which is every member of
-	// every Choice that existed before this, so their descriptors do not move.
+	// NOTE: One rule for every derived composite: it asks its members. A member
+	// naming no Type Parameter is where the walk can begin again: a `tag: Tag`
+	// compares by whatever `Tags` writes, a `children: List<Tag>` itemwise
+	// through that same `is`, and a `price: Money` through the Record routing
+	// one level down. The router answers the slot such a member's witness
+	// arrives in, or null where the member really is compared structurally.
 	route: MemberRouter = () => null,
 ): common.DescriptorNode {
 	if (!typeMentionsGenerics(type, generics)) {
@@ -3720,11 +3717,11 @@ function describeMembers(
 	return described
 }
 
-// NOTE: DECISION 3, and it is the SAME rule one level down from a Record's: a
-// derived `is` asks the members its Cases declare. The Type Parameters keep the
-// slots their declaration order gives them, and every payload member that names
-// none — `tag: Tag`, `children: List<Tag>`, `price: Money` — takes the next slot
-// free where its own Type's conformance is not the structural one.
+// NOTE: The SAME rule one level down from a Record's: a derived `is` asks the
+// members its Cases declare. The Type Parameters keep the slots their
+// declaration order gives them, and every payload member that names none —
+// `tag: Tag`, `children: List<Tag>`, `price: Money` — takes the next slot free
+// where its own Type's conformance is not the structural one.
 //
 // `types` is the Type per slot AFTER the Parameters, in the order the walk met
 // them, which is the order the conditions are solved in and the order the hidden
@@ -3765,14 +3762,14 @@ function choiceMemberRouting(
 				report(ambiguity)
 			}
 
-			// NOTE: A member with NO conformance takes a slot too, and that
-			// is how decision 3's other half is refused in the words the rest
-			// of the language already uses: the slot becomes a bounded Generic
-			// pinned to the member's Type, and the ordinary conformance rail
-			// reports `unsatisfied-bound` about it at the call — which is
-			// exactly what a generic Choice handed a non-Equatable Type
-			// Argument has always done. The bounded rail refuses it one line
-			// later, where the condition fails to solve.
+			// NOTE: A member with NO conformance takes a slot too, and that is
+			// how it is refused in the words the rest of the language already
+			// uses: the slot becomes a bounded Generic pinned to the member's
+			// Type, and the ordinary conformance rail reports
+			// `unsatisfied-bound` about it at the call — which is exactly what
+			// a generic Choice handed a non-Equatable Type Argument has always
+			// done. The bounded rail refuses it one line later, where the
+			// condition fails to solve.
 			//
 			// NOTE: Two refusals are NOT that, and neither takes a slot. A
 			// refusal the solve REPORTED rather than described arrives with an
@@ -3872,10 +3869,9 @@ export function derivedEquatableDescriptorFor(
 
 // NOTE: A Choice's whole compile-time plan — the descriptor its runtime helper
 // follows and the Types whose witnesses fill the slots the descriptor names
-// beyond the Type Parameters. Null for a Choice with no Alias in scope, and for
-// a non-generic Choice whose payload routes NOTHING, which is every Choice that
-// existed before decision 3: such a Choice keeps emitting the flat `choiceIs`
-// and its witness stays the plain unconditional map.
+// beyond the Type Parameters. Null where no payload mentions a Type Parameter
+// and no payload member routes: such a Choice emits the flat `choiceIs` and its
+// witness stays the plain unconditional map.
 //
 // Both rails read it — the witness the bounded call is handed and the descriptor
 // the direct call emits — so the slots they agree about are agreed about here,
@@ -3894,8 +3890,7 @@ function choiceRouting(
 ): {
 	// NOTE: Null for a NON-generic Choice, which is a plain Union in the Type
 	// Scope and no Alias at all — `resolveChoiceDeclarationStatementType` only
-	// builds an Alias where there are Parameters to bind. Before decision 3
-	// nothing asked a non-generic Choice anything, so nothing noticed.
+	// builds an Alias where there are Parameters to bind.
 	alias: common.GenericAliasType | null
 	descriptor: common.DerivedEquatableDescriptor
 	routedTypes: Array<common.Type>
@@ -3947,8 +3942,7 @@ function choiceCasesOf(
 // NOTE: The same plan for a Choice that takes no Type Parameters: one entry per
 // Case tag, every member described with an empty Parameter set — so the only
 // node the walk can produce is `eq`, or the `w` the ROUTER puts in its place.
-// Before decision 3 this descriptor was always empty of witnesses and was never
-// built at all; it is built now exactly when the router found one.
+// It is kept only where the router found a member to route.
 function derivedEquatableDescriptorForCases(
 	cases: Array<common.Type>,
 	route: MemberRouter,
@@ -3989,8 +3983,8 @@ export function derivedEquatableNamespace(
 	// memoised, so every caller may pass its own — and the one funnel that does
 	// (`namespacesDeclaringMethod`) is the funnel Completion and Hover come
 	// through as well, which is what keeps what they list and what is emitted
-	// one answer rather than two. Null builds the Methods a Choice had before
-	// decision 3, for a caller that holds no Position at all.
+	// one answer rather than two. Null builds the Methods with no member routed,
+	// for a caller that holds no Position at all.
 	position: common.Position | null = null,
 ): common.NamespaceType | null {
 	let choiceType = choiceTypeOf(baseType, scope)
@@ -4033,13 +4027,13 @@ export function derivedEquatableNamespaceForChoice(
 	choiceType: common.Type,
 	declaredAlias: common.GenericAliasType | null = null,
 	typeArguments: Array<common.Type> = [],
-	// NOTE: DECISION 3 on the DIRECT rail. A payload member that routes needs
-	// its witness at the call, and the rail that carries one is the same rail a
-	// Type Parameter's rides: a Generic the invocation can not infer, pinned to
-	// the member's Type by its default and bounded by the Protocol. Invocation
-	// inference seeds the pin, `resolveConformances` solves it, and the witness
-	// lands in the slot the descriptor named — after the Parameters, because
-	// these Declarations stand after theirs.
+	// NOTE: Member routing on the DIRECT rail. A payload member that routes
+	// needs its witness at the call, and the rail that carries one is the same
+	// rail a Type Parameter's rides: a Generic the invocation can not infer,
+	// pinned to the member's Type by its default and bounded by the Protocol.
+	// Invocation inference seeds the pin, `resolveConformances` solves it, and
+	// the witness lands in the slot the descriptor named — after the
+	// Parameters, because these Declarations stand after theirs.
 	routedTypes: Array<common.Type> = [],
 ): common.NamespaceType {
 	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
@@ -4070,7 +4064,7 @@ export function derivedEquatableNamespaceForChoice(
 		}
 	}
 
-	// NOTE: R4 — a fresh bound list per Method, never the singleton Alias'
+	// NOTE: A fresh bound list per Method, never the singleton Alias'
 	// Declarations. Only the mentioned Parameters are bounded; an unmentioned
 	// one would stay unbound at inference and misreport as uninferable.
 	let boundGenerics: Array<common.GenericDeclaration> =
@@ -4470,8 +4464,8 @@ function derivedConformanceSource(
 
 	// NOTE: A generic Choice conforms only where each payload-mentioned
 	// Parameter's Type Argument does — solved recursively, in declaration order
-	// (R7) so the witnesses line up with the descriptor's `w` indices. Any
-	// failure withholds the derive, and the caller surfaces the because-chain.
+	// so the witnesses line up with the descriptor's `w` indices. Any failure
+	// withholds the derive, and the caller surfaces the because-chain.
 	let aliasGenerics = routing.alias
 	let genericNames =
 		aliasGenerics?.generics.map((generic) => generic.name) ?? []
@@ -5222,7 +5216,7 @@ function providedMethodNamespaceFor(
 					bindings,
 				) as common.SimpleMethodType),
 				// NOTE: A fresh Declaration per Method rather than one shared
-				// object — R4, the same rule the derived equality's bounds follow.
+				// object, the same rule the derived equality's bounds follow.
 				//
 				// The source's OPEN Parameters stand before the pin, so that a
 				// pin naming one (`List<ItemType>`, where no receiver has said

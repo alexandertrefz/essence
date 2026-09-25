@@ -5493,8 +5493,8 @@ function narrowedBy(
 	// NOTE: A Dictionary is counted in ENTRIES rather than items or characters,
 	// and `minimumLength`/`maximumLength` say exactly that about it — the field
 	// names are the narrowing's, and what a length is belongs to the Type. This
-	// is what lets slice 3's `NonEmptyDictionary` draw a Dictionary that holds
-	// something rather than draw and throw away.
+	// is what lets `NonEmptyDictionary` draw a Dictionary that holds something
+	// rather than draw and throw away.
 	if (
 		(base.type === "List" ||
 			base.type === "String" ||
