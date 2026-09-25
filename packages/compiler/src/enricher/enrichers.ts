@@ -13701,7 +13701,6 @@ function staticCallHelp(
 }
 
 // NOTE: One entry a refused call was measured against, as a report names it.
-// `signature` is what the Arguments were matched against and `receiverParameters`// NOTE: One entry a refused call was measured against, as a report names it.
 // `signature` is what the Arguments were matched against and `receiverParameters`
 // is how much of its front the call did not write: the receiver occupies the
 // first Parameter of every non-static Method signature, but a `::` call writes it
