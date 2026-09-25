@@ -278,11 +278,10 @@ export function endOfLine(lines: Array<string>, line: number): common.Cursor {
 
 // NOTE: Whether a span reads as a WHOLE written value: every bracket it opens
 // it closes, every String it opens it ends, and neither edge cuts a name in
-// half. What this is for is the fixes that DELETE what a span covers. A
-// Diagnostic the client echoed back may be a keystroke stale, and a span that
-// has slid by a column still reads as something — `{ a = 1 ` out of `Red = { a
-// = 1 }, Green`, or ` 4` out of `Red = 42` — so a deletion measured off one
-// takes a bracket the value never owned, or half a number, with it.
+// half. What this is for is the fixes that DELETE what a span covers. A span a
+// column off still reads as something, `{ a = 1 ` out of `Red = { a = 1 },
+// Green` or ` 4` out of `Red = 42`, and a deletion measured off one would take
+// a bracket the value never owned, or half a number, with it.
 //
 // Comments are stepped over rather than refused: a value written over several
 // lines may carry one, and what goes with the value goes with it.

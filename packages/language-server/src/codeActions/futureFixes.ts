@@ -34,9 +34,8 @@ export function declareFutureReturnAction(
 
 	let written = sliceOf(lines, definition.returnType.position).trim()
 
-	// NOTE: A Diagnostic the client echoed back may be a keystroke stale, and
-	// the annotation may already read the way this would write it — in which
-	// case there is nothing to offer rather than `Future<Future<Integer>>`.
+	// NOTE: Nothing is offered where the annotation is empty or already reads
+	// `Future<…>`, rather than `Future<Future<Integer>>`.
 	if (written === "" || written.startsWith("Future<")) {
 		return null
 	}

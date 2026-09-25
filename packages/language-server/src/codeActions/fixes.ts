@@ -188,17 +188,15 @@ export function unreachableCaseAction(
 // of several codes share it, since a misspelling reads the same wherever it
 // stands.
 //
-// The span is read off the buffer first, as everything here is. A Diagnostic a
-// client echoed back may be several keystrokes old and a span that has slid by
-// a column still lands on SOMETHING: `person.firstNme` answered on one writes
-// `personfirstNamee`, and `"Ada"::lenth()` writes `"Ada":lengthh()`. So what is
-// asked is that the span stand on a whole NAME — what it covers reads as one,
-// and neither neighbour is a character a name is made of. `_` is admitted at
-// the head of one, since a `@param _` line documents a Parameter with no label.
+// The span is read off the buffer first, as everything here is, and has to
+// stand on a whole name: what it covers reads as one, and neither neighbour is
+// a character a name is made of. `_` is admitted at the head of one, since a
+// `@param _` line documents a Parameter with no label.
 //
-// Which is not optional, precisely because this is preferred: an Editor applies
-// a preferred fix without asking, so the only thing between a stale span and
-// somebody's source is the check.
+// The Diagnostics a fix reads are those of the text handed in, and the check
+// holds all the same because this fix is preferred: an Editor applies it
+// without asking, and a span a column off would write `personfirstNamee` over
+// `person.firstNme`.
 const writtenName = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export function suggestionAction(
@@ -238,9 +236,9 @@ export function suggestionAction(
 // standing on a whole name, and it is preferred, because a misspelled member is
 // one edit and the reader can see it is the right one.
 //
-// Null where the name is no longer there. The analysis is fresh and the
-// Diagnostic may not be — a client echoes one back keystrokes later — and a
-// member the reader has since renamed is one this must not write over.
+// Null where no member of that name has its value at the Diagnostic's
+// Position, or the buffer does not read that name there as a whole one: a
+// preferred fix writes over nothing else.
 export function recordMemberAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
