@@ -8,8 +8,8 @@ import { walk } from "./lookups"
 // a mechanical answer and are written below; `unobserved-started` has none and
 // is the reason the NOTE at the bottom of this file exists.
 
-// NOTE: The Keyword each Node is written with, which is what the two fixes that
-// read the buffer back check the text against before cutting or naming it.
+// NOTE: The Keyword each Node is written with, which is what
+// `dropKeywordAction` checks the buffer against before cutting it.
 const keywords = { Start: "start", Complete: "complete" } as const
 
 // NOTE: `complete` in a body that declared something other than a Future. The
