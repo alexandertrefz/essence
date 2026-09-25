@@ -14,11 +14,12 @@ import {
 // with a written Namespace. The Rewriter recognises it and emits the runtime
 // helpers instead of a member read — there is no object anywhere with this name.
 //
-// NOTE: The five names live HERE, beside the two lists that read them, rather
-// than in the Enricher that fabricates them: the Rewriter's brand and the
-// Enricher's routing have to name the same Namespaces, and a name spelled twice
-// is two places that can disagree. `resolvers.ts` re-exports the three Choice
-// ones, so every site that imported them from there still does.
+// NOTE: The fabricated names live here rather than in the Enricher that
+// fabricates them, so that the Rewriter and the Enricher import one spelling:
+// the Rewriter's brand and the Enricher's routing have to name the same
+// Namespaces, and a name spelled twice is two places that can disagree.
+// `resolvers.ts` re-exports the three Choice ones, so every site that imported
+// them from there still does.
 export const derivedEquatableNamespaceName = "Choice_Equatable"
 
 // NOTE: The Namespace name the derived printing answers to, under the same rule
@@ -32,20 +33,16 @@ export const derivedPrintableNamespaceName = "Choice_Printable"
 // tags the Choice's Cases carry.
 export const derivedEnumerableNamespaceName = "Choice_Enumerable"
 
-// NOTE: And the two a Record answers to when its DECLARED members do not all
-// compare — or print — the way the universal structural walk does. A Record
-// whose members are all structural keeps naming the builtin `Record` Namespace
-// and emits exactly what it always did; only a Record that ROUTES a member
-// through that member's own conformance arrives under one of these, curried
-// with the routed member names and handed the member witnesses as its trailing
-// conformance Arguments. Unspellable from Essence for the same reason.
+// NOTE: Read nowhere. A Record that ROUTES a member through that member's own
+// conformance still arrives under the builtin `Record` Namespace, and the
+// Rewriter names the routing by the member list.
 export const recordEquatableNamespaceName = "Record_Equatable"
 
 export const recordPrintableNamespaceName = "Record_Printable"
 
-// NOTE: The Protocol a composite's members are asked about, named once for the
-// reason every other Protocol name here is: the routing rule is read in four
-// places and a typo in any of them would silently route nothing.
+// NOTE: The Protocol a composite's members are asked about, named once because
+// the routing rule reads it at several sites and a typo in any of them would
+// silently route nothing.
 export const equatableProtocolName = "Equatable"
 
 // NOTE: The standard library's own Namespaces whose `Equatable::is` is
@@ -73,10 +70,11 @@ export const equatableProtocolName = "Equatable"
 // through the witness instead of trusting an encoding that would call two of its
 // keys distinct.
 //
-// NOTE: `Record` is on the list and `Record_Equatable` is on NEITHER. The
-// builtin Namespace's `is` compares every member through `anyIs` whatever its
-// own Namespace writes, which is the structural rule; the routed witness asks a
-// member's own `is`, which by construction is one that is not.
+// NOTE: `Record` is on this list and not on the conditional one. The builtin
+// Namespace's `is` compares every member through `anyIs` whatever its own
+// Namespace writes, which is the structural rule; a Record that routes a member
+// arrives with that member's witness as a condition, and the member's own `is`
+// is by construction one that is not.
 export const structurallyEquatableNamespaces = new Set([
 	"String",
 	"Integer",
@@ -113,9 +111,9 @@ export const structurallyEquatableNamespaces = new Set([
 // `is` is structural under the same conditions but whose keys the runtime
 // encoder declines outright: spelling a Dictionary would make `Dictionary.ts`
 // and `keyEncoding.ts` a real cycle, and every `removeDuplicates` Program would
-// carry the store. And so is `Record_…` — a Record that ROUTES is conditional
-// on a member whose own `is` is by construction not the structural one, which is
-// the whole reason it routes.
+// carry the store. And so is a Record that ROUTES: it arrives as `Record` with a
+// condition, on a member whose own `is` is by construction not the structural
+// one, which is the whole reason it routes.
 //
 // The brand for such a Namespace is CONDITIONAL, and it is resolved where the
 // condition witnesses are: `boundConformance` reads it off the method map, asks
