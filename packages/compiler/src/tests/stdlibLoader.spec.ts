@@ -1997,9 +1997,8 @@ describe("Standard Library Loader", () => {
 				}
 			})
 
-			// NOTE: The other half of the invariant — where nothing is native the
-			// indices are the identity, which is the shape `loop`'s two bodied
-			// entries and every user-written `overload function` rely on.
+			// NOTE: The other half of the invariant: where nothing is native the
+			// indices are the identity.
 			it("numbers an all bodied block from one, in order", () => {
 				let stdlib = overloadFunction(["bodiedString", "bodiedBoolean"])
 

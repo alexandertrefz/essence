@@ -446,10 +446,9 @@ describe("Stdlib Call Graph", () => {
 	// no more a static call than a Function-typed Parameter's is.
 	//
 	// NOTE: The free Functions are in the same graph, which is what makes `loop`'s
-	// three bodied entries answerable for: two are written on the native
-	// primitive of their family and the third on one of those two, and a further
-	// entry written on a bodied one is a cycle two individually reasonable
-	// commits can close between them.
+	// bodied entries answerable for: each is written on one of the family's two
+	// natives or on another bodied entry, and an entry written on a bodied one is
+	// a cycle two individually reasonable commits can close between them.
 	it("has no cycle among the Essence-implemented Methods", () => {
 		let cycle = findCycle(
 			buildCallGraph(stdlibPrelude(), stdlibFreeFunctions()),
@@ -1153,9 +1152,8 @@ describe("Stdlib Call Graph", () => {
 	})
 
 	// NOTE: The free Functions, which are Nodes of the same graph. `loop`'s bodied
-	// entries are both written on the family's native `while`, so the real library
-	// draws no edge between two Nodes here yet — these fixtures are what answer
-	// for the day it does.
+	// entries are written on the family's natives and on each other; these
+	// fixtures hold each kind of edge on a library of their own.
 	describe("free Functions", () => {
 		// NOTE: Both directions across the boundary at once, which is what makes
 		// the shared graph worth having: a free Function's body reaching a Method,
@@ -1194,8 +1192,8 @@ describe("Stdlib Call Graph", () => {
 
 		// NOTE: The edge the acyclicity check was blind to until the free
 		// Functions became Nodes — one entry of an `overload function` block
-		// written on another, which is exactly how `loop`'s bodied entries are
-		// written on the family's native `while`.
+		// written on another, which is how `loop`'s bodied entries are written on
+		// the family's natives and on each other.
 		it("records an edge between two entries of one overload block", () => {
 			let graph = graphOf(`declarations {
 	§§ Combines a value with itself.

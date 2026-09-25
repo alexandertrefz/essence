@@ -2881,13 +2881,11 @@ describe("Code Generation", () => {
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
 			})
 
-			// NOTE: The free Functions share the ONE fixed point with the
+			// NOTE: The free Functions share the one fixed point with the
 			// Methods, so an edge that crosses between the two kinds has to be
-			// followed like any other. Driven over a synthetic library whose
-			// chain crosses the boundary twice — Method to free Function, free
-			// Function to free Function, free Function back to Method — because
-			// the real library's two bodied entries call a native `while` and
-			// nothing else, so it exercises no crossing edge at all yet.
+			// followed like any other. It is driven over a synthetic library
+			// whose chain crosses the boundary twice: Method to free Function,
+			// free Function to free Function, and free Function back to Method.
 			describe("free Functions", () => {
 				const crossing = `declarations {
 	§§ Doubles the value.
