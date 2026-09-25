@@ -676,8 +676,6 @@ declarations {
 			(
 				onFirst separator: String,
 			) -> Optional<{ leading: String, trailing: String }> {
-				§ `@` is read inside a Function literal below, so the
-				§ receiver is bound here first.
 				constant text = @
 
 				<- text::firstIndex(of separator)

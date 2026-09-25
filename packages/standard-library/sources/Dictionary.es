@@ -486,14 +486,10 @@ declarations {
 			<KeyType is Equatable>(
 				with other: Dictionary<KeyType, ValueType>,
 			) -> Dictionary<KeyType, ValueType> {
-				§ `@` is not the receiver inside a callback, so the Dictionary
-				§ the fold builds on is bound above it. See DEVELOPMENT.md,
-				§ Why bodies look the way they do.
-				§
-				§ The fold starts from `mine`, which is already a Dictionary
-				§ of the answer's Types. A `reduce` binds `Result` from
-				§ `startingWith`, and there is no empty Dictionary to write
-				§ down.
+				§ The fold starts from the receiver, which is already a
+				§ Dictionary of the answer's Types, and `reduce` binds `Answer`
+				§ from `startingWith`. See DEVELOPMENT.md, Why bodies look the
+				§ way they do.
 				constant mine = @
 
 				<- other
