@@ -329,12 +329,6 @@ const declarationKeywordTokenTypes = new Set([
 	TokenType.KeywordStatic,
 ])
 
-// NOTE: The six openings whose Declaration is HOISTED — the same list
-// `isHoistable` in the Enricher is written over, which is where the rule lives.
-// A run opening with one of them may have declared a name that was in scope
-// ABOVE its own line, so the silence it buys can not be bounded from above; a
-// `constant`, a `variable` or a `static` is in scope from its own line down and
-// nowhere else.
 // NOTE: Whether `cursor` stands inside `span`, inclusive of both ends.
 function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
 	let afterStart =
@@ -347,6 +341,11 @@ function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
 	return afterStart && beforeEnd
 }
 
+// NOTE: The openings whose Declaration is HOISTED — the same list `isHoistable`
+// in the Enricher is written over, which is where the rule lives. A run opening
+// with one of them may have declared a name that was in scope ABOVE its own
+// line, so the silence it buys can not be bounded from above; a `constant`, a
+// `variable` or a `static` is in scope from its own line down and nowhere else.
 const hoistableKeywordTokenTypes = new Set([
 	TokenType.KeywordFunction,
 	TokenType.KeywordOverload,
@@ -356,23 +355,6 @@ const hoistableKeywordTokenTypes = new Set([
 	TokenType.KeywordProtocol,
 ])
 
-// NOTE: The names a Statement the Parser abandoned would have declared, read
-// off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
-// about a name, which is every Statement that declares none and a few that do:
-// the point is to be RIGHT about the names it answers, never to answer about
-// all of them. A name this misses is a name read exactly as it always was.
-//
-// NOTE: A Method written in a Namespace body opens with its own name and a `(`,
-// which no Statement outside a Namespace does — a bare `name(…)` at the top
-// level is a call, and a call declares nothing. So the shape is only read as a
-// Declaration where it can be one: behind a `(`, and with no Keyword in front
-// of it that would have claimed the name itself.
-//
-// NOTE: A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
-// with it, and each of those is a name the rest of the file reads. They are
-// collected from the body's own level and no deeper — a `NAME(` one brace
-// further in is a CALL the body makes, and a name a body calls is a name this
-// has no business answering for.
 // NOTE: A Parameter is declared by the name in front of its `:`, and a
 // Parameter list goes down with the head it is written on — so `text` in
 // `function exclaimed(_ text: NonEmptyString)` is as undeclared as `exclaimed`
@@ -432,6 +414,23 @@ function abandonedRunOpensBody(tokens: Array<Token>): boolean {
 	)
 }
 
+// NOTE: The names a Statement the Parser abandoned would have declared, read
+// off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
+// about a name, which is every Statement that declares none and a few that do:
+// the point is to be RIGHT about the names it answers, never to answer about
+// all of them. A name this misses is a name read exactly as it always was.
+//
+// NOTE: A Method written in a Namespace body opens with its own name and a `(`,
+// which no Statement outside a Namespace does — a bare `name(…)` at the top
+// level is a call, and a call declares nothing. So the shape is only read as a
+// Declaration where it can be one: behind a `(`, and with no Keyword in front
+// of it that would have claimed the name itself.
+//
+// NOTE: A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
+// with it, and each of those is a name the rest of the file reads. They are
+// collected from the body's own level and no deeper — a `NAME(` one brace
+// further in is a CALL the body makes, and a name a body calls is a name this
+// has no business answering for.
 function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	let index = 0
 
@@ -517,10 +516,6 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
-// NOTE: Whether two Positions are written flush against each other, with
-// neither whitespace nor a line break between them. Some of the grammar reads
-// several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
-// tells that apart from the same Tokens written as separate things.
 // NOTE: The span a key was written across — the whole path where it is one,
 // and the name alone where it is not.
 function keyPosition(pair: {
@@ -550,6 +545,10 @@ function keysClash(left: string, right: string): boolean {
 	return longer.startsWith(`${shorter}.`)
 }
 
+// NOTE: Whether two Positions are written flush against each other, with
+// neither whitespace nor a line break between them. Some of the grammar reads
+// several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
+// tells that apart from the same Tokens written as separate things.
 function isAdjacent(left: common.Position, right: common.Position): boolean {
 	return (
 		left.end.line === right.start.line &&
@@ -557,11 +556,6 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// NOTE: What a reader wrote between a key and its value when they did not write
-// `=`. Only the two spellings other languages use are named — `:` and `->` —
-// because those are the ones somebody reaches for on purpose; every other Token
-// standing there is a Program that went wrong somewhere else, and claiming it
-// meant to write an entry would send the reader after the wrong edit.
 // NOTE: What a Dictionary entry is, said once for the three sites that say it.
 const dictionaryEntryNote =
 	"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
@@ -597,6 +591,11 @@ function writtenDictionaryKey(node: parser.ExpressionNode): boolean {
 	)
 }
 
+// NOTE: What a reader wrote between a key and its value when they did not write
+// `=`. Only the two spellings other languages use are named — `:` and `->` —
+// because those are the ones somebody reaches for on purpose; every other Token
+// standing there is a Program that went wrong somewhere else, and claiming it
+// meant to write an entry would send the reader after the wrong edit.
 function writtenSeparatorLexeme(
 	found: Token,
 	next: Token | undefined,
