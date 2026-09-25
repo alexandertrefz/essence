@@ -37,8 +37,8 @@ import {
 // #region The description
 
 export type Narrowing = {
-	// NOTE: Integer bounds, in digits — an Integer is a bigint at run time and
-	// no JSON number spells every one of them.
+	// NOTE: Integer bounds, in digits — an Integer beyond safe range is a
+	// bigint at run time, and no JSON number spells every one of them.
 	atLeast?: string
 	atMost?: string
 	notEqualTo?: Array<string>
@@ -1567,9 +1567,9 @@ function itemsOf(value: AnyType): Array<AnyType> {
 // answer a value of a shape the property was never asked about.
 export type EncodedValue =
 	| { kind: "boolean"; value: boolean }
-	// NOTE: Digits rather than a JSON number — an Integer is a bigint at run
-	// time and no JSON number spells every one of them. It is the same spelling
-	// `Narrowing.atLeast` is written in, for the same reason.
+	// NOTE: Digits rather than a JSON number — an Integer beyond safe range is
+	// a bigint at run time, and no JSON number spells every one of them. It is
+	// the same spelling `Narrowing.atLeast` is written in, for the same reason.
 	| { kind: "integer"; value: string }
 	| { kind: "rational"; numerator: string; denominator: string }
 	| { kind: "string"; value: string }
