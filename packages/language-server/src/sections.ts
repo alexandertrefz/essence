@@ -6,9 +6,9 @@ import { isSamePosition } from "./positions"
 // stands the `tests { … }` block, and inside it every test and every suite
 // opens a body of its own — so a request that walks `implementation.nodes` and
 // stops there answers about half a file. This is the ONE walk that reaches all
-// of them, and every feature in this Server goes through it: a Section added
-// here is a Section Hover, Rename, Completion and the rest reach on the same
-// day, rather than a walk per feature, each of which has to remember it.
+// of them, and nearly every feature in this Server goes through it: a Section
+// added here is a Section Hover, Rename, Completion and the rest reach on the
+// same day, rather than a walk per feature, each of which has to remember it.
 //
 // A Section is a body of Statements TOGETHER WITH the Scope it opens, because
 // the two questions are one question. The tests section is a CHILD Scope of the
