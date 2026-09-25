@@ -2232,9 +2232,8 @@ function simplifyAssertion(
 		node.nodeType === "ExpectStatement"
 			? ("expect" as const)
 			: ("require" as const)
-	// NOTE: Asked of the TYPED Node, before anything is simplified: the
-	// Simplifier mangles an overloaded Method's name in place, so `is` is only
-	// called `is` on this side of it.
+	// NOTE: Asked of the typed Node: the simplified one spells an overloaded
+	// `is` by its mangled name and passes the receiver as its first Argument.
 	let operands = comparedOperands(node.value)
 	// NOTE: What a failure UNDERLINES. For the Boolean form that is the whole
 	// asserted Expression; for `require MATCHER = EXPR` it runs from the
