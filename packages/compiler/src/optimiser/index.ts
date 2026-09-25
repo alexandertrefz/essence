@@ -73,9 +73,9 @@ export type OptimiserPass = {
 }
 
 export type OptimiserOptions = {
-	// NOTE: The whole phase, off — `--no-optimise`, and what a debug session
-	// will build with once the Debug Adapter compiles through here, so that
-	// what is stepped through is the Program as it was written.
+	// NOTE: The whole phase, off: `--no-optimise`, and what `essence dap`
+	// compiles a debug session with, so that what is stepped through is the
+	// Program as it was written.
 	enabled: boolean
 	// NOTE: The passes to skip, by registered name. An unknown name is refused
 	// by the command line rather than ignored here: a misspelt pass that
@@ -127,10 +127,9 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	compileUnionDispatch,
 	devirtualiseWitnesses,
 	lowerMatchesToStatements,
-	// NOTE: Straight after it, which is where the collapse it used to perform
-	// itself already stood: every pass that BUILDS an `essence-boolean` runs
-	// above, and every pass below reads a condition that is already the test it
-	// was built from.
+	// NOTE: After every pass that builds an `essence-boolean`, so that every
+	// pass after it reads a condition that is already the test it was built
+	// from.
 	unboxConditions,
 	inlineLoops,
 	buildListsInPlace,
@@ -239,8 +238,8 @@ export function optimise(
 	//
 	// NOTE: And the Namespaces are NOT computed on this path. Answering costs a
 	// deep walk of everything the Program holds, Types included, and the one
-	// pass that runs here does not read them — `esc dap` compiles every debug
-	// session this way.
+	// pass that runs here does not read them — `essence dap` compiles every
+	// debug session this way.
 	if (!options.enabled) {
 		return options.coverage === true &&
 			!options.disabledPasses.has(instrumentCoverage.name)
