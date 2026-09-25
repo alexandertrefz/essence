@@ -13,8 +13,8 @@ import {
 
 // NOTE: The product is `Rational`'s own rather than a second one, for the
 // reason `NonZeroInteger.ts` gives: a refinement erases before anything runs,
-// so both operands ARE `RationalType`s here and the answer is the same
-// cross-multiplication it always was. `multiply` is not an Overload in this
+// so both operands ARE `RationalType`s here and the answer is the same product
+// `Rational.ts` computes. `multiply` is not an Overload in this
 // Namespace, so it binds under the bare name. The numerator is the same read:
 // a Rational is zero exactly when its numerator is, and the receiver is proven
 // not to be, so the Integer `Rational.numerator` answers is a `NonZeroInteger`

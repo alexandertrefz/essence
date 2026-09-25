@@ -8,8 +8,8 @@ import { type RationalType, squareRoot__overload$1 } from "./Rational"
 
 // NOTE: The sum and the product are `Rational`'s own, for the reason
 // `NonZeroRational.ts` gives: a refinement erases before anything runs, so both
-// operands ARE `RationalType`s here and the answer is the same
-// cross-multiplication it always was. `add` is an Overload of two entries — a
+// operands ARE `RationalType`s here and the answer is the same arithmetic
+// `Rational.ts` does. `add` is an Overload of two entries — a
 // positive summand makes the sum positive, a non-negative one keeps it
 // non-negative — and both bind to the one sum, under the names their positions
 // give them. `multiply` is a lone entry and binds under the bare name.
