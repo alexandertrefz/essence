@@ -750,24 +750,6 @@ function foreignSyntaxRefusal(
 	return null
 }
 
-// NOTE: `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
-// its position in brackets, which is the one habit here that is a SHAPE rather
-// than a lexeme: every character of it is Essence, and what is foreign is that
-// one value stands flush in front of another.
-//
-// `receiver` is the value in front of the brackets as it was WRITTEN, where
-// that is a name or a path of them — `primes`, `box.items`, `@.items` — and
-// null where an Expression stands there instead. `key` is what was written
-// INSIDE them where that is a single value, and null where it is anything else.
-// The Helps put both back in front of the reader, and write a schematic name
-// where there is none to put.
-//
-// NOTE: No `essence-spelling`. Which Method reads an item is decided by the
-// receiver's TYPE — `item(at:)` for a List, `value(at:)` for a Dictionary,
-// `character(at:)` for a String — and the Parser knows no Types at all. A fix
-// that guessed one of the three would trade this refusal for an
-// `unknown-method` two thirds of the time, so the three are offered as Helps
-// and the reader picks the one they meant.
 // NOTE: The value in front of the brackets spelled back out, where it is a name
 // or a path of names — `primes`, `box.items`, `@.items`. Null for everything
 // else, which is every shape whose spelling the Parser does not hold: a call, a
@@ -790,6 +772,24 @@ function writtenReceiver(node: parser.ExpressionNode): string | null {
 	}
 }
 
+// NOTE: `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
+// its position in brackets, which is the one habit here that is a SHAPE rather
+// than a lexeme: every character of it is Essence, and what is foreign is that
+// one value stands flush in front of another.
+//
+// `receiver` is the value in front of the brackets as it was WRITTEN, where
+// that is a name or a path of them — `primes`, `box.items`, `@.items` — and
+// null where an Expression stands there instead. `key` is what was written
+// INSIDE them where that is a single value, and null where it is anything else.
+// The Helps put both back in front of the reader, and write a schematic name
+// where there is none to put.
+//
+// NOTE: No `essence-spelling`. Which Method reads an item is decided by the
+// receiver's TYPE — `item(at:)` for a List, `value(at:)` for a Dictionary,
+// `character(at:)` for a String — and the Parser knows no Types at all. A fix
+// that guessed one of the three would trade this refusal for an
+// `unknown-method` two thirds of the time, so the three are offered as Helps
+// and the reader picks the one they meant.
 function indexRefusal(
 	receiver: string | null,
 	key: { text: string; keyed: boolean } | null,
@@ -8861,10 +8861,6 @@ class DescentParser {
 		this.nestingDepth++
 	}
 
-	// NOTE: Reads a Function's body, which is never part of the test whose
-	// body it was written in — every Function block goes through here so that
-	// the one rule is stated in one place rather than at each of the four
-	// spellings a Function has.
 	// NOTE: Whether the `(` the reader is standing on opens a parameter list
 	// rather than a call: it does exactly when the `)` that closes it is
 	// followed by the `{` of a block, or by the `for` of a `for any (…)`.
@@ -8941,6 +8937,10 @@ class DescentParser {
 		}
 	}
 
+	// NOTE: Reads a Function's body, which is never part of the test whose
+	// body it was written in — every Function block goes through here so that
+	// the one rule is stated in one place rather than at each of the four
+	// spellings a Function has.
 	protected outsideTestBody<T>(parse: () => T): T {
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = false
