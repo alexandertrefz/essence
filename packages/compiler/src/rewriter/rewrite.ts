@@ -467,7 +467,7 @@ function rewriteModuleGraph(
 }
 
 // NOTE: The shared prelude, as its own Module: the runtime imports its consts
-// read, the consts themselves in the two bands `orderEssenceMembers` puts them
+// read, the consts themselves in the two bands `essenceMemberBands` puts them
 // in, and one export list naming every one of them. Every const is exported
 // whether or not anything imports it — esbuild shakes the unimported ones away,
 // and deciding here which are named would mean running the fixed point once per
@@ -1012,7 +1012,7 @@ function rewriteNamespaceDefinitionStatement(
 // Essence.
 //
 // NOTE: The member name is taken exactly as the Simplifier produced it, so an
-// Overload's const is named for N its position in the METHOD TYPE's Overloads,
+// Overload's const is named for its position in the METHOD TYPE's Overloads,
 // not among the bodied ones — a block that binds Overload 1 to the runtime and
 // writes Overload 2 in Essence emits `$es_X_m__overload$2`, and the native's
 // `X.m__overload$1` is untouched.
@@ -1109,7 +1109,7 @@ function rewriteNativeShim(
 }
 
 // NOTE: One Essence-implemented standard library Property, emitted as its own
-// top-level const — the value band's counterpart of `rewriteEssenceMethod`. A
+// top-level const — the value band's counterpart of `rewriteEssenceMember`. A
 // `static EMPTY: String = ""` becomes:
 //
 //   const $es_String_EMPTY = String.createString("")
@@ -1169,6 +1169,16 @@ export type EssenceMember = {
 	declaration: estree.VariableDeclaration | estree.FunctionDeclaration
 } & EssenceMemberReferences
 
+// NOTE: The two bands of `essenceMemberBands` as one list, the Function-valued
+// members first. Only the tests ask for it: the emitter needs the seam.
+export function orderEssenceMembers(
+	members: Map<string, EssenceMember>,
+): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
+	let bands = essenceMemberBands(members)
+
+	return [...bands.functions, ...bands.values]
+}
+
 // NOTE: The reachable members in the order they are emitted, in two bands.
 //
 // A Function-valued member — an Essence Method's const, a bodied free Function's
@@ -1198,20 +1208,12 @@ export type EssenceMember = {
 // and of that one only a Property written above it, which is what the Validator
 // refuses to let past — so every edge points backwards. This answers for the day
 // that changes, rather than for a mistake anyone has made yet.
-export function orderEssenceMembers(
-	members: Map<string, EssenceMember>,
-): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
-	let bands = essenceMemberBands(members)
-
-	return [...bands.functions, ...bands.values]
-}
-
-// NOTE: The same answer with the seam between the two bands still visible,
-// because one thing is emitted BETWEEN them: the pooled constants. A pooled
-// conformance witness reads the Function-valued consts, and a static Property's
-// value — which runs where its const is emitted — may read a pooled constant,
-// so the pool has to stand between what it reads and what reads it. Everything
-// that does not care asks `orderEssenceMembers` above and reads one list.
+//
+// NOTE: The two bands are handed back apart, because one thing is emitted
+// BETWEEN them: the pooled constants. A pooled conformance witness reads the
+// Function-valued consts, and a static Property's value — which runs where its
+// const is emitted — may read a pooled constant, so the pool has to stand
+// between what it reads and what reads it.
 export function essenceMemberBands(members: Map<string, EssenceMember>): {
 	functions: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
 	values: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
@@ -2040,7 +2042,7 @@ export function reachableEssenceMethods(
 // test that feeds it each shape directly.
 //
 // NOTE: Each shape also answers WHETHER this body evaluates what it names, which
-// is what `orderEssenceMembers` orders the value band by — see
+// is what `essenceMemberBands` orders the value band by — see
 // `EssenceMemberReferences`. A call evaluates its target, a Property read
 // evaluates the Property, and a Function this body only hands on does not.
 export function essenceMethodReferences(
