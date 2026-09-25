@@ -460,8 +460,8 @@ export function collectSites(
 }
 
 // NOTE: What a SPEC may reach in and change, and nothing a command line can
-// say. The per-mutant timeout is minutes long by design, and a spec that proves
-// a hang is caught has to be able to ask for one that is not — so the seam is a
+// say. `mutantTimeout` never answers under `MINIMUM_MUTANT_TIMEOUT`, and a
+// spec that proves a hang is caught asks for a shorter wait, so the seam is a
 // parameter of this Function rather than an Option or an environment variable,
 // which are both promises to a user that nobody wants to keep.
 export type MutationInternals = {
