@@ -137,11 +137,11 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: An overloaded native free Function (WP5) resolves at a call site to
-	// an `OverloadedStaticMethod` callee — the same shape a future `loop` has.
-	// Hover and Signature Help both render it through these, so they must spell
-	// every Overload without collapsing or crashing. Implementation mode cannot
-	// declare one, so the fixture is built by hand.
+	// NOTE: An overloaded free Function such as `loop` resolves at a call site
+	// to an `OverloadedStaticMethod` callee. Hover and Signature Help both
+	// render it through these, so they must spell every Overload without
+	// collapsing or crashing. Implementation mode cannot declare one, so the
+	// fixture is built by hand.
 	describe("Overloaded free Functions", () => {
 		let overloaded: common.OverloadedStaticMethodType = {
 			type: "OverloadedStaticMethod",

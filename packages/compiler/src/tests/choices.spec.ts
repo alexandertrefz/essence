@@ -28,8 +28,8 @@ import { compiles } from "./followedHelps"
 // the Rewriter emits for a derived equality, and the Optimiser answers a
 // comparison against a payload-less Case without reaching the Rewriter's
 // emission at all. Turning that one pass off is how the emission is asked
-// about directly; what the Optimiser does with it instead is pinned in
-// `optimiserPasses.spec.ts`.
+// about directly; what the Optimiser does with it instead is pinned under
+// `lower-unit-case-equality` in `optimiser.spec.ts`.
 function generate(
 	source: string,
 	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,

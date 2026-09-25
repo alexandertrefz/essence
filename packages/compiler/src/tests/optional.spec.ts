@@ -554,7 +554,7 @@ describe("Optional", () => {
 		it("binds the payload, and a Guard can name it", async () => {
 			// NOTE: The Guard resolves the binding into the `@.item` it stands
 			// for — a Guard runs in the Handler's test, before the body's
-			// constant exists. See `enrichCaseMatcherBinding`.
+			// constant exists. See `scopeLendingBindings`.
 			expect(
 				await run(`implementation {
 					constant stored: List<Optional<Integer>> = [#Empty, #Value(7)]
@@ -591,12 +591,12 @@ describe("Optional", () => {
 		})
 
 		it("names the receiver as written when the Arguments are wrong", () => {
-			// NOTE: `otherwise` is declared on the Namespace covering BOTH
-			// Cases, so a rejected Argument falls through to per-member
-			// dispatch — which is a second chance, not the failure worth
-			// reporting. Reporting the member said `for Optional#Value`, a Case
-			// the writer never mentioned, and spelled the Parameter as the
-			// Namespace's own `ItemType`.
+			// NOTE: `value` is declared on the Namespace covering both Cases,
+			// so a rejected Argument falls through to per-member dispatch,
+			// which is a second chance rather than the failure worth
+			// reporting. The report names the receiver as written, not an
+			// `Optional#Value` the writer never mentioned, and spells the
+			// Parameter as `Rational` rather than the Namespace's `ItemType`.
 			let diagnostics = diagnosticsOf(`implementation {
 				constant maybe: Optional<Rational> = #Empty
 

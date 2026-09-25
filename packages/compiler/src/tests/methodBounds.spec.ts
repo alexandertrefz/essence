@@ -140,8 +140,9 @@ describe("A per-Method bound on a Namespace's Type Parameter", () => {
 		).toEqual(["unsatisfied-bound"])
 	})
 
-	// NOTE: THE Program the campaign started from — `w_Hang.es`, which never
-	// left the Enricher on master. It must answer, and answer 2.
+	// NOTE: A generic Function whose Type Parameter is spelled like the
+	// Namespace's, reached through a bounded Method. It must answer, and
+	// answer 2.
 	it("answers through a generic caller spelling its Parameter alike", async () => {
 		expect(
 			await run(`implementation {

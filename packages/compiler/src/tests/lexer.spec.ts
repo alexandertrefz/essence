@@ -186,8 +186,7 @@ describe("Lexer", () => {
 
 		// NOTE: U+0000 is a Unicode scalar value like any other, so it is a
 		// character a Literal may name. Nothing downstream terminates on it:
-		// the emitted JavaScript writes it as `\0`, and `strings.spec.ts` in
-		// the compiler's test suite builds and runs a Program holding one.
+		// the emitted JavaScript writes it as `\0`.
 		it("should accept the null character", () => {
 			let lexer = new Lexer()
 

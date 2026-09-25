@@ -3077,18 +3077,10 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: A Generic member of an expected Union used to have one inference
-	// rule beyond the ordinary ones. `matchUnionRemainder` let it bind
-	// EVERYTHING the concrete expected members had not claimed, so an actual
-	// `MaybeInt | Rational` — `MaybeInt` a named Alias for `Integer | Nothing`
-	// — matched an expected `ItemType | Nothing` by handing the buried
-	// `Nothing` to the concrete member and binding
-	// `ItemType := Integer | Rational` from what was left over. It was written
-	// for exactly one call, `otherwise` on such a receiver, and it went with
-	// `Nothing` itself. What remains is the plain rule these pin: every actual
-	// member has to be taken by ONE expected member, and a Generic takes the
-	// whole member it binds to — which still binds a compound payload in one
-	// piece, as long as that payload is written as one member.
+	// NOTE: The rule these pin: every actual member of a Union has to be taken
+	// by one expected member, and a Generic takes the whole member it binds to,
+	// which still binds a compound payload in one piece as long as that payload
+	// is written as one member.
 	describe("matchesTypeWithBindings against a Union actual", () => {
 		const integer: Type = { type: "Integer" }
 		const rational: Type = { type: "Rational" }
@@ -3128,11 +3120,11 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: The direct counterpart of the deleted remainder rule. `Integer`
-		// binds `ItemType`, `Rational` then finds no expected member left that
-		// will take it, and the match fails — where the remainder rule would
-		// have collected both into `ItemType := Integer | Rational`. Written as
-		// ONE nested member, the very same pair still binds; see above.
+		// NOTE: A Generic does not collect the members no concrete member took.
+		// `Integer` binds `ItemType`, `Rational` then finds no expected member
+		// left that will take it, and the match fails rather than binding
+		// `ItemType := Integer | Rational`. Written as one nested member, the
+		// same pair binds in one piece.
 		it("should not spread a Generic over every member no concrete member took", () => {
 			expect(
 				matchesTypeWithBindings(

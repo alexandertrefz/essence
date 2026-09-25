@@ -8,8 +8,7 @@ import { parseWithDiagnostics } from "../parser/index"
 
 // NOTE: The writing rules the standard library's prose is held to, read off the
 // sources themselves. They are the ASD-STE100 *writing* rules — not its
-// dictionary, since the language's own terms are technical names — as agreed in
-// `plans/2026-08-18-stdlib-readability.md` (B2):
+// dictionary, since the language's own terms are technical names:
 //
 // - No sentence over 25 words, in a `§§` block or a `§` note.
 // - No em-dash aside inside a `§§` sentence. A tag's own separator is not one.
@@ -17,15 +16,14 @@ import { parseWithDiagnostics } from "../parser/index"
 // - No ALL-CAPS emphasis. An acronym is written in capitals and is allowed;
 //   a Type or Namespace name is CamelCase and never matches.
 //
-// A fifth check is about WHERE the prose stands rather than how it reads: every
+// Another check is about where the prose stands rather than how it reads: every
 // `choice` and every `type` alias here carries a `§§` block, because a `§` note
 // above one is read by the next editor of the file and by nobody who uses the
 // Type. It is guarded by a count of its own, since a scanner that matched
-// nothing would pass it silently.
+// nothing would pass it silently. A last check parses every `define` span a
+// block writes, so a reader can copy it.
 //
-// All four rules are live. The documentation pass (Phase 3 of the plan) took
-// every source to zero findings, and a source that breaks one of them again
-// fails here.
+// All four rules are live, and a source that breaks one of them fails here.
 //
 // `ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints what each rule finds,
 // per rule and per file, with the line each finding sits on.

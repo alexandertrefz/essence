@@ -7059,7 +7059,7 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A Program's own Namespace over a Rational is left exactly as
-		// written. What `Frac::isHalf` asks is the Program's question, and
+		// written. What `Frac::isBig` asks is the Program's question, and
 		// renaming it to Rational's own would say the standard library answers
 		// something it never declared.
 		it("should leave a Program's own Namespace over a Rational alone", () => {

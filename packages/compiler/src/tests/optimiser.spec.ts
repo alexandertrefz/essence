@@ -6600,7 +6600,7 @@ describe("Optimiser", () => {
 
 		it("walks on the same receiver and on another", async () => {
 			// NOTE: Two Methods of one Namespace. `sameReceiver` hands `@` on
-			// unchanged, so `_self` is not assigned at all; `otherReceiver`
+			// unchanged, so `_self` is not assigned at all; `total`
 			// walks a different value of the same Namespace, which is a self
 			// call with a new `@` — and inside a Match Handler `@` is the
 			// matched value, so the receiver is rebound through a slot.

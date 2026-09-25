@@ -39,8 +39,8 @@ import { acceptsAllAtRuntime, overlapsAtRuntime } from "../validator/index"
 // its Type does not declare. A wider Record is assignable to a narrower one and
 // the runtime's Record check is open, while the Validator's edges are written
 // on the members a Type declares — whether that width should be assignable at
-// all is a question `Discussion.md` still has open, and sampling it here would
-// restate that question instead of the agreement this file is about.
+// all is an open question, and sampling it here would restate that question
+// instead of the agreement this file is about.
 type Sample = { name: string; type: common.Type; values: Array<AnyType> }
 
 const integerType: common.Type = { type: "Integer" }

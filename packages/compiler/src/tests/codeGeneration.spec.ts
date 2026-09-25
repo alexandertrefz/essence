@@ -2170,10 +2170,8 @@ describe("Code Generation", () => {
 		// NOTE: The Union is spelled out by hand and `Item` is inferred from a
 		// second Parameter, because an argument that lands on the concrete
 		// member leaves `Item` unbound and the call is rejected as
-		// uninferable. This pair of tests used to reach the same shape through
-		// `items::firstItem()::toString()`, back when `Optional<Item>` was a
-		// Type Alias for `Item | Nothing`; `Optional` is a Choice now, so
-		// `toString` on it resolves statically to `$es_Optional_toString` and
+		// uninferable. An Optional would not do: it is a Choice, so `toString`
+		// on it resolves statically to the native `Optional.toString` and
 		// dispatches over nothing at all.
 		it("should dispatch a bounded Type Parameter member through the conformance parameter", async () => {
 			const source = `implementation {
@@ -2263,10 +2261,9 @@ describe("Code Generation", () => {
 	})
 
 	// NOTE: A standard library Namespace may be half native and half Essence.
-	// The prelude is what hides that from everything downstream: the runtime
-	// module is imported under `$native_<Name>` and spread into a const that
-	// carries the Namespace's own name, with the Essence-implemented Methods on
-	// top. `Boolean.isNot` was the first Method to have made the trip; it is
+	// The runtime module is imported under the Namespace's own name, and each
+	// Essence-implemented Method is a top-level const of its own beside it.
+	// `Boolean.isNot` was the first Method to have made the trip; it is
 	// `Equatable`'s provided Method now, and `Boolean.exclusiveOr` — the same
 	// `@::is(other)::negate()` under another name — stands for it here.
 	describe("Essence Method Names", () => {
