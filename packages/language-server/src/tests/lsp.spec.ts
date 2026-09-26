@@ -2069,9 +2069,9 @@ describe("LSP in a standard library source", () => {
 	// NOTE: A rename inside a standard library source is silently destructive
 	// — the edit reaches this document only, while the name is the binding a
 	// runtime export answers to and a `is …` clause may depend on. Renaming
-	// `exclusiveOr` to `xor` type-checks, emits no Diagnostic and produces a
-	// call to `undefined`; renaming `is` breaks the Equatable conformance and
-	// the loader throws for every Program compiled afterwards.
+	// `isPrime` to `prime` passes `essence check` and leaves a caller calling
+	// `undefined`; renaming `is` breaks the Equatable conformance and the
+	// loader throws for every Program compiled afterwards.
 	it("should refuse to rename anything in a standard library source", () => {
 		let { program } = parseDocument(source, stdlibPath)
 		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)

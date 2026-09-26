@@ -394,9 +394,9 @@ function propertyReadsIn(node: unknown): Array<string> {
 // idea of what a Node looks like.
 //
 // NOTE: The free Functions are collected the way `buildStdlibArtifacts` collects
-// the real ones — the copy before the Simplifier included, since it writes into
-// the Nodes it is handed. They can not be read off `stdlibFreeFunctions`, which
-// answers for the process-wide standard library rather than for this source.
+// the real ones, copy included. They can not be read off `stdlibFreeFunctions`,
+// which answers for the process-wide standard library rather than for this
+// source.
 function artifactsOf(source: string): {
 	prelude: Array<PreludeNamespace>
 	freeFunctions: Array<PreludeFreeFunction>

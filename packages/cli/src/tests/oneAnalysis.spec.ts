@@ -99,10 +99,9 @@ describe("one analysis", () => {
 	})
 })
 
-// NOTE: The finding this whole seam was built for. Three mistakes, one per
-// stage, in one file: the Enricher's `unknown-name` used to be the entire
-// report, and the two Validator Diagnostics above it took two more edit-and-
-// check rounds to find.
+// NOTE: Three mistakes in one file, from two stages: the Validator reports
+// `return-type-mismatch` and `missing-return`, the Enricher `unknown-name`, and
+// one run reports all three.
 describe("every stage in one run", () => {
 	let filePath = path.join(SHOWCASE_DIRECTORY, "Staged.es")
 

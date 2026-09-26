@@ -2832,10 +2832,10 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: A Choice's payload may name the Choice, so the Type under a memo key
-	// can lead back to itself — the same shape `eraseRefinements` rebuilds
-	// below. The serialisation walked such a Type without remembering what it
-	// was inside, so keying a conformance for one never returned.
+	// NOTE: The cyclic Types here are built by hand, since no Program can
+	// declare one: the Enricher refuses a Type declaration that names itself,
+	// so the serialisation's back-edge guard is defence. Keying a conformance
+	// for such a Type still returns, and tells two cycles apart.
 	describe("conformanceKey", () => {
 		function tree(): UnionType {
 			let union: UnionType = {
@@ -3892,15 +3892,12 @@ describe("Helpers", () => {
 				expect(eraseRefinements(program)).toBe(program)
 			})
 
-			// NOTE: A Choice's payload may name the Choice, so a Type can lead
-			// back to itself — `choice Tree { Node { weight: NonZeroInteger,
-			// children: List<Tree> } }` is legal and its Union IS a cycle. The
-			// one-pass form of this walk answered the cycle's back-edge with the
-			// original object before it knew the payload changed, so the
-			// refinement survived everywhere the back-edge reached and the
-			// Rewriter's ICE guard turned a legal Program into a compile
-			// failure. What the rebuilt graph must show: no refinement anywhere,
-			// and the SAME cycle — the back-edge wired to the replacement.
+			// NOTE: The Enricher refuses `choice Tree { Node { weight:
+			// NonZeroInteger, children: List<Tree> } }` as
+			// `recursive-type-declaration`, so its cycle is built by hand and
+			// the two passes are defence here. What the rebuilt graph must
+			// show: no refinement anywhere, and the SAME cycle, with the
+			// back-edge wired to the replacement.
 			it("should erase a refinement standing on a cycle", () => {
 				let union: common.UnionType = {
 					type: "UnionType",

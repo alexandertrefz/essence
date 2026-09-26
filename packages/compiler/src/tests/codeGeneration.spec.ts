@@ -2664,8 +2664,7 @@ describe("Code Generation", () => {
 
 		// NOTE: Simplifying and optimising the standard library for every file
 		// compiled would be paid once per file for an answer that can not
-		// differ — and the Simplifier writes into the Nodes it is handed, so a
-		// second pass over the same tree would mangle the names twice.
+		// differ.
 		it("builds the prelude once per process", () => {
 			expect(stdlibPrelude()).toBe(stdlibPrelude())
 		})
@@ -2909,10 +2908,9 @@ describe("Code Generation", () => {
 }`
 
 				// NOTE: The free-Function half of a synthetic prelude, built the
-				// way `buildStdlibArtifacts` builds the real one — the copy
-				// before the Simplifier included, since it writes into the Nodes
-				// it is handed. It can not be read off `stdlibFreeFunctions`,
-				// which answers for the process-wide standard library.
+				// way `buildStdlibArtifacts` builds the real one, copy included.
+				// It can not be read off `stdlibFreeFunctions`, which answers for
+				// the process-wide standard library.
 				function freeFunctionsOf(
 					source: string,
 				): Array<PreludeFreeFunction> {

@@ -287,13 +287,13 @@ describe("Builtins", () => {
 	})
 
 	// NOTE: The Enricher's tables promise a Method exists; the runtime module
-	// has to keep that promise. Nothing between the two stages checks it — a
-	// declared Method with no matching export type-checks, compiles, and then
-	// emits a call to `undefined`. `removeLast` shipped that way: declared with
-	// two overloads, implemented as one plain function, so every
-	// `list::removeLast()` was broken. The per-function unit tests missed it
-	// because they call the runtime directly, under the name it happens to
-	// have, rather than the name the Simplifier will ask for.
+	// has to keep that promise. A declared Method with no matching export
+	// passes `essence check`, and a Program that calls it calls `undefined` at
+	// run time. `removeLast` shipped that way: declared with two overloads,
+	// implemented as one plain function, so every `list::removeLast()` was
+	// broken. The per-function unit tests missed it because they call the
+	// runtime directly, under the name it happens to have, rather than the name
+	// the Simplifier will ask for.
 	//
 	// NOTE: The check runs in BOTH directions now that a standard library
 	// Method may be implemented in Essence rather than bound to the runtime. A

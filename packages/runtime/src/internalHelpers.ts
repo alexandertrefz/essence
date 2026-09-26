@@ -218,11 +218,9 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 			)
 		}
 		case "Transcendental": {
-			// NOTE: Transcendental.is is written in Essence now — it reads the
-			// `Number` Union's `is`, whose Transcendental/Transcendental cell
-			// is exact. Canonical forms make that the same answer as comparing
-			// the representation directly, which is what the deleted native
-			// did.
+			// NOTE: The test the native `Transcendental.is` makes: every
+			// component is held in canonical form, so two Transcendentals are
+			// equal when their rational parts and term lists agree.
 			const other = b as TranscendentalType
 
 			return (

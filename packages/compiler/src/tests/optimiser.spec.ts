@@ -5928,11 +5928,10 @@ describe("Optimiser", () => {
 			])
 		})
 
-		// NOTE: A Type graph that leads back into itself is what every
-		// structural walker in this stage carries a guard for. No source-level
-		// Program builds one — recursive Type declarations are refused — so the
-		// pass is asked directly, exactly as `pool-constants`' key serialiser
-		// is.
+		// NOTE: A Type graph that leads back into itself. No source-level
+		// Program builds one, since recursive Type declarations are refused, so
+		// the pass is asked directly, exactly as `pool-constants`' key
+		// serialiser is.
 		it("stops descending where a Matcher leads back into itself", () => {
 			let outer: common.RecordType = {
 				type: "Record",
@@ -7067,12 +7066,10 @@ describe("Optimiser", () => {
 			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "Record"/)
 		})
 
-		// NOTE: A Choice's payload may name the Choice, so the descriptor a
-		// compiled test embeds can lead back into itself — the shape every
-		// structural Type walker in the stage carries a guard for.
-		// `JSON.stringify` answered it by throwing, turning a legal Program into
-		// a compiler crash. No source-level Program builds one today (recursive
-		// Type declarations are refused), so the pass is asked directly.
+		// NOTE: A descriptor whose graph leads back into itself, built by hand:
+		// the Enricher refuses a Type declaration that names itself, so no
+		// Program builds one and the pass is asked directly. `serializeKey`
+		// answers the back-edge with a `<cycle:N>` marker.
 		it("keys a descriptor whose graph leads back into itself", () => {
 			function descriptorProgram(): common.typedSimple.Program {
 				let union: common.UnionType = {

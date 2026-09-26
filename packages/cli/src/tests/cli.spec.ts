@@ -1777,11 +1777,8 @@ describe("CLI on a Module graph", () => {
 	})
 
 	// NOTE: Both files built in one invocation, so the dependency's typed
-	// Program is the one the entry's graph holds. It may be emitted from twice
-	// and simplified once: the Simplifier writes an overloaded Method's mangled
-	// name onto the typed Node it read it off, and a second pass mangles it
-	// again into a Method nothing declares — which surfaced as a bundle
-	// importing a name the runtime does not export.
+	// Program is the one the entry's graph holds: it is emitted from twice, and
+	// the session simplifies it once.
 	it("emits a Module twice over without simplifying it twice", async () => {
 		await withModules(sharedDependency, async (directory) => {
 			let session = createCompileSession([

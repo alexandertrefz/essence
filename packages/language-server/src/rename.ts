@@ -370,8 +370,8 @@ export function isValidBindingLabelName(name: string): boolean {
 //     workspace index holds nothing for a standard library source.
 //   • the name IS the runtime binding. A body-less signature is bound to the
 //     export of the same name in `@essence-lang/runtime`, so renaming
-//     `exclusiveOr` to `xor` type-checks, emits ZERO Diagnostics and produces
-//     a call to `undefined` at run time.
+//     `isPrime` to `prime` passes `essence check`, draws only a bundler
+//     warning from `essence build`, and calls `undefined` at run time.
 //   • renaming a Method a `is …` clause depends on breaks the conformance, and
 //     the standard library loader then throws for EVERY Program compiled
 //     afterwards — the Editor would have bricked the compiler.
@@ -379,13 +379,13 @@ export function isValidBindingLabelName(name: string): boolean {
 // The Namespace's own NAME was already protected, since it resolves to a
 // builtin; its Methods, Parameters and local Type names were not.
 //
-// NOTE: What stands between a mis-bound native and a broken build is the
-// runtime-export cross-check in the Compiler's `src/tests/builtins.spec.ts`,
-// which drives `nativeBindings` against the real `@essence-lang/runtime`
-// modules in both directions and fails on renaming `exclusiveOr` to `xor`. It
-// is the last line of defence, since the standard library is only Essence
-// source, and it can only speak for Namespaces its `runtimeModules` table
-// names.
+// NOTE: The native contract and the Compiler's specs catch a mis-bound native.
+// `src/tests/natives.spec.ts` fails while the runtime's `natives.generated.ts`
+// lags the standard library, and once that file is regenerated tsc fails
+// unless each runtime module has the shape generated for it, such as
+// `IntegerNatives`. `src/tests/builtins.spec.ts` drives `nativeBindings`
+// against the real runtime modules in both directions, for the Namespaces its
+// `runtimeModules` table names. Renaming `isPrime` to `prime` trips each.
 export function findRenameableOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,
