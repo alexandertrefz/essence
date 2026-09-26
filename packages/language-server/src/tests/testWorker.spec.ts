@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
 import { canonicalPath } from "@essence-lang/compiler/documents"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import type {
 	TestWorkerData,
@@ -170,4 +171,54 @@ describe("The test Worker's staging directory", () => {
 		expect(stagedWhileRunning).toBe(true)
 		expect(existsSync(staging)).toBe(false)
 	})
+})
+
+// NOTE: In a child of its own, because a process's input is the one thing a
+// spec can not choose for itself. Over stdio it is the Server's LSP stream.
+describe("The test Worker's input", () => {
+	const readsAtLoad = [
+		"implementation {",
+		'\tconstant team = Terminal.readLine()::value(defaultingTo "nobody")',
+		"}",
+		"",
+		"tests {",
+		'\ttest "read {team}" {',
+		'\t\texpect team::is("nobody")',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("hands a Module that reads as it loads an empty input, whatever its process was piped", async () => {
+		let driver = [
+			'let { Worker } = await import("node:worker_threads")',
+			`let worker = new Worker(${JSON.stringify(workerPath)}, {`,
+			"\tstdout: true,",
+			"\tstderr: true,",
+			`\tworkerData: ${JSON.stringify({ staging: stagingDirectory() })},`,
+			"})",
+			'worker.on("message", (message) => {',
+			'\tif (message.kind === "ready") {',
+			`\t\tworker.postMessage(${JSON.stringify(runRequest(1, readsAtLoad))})`,
+			'\t} else if (message.kind === "entry") {',
+			"\t\tconsole.log(JSON.stringify(message.events.flatMap((event) =>",
+			'\t\t\tevent.kind === "test-pass" || event.kind === "test-fail"',
+			"\t\t\t\t? [`${event.kind} ${event.name}`]",
+			"\t\t\t\t: [],",
+			"\t\t)))",
+			'\t} else if (message.kind === "done") {',
+			"\t\tvoid worker.terminate()",
+			"\t}",
+			"})",
+		].join("\n")
+		let result = await spawnAndWait([process.execPath, "--eval", driver], {
+			input: "Tigers\n",
+			deadline: 30_000,
+		})
+
+		expect(result.stdout.trim()).toBe(
+			JSON.stringify(["test-pass read nobody"]),
+		)
+		expect(result.code).toBe(0)
+	}, 40_000)
 })

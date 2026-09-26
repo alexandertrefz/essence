@@ -54,6 +54,17 @@ let { staging } = workerData as TestWorkerData
 // under, so running a bundle again does not count toward `BUNDLE_LIMIT`.
 let loaded = new Set<string>()
 
+// NOTE: Descriptor 0 is the Server's input, which over stdio is the LSP stream.
+// Every test reads an empty input, and here so do a Module's own statements,
+// which run as its bundle loads and read through this Worker's `node:fs`.
+let fileSystem = process.getBuiltinModule("node:fs")
+let readSync = fileSystem.readSync as (...values: Array<unknown>) => number
+
+fileSystem.readSync = ((descriptor: unknown, ...rest: Array<unknown>) =>
+	descriptor === 0
+		? 0
+		: readSync(descriptor, ...rest)) as typeof fileSystem.readSync
+
 // NOTE: The bundle is named after its own hash, so sources this Worker compiled
 // before, such as a file run again unchanged or an edit undone, name a file it
 // already imported, and the run reuses that Module rather than loading another.
