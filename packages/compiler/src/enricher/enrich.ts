@@ -40,6 +40,7 @@ import {
 import { exampleSuite, exampleTestsOf } from "./examples"
 import {
 	collectDerivedTypeNames,
+	dropRefusedConditions,
 	forgetNamespaceTargets,
 	invalidateNamespacesInScope,
 	referencedTypeNames,
@@ -1701,6 +1702,18 @@ function hoistDeclarationsInner(
 	// it stands on.
 	rereadAliases(true)
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
+
+	// NOTE: After the final seeding, so that a condition is dropped only where
+	// its Protocol never arrives.
+	for (let unit of units) {
+		for (let node of unit.nodes) {
+			let type = hoistedTypes.get(node)
+
+			if (type?.type === "Namespace") {
+				dropRefusedConditions(type, unit.scope)
+			}
+		}
+	}
 
 	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
 	// in Scope: the back edges of the cycle resolve to Error silently, so what

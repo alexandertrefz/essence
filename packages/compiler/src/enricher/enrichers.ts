@@ -104,6 +104,7 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
+	dropRefusedConditions,
 	enclosingNamespaceOf,
 	enumerableMethodName,
 	findCaseTypesInScope,
@@ -2506,7 +2507,7 @@ function enrichInterpolatedStringValue(
 
 			if (!solved.ok) {
 				// NOTE: An empty chain means the failure was already reported
-				// (an Error-typed hole, an unknown Protocol) — stay silent to
+				// (an Error-typed hole, an ambiguity) — stay silent to
 				// avoid a cascade, exactly as `resolveConformances` does.
 				if (solved.chain.length > 0) {
 					let answer = interpolationAnswer(expression.type, scope)
@@ -20829,6 +20830,8 @@ export function resolveNamespaceDefinitionStatementType(
 			scope,
 			false,
 		)
+	} else {
+		dropRefusedConditions(resultType, scope)
 	}
 
 	return resultType

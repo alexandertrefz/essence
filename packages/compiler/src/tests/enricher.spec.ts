@@ -3003,6 +3003,35 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
+		// NOTE: A condition naming a Protocol nothing declares is refused at the
+		// Namespace and not carried, so a use site standing above the Namespace
+		// asks nothing of it either.
+		it("should stay quiet at a use site above a condition it refused", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Sized {
+					size() -> Integer
+				}
+
+				function measure <infer Item is Sized>(_ item: Item) -> Integer {
+					<- item::size()
+				}
+
+				constant measured: Integer = measure([1, 2])
+
+				namespace ListSized<infer ItemType> for List<ItemType>
+					is Sized where ItemType is Undeclared
+				{
+					size() -> Integer {
+						<- 2
+					}
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-protocol",
+			])
+		})
+
 		it("should solve a conditional conformance at a use site", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				constant ordered: List<Integer> = [3, 1, 2]::sort()

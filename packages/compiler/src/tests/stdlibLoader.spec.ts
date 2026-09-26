@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
 import type { common, enricher } from "@essence-lang/interfaces"
-import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
+import {
+	readStdlibFiles,
+	STDLIB_DIRECTORY,
+} from "@essence-lang/standard-library"
 
 import { collectDiagnostics } from "../diagnostics/index"
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
@@ -1350,6 +1353,37 @@ describe("Standard Library Loader", () => {
 
 		expect(load).toThrow(/use-before-declaration/)
 		expect(load).toThrow(/Constants\.BASE/)
+	})
+
+	// NOTE: `NumberList.es` imports `Comparable` only because its `@::sort()`
+	// calls are bounded by it. Without the entry, the call has to be refused
+	// with a Diagnostic, not emitted without its witness.
+	it("reports a bound whose Protocol the calling file does not import", () => {
+		let entry = '\tfrom "./Comparable.es" { Comparable }\n'
+		let sources = readStdlibFiles().map(({ filePath, sourceText }) => {
+			if (!filePath.endsWith("/NumberList.es")) {
+				return parseStdlibSource(filePath, sourceText)
+			}
+
+			expect(sourceText).toContain(entry)
+
+			return parseStdlibSource(filePath, sourceText.replace(entry, ""))
+		})
+
+		let message = ""
+
+		try {
+			loadStdlibFrom(sources)
+		} catch (error) {
+			message = error instanceof Error ? error.message : String(error)
+		}
+
+		expect(message).toContain("standard library failed to enrich")
+		expect(message).toContain("[unsatisfied-bound]")
+		expect(message).toContain(
+			"'Comparable' is declared in Comparable.es — import it here",
+		)
+		expect(message).not.toContain("internal-error")
 	})
 
 	// NOTE: Every Documentation a consumer can reach has to be sourceless — a

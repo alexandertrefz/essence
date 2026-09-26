@@ -14,6 +14,7 @@ import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
+import { analyseLinkedModules } from "../analysis"
 import { bundle, type ModuleSources } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
 import { loadModuleGraph, type Module } from "../modules/graph"
@@ -909,6 +910,20 @@ function linkedAt(
 	}
 
 	return module
+}
+
+// NOTE: One Module's Diagnostics once the whole graph has been analysed, which
+// is where the Validator has run over it too.
+function analysedAt(
+	directory: string,
+	entry: string,
+	name: string,
+): Array<common.Diagnostic> {
+	let analyses = analyseLinkedModules([
+		...linkProject(directory, entry).modules.values(),
+	])
+
+	return analyses?.get(path.join(directory, name)) ?? []
 }
 
 function codesOf(diagnostics: Array<common.Diagnostic>) {
@@ -2343,6 +2358,438 @@ export {
 						"Main.es",
 					).diagnostics[0]?.helps,
 				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: `measure` is bounded by `Sized`, and `IntegerSized` is what makes an
+	// Integer conform to it.
+	const sizedModule = `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	IntegerSized
+	Sized
+	measure
+}
+`
+
+	// NOTE: A call's witnesses are solved against the Protocols in the caller's
+	// Scope. `measure` is bounded by a Protocol `Main.es` never imported, so the
+	// call can not be given its witness and has to be refused.
+	it("refuses a call bounded by a Protocol the calling Module never imported", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+				let refusal = main.find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(codesOf(main)).not.toContain("internal-error")
+				expect(refusal?.message).toBe(
+					"Integer does not conform to 'Sized'",
+				)
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es — import it here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "import-declaration",
+					name: "Sized",
+					modulePath: path.join(directory, "Sized.es"),
+				})
+			},
+		)
+	})
+
+	// NOTE: Importing is not enough where the declaring Module keeps the
+	// Protocol private, so the Help asks for the export as well and no import
+	// is offered as a Quick Fix.
+	it("asks for the export of a bounding Protocol its Module keeps private", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule.replace("\tSized\n", ""),
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+				let refusal = main.find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(codesOf(main)).not.toContain("internal-error")
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	// NOTE: `Sized.es` is outside what `Main.es` reaches, so the Help and the
+	// Quick Fix read the same whichever entry the graph was loaded from.
+	it("names only the Modules the caller reaches as declaring the Protocol", () => {
+		withProject(
+			{
+				"Entry.es": `import {
+	from "./Other.es" { Sized }
+	from "./Main.es" { run }
+}
+
+implementation {
+	Terminal.inspect(run())
+}
+`,
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	function run() -> Integer {
+		<- measure(3)
+	}
+}
+
+export {
+	run
+}
+`,
+				"Other.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+}
+
+export {
+	Sized
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let answersFrom = (entry: string) =>
+					analysedAt(directory, entry, "Main.es").map(
+						(diagnostic) => [
+							diagnostic.code,
+							diagnostic.helps,
+							diagnostic.data,
+						],
+					)
+
+				expect(answersFrom("Entry.es")).toEqual(answersFrom("Main.es"))
+				expect(answersFrom("Entry.es")).toContainEqual([
+					"unsatisfied-bound",
+					["'Sized' is declared in Sized.es — import it here."],
+					{
+						kind: "import-declaration",
+						name: "Sized",
+						modulePath: path.join(directory, "Sized.es"),
+					},
+				])
+			},
+		)
+	})
+
+	// NOTE: A `where` condition is solved in the caller's Scope as well, so the
+	// Protocol it names has to be imported where `ListSized` is used.
+	it("refuses a call whose conformance has a condition the caller can not see", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerWeighed
+		ListSized
+		Sized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure([1, 2]))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace IntegerWeighed for Integer is Weighed {
+		weight() -> Integer {
+			<- @
+		}
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	IntegerWeighed
+	ListSized
+	Sized
+	Weighed
+	measure
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+				let refusal = main.find(
+					(diagnostic) =>
+						diagnostic.code === "unsatisfied-conformance-condition",
+				)
+
+				expect(codesOf(main)).not.toContain("internal-error")
+				expect(refusal?.message).toBe(
+					"List<Integer> does not conform to 'Sized'",
+				)
+				expect(refusal?.notes).toEqual([
+					"Integer does not conform to 'Weighed'.",
+					"A conformance is found through the Protocol it names, and 'Weighed' is not in scope here.",
+				])
+				expect(refusal?.helps).toEqual([
+					"'Weighed' is declared in Sized.es — import it here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "import-declaration",
+					name: "Weighed",
+					modulePath: path.join(directory, "Sized.es"),
+				})
+			},
+		)
+	})
+
+	// NOTE: `Main.es` declares the bound itself without importing `Sized`, which
+	// is `unknown-protocol` there. The refused bound asks nothing of the call.
+	it("stays quiet at a call to a Function whose bound its own Module refused", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { IntegerSized }
+}
+
+implementation {
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- 1
+	}
+
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["unused-import", "unknown-protocol"])
+			},
+		)
+	})
+
+	// NOTE: `Measure.es` bounds `measure` by a `Sized` it never imported, which
+	// is its own mistake to fix. `Main.es` reaches a `Sized` in another file,
+	// and a Help asking to import that one here would send the edit astray.
+	it("stays quiet about a call into a dependency that refused its bound", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Measure.es" { measure }
+	from "./Sized.es" { IntegerSized }
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Measure.es": `implementation {
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- 1
+	}
+}
+
+export {
+	measure
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Measure.es")),
+				).toEqual(["unknown-protocol"])
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["dependency-has-errors", "unused-import"])
+			},
+		)
+	})
+
+	// NOTE: The same for a `where` condition: `Sized.es` names a `Weighed` it
+	// never imported, and the condition it refused asks nothing of the call.
+	it("stays quiet about a conformance whose condition its Module refused", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		Sized
+		measure
+	}
+	from "./Weighed.es" { IntegerWeighed }
+}
+
+implementation {
+	Terminal.inspect(measure([1, 2]))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	ListSized
+	Sized
+	measure
+}
+`,
+				"Weighed.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	namespace IntegerWeighed for Integer is Weighed {
+		weight() -> Integer {
+			<- @
+		}
+	}
+}
+
+export {
+	IntegerWeighed
+	Weighed
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Sized.es")),
+				).toEqual(["unknown-protocol"])
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["dependency-has-errors", "unused-import"])
+			},
+		)
+	})
+
+	// NOTE: `Measure.es` bounds `measure` by `Sized` under its own local name,
+	// which is the name the call looks the Protocol up by. Refused, not emitted
+	// without its witness.
+	it("refuses a call bounded by a Protocol the callee imported under an alias", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Measure.es" { measure }
+	from "./Sized.es" {
+		IntegerSized
+		Sized
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Measure.es": `import {
+	from "./Sized.es" { Sized as Measurable }
+}
+
+implementation {
+	function measure <infer Item is Measurable>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	measure
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(codesOf(main)).not.toContain("internal-error")
+				expect(
+					main.find(
+						(diagnostic) => diagnostic.code === "unsatisfied-bound",
+					)?.message,
+				).toBe("Integer does not conform to 'Measurable'")
 			},
 		)
 	})

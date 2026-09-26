@@ -75,6 +75,7 @@ import {
 	declarationWasAbandoned,
 	memberDeclarationWasAbandoned,
 	modulePathOf,
+	protocolDeclarationsOf,
 } from "./scope"
 
 // NOTE: Type resolution: the Types written in annotations and signatures, the
@@ -2203,6 +2204,8 @@ export function resolveGenericDeclarations(
 			defaultType = resolveType(generic.defaultType, scope)
 		}
 
+		let constraint = generic.constraint?.content ?? null
+
 		if (
 			generic.constraint !== null &&
 			findProtocolInScope(generic.constraint.content, scope) === null
@@ -2232,13 +2235,16 @@ export function resolveGenericDeclarations(
 					),
 				},
 			)
+
+			// NOTE: Not carried, so that no call is refused over it a second time.
+			constraint = null
 		}
 
 		return {
 			name: generic.name.content,
 			infer: generic.inferred,
 			defaultType,
-			constraint: generic.constraint?.content ?? null,
+			constraint,
 		}
 	})
 }
@@ -5444,9 +5450,17 @@ export function solveConformance(
 
 	let protocol = findProtocolInScope(protocolName, scope)
 
-	// NOTE: An unknown Protocol was already diagnosed at the declaration.
+	// NOTE: A Protocol out of this Scope has no witness to give, and the
+	// culprit is what `missingConformance` answers with the import. A bound or
+	// condition refused where it is written is not carried, so it never asks.
 	if (protocol === null) {
-		return { ok: false, chain: [] }
+		return {
+			ok: false,
+			chain: [
+				`${describeType(binding)} does not conform to '${protocolName}'.`,
+			],
+			culprit: { type: binding, protocolName },
+		}
 	}
 
 	let key = conformanceKey(protocolName, binding)
@@ -5804,10 +5818,11 @@ function orderConditions(
 	)
 }
 
-// NOTE: What to say about a concrete Type with no conforming Namespace. Four
-// answers, because four different things are actually wrong, and the plain
+// NOTE: What to say about a concrete Type with no conforming Namespace. Five
+// answers, because five different things are actually wrong, and the plain
 // "declare a Namespace" is only the last of them:
 //
+// - The Protocol is not in this Scope, so the edit is an import of it.
 // - A bare Case binds the CASE. `namespace X for Colour#Red is Enumerable` does
 //   not parse and never will — a Namespace targets a Type, and one Case of a
 //   Choice is not one — so what the reader edits is the value's annotation.
@@ -5842,6 +5857,10 @@ function missingConformance(
 	// answer is the one outcome nobody wanted. The edit is the missing word.
 	describesWork?: true
 } {
+	if (findProtocolInScope(protocolName, scope) === null) {
+		return protocolOutOfScope(protocolName, scope)
+	}
+
 	// NOTE: A bare Case is typed as the CASE and not as its Choice, and no
 	// Namespace can target one — `namespace X for Colour#Red` does not parse —
 	// so the edit is one Type wider. WHICH edit depends on the Choice: where it
@@ -6258,8 +6277,17 @@ export function resolveConformances(
 		// caller Type Parameter spelled like a callee's was rewritten with it.
 		let binding = bound
 
-		// NOTE: An unknown Protocol was already diagnosed at the declaration.
+		// NOTE: No witness can be solved without the bound's Protocol, so a call
+		// that can not see it is refused. A bound refused where it is written is
+		// not carried, and asks nothing of the call.
 		if (findProtocolInScope(generic.constraint, scope) === null) {
+			reportProtocolOutOfScope(
+				binding,
+				generic.constraint,
+				scope,
+				position,
+			)
+
 			continue
 		}
 
@@ -6468,6 +6496,69 @@ export function resolveConformances(
 	return conformances
 }
 
+function reportProtocolOutOfScope(
+	binding: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): void {
+	let subject =
+		binding.type === "GenericUse"
+			? `Type Parameter '${displayGenericName(binding.name)}'`
+			: describeType(binding)
+	let missing = protocolOutOfScope(protocolName, scope)
+
+	reportError(`${subject} does not conform to '${protocolName}'`, position, {
+		code: "unsatisfied-bound",
+		labels: [
+			primary(
+				position,
+				`this binds a Type Parameter bound to '${protocolName}'`,
+			),
+		],
+		notes: missing.notes,
+		helps: missing.helps,
+		...(missing.data === undefined ? {} : { data: missing.data }),
+	})
+}
+
+// NOTE: A bound's Protocol out of this Scope. The Modules this one reaches that
+// declare it are named, and the one import a Quick Fix can write is offered
+// where only one of them declares it and exports it.
+function protocolOutOfScope(
+	protocolName: string,
+	scope: enricher.Scope,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	data?: common.DiagnosticData
+} {
+	let declarations = protocolDeclarationsOf(scope, protocolName)
+	let only = declarations.length === 1 ? declarations[0] : undefined
+
+	return {
+		notes: [
+			`A conformance is found through the Protocol it names, and '${protocolName}' is not in scope here.`,
+		],
+		helps: declarations.map(({ modulePath, exported }) => {
+			let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
+
+			return exported
+				? `'${protocolName}' is declared in ${fileName} — import it here.`
+				: `'${protocolName}' is declared in ${fileName}, which does not export it — export it there and import it here.`
+		}),
+		...(only?.exported === true
+			? {
+					data: {
+						kind: "import-declaration" as const,
+						name: protocolName,
+						modulePath: only.modulePath,
+					},
+				}
+			: {}),
+	}
+}
+
 // NOTE: The result of checking one conformance clause that holds — its
 // Protocol, the validated `where` conditions, and the map from each Protocol
 // Method to the fulfilling Namespace Method. Handed back to the Enricher so it
@@ -6520,6 +6611,27 @@ function whereConditionRejection(
 	}
 
 	return null
+}
+
+// NOTE: A `where` condition naming a Protocol its Namespace's Scope can not see
+// is refused as `unknown-protocol`, and is not carried either. Asked once every
+// import is bound, since a Scope that is still hoisting has not seen them all.
+export function dropRefusedConditions(
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+): void {
+	let conditions = namespaceType.conformanceConditions ?? {}
+
+	for (let [protocolName, written] of Object.entries(conditions)) {
+		let carried = written.filter(
+			(condition) =>
+				findProtocolInScope(condition.protocol, scope) !== null,
+		)
+
+		if (carried.length < written.length) {
+			conditions[protocolName] = carried
+		}
+	}
 }
 
 // NOTE: What `checkProtocolConformance` would find, with nothing reported and

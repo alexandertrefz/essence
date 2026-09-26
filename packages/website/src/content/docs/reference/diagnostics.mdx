@@ -4203,6 +4203,14 @@ A parameter that already carries a bound is a third answer: a type parameter
 takes ONE bound, so neither edit is offered and the notes say the rule and the
 one way around it — a protocol that extends both.
 
+A call is also refused when the protocol of its bound is not in scope. A
+conformance is found through the protocol it names, so a function bounded by a
+protocol another module declares can be called only where that protocol is
+imported too, even when the conforming namespace is. The Help names the module
+among those the file reaches, `'Sized' is declared in Sized.es — import it
+here.`, and a **Quick Fix** writes the entry. Where that module keeps the
+protocol private, the Help asks for the export as well.
+
 Taught on: [Protocols › Declared, not structural](/docs/language/protocols#declared-not-structural)
 
 ### `interpolation-not-printable`
@@ -4733,6 +4741,10 @@ Make the item type conform to the protocol, as the Help shows. The Help names th
 **last** link of the chain — the type that actually has no conforming namespace,
 which the notes walk down to. A namespace declared for the outer type answers the
 one call and leaves every other list of that record unsorted.
+
+A condition is solved where the call is, so its protocol has to be in scope
+there too. Where it is not, the Help names the module to import it from, as
+[`unsatisfied-bound`](#unsatisfied-bound) does for a bound.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

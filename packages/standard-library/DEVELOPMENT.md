@@ -664,9 +664,8 @@ rule stated there.
 - **A file calling a Method whose Type Parameter carries a bound imports the
   PROTOCOL.** `@::sort()` threads a conformance witness the Enricher can only
   build with the bound's Protocol in Scope, and a file calling it need spell
-  `Comparable` nowhere else. Without the import the Enricher throws an
-  Internal Compiler Error naming the Method and the count of witnesses it was
-  given, which reads as a Compiler bug rather than as a missing line.
+  `Comparable` nowhere else. Without the import the load fails with
+  `unsatisfied-bound`, whose Help names the file to import it from.
   `NumberList.es` imports `Comparable` for this reason alone.
 - **A named Union is only NAMED.** `type Number = Integer | Rational |
   Irrational` gives the Union a name, and Hovers, Inlay Hints and Diagnostics

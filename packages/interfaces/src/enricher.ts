@@ -11,6 +11,13 @@ export type UnimportedNamespace = {
 	namespace: common.NamespaceType
 }
 
+// NOTE: A Module that declares a Protocol at its top level, by its canonical
+// path, and whether its export block lists it under that name.
+export type ProtocolDeclaration = {
+	modulePath: string
+	exported: boolean
+}
+
 // NOTE: One Declaration the Parser dropped, as the Enricher consults it — the
 // Parser's own record (`parser.AbandonedDeclaration`) with its two halves of
 // hoisting already decided. `hoists` is what says the silence is file-wide
@@ -80,6 +87,10 @@ export type Scope = {
 	// Module and never look. Absent for a Program that is no Module, and read
 	// through the parent chain like `modulePath`.
 	unimportedNamespaces?: () => Array<UnimportedNamespace>
+	// NOTE: Every Module this one reaches that declares a Protocol of this name,
+	// asked when a bound names a Protocol this Scope can not see. Absent for a
+	// Program that is no Module, and read through the parent chain.
+	protocolDeclarations?: (name: string) => Array<ProtocolDeclaration>
 	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
 	// Function bodies and Match Handler bodies. Bare Case Expressions
 	// (`<- #Less`) consult it before falling back to the scope scan. Null is a

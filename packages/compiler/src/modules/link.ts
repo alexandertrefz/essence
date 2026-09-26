@@ -637,11 +637,23 @@ export function linkModuleGraph(
 		declarations.set(filePath, topLevelDeclarations(module.program))
 	}
 
+	let dependencies = new Map(
+		[...graph.modules].map(([filePath, module]) => [
+			filePath,
+			module.dependencies,
+		]),
+	)
 	let surfaces = new Map<string, ExportSurface>()
 	let linked = new Map<string, LinkedModule>()
 
 	for (let group of graph.groups) {
-		for (let result of linkGroup(group, declarations, surfaces, options)) {
+		for (let result of linkGroup(
+			group,
+			declarations,
+			dependencies,
+			surfaces,
+			options,
+		)) {
 			surfaces.set(result.module.filePath, result.surface)
 			linked.set(result.module.filePath, result)
 		}
@@ -659,12 +671,14 @@ export function linkModuleGraph(
 
 // NOTE: What linking ONE more Module against a graph that is already linked
 // needs of that graph, and nothing else: the export surface every Module in it
-// published, and what each declares. Held apart from the `LinkedGraph` itself
-// because a caller that keeps one of these keeps a Type table and a name list,
-// while keeping the graph would pin every typed Program it produced.
+// published, what each declares, and which Modules each names. Held apart from
+// the `LinkedGraph` itself because a caller that keeps one of these keeps Type
+// tables and name lists, while keeping the graph would pin every typed Program
+// it produced.
 export type LinkContext = {
 	surfaces: Map<string, ExportSurface>
 	declarations: Map<string, Map<string, Declaration>>
+	dependencies: Map<string, Array<string>>
 }
 
 export function linkContextOf(linked: LinkedGraph): LinkContext {
@@ -676,6 +690,12 @@ export function linkContextOf(linked: LinkedGraph): LinkContext {
 			]),
 		),
 		declarations: linked.declarations,
+		dependencies: new Map(
+			[...linked.modules].map(([filePath, module]) => [
+				filePath,
+				module.module.dependencies,
+			]),
+		),
 	}
 }
 
@@ -699,11 +719,21 @@ export function linkModuleAgainst(
 
 	declarations.set(module.filePath, topLevelDeclarations(module.program))
 
+	let dependencies = new Map(context.dependencies)
+
+	dependencies.set(module.filePath, module.dependencies)
+
 	let surfaces = new Map(context.surfaces)
 
 	surfaces.delete(module.filePath)
 
-	return linkGroup([module], declarations, surfaces, options)[0]!
+	return linkGroup(
+		[module],
+		declarations,
+		dependencies,
+		surfaces,
+		options,
+	)[0]!
 }
 
 // NOTE: Every Protocol declaration in a Module that provides at least one
@@ -845,6 +875,7 @@ function reportClashingProvidedMethods(
 function linkGroup(
 	group: Array<Module>,
 	declarations: Map<string, Map<string, Declaration>>,
+	dependencies: Map<string, Array<string>>,
 	surfaces: Map<string, ExportSurface>,
 	options: LinkOptions,
 ): Array<LinkedModule> {
@@ -873,6 +904,15 @@ function linkGroup(
 
 		state.scope.unimportedNamespaces = () =>
 			unimportedNamespacesFor(state, surfaces)
+		state.scope.protocolDeclarations = (name) =>
+			protocolDeclarationsFor(
+				state,
+				name,
+				declarations,
+				dependencies,
+				states,
+				surfaces,
+			)
 
 		for (let entry of [...(module.program.imports?.entries ?? [])].sort(
 			compareEntries,
@@ -1720,4 +1760,59 @@ function unimportedNamespacesFor(
 	}
 
 	return candidates
+}
+
+// NOTE: The Modules this one reaches that declare a Protocol of this name, read
+// off the declarations so that a private one is found too. Only what it reaches,
+// and by path, so that its Diagnostics do not depend on the graph's entry.
+function protocolDeclarationsFor(
+	state: ModuleState,
+	name: string,
+	declarations: Map<string, Map<string, Declaration>>,
+	dependencies: Map<string, Array<string>>,
+	states: Map<string, ModuleState>,
+	surfaces: Map<string, ExportSurface>,
+): Array<enricher.ProtocolDeclaration> {
+	let reached = new Set<string>()
+	let pending = [...state.module.dependencies]
+
+	while (pending.length > 0) {
+		let modulePath = pending.pop()!
+
+		if (!reached.has(modulePath)) {
+			reached.add(modulePath)
+			pending.push(...(dependencies.get(modulePath) ?? []))
+		}
+	}
+
+	let found: Array<enricher.ProtocolDeclaration> = []
+
+	for (let modulePath of [...reached].sort()) {
+		if (
+			modulePath === state.module.filePath ||
+			declarations.get(modulePath)?.get(name)?.kind !== "protocol"
+		) {
+			continue
+		}
+
+		let surface = surfaces.get(modulePath)
+		let entry = states.get(modulePath)?.exports.get(name)
+
+		if (surface !== undefined) {
+			found.push({
+				modulePath,
+				exported: surface.kinds[name] === "protocol",
+			})
+		} else if (states.has(modulePath)) {
+			found.push({
+				modulePath,
+				exported:
+					entry !== undefined &&
+					entry.source === null &&
+					entry.name.content === name,
+			})
+		}
+	}
+
+	return found
 }

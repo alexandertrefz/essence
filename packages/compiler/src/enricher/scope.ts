@@ -148,6 +148,25 @@ export function unimportedNamespacesOf(
 	return []
 }
 
+// NOTE: The Modules this one reaches that declare a Protocol of this name, asked
+// of the nearest Scope that knows. Empty for a Program that is no Module.
+export function protocolDeclarationsOf(
+	scope: enricher.Scope,
+	name: string,
+): Array<enricher.ProtocolDeclaration> {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.protocolDeclarations !== undefined) {
+			return current.protocolDeclarations(name)
+		}
+	}
+
+	return []
+}
+
 // NOTE: What the Parser abandoned on the way to this Program — the same
 // parent-chain walk `modulePathOf` makes, and for the same reason: a name read
 // deep inside a body has to reach what the Program's top level was told.
