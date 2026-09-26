@@ -24,6 +24,7 @@ import type { StringType } from "./String"
 import {
 	getStringRepresentation,
 	type OutputStream,
+	withInputSource,
 	withOutputSink,
 } from "./Terminal"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -36,12 +37,12 @@ import { type AnyType, typeKeySymbol } from "./type"
 //
 // NOTE: Most of what a running test touches hangs off a CONTEXT object it is
 // handed — the trace buffer, the captured output, the recorded expectations,
-// what failed. Two things that belong to the running test are module-level:
-// the coverage span (`epoch` and `touched`) and the output sink in
-// `Terminal.ts`, which is why `runTests` runs one test at a time. The REGISTRY
-// is module-level too, but it is state about the Modules a bundle holds rather
-// than about a run, and is written exactly once per Module as that Module is
-// evaluated.
+// what failed. Three things that belong to the running test are module-level:
+// the coverage span (`epoch` and `touched`) and the output sink and input
+// source in `Terminal.ts`, which is why `runTests` runs one test at a time.
+// The REGISTRY is module-level too, but it is state about the Modules a bundle
+// holds rather than about a run, and is written exactly once per Module as
+// that Module is evaluated.
 
 // #region The manifest a Module registers
 
@@ -2436,7 +2437,7 @@ export async function runTests(
 // hole in it is what the test will be called, and running a section to be told
 // so would make every run pay for the one shape that needs it. Whatever the
 // setup writes on the way is dropped: the output a reader is shown belongs to a
-// test, and no test is running here.
+// test, and no test is running here. It reads an empty input, as a test does.
 async function renderedNames(registry: Registry): Promise<Map<string, string>> {
 	let names = new Map<string, string>()
 
@@ -2454,7 +2455,7 @@ async function renderedNames(registry: Registry): Promise<Map<string, string>> {
 			// with the manifest's templates.
 			await withOutputSink(
 				(text, stream) => context.output.push({ stream, text }),
-				() => module.run(context),
+				() => withInputSource("", () => module.run(context)),
 			)
 		} catch {
 			continue
@@ -2532,13 +2533,17 @@ async function runOne(
 		// failure the same way one that does not does: what a body throws after
 		// its first `complete` arrives here as a rejection, and the arm below
 		// is what turns either of them into the one error a report carries.
+		//
+		// NOTE: The input is empty whatever the host holds, so what a test
+		// answers does not depend on it, and a runner's own input, a terminal
+		// or an editor's protocol, is never read.
 		await withOutputSink(
 			(text, stream) => {
 				if (context.recording) {
 					context.output.push({ stream, text })
 				}
 			},
-			() => test.module.run(context),
+			() => withInputSource("", () => test.module.run(context)),
 		)
 	} catch (thrown) {
 		// NOTE: A failed `require` unwinds the test on purpose and is not an

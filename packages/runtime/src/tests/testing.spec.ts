@@ -8,7 +8,13 @@ import { createList } from "../List"
 import { createRecord } from "../Record"
 import type { StreamType } from "../Stream"
 import { createString } from "../String"
-import { inspect, write, withOutputSink } from "../Terminal"
+import {
+	inspect,
+	readLine,
+	withInputSource,
+	withOutputSink,
+	write,
+} from "../Terminal"
 import {
 	beginCoverageRun,
 	benchmark,
@@ -39,7 +45,7 @@ import {
 	type TestModule,
 	trace,
 } from "../Testing"
-import { type AnyType, createCase } from "../type"
+import { type AnyType, createCase, typeKeySymbol } from "../type"
 
 // NOTE: The test runtime, asked the way the emitted JavaScript asks it. Nothing
 // here compiles anything — a Module's manifest is plain data and its `run` is a
@@ -1647,6 +1653,86 @@ describe("Terminal capture", () => {
 		)
 
 		expect(captured).toEqual(["inner"])
+	})
+})
+
+// NOTE: A host whose input holds `text`, staged as Deno's for as long as the
+// run waits, so that a read the runner left unstaged reaches it rather than
+// this process's own descriptor.
+async function withHostInput<Value>(
+	text: string,
+	run: () => Promise<Value>,
+): Promise<Value> {
+	let host = globalThis as { Deno?: unknown }
+	let previous = Object.getOwnPropertyDescriptor(host, "Deno")
+	let unread: Uint8Array | null = new TextEncoder().encode(text)
+
+	host.Deno = {
+		stdin: {
+			readSync: (into: Uint8Array) => {
+				if (unread === null) {
+					return null
+				}
+
+				let count = unread.length
+
+				into.set(unread)
+				unread = null
+
+				return count
+			},
+		},
+	}
+
+	try {
+		return await withInputSource(null, run)
+	} finally {
+		if (previous === undefined) {
+			delete host.Deno
+		} else {
+			Object.defineProperty(host, "Deno", previous)
+		}
+	}
+}
+
+function lineOf(answer: ReturnType<typeof readLine>): string | null {
+	return answer[typeKeySymbol] === "Optional#Empty" ? null : answer.item.value
+}
+
+describe("Terminal input", () => {
+	test("hands every test an empty input, whatever the host holds", async () => {
+		let seen: Array<string | null> = []
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a", { name: "read {line}", interpolated: true }),
+					manifest("/b"),
+				],
+				async (context) => {
+					let line = lineOf(readLine()) ?? "nothing"
+
+					entry(context, 0, string(`read ${line}`), () => {
+						seen.push(lineOf(readLine()))
+					})
+
+					// NOTE: A read after the test's own wait, where a source
+					// put back when the call returned would no longer apply.
+					await entry(context, 1, null, async () => {
+						await Promise.resolve()
+
+						seen.push(lineOf(readLine()))
+					})
+				},
+			),
+		])
+		let { events } = await withHostInput("alpha\nbeta\ngamma\n", () =>
+			collect(registry),
+		)
+
+		expect(
+			events.find((event) => event.kind === "test-start"),
+		).toMatchObject({ name: "read nothing" })
+		expect(seen).toEqual([null, null])
 	})
 })
 

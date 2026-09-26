@@ -145,9 +145,13 @@ function runTests(
 // process — including the ones in other spec files — resolving against a
 // directory that is no longer there. A child of its own takes its working
 // directory with it.
+//
+// NOTE: `input` is what the run is piped. Without one the child's input is
+// empty, so a Program that reads can not wait on a terminal.
 async function runTestsIn(
 	directory: string,
 	essenceArguments: Array<string> = [],
+	input?: string,
 ): Promise<{ code: number; out: string; err: string }> {
 	let binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
 	let result = await spawnAndWait(
@@ -167,6 +171,7 @@ async function runTestsIn(
 			// answering out of the reader's own stores is a child answering
 			// about a project it has never seen.
 			env: { ...process.env },
+			input,
 		},
 	)
 
@@ -2204,6 +2209,39 @@ describe("essence test — a test that waits", () => {
 			expect(err).toContain("'fails after waiting' failed")
 			expect(err).toContain("`is` compared 4 with 5")
 			expect(code).toBe(EXIT_FAILURE)
+		})
+	})
+})
+
+// NOTE: Piped, because what is asserted is that the run's own input never
+// reaches a test: not in the pass that renders names, not in a test, and not
+// after a test's wait.
+describe("essence test — a test's input", () => {
+	const reading = [
+		"tests {",
+		'\tconstant line = Terminal.readLine()::value(defaultingTo "nothing")',
+		"",
+		'\ttest "read {line}" {',
+		'\t\texpect Terminal.readAll()::is("")',
+		"\t}",
+		"",
+		'\ttest "reads nothing after a wait" {',
+		"\t\tconstant waited = complete Async.sleep(milliseconds 5)",
+		"",
+		"\t\texpect Terminal.readLine()::hasValue()::is(false)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("hands every test an empty input, whatever the run was piped", async () => {
+		await withFiles({ "Reading.tests.es": reading }, async (directory) => {
+			let { code, out } = await runTestsIn(directory, [], "alpha\nbeta\n")
+
+			expect(out).toContain("✓ read nothing")
+			expect(out).toContain("✓ reads nothing after a wait")
+			expect(out).toContain("2 passed")
+			expect(code).toBe(EXIT_SUCCESS)
 		})
 	})
 })

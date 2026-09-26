@@ -482,12 +482,11 @@ let input: InputState = {
 	decoder: null,
 }
 
-// NOTE: The reading half of `withOutputSink`: a dynamically scoped binding
-// installed for the length of one synchronous call and put back by the
-// `finally`. `text` is the whole of the input for that call, and `null`
-// is the host's own descriptor read from the start. Both replace the buffer
-// above, which is what makes a read that is staged repeatable — the state a
-// reading Program carries is the one thing a caller can not otherwise reach.
+// NOTE: The reading half of `withOutputSink`, scoped the same way: for one
+// call, and until the promise it answers with settles. `text` is the whole of
+// the input for that call, and `null` is the host's own descriptor read from
+// the start. Either replaces `input`, which is what makes a staged read
+// repeatable.
 export function withInputSource<Value>(
 	text: string | null,
 	run: () => Value,
@@ -501,11 +500,34 @@ export function withInputSource<Value>(
 		decoder: null,
 	}
 
+	let answered: Value
+
 	try {
-		return run()
-	} finally {
+		answered = run()
+	} catch (thrown) {
 		input = previous
+
+		throw thrown
 	}
+
+	if (!isPending(answered)) {
+		input = previous
+
+		return answered
+	}
+
+	return answered.then(
+		(value: unknown) => {
+			input = previous
+
+			return value
+		},
+		(thrown: unknown) => {
+			input = previous
+
+			throw thrown
+		},
+	) as Value
 }
 
 // NOTE: What a host can be asked for: some bytes, into a buffer, answering how

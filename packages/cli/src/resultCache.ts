@@ -239,10 +239,8 @@ export function resultKey(parts: ResultKeyParts): string {
 // Program's requests go out through, and everything else in this runtime answers
 // out of the Program's own values.
 //
-// NOTE: `Terminal`'s reads are NOT among them, though they reach a host
-// descriptor. A test that reads standard input is supplied by the runner —
-// `withInputSource` hands it the lines the test wrote down — so what it answers
-// is a function of the inputs after all, and the key already covers them.
+// NOTE: `Terminal`'s reads are not among them, though they reach a host
+// descriptor: the test runtime hands every test an empty input.
 //
 // NOTE: Spelled as esbuild LABELS it. Every module a bundle inlines is written
 // into the output under its path relative to the runtime directory — see
