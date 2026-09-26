@@ -33,13 +33,6 @@ export const derivedPrintableNamespaceName = "Choice_Printable"
 // tags the Choice's Cases carry.
 export const derivedEnumerableNamespaceName = "Choice_Enumerable"
 
-// NOTE: Read nowhere. A Record that ROUTES a member through that member's own
-// conformance still arrives under the builtin `Record` Namespace, and the
-// Rewriter names the routing by the member list.
-export const recordEquatableNamespaceName = "Record_Equatable"
-
-export const recordPrintableNamespaceName = "Record_Printable"
-
 // NOTE: The Protocol a composite's members are asked about, named once because
 // the routing rule reads it at several sites and a typo in any of them would
 // silently route nothing.
