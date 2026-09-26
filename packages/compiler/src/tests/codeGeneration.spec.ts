@@ -1642,13 +1642,11 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
-		// NOTE: The Help used to annotate the Parameter it offered with
-		// `SomeType`, a Type nothing declares — and the Type it wanted there is
-		// the one thing this site has not got, since what is missing IS the
-		// context that would name it. So the first Help is the other real
-		// answer, moving the path to a position that names a Function, and the
-		// second writes the blanks out: a literal standing outside Argument
-		// position takes no Types from around it and has to write both.
+		// NOTE: The Type a Parameter here would need is the one thing this site
+		// has not got, since what is missing IS the context that would name it.
+		// So the first Help moves the path to a position that names a Function,
+		// and the second writes both Types out as blanks: a literal standing
+		// outside Argument position takes no Types from around it.
 		it("refuses a path where no Function is expected", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				${product}

@@ -1798,11 +1798,10 @@ describe("Parser AST", () => {
 		})
 	})
 
-	// NOTE: The Helps that used to print an EXAMPLE where the reader's own text
-	// was in hand. Each named something nothing in the file declared — a Type
-	// called `SomeType`, a Case called `#Rectangle`, a value called `base` — so
-	// a reader who followed one arrived at a report about a name they had never
-	// written. Every Help asserted here is written back into its own probe and
+	// NOTE: Helps that spell the reader's own text where it is in hand, rather
+	// than an example. An example names something nothing in the file declares,
+	// and a reader who follows it arrives at a report about a name they never
+	// wrote. Every Help asserted here is written back into its own probe and
 	// compiled: a promise like this is only worth making where it holds.
 	describe("Helps built from the text that was written", () => {
 		it("spells the reader's own path and call in the Function literal", () => {

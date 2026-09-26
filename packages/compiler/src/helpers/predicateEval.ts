@@ -586,7 +586,7 @@ const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	// NOTE: `isOneCharacter` is `@::length()::is(1)`, and `length` counts
 	// grapheme clusters — so this one has to segment where `isEmpty` could
 	// read the code units. It is the same segmentation the runtime performs
-	// (`graphemesOf` in `String.ts`): the NFC form, cut by `Intl.Segmenter`.
+	// (`clustersIn` in `String.ts`): the NFC form, cut by `Intl.Segmenter`.
 	// A written `"a"` is what proves `Character` at a call, so a table that
 	// declined to decide it would leave every Character Argument to be
 	// narrowed by hand.

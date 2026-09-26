@@ -61,9 +61,8 @@ let docs = defineCollection({
 			/** Protocols the type conforms to, with the `where` clause when conditional. */
 			conformsTo: z.array(z.string()).default([]),
 		})
-		// NOTE: A key the schema does not name is an error, not a silent extra —
-		// the retired fields (`nestUnder`, `member`, `kind`, `signature`,
-		// `monoTitle`) would otherwise linger in frontmatter doing nothing.
+		// NOTE: A key the schema does not name is an error, not a silent extra,
+		// so a field the schema drops can not linger in frontmatter doing nothing.
 		.strict()
 		.transform((data) => ({
 			...data,

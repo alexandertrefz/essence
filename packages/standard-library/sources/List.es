@@ -452,9 +452,10 @@ declarations {
 		§ receiver is compared against fewer items than it has, and no guard
 		§ is needed.
 		§
-		§ The two `doesNot` bodies are read as well as run, as `String`'s two
-		§ are. Each asks its contrary's question over whatever List the call
-		§ writes. See DEVELOPMENT.md, Why bodies look the way they do.
+		§ The `doesNotStart` and `doesNotEnd` bodies are read as well as run,
+		§ as `String`'s are. Each asks its contrary's question over whatever
+		§ List the call writes. See DEVELOPMENT.md, Why bodies look the way
+		§ they do.
 
 		§§ Answers whether the List begins with the items of the given one.
 		§§

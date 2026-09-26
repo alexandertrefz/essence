@@ -3496,9 +3496,8 @@ function reportPathWithoutContext(
 // where it stands as an Argument, which is the one position this Diagnostic is
 // never raised in — so a literal written from this report must write its
 // Parameter Type and its `-> Type` or meet `missing-return-type` on the next
-// run. The old Help wrote neither, and its `SomeType` was a name no Program
-// declares: a reader who filled it in met the second report for the return
-// Type, which is two round trips for one edit. `<Type>` is a blank and says so.
+// run. So the Help writes both, each as the blank `<Type>`: a made-up name
+// would read as a Type to copy, and a blank reads as one to fill in.
 //
 // Where the position names nothing at all there is a cheaper edit than writing
 // either Type, and it comes first: move the path to a position that DOES name a

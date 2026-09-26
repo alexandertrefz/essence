@@ -73,10 +73,9 @@ describe("A member path with no Function around it", () => {
 		).toBe(false)
 	})
 
-	// NOTE: The Help used to write `(_ item: SomeType) { … }`, and BOTH halves of
-	// it were dead ends: `SomeType` is a Type no Program declares, and a literal
-	// outside Argument position that omits its `-> Type` is refused for that too.
-	// A reader who fixed the first met `missing-return-type` for the second.
+	// NOTE: The literal the Help writes compiles once each `<Type>` is filled in.
+	// A literal outside Argument position takes no Types from around it, so one
+	// that left out its `-> Type` would meet `missing-return-type`.
 	it("compiles with the blanks filled in", () => {
 		expect(
 			compiles(`implementation {

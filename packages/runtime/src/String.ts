@@ -382,12 +382,11 @@ const normalisedKey = Symbol("$normalised")
 // in a text it does not itself spell. `viewOffsetsKey` is where each cluster
 // begins in that text.
 //
-// NOTE: There was a sixth key, `segmentedKey`, saying the Segmenter had RUN for
-// this Array. Nothing in the runtime read it and only the drain guard did — and
-// a flag written inside a reached Function can not be shaken out of a bundle,
-// so it cost 94 bytes in the floor EVERY Program pays and 220 in one that cuts.
-// The guard counts `Intl.Segmenter.prototype.segment` from the spec instead,
-// which is the same claim for nothing at all.
+// NOTE: No key says the Segmenter has RUN for an Array. Nothing in the runtime
+// would read one, and a flag written inside a reached Function can not be
+// shaken out of a bundle, so every Program would pay for it. The drain guard,
+// `whileCountingSegmentations` in `stringWindows.spec.ts`, counts calls to
+// `Intl.Segmenter.prototype.segment` instead.
 type MeasuredString = StringType & {
 	[graphemesKey]?: Array<string>
 	[viewStartKey]?: number
@@ -784,7 +783,7 @@ function createAsciiString(value: string): StringType {
 // NOTE: A String THAT HAS A VIEW IS NEVER SCANNED HERE, which is the same
 // addition `readsByUnit` makes and the reason is the same. This is the Function
 // `is`, `compare`, every Dictionary key, `codePoints`, `words` and the four
-// `hasOnly` predicates reach, so the scan it used to ask was the one a
+// `hasOnly…` predicates reach, so the scan it used to ask was the one a
 // tokenizer comparing its `rest` with a keyword paid per turn — O(window) every
 // turn, which is the same n² the copying was. What the window pays instead is
 // the JavaScript call, and the engine answers that in constant time for a text

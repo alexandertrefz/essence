@@ -8500,7 +8500,7 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
-			// NOTE: The standard library's own `doesNot` Methods are of this
+			// NOTE: The standard library's own `doesNot…` Methods are of this
 			// shape, and String and List are two of the four bases a `where`
 			// clause may be written on. So the `else` of `contains` proves a
 			// refinement written on the contrary, over the very bound the
