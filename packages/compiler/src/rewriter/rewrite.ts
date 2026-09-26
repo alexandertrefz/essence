@@ -95,6 +95,20 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 	const protocolMembers = protocolPreludeNamespaces([program])
 	const prelude = [...stdlibPrelude(), ...protocolMembers]
 
+	return withEmission(
+		{
+			spellings: new Map(),
+			target: BUNDLE_TARGET,
+			providedMembers: providedMemberIdentifiers(prelude),
+		},
+		() => rewriteLoneProgram(program, prelude),
+	)
+}
+
+function rewriteLoneProgram(
+	program: common.typedSimple.Program,
+	prelude: Array<PreludeNamespace>,
+): string {
 	// NOTE: The user Program is rewritten FIRST, so that which merged Namespaces
 	// it needs can be answered from the finished tree rather than guessed at from
 	// the source. Every reference to a Namespace — a plain `Boolean.isNot(…)`
@@ -337,9 +351,10 @@ function rewriteModuleGraph(
 	let protocolMembers = protocolPreludeNamespaces(
 		modules.map((module) => module.program),
 	)
+	let prelude = [...stdlibPrelude(), ...protocolMembers]
+	let providedMembers = providedMemberIdentifiers(prelude)
 
-	return withEmission({ spellings, target }, () => {
-		let prelude = [...stdlibPrelude(), ...protocolMembers]
+	return withEmission({ spellings, target, providedMembers }, () => {
 		let freeFunctions = stdlibFreeFunctions()
 		// NOTE: A pool per Module, because a Module's constants are declared in
 		// it and a name declared in one Module is not in scope in another. The
@@ -731,20 +746,27 @@ function namedExport(
 type Emission = {
 	spellings: ReadonlyMap<string, string>
 	target: EmitTarget
+	providedMembers: ProvidedMemberIdentifiers
 }
 
-let emission: Emission = { spellings: new Map(), target: BUNDLE_TARGET }
+let emission: Emission = {
+	spellings: new Map(),
+	target: BUNDLE_TARGET,
+	providedMembers: new Map(),
+}
 
 // NOTE: `finally`, for the same reason the Namespace scope stack has one: a
 // throw out of the emission of one bundle must not leave the next Program in
 // this process rendering its tags against a graph it is not part of.
 function withEmission<Value>(next: Emission, emit: () => Value): Value {
+	let outer = emission
+
 	emission = next
 
 	try {
 		return emit()
 	} finally {
-		emission = { spellings: new Map(), target: BUNDLE_TARGET }
+		emission = outer
 	}
 }
 
@@ -1736,8 +1758,7 @@ export function reachableEssenceMethods(
 	// Namespace can not draw the other's edge.
 	let protocols = prelude.filter((entry) => entry.protocol === true)
 	let namespaces = prelude.filter((entry) => entry.protocol !== true)
-
-	refuseProtocolNameClashes(protocols)
+	let provided = providedMemberIdentifiers(protocols)
 
 	// NOTE: The pairs this prelude implements in Essence — an edge is drawn only
 	// to a Method the prelude actually defines a const for.
@@ -1745,16 +1766,6 @@ export function reachableEssenceMethods(
 		namespaces.flatMap((namespace) =>
 			Object.keys(namespace.node.methods).map(
 				(memberName) => `${namespace.name} ${memberName}`,
-			),
-		),
-	)
-
-	// NOTE: The same table for the PROVIDED Methods, keyed the same way and read
-	// only where an Invocation said a Protocol answered it.
-	let provided = new Set(
-		protocols.flatMap((protocol) =>
-			Object.keys(protocol.node.methods).map(
-				(memberName) => `${protocol.name} ${memberName}`,
 			),
 		),
 	)
@@ -1924,16 +1935,20 @@ export function reachableEssenceMethods(
 
 	// NOTE: A Protocol's provided Methods are candidates on exactly the same
 	// footing — one const each, shaken away where nothing names them — under the
-	// name `protocolMemberIdentifier` spells.
+	// name the table of provided members gives them.
 	let protocolCandidates: Array<[string, EssenceMember]> = protocols.flatMap(
 		(protocol) =>
 			Object.entries(protocol.node.methods).map(
 				([memberName, method]): [string, EssenceMember] => [
-					protocolMemberIdentifier(protocol.name, memberName),
+					provided
+						.get(protocolEntryIdentity(protocol))!
+						.get(memberName)!,
 					{
 						kind: "function",
 						declaration: rewriteEssenceMember(
-							protocolMemberIdentifier(protocol.name, memberName),
+							provided
+								.get(protocolEntryIdentity(protocol))!
+								.get(memberName)!,
 							method,
 						),
 						...essenceMethodReferences(
@@ -2058,11 +2073,10 @@ export function essenceMethodReferences(
 	// `namespaceMember` routes to a shim — a native called at full arity is a
 	// plain member read and draws no edge.
 	shimmed: Set<string> = new Set(),
-	// NOTE: The `(Protocol, member)` pairs a Protocol PROVIDED a body for.
-	// Consulted only where the Invocation says a Protocol answered it, which is
-	// the same question `namespaceMember` routes on — the two have to agree, or
-	// a const is named in a body and never pulled in.
-	provided: Set<string> = new Set(),
+	// NOTE: The consts of the Methods a Protocol provided a body for. Consulted
+	// only where the Invocation says a Protocol answered it, the question
+	// `namespaceMember` routes on, so no const is named without being pulled in.
+	provided: ProvidedMemberIdentifiers = new Map(),
 	// NOTE: The native pairs whose shim MERGES a Record default into what the
 	// call wrote. Consulted where the call left nothing out, because that is
 	// exactly where `namespaceMember` routes one to its shim and the set above
@@ -2077,13 +2091,12 @@ export function essenceMethodReferences(
 		protocolName: unknown,
 		memberName: unknown,
 	): void => {
-		if (
-			typeof protocolName === "string" &&
-			typeof memberName === "string" &&
-			provided.has(`${protocolName} ${memberName}`)
-		) {
-			let name = protocolMemberIdentifier(protocolName, memberName)
+		let name =
+			typeof protocolName === "string" && typeof memberName === "string"
+				? provided.get(protocolName)?.get(memberName)
+				: undefined
 
+		if (name !== undefined) {
 			references.add(name)
 			evaluatedReferences.add(name)
 		}
@@ -3770,7 +3783,7 @@ function rewriteConformanceValue(
 						key: memberKey(memberName),
 						value: {
 							type: "Identifier",
-							name: protocolMemberIdentifier(
+							name: providedMemberIdentifier(
 								protocolName,
 								memberName,
 							),
@@ -3928,7 +3941,7 @@ function namespaceMember(
 	if (providedBy !== undefined) {
 		return {
 			type: "Identifier",
-			name: protocolMemberIdentifier(providedBy, memberName),
+			name: providedMemberIdentifier(providedBy, memberName),
 		}
 	}
 
@@ -5124,6 +5137,7 @@ function protocolPreludeNamespaces(
 				found.push({
 					name: protocol.name.name,
 					protocol: true,
+					identity: protocol.name.name,
 					node: {
 						nodeType: "NamespaceDefinitionStatement",
 						name: protocol.name,
@@ -5162,40 +5176,102 @@ function protocolPreludeNamespaces(
 	return found
 }
 
-// NOTE: One const per Protocol name AND Method name, which holds only while no
-// two Protocol declarations provide the same pair. Two Modules of a graph each
-// declaring `protocol Tagged` with a `shout` of its own would both emit
-// `$es_Tagged__shout` and the second would answer for the first — a Program
-// that compiles green and runs the wrong body.
-//
-// The pair rather than the Protocol name alone: two same-named Protocols
-// providing DIFFERENT Methods emit different consts and tread on nothing, and
-// refusing those refused Programs that are perfectly well formed.
-//
-// `clashing-provided-method` reports the pair over the Module graph, with both
-// declarations to point at, so nothing a compile can meet reaches this. It
-// stays as the emitter's own last word: emitting the second const over the
-// first is the one outcome worse than stopping.
-//
-// A Protocol identity carrying the declaring Module — what a Choice takes — is
-// what would lift the restriction, and it is a naming decision rather than a
-// check.
-function refuseProtocolNameClashes(protocols: Array<PreludeNamespace>): void {
-	let seen = new Set<string>()
+// NOTE: Each provided Method's const, by Protocol identity and Method name:
+// `$es_<Name>__<member>` for the first Protocol of a name to claim it, and
+// `$es_<Name>_<n>__<member>` for the n-th, which no Name can spell.
+export type ProvidedMemberIdentifiers = ReadonlyMap<
+	string,
+	ReadonlyMap<string, string>
+>
 
-	for (let entry of protocols) {
+// NOTE: Bare identities claim first, so the standard library's consts never
+// depend on the graph. The rest claim by declaring Module path and Position, so
+// every entry of a graph names them alike.
+function providedMemberIdentifiers(
+	prelude: Array<PreludeNamespace>,
+): ProvidedMemberIdentifiers {
+	let protocols = prelude.filter((entry) => entry.protocol === true)
+	let isBare = (entry: PreludeNamespace): boolean =>
+		!/[#@]/.test(protocolEntryIdentity(entry))
+	let claimOrder = [
+		...protocols.filter(isBare),
+		...protocols
+			.filter((entry) => !isBare(entry))
+			.map((entry) => ({ entry, key: declarationKey(entry) }))
+			.sort((left, right) => compareKeys(left.key, right.key))
+			.map(({ entry }) => entry),
+	]
+	let claims = new Map<string, number>()
+	let table = new Map<string, Map<string, string>>()
+
+	for (let entry of claimOrder) {
+		let identity = protocolEntryIdentity(entry)
+		let members = table.get(identity) ?? new Map<string, string>()
+
+		table.set(identity, members)
+
 		for (let memberName of Object.keys(entry.node.methods)) {
-			let pair = `${entry.name} ${memberName}`
-
-			if (seen.has(pair)) {
+			// NOTE: One identity is one declaration, so this never holds.
+			if (members.has(memberName)) {
 				throw new Error(
-					`Two Protocols named '${entry.name}' provide a Method named '${memberName}', and both would be emitted under the same name — declare the Protocol once and import it where it is needed`,
+					`Two Protocols named '${entry.name}' of one identity provide a Method named '${memberName}'`,
 				)
 			}
 
-			seen.add(pair)
+			let pair = `${entry.name} ${memberName}`
+			let claim = (claims.get(pair) ?? 0) + 1
+
+			claims.set(pair, claim)
+			members.set(
+				memberName,
+				protocolMemberIdentifier(
+					claim === 1 ? entry.name : `${entry.name}_${claim}`,
+					memberName,
+				),
+			)
 		}
 	}
+
+	return table
+}
+
+function protocolEntryIdentity(entry: PreludeNamespace): string {
+	return entry.identity ?? entry.name
+}
+
+function declarationKey(entry: PreludeNamespace): [string, number, number] {
+	let identity = protocolEntryIdentity(entry)
+	let separator = identity.lastIndexOf("#")
+	let start = entry.node.position?.start
+
+	return [
+		separator === -1 ? "" : identity.slice(0, separator),
+		start?.line ?? 0,
+		start?.column ?? 0,
+	]
+}
+
+function compareKeys(
+	left: [string, number, number],
+	right: [string, number, number],
+): number {
+	if (left[0] !== right[0]) {
+		return left[0] < right[0] ? -1 : 1
+	}
+
+	return left[1] - right[1] || left[2] - right[2]
+}
+
+// NOTE: Outside an emission the table is empty, and the first claimant's name
+// is the only one there is.
+function providedMemberIdentifier(
+	identity: string,
+	memberName: string,
+): string {
+	return (
+		emission.providedMembers.get(identity)?.get(memberName) ??
+		protocolMemberIdentifier(identity, memberName)
+	)
 }
 
 function declareUserNamespace(namespaceName: string): void {

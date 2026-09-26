@@ -22,8 +22,15 @@ import { diskModuleHost } from "../modules/host"
 import { linkModuleGraph } from "../modules/link"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
-import { rewrite, rewriteModules } from "../rewriter/index"
-import { essenceMethodName } from "../rewriter/stdlibPrelude"
+import {
+	reachableEssenceMethods,
+	rewrite,
+	rewriteModules,
+} from "../rewriter/index"
+import {
+	essenceMethodName,
+	type PreludeNamespace,
+} from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
 import { renderNativesModule } from "../tools/generateNatives"
 import { validate } from "../validator/index"
@@ -2273,6 +2280,67 @@ describe("two Protocols of one name", () => {
 				"/a.es",
 			),
 		).toThrow(/Two Protocols named 'Tagged'/)
+	})
+
+	// NOTE: Fed in reverse, because the names follow the declaring Module's path
+	// rather than the order the entries arrive in.
+	it("should give each of two identities a const of its own", () => {
+		let entryFor = (identity: string): PreludeNamespace => {
+			let protocol = programWith(
+				taggedProviding("describe"),
+			).implementation.nodes.find(
+				(node) => node.nodeType === "ProtocolDeclarationStatement",
+			) as common.typedSimple.ProtocolDeclarationStatementNode
+
+			return {
+				name: "Tagged",
+				protocol: true,
+				identity,
+				node: {
+					nodeType: "NamespaceDefinitionStatement",
+					name: protocol.name,
+					properties: {},
+					methods: protocol.methods,
+					nativeShims: [],
+					type: {
+						type: "Namespace",
+						name: "Tagged",
+						targetType: null,
+						generics: [],
+						properties: {},
+						methods: {},
+					},
+					position: protocol.position,
+				},
+			}
+		}
+
+		let reachable = reachableEssenceMethods(
+			[entryFor("/b.es#Tagged"), entryFor("/a.es#Tagged")],
+			[
+				{
+					type: "ExpressionStatement",
+					expression: {
+						type: "ArrayExpression",
+						elements: [
+							{
+								type: "Identifier",
+								name: "$es_Tagged__describe",
+							},
+							{
+								type: "Identifier",
+								name: "$es_Tagged_2__describe",
+							},
+						],
+					},
+				},
+			],
+		)
+
+		expect([...reachable.keys()]).toEqual([
+			"$es_Tagged__describe",
+			"$es_Tagged_2__describe",
+		])
 	})
 
 	it("should emit two declarations that provide different Methods", () => {

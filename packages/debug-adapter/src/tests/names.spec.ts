@@ -12,6 +12,14 @@ describe("demangleName", () => {
 		expect(demangleName("$es_List_sorted")).toBe("List.sorted")
 	})
 
+	it("reads a Protocol's provided Method as Protocol.member", () => {
+		expect(demangleName("$es_Sized__size")).toBe("Sized.size")
+		expect(demangleName("$es_Tagged_2__describe")).toBe("Tagged.describe")
+		expect(demangleName("$es_Tagged__shout__overload$1")).toBe(
+			"Tagged.shout",
+		)
+	})
+
 	it("strips the overload suffix first", () => {
 		expect(demangleName("$es_Integer_divide__overload$1")).toBe(
 			"Integer.divide",

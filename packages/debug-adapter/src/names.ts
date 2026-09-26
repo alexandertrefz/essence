@@ -5,11 +5,13 @@
 // and writes every other character as `_<hex>_` (no Essence identifier
 // contains `_` — the Lexer reads it as a Symbol); a reserved word is
 // `_`-prefixed; an overload is `__overload$N`; a standard library Method is
-// `$es_<Namespace>_<member>`.
+// `$es_<Namespace>_<member>`, and a Protocol's provided Method
+// `$es_<Protocol>__<member>` or `$es_<Protocol>_<n>__<member>`.
 
 const mangledNamePrefix = "$user_"
 const stdlibMethodPrefix = "$es_"
 const overloadSuffix = /__overload\$\d+$/
+const providedMethod = /^([^_]+)(?:_\d+)?__(.+)$/
 
 // NOTE: The same list the Rewriter escapes — a `_new` in a frame is the
 // user's `new`, while `_self` (not reserved) is the compiler's receiver.
@@ -82,6 +84,12 @@ export function demangleName(name: string): string {
 
 	if (base.startsWith(stdlibMethodPrefix)) {
 		let rest = base.slice(stdlibMethodPrefix.length)
+		let provided = providedMethod.exec(rest)
+
+		if (provided !== null) {
+			return `${provided[1]}.${provided[2]}`
+		}
+
 		let separator = rest.indexOf("_")
 
 		if (separator > 0) {

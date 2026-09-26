@@ -3576,7 +3576,7 @@ describe("Code Generation", () => {
 								new Set(),
 								new Set(),
 								new Set(),
-								new Set(),
+								new Map(),
 								mergingShims,
 							).references,
 						]

@@ -44,6 +44,9 @@ export type PreludeNamespace = {
 	// guess off the name, because a Protocol and a Namespace may be spelled
 	// exactly alike.
 	protocol?: true
+	// NOTE: The identity a Protocol entry's provided Methods are keyed by, which
+	// is what an Invocation's `providedBy` names.
+	identity?: string
 }
 
 export type PreludeFreeFunction = {
@@ -117,6 +120,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 					namespaces.push({
 						name: node.name.name,
 						protocol: true,
+						identity: node.name.name,
 						node: {
 							nodeType: "NamespaceDefinitionStatement",
 							name: node.name,
