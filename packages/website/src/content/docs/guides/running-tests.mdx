@@ -144,6 +144,8 @@ The runner compiles and runs each entry on its own. An entry is a file with a `t
 
 The first two lines are the program's own output. The runner loads each entry the way [`essence run`](/docs/reference/cli#run) loads a program, so a module's statements run before its tests. The line prints twice because two entries load `Points.es`: `Points.es` itself, and `Season.tests.es`, which imports it.
 
+A module's statements also read the run's input, as they do under `essence run`. A test reads an empty input, whatever is piped to `essence test`: in a test, [`Terminal.readLine()`](/docs/library/terminal#readLine) returns nothing and [`Terminal.readAll()`](/docs/library/terminal#readAll) returns `""`.
+
 The report lists each file, then its suites, then its tests. A suite is a named group of tests:
 
 - `✓` marks a test that passed, `✗` one that failed, and `–` one that is skipped, followed by `skipped:` and its reason.
@@ -531,6 +533,8 @@ A consumer should ignore any kind it does not know.
 A run remembers what each entry reported. The next run replays an entry when its code, its snapshot and counterexample files, and the run's filters are all unchanged. The summary then counts the replayed entries, and the `--json` stream marks each with `results-cached`. A replayed entry is not loaded, so its module statements do not run.
 
 A test that failed always runs again, and so does a property test. Run `essence test` twice at the end of this guide, and the second run reports `2 of 3 entries cached`. `Winners.tests.es` holds a property test and runs again, so `1 played, 3 points` prints once instead of three times. `--update`, `--coverage` and `--seed` skip the cache, and so does `--cases`, unless it repeats the number `test.cases` sets.
+
+Three kinds of entry are never remembered and run every time, because what they report depends on more than their code: an entry that uses [`Http`](/docs/library/http) in any module it loads, one whose module statements read the run's input, and one that drew from [`Randomness.entropy()`](/docs/library/randomness#entropy), in a test or in a module statement. A source from [`Randomness.seeded`](/docs/library/randomness#seeded) draws the same values on every run, so drawing from one does not stop an entry being remembered.
 
 `ESSENCE_RESULTS_CACHE=off` turns the result cache off. The note `compile cache warm` belongs to a second cache, of compiled bundles, which `ESSENCE_CLI_CACHE=off` turns off. A third, `ESSENCE_COMPILER_CACHE`, holds the compiler's snapshot of the standard library. There is no `--no-cache` flag. To run with nothing reused, turn off all three:
 

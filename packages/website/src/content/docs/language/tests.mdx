@@ -150,7 +150,7 @@ The block sees every name the file declares, exported or not. It takes any state
 - **A [`function`](/docs/reference/syntax-glossary#function), a [`type`](/docs/reference/syntax-glossary#type) or a [`namespace`](/docs/reference/syntax-glossary#namespace) is a helper.** `Fixture` and `leader` exist only for the tests.
 - **There are no hooks.** Essence has no `beforeEach` or `afterEach`. Setup is values.
 
-The statements of the `implementation` block run when the file loads, before the first test. That is why `loaded Lions` prints above the report.
+The statements of the `implementation` block run when the file loads, before the first test. That is why `loaded Lions` prints above the report. They read the run's input, as under `essence run`, but a test reads an empty input: in a test, [`Terminal.readLine()`](/docs/library/terminal#readLine) returns nothing, whatever is piped to `essence test`.
 
 `essence test` compiles the block and runs it. [`essence check`](/docs/reference/cli#check) type-checks it without running it, so a test that compares a number with a string is an error before anything runs. [`essence build`](/docs/reference/cli#build) and [`essence run`](/docs/reference/cli#run) drop the block before they compile. A type error in a test does not stop them, and the built file holds no trace of the tests. `essence build --tests` keeps the block.
 
@@ -676,7 +676,7 @@ implementation {
 }
 ```
 
-[`Randomness.seeded`](/docs/library/randomness#seeded) returns a source that draws the same values for the same seed, so `dice` and `replay` both draw `3`. [`Randomness.entropy()`](/docs/library/randomness#entropy) returns the host's own source, which differs on every run. A source draws with [`drawBoolean`](/docs/library/randomness#drawBoolean), [`drawInteger(between:and:)`](/docs/library/randomness#drawInteger), [`drawRational(between:and:)`](/docs/library/randomness#drawRational) and [`drawString(upTo:)`](/docs/library/randomness#drawString). It chooses from a list with [`pick(from:)`](/docs/library/randomness#pick) and [`shuffle`](/docs/library/randomness#shuffle).
+[`Randomness.seeded`](/docs/library/randomness#seeded) returns a source that draws the same values for the same seed, so `dice` and `replay` both draw `3`. [`Randomness.entropy()`](/docs/library/randomness#entropy) returns the host's own source, which differs on every run, so an entry that draws from it is never replayed from the [result cache](/docs/guides/running-tests#the-result-cache). A source draws with [`drawBoolean`](/docs/library/randomness#drawBoolean), [`drawInteger(between:and:)`](/docs/library/randomness#drawInteger), [`drawRational(between:and:)`](/docs/library/randomness#drawRational) and [`drawString(upTo:)`](/docs/library/randomness#drawString). It chooses from a list with [`pick(from:)`](/docs/library/randomness#pick) and [`shuffle`](/docs/library/randomness#shuffle).
 
 ## Snapshots
 
