@@ -70,10 +70,8 @@ implementation {
 	§ 'Printable', so a bound of its own would break the promise the conformance
 	§ makes — the edit belongs on the 'where', and nothing offers the per-Method
 	§ one the Help withholds.
-	namespace Fulfilling<infer Item, infer Tag> for {
-		items: List<Item>,
-		tag: Tag,
-	}
+	namespace Fulfilling<infer Item, infer Tag>
+		for { items: List<Item>, tag: Tag }
 		is Printable where Tag is Printable
 	{
 		toString() -> String {

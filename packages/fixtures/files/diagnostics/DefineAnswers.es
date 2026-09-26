@@ -9,7 +9,7 @@
 § was showcasing no longer has a home.
 
 implementation {
-	function count (_ found: Optional<Integer>) -> Integer {
+	function count(_ found: Optional<Integer>) -> Integer {
 		<- found::value(defaultingTo 0)
 	}
 

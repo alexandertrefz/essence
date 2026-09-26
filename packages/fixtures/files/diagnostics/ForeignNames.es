@@ -17,7 +17,7 @@ implementation {
 
 	constant names = ["ada", "alan"]
 	constant ready = true
-	constant user = { name = "Ada" }
+	constant user  = { name = "Ada" }
 
 	§ method-called-with-dot — the Method is there and the separator is not. The
 	§ first was called and the second read, which is two Helps and two fixes.
@@ -35,7 +35,7 @@ implementation {
 	§ foreign-syntax — words another language has. Each names what Essence writes
 	§ instead, and the ones that are one word carry a fix.
 	constant missing = null
-	constant listed = new
+	constant listed  = new
 	console.log("hi")
 
 	§ foreign-syntax — the two postfix habits, each of them read as one name. The

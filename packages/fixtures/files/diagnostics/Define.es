@@ -22,14 +22,14 @@ implementation {
 	§ them is held to the answer Type. The arrow wrote this one down.
 	constant grade = define -> Integer {
 		as "A" if score::isGreaterThanOrEqualTo(90)
-		as 0 otherwise
+		as 0   otherwise
 	}
 
 	§ return-type-mismatch — and the same check where the POSITION decided the
 	§ answer Type rather than an arrow, which is the other half of the same
 	§ claim: the Declaration's annotation reaches every arm.
 	constant band: String = define {
-		as 1 if score::isGreaterThanOrEqualTo(90)
+		as 1     if score::isGreaterThanOrEqualTo(90)
 		as "low" otherwise
 	}
 

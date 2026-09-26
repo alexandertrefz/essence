@@ -7,7 +7,10 @@ implementation {
 
 	§ A partial default says which members a call may leave out of the Record
 	§ it writes; every other member still has to be written.
-	function connect(_ url: String, using options: Options = { retries = 3 }) -> String {
+	function connect(
+		_ url: String,
+		using options: Options = { retries = 3 },
+	) -> String {
 		<- url
 	}
 

@@ -15,7 +15,7 @@
 implementation {
 	§ assignment-type-mismatch — two instantiations of the same Choice are not
 	§ interchangeable; a `Step<Integer, String>` is not a `Step<String, Integer>`.
-	constant done: Step<Integer, String> = #Done("stop")
+	constant done: Step<Integer, String>    = #Done("stop")
 	constant swapped: Step<String, Integer> = done
 
 	§ unexpected-payload — the one-member shorthand does not reach a zero-member

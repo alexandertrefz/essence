@@ -9,18 +9,18 @@ implementation {
 	§ A Dictionary holds one value per key, so the second entry would take the
 	§ first one's place and nothing would say the first was ever there. The key
 	§ is the VALUE and not the characters: `2/4` and `1/2` are one key.
-	constant twice = ["alex" = 39, "alex" = 40]
+	constant twice  = ["alex" = 39, "alex" = 40]
 	constant halves = [1/2 = "a", 2/4 = "b"]
 
 	§ A Record is updated in braces and a Dictionary in brackets. The two are
 	§ different forms and not two styles of one form, so each is told which
 	§ pair its base wants rather than measured against the form it is in.
-	constant moved = [config with port = 90]
+	constant moved  = [config with port = 90]
 	constant merged = { ages with ages }
 
 	§ An update may only set keys of the Dictionary's key Type, with the Type
 	§ it declared for its values.
-	constant wrongKey = [ages with 1 = 40]
+	constant wrongKey   = [ages with 1 = 40]
 	constant wrongValue = [ages with "kim" = "seven"]
 
 	§ And a whole Dictionary merged in has to hold both of them.

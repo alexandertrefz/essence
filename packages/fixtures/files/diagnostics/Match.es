@@ -51,7 +51,7 @@ implementation {
 
 	constant kind = match lists -> String {
 		case List<Integer> { <- "numbers" }
-		case List<String> { <- "words" }
+		case List<String>  { <- "words" }
 	}
 
 	§ literal-match-shape — a Match on an Integer DOES name a value, so its Cases

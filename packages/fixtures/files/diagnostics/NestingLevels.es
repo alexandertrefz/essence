@@ -13,8 +13,10 @@
 § Diagnostic it was showcasing no longer has a home.
 
 implementation {
-	constant nested: Optional<Optional<Integer>> = #Value(#Empty)
-	constant failed: Result<Result<Integer, String>, String> = #Value(#Failure("gone"))
+	constant nested: Optional<Optional<Integer>>             = #Value(#Empty)
+	constant failed: Result<Result<Integer, String>, String> = #Value(
+		#Failure("gone")
+	)
 
 	§ ambiguous-nesting-level — the receiver holds `#Empty`, and the answer is
 	§ `false`: the question reached the entry taking the whole Optional, and

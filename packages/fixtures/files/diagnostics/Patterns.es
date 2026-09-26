@@ -28,10 +28,9 @@ implementation {
 
 	§ refutable-pattern — a Parameter is bound after the call has already been
 	§ made, which is the same reason.
-	function area(of { width = 1, height }: {
-		width: Integer,
-		height: Integer,
-	}) -> Integer {
+	function area(
+		of { width = 1, height }: { width: Integer, height: Integer },
+	) -> Integer {
 		<- width::multiply(with height)
 	}
 

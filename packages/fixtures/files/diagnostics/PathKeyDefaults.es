@@ -13,7 +13,10 @@ implementation {
 	§§ @param _ — the address to connect to.
 	§§ @param using — how to connect.
 	§§ @returns — the description.
-	function connect(_ url: String, using options: Options = { retries = 3 }) -> String {
+	function connect(
+		_ url: String,
+		using options: Options = { retries = 3 },
+	) -> String {
 		<- url
 	}
 

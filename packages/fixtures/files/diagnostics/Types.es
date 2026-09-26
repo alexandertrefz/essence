@@ -24,5 +24,5 @@ implementation {
 	}
 
 	constant greeting = greet("World")
-	constant shout = greet(1, times "twice")
+	constant shout    = greet(1, times "twice")
 }

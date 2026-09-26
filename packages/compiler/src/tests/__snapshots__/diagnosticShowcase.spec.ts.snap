@@ -112,11 +112,11 @@ Error: 'complete' waits, and nothing here can wait
 
 [complete-outside-future]
 Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:23:37 │
+    ╭─┤ Asynchrony.es:24:22 │
     │
- 23 │     function padded(_ width: Integer = complete Async.deferred(() { <- 2 })) -> Integer {
-    │                                        ──────────────────┬─────────────────  
-    │                                                          ╰─────────────────── this suspends, and this position can not
+ 24 │        _ width: Integer = complete Async.deferred(() { <- 2 }),
+    │                           ──────────────────┬─────────────────  
+    │                                             ╰─────────────────── this suspends, and this position can not
     │ 
     │ Help: Complete the work above this Declaration, into a Constant the default reads.
     │ 
@@ -125,9 +125,9 @@ Error: 'complete' waits, and nothing here can wait
 
 [needless-complete]
 Warning: This is not work to wait for
-    ╭─┤ Asynchrony.es:30:20 │
+    ╭─┤ Asynchrony.es:32:20 │
     │
- 30 │     constant waited = complete 3
+ 32 │     constant waited = complete 3
     │                                ▲  
     │                                ╰── this is an Integer
     │ 
@@ -138,9 +138,9 @@ Warning: This is not work to wait for
 
 [needless-start]
 Warning: This is not a Future, so there is nothing to start
-    ╭─┤ Asynchrony.es:34:21 │
+    ╭─┤ Asynchrony.es:36:21 │
     │
- 34 │     constant running = start 4
+ 36 │     constant running = start 4
     │                              ▲  
     │                              ╰── this is an Integer
     │ 
@@ -151,9 +151,9 @@ Warning: This is not a Future, so there is nothing to start
 
 [complete-outside-future]
 Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:44:22 │
+    ╭─┤ Asynchrony.es:46:22 │
     │
- 44 │        constant counted = complete Async.deferred(() { <- 5 })
+ 46 │        constant counted = complete Async.deferred(() { <- 5 })
     │                           ──────────────────┬─────────────────  
     │                                             ╰─────────────────── this suspends, and this position can not
     │ 
@@ -164,9 +164,9 @@ Error: 'complete' waits, and nothing here can wait
 
 [complete-outside-future]
 Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:52:21 │
+    ╭─┤ Asynchrony.es:54:21 │
     │
- 52 │        constant padded = complete Async.deferred(() { <- width })
+ 54 │        constant padded = complete Async.deferred(() { <- width })
     │                          ────────────────────┬───────────────────  
     │                                              ╰───────────────────── this suspends, and this position can not
     │ 
@@ -457,9 +457,9 @@ Error: Type Parameter 'Item' does not conform to 'Comparable'
 
 [unsatisfied-bound]
 Error: Type Parameter 'Item' does not conform to 'Comparable'
-    ╭─┤ Conformance.es:80:17 │
+    ╭─┤ Conformance.es:78:17 │
     │
- 80 │          <- "{@.tag} {@.items::sort()::length()}"
+ 78 │          <- "{@.tag} {@.items::sort()::length()}"
     │                       ───────┬───────  
     │                              ╰───────── bound here to an unbounded Type Parameter
     │ 
@@ -665,7 +665,7 @@ Error: This arm does not answer with the Type this 'define' has
 Error: This arm does not answer with the Type this 'define' has
     ╭─┤ Define.es:32:6 │
     │
- 32 │        as 1 if score::isGreaterThanOrEqualTo(90)
+ 32 │        as 1     if score::isGreaterThanOrEqualTo(90)
     │           ▲  
     │           ╰── this is an Integer
     │ 
@@ -842,13 +842,13 @@ Error: Namespace 'Compared' writes 'is' without declaring 'is Equatable'
 exports[`Diagnostic Showcase Dictionaries.es should render the same report every time 1`] = `
 "[duplicate-key]
 Error: This key is written twice
-    ╭─┤ Dictionaries.es:12:33 │
+    ╭─┤ Dictionaries.es:12:34 │
     │
- 12 │     constant twice = ["alex" = 39, "alex" = 40]
-    │                       ───┬──       ───┬──  
-    │                          ╰────────────│──── first written here
-    │                                       │    
-    │                                       ╰──── written a second time here
+ 12 │     constant twice  = ["alex" = 39, "alex" = 40]
+    │                        ───┬──       ───┬──  
+    │                           ╰────────────│──── first written here
+    │                                        │    
+    │                                        ╰──── written a second time here
     │ 
     │ Help: Keep one entry for the key.
     │ 
@@ -872,13 +872,13 @@ Error: This key is written twice
 
 [wrong-update-brackets]
 Error: A Record is updated in braces
-    ╭─┤ Dictionaries.es:18:19 │
+    ╭─┤ Dictionaries.es:18:20 │
     │
- 18 │     constant moved = [config with port = 90]
-    │                      ────┬──────┬───────────  
-    │                          ╰──────│───────────── this is a { port: Integer, host: String }
-    │                                 │             
-    │                                 ╰───────────── this update is written in brackets
+ 18 │     constant moved  = [config with port = 90]
+    │                       ────┬──────┬───────────  
+    │                           ╰──────│───────────── this is a { port: Integer, host: String }
+    │                                  │             
+    │                                  ╰───────────── this update is written in brackets
     │ 
     │ Help: Write the update in braces: '{ base with member = value }'.
     │ 
@@ -902,13 +902,13 @@ Error: A Dictionary is updated in brackets
 
 [partial-type-mismatch]
 Error: This is not a key the Dictionary can hold
-    ╭─┤ Dictionaries.es:23:33 │
+    ╭─┤ Dictionaries.es:23:35 │
     │
- 23 │     constant wrongKey = [ages with 1 = 40]
-    │                          ──┬─      ▲  
-    │                            ╰───────│── this is a Dictionary<String, Integer>
-    │                                    │  
-    │                                    ╰── this is an Integer
+ 23 │     constant wrongKey   = [ages with 1 = 40]
+    │                            ──┬─      ▲  
+    │                              ╰───────│── this is a Dictionary<String, Integer>
+    │                                      │  
+    │                                      ╰── this is an Integer
     │ 
     │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
 ────╯
@@ -1382,11 +1382,11 @@ Error: 'null' names nothing in Essence
 
 [foreign-syntax]
 Error: 'new' names nothing in Essence
-    ╭─┤ ForeignNames.es:38:20 │
+    ╭─┤ ForeignNames.es:38:21 │
     │
- 38 │     constant listed = new
-    │                       ─┬─  
-    │                        ╰─── no such Variable or Constant
+ 38 │     constant listed  = new
+    │                        ─┬─  
+    │                         ╰─── no such Variable or Constant
     │ 
     │ Help: Write the Literal — '{ x = 1 }' for a Record, '[1, 2]' for a List, '["a" = 1]' for a Dictionary.
     │ 
@@ -1934,7 +1934,7 @@ Warning: This Case never sees an empty List
  53 │        case List<Integer> { <- "numbers" }
     │             ──────┬──────  
     │                   ╰──────── this Case runs first
- 54 │        case List<String> { <- "words" }
+ 54 │        case List<String>  { <- "words" }
     │             ──────┬─────  
     │                   ╰─────── an empty List<String> fits the Case above too
     │ 
@@ -2116,9 +2116,9 @@ Error: There is no '@' in a static Method
 exports[`Diagnostic Showcase NestingLevels.es should render the same report every time 1`] = `
 "[ambiguous-nesting-level]
 Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:22:32 │
+    ╭─┤ NestingLevels.es:24:32 │
     │
- 22 │     constant isEmpty = nested::is(#Empty)
+ 24 │     constant isEmpty = nested::is(#Empty)
     │                                ─┐ ───┬──  
     │                                 ╰────│──── this takes an Optional<Integer> as well
     │                                      │    
@@ -2132,9 +2132,9 @@ Warning: This Argument fits the receiver and what it holds
 
 [ambiguous-nesting-level]
 Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:26:38 │
+    ╭─┤ NestingLevels.es:28:38 │
     │
- 26 │     constant isNotEmpty = nested::isNot(#Empty)
+ 28 │     constant isNotEmpty = nested::isNot(#Empty)
     │                                   ──┬── ───┬──  
     │                                     ╰──────│──── this takes an Optional<Integer> as well
     │                                            │    
@@ -2148,9 +2148,9 @@ Warning: This Argument fits the receiver and what it holds
 
 [ambiguous-nesting-level]
 Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:31:34 │
+    ╭─┤ NestingLevels.es:33:34 │
     │
- 31 │     constant hasFailed = failed::is(#Failure("gone"))
+ 33 │     constant hasFailed = failed::is(#Failure("gone"))
     │                                  ─┐ ────────┬───────  
     │                                   ╰─────────│───────── this takes a Result<Integer, String> as well
     │                                             │         
@@ -2164,9 +2164,9 @@ Warning: This Argument fits the receiver and what it holds
 
 [ambiguous-nesting-level]
 Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:37:35 │
+    ╭─┤ NestingLevels.es:39:35 │
     │
- 37 │     constant spelledOut = nested::is(Optional<Optional<Integer>>#Empty)
+ 39 │     constant spelledOut = nested::is(Optional<Optional<Integer>>#Empty)
     │                                   ─┐ ────────────────┬────────────────  
     │                                    ╰─────────────────│────────────────── this takes an Optional<Integer> as well
     │                                                      │                  
@@ -2185,9 +2185,9 @@ Warning: This Argument fits the receiver and what it holds
 exports[`Diagnostic Showcase PathKeyDefaults.es should render the same report every time 1`] = `
 "[path-key-without-default]
 Error: A path key reaches into a member no default fills in
-    ╭─┤ PathKeyDefaults.es:34:49 │
+    ╭─┤ PathKeyDefaults.es:37:49 │
     │
- 34 │     Terminal.print(connect("essence.lang", using { server.port = 1 }))
+ 37 │     Terminal.print(connect("essence.lang", using { server.port = 1 }))
     │                                                    ───┬──  
     │                                                       ╰──── nothing fills in 'server'
     │ 
@@ -2199,9 +2199,9 @@ Error: A path key reaches into a member no default fills in
 
 [path-key-without-default]
 Error: A path key reaches into a member the default does not write out
-    ╭─┤ PathKeyDefaults.es:38:47 │
+    ╭─┤ PathKeyDefaults.es:41:47 │
     │
- 38 │     Terminal.print(reach("essence.lang", using { server.port = 1 }))
+ 41 │     Terminal.print(reach("essence.lang", using { server.port = 1 }))
     │                                                  ───┬──  
     │                                                     ╰──── 'server' is filled in whole
     │ 
@@ -2213,9 +2213,9 @@ Error: A path key reaches into a member the default does not write out
 
 [path-step-not-a-record]
 Error: A path key steps through Records only
-    ╭─┤ PathKeyDefaults.es:43:33 │
+    ╭─┤ PathKeyDefaults.es:46:33 │
     │
- 43 │        reach("essence.lang", using { retries.length = 1, server = fallback }),
+ 46 │        reach("essence.lang", using { retries.length = 1, server = fallback }),
     │                                      ───┬───  
     │                                         ╰───── this is an Integer
     │ 
@@ -2226,9 +2226,9 @@ Error: A path key steps through Records only
 
 [path-key-without-default]
 Error: A path key reaches into a member no default fills in
-    ╭─┤ PathKeyDefaults.es:54:36 │
+    ╭─┤ PathKeyDefaults.es:57:36 │
     │
- 54 │     constant reaching: Fetch = #Get({ origin.port = 3, limits.port = 2 })
+ 57 │     constant reaching: Fetch = #Get({ origin.port = 3, limits.port = 2 })
     │                                       ───┬──  
     │                                          ╰──── nothing fills in 'origin'
     │ 
@@ -2295,22 +2295,20 @@ exports[`Diagnostic Showcase PathKeys.es should render the same report every tim
 Error: This value does not fit the declared Type of Constant 'blank'
     ╭─┤ PathKeys.es:21:27 │
     │
- 21 │ ╭─▶     constant blank: Config = {
-    ┆ ┆   
- 24 │ ├─▶     }
-    │ │           
-    │ ╰─────────── 'server' is missing
+ 21 │     constant blank: Config = { name = "api", server.port = 8080 }
+    │                              ──────────────────┬─────────────────  
+    │                                                ╰─────────────────── 'server' is missing
     │ 
     │ Note: 'blank' is declared as Config.
 ────╯
 
 [path-key-outside-combination]
 Error: A path key reaches into nothing here
-    ╭─┤ PathKeys.es:23:3 │
+    ╭─┤ PathKeys.es:21:43 │
     │
- 23 │        server.port = 8080,
-    │        ─────┬─────  
-    │             ╰─────── this reaches into a value
+ 21 │     constant blank: Config = { name = "api", server.port = 8080 }
+    │                                              ─────┬─────  
+    │                                                   ╰─────── this reaches into a value
     │ 
     │ Help 1: Write the whole member: 'server = { … }'.
     │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
@@ -2320,9 +2318,9 @@ Error: A path key reaches into nothing here
 
 [path-step-not-a-record]
 Error: A path key steps through Records only
-    ╭─┤ PathKeys.es:28:35 │
+    ╭─┤ PathKeys.es:25:35 │
     │
- 28 │     constant renamed = { config with name.length = 1 }
+ 25 │     constant renamed = { config with name.length = 1 }
     │                                      ──┬─  
     │                                        ╰─── this is a String
     │ 
@@ -2333,9 +2331,9 @@ Error: A path key steps through Records only
 
 [path-on-computed-value]
 Error: A path key updates a value it can name
-    ╭─┤ PathKeys.es:32:22 │
+    ╭─┤ PathKeys.es:29:22 │
     │
- 32 │     constant loaded = { load() with server.port = 8080 }
+ 29 │     constant loaded = { load() with server.port = 8080 }
     │                         ───┬──  
     │                            ╰──── this is worked out here, not named
     │ 
@@ -2378,11 +2376,11 @@ Error: A Declaration can not match a value against a Pattern
 
 [refutable-pattern]
 Error: A Parameter can not match a value against a Pattern
-    ╭─┤ Patterns.es:31:21 │
+    ╭─┤ Patterns.es:32:8 │
     │
- 31 │     function area(of { width = 1, height }: {
-    │                        ────┬────  
-    │                            ╰────── this can decline the value
+ 32 │        of { width = 1, height }: { width: Integer, height: Integer },
+    │             ────┬────  
+    │                 ╰────── this can decline the value
     │ 
     │ Help: Write only 'width' to bind it, and ask about its value with 'match'.
     │ 
@@ -2391,9 +2389,9 @@ Error: A Parameter can not match a value against a Pattern
 
 [unknown-member]
 Error: { width: Integer, height: Integer } has no member 'widht'
-    ╭─┤ Patterns.es:41:13 │
+    ╭─┤ Patterns.es:40:13 │
     │
- 41 │     constant { widht } = rectangle
+ 40 │     constant { widht } = rectangle
     │                ──┬──  
     │                  ╰──── no such member
     │ 
@@ -2404,9 +2402,9 @@ Error: { width: Integer, height: Integer } has no member 'widht'
 
 [duplicate-variable]
 Error: Variable 'measure' is already declared
-    ╭─┤ Patterns.es:46:41 │
+    ╭─┤ Patterns.es:45:41 │
     │
- 46 │     constant { width as measure, height as measure } = rectangle
+ 45 │     constant { width as measure, height as measure } = rectangle
     │                         ───┬───            ───┬───  
     │                            ╰──────────────────│───── first declared here
     │                                               │     
@@ -2415,9 +2413,9 @@ Error: Variable 'measure' is already declared
 
 [unbindable-case-payload]
 Error: 'Shape#Rectangle' has no single value to bind
-    ╭─┤ Patterns.es:59:19 │
+    ╭─┤ Patterns.es:58:19 │
     │
- 59 │        case #Rectangle(box) { <- 0 }
+ 58 │        case #Rectangle(box) { <- 0 }
     │                        ─┬─  
     │                         ╰─── this Case carries 2 values
     │ 
@@ -2565,9 +2563,9 @@ Error: Protocol 'Sorted' extends itself through 'Listed'
 exports[`Diagnostic Showcase RecordDefaults.es should render the same report every time 1`] = `
 "[incomplete-record-argument]
 Error: This Argument is missing 2 members the default does not fill in
-    ╭─┤ RecordDefaults.es:14:47 │
+    ╭─┤ RecordDefaults.es:17:47 │
     │
- 14 │     Terminal.print(connect("essence.lang", using { retries = 1 }))
+ 17 │     Terminal.print(connect("essence.lang", using { retries = 1 }))
     │                                                  ───────┬───────  
     │                                                         ╰───────── 'host', 'tls' not written here
     │ 
@@ -2579,9 +2577,9 @@ Error: This Argument is missing 2 members the default does not fill in
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:18:56 │
+    ╭─┤ RecordDefaults.es:21:56 │
     │
- 18 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
+ 21 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
     │                                                           ▲  
     │                                                           ╰── this is an Integer, and Options declares a String
     │ 
@@ -2590,9 +2588,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:22:69 │
+    ╭─┤ RecordDefaults.es:25:69 │
     │
- 22 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
+ 25 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
     │                                                                          ─┐  
     │                                                                           ╰── 'timeout' is not a member of Options
     │ 
@@ -2601,9 +2599,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:35:47 │
+    ╭─┤ RecordDefaults.es:38:47 │
     │
- 35 │     Terminal.print(connect("essence.lang", using partial))
+ 38 │     Terminal.print(connect("essence.lang", using partial))
     │                                                  ───┬───  
     │                                                     ╰───── this is a { host: String, tls: Boolean }
     │ 
@@ -2615,9 +2613,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [incomplete-record-argument]
 Error: This payload is missing 1 member the default does not fill in
-    ╭─┤ RecordDefaults.es:45:36 │
+    ╭─┤ RecordDefaults.es:48:36 │
     │
- 45 │     constant incomplete: Fetch = #Get({})
+ 48 │     constant incomplete: Fetch = #Get({})
     │                                       ─┐  
     │                                        ╰── 'url' not written here
     │ 
@@ -2629,9 +2627,9 @@ Error: This payload is missing 1 member the default does not fill in
 
 [missing-payload]
 Error: Case '#Blank' requires a payload
-    ╭─┤ RecordDefaults.es:50:25 │
+    ╭─┤ RecordDefaults.es:53:25 │
     │
- 50 │     constant bare: Fetch = #Blank
+ 53 │     constant bare: Fetch = #Blank
     │                            ───┬──  
     │                               ╰──── no payload was given
     │ 
@@ -3596,22 +3594,22 @@ Error: This call passes the wrong number of Arguments
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 1
-    ╭─┤ Types.es:27:25 │
+    ╭─┤ Types.es:27:28 │
     │
- 27 │     constant shout = greet(1, times "twice")
-    │                            ▲  
-    │                            ╰── this is an Integer
+ 27 │     constant shout    = greet(1, times "twice")
+    │                               ▲  
+    │                               ╰── this is an Integer
     │ 
     │ Note: Parameter 1 is String.
 ────╯
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'times'
-    ╭─┤ Types.es:27:34 │
+    ╭─┤ Types.es:27:37 │
     │
- 27 │     constant shout = greet(1, times "twice")
-    │                                     ───┬───  
-    │                                        ╰───── this is a String
+ 27 │     constant shout    = greet(1, times "twice")
+    │                                        ───┬───  
+    │                                           ╰───── this is a String
     │ 
     │ Note: Parameter 'times' is Integer.
 ────╯
@@ -3764,26 +3762,26 @@ Error: A Module can not import itself
 
 [unknown-export]
 Error: ./Shapes.es declares nothing named 'aera'
-    ╭─┤ Mirror.es:11:3 │
-    │
- 11 │        aera
-    │        ──┬─  
-    │          ╰─── no such name in that Module
-    │ 
-    │ Help 1: Did you mean 'area'?
-    │ Help 2: Check the spelling, and that the specifier names the file you meant.
-    │ 
-    │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
-────╯
+   ╭─┤ Mirror.es:9:3 │
+   │
+ 9 │        aera
+   │        ──┬─  
+   │          ╰─── no such name in that Module
+   │ 
+   │ Help 1: Did you mean 'area'?
+   │ Help 2: Check the spelling, and that the specifier names the file you meant.
+   │ 
+   │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+───╯
 
 [duplicate-import]
 Error: 'area' is already declared here
-    ╭─┤ Mirror.es:16:3 │
+    ╭─┤ Mirror.es:13:3 │
     │
- 15 │        area
+ 12 │        area
     │        ──┬─  
     │          ╰─── first declared here
- 16 │        area
+ 13 │        area
     │        ──┬─  
     │          ╰─── this binds 'area' a second time
     │ 

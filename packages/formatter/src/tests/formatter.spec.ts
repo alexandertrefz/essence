@@ -103,6 +103,11 @@ const REFUSED = new Set([
 	"diagnostics/ForeignSyntax.es",
 ])
 
+// NOTE: Showcase files the formatter reads but that stay as written, because
+// their layout is what the rendered report shows. `GenericChoice.es` splits the
+// `loop` call over two lines so the report keeps its `#Continue` callback.
+const SHAPED = new Set(["diagnostics/GenericChoice.es"])
+
 describe("formatter", () => {
 	it("finds the corpus", () => {
 		expect(CORPUS.length).toBeGreaterThan(30)
@@ -143,15 +148,10 @@ describe("formatter", () => {
 	// successful compile. The corpus stays canonically formatted because it is
 	// checked here, not because the compiler writes to anybody's source tree.
 	//
-	// The Diagnostic showcase files are exempt: their rendered output is
-	// snapshotted line and column exact by `diagnosticShowcase.spec.ts`, so
-	// they are shaped for the Diagnostics they produce rather than for style.
+	// The showcase files in `REFUSED` and `SHAPED` are exempt.
 	describe("the repository is formatted", () => {
 		for (let file of CORPUS) {
-			if (
-				REFUSED.has(file.name) ||
-				file.name.startsWith("diagnostics/")
-			) {
+			if (REFUSED.has(file.name) || SHAPED.has(file.name)) {
 				continue
 			}
 

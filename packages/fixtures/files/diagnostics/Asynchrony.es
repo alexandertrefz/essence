@@ -20,7 +20,9 @@ implementation {
 	§ complete-outside-future — and the position that can not suspend at all. A
 	§ default is filled in by the emitted Function itself, before any of its own
 	§ asynchrony begins.
-	function padded(_ width: Integer = complete Async.deferred(() { <- 2 })) -> Integer {
+	function padded(
+		_ width: Integer = complete Async.deferred(() { <- 2 }),
+	) -> Integer {
 		<- width
 	}
 

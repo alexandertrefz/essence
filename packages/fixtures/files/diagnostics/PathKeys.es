@@ -18,10 +18,7 @@ implementation {
 
 	§ A plain Literal writes its members from nothing, so there is no `server`
 	§ under this key to reach into.
-	constant blank: Config = {
-		name = "api",
-		server.port = 8080,
-	}
+	constant blank: Config = { name = "api", server.port = 8080 }
 
 	§ Every step but the last names the value the step after it updates, and a
 	§ String can not be updated.
