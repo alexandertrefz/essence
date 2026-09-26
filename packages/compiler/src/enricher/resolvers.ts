@@ -74,6 +74,7 @@ import {
 	completionBarrierIn,
 	declarationWasAbandoned,
 	memberDeclarationWasAbandoned,
+	moduleBindsName,
 	modulePathOf,
 	protocolDeclarationsOf,
 } from "./scope"
@@ -2210,31 +2211,7 @@ export function resolveGenericDeclarations(
 			generic.constraint !== null &&
 			findProtocolInScope(generic.constraint.content, scope) === null
 		) {
-			reportError(
-				`Protocol '${generic.constraint.content}' is not declared`,
-				generic.constraint.position,
-				{
-					code: "unknown-protocol",
-					labels: [
-						primary(
-							generic.constraint.position,
-							"no such Protocol",
-						),
-					],
-					helps: suggestionHelps(
-						generic.constraint.content,
-						scope,
-						"protocols",
-					),
-					...suggestionData(
-						suggestionInScope(
-							generic.constraint.content,
-							scope,
-							"protocols",
-						),
-					),
-				},
-			)
+			reportUnknownProtocol(generic.constraint, scope)
 
 			// NOTE: Not carried, so that no call is refused over it a second time.
 			constraint = null
@@ -2578,18 +2555,7 @@ function resolveExtendedProtocol(
 			)
 		}
 
-		reportError(
-			`Protocol '${identifier.content}' is not declared`,
-			identifier.position,
-			{
-				code: "unknown-protocol",
-				labels: [primary(identifier.position, "no such Protocol")],
-				helps: suggestionHelps(identifier.content, scope, "protocols"),
-				...suggestionData(
-					suggestionInScope(identifier.content, scope, "protocols"),
-				),
-			},
-		)
+		reportUnknownProtocol(identifier, scope)
 
 		return null
 	}
@@ -6540,13 +6506,9 @@ function protocolOutOfScope(
 		notes: [
 			`A conformance is found through the Protocol it names, and '${protocolName}' is not in scope here.`,
 		],
-		helps: declarations.map(({ modulePath, exported }) => {
-			let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
-
-			return exported
-				? `'${protocolName}' is declared in ${fileName} — import it here.`
-				: `'${protocolName}' is declared in ${fileName}, which does not export it — export it there and import it here.`
-		}),
+		helps: declarations.map((declaration) =>
+			declaredInHelp(protocolName, declaration),
+		),
 		...(only?.exported === true
 			? {
 					data: {
@@ -6557,6 +6519,46 @@ function protocolOutOfScope(
 				}
 			: {}),
 	}
+}
+
+// NOTE: An unknown Protocol name where it is written. The Helps name the Modules
+// this one reaches that declare it, then the near miss in scope; the import
+// itself is the Language Server's to offer, from the name under the cursor.
+export function reportUnknownProtocol(
+	identifier: parser.IdentifierNode,
+	scope: enricher.Scope,
+): void {
+	let name = identifier.content
+	let taken = moduleBindsName(scope, name)
+
+	reportError(`Protocol '${name}' is not declared`, identifier.position, {
+		code: "unknown-protocol",
+		labels: [primary(identifier.position, "no such Protocol")],
+		helps: [
+			...protocolDeclarationsOf(scope, name).map((declaration) =>
+				declaredInHelp(name, declaration, taken),
+			),
+			...suggestionHelps(name, scope, "protocols"),
+		],
+		...suggestionData(suggestionInScope(name, scope, "protocols")),
+	})
+}
+
+// NOTE: `taken` where this Module binds the name already, so that the import
+// needs a name of its own and what was written has to become it.
+function declaredInHelp(
+	protocolName: string,
+	{ modulePath, exported }: enricher.ProtocolDeclaration,
+	taken: boolean = false,
+): string {
+	let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
+	let importing = taken
+		? `import it under a name of its own, '${protocolName} as …', and write that name here, since this file binds '${protocolName}' already`
+		: "import it here"
+
+	return exported
+		? `'${protocolName}' is declared in ${fileName} — ${importing}.`
+		: `'${protocolName}' is declared in ${fileName}, which does not export it — export it there and ${importing}.`
 }
 
 // NOTE: The result of checking one conformance clause that holds — its
@@ -6759,26 +6761,7 @@ export function checkProtocolConformance(
 		let protocol = findProtocolInScope(identifier.content, scope)
 
 		if (protocol === null) {
-			reportError(
-				`Protocol '${identifier.content}' is not declared`,
-				identifier.position,
-				{
-					code: "unknown-protocol",
-					labels: [primary(identifier.position, "no such Protocol")],
-					helps: suggestionHelps(
-						identifier.content,
-						scope,
-						"protocols",
-					),
-					...suggestionData(
-						suggestionInScope(
-							identifier.content,
-							scope,
-							"protocols",
-						),
-					),
-				},
-			)
+			reportUnknownProtocol(identifier, scope)
 
 			continue
 		}
@@ -6872,31 +6855,7 @@ export function checkProtocolConformance(
 						},
 					)
 				} else if (rejection.kind === "unknown-protocol") {
-					reportError(
-						`Protocol '${condition.protocol.content}' is not declared`,
-						condition.protocol.position,
-						{
-							code: "unknown-protocol",
-							labels: [
-								primary(
-									condition.protocol.position,
-									"no such Protocol",
-								),
-							],
-							helps: suggestionHelps(
-								condition.protocol.content,
-								scope,
-								"protocols",
-							),
-							...suggestionData(
-								suggestionInScope(
-									condition.protocol.content,
-									scope,
-									"protocols",
-								),
-							),
-						},
-					)
+					reportUnknownProtocol(condition.protocol, scope)
 				} else {
 					// NOTE: One bound per Type Parameter per conformance,
 					// because a conformance threads ONE hidden witness per

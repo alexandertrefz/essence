@@ -2763,6 +2763,87 @@ implementation {
 		)
 	})
 
+	// NOTE: A bound is resolved where it is written, so `Main.es` has to import a
+	// Protocol it names itself, and the Module that declares one is the answer.
+	it("names the Module that declares a Protocol a bound names unimported", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { IntegerSized }
+}
+
+implementation {
+	function measureTwice <infer Item is Sized>(_ item: Item) -> Integer {
+		<- 2
+	}
+
+	Terminal.inspect(measureTwice(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-protocol",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es — import it here.",
+				])
+			},
+		)
+	})
+
+	// NOTE: An import under the declared name would collide with the Type this
+	// file declares.
+	it("asks for a name of its own for a Protocol whose name a Type here takes", () => {
+		let main = (entry: string, bound: string) => `import {
+	from "./Sized.es" { ${entry} }
+}
+
+implementation {
+	type Sized = { count: Integer }
+
+	function measureTwice <infer Item is ${bound}>(_ item: Item) -> Integer {
+		<- 2
+	}
+}
+
+export {
+	measureTwice
+	Sized
+}
+`
+
+		withProject(
+			{
+				"Main.es": main("IntegerSized", "Sized"),
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-protocol",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es — import it under a name of its own, 'Sized as …', and write that name here, since this file binds 'Sized' already.",
+				])
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main("Sized as Measured", "Measured"),
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([])
+			},
+		)
+	})
+
 	// NOTE: `Measure.es` bounds `measure` by a `Sized` it never imported, which
 	// is its own mistake to fix. `Main.es` reaches a `Sized` in another file,
 	// and a Help asking to import that one here would send the edit astray.

@@ -2175,6 +2175,60 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
+		// NOTE: `Main.es` bounds its own Function by a `Sized` it never imported.
+		// The Compiler names the Module that declares it, and the fix writes the
+		// entry, after which nothing is left to report.
+		it("should answer a bound naming an unimported Protocol with the import", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tconstant unit = 1",
+					"}",
+					"",
+					"export {",
+					"\tSized",
+					"\tunit",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { unit }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()::add(unit)",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let reported = analyseDocument(source, mainPath, {
+				host: workspace.host,
+			}).diagnostics.find(
+				(diagnostic) => diagnostic.code === "unknown-protocol",
+			)
+
+			expect(reported?.helps).toEqual([
+				"'Sized' is declared in Sized.es — import it here.",
+			])
+
+			let [fix] = fixesFor(workspace, mainPath, 6, "Sized")
+
+			expect(fix.title).toBe("Import 'Sized' from ./Sized.es")
+			expect(
+				codesAfter(workspace, mainPath, applyEdits(source, fix.edits)),
+			).toEqual([])
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

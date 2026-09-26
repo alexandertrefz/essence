@@ -167,6 +167,27 @@ export function protocolDeclarationsOf(
 	return []
 }
 
+// NOTE: Whether the Module's own Scope, which an import binds into, binds this
+// name already, so that an import under it would be refused. False for a
+// Program that is no Module.
+export function moduleBindsName(scope: enricher.Scope, name: string): boolean {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.protocolDeclarations !== undefined) {
+			return (
+				Object.hasOwn(current.members, name) ||
+				Object.hasOwn(current.types, name) ||
+				Object.hasOwn(current.protocols, name)
+			)
+		}
+	}
+
+	return false
+}
+
 // NOTE: What the Parser abandoned on the way to this Program — the same
 // parent-chain walk `modulePathOf` makes, and for the same reason: a name read
 // deep inside a body has to reach what the Program's top level was told.
