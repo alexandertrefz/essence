@@ -100,6 +100,9 @@ export type LinkedGraph = {
 	// `linkContextOf` — and reading it again is a walk per Module for something
 	// that was already computed here.
 	declarations: Map<string, Map<string, Declaration>>
+	// NOTE: Every Protocol the graph declares, by identity: the registry each
+	// Module's Scope is linked with.
+	protocols: Map<string, common.ProtocolType>
 }
 
 function emptySurface(): ExportSurface {
@@ -645,6 +648,7 @@ export function linkModuleGraph(
 	)
 	let surfaces = new Map<string, ExportSurface>()
 	let linked = new Map<string, LinkedModule>()
+	let protocols = new Map<string, common.ProtocolType>()
 
 	for (let group of graph.groups) {
 		for (let result of linkGroup(
@@ -652,6 +656,7 @@ export function linkModuleGraph(
 			declarations,
 			dependencies,
 			surfaces,
+			protocols,
 			options,
 		)) {
 			surfaces.set(result.module.filePath, result.surface)
@@ -666,6 +671,7 @@ export function linkModuleGraph(
 		modules: linked,
 		diagnostics: graph.diagnostics,
 		declarations,
+		protocols,
 	}
 }
 
@@ -679,6 +685,7 @@ export type LinkContext = {
 	surfaces: Map<string, ExportSurface>
 	declarations: Map<string, Map<string, Declaration>>
 	dependencies: Map<string, Array<string>>
+	protocols: Map<string, common.ProtocolType>
 }
 
 export function linkContextOf(linked: LinkedGraph): LinkContext {
@@ -696,6 +703,7 @@ export function linkContextOf(linked: LinkedGraph): LinkContext {
 				module.module.dependencies,
 			]),
 		),
+		protocols: linked.protocols,
 	}
 }
 
@@ -727,11 +735,14 @@ export function linkModuleAgainst(
 
 	surfaces.delete(module.filePath)
 
+	// NOTE: A copy, which the Module overwrites its own entries in. An entry
+	// it stops declaring is kept, since the surfaces are built against it.
 	return linkGroup(
 		[module],
 		declarations,
 		dependencies,
 		surfaces,
+		new Map(context.protocols),
 		options,
 	)[0]!
 }
@@ -877,6 +888,7 @@ function linkGroup(
 	declarations: Map<string, Map<string, Declaration>>,
 	dependencies: Map<string, Array<string>>,
 	surfaces: Map<string, ExportSurface>,
+	protocols: Map<string, common.ProtocolType>,
 	options: LinkOptions,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
@@ -902,6 +914,14 @@ function linkGroup(
 			diagnostics: [],
 		}
 
+		// NOTE: The builtins a fresh top level Scope binds join the registry
+		// before anything of the Module's own is declared.
+		for (let protocol of Object.values(state.scope.protocols)) {
+			protocols.set(protocol.identity, protocol)
+		}
+
+		state.scope.protocolRegistry = protocols
+		state.scope.programTop = true
 		state.scope.unimportedNamespaces = () =>
 			unimportedNamespacesFor(state, surfaces)
 		state.scope.protocolDeclarations = (name) =>

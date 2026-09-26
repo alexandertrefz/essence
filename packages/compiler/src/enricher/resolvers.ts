@@ -31,6 +31,8 @@ import {
 	describeType,
 	displayChoiceName,
 	displayGenericName,
+	displayProtocolName,
+	protocolIdentity,
 	recordMismatchEvidence,
 	undecidedSlotEvidence,
 	unwaitedWorkReport,
@@ -77,6 +79,7 @@ import {
 	moduleBindsName,
 	modulePathOf,
 	protocolDeclarationsOf,
+	protocolRegistryOf,
 } from "./scope"
 
 // NOTE: Type resolution: the Types written in annotations and signatures, the
@@ -2527,6 +2530,11 @@ export function resolveProtocolDeclarationStatementType(
 	return {
 		type: "Protocol",
 		name: node.name.content,
+		identity: protocolIdentity(
+			modulePathOf(scope),
+			node.name.content,
+			scope.programTop === true ? null : node.name.position,
+		),
 		methods,
 		...(Object.keys(providedMethods).length === 0
 			? {}
@@ -7910,6 +7918,68 @@ export function findProtocolInScope(
 			searchScope = searchScope.parent
 		}
 	}
+}
+
+// NOTE: The Protocol a stored identity names. The nearest Protocol of its name
+// answers where it is the one, and the registry answers everywhere else; an
+// identity neither knows is an Internal Compiler Error.
+export function protocolOf(
+	identity: string,
+	scope: enricher.Scope,
+): common.ProtocolType {
+	let nearest = findProtocolInScope(displayProtocolName(identity), scope)
+
+	if (nearest?.identity === identity) {
+		return nearest
+	}
+
+	let registered = protocolRegistryOf(scope)?.get(identity)
+
+	if (registered === undefined) {
+		throw new Error(`No Protocol is known by '${identity}'`)
+	}
+
+	return registered
+}
+
+// NOTE: The name this Scope reads a Protocol under: its declared name where
+// that binds it, otherwise the nearest name that does, such as an import alias,
+// and null where no name here binds it.
+export function protocolSpelling(
+	identity: string,
+	scope: enricher.Scope,
+): string | null {
+	let declared = displayProtocolName(identity)
+
+	if (findProtocolInScope(declared, scope)?.identity === identity) {
+		return declared
+	}
+
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		for (let name in current.protocols) {
+			if (
+				current.protocols[name].identity === identity &&
+				findProtocolInScope(name, scope) === current.protocols[name]
+			) {
+				return name
+			}
+		}
+	}
+
+	return null
+}
+
+// NOTE: How a message names a Protocol: as this Scope reads it, or by its
+// declared name where nothing here binds it.
+export function describeProtocol(
+	identity: string,
+	scope: enricher.Scope,
+): string {
+	return protocolSpelling(identity, scope) ?? displayProtocolName(identity)
 }
 
 // NOTE: The Protocols in scope that declare a Method of this name, alphabetically

@@ -28,7 +28,12 @@ import {
 	conformanceKey,
 } from "../helpers/conformance"
 import { recordDefaultNesting } from "../helpers/defaults"
-import { describeRecordShape, describeType } from "../helpers/describe"
+import {
+	describeRecordShape,
+	describeType,
+	displayProtocolName,
+	protocolIdentity,
+} from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import { closestMatch } from "../helpers/suggest"
@@ -2581,6 +2586,7 @@ describe("Helpers", () => {
 		const printable: ProtocolType = {
 			type: "Protocol",
 			name: "Printable",
+			identity: "Printable",
 			methods: { toString: toStringRequirement },
 		}
 
@@ -2706,6 +2712,7 @@ describe("Helpers", () => {
 			const combinable: ProtocolType = {
 				type: "Protocol",
 				name: "Combinable",
+				identity: "Combinable",
 				methods: {
 					combine: {
 						type: "OverloadedMethod",
@@ -4250,6 +4257,41 @@ describe("Dictionary Types", () => {
 				resolveUnknownSlots(stored, dictionary(integer, string)),
 			).toBe(stored)
 		})
+	})
+})
+
+describe("Protocol identities", () => {
+	let at = (line: number, column: number): common.Position => ({
+		start: { line, column },
+		end: { line, column: column + 5 },
+	})
+
+	it("should read the declared name back out of every identity", () => {
+		for (let [modulePath, nestedAt] of [
+			[null, null],
+			[null, at(3, 11)],
+			["/project/Sized.es", null],
+			["/project/Sized.es", at(11, 11)],
+			["/work#1/@scope/Sized.es", null],
+			["/work#1/@scope/Sized.es", at(2, 4)],
+		] as const) {
+			expect(
+				displayProtocolName(
+					protocolIdentity(modulePath, "Sized", nestedAt),
+				),
+			).toBe("Sized")
+		}
+	})
+
+	it("should tell a nested Protocol from the one it shadows", () => {
+		expect(protocolIdentity("/project/Main.es", "Sized", null)).toBe(
+			"/project/Main.es#Sized",
+		)
+		expect(protocolIdentity("/project/Main.es", "Sized", at(11, 11))).toBe(
+			"/project/Main.es#Sized@11:11",
+		)
+		expect(protocolIdentity(null, "Tagged", at(3, 11))).toBe("Tagged@3:11")
+		expect(protocolIdentity(null, "Equatable", null)).toBe("Equatable")
 	})
 })
 

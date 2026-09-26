@@ -166,6 +166,7 @@ import {
 	expectedReturnTypeIn,
 	memberDeclarationWasAbandoned,
 	modulePathOf,
+	registerProtocol,
 	scopeMap,
 	typeDeclarationCount,
 	unimportedNamespacesOf,
@@ -9175,6 +9176,7 @@ function declareProtocolInScope(
 	}
 
 	scope.protocols[identifier.content] = protocolType
+	registerProtocol(scope, protocolType)
 
 	return scope
 }

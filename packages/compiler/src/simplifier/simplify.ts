@@ -1149,6 +1149,7 @@ function simplifyProtocolDeclarationStatement(
 	return {
 		nodeType: "ProtocolDeclarationStatement",
 		name: simplifyIdentifier(node.name),
+		identity: node.protocolType.identity,
 		// NOTE: `_self` is typed as the bounded `Self` — the receiver of a
 		// provided Method is not one Type but whichever conformer called it.
 		methods: simplifyMethods(node.methods, {

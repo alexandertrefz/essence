@@ -148,6 +148,46 @@ export function unimportedNamespacesOf(
 	return []
 }
 
+// NOTE: The registry of every Protocol the compile declared, from the nearest
+// Scope that carries one.
+export function protocolRegistryOf(
+	scope: enricher.Scope,
+): Map<string, common.ProtocolType> | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.protocolRegistry !== undefined) {
+			return current.protocolRegistry
+		}
+	}
+
+	return null
+}
+
+// NOTE: Records a Protocol just declared in this Scope in the compile's
+// registry.
+export function registerProtocol(
+	scope: enricher.Scope,
+	protocol: common.ProtocolType,
+): void {
+	protocolRegistryOf(scope)?.set(protocol.identity, protocol)
+}
+
+// NOTE: A registry holding the Protocols a new top level Scope already binds,
+// which are the builtins.
+export function protocolRegistryFor(
+	protocols: Record<string, common.ProtocolType>,
+): Map<string, common.ProtocolType> {
+	return new Map(
+		Object.values(protocols).map((protocol) => [
+			protocol.identity,
+			protocol,
+		]),
+	)
+}
+
 // NOTE: The Modules this one reaches that declare a Protocol of this name, asked
 // of the nearest Scope that knows. Empty for a Program that is no Module.
 export function protocolDeclarationsOf(

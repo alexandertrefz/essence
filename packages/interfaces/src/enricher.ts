@@ -74,6 +74,13 @@ export type Scope = {
 	// not a Type, and keeping the maps apart is what lets Type positions
 	// reject Protocol names with a dedicated Diagnostic.
 	protocols: Record<string, common.ProtocolType>
+	// NOTE: Every Protocol the compile declared, by identity, which is how a
+	// stored identity is read back where no name in Scope binds it. Read through
+	// the parent chain; one Map is shared by every Module of a graph.
+	protocolRegistry?: Map<string, common.ProtocolType>
+	// NOTE: Set on the Scope a Program's top level declarations are made in. A
+	// Protocol declared in any other Scope carries its Position in its identity.
+	programTop?: true
 	// NOTE: The canonical path of the Module whose declarations this Scope
 	// holds, which is what a Choice declared in it takes its nominal identity
 	// from. Absent — the default — for a Program that is no Module: the standard

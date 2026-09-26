@@ -53,6 +53,8 @@ import {
 	childScope,
 	countTypeDeclaration,
 	modulePathOf,
+	protocolRegistryFor,
+	registerProtocol,
 	scopeMap,
 } from "./scope"
 import {
@@ -142,6 +144,9 @@ export function topLevelScope(
 	let members: Record<string, common.Type> = scopeMap(
 		withoutShadowed(builtinMembers(), shadowed?.members),
 	)
+	let protocols = scopeMap(
+		withoutShadowed(builtinProtocols(), shadowed?.protocols),
+	)
 
 	return {
 		parent: null,
@@ -174,9 +179,9 @@ export function topLevelScope(
 		// Essence value to record, and every child Scope leaves the field off.
 		constantValues: scopeMap(),
 		types: scopeMap(withoutShadowed(builtinTypes(), shadowed?.types)),
-		protocols: scopeMap(
-			withoutShadowed(builtinProtocols(), shadowed?.protocols),
-		),
+		protocols,
+		protocolRegistry: protocolRegistryFor(protocols),
+		programTop: true,
 	}
 }
 
@@ -1713,6 +1718,13 @@ function hoistDeclarationsInner(
 
 				targetMap[node.name.content] = speculation.result
 				countTypeDeclaration()
+
+				if (node.nodeType === "ProtocolDeclarationStatement") {
+					registerProtocol(
+						scope,
+						speculation.result as common.ProtocolType,
+					)
+				}
 
 				// NOTE: "Which Namespaces can this Scope see" is memoised
 				// against a version that every declaration bumps, and the hoist

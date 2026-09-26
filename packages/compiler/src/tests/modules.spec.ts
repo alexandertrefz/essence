@@ -2487,6 +2487,54 @@ export {
 		)
 	})
 
+	// NOTE: `Main.es` binds no name for either Protocol, so the registry is the
+	// only way back to them from an identity.
+	it("registers a private Protocol and a nested one by their identities", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { unit }
+}
+
+implementation {
+	Terminal.inspect(unit)
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	function tagged() -> Integer {
+		protocol Sized {
+			count() -> Integer
+		}
+
+		<- 1
+	}
+
+	constant unit = 1
+}
+
+export {
+	unit
+}
+`,
+			},
+			(directory) => {
+				let { protocols } = linkProject(directory, "Main.es")
+				let sizedPath = path.join(directory, "Sized.es")
+				let topLevel = protocols.get(`${sizedPath}#Sized`)
+				let nested = protocols.get(`${sizedPath}#Sized@7:12`)
+
+				expect(Object.keys(topLevel?.methods ?? {})).toEqual(["size"])
+				expect(Object.keys(nested?.methods ?? {})).toEqual(["count"])
+				expect(nested?.identity).toBe(`${sizedPath}#Sized@7:12`)
+				expect(protocols.get("Equatable")?.identity).toBe("Equatable")
+			},
+		)
+	})
+
 	// NOTE: `measure` is bounded by `Sized`, and `IntegerSized` is what makes an
 	// Integer conform to it.
 	const sizedModule = `implementation {

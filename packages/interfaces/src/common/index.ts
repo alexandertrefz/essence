@@ -988,7 +988,12 @@ export type NamespaceType = {
 // GenericUse named "Self".
 export type ProtocolType = {
 	type: "Protocol"
+	// NOTE: The declared name, which is what a reader is shown.
 	name: string
+	// NOTE: What tells two Protocols of one name apart: the declaring Module and
+	// the name, and the Position of the name for one declared inside a body.
+	// See `protocolIdentity`.
+	identity: string
 	// NOTE: Every Method the Protocol's surface holds — its own requirements,
 	// its own provided Methods, and both of those from every Protocol it
 	// extends, merged in at declaration. One record, because everything that

@@ -37,7 +37,7 @@ const AREA = "compiler"
 // one of the sources it digests — so this is belt to that braces, and the one
 // signal that survives a Compiler shipped as a bundle whose fingerprint is
 // coarser.
-const FORMAT = "essence-snapshot-1"
+const FORMAT = "essence-snapshot-2"
 
 // NOTE: How many snapshots of one kind are kept. The key changes on every edit
 // to the Compiler, so a development session would otherwise leave a megabyte of

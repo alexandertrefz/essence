@@ -96,6 +96,30 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
+// NOTE: The nominal identity of a Protocol, by the Choice rule. One declared
+// anywhere but its Program's top level also carries the Position of its name,
+// because it may shadow another of its name in the same Module.
+export function protocolIdentity(
+	modulePath: string | null,
+	name: string,
+	nestedAt: common.Position | null,
+): string {
+	let identity = choiceIdentity(modulePath, name)
+
+	return nestedAt === null
+		? identity
+		: `${identity}@${nestedAt.start.line}:${nestedAt.start.column}`
+}
+
+// NOTE: The declared name inside an identity. A Module path may hold `#` or `@`
+// and a name holds neither.
+export function displayProtocolName(identity: string): string {
+	let name = identity.slice(identity.lastIndexOf("#") + 1)
+	let suffix = name.indexOf("@")
+
+	return suffix === -1 ? name : name.slice(0, suffix)
+}
+
 // NOTE: The Cases of the Choice a Type Alias declares, or null for an alias such
 // as `type Answer = Optional<Integer>` whose Cases belong to another Choice. The
 // alias holds the written name, not the Choice's identity.

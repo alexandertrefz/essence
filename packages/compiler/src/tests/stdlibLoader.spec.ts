@@ -1702,6 +1702,28 @@ describe("Standard Library Loader", () => {
 		])
 	})
 
+	// NOTE: A standard library Protocol is known by its bare name, which holds
+	// only while no two files declare a Protocol of one name.
+	it("declares every Protocol under a name no other file declares", () => {
+		let declared = readStdlibFiles().flatMap(({ filePath, sourceText }) =>
+			parseStdlibSource(
+				filePath,
+				sourceText,
+			).program.implementation.nodes.flatMap((node) =>
+				node.nodeType === "ProtocolDeclarationStatement"
+					? [node.name.content]
+					: [],
+			),
+		)
+		let protocols = loadStdlib().protocols
+
+		expect(declared.length).toBeGreaterThan(0)
+		expect(new Set(declared).size).toBe(declared.length)
+		expect(
+			Object.values(protocols).map((protocol) => protocol.identity),
+		).toEqual(Object.keys(protocols))
+	})
+
 	// NOTE: The order lists above check NAMES. They say nothing about the
 	// values, and a name bound to `{ type: "Error" }` — what an unresolvable
 	// import is bound to, so that one bad entry does not cascade — passes every

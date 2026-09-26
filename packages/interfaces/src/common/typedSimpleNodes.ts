@@ -1570,6 +1570,7 @@ export interface NamespaceDefinitionStatementNode {
 export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
+	identity: string
 	// NOTE: The provided Methods, with `_self` already unshifted onto each and
 	// the hidden `Self__conformance` Parameter already appended by the bounded
 	// Generic rail — exactly the shape a Namespace's Methods arrive in, which
