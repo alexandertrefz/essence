@@ -154,17 +154,13 @@ export function canonicalEncoding(key: AnyType): EncodedKey | null {
 }
 
 // NOTE: The text a Case, a Record or a List encodes to, or `null` for a value
-// that is none of those or that holds a part with no encoding. It is only ever
-// asked under a BRANDED witness, and the witnesses that can carry the brand for
-// these kinds are the ones this text is written to agree with: `Record::is` is
-// the universal structural comparison over the members, whatever `is` a
-// member's own Namespace writes (see `Record.es`); a Choice's DERIVED equality
-// is the same comparison over the payload after the tag has decided the Case;
-// and `List::is` is the items compared pairwise through the ITEM's witness,
-// which is branded exactly when that item witness is — see `encodeKey`. A
-// Choice whose Namespace writes an `is` of its own is never branded, so its
-// keys never reach here, and neither does a List whose items are compared by
-// such a Namespace.
+// that is none of those or that holds a part with no encoding. It is only asked
+// under a branded witness, and a branded witness compares these kinds as the
+// text reads: a Record's members and a Case's payload structurally once the tag
+// has decided the Case, and a List's items through a branded item witness. A
+// Record, Case or List that compares a member or item through a witness with no
+// brand, such as an `is` a Program writes (see `Record.es`), has none either,
+// so its keys scan.
 //
 // NOTE: One text serves two comparisons, which is what makes a List safe to
 // spell in both positions. As a KEY a List is compared by `List::is` through
