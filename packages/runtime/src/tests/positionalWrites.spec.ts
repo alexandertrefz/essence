@@ -4,8 +4,12 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { BooleanType } from "../Boolean"
 import { createBoolean } from "../Boolean"
-import { keys } from "../Dictionary"
-import { group, tally } from "../GroupedList"
+import {
+	type EntryRecord,
+	keys,
+	of__overload$1 as dictionaryOf,
+} from "../Dictionary"
+import { group, index as indexOn, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { compare as compareIntegers, createInteger } from "../Integer"
 import { anyIs, boundChoiceIs } from "../internalHelpers"
@@ -19,6 +23,7 @@ import {
 	everyItem__overload$1 as everyItem,
 	everyItem__overload$2 as everyItemIn,
 	hasDuplicates__overload$1 as hasDuplicates,
+	hasDuplicates__overload$2 as hasDuplicatesOn,
 	insert,
 	is,
 	isSorted,
@@ -29,7 +34,6 @@ import {
 	type ListType,
 	map,
 	materialise,
-	mode,
 	ownItemsOf,
 	partition__overload$1 as partition,
 	prepend__overload$1 as prepend,
@@ -37,12 +41,14 @@ import {
 	reduce__overload$2 as reduceWithStep,
 	remove,
 	removeDuplicates__overload$1 as removeDuplicates,
+	removeDuplicates__overload$2 as removeDuplicatesOn,
 	removeEvery__overload$3 as removeEveryIn,
 	replace__overload$1 as replace,
 	reverse,
 	runs as runsWhere,
 	slice,
 	sort__overload$1 as sort,
+	sort__overload$2 as sortBy,
 	sort__overload$3 as sortOn,
 	split__overload$3 as splitWhere,
 	toString as listToString,
@@ -50,6 +56,7 @@ import {
 } from "../List"
 import { firstItem, lastItem } from "../NonEmptyList"
 import type { OrderingType } from "../Ordering"
+import { createRecord } from "../Record"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
@@ -990,6 +997,10 @@ describe("reentrancy", () => {
 	// NOTE: The list is what makes the audit checkable: a native that takes a
 	// Function or a conformance and reads its receiver belongs here, and one
 	// that is missing is a native that may have forgotten to seal.
+	//
+	// NOTE: `mode` takes neither and runs no user code, so it is not here.
+	// `Dictionary.of(_:)` walks entry Records rather than Integers, so it has a
+	// test of its own.
 	const walks: Array<
 		[
 			string,
@@ -1121,6 +1132,27 @@ describe("reentrancy", () => {
 				}),
 		],
 		[
+			"sort(in:)",
+			(list, visit) =>
+				void sort(list, ascending, {
+					compare: (first: IntegerType, second: IntegerType) => (
+						visit(first),
+						compareIntegers(first, second)
+					),
+				}),
+		],
+		[
+			"sort(by:)",
+			(list, visit) =>
+				void sortBy(
+					list,
+					(first, second) => (
+						visit(first),
+						compareIntegers(first, second)
+					),
+				),
+		],
+		[
 			"sort(on:)",
 			(list, visit) =>
 				void sortOn(list, (item) => (visit(item), item), ascending, {
@@ -1132,8 +1164,26 @@ describe("reentrancy", () => {
 			(list, visit) => void removeDuplicates(list, visiting(visit)),
 		],
 		[
+			"removeDuplicates(on:)",
+			(list, visit) =>
+				void removeDuplicatesOn(
+					list,
+					(item) => (visit(item), item),
+					integerEquality,
+				),
+		],
+		[
 			"hasDuplicates",
 			(list, visit) => void hasDuplicates(list, visiting(visit)),
+		],
+		[
+			"hasDuplicates(on:)",
+			(list, visit) =>
+				void hasDuplicatesOn(
+					list,
+					(item) => (visit(item), item),
+					integerEquality,
+				),
 		],
 		[
 			"everyItem(alsoIn:)",
@@ -1149,7 +1199,6 @@ describe("reentrancy", () => {
 			"contains(everyItemOf:)",
 			(list, visit) => void contains(list, list, visiting(visit)),
 		],
-		["mode", (list, visit) => void mode(visitedThrough(list, visit))],
 		[
 			"group(on:)",
 			(list, visit) =>
@@ -1160,10 +1209,15 @@ describe("reentrancy", () => {
 				),
 		],
 		[
-			"tally",
+			"index(on:)",
 			(list, visit) =>
-				void tally(visitedThrough(list, visit), integerEquality),
+				void indexOn(
+					list,
+					(item) => (visit(item), item),
+					integerEquality,
+				),
 		],
+		["tally", (list, visit) => void tally(list, visitingKey(visit))],
 	]
 
 	// NOTE: A witness that reports every item it is asked about. The set-shaped
@@ -1176,17 +1230,6 @@ describe("reentrancy", () => {
 				createBoolean(first.value === second.value)
 			),
 		}
-	}
-
-	// NOTE: `mode` and `tally` take no Function at all — what they ask about
-	// each item is the item's own encoding — so the visit is reported by a
-	// mapped copy standing in front of them. The List they walk is still the
-	// one being written, which is what the seal is being asked about.
-	function visitedThrough(
-		list: ListType<IntegerType>,
-		visit: (item: IntegerType) => void,
-	): ListType<IntegerType> {
-		return map(list, (item) => (visit(item), item))
 	}
 
 	for (let [label, walk] of walks) {
@@ -1210,6 +1253,46 @@ describe("reentrancy", () => {
 			expect(itemsOf(latest)).toEqual([1, 2, 3, 4, 99])
 		})
 	}
+
+	// NOTE: The key witness reports the key the walk has just reached and
+	// replaces the last entry, so an unsealed walk would file the key 99.
+	test("Dictionary.of(_:) over entries its key witness writes answers the entry keys", () => {
+		let entry = (key: number) =>
+			createRecord({
+				key: createInteger(BigInt(key)),
+				value: createInteger(0n),
+			}) as EntryRecord<IntegerType, IntegerType>
+		let keysOf = (
+			entries: ListType<EntryRecord<IntegerType, IntegerType>>,
+		) => ownItemsOf(entries).map((each) => Number(each.key.value))
+		let entries = replace(
+			createList([1, 2, 3, 4, 5].map(entry)),
+			entry(1),
+			createInteger(0n),
+		)
+		let latest = entries
+		let visited: Array<number> = []
+
+		expect(entries.writes).toBeDefined()
+
+		let answer = dictionaryOf(
+			entries,
+			visitingKey((key) => {
+				visited.push(Number(key.value))
+				latest = replace(latest, entry(99), createInteger(4n))
+			}),
+		)
+
+		expect(itemsOf(keys(answer))).toEqual([1, 2, 3, 4, 5])
+		expect(visited.length).toBeGreaterThan(0)
+
+		for (let seen of visited) {
+			expect([1, 2, 3, 4, 5]).toContain(seen)
+		}
+
+		expect(keysOf(entries)).toEqual([1, 2, 3, 4, 5])
+		expect(keysOf(latest)).toEqual([1, 2, 3, 4, 99])
+	})
 
 	// NOTE: THE OTHER HALF OF THE HAZARD, and the one the sweep above can not
 	// see: a native holding a SECOND List's raw run across the same user code.
