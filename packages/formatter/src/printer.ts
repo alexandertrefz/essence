@@ -775,8 +775,7 @@ export class Printer {
 		}
 
 		// NOTE: A Comment written below the last member belongs to no member,
-		// so nothing carries it — it is written where it stands, above the
-		// block's closing brace.
+		// so it is written where it stands, above the block's closing brace.
 		let loose = this.trivia.takeBefore(section.position.end.line)
 
 		bare.sort((left, right) => compareEntries(left.node, right.node))
