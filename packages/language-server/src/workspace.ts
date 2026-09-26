@@ -42,6 +42,7 @@ import {
 	type Declaration,
 	type DeclarationKind,
 	indexProgram,
+	isBuiltinProtocolMember,
 	occurrenceAt,
 	type OccurrenceAccess,
 	type ProgramIndex,
@@ -115,6 +116,9 @@ export type WorkspaceSymbol = {
 	// NOTE: Every file a declaration of the symbol is written in: one, unless
 	// it renames with others, as a requirement does with its conformers' Methods.
 	declaredIn: Array<string>
+	// NOTE: Set where a Method of the group answers a member of a standard
+	// library Protocol, which is declared outside every workspace.
+	answersBuiltin?: boolean
 	occurrences: Array<WorkspaceOccurrence>
 }
 
@@ -1559,6 +1563,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			filePath,
 			definition: occurrence.declaration.definition,
 			declaredIn: [filePath],
+			answersBuiltin: occurrence.declaration.answersBuiltin,
 			occurrences: occurrence.declaration.occurrences.map((site) => ({
 				filePath,
 				position: site.position,
@@ -1626,8 +1631,14 @@ type SiteData = {
 	labelled?: boolean
 	filePath: string | null
 	definition: common.Position | null
+	answersBuiltin?: boolean
 	occurrences: Array<WorkspaceOccurrence>
 }
+
+// NOTE: What `protocolMemberKey` answers for a standard library Protocol's
+// member. That member has no site to join, so a Method answering it is marked
+// instead.
+const builtinMember = Symbol("builtinMember")
 
 type JoinedWorkspace = {
 	symbolFor(
@@ -1882,6 +1893,16 @@ function joinComponent(
 		}
 	}
 
+	let topLevelBinding = (
+		filePath: string,
+		name: string,
+		space: "values" | "types",
+	): Declaration | undefined =>
+		indices
+			.get(filePath)
+			?.scopes.find((entry) => entry.range === null)
+			?.scope[space].get(name)
+
 	// NOTE: The Declaration a name written in this file resolves to, wherever
 	// that is declared, and under the name it is declared with there. A Protocol
 	// is not a value, so its name binds among the Types.
@@ -1890,10 +1911,7 @@ function joinComponent(
 		name: string,
 		space: "values" | "types",
 	): { filePath: string; name: string } | null => {
-		let topLevel = indices
-			.get(filePath)
-			?.scopes.find((entry) => entry.range === null)?.scope
-		let binding = topLevel?.[space].get(name)
+		let binding = topLevelBinding(filePath, name, space)
 		let localKey =
 			binding === undefined || binding.builtin
 				? undefined
@@ -1921,7 +1939,15 @@ function joinComponent(
 		protocolName: string,
 		memberName: string,
 		visited: Set<string> = new Set(),
-	): string | undefined => {
+	): string | typeof builtinMember | undefined => {
+		if (
+			topLevelBinding(filePath, protocolName, "types")?.builtin === true
+		) {
+			return isBuiltinProtocolMember(protocolName, memberName)
+				? builtinMember
+				: undefined
+		}
+
 		let declaring = declaringSiteOf(filePath, protocolName, "types")
 
 		if (declaring === null) {
@@ -1978,11 +2004,13 @@ function joinComponent(
 			let memberKey: string | undefined
 
 			if (reference.protocol === true) {
-				memberKey = protocolMemberKey(
+				let key = protocolMemberKey(
 					filePath,
 					reference.namespaceName,
 					reference.memberName,
 				)
+
+				memberKey = key === builtinMember ? undefined : key
 			} else {
 				let declaring = declaringSiteOf(
 					filePath,
@@ -2025,7 +2053,13 @@ function joinComponent(
 				link.memberName,
 			)
 
-			if (ownKey !== undefined && memberKey !== undefined) {
+			if (ownKey === undefined || memberKey === undefined) {
+				continue
+			}
+
+			if (memberKey === builtinMember) {
+				sites.get(ownKey)!.answersBuiltin = true
+			} else {
 				union(memberKey, ownKey)
 			}
 		}
@@ -2062,6 +2096,9 @@ function joinComponent(
 					),
 				),
 			],
+			answersBuiltin: members.some(
+				([, site]) => site.answersBuiltin === true,
+			),
 			occurrences: members.flatMap(([, site]) => site.occurrences),
 		}
 	}

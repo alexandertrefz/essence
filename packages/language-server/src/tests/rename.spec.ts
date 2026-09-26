@@ -1579,6 +1579,87 @@ describe("identifierPattern", () => {
 			expect(findOccurrence(source, { line: 2, column: 38 })).toBeNull()
 		})
 
+		// NOTE: The member is declared in the standard library, which no rename
+		// reaches, so renaming the Method alone would break the conformance.
+		// `Boxes` reaches it through an extension.
+		it("should not rename a Method that answers a builtin Protocol's member", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Showable is Printable {",
+				"\t\tdescribe() -> String",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Printable {",
+				"\t\ttoString() -> String {",
+				'\t\t\t<- "bag"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Box = { count: Integer }",
+				"",
+				"\tnamespace Boxes for Box is Showable {",
+				"\t\ttoString() -> String {",
+				'\t\t\t<- "box"',
+				"\t\t}",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "a box"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 0 }",
+				"",
+				"\tTerminal.inspect(bag::toString())",
+				"}",
+			].join("\n")
+
+			expect(findOccurrence(source, { line: 9, column: 3 })).toBeNull()
+			expect(findOccurrence(source, { line: 17, column: 3 })).toBeNull()
+			expect(findOccurrence(source, { line: 28, column: 24 })).toBeNull()
+			expect(
+				findOccurrence(source, { line: 21, column: 3 }),
+			).not.toBeNull()
+		})
+
+		// NOTE: Every JavaScript object carries `toString` and `valueOf`, but
+		// `Equatable` declares neither.
+		it("should rename a Method that a builtin Protocol it conforms to does not declare", () => {
+			let source = [
+				"implementation {",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Equatable {",
+				"\t\tis(_ other: Bag) -> Boolean {",
+				"\t\t\t<- @.count::is(other.count)",
+				"\t\t}",
+				"",
+				"\t\ttoString() -> String {",
+				'\t\t\t<- "bag"',
+				"\t\t}",
+				"",
+				"\t\tvalueOf() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 0 }",
+				"",
+				"\tTerminal.inspect(bag::toString())",
+				"\tTerminal.inspect(bag::valueOf())",
+				"}",
+			].join("\n")
+
+			expect(rename(source, { line: 9, column: 3 }, "describe")).toBe(
+				source.replaceAll("toString", "describe"),
+			)
+			expect(rename(source, { line: 13, column: 3 }, "total")).toBe(
+				source.replaceAll("valueOf", "total"),
+			)
+			expect(findOccurrence(source, { line: 5, column: 3 })).toBeNull()
+		})
+
 		// NOTE: A requirement and its conformers' Methods rename as one. `Pairs`
 		// conforms through an extension, and `measure` and the provided body
 		// call through a bounded Type.

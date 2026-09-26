@@ -140,6 +140,10 @@ export type Declaration = {
 	// NOTE: Shared with every Declaration this one renames with, as a Method
 	// does with the requirement it answers (`shareConformanceSites`).
 	occurrences: Array<RenameSite>
+	// NOTE: Set on a Method that answers a member of a standard library
+	// Protocol. No rename reaches that member, so renaming the Method alone
+	// would break the conformance.
+	answersBuiltin?: boolean
 }
 
 export type Scope = {
@@ -271,6 +275,18 @@ const builtinValues = () => Object.entries(builtinMembers())
 const builtinTypes = () => Object.keys(builtinTypeTable())
 
 const builtinProtocols = () => Object.keys(builtinProtocolTable())
+
+// NOTE: Whether a standard library Protocol's surface holds the member, which
+// is then declared where no rename reaches. `methods` is a plain object, so
+// an inherited name such as `toString` is not one of its members.
+export function isBuiltinProtocolMember(
+	protocolName: string,
+	memberName: string,
+): boolean {
+	let protocol = builtinProtocolTable()[protocolName]
+
+	return protocol !== undefined && Object.hasOwn(protocol.methods, memberName)
+}
 
 const reservedWords = new Set([
 	"if",
@@ -409,7 +425,11 @@ export function findRenameableOccurrence(
 
 	let occurrence = findOccurrence(program, cursor, enrichedProgram)
 
-	if (occurrence === null || occurrence.declaration.builtin) {
+	if (
+		occurrence === null ||
+		occurrence.declaration.builtin ||
+		occurrence.declaration.answersBuiltin === true
+	) {
 		return null
 	}
 
@@ -2631,9 +2651,38 @@ function protocolMember(
 	return undefined
 }
 
+// NOTE: Whether the member is one a standard library Protocol declares, reached
+// through the Protocols this file declares.
+function holdsBuiltinMember(
+	context: WalkContext,
+	protocolName: string,
+	memberName: string,
+	visited: Set<string> = new Set(),
+): boolean {
+	if (visited.has(protocolName)) {
+		return false
+	}
+
+	visited.add(protocolName)
+
+	let binding = context.scopes
+		.find((entry) => entry.range === null)
+		?.scope.types.get(protocolName)
+
+	if (binding?.builtin === true) {
+		return isBuiltinProtocolMember(protocolName, memberName)
+	}
+
+	return (context.protocolExtensions.get(protocolName) ?? []).some(
+		(extended) =>
+			holdsBuiltinMember(context, extended, memberName, visited),
+	)
+}
+
 // NOTE: The linked Declarations share one list of sites, so a rename, a
-// reference search or a linked edit started at any of them reaches all. Each
-// keeps its own definition, which is where a call bound to it still leads.
+// reference search or a linked edit started at any of them reaches all. They
+// share `answersBuiltin` too. Each keeps its own definition, which is where a
+// call bound to it still leads.
 function shareConformanceSites(context: WalkContext) {
 	let parents = new Map<Declaration, Declaration>()
 
@@ -2655,6 +2704,12 @@ function shareConformanceSites(context: WalkContext) {
 		let member = protocolMember(context, link.protocolName, link.memberName)
 
 		if (member === undefined) {
+			if (
+				holdsBuiltinMember(context, link.protocolName, link.memberName)
+			) {
+				link.declaration.answersBuiltin = true
+			}
+
 			continue
 		}
 
@@ -2685,8 +2740,16 @@ function shareConformanceSites(context: WalkContext) {
 				a.position.start.column - b.position.start.column,
 		)
 
+		let answersBuiltin = group.some(
+			(member) => member.answersBuiltin === true,
+		)
+
 		for (let member of group) {
 			member.occurrences = sites
+
+			if (answersBuiltin) {
+				member.answersBuiltin = true
+			}
 		}
 	}
 }

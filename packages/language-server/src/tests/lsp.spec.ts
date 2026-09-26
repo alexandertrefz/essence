@@ -1942,6 +1942,107 @@ describe("A rename asked of the Server", () => {
 			files.dispose()
 		}
 	})
+
+	// NOTE: `Boxes` reaches `toString` through a Protocol another Module
+	// declares, and `describe` is that Protocol's own. `Equatable` does not
+	// declare `toString`.
+	it("should refuse a Method that answers a standard library Protocol's member", async () => {
+		let showable = [
+			"implementation {",
+			"\tprotocol Showable is Printable {",
+			"\t\tdescribe() -> String",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\tShowable",
+			"}",
+			"",
+		].join("\n")
+		let bag = [
+			"import {",
+			'\tfrom "./Showable.es" { Showable }',
+			"}",
+			"",
+			"implementation {",
+			"\ttype Bag = { count: Integer }",
+			"",
+			"\tnamespace Bags for Bag is Printable {",
+			"\t\ttoString() -> String {",
+			'\t\t\t<- "bag"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Box = { count: Integer }",
+			"",
+			"\tnamespace Boxes for Box is Showable {",
+			"\t\ttoString() -> String {",
+			'\t\t\t<- "box"',
+			"\t\t}",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "a box"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Crate = { count: Integer }",
+			"",
+			"\tnamespace Crates for Crate is Equatable {",
+			"\t\tis(_ other: Crate) -> Boolean {",
+			"\t\t\t<- @.count::is(other.count)",
+			"\t\t}",
+			"",
+			"\t\ttoString() -> String {",
+			'\t\t\t<- "crate"',
+			"\t\t}",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+		let files = makeSessionWorkspace({
+			"Showable.es": showable,
+			"Bag.es": bag,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Bag.es"), bag)
+			await session.settle()
+
+			let prepare = (line: number, needle: string) =>
+				session
+					.request(PrepareRenameRequest.type, {
+						textDocument: {
+							uri: uriOf(files.pathOf("Bag.es")),
+						},
+						position: {
+							line,
+							character: bag.split("\n")[line]!.indexOf(needle),
+						},
+					})
+					.then(
+						() => "accepted",
+						(error: { code: number; message: string }) => ({
+							code: error.code,
+							message: error.message,
+						}),
+					)
+			let refused = {
+				code: ErrorCodes.InvalidRequest,
+				message:
+					"'toString' is declared outside this workspace, so its other uses can not be found.",
+			}
+
+			expect(await prepare(8, "toString")).toEqual(refused)
+			expect(await prepare(16, "toString")).toEqual(refused)
+			expect(await prepare(20, "describe")).toBe("accepted")
+			expect(await prepare(32, "toString")).toBe("accepted")
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
 })
 
 // NOTE: A standard library source is an ordinary `.es` file that two rules do

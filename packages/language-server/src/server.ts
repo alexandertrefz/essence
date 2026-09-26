@@ -1427,14 +1427,17 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// workspace folder is one whose other occurrences this Server was never
 		// asked to index, so renaming it would rewrite the uses it happens to
 		// have found and leave the rest naming something that no longer exists.
-		// A requirement declared outside counts for every conformer's Method.
+		// A requirement declared outside counts for every conformer's Method,
+		// and the standard library is outside every workspace.
 		if (
 			anchor !== null &&
-			folders.length > 0 &&
-			[anchor.symbol.filePath, ...anchor.symbol.declaredIn].some(
-				(filePath) =>
-					filePath !== null && !workspace.isInWorkspace(filePath),
-			)
+			(anchor.symbol.answersBuiltin === true ||
+				(folders.length > 0 &&
+					[anchor.symbol.filePath, ...anchor.symbol.declaredIn].some(
+						(filePath) =>
+							filePath !== null &&
+							!workspace.isInWorkspace(filePath),
+					)))
 		) {
 			return new ResponseError(
 				ErrorCodes.InvalidRequest,
