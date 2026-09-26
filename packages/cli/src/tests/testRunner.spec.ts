@@ -3187,6 +3187,79 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
+	const drawsInTest = [
+		"tests {",
+		'\ttest "rolls a die" {',
+		"\t\texpect Randomness.entropy()::drawInteger(between 1, and 6)::isLessThanOrEqualTo(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const drawsAtLoad = [
+		"implementation {",
+		"\tconstant roll = Randomness.entropy()::drawInteger(between 1, and 6)",
+		"}",
+		"",
+		"tests {",
+		'\ttest "rolled a die as it loaded" {',
+		"\t\texpect roll::isLessThanOrEqualTo(6)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const drawsSeeded = [
+		"tests {",
+		'\ttest "rolls a seeded die" {',
+		'\t\texpect Randomness.seeded("docs")::drawInteger(between 1, and 6)::is(3)',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: What the machine answered is in no key, whether a test drew it or
+	// a Module's own statements did as the bundle loaded.
+	it("never remembers an entry that drew the machine's entropy", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{
+					"InTest.tests.es": drawsInTest,
+					"AtLoad.tests.es": drawsAtLoad,
+					"Standalone.tests.es": standalone,
+				},
+				async (directory) => {
+					expect((await runTests(directory)).code).toBe(EXIT_SUCCESS)
+					expect(records(store)).toHaveLength(1)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("1 of 3 entries cached")
+				},
+			)
+		})
+	})
+
+	// NOTE: A seeded source answers the same draws for the same code, which is
+	// in the key.
+	it("remembers an entry whose tests drew from a seeded source", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Seeded.tests.es": drawsSeeded },
+				async (directory) => {
+					expect((await runTests(directory)).code).toBe(EXIT_SUCCESS)
+					expect(records(store)).toHaveLength(1)
+
+					let { code, out } = await runTests(directory)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(out).toContain("1 of 1 entry cached")
+				},
+			)
+		})
+	})
+
 	// NOTE: Fresh entropy every run is what a property test IS. Freezing a
 	// hundred cases under a name would end its search, and the values it has
 	// already failed on are the corpus's business rather than this store's.

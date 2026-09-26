@@ -16,6 +16,7 @@ import {
 	createRandomness,
 	entropy,
 	fraction,
+	hasDrawnEntropy,
 	nextWord,
 	seedOf,
 } from "./Randomness"
@@ -2872,6 +2873,10 @@ export const entryPoints = {
 	// empty one, so the reads it reports are a Module's own statements, run as
 	// the bundle loaded.
 	hasReadHostInput,
+	// NOTE: Whether this bundle drew from the machine's entropy, in a test or
+	// as it loaded. A `run` handed no seed draws one here too, so a runner that
+	// asks this hands it one.
+	hasDrawnEntropy,
 }
 
 // #endregion

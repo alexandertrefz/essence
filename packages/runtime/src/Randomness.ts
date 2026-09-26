@@ -137,7 +137,17 @@ const ENTROPY_WORDS = new Uint32Array(256)
 
 let entropyCursor = ENTROPY_WORDS.length
 
+// NOTE: Whether a draw has read the machine. A runner that remembers results
+// asks it after a run, since what the machine answered is in no key.
+let entropyDrawn = false
+
+export function hasDrawnEntropy(): boolean {
+	return entropyDrawn
+}
+
 function entropyWord(): number {
+	entropyDrawn = true
+
 	if (entropyCursor >= ENTROPY_WORDS.length) {
 		globalThis.crypto.getRandomValues(ENTROPY_WORDS)
 		entropyCursor = 0

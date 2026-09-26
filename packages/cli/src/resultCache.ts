@@ -28,15 +28,10 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 // would have to key a test against a graph slice nothing computes, and anything
 // coarser would lose the whole project to one edit.
 //
-// NOTE: THE ONE EXCEPTION, and the one thing above that is not true of every
-// Program. A test that reaches the network is not a function of its inputs at
-// all: the same bytes asked the same question of the same host answer
-// differently on Tuesday, and a remembered pass would go on reporting Monday's
-// answer until something unrelated changed the key. So an entry whose bundle
-// links a runtime module that talks to the world is neither read from this
-// store nor written to it — see `linksEffectfulRuntime`, which is what decides
-// it, and which asks the BUNDLE rather than the sources, because a bundle is
-// all a warm run has in hand.
+// NOTE: The network, the host's input read as a bundle loads and the machine's
+// entropy are in no key, so an entry that reached one is never written here.
+// `linksEffectfulRuntime` decides the first from the bundle, and the bundle's
+// own `hasReadHostInput` and `hasDrawnEntropy` the other two.
 //
 // NOTE: A sibling of `cache.ts` in shape and deliberately so: same area rules,
 // same atomic write, same age-ordered prune. What it holds is the only
@@ -236,13 +231,12 @@ export function resultKey(parts: ResultKeyParts): string {
 
 // NOTE: The runtime modules a cached answer may not have been produced by. One
 // name so far, and it is named rather than reached for: `Http` is the module a
-// Program's requests go out through, and everything else in this runtime answers
-// out of the Program's own values.
+// Program's requests go out through.
 //
-// NOTE: `Terminal`'s reads are not among them, though they reach a host
-// descriptor. Every test reads an empty input, and an entry whose bundle read
-// the host's as it loaded says so through `hasReadHostInput` and is not
-// remembered.
+// NOTE: `Terminal` and `Randomness` are not among them, though both reach the
+// host, because every test bundle links both. A bundle that read the host's
+// input or drew the machine's entropy says so through `hasReadHostInput` or
+// `hasDrawnEntropy` instead.
 //
 // NOTE: Spelled as esbuild LABELS it. Every module a bundle inlines is written
 // into the output under its path relative to the runtime directory — see

@@ -1383,6 +1383,12 @@ export async function runTest(
 				continue
 			}
 
+			// NOTE: The key holds nothing the machine's entropy answered,
+			// whether a test drew it or a Module's own statements did.
+			if (suite.tests.hasDrawnEntropy()) {
+				continue
+			}
+
 			// NOTE: Asked on the way IN rather than on the way out. An entry
 			// whose bundle reaches the world is never written here, so there is
 			// nothing for a later run to find — which is what keeps the warm
