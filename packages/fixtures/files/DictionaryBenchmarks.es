@@ -13,14 +13,15 @@ implementation {
 	§ times the wait, and ten thousand of them measure nothing a reader would
 	§ sit through.
 	§
-	§ WHAT THEY MEASURED, on an Apple M3 Pro under Bun 1.4.0 — the median of
-	§ eight runs, and the same time divided by the keys the body touched:
+	§ WHAT THEY MEASURED, on an Apple M3 Pro under Bun 1.4.0, and `toString()`
+	§ under 1.4.2 — the median of eight runs, and the same time divided by the
+	§ keys the body touched:
 	§
 	§   Dictionary, ten thousand String keys
 	§     counted in, `update(at:defaultingTo:with:)`   683 µs   68.3 ns/key
 	§     set in, `set(_:to:)`                          487 µs   48.7 ns/key
 	§     read out, `value(at:defaultingTo:)`           280 µs   28.0 ns/key
-	§     printed, `toString()`                         635 µs   63.5 ns/entry
+	§     printed, `toString()`                         488 µs   48.8 ns/entry
 	§   Dictionary, a hundred writes from ONE base     32.7 ms    327 µs/fork
 	§   A List becoming a Dictionary, ten thousand items over a hundred keys
 	§     `tally()`                                     254 µs   25.4 ns/item
@@ -54,7 +55,7 @@ implementation {
 	§     read out, `value(at:defaultingTo:)`           186 µs    186 ns/key
 	§   Choice keys, encoded by tag and payload
 	§     set in, `set(_:to:)`                          143 µs    143 ns/key
-	§     read out, `value(at:defaultingTo:)`           140 µs    140 ns/key
+	§     read out, `value(at:defaultingTo:)`           128 µs    128 ns/key
 	§   A payload-free Choice, ten thousand reads of three keys
 	§     read out, `value(at:defaultingTo:)`           344 µs   34.4 ns/read
 	§   Record keys holding a Dictionary, found by the scan path

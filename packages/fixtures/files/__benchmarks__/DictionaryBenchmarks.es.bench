@@ -21,7 +21,7 @@ benchmark "Choice keys/builds a thousand"
 	160000 ns
 
 benchmark "Choice keys/looks a thousand up"
-	165000 ns
+	147000 ns
 
 benchmark "Choice keys/looks three payload-free Cases up ten thousand times"
 	400000 ns
@@ -39,7 +39,7 @@ benchmark "Dictionary/looks ten thousand keys up"
 	322000 ns
 
 benchmark "Dictionary/prints ten thousand entries"
-	730000 ns
+	561000 ns
 
 benchmark "Dictionary/sets ten thousand keys"
 	560000 ns
