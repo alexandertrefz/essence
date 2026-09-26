@@ -3207,13 +3207,9 @@ export const enumerableProtocolName = "Enumerable"
 
 export const enumerableMethodName = "cases"
 
-// NOTE: The names this enrichment looked up IN SCOPE to derive a conformance,
-// and the one thing a Module can read a name through without writing it
-// anywhere. `outcome::is(#Failure(…))` derives Equatable for the Choice the
-// receiver belongs to, and deriving it means finding the Choice BY NAME in this
-// Module's Scope — so an import that carries a Choice reaching the file only as
-// a Type Argument is load-bearing, with no Identifier and no Namespace name left
-// behind to say so.
+// NOTE: The names this enrichment reached a conformance through without
+// writing them: the Choice a derived `is` finds by name, and every Namespace
+// that could conform to a bound, whether or not the call is refused.
 //
 // Read back by the linker's unused-import check, which is the one question in
 // the Compiler that has to know how a name was REACHED rather than what it
@@ -3221,26 +3217,26 @@ export const enumerableMethodName = "cases"
 // a nested load — the standard library, on the first compile of a process —
 // records into whichever collection is open, which over-counts a name in a file
 // that does not import it and can only make this quieter.
-let derivedTypeNames: Set<string> | null = null
+let reachedNames: Set<string> | null = null
 
-export function collectDerivedTypeNames<Result>(run: () => Result): {
+export function collectReachedNames<Result>(run: () => Result): {
 	result: Result
 	names: Set<string>
 } {
-	let outer = derivedTypeNames
+	let outer = reachedNames
 	let names = new Set<string>()
 
-	derivedTypeNames = names
+	reachedNames = names
 
 	try {
 		return { result: run(), names }
 	} finally {
-		derivedTypeNames = outer
+		reachedNames = outer
 	}
 }
 
-function noteDerivedTypeName(name: string): void {
-	derivedTypeNames?.add(name)
+function noteReachedName(name: string): void {
+	reachedNames?.add(name)
 }
 
 // NOTE: The identity of the Choice a receiver belongs to, or null when it
@@ -3359,7 +3355,7 @@ function declaredChoiceAliasOf(
 	// Module's same-named Choice is no more this Choice than a shadowed one is.
 	let declared = findTypeInScope(displayChoiceName(identity), scope)
 
-	noteDerivedTypeName(displayChoiceName(identity))
+	noteReachedName(displayChoiceName(identity))
 
 	if (declared === null || declared.type !== "GenericAlias") {
 		return null
@@ -3414,7 +3410,7 @@ function choiceTypeOf(
 	// NOTE: Recorded whatever the lookup answered. A name that resolves to
 	// nothing here is a name this Module was reaching for, which is exactly what
 	// the unused-import check is asking about.
-	noteDerivedTypeName(displayChoiceName(identity))
+	noteReachedName(displayChoiceName(identity))
 
 	if (declared === null) {
 		return null
@@ -6068,6 +6064,10 @@ function solveNamespaceConformance(
 		candidates,
 		(candidate) => candidate.declaredTarget,
 	)
+
+	for (let candidate of candidates) {
+		noteReachedName(candidate.name)
+	}
 
 	if (candidates.length === 0) {
 		// NOTE: No written Namespace conforms — a Choice still does, through

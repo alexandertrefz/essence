@@ -5481,7 +5481,7 @@ Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-a
 
 ### `unused-import`
 
-**Warning.** Nothing in the module reads an imported name. A namespace counts as used when a call runs one of its methods.
+**Warning.** Nothing in the module reads an imported name. A namespace counts as used when a call runs one of its methods, and a call refused for want of a conformance still counts the namespaces it would have used.
 
 <div class="error-output">
 

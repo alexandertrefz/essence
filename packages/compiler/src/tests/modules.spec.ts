@@ -3254,6 +3254,89 @@ implementation {
 		)
 	})
 
+	// NOTE: The call is refused for want of `IntegerWeighed`, and `ListSized` is
+	// the Namespace it would conform through, so its entry is not one to remove.
+	it("counts the Namespace a refused call would have used", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure([1, 2]))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace IntegerWeighed for Integer is Weighed {
+		weight() -> Integer {
+			<- @
+		}
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	IntegerWeighed
+	ListSized
+	measure
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["unsatisfied-conformance-condition"])
+			},
+		)
+	})
+
+	it("says what counts as a use of an imported Protocol", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { Sized }
+}
+
+implementation {
+	Terminal.inspect(3)
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let [unused] = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(unused?.code).toBe("unused-import")
+				expect(unused?.notes).toEqual([
+					"A Protocol counts as used where this file names it or calls a Method it provides.",
+				])
+			},
+		)
+	})
+
 	// NOTE: `Main.es` declares the bound itself without importing `Sized`, which
 	// is `unknown-protocol` there. The refused bound asks nothing of the call.
 	it("stays quiet at a call to a Function whose bound its own Module refused", () => {
@@ -3323,11 +3406,7 @@ implementation {
 			(directory) => {
 				expect(
 					codesOf(analysedAt(directory, "Main.es", "Main.es")),
-				).toEqual([
-					"unused-import",
-					"unused-import",
-					"unknown-protocol",
-				])
+				).toEqual(["unused-import", "unknown-protocol"])
 			},
 		)
 	})

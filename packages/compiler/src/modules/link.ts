@@ -859,7 +859,7 @@ function linkGroup(
 			reportUnusedImports(
 				state,
 				enriched[index]!.program,
-				enriched[index]!.derivedTypeNames,
+				enriched[index]!.reachedNames,
 			)
 
 			if (group.length > 1) {
@@ -1401,15 +1401,15 @@ function reportExportProblems(
 function usedNames(
 	module: Module,
 	program: common.typed.Program,
-	// NOTE: The names the Enricher looked up in this Module's Scope to DERIVE a
-	// conformance, which is the one way a Module reads an imported name without
-	// writing it anywhere. See `collectDerivedTypeNames`.
-	derivedTypeNames: Set<string>,
+	// NOTE: The names the Enricher reached a conformance through in this
+	// Module's Scope, which is how a Module reads an imported name without
+	// writing it anywhere. See `collectReachedNames`.
+	reachedNames: Set<string>,
 	// NOTE: The Protocols this Module's Scope binds, by local name. The typed
 	// tree names a Protocol by identity, and every name bound to one is read.
 	protocols: Record<string, common.ProtocolType>,
 ): Set<string> {
-	let names = new Set(derivedTypeNames)
+	let names = new Set(reachedNames)
 	let identities = new Set<string>()
 
 	let visit = (node: unknown): void => {
@@ -1473,7 +1473,7 @@ function usedNames(
 		// that answers one, would never be reported although removing the
 		// entry compiles. A Choice reaching this file as a Type Argument, whose
 		// Equatable is derived by looking the Choice up by name, is recorded
-		// where that lookup happens and arrives here as `derivedTypeNames`.
+		// where that lookup happens and arrives here as `reachedNames`.
 
 		for (let value of Object.values(record)) {
 			visit(value)
@@ -1502,7 +1502,7 @@ function usedNames(
 function reportUnusedImports(
 	state: ModuleState,
 	program: common.typed.Program,
-	derivedTypeNames: Set<string>,
+	reachedNames: Set<string>,
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
@@ -1528,7 +1528,7 @@ function reportUnusedImports(
 	let used = usedNames(
 		state.module,
 		program,
-		derivedTypeNames,
+		reachedNames,
 		state.scope.protocols,
 	)
 
@@ -1538,6 +1538,9 @@ function reportUnusedImports(
 		}
 
 		let local = binding.entry.alias ?? binding.entry.name
+		let isProtocol =
+			state.scope.protocols[binding.localName] !== undefined &&
+			state.scope.members[binding.localName] === undefined
 
 		reportWarning(
 			`'${binding.localName}' is imported and never used`,
@@ -1546,7 +1549,9 @@ function reportUnusedImports(
 				code: "unused-import",
 				labels: [primary(local.position, "nothing reads this name")],
 				notes: [
-					"A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
+					isProtocol
+						? "A Protocol counts as used where this file names it or calls a Method it provides."
+						: "A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
 				],
 				helps: ["Remove the entry."],
 				tags: ["unnecessary"],
