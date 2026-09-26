@@ -57,12 +57,16 @@ implementation {
 	§     read out, `value(at:defaultingTo:)`           140 µs    140 ns/key
 	§   A payload-free Choice, ten thousand reads of three keys
 	§     read out, `value(at:defaultingTo:)`           344 µs   34.4 ns/read
+	§   Record keys holding a Dictionary, found by the scan path
+	§     set in, `set(_:to:)`                         23.8 ms   23.8 µs/key
+	§     read out, `value(at:defaultingTo:)`          24.2 ms   24.2 µs/key
 	§
 	§ A Record key and a Case are encoded by their parts, so each is found in
 	§ one step as a String is, at a few times a String's cost for the text the
 	§ parts are spelled into. A key with no encoding is found by a walk that
-	§ asks the key's own `is` of each entry, the scan path. A Record or a Case
-	§ holding a List encodes as well, so no suite here measures the scan path.
+	§ asks the key's own `is` of each entry, the scan path. A Record holding a
+	§ Dictionary is such a key, and at a thousand entries its walk costs over
+	§ a hundred times what an encoded Record key costs.
 
 	§ An entry as the baseline holds it. It is the Record a Dictionary hands
 	§ every callback, written down as the Type of a List's items.
@@ -89,9 +93,10 @@ implementation {
 		Right,
 	}
 
-	§ A Record key holding a List. The List has a canonical encoding, so the
-	§ Record has one too, and it is found in one step as `Seat` is.
-	type Tagged = { row: Integer, tags: List<String> }
+	§ A Record key holding a Dictionary. The Record compares that member by
+	§ the Dictionary's own `is`, which no encoding stands in for, so the key
+	§ is found by asking the Record's `is` of each entry: the scan path.
+	type Tagged = { row: Integer, tags: Dictionary<String, Integer> }
 
 	§ One row of a season, for the Methods that turn a List into a
 	§ Dictionary.
@@ -169,7 +174,7 @@ implementation {
 		::set(#Right, to 3)
 
 	constant tagged: List<Tagged> = List.of(integersFrom 0, through 999)
-		::map((number) { <- { row = number, tags = ["a"] } })
+		::map((number) { <- { row = number, tags = ["a" = 1] } })
 
 	constant noTagged: Dictionary<Tagged, Integer> = [=]
 
@@ -338,9 +343,8 @@ tests {
 
 	§ A Case is found the same way, under its tag and its payload. The
 	§ baselines beside this file are what hold a Choice key to the encoded
-	§ path: the scan path measured forty times these numbers at a thousand
-	§ entries, so a Choice key that fell back onto it would fail the run
-	§ rather than quietly cost what it cost before.
+	§ path: a thousand keys cost many times these numbers on the scan path, so
+	§ a Choice key that fell back onto it would fail the run.
 	suite "Choice keys" {
 		benchmark "builds a thousand" {
 			constant filled = tickets::reduce(
@@ -368,8 +372,9 @@ tests {
 		}
 	}
 
-	§ Despite the name, these keys take the encoded path: `Tagged` holds a
-	§ List, and a List has a canonical encoding.
+	§ A `Tagged` key has no encoding, so every write and every lookup walks
+	§ the entries asking the Record's `is` of each. The walk is what these two
+	§ measure.
 	suite "Scan-path keys" {
 		benchmark "builds a thousand" {
 			constant filled = tagged::reduce(

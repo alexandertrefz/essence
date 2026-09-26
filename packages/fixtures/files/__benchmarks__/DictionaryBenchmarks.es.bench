@@ -54,7 +54,7 @@ benchmark "Record keys/looks a thousand up"
 	210000 ns
 
 benchmark "Scan-path keys/builds a thousand"
-	8000000 ns
+	27500000 ns
 
 benchmark "Scan-path keys/looks a thousand up"
-	8500000 ns
+	28000000 ns
