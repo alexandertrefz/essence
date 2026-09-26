@@ -2007,8 +2007,11 @@ export function reachableEssenceMethods(
 //                            ConformanceValues and its own Arguments are
 //                            ordinary Expressions, both reached by the
 //                            recursion below)
-//   Lookup (Identifier base) a static call OR a bare static reference —
-//                            base.name, member.name
+//   Lookup                   a static call OR a bare static reference —
+//                            namespaceName or a Namespace base's name +
+//                            member.name
+//   Combination              a Dictionary update — `merge` for a Dictionary
+//                            on the right, `set` for written entries
 //   ConformanceValue         a witness `{ m: X.m }` — namespaceName + each
 //                            methodMap value; a conditional one nests more
 //                            ConformanceValues in `conditions`, reached below
@@ -2130,11 +2133,17 @@ export function essenceMethodReferences(
 		}
 
 		let record = node as Record<string, unknown>
+		let isUpdatingDictionary =
+			record["nodeType"] === "Combination" &&
+			isDictionaryUpdate(
+				(record["lhs"] as { type?: common.Type } | undefined)?.type,
+			)
 
 		if (
 			record["nodeType"] === "MethodInvocation" ||
 			record["nodeType"] === "UnionMethodInvocation" ||
 			record["nodeType"] === "FunctionInvocation" ||
+			isUpdatingDictionary ||
 			(record["nodeType"] === "Intrinsic" &&
 				record["kind"] === "dispatch-chain") ||
 			// NOTE: An inlined loop RUNS the bodies it holds, which is what the
@@ -2241,25 +2250,30 @@ export function essenceMethodReferences(
 					implemented,
 					true,
 				)
+				consider(
+					record["namespaceName"],
+					record["memberName"],
+					mergingShims,
+					true,
+				)
 			}
 		} else if (record["nodeType"] === "Lookup") {
-			// NOTE: A `Lookup` off an Identifier whose TYPE is a Namespace is a
-			// static-Method reference or a static-Property read — as a call's
-			// callee or a bare value both — and is the only spelling
-			// `rewriteLookup` sends through `namespaceMember`. The Type is what
-			// decides it there, so it decides it here: a local named after a
-			// Namespace (`constant Optional = { otherwise = 5 }`) is a Record
-			// field read, and drawing an edge from it would emit a const nothing
-			// names.
+			// NOTE: `rewriteLookup` reads a member off a Namespace where the
+			// base's Type is one, or where the Lookup carries the Namespace a
+			// Choice's `cases` is written in. A local named after a Namespace
+			// (`constant Optional = { otherwise = 5 }`) is a Record field read.
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
-
-			if (
-				base?.["nodeType"] === "Identifier" &&
+			let namespaceName =
+				record["namespaceName"] ??
+				(base?.["nodeType"] === "Identifier" &&
 				(base["type"] as Record<string, unknown> | undefined)?.[
 					"type"
 				] === "Namespace"
-			) {
+					? base["name"]
+					: undefined)
+
+			if (namespaceName !== undefined) {
 				// NOTE: A member a Protocol PROVIDED is a const of its own and
 				// no member of the Namespace it is written on, so the edge goes
 				// where the emission goes.
@@ -2270,13 +2284,13 @@ export function essenceMethodReferences(
 					// Property wherever it is named at all — reading its const is
 					// what yields the value, so there is no handing it on.
 					consider(
-						base["name"],
+						namespaceName,
 						member?.["name"],
 						implemented,
 						!isStored,
 					)
 					consider(
-						base["name"],
+						namespaceName,
 						member?.["name"],
 						implementedProperties,
 						true,
@@ -2286,23 +2300,40 @@ export function essenceMethodReferences(
 					// bare reference to it is routed to the shim too, because
 					// the merge is what makes it the whole Method.
 					consider(
-						base["name"],
+						namespaceName,
 						member?.["name"],
 						mergingShims,
 						!isStored,
 					)
 				}
 			}
+		} else if (isUpdatingDictionary) {
+			let rhs = record["rhs"] as Record<string, unknown> | undefined
+			let memberName =
+				rhs?.["nodeType"] === "DictionaryValue"
+					? dictionarySetName
+					: dictionaryMergeName
+
+			consider("Dictionary", memberName, implemented, true)
+			consider("Dictionary", memberName, mergingShims, true)
 		} else if (record["nodeType"] === "ConformanceValue") {
 			let methodMap = record["methodMap"] as
 				| Record<string, unknown>
 				| undefined
 
+			// NOTE: A witness is called at full arity, so a native whose shim
+			// merges a Record default is named by its shim here as well.
 			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
 				consider(
 					record["namespaceName"],
 					namespaceMethodName,
 					implemented,
+					!isStored,
+				)
+				consider(
+					record["namespaceName"],
+					namespaceMethodName,
+					mergingShims,
 					!isStored,
 				)
 			}
@@ -4206,10 +4237,7 @@ function rewriteCombination(
 	// standing where a `NonEmptyDictionary` is wanted is exactly that: a
 	// Dictionary update wearing a Refinement, which reads as no Dictionary at
 	// all and would be `Object.assign`ed as though it were a Record.
-	let baseType =
-		node.lhs.type.type === "Refinement" ? node.lhs.type.base : node.lhs.type
-
-	if (baseType.type === "Dictionary") {
+	if (isDictionaryUpdate(node.lhs.type)) {
 		return rewriteDictionaryCombination(node)
 	}
 
@@ -4248,6 +4276,20 @@ function rewriteCombination(
 	}
 }
 
+// NOTE: Whether a Combination with a base of this Type is a Dictionary update.
+// `essenceMethodReferences` asks it too, so the edges it draws follow the calls
+// emitted here.
+function isDictionaryUpdate(lhsType: common.Type | undefined): boolean {
+	let baseType = lhsType?.type === "Refinement" ? lhsType.base : lhsType
+
+	return baseType?.type === "Dictionary"
+}
+
+// NOTE: The Dictionary Methods an update is emitted as calls of. `merge`'s first
+// entry is the one taking only `with`.
+const dictionaryMergeName = "merge__overload$1"
+const dictionarySetName = "set"
+
 // NOTE: A Dictionary update, emitted as the calls an author could have written
 // by hand: `[ages with "kim" = 7, "sam" = 9]` is `set` over `set`, and
 // `[ages with other]` is `merge(with other)`. Neither is a merge of two objects
@@ -4278,14 +4320,7 @@ function rewriteDictionaryCombination(
 		return {
 			type: "CallExpression",
 			optional: false,
-			// NOTE: `merge` is written in Essence and reached by name through
-			// the one helper every emission site routes through, so the search
-			// that decides which standard library consts a Module carries finds
-			// this call exactly as it finds a written one. The name is the
-			// standard library's own — `merge`'s FIRST entry, the one taking
-			// only `with` — and `Dictionary.es` is where the two are kept in
-			// step.
-			callee: namespaceMember("Dictionary", "merge__overload$1"),
+			callee: namespaceMember("Dictionary", dictionaryMergeName),
 			arguments: [
 				rewriteExpression(node.lhs),
 				rewriteExpression(node.rhs),
@@ -4300,7 +4335,7 @@ function rewriteDictionaryCombination(
 		built = {
 			type: "CallExpression",
 			optional: false,
-			callee: namespaceMember("Dictionary", "set"),
+			callee: namespaceMember("Dictionary", dictionarySetName),
 			arguments: [
 				built,
 				rewriteExpression(entry.key),

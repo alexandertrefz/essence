@@ -3415,6 +3415,355 @@ describe("Code Generation", () => {
 
 					expect([...refs.references]).toEqual([])
 				})
+
+				// NOTE: `[ages with other]` is emitted as a call of `merge`, and
+				// `[ages with "kim" = 7]` as a call of `set` per entry.
+				describe("a Dictionary update", () => {
+					const updates = new Set([
+						"Dictionary merge__overload$1",
+						"Dictionary set",
+					])
+
+					function updateOf(
+						lhsType: unknown,
+						rhs: unknown,
+					): Record<string, unknown> {
+						return {
+							nodeType: "Combination",
+							lhs: {
+								nodeType: "Identifier",
+								name: "ages",
+								type: lhsType,
+							},
+							rhs,
+						}
+					}
+
+					const other = {
+						nodeType: "Identifier",
+						name: "other",
+						type: { type: "Dictionary" },
+					}
+
+					it("follows the merge a Dictionary on the right is emitted as", () => {
+						let refs = essenceMethodReferences(
+							updateOf({ type: "Dictionary" }, other),
+							updates,
+						)
+
+						expect([...refs.references]).toEqual([
+							"$es_Dictionary_merge__overload$1",
+						])
+						expect([...refs.evaluatedReferences]).toEqual([
+							"$es_Dictionary_merge__overload$1",
+						])
+					})
+
+					it("follows the set written entries are emitted as", () => {
+						let refs = essenceMethodReferences(
+							updateOf(
+								{ type: "Dictionary" },
+								{
+									nodeType: "DictionaryValue",
+									entries: [{ key: {}, value: {} }],
+									keyConformance: null,
+								},
+							),
+							updates,
+						)
+
+						expect([...refs.references]).toEqual([
+							"$es_Dictionary_set",
+						])
+					})
+
+					it("reads the base through the Refinement it carries", () => {
+						let refs = essenceMethodReferences(
+							updateOf(
+								{
+									type: "Refinement",
+									base: { type: "Dictionary" },
+								},
+								other,
+							),
+							updates,
+						)
+
+						expect([...refs.references]).toEqual([
+							"$es_Dictionary_merge__overload$1",
+						])
+					})
+
+					it("draws no edge from a Record update", () => {
+						let refs = essenceMethodReferences(
+							updateOf({ type: "Record" }, other),
+							updates,
+						)
+
+						expect([...refs.references]).toEqual([])
+					})
+
+					// NOTE: The update runs the call it is emitted as, so a Method
+					// handed to it counts as evaluated, as it does under a written
+					// `set`.
+					it("evaluates a static Method stored by the update", () => {
+						let refs = essenceMethodReferences(
+							updateOf(
+								{ type: "Dictionary" },
+								{
+									nodeType: "DictionaryValue",
+									entries: [
+										{
+											key: {},
+											value: {
+												nodeType: "Lookup",
+												base: {
+													nodeType: "Identifier",
+													name: "Target",
+													type: { type: "Namespace" },
+												},
+												member: {
+													nodeType: "Identifier",
+													name: "static",
+												},
+											},
+										},
+									],
+									keyConformance: null,
+								},
+							),
+							implemented,
+						)
+
+						expect([...refs.evaluatedReferences]).toEqual([
+							"$es_Target_static",
+						])
+					})
+				})
+
+				// NOTE: `Shade.cases()` beside `namespace Shades for Shade` names
+				// the Choice in its base and is emitted off the Namespace the
+				// Lookup carries.
+				it("follows a `cases` read off the Namespace that writes it", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "Lookup",
+							base: {
+								nodeType: "Identifier",
+								name: "Shade",
+								type: { type: "Choice" },
+							},
+							member: { nodeType: "Identifier", name: "cases" },
+							namespaceName: "Shades",
+						},
+						new Set(["Shades cases"]),
+					)
+
+					expect([...refs.references]).toEqual(["$es_Shades_cases"])
+				})
+
+				// NOTE: A witness and a devirtualised witness name a native at
+				// full arity, which is where `namespaceMember` routes a native
+				// whose shim merges a Record default.
+				describe("a native whose shim merges a Record default", () => {
+					const mergingShims = new Set(["Target sent"])
+
+					function referencesOf(root: unknown): Array<string> {
+						return [
+							...essenceMethodReferences(
+								root,
+								new Set(),
+								new Set(),
+								new Set(),
+								new Set(),
+								new Set(),
+								mergingShims,
+							).references,
+						]
+					}
+
+					it("follows a witness's method map to the shim", () => {
+						expect(
+							referencesOf({
+								nodeType: "ConformanceValue",
+								namespaceName: "Target",
+								methodMap: { send: "sent" },
+								conditions: [],
+							}),
+						).toEqual(["$es_Target_sent"])
+					})
+
+					it("follows a devirtualised witness to the shim", () => {
+						expect(
+							referencesOf({
+								nodeType: "Intrinsic",
+								kind: "direct-method",
+								namespaceName: "Target",
+								memberName: "sent",
+							}),
+						).toEqual(["$es_Target_sent"])
+					})
+				})
+			})
+
+			// NOTE: The real sources and one more file, installed as the library
+			// for the length of the block, so the emitted bodies spell their
+			// consts from the prelude the walk is handed.
+			describe("the edges of a library body", () => {
+				// NOTE: Appended to the real sources, so its imports resolve to
+				// the real files and `merge` is the library's own.
+				const reached = `import {
+	from "./Dictionary.es" { Dictionary }
+	from "./Enumerable.es" { Enumerable }
+	from "./List.es" { NonEmptyList }
+	from "./String.es" { String }
+}
+
+declarations {
+
+	§§ A shade of a colour.
+	choice Shade {
+		Light,
+		Dark,
+	}
+
+	§ Named apart from the Choice, so \`Shade.cases()\` reads this Namespace's
+	§ \`cases\` through the Choice's own name.
+	namespace Shades for Shade is Enumerable {
+		§§ Every Shade.
+		§§
+		§§ @returns — every Shade, lightest first.
+		static cases() -> NonEmptyList<Shade> {
+			<- [#Light, #Dark]
+		}
+	}
+
+	namespace Reached for String {
+		§§ Every Shade, read through the Choice.
+		§§
+		§§ @returns — every Shade, lightest first.
+		static shades() -> NonEmptyList<Shade> {
+			<- Shade.cases()
+		}
+
+		§§ The two Dictionaries as one.
+		§§
+		§§ @param _ — the Dictionary to add to
+		§§ @param with — the Dictionary whose entries to add
+		§§ @returns — the merged Dictionary.
+		static merged(
+			_ first: Dictionary<String, Integer>,
+			with other: Dictionary<String, Integer>,
+		) -> Dictionary<String, Integer> {
+			<- [first with other]
+		}
+
+		§§ The Dictionary with one more entry.
+		§§
+		§§ @param _ — the Dictionary to add to
+		§§ @returns — the Dictionary with the entry.
+		static extended(
+			_ first: Dictionary<String, Integer>,
+		) -> Dictionary<String, Integer> {
+			<- [first with "kim" = 7]
+		}
+	}
+}
+
+export {
+	Reached
+	Shade
+}
+`
+
+				let replacedStdlib: Stdlib | null = null
+
+				beforeAll(() => {
+					let sources = readStdlibFiles().map(
+						({ filePath, sourceText }) =>
+							parseStdlibSource(
+								filePath,
+								filePath.endsWith("Prelude.es")
+									? sourceText.replace(
+											/\n}\s*$/,
+											'\n\tfrom "./Reached.es" { Reached }\n}\n',
+										)
+									: sourceText,
+							),
+					)
+
+					sources.push(parseStdlibSource("Reached.es", reached))
+
+					replacedStdlib = useStdlib(loadStdlibFrom(sources))
+				})
+
+				afterAll(() => {
+					useStdlib(replacedStdlib)
+				})
+
+				it("reaches merge from a body that writes a Dictionary update", () => {
+					let reachable = reachableEssenceMethods(stdlibPrelude(), [
+						callOf("Reached", "merged"),
+					])
+
+					expect([...reachable.keys()]).toContain(
+						"$es_Dictionary_merge__overload$1",
+					)
+				})
+
+				it("reaches a cases written in a Namespace of another name", () => {
+					let reachable = reachableEssenceMethods(stdlibPrelude(), [
+						callOf("Reached", "shades"),
+					])
+
+					expect([...reachable.keys()]).toContain("$es_Shades_cases")
+				})
+
+				it("compiles and runs a Program that reaches those bodies", async () => {
+					expect(
+						await run(`implementation {
+	Terminal.inspect(Reached.merged(["amy" = 1], with ["bo" = 2]))
+	Terminal.inspect(Reached.extended(["amy" = 1]))
+	Terminal.inspect(Reached.shades())
+}`),
+					).toEqual([
+						'[ "amy" = 1, "bo" = 2 ]',
+						'[ "amy" = 1, "kim" = 7 ]',
+						"[ Shade#Light, Shade#Dark ]",
+					])
+				})
+
+				// NOTE: `namespaceMember` spells each body's consts and the walk
+				// reads its edges off the typed body, so a shape only one of the
+				// two knows fails here for every body that writes it.
+				it("draws an edge to every const a library body names", () => {
+					let whole = reachableEssenceMethods(
+						stdlibPrelude(),
+						[],
+						stdlibFreeFunctions(),
+						null,
+						"whole",
+					)
+
+					let unfollowed = [...whole].flatMap(([name, member]) => {
+						try {
+							checkEssenceMethodsAreDeclared(
+								{
+									type: "Program",
+									sourceType: "module",
+									body: [member.declaration],
+								},
+								new Set([name, ...member.references]),
+							)
+
+							return []
+						} catch (error) {
+							return [`${name}: ${(error as Error).message}`]
+						}
+					})
+
+					expect(unfollowed).toEqual([])
+				})
 			})
 		})
 
