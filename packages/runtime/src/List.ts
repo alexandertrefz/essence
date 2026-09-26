@@ -165,12 +165,14 @@ export function viewOf<ItemType extends AnyType>(
 // this one" copy the whole table every turn.
 //
 // NOTE: Every call of `walkOf` and `sealedRunsOf` here that hands items to user
-// code, and the `materialise` in `sort(on:)`, is held against a callback that
-// writes the List being walked, in `positionalWrites.spec.ts`. `is`, `compare`,
-// `contains(everyItemOf:)`, `everyItem(alsoIn:)`, `removeEvery(contentsOf:)`
-// and the generic Choice member walk in `internalHelpers.ts` are held against a
-// distinct freshly logged argument as well, because one box passed as both
-// operands hides exactly this class of bug behind the receiver's own seal.
+// code, and the `materialise` in each `sort`, is held against a callback that
+// writes the List being walked, in `positionalWrites.spec.ts`. `sort(in:)` and
+// `sort(by:)` compare a copy of that Array, so only `sort(on:)` needs its seal.
+// `is`, `compare`, `contains(everyItemOf:)`, `everyItem(alsoIn:)`,
+// `removeEvery(contentsOf:)` and the generic Choice member walk in
+// `internalHelpers.ts` are held against a distinct freshly logged argument,
+// because one box passed as both operands hides a missing seal behind the
+// receiver's own.
 export function walkOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
