@@ -36,11 +36,11 @@ import {
 	resolveRefinementConjuncts,
 	resolveTypeAliasStatementSkeleton,
 	resolveTypeAliasStatementType,
+	settleConformanceClauses,
 } from "./enrichers"
 import { exampleSuite, exampleTestsOf } from "./examples"
 import {
 	collectDerivedTypeNames,
-	dropRefusedConditions,
 	forgetNamespaceTargets,
 	invalidateNamespacesInScope,
 	referencedTypeNames,
@@ -1866,15 +1866,28 @@ function hoistDeclarationsInner(
 	rereadAliases(true)
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
-	// NOTE: After the final seeding, so that a condition is dropped only where
-	// its Protocol never arrives.
+	// NOTE: After the final seeding, so that a clause or a condition is left
+	// out only where its Protocol never arrives. A solve made during the rounds
+	// saw the clauses unsettled, so every Scope's memo is dropped.
+	let settled: Array<common.NamespaceType> = []
+
 	for (let unit of units) {
 		for (let node of unit.nodes) {
 			let type = hoistedTypes.get(node)
 
-			if (type?.type === "Namespace") {
-				dropRefusedConditions(type, unit.scope)
+			if (
+				type?.type === "Namespace" &&
+				node.nodeType === "NamespaceDefinitionStatement" &&
+				settleConformanceClauses(type, node, unit.scope)
+			) {
+				settled.push(type)
 			}
+		}
+	}
+
+	for (let type of settled) {
+		for (let unit of units) {
+			invalidateNamespacesInScope(unit.scope, type.name, type)
 		}
 	}
 

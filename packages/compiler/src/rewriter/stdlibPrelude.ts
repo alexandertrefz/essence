@@ -120,7 +120,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 					namespaces.push({
 						name: node.name.name,
 						protocol: true,
-						identity: node.name.name,
+						identity: node.identity,
 						node: {
 							nodeType: "NamespaceDefinitionStatement",
 							name: node.name,

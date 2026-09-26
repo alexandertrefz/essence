@@ -531,6 +531,34 @@ describe("Completion", () => {
 			expect(labels).toContain("describe")
 		})
 
+		// NOTE: The nested `Sized` shadows the top-level one and is another
+		// Protocol, so its bound reaches its own Methods and none of the other's.
+		it("should list the Methods of a bound on a Protocol declared in a body", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\tfunction inner() -> Integer {",
+				"\t\tprotocol Sized {",
+				"\t\t\tcount() -> Integer",
+				"\t\t}",
+				"",
+				"\t\tfunction gauge <infer Item is Sized>(_ item: Item) -> Integer {",
+				"\t\t\t<- item::",
+				"\t\t}",
+				"",
+				"\t\t<- 1",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 12, column: 13 })).toEqual([
+				"count",
+			])
+		})
+
 		// NOTE: The builtin `for List<ItemType>` is listed first, but the call
 		// dispatches to the narrower `for List<Integer>` — so listing the
 		// builtin's `Optional<ItemType>` signature would describe a Method

@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import {
 	displayChoiceName,
 	displayGenericName,
+	displayProtocolName,
 	displayedRefinementArguments,
 } from "./helpers/describe"
 
@@ -306,7 +307,7 @@ export function describeSignature(
 						// depends on rather than a bare `ItemType`.
 						generic.constraint == null
 							? generic.name
-							: `${generic.name} is ${generic.constraint}`,
+							: `${generic.name} is ${displayProtocolName(generic.constraint)}`,
 					)
 					.join(", ")}>`
 

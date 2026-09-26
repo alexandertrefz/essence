@@ -1237,6 +1237,7 @@ function reportProvidedMethodOutOfReach(
 	}
 
 	let declaration = declaringScope.declarations[name]
+	let protocol = describeProtocol(protocolName, scope)
 
 	reportError(
 		`'${name}' can not be read from a provided Method`,
@@ -1250,10 +1251,10 @@ function reportProvidedMethodOutOfReach(
 					: [secondary(declaration, `'${name}' is declared here`)]),
 			],
 			notes: [
-				`A provided Method is emitted once, above every Program that reaches '${protocolName}' — so its body can name the standard library and nothing the Program declares.`,
+				`A provided Method is emitted once, above every Program that reaches '${protocol}' — so its body can name the standard library and nothing the Program declares.`,
 			],
 			helps: [
-				`Give '${protocolName}' a requirement the body calls on '@' instead, and let each conforming Namespace reach '${name}'.`,
+				`Give '${protocol}' a requirement the body calls on '@' instead, and let each conforming Namespace reach '${name}'.`,
 			],
 		},
 	)
@@ -1715,7 +1716,7 @@ export function resolveIdentifierType(
 			return { type: "Error" }
 		}
 
-		if (findProtocolInScope(name, scope) !== null) {
+		if (resolveWrittenProtocol(node, scope) !== null) {
 			reportError(
 				`Protocol '${name}' can not be used as a value`,
 				node.position,
@@ -2208,23 +2209,21 @@ export function resolveGenericDeclarations(
 			defaultType = resolveType(generic.defaultType, scope)
 		}
 
-		let constraint = generic.constraint?.content ?? null
+		let protocol =
+			generic.constraint === null
+				? null
+				: resolveWrittenProtocol(generic.constraint, scope)
 
-		if (
-			generic.constraint !== null &&
-			findProtocolInScope(generic.constraint.content, scope) === null
-		) {
+		// NOTE: Not carried, so that no call is refused over it a second time.
+		if (generic.constraint !== null && protocol === null) {
 			reportUnknownProtocol(generic.constraint, scope)
-
-			// NOTE: Not carried, so that no call is refused over it a second time.
-			constraint = null
 		}
 
 		return {
 			name: generic.name.content,
 			infer: generic.inferred,
 			defaultType,
-			constraint,
+			constraint: protocol?.identity ?? null,
 		}
 	})
 }
@@ -2244,13 +2243,29 @@ export function scopeWithGenerics(
 	let types: Record<string, common.Type> = {}
 
 	for (let generic of generics) {
-		let constraint =
-			generic.constraint?.content ?? implied.get(generic.name.content)
+		let name = generic.name.content
 
-		types[generic.name.content] = {
-			type: "GenericUse",
-			name: generic.name.content,
-			...(constraint === undefined ? {} : { constraint }),
+		// NOTE: A written bound that names no Protocol is reported by
+		// `resolveGenericDeclarations`, and marked here so that nothing asks
+		// the Parameter to answer for it again.
+		if (generic.constraint === null) {
+			let constraint = implied.get(name)
+
+			types[name] = {
+				type: "GenericUse",
+				name,
+				...(constraint === undefined ? {} : { constraint }),
+			}
+		} else {
+			let protocol = resolveWrittenProtocol(generic.constraint, scope)
+
+			types[name] = {
+				type: "GenericUse",
+				name,
+				...(protocol === null
+					? { refusedBound: true as const }
+					: { constraint: protocol.identity }),
+			}
 		}
 	}
 
@@ -2478,10 +2493,14 @@ export function resolveProtocolDeclarationStatementType(
 	let signatureScope = childScope(scope, { types: { Self: selfType } })
 
 	let methods: Record<string, common.MethodType> = {}
-	// NOTE: Which Methods carry a body, and which Protocol wrote it — an
+	let identity = protocolIdentity(
+		modulePathOf(scope),
+		node.name.content,
+		scope.programTop === true ? null : node.name.position,
+	)
+	// NOTE: Which Methods carry a body, and which Protocol wrote it. An
 	// ancestor's entries arrive naming the ancestor, so a provided Method is
-	// emitted once under the name of the Protocol that WROTE it, however far
-	// down the chain it is reached from.
+	// emitted once, under its writer, however far down the chain it is reached.
 	let providedMethods: Record<string, string> = {}
 	let conformsTo: Array<string> = []
 
@@ -2496,12 +2515,12 @@ export function resolveProtocolDeclarationStatementType(
 				continue
 			}
 
-			for (let name of [
-				clause.protocol.content,
+			for (let ancestorIdentity of [
+				ancestor.identity,
 				...(ancestor.conformsTo ?? []),
 			]) {
-				if (!conformsTo.includes(name)) {
-					conformsTo.push(name)
+				if (!conformsTo.includes(ancestorIdentity)) {
+					conformsTo.push(ancestorIdentity)
 				}
 			}
 
@@ -2523,18 +2542,14 @@ export function resolveProtocolDeclarationStatementType(
 			// belonged to, and conformers owe the Method again.
 			delete providedMethods[methodName]
 		} else {
-			providedMethods[methodName] = node.name.content
+			providedMethods[methodName] = identity
 		}
 	}
 
 	return {
 		type: "Protocol",
 		name: node.name.content,
-		identity: protocolIdentity(
-			modulePathOf(scope),
-			node.name.content,
-			scope.programTop === true ? null : node.name.position,
-		),
+		identity,
 		methods,
 		...(Object.keys(providedMethods).length === 0
 			? {}
@@ -2554,7 +2569,7 @@ function resolveExtendedProtocol(
 	options: { deferOnPendingProtocols?: ReadonlySet<string> },
 ): common.ProtocolType | null {
 	let identifier = clause.protocol
-	let ancestor = findProtocolInScope(identifier.content, scope)
+	let ancestor = resolveWrittenProtocol(identifier, scope)
 
 	if (ancestor === null) {
 		if (options.deferOnPendingProtocols?.has(identifier.content) === true) {
@@ -4274,7 +4289,7 @@ export function derivedEnumerableNamespaceFor(
 		return null
 	}
 
-	let protocol = findProtocolInScope(enumerableProtocolName, scope)
+	let protocol = knownProtocol(enumerableProtocolName, scope)
 
 	return protocol === null
 		? null
@@ -4343,7 +4358,7 @@ function derivedConformanceSource(
 	// `derivedEquatableNamespace` builds are for the direct-call rail, where
 	// invocation inference binds their Parameters; here the witnesses are solved
 	// by hand below instead.
-	let protocol = findProtocolInScope(protocolName, scope)
+	let protocol = knownProtocol(protocolName, scope)
 
 	if (protocol === null) {
 		return null
@@ -4734,8 +4749,8 @@ function routedRecordSource(
 			// `unsatisfied-conformance-condition`, which is the Diagnostic
 			// `List<Function>` is refused with, and the two stories read alike.
 			chain: [
-				`${describeType(binding)} does not conform to '${protocolName}'.`,
-				`Its member '${routing.memberPath}' does not conform to '${protocolName}'.`,
+				`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
+				`Its member '${routing.memberPath}' does not conform to '${describeProtocol(protocolName, scope)}'.`,
 				...routing.chain,
 			],
 			...(routing.culprit === undefined
@@ -4820,14 +4835,15 @@ export function routedRecordCall(
 				position,
 			)
 
-			let message = `${describeType(baseType)} does not conform to '${protocolName}'`
+			let protocol = describeProtocol(protocolName, scope)
+			let message = `${describeType(baseType)} does not conform to '${protocol}'`
 
 			reportError(message, position, {
 				code: "unsatisfied-conformance-condition",
 				labels: [
 					primary(
 						position,
-						`this asks each declared member for its own '${protocolName}'`,
+						`this asks each declared member for its own '${protocol}'`,
 					),
 				],
 				notes: [
@@ -4933,10 +4949,7 @@ function protocolGrants(
 		return true
 	}
 
-	return (
-		findProtocolInScope(declared, scope)?.conformsTo?.includes(wanted) ===
-		true
-	)
+	return protocolOf(declared, scope).conformsTo?.includes(wanted) === true
 }
 
 // NOTE: The `grants` question `computeConformanceMethodMap` asks about a
@@ -4950,19 +4963,18 @@ function conformanceGrantsIn(
 }
 
 // NOTE: The `providerOf` question `computeConformanceMethodMap` asks about a
-// name, bound to a Scope and to everything the conformer conforms to. The
-// Protocol a witness is being solved for answers with the body IT knows about,
-// which is the ancestor's where a descendant re-provided the name — and the
-// descendant's is what a direct call runs. The most DERIVED provider among the
-// conformer's Protocols is the one both spellings then agree on, which is the
-// same descendant-wins rule the two call-side walks already run.
+// name, bound to a Scope and to the identities of everything the conformer
+// conforms to. The Protocol a witness is being solved for answers with the body
+// IT knows about, which is the ancestor's where a descendant re-provided the
+// name — and the descendant's is what a direct call runs. The most DERIVED
+// provider among the conformer's Protocols is the one both spellings then agree
+// on, which is the same descendant-wins rule the two call-side walks already
+// run.
 function conformanceProvidersIn(
-	protocolNames: Iterable<string>,
+	identities: Iterable<string>,
 	scope: enricher.Scope,
 ): (methodName: string) => string | null {
-	let reached = [...protocolNames]
-		.map((name) => findProtocolInScope(name, scope))
-		.filter((protocol) => protocol !== null)
+	let reached = [...identities].map((identity) => protocolOf(identity, scope))
 
 	return (methodName) => {
 		let winner: string | null = null
@@ -5039,7 +5051,9 @@ function protocolsProviding(
 	for (let protocol of allProtocolsInScope(scope)) {
 		// NOTE: A Protocol that INHERITED the name offers nothing here — it is
 		// offered by the Protocol that wrote it, which this same walk reaches.
-		if (providedMethodProtocol(protocol, methodName) === protocol.name) {
+		if (
+			providedMethodProtocol(protocol, methodName) === protocol.identity
+		) {
 			providers.push(protocol)
 		}
 	}
@@ -5090,7 +5104,7 @@ function conformanceSourcesFor(
 	let sources: Array<ConformanceSourceNamespace> = []
 
 	for (let namespace of namespaces) {
-		if (namespace.conformsTo?.includes(protocol.name) !== true) {
+		if (namespace.conformsTo?.includes(protocol.identity) !== true) {
 			continue
 		}
 
@@ -5120,7 +5134,7 @@ function conformanceSourcesFor(
 		collectDiagnostics(() =>
 			derivedConformanceSource(
 				baseType,
-				protocol.name,
+				protocol.identity,
 				null,
 				scope,
 				position,
@@ -5203,13 +5217,13 @@ function providedMethodNamespaceFor(
 						name: "Self",
 						infer: false,
 						defaultType: source.witnessType ?? source.selfType,
-						constraint: protocol.name,
+						constraint: protocol.identity,
 					},
 				],
 			},
 		},
-		conformsTo: [protocol.name],
-		providedBy: protocol.name,
+		conformsTo: [protocol.identity],
+		providedBy: protocol.identity,
 	}
 }
 
@@ -5282,7 +5296,7 @@ export function providedMethodNamespaces(
 				protocols.some(
 					(other) =>
 						other !== protocol &&
-						other.conformsTo?.includes(protocol.name) === true,
+						other.conformsTo?.includes(protocol.identity) === true,
 				)
 			) {
 				continue
@@ -5305,7 +5319,7 @@ export function providedMethodNamespaces(
 			// keys to be reported at all.
 			found.set(
 				found.has(source.name)
-					? `${source.name} (${protocol.name})`
+					? `${source.name} (${describeProtocol(protocol.identity, scope)})`
 					: source.name,
 				namespace,
 			)
@@ -5329,7 +5343,8 @@ export function providedNamespaceMember(
 	scope: enricher.Scope,
 ): { type: common.MethodType; providedBy: string } | null {
 	let reached = protocolsProviding(memberName, scope).filter(
-		(protocol) => namespace.conformsTo?.includes(protocol.name) === true,
+		(protocol) =>
+			namespace.conformsTo?.includes(protocol.identity) === true,
 	)
 
 	for (let protocol of reached) {
@@ -5339,7 +5354,7 @@ export function providedNamespaceMember(
 			reached.some(
 				(other) =>
 					other !== protocol &&
-					other.conformsTo?.includes(protocol.name) === true,
+					other.conformsTo?.includes(protocol.identity) === true,
 			)
 		) {
 			continue
@@ -5371,7 +5386,7 @@ export function providedNamespaceMember(
 		if (provided !== null) {
 			return {
 				type: provided.methods[memberName]!,
-				providedBy: protocol.name,
+				providedBy: protocol.identity,
 			}
 		}
 	}
@@ -5411,11 +5426,12 @@ export function solveConformance(
 
 		return {
 			ok: false,
-			chain: carriesRefusedBound(binding, scope)
-				? []
-				: [
-						`Type Parameter '${displayGenericName(binding.name)}' does not conform to '${protocolName}'.`,
-					],
+			chain:
+				binding.refusedBound === true
+					? []
+					: [
+							`Type Parameter '${displayGenericName(binding.name)}' does not conform to '${describeProtocol(protocolName, scope)}'.`,
+						],
 		}
 	}
 
@@ -5424,21 +5440,20 @@ export function solveConformance(
 		return { ok: false, chain: [] }
 	}
 
-	let protocol = findProtocolInScope(protocolName, scope)
-
-	// NOTE: A Protocol out of this Scope has no witness to give, and the
-	// culprit is what `missingConformance` answers with the import. A bound or
-	// condition refused where it is written is not carried, so it never asks.
-	if (protocol === null) {
+	// NOTE: A Protocol no name in this Scope binds has no witness to give, and
+	// the culprit is what `missingConformance` answers with the import. A bound
+	// or condition refused where it is written is not carried, so it never asks.
+	if (protocolSpelling(protocolName, scope) === null) {
 		return {
 			ok: false,
 			chain: [
-				`${describeType(binding)} does not conform to '${protocolName}'.`,
+				`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 			],
 			culprit: { type: binding, protocolName },
 		}
 	}
 
+	let protocol = protocolOf(protocolName, scope)
 	let key = conformanceKey(protocolName, binding)
 	let state = conformanceStateFor(scope)
 
@@ -5452,7 +5467,7 @@ export function solveConformance(
 			ok: false,
 			cycle: true,
 			chain: [
-				`${describeType(binding)} conforming to '${protocolName}' depends on itself.`,
+				`${describeType(binding)} conforming to '${describeProtocol(protocolName, scope)}' depends on itself.`,
 			],
 		}
 	}
@@ -5588,7 +5603,7 @@ function solveNamespaceConformance(
 		return {
 			ok: false,
 			chain: [
-				`${describeType(binding)} does not conform to '${protocolName}'.`,
+				`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 			],
 			culprit: { type: binding, protocolName },
 		}
@@ -5596,7 +5611,7 @@ function solveNamespaceConformance(
 
 	if (candidates.length > 1) {
 		reportError(
-			`More than one Namespace makes ${describeType(binding)} conform to '${protocolName}'`,
+			`More than one Namespace makes ${describeType(binding)} conform to '${describeProtocol(protocolName, scope)}'`,
 			position,
 			{
 				code: "ambiguous-conformance",
@@ -5605,7 +5620,7 @@ function solveNamespaceConformance(
 				],
 				notes: candidates.map(
 					(candidate) =>
-						`'${candidate.name}' conforms to '${protocolName}'.`,
+						`'${candidate.name}' conforms to '${describeProtocol(protocolName, scope)}'.`,
 				),
 				// NOTE: The choice is made by SPECIFICITY, not at the call —
 				// nothing written here can pick between two Namespaces, which
@@ -5665,11 +5680,11 @@ function solveNamespaceConformance(
 		// carries an unassumed bound. Reported here; the caller stays silent.
 		let label =
 			result.kind === "needs-condition"
-				? `Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`
+				? `Method '${result.methodName}' needs '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'`
 				: `this needs ${describeType(binding)} to conform`
 
 		reportError(
-			`Namespace '${candidate.name}' does not conform to '${protocolName}'`,
+			`Namespace '${candidate.name}' does not conform to '${describeProtocol(protocolName, scope)}'`,
 			position,
 			{
 				code: "nonconforming-namespace",
@@ -5706,7 +5721,7 @@ function solveNamespaceConformance(
 				chain: typeContainsError(binding)
 					? []
 					: [
-							`${describeType(binding)} does not conform to '${protocolName}'.`,
+							`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 							`Its '${condition.generic}' is not determined here — an empty List Literal leaves the item Type unknown until something pins it down.`,
 						],
 			}
@@ -5726,7 +5741,7 @@ function solveNamespaceConformance(
 					solved.chain.length === 0
 						? []
 						: [
-								`${describeType(binding)} does not conform to '${protocolName}'.`,
+								`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 								...solved.chain,
 							],
 				// NOTE: The level below names the Type to do something about,
@@ -5778,18 +5793,6 @@ function solveNamespaceConformance(
 			conditions,
 		},
 	}
-}
-
-// NOTE: A Type Parameter whose bound names no Protocol was refused where it is
-// declared, and that report stands for whatever the Parameter can not satisfy.
-function carriesRefusedBound(
-	binding: common.GenericUse,
-	scope: enricher.Scope,
-): boolean {
-	return (
-		binding.constraint !== undefined &&
-		findProtocolInScope(binding.constraint, scope) === null
-	)
 }
 
 // NOTE: Orders a Protocol's `where` conditions by the Namespace's Generic
@@ -5845,9 +5848,13 @@ function missingConformance(
 	// answer is the one outcome nobody wanted. The edit is the missing word.
 	describesWork?: true
 } {
-	if (findProtocolInScope(protocolName, scope) === null) {
+	let spelling = protocolSpelling(protocolName, scope)
+
+	if (spelling === null) {
 		return protocolOutOfScope(protocolName, scope)
 	}
+
+	let protocol = describeProtocol(protocolName, scope)
 
 	// NOTE: A bare Case is typed as the CASE and not as its Choice, and no
 	// Namespace can target one — `namespace X for Colour#Red` does not parse —
@@ -5894,10 +5901,10 @@ function missingConformance(
 	if (foreign !== null) {
 		return {
 			notes: [
-				`A Choice conforms to '${protocolName}' wherever it is in scope, and '${foreign.name}' is not in scope here.`,
+				`A Choice conforms to '${protocol}' wherever it is in scope, and '${foreign.name}' is not in scope here.`,
 			],
 			helps: [
-				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocolName}' is in scope.`,
+				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocol}' is in scope.`,
 			],
 			// NOTE: The import a Quick Fix writes. The Module is named by its
 			// canonical path rather than by a specifier, because the specifier
@@ -5931,8 +5938,8 @@ function missingConformance(
 			: [
 					protocolName === printableProtocolName &&
 					choiceCasesArePayloadFree(culprit)
-						? `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-						: `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}'.`,
+						? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+						: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
 				],
 		// NOTE: No Parameter, because the Type that failed is a concrete one —
 		// what this asks for is a Namespace declaring the conformance, which is
@@ -5941,7 +5948,7 @@ function missingConformance(
 		// with it is not this site's to decide.
 		data: {
 			kind: "required-protocol",
-			protocol: protocolName,
+			protocol: spelling,
 			parameter: null,
 		},
 	}
@@ -6042,7 +6049,11 @@ export function typeParameterBoundReport(
 } {
 	if (carriedBound !== null) {
 		return {
-			notes: oneBoundOnly(parameter, carriedBound, protocolName),
+			notes: oneBoundOnly(
+				parameter,
+				describeProtocol(carriedBound, scope),
+				describeProtocol(protocolName, scope),
+			),
 			helps: [],
 			bounded: "none",
 		}
@@ -6053,7 +6064,9 @@ export function typeParameterBoundReport(
 	if (namespaceType === null) {
 		return {
 			notes: [],
-			helps: [`Declare it as '<infer ${parameter} is ${protocolName}>'.`],
+			helps: [
+				`Declare it as '<infer ${parameter} is ${describeProtocol(protocolName, scope)}>'.`,
+			],
 			bounded: "declaration",
 		}
 	}
@@ -6107,18 +6120,24 @@ function namespaceParameterBound(
 				protocolGrants(condition.protocol, protocolName, scope),
 		),
 	)
-	let methodHelp = `Bound it for this Method: write '<${parameter} is ${protocolName}>' after the Method's name.`
-	let first = carrying[0]
+	let wanted = describeProtocol(protocolName, scope)
+	let methodHelp = `Bound it for this Method: write '<${parameter} is ${wanted}>' after the Method's name.`
+	let first =
+		carrying[0] === undefined
+			? undefined
+			: describeProtocol(carrying[0], scope)
 	// NOTE: Whether the Method this is reported inside FULFILS a conformance —
 	// asked of the Protocol's surface, which is the same question the conformance
 	// check answers and the only half of it available from a body. A Protocol's
 	// ancestors are already flattened into `methods`, so one lookup covers the
 	// chain.
-	let fulfils = (protocol: string) => {
+	let fulfils = (identity: string) => {
 		let name = enclosingMethodName(scope)
-		let found = name === null ? null : findProtocolInScope(protocol, scope)
 
-		return found !== null && Object.hasOwn(found.methods, name!)
+		return (
+			name !== null &&
+			Object.hasOwn(protocolOf(identity, scope).methods, name)
+		)
 	}
 
 	// NOTE: The two edits are EXCLUSIVE, and which one works is decided by
@@ -6155,22 +6174,25 @@ function namespaceParameterBound(
 		return {
 			notes: [
 				`'${parameter}' is '${namespaceType.name}'s own Type Parameter, and this Method fulfils ${fulfilled
-					.map((name) => `'${name}'`)
+					.map((identity) => `'${describeProtocol(identity, scope)}'`)
 					.join(
 						" and ",
 					)} — so the bound belongs on the conformance, which promises the Method under it.`,
 				...(first === undefined
 					? []
 					: [
-							`'is ${first} where ${parameter} is ${protocolName}' is declared here already, so what is missing is the Method's own promise rather than the condition.`,
+							`'is ${first} where ${parameter} is ${wanted}' is declared here already, so what is missing is the Method's own promise rather than the condition.`,
 						]),
 			],
 			helps:
 				open.length === 0
 					? []
 					: [
-							`Add 'where ${parameter} is ${protocolName}' to ${open
-								.map((name) => `'is ${name}'`)
+							`Add 'where ${parameter} is ${wanted}' to ${open
+								.map(
+									(identity) =>
+										`'is ${describeProtocol(identity, scope)}'`,
+								)
 								.join(" or ")} on this Namespace.`,
 						],
 			bounded: "none",
@@ -6183,7 +6205,7 @@ function namespaceParameterBound(
 	if (first !== undefined) {
 		return {
 			notes: [
-				`'is ${first} where ${parameter} is ${protocolName}' is declared here already, and a 'where' reaches the Methods that fulfil '${first}' and no others.`,
+				`'is ${first} where ${parameter} is ${wanted}' is declared here already, and a 'where' reaches the Methods that fulfil '${first}' and no others.`,
 			],
 			helps: [methodHelp],
 			bounded: "method",
@@ -6266,9 +6288,11 @@ export function resolveConformances(
 		let binding = bound
 
 		// NOTE: No witness can be solved without the bound's Protocol, so a call
-		// that can not see it is refused. A bound refused where it is written is
-		// not carried, and asks nothing of the call.
-		if (findProtocolInScope(generic.constraint, scope) === null) {
+		// that binds no name for it is refused. A bound refused where it is
+		// written is not carried, and asks nothing of the call.
+		let spelling = protocolSpelling(generic.constraint, scope)
+
+		if (spelling === null) {
 			reportProtocolOutOfScope(
 				binding,
 				generic.constraint,
@@ -6297,7 +6321,7 @@ export function resolveConformances(
 						name: conformanceParameterName(binding.name),
 					},
 				})
-			} else if (!carriesRefusedBound(binding, scope)) {
+			} else if (binding.refusedBound !== true) {
 				// NOTE: Under the name the SOURCE wrote. A callee's Generics
 				// are alpha-renamed for the span of one invocation — `ItemType`
 				// becomes `ItemType`, a zero-width space and a counter — and a
@@ -6315,6 +6339,7 @@ export function resolveConformances(
 				// the source wrote and under no other.
 				let shown = displayGenericName(binding.name)
 				let carried = binding.constraint ?? null
+				let wanted = describeProtocol(generic.constraint, scope)
 				let bound = typeParameterBoundReport(
 					shown,
 					generic.constraint,
@@ -6323,7 +6348,7 @@ export function resolveConformances(
 				)
 
 				reportError(
-					`Type Parameter '${shown}' does not conform to '${generic.constraint}'`,
+					`Type Parameter '${shown}' does not conform to '${wanted}'`,
 					position,
 					{
 						code: "unsatisfied-bound",
@@ -6336,13 +6361,13 @@ export function resolveConformances(
 								// that is written right there.
 								carried === null
 									? "bound here to an unbounded Type Parameter"
-									: `bound here to a Type Parameter bounded by '${carried}'`,
+									: `bound here to a Type Parameter bounded by '${describeProtocol(carried, scope)}'`,
 							),
 						],
 						notes: [
 							...(carried === null
 								? [
-										`'${shown}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+										`'${shown}' carries no '${wanted}' bound of its own, so it can not satisfy one.`,
 									]
 								: []),
 							...bound.notes,
@@ -6367,14 +6392,12 @@ export function resolveConformances(
 										bound.bounded === "declaration"
 											? {
 													kind: "required-protocol" as const,
-													protocol:
-														generic.constraint,
+													protocol: spelling,
 													parameter: shown,
 												}
 											: {
 													kind: "method-bound" as const,
-													protocol:
-														generic.constraint,
+													protocol: spelling,
 													parameter: shown,
 												},
 								}),
@@ -6422,47 +6445,42 @@ export function resolveConformances(
 			scope,
 			position,
 		)
-		let message = `${describeType(binding)} does not conform to '${generic.constraint}'`
+		let wanted = describeProtocol(generic.constraint, scope)
+		let message = `${describeType(binding)} does not conform to '${wanted}'`
 
 		// NOTE: A single-level chain is the plain "no Namespace conforms" case
 		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
 		// a conditional conformance whose `where` condition failed — its
 		// because-chain becomes the notes of `unsatisfied-conformance-condition`.
 		if (result.chain.length === 1) {
-			reportError(
-				`${describeType(binding)} does not conform to '${generic.constraint}'`,
-				position,
-				{
-					code: "unsatisfied-bound",
-					labels: [
-						primary(
-							position,
-							`this binds a Type Parameter bound to '${generic.constraint}'`,
-						),
-					],
-					notes: [
-						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
-						...missing.notes,
-					],
-					helps: [
-						...printingEscapeHelps(
-							generic.constraint,
-							atPrintingCall && missing.describesWork !== true,
-						),
-						...missing.helps,
-					],
-					...(missing.data === undefined
-						? {}
-						: { data: missing.data }),
-				},
-			)
+			reportError(message, position, {
+				code: "unsatisfied-bound",
+				labels: [
+					primary(
+						position,
+						`this binds a Type Parameter bound to '${wanted}'`,
+					),
+				],
+				notes: [
+					`No Namespace in scope makes ${describeType(binding)} conform to '${wanted}'.`,
+					...missing.notes,
+				],
+				helps: [
+					...printingEscapeHelps(
+						generic.constraint,
+						atPrintingCall && missing.describesWork !== true,
+					),
+					...missing.helps,
+				],
+				...(missing.data === undefined ? {} : { data: missing.data }),
+			})
 		} else {
 			reportError(message, position, {
 				code: "unsatisfied-conformance-condition",
 				labels: [
 					primary(
 						position,
-						`this binds a Type Parameter bound to '${generic.constraint}'`,
+						`this binds a Type Parameter bound to '${wanted}'`,
 					),
 				],
 				notes: [
@@ -6495,13 +6513,14 @@ function reportProtocolOutOfScope(
 			? `Type Parameter '${displayGenericName(binding.name)}'`
 			: describeType(binding)
 	let missing = protocolOutOfScope(protocolName, scope)
+	let protocol = displayProtocolName(protocolName)
 
-	reportError(`${subject} does not conform to '${protocolName}'`, position, {
+	reportError(`${subject} does not conform to '${protocol}'`, position, {
 		code: "unsatisfied-bound",
 		labels: [
 			primary(
 				position,
-				`this binds a Type Parameter bound to '${protocolName}'`,
+				`this binds a Type Parameter bound to '${protocol}'`,
 			),
 		],
 		notes: missing.notes,
@@ -6511,16 +6530,17 @@ function reportProtocolOutOfScope(
 }
 
 // NOTE: A bound's Protocol out of this Scope. The Modules this one reaches that
-// declare it are named, and the one import a Quick Fix can write is offered
-// where only one of them declares it and exports it.
+// declare its name are named, and the one import a Quick Fix can write is
+// offered where only one of them declares it and exports it.
 function protocolOutOfScope(
-	protocolName: string,
+	identity: string,
 	scope: enricher.Scope,
 ): {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
 } {
+	let protocolName = displayProtocolName(identity)
 	let declarations = protocolDeclarationsOf(scope, protocolName)
 	let only = declarations.length === 1 ? declarations[0] : undefined
 
@@ -6588,6 +6608,7 @@ function declaredInHelp(
 // Method to the fulfilling Namespace Method. Handed back to the Enricher so it
 // can thread each conditional clause's bounds into the fulfilling Methods.
 export type CheckedConformance = {
+	// NOTE: Identities, as the conditions' Protocols are.
 	protocolName: string
 	conditions: Array<{ generic: string; protocol: string }>
 	methodMap: Record<string, string>
@@ -6624,7 +6645,7 @@ function whereConditionRejection(
 		return { kind: "unwitnessable" }
 	}
 
-	if (findProtocolInScope(condition.protocol.content, scope) === null) {
+	if (resolveWrittenProtocol(condition.protocol, scope) === null) {
 		return { kind: "unknown-protocol" }
 	}
 
@@ -6637,25 +6658,20 @@ function whereConditionRejection(
 	return null
 }
 
-// NOTE: A `where` condition naming a Protocol its Namespace's Scope can not see
-// is refused as `unknown-protocol`, and is not carried either. Asked once every
-// import is bound, since a Scope that is still hoisting has not seen them all.
-export function dropRefusedConditions(
-	namespaceType: common.NamespaceType,
+// NOTE: `conformanceProvidersIn` over the Protocols a Namespace's clauses name
+// where they are written, leaving out any that names none.
+function clauseProvidersIn(
+	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
-): void {
-	let conditions = namespaceType.conformanceConditions ?? {}
+): (methodName: string) => string | null {
+	return conformanceProvidersIn(
+		node.conformsTo.flatMap((clause) => {
+			let protocol = resolveWrittenProtocol(clause.protocol, scope)
 
-	for (let [protocolName, written] of Object.entries(conditions)) {
-		let carried = written.filter(
-			(condition) =>
-				findProtocolInScope(condition.protocol, scope) !== null,
-		)
-
-		if (carried.length < written.length) {
-			conditions[protocolName] = carried
-		}
-	}
+			return protocol === null ? [] : [protocol.identity]
+		}),
+		scope,
+	)
 }
 
 // NOTE: What `checkProtocolConformance` would find, with nothing reported and
@@ -6679,30 +6695,29 @@ export function silentCheckedConformances(
 	let declaredGenerics = new Set(
 		node.generics.map((generic) => generic.name.content),
 	)
-	// NOTE: Every clause, for every clause — a Method one clause's Protocol
-	// only REQUIRES may be provided by another's, and then the Namespace owes
-	// nothing for it.
-	let providers = conformanceProvidersIn(
-		node.conformsTo.map((clause) => clause.protocol.content),
-		scope,
-	)
-
 	for (let clause of node.conformsTo) {
-		for (let name of [
-			clause.protocol.content,
-			...clause.conditions.map((condition) => condition.protocol.content),
+		for (let identifier of [
+			clause.protocol,
+			...clause.conditions.map((condition) => condition.protocol),
 		]) {
 			if (
-				findProtocolInScope(name, scope) === null &&
-				pendingProtocols.has(name)
+				resolveWrittenProtocol(identifier, scope) === null &&
+				pendingProtocols.has(identifier.content)
 			) {
 				throw new NotHoistedYet(
-					`Protocol '${name}' has not been hoisted yet — deferring Namespace '${node.name.content}'`,
+					`Protocol '${identifier.content}' has not been hoisted yet — deferring Namespace '${node.name.content}'`,
 				)
 			}
 		}
+	}
 
-		let protocol = findProtocolInScope(clause.protocol.content, scope)
+	// NOTE: The providers of every clause, for every clause: a Method one
+	// clause's Protocol only requires may be provided by another's, and then
+	// the Namespace owes nothing for it.
+	let providers = clauseProvidersIn(node, scope)
+
+	for (let clause of node.conformsTo) {
+		let protocol = resolveWrittenProtocol(clause.protocol, scope)
 
 		if (protocol === null || namespaceType.targetType === null) {
 			continue
@@ -6724,13 +6739,15 @@ export function silentCheckedConformances(
 				continue
 			}
 
-			assumptions.set(
-				condition.generic.content,
-				condition.protocol.content,
-			)
+			let conditionProtocol = resolveWrittenProtocol(
+				condition.protocol,
+				scope,
+			)!.identity
+
+			assumptions.set(condition.generic.content, conditionProtocol)
 			conditions.push({
 				generic: condition.generic.content,
-				protocol: condition.protocol.content,
+				protocol: conditionProtocol,
 			})
 		}
 
@@ -6745,7 +6762,7 @@ export function silentCheckedConformances(
 
 		if (result.kind === "conforms") {
 			checked.push({
-				protocolName: protocol.name,
+				protocolName: protocol.identity,
 				conditions,
 				methodMap: result.methodMap,
 			})
@@ -6773,14 +6790,11 @@ export function checkProtocolConformance(
 	)
 	// NOTE: As in the silent twin — a name one clause's Protocol requires may
 	// be provided by another's, and the Namespace owes nothing for it then.
-	let providers = conformanceProvidersIn(
-		node.conformsTo.map((clause) => clause.protocol.content),
-		scope,
-	)
+	let providers = clauseProvidersIn(node, scope)
 
 	for (let clause of node.conformsTo) {
 		let identifier = clause.protocol
-		let protocol = findProtocolInScope(identifier.content, scope)
+		let protocol = resolveWrittenProtocol(identifier, scope)
 
 		if (protocol === null) {
 			reportUnknownProtocol(identifier, scope)
@@ -6895,11 +6909,11 @@ export function checkProtocolConformance(
 							labels: [
 								primary(
 									condition.generic.position,
-									`already bound to '${rejection.protocol}'`,
+									`already bound to '${describeProtocol(rejection.protocol, scope)}'`,
 								),
 							],
 							notes: [
-								`'${condition.generic.content}' is already required to conform to '${rejection.protocol}'.`,
+								`'${condition.generic.content}' is already required to conform to '${describeProtocol(rejection.protocol, scope)}'.`,
 								"A conformance threads one witness per Type Parameter into the Methods that fulfil it, and one witness can not be two Protocols.",
 							],
 							helps: [
@@ -6912,13 +6926,15 @@ export function checkProtocolConformance(
 				continue
 			}
 
-			assumptions.set(
-				condition.generic.content,
-				condition.protocol.content,
-			)
+			let conditionProtocol = resolveWrittenProtocol(
+				condition.protocol,
+				scope,
+			)!.identity
+
+			assumptions.set(condition.generic.content, conditionProtocol)
 			conditions.push({
 				generic: condition.generic.content,
-				protocol: condition.protocol.content,
+				protocol: conditionProtocol,
 			})
 		}
 
@@ -6941,20 +6957,22 @@ export function checkProtocolConformance(
 			result.kind !== "conforms" &&
 			derivedConformanceSource(
 				namespaceType.targetType,
-				protocol.name,
+				protocol.identity,
 				namespaceType,
 				scope,
 				identifier.position,
 			) !== null
 		) {
 			checked.push({
-				protocolName: protocol.name,
+				protocolName: protocol.identity,
 				conditions,
 				methodMap: {},
 			})
 
 			continue
 		}
+
+		let spelled = describeProtocol(protocol.identity, scope)
 
 		if (result.kind === "needs-condition") {
 			// NOTE: The condition this clause already carries for the same Type
@@ -6966,27 +6984,27 @@ export function checkProtocolConformance(
 			let existing = assumptions.get(result.genericName)
 
 			reportError(
-				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
+				`Namespace '${namespaceType.name}' does not conform to '${spelled}'`,
 				identifier.position,
 				{
 					code: "nonconforming-namespace",
 					labels: [
 						primary(
 							identifier.position,
-							`Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`,
+							`Method '${result.methodName}' needs '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'`,
 						),
 					],
 					helps: [
 						existing === undefined ||
 						existing === result.protocolName
-							? `Add 'where ${result.genericName} is ${result.protocolName}' to this conformance.`
-							: `'${result.genericName}' already carries '${existing}' here, and a Type Parameter takes one bound per conformance — declare 'is ${protocol.name} where ${result.genericName} is ${result.protocolName}' on a Namespace of its own.`,
+							? `Add 'where ${result.genericName} is ${describeProtocol(result.protocolName, scope)}' to this conformance.`
+							: `'${result.genericName}' already carries '${describeProtocol(existing, scope)}' here, and a Type Parameter takes one bound per conformance — declare 'is ${spelled} where ${result.genericName} is ${describeProtocol(result.protocolName, scope)}' on a Namespace of its own.`,
 					],
 				},
 			)
 		} else if (result.kind === "missing") {
 			reportError(
-				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
+				`Namespace '${namespaceType.name}' does not conform to '${spelled}'`,
 				identifier.position,
 				{
 					code: "nonconforming-namespace",
@@ -7007,7 +7025,7 @@ export function checkProtocolConformance(
 							providers,
 						)
 							.map((methodName) => `'${methodName}'`)
-							.join(", ")} as '${protocol.name}' declares ${
+							.join(", ")} as '${spelled}' declares ${
 							missingRequirements(
 								protocol,
 								namespaceType,
@@ -7015,7 +7033,7 @@ export function checkProtocolConformance(
 							).length === 1
 								? "it"
 								: "them"
-						}, or drop the 'is ${protocol.name}'.`,
+						}, or drop the 'is ${spelled}'.`,
 					],
 					// NOTE: The whole list, where the Label names the one the
 					// check stopped at — a fix that writes the stubs writes
@@ -7027,7 +7045,7 @@ export function checkProtocolConformance(
 					// is a clause to add to the conformance itself.
 					data: {
 						kind: "missing-requirements",
-						protocol: protocol.name,
+						protocol: spelled,
 						methods: missingRequirements(
 							protocol,
 							namespaceType,
@@ -7038,7 +7056,7 @@ export function checkProtocolConformance(
 			)
 		} else if (result.kind === "mismatched") {
 			reportError(
-				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
+				`Namespace '${namespaceType.name}' does not conform to '${spelled}'`,
 				identifier.position,
 				{
 					code: "nonconforming-namespace",
@@ -7054,13 +7072,13 @@ export function checkProtocolConformance(
 					// differs is a comparison this site does not make — it knows
 					// only that they do not match.
 					helps: [
-						`Write '${result.methodName}' with the signature '${protocol.name}' declares for it.`,
+						`Write '${result.methodName}' with the signature '${spelled}' declares for it.`,
 					],
 				},
 			)
 		} else {
 			checked.push({
-				protocolName: protocol.name,
+				protocolName: protocol.identity,
 				conditions,
 				methodMap: result.methodMap,
 			})
@@ -7106,7 +7124,10 @@ function reportUndeclaredDerivedConformance(
 	}
 
 	let declared = new Set(
-		node.conformsTo.map((clause) => clause.protocol.content),
+		node.conformsTo.map(
+			(clause) =>
+				resolveWrittenProtocol(clause.protocol, scope)?.identity,
+		),
 	)
 
 	for (let protocolName of undeclaredDerivedProtocolNames) {
@@ -7114,11 +7135,14 @@ function reportUndeclaredDerivedConformance(
 			continue
 		}
 
-		let protocol = findProtocolInScope(protocolName, scope)
+		let protocol = knownProtocol(protocolName, scope)
 
 		if (protocol === null) {
 			continue
 		}
+
+		let spelling = protocolSpelling(protocolName, scope)
+		let spelled = spelling ?? displayProtocolName(protocolName)
 
 		// NOTE: The Protocol's REQUIREMENTS, and not the Methods it PROVIDES.
 		// A requirement is what the derive answers, so a Namespace writing that
@@ -7155,18 +7179,18 @@ function reportUndeclaredDerivedConformance(
 		let first = node.methods[written[0]]!
 
 		reportError(
-			`Namespace '${namespaceType.name}' writes '${written[0]}' without declaring 'is ${protocolName}'`,
+			`Namespace '${namespaceType.name}' writes '${written[0]}' without declaring 'is ${spelled}'`,
 			first.name.position,
 			{
 				code: "undeclared-conformance",
 				labels: [
 					primary(
 						first.name.position,
-						`${describeType(targetType)} derives '${protocolName}' unless this Namespace declares it`,
+						`${describeType(targetType)} derives '${spelled}' unless this Namespace declares it`,
 					),
 				],
 				notes: [
-					`A call naming this Namespace answers what is written here; a call through an '${protocolName}' bound answers the derived one.`,
+					`A call naming this Namespace answers what is written here; a call through an '${spelled}' bound answers the derived one.`,
 					...(written.length > 1
 						? [
 								`This Namespace writes ${written
@@ -7176,15 +7200,19 @@ function reportUndeclaredDerivedConformance(
 						: []),
 				],
 				helps: [
-					`Declare the conformance: 'is ${protocolName}' on this Namespace.`,
+					`Declare the conformance: 'is ${spelled}' on this Namespace.`,
 				],
 				// NOTE: No Parameter — what carries a conformance here is the
 				// Namespace's own head, which is the Node the fix writes into.
-				data: {
-					kind: "required-protocol",
-					protocol: protocolName,
-					parameter: null,
-				},
+				...(spelling === null
+					? {}
+					: {
+							data: {
+								kind: "required-protocol" as const,
+								protocol: spelling,
+								parameter: null,
+							},
+						}),
 			},
 		)
 	}
@@ -7378,7 +7406,7 @@ function resolveIdentifierTypeDeclarationType(
 			return { type: "Error" }
 		}
 
-		if (findProtocolInScope(name, scope) !== null) {
+		if (resolveWrittenProtocol(node.type, scope) !== null) {
 			reportError(
 				`Protocol '${name}' can not be used as a Type`,
 				node.position,
@@ -7901,7 +7929,7 @@ export function findTypeInScope(
 	}
 }
 
-export function findProtocolInScope(
+function protocolNamed(
 	name: string,
 	scope: enricher.Scope,
 ): common.ProtocolType | null {
@@ -7920,6 +7948,16 @@ export function findProtocolInScope(
 	}
 }
 
+// NOTE: The Protocol a name written in this Scope refers to. Only a written
+// name is read this way: whatever is stored is an identity, read through
+// `protocolOf`.
+export function resolveWrittenProtocol(
+	identifier: parser.IdentifierNode,
+	scope: enricher.Scope,
+): common.ProtocolType | null {
+	return protocolNamed(identifier.content, scope)
+}
+
 // NOTE: The Protocol a stored identity names. The nearest Protocol of its name
 // answers where it is the one, and the registry answers everywhere else; an
 // identity neither knows is an Internal Compiler Error.
@@ -7927,19 +7965,28 @@ export function protocolOf(
 	identity: string,
 	scope: enricher.Scope,
 ): common.ProtocolType {
-	let nearest = findProtocolInScope(displayProtocolName(identity), scope)
+	let protocol = knownProtocol(identity, scope)
+
+	if (protocol === null) {
+		throw new Error(`No Protocol is known by '${identity}'`)
+	}
+
+	return protocol
+}
+
+// NOTE: The same, for a standard library Protocol asked for by its identity,
+// which a load that has not declared it yet does not know.
+export function knownProtocol(
+	identity: string,
+	scope: enricher.Scope,
+): common.ProtocolType | null {
+	let nearest = protocolNamed(displayProtocolName(identity), scope)
 
 	if (nearest?.identity === identity) {
 		return nearest
 	}
 
-	let registered = protocolRegistryOf(scope)?.get(identity)
-
-	if (registered === undefined) {
-		throw new Error(`No Protocol is known by '${identity}'`)
-	}
-
-	return registered
+	return protocolRegistryOf(scope)?.get(identity) ?? null
 }
 
 // NOTE: The name this Scope reads a Protocol under: its declared name where
@@ -7951,7 +7998,7 @@ export function protocolSpelling(
 ): string | null {
 	let declared = displayProtocolName(identity)
 
-	if (findProtocolInScope(declared, scope)?.identity === identity) {
+	if (protocolNamed(declared, scope)?.identity === identity) {
 		return declared
 	}
 
@@ -7963,7 +8010,7 @@ export function protocolSpelling(
 		for (let name in current.protocols) {
 			if (
 				current.protocols[name].identity === identity &&
-				findProtocolInScope(name, scope) === current.protocols[name]
+				protocolNamed(name, scope) === current.protocols[name]
 			) {
 				return name
 			}
@@ -7971,6 +8018,23 @@ export function protocolSpelling(
 	}
 
 	return null
+}
+
+// NOTE: What holds a Protocol's declared name here, so that an import of it
+// under that name would collide or name something else: another Protocol, or a
+// Type or member of this Module. Null where the name is free.
+export function protocolNameTaken(
+	identity: string,
+	scope: enricher.Scope,
+): "protocol" | "other" | null {
+	let name = displayProtocolName(identity)
+	let bound = protocolNamed(name, scope)
+
+	if (bound !== null) {
+		return bound.identity === identity ? null : "protocol"
+	}
+
+	return moduleBindsName(scope, name) ? "other" : null
 }
 
 // NOTE: How a message names a Protocol: as this Scope reads it, or by its
@@ -7993,14 +8057,13 @@ export function protocolsDeclaringMethod(
 ): Array<string> {
 	return allProtocolsInScope(scope)
 		.filter((protocol) => Object.hasOwn(protocol.methods, methodName))
-		.map((protocol) => protocol.name)
+		.map((protocol) => describeProtocol(protocol.identity, scope))
 		.sort()
 }
 
-// NOTE: Every Protocol a Scope can see, the nearest declaration of a name
-// winning — the shadowing rule the Namespace enumeration follows. Asked only
-// where a Method call found nothing written, so that a Protocol's provided
-// Methods can be offered as the fallback they are.
+// NOTE: Every Protocol a Scope can see, once however many names bind it, the
+// nearest declaration of a name winning. Asked where a Method call found nothing
+// written, so a Protocol's provided Methods can answer it.
 function allProtocolsInScope(
 	scope: enricher.Scope,
 ): Array<common.ProtocolType> {
@@ -8017,7 +8080,14 @@ function allProtocolsInScope(
 		searchScope = searchScope.parent
 	}
 
-	return [...found.values()]
+	return [
+		...new Map(
+			[...found.values()].map((protocol) => [
+				protocol.identity,
+				protocol,
+			]),
+		).values(),
+	]
 }
 
 // NOTE: Method resolution asks which Namespaces a Scope can see once per
@@ -8690,8 +8760,7 @@ function computeNamespacesTargeting(
 // NOTE: The pseudo-Namespace a Protocol-bounded Type Parameter's Methods are
 // reached through — named after the hidden conformance parameter the call is
 // emitted against, with `Self` substituted by the Type Parameter itself. Null
-// where the bound names no Protocol in scope, which is a Diagnostic of its own
-// at the declaration.
+// for an unbounded one.
 //
 // NOTE: The whole Protocol surface, requirements and PROVIDED Methods alike — a
 // witness carries an entry for every one of them, which is what makes a bounded
@@ -8711,12 +8780,7 @@ export function conformanceNamespaceFor(
 		return null
 	}
 
-	let protocol = findProtocolInScope(baseType.constraint, scope)
-
-	if (protocol === null) {
-		return null
-	}
-
+	let protocol = protocolOf(baseType.constraint, scope)
 	let selfBindings: GenericBindings = new Map([["Self", baseType]])
 	let methods: Record<string, common.MethodType> = {}
 	let providedMembers: Record<string, string> = {}
@@ -8804,7 +8868,7 @@ function derivedEnumerableNamespaceForNamedChoice(
 	declared: common.Type,
 	scope: enricher.Scope,
 ): common.NamespaceType | null {
-	let protocol = findProtocolInScope(enumerableProtocolName, scope)
+	let protocol = knownProtocol(enumerableProtocolName, scope)
 
 	if (protocol === null || choiceIdentityOf(declared) === null) {
 		return null
@@ -8941,15 +9005,16 @@ export function partitionInstanceMethodNamespaces(
 // that Namespace is what a specifier names; only a provided Method is the
 // Protocol's own to offer.
 function providedMethodNamespacesNamed(
-	specifierName: string,
+	specifier: parser.IdentifierNode,
 	methodName: string,
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
 ): Map<string, common.NamespaceType> {
 	let named = new Map<string, common.NamespaceType>()
+	let protocol = resolveWrittenProtocol(specifier, scope)
 
-	if (findProtocolInScope(specifierName, scope) === null) {
+	if (protocol === null) {
 		return named
 	}
 
@@ -8964,7 +9029,7 @@ function providedMethodNamespacesNamed(
 		scope,
 		position,
 	)) {
-		if (namespace.providedBy === specifierName) {
+		if (namespace.providedBy === protocol.identity) {
 			named.set(name, namespace)
 		}
 	}
@@ -8993,7 +9058,7 @@ export function namespacesDeclaringMethod(
 ): Map<string, common.NamespaceType> {
 	if (specifier !== null && namespaces.size === 0) {
 		return providedMethodNamespacesNamed(
-			specifier.content,
+			specifier,
 			methodName,
 			baseType,
 			scope,
@@ -10036,11 +10101,13 @@ export function splitMethodGenerics(
 			continue
 		}
 
+		let protocol = resolveWrittenProtocol(generic.constraint, scope)
+
 		// NOTE: Refused as a Method's own bound is, and not carried either.
-		if (findProtocolInScope(generic.constraint.content, scope) === null) {
+		if (protocol === null) {
 			reportUnknownProtocol(generic.constraint, scope)
 		} else {
-			bounds.set(generic.name.content, generic.constraint.content)
+			bounds.set(generic.name.content, protocol.identity)
 		}
 	}
 

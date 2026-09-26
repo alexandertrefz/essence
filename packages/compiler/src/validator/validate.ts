@@ -17,6 +17,7 @@ import {
 	describeParameter,
 	describeSignature,
 	describeType,
+	displayProtocolName,
 	recordMismatchEvidence,
 	returnAsynchronyHelps,
 	undecidedSlotEvidence,
@@ -65,6 +66,11 @@ type MatchHandler = common.typed.MatchNode["handlers"][number]
 // threading it through every `validate…` function, and only one Program is
 // validated at a time.
 let witnessScopes: Array<Set<string>> = []
+
+// NOTE: The bounds of every enclosing Function Definition's Type Parameters as
+// its source spells them, innermost last, for a Help that writes one. A
+// provided Method's `Self` holds an identity and shows its name.
+let writtenBounds: Array<Map<string, string>> = []
 
 // NOTE: Whether each enclosing body may write `complete`, innermost last — a
 // body may where it answers a Future, and the top level may outright. Module
@@ -207,6 +213,7 @@ export const validate = (
 	// is the guarantee rather than the mechanism: no Program is ever checked
 	// against a Type Parameter that another Program declared.
 	witnessScopes = []
+	writtenBounds = []
 	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
 	executingTopLevelIndex = null
 	initialisingProperty = null
@@ -1004,7 +1011,7 @@ function checkWitnessNamespacesAreDeclared(
 		checkNamespaceIsDeclared(
 			namespaceName,
 			position,
-			describeUse(protocolName),
+			describeUse(displayProtocolName(protocolName)),
 		)
 	}
 }
@@ -1362,6 +1369,21 @@ function validateFunctionDefinition(
 				.map((generic) => conformanceParameterName(generic.name)),
 		),
 	)
+	writtenBounds.push(
+		new Map(
+			node.generics.flatMap((generic) =>
+				generic.constraint === null
+					? []
+					: [
+							[
+								generic.name,
+								generic.spelling ??
+									displayProtocolName(generic.constraint),
+							],
+						],
+			),
+		),
+	)
 
 	// NOTE: A body does not run where it is written — it runs when the Function
 	// is called, which is at the earliest the statement that calls it — so
@@ -1405,11 +1427,26 @@ function validateFunctionDefinition(
 		initialisingProperty = enclosingProperty
 		waitingBodies.pop()
 		witnessScopes.pop()
+		writtenBounds.pop()
 	}
 
 	validateDefiniteReturn(node, position)
 
 	return node
+}
+
+function writtenBoundOf(
+	parameter: common.GenericUse & { constraint: string },
+): string {
+	for (let index = writtenBounds.length - 1; index >= 0; index -= 1) {
+		let written = writtenBounds[index].get(parameter.name)
+
+		if (written !== undefined) {
+			return written
+		}
+	}
+
+	return displayProtocolName(parameter.constraint)
 }
 
 // NOTE: A native Method has no body, and the frame the Compiler synthesizes for
@@ -1747,6 +1784,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 									node.value.nodeType === "Identifier"
 										? node.value.content
 										: null,
+									writtenBoundOf,
 								)
 							: [
 									`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,

@@ -23,7 +23,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
 import { documentAnalysisOf } from "./moduleLink"
-import { typedProgramBodies, typedProgramNodes } from "./sections"
+import { typedProgramBodies } from "./sections"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type
@@ -184,14 +184,8 @@ export function matchingNamespaces(
 	// resolves only through its Protocol — mirroring the Enricher's Method
 	// resolution, but named after the Protocol for readable listings.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
-		let constraint = baseType.constraint
-		let allProtocols = [
-			...builtinProtocols(),
-			...collectProtocolTypes(analysed),
-		]
-		let protocol = allProtocols.find(
-			(candidate) => candidate.name === constraint,
-		)
+		let protocolFor = protocolsByIdentity(analysed)
+		let protocol = protocolFor(baseType.constraint)
 
 		if (protocol === undefined) {
 			return []
@@ -228,7 +222,7 @@ export function matchingNamespaces(
 			...providedNamespacesOf(
 				protocol,
 				baseType,
-				allProtocols,
+				protocolFor,
 				() => false,
 			),
 		]
@@ -290,7 +284,7 @@ export function matchingNamespaces(
 			protocol.providedMethods === undefined ||
 			!namespaces.some(
 				(namespace) =>
-					namespace.conformsTo?.includes(protocol.name) === true,
+					namespace.conformsTo?.includes(protocol.identity) === true,
 			)
 		) {
 			continue
@@ -327,7 +321,7 @@ function providedNamespaceOf(
 		let method = protocol.methods[methodName]
 
 		if (
-			writtenBy !== protocol.name ||
+			writtenBy !== protocol.identity ||
 			method === undefined ||
 			written(methodName)
 		) {
@@ -351,8 +345,8 @@ function providedNamespaceOf(
 		generics: [],
 		properties: {},
 		methods,
-		conformsTo: [protocol.name],
-		providedBy: protocol.name,
+		conformsTo: [protocol.identity],
+		providedBy: protocol.identity,
 	}
 }
 
@@ -361,16 +355,14 @@ function providedNamespaceOf(
 function providedNamespacesOf(
 	protocol: common.ProtocolType,
 	baseType: common.Type,
-	allProtocols: Array<common.ProtocolType>,
+	protocolFor: (identity: string) => common.ProtocolType | undefined,
 	written: (methodName: string) => boolean,
 ): Array<common.NamespaceType> {
 	let namespaces: Array<common.NamespaceType> = []
 
-	for (let name of [protocol.name, ...(protocol.conformsTo ?? [])]) {
+	for (let identity of [protocol.identity, ...(protocol.conformsTo ?? [])]) {
 		let ancestor =
-			name === protocol.name
-				? protocol
-				: allProtocols.find((candidate) => candidate.name === name)
+			identity === protocol.identity ? protocol : protocolFor(identity)
 
 		if (ancestor === undefined) {
 			continue
@@ -584,6 +576,20 @@ function collectNamespaceTypesInBody(
 	}
 }
 
+// NOTE: The Protocol a stored identity names, for this document: the graph's
+// registry where the document is a Module, which holds a Protocol the document
+// never imports, and otherwise what the document and the builtins declare.
+function protocolsByIdentity(
+	document: DocumentAnalysis | null,
+): (identity: string) => common.ProtocolType | undefined {
+	let registry = document?.module?.context.protocols
+	let known = [...builtinProtocols(), ...collectProtocolTypes(document)]
+
+	return (identity) =>
+		registry?.get(identity) ??
+		known.find((candidate) => candidate.identity === identity)
+}
+
 function collectProtocolTypes(
 	document: DocumentAnalysis | null,
 ): Array<common.ProtocolType> {
@@ -597,13 +603,31 @@ function collectProtocolTypes(
 		document?.module?.imported.protocols ?? {},
 	)
 
-	for (let node of typedProgramNodes(enrichedProgram)) {
-		if (node.nodeType === "ProtocolDeclarationStatement") {
-			protocols.push(node.protocolType)
-		}
+	// NOTE: A Protocol declared in a body too, which is a Protocol of its own
+	// however it is named.
+	for (let body of typedProgramBodies(enrichedProgram)) {
+		collectProtocolTypesInBody(body, protocols)
 	}
 
 	return protocols
+}
+
+function collectProtocolTypesInBody(
+	nodes: Array<common.typed.ImplementationNode>,
+	protocols: Array<common.ProtocolType>,
+) {
+	for (let node of nodes) {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocols.push(node.protocolType)
+		} else if (node.nodeType === "IfStatement") {
+			collectProtocolTypesInBody(node.body, protocols)
+		} else if (node.nodeType === "IfElseStatement") {
+			collectProtocolTypesInBody(node.trueBody, protocols)
+			collectProtocolTypesInBody(node.falseBody, protocols)
+		} else if (node.nodeType === "FunctionStatement") {
+			collectProtocolTypesInBody(node.value.body, protocols)
+		}
+	}
 }
 
 // NOTE: The Namespaces the import block brought in — declared in another

@@ -953,31 +953,26 @@ export type NamespaceType = {
 	generics: Array<GenericDeclaration>
 	properties: Record<string, Type | GenericUse>
 	methods: Record<string, MethodType>
-	// NOTE: Names of the Protocols this Namespace declares conformance to via
-	// its `is` clause. Optional so the hand written builtin Namespaces stay
-	// valid until they conform.
+	// NOTE: The identities of the Protocols this Namespace declares conformance
+	// to via its `is` clause. Optional so the hand written builtin Namespaces
+	// stay valid until they conform.
 	conformsTo?: Array<string>
 	// NOTE: The `where` conditions of each conditional conformance, keyed by
-	// Protocol name — `{ Comparable: [{ generic: "ItemType", protocol:
-	// "Comparable" }] }`. Absent for an unconditional conformance. A sibling
-	// of `conformsTo` so the builtin tables' plain `conformsTo` stays valid.
+	// the Protocol's identity, each naming its Protocol by identity too, as in
+	// `{ Comparable: [{ generic: "ItemType", protocol: "Comparable" }] }`.
+	// Absent for an unconditional conformance.
 	conformanceConditions?: Record<
 		string,
 		Array<{ generic: string; protocol: string }>
 	>
-	// NOTE: Set only on the pseudo Namespace a Protocol's PROVIDED Methods are
-	// reached through on a CONCRETE receiver, to the Protocol that wrote them.
-	// The Namespace's own `name` is the conformance source's — the Namespace
-	// whose conformance put the Method in reach — so this is what tells a
-	// Protocol from a Namespace at emission, and what tells a reader where a
-	// Method they did not write came from.
+	// NOTE: The identity of the Protocol that wrote the provided Methods, on the
+	// pseudo Namespace a concrete receiver reaches them through. It tells a
+	// Protocol from a Namespace at emission, since `name` is the source's.
 	providedBy?: string
-	// NOTE: Which members of the pseudo Namespace a Protocol-BOUNDED receiver
+	// NOTE: Which members of the pseudo Namespace a Protocol-bounded receiver
 	// resolves through were provided rather than required, each under the
-	// Protocol that wrote the body. That Namespace is the hidden conformance
-	// Parameter and every member of it is reached through the witness, provided
-	// or required alike — so this decides nothing about emission and is read
-	// only where a reader has to be told whose Method they are looking at.
+	// identity of the Protocol that wrote the body. Read only where a reader
+	// has to be told whose Method they are looking at.
 	providedMembers?: Record<string, string>
 }
 
@@ -1000,16 +995,12 @@ export type ProtocolType = {
 	// asks a Protocol what it can do (the conformance check, a bounded
 	// receiver's pseudo Namespace, Completion) means the whole surface.
 	methods: Record<string, MethodType>
-	// NOTE: Which of `methods` carry a BODY, and the Protocol that wrote it —
-	// this one, or an ancestor. A name in here is not a requirement: a
-	// conformer that writes nothing still answers it, and
-	// `nonconforming-namespace` never asks for it. Optional so the hand
-	// written builtin Protocol tables stay valid.
+	// NOTE: Which of `methods` carry a body, and the identity of the Protocol
+	// that wrote it, this one or an ancestor. A name in here is not a
+	// requirement: a conformer that writes nothing still answers it.
 	providedMethods?: Record<string, string>
-	// NOTE: The Protocols this one extends, TRANSITIVELY — `Orderable` carries
-	// `Comparable`, and a Protocol extending `Orderable` carries both. Written
-	// flat because every reader asks "does conforming to this grant that", and
-	// a flat list answers it without walking. Optional, as on a Namespace.
+	// NOTE: The identities of every Protocol this one extends, directly or not,
+	// so that "does conforming to this grant that" is a lookup, not a walk.
 	conformsTo?: Array<string>
 	documentation?: Documentation
 }
@@ -1039,18 +1030,20 @@ export type GenericDeclaration = {
 	name: GenericName
 	infer: boolean
 	defaultType: Type | null
-	// NOTE: The Protocol bound of `<infer Item is Comparable>` — null when
-	// the Type Parameter is unbounded. Optional so the hand written builtin
-	// Namespaces stay valid.
+	// NOTE: The identity of the Protocol bound of `<infer Item is Comparable>`,
+	// null when the Type Parameter is unbounded or its bound named no Protocol.
 	constraint?: string | null
 }
 
 export type GenericUse = {
 	type: "GenericUse"
 	name: GenericName
-	// NOTE: Set on the GenericUse registered for a bounded Type Parameter —
-	// Method calls on values of this Type resolve through the Protocol.
+	// NOTE: The identity of the bound of a bounded Type Parameter. Method
+	// calls on values of this Type resolve through the Protocol.
 	constraint?: string
+	// NOTE: Set instead where the written bound names no Protocol, which is
+	// reported at the declaration, so nothing asks the Parameter again.
+	refusedBound?: true
 }
 
 // NOTE: The unapplied form of a generic Type Alias — use sites apply Type
@@ -1282,15 +1275,11 @@ export type ConformanceSource =
 			kind: "namespace"
 			name: string
 			methodMap: Record<string, string>
-			// NOTE: The Protocol's PROVIDED Methods this conformer does not
-			// override, each under the Protocol that WROTE the body. They are in
-			// the witness so that a bounded call reaches the same Method a
-			// direct one does, but they are no Methods of the Namespace — the
-			// emitted const takes the finished witness as its own trailing
-			// Argument, which is why they are kept apart from `methodMap`.
-			// Absent where the Protocol provides nothing, which keeps every
-			// witness that has none emitting the plain object literal it always
-			// did.
+			// NOTE: The Protocol's provided Methods this conformer does not
+			// override, each under the identity of the Protocol that wrote the
+			// body. They are no Methods of the Namespace: the emitted const takes
+			// the finished witness as its trailing Argument. Absent where the
+			// Protocol provides nothing, so such a witness is a plain object.
 			providedMethods?: Record<string, string>
 			// NOTE: The recursively solved conformances for this Namespace's
 			// own `where` conditions, ordered by its Generic declaration order
@@ -1322,6 +1311,7 @@ export type ConformanceSource =
 
 export type Conformance = {
 	genericName: string
+	// NOTE: The identity of the Protocol the witness is for.
 	protocolName: string
 	source: ConformanceSource
 }
@@ -1356,10 +1346,9 @@ export type DispatchCase = {
 	// declared member, read exactly as the field of the same name on a plain
 	// Method Invocation.
 	derivedMembers?: Array<string>
-	// NOTE: The Protocol that PROVIDED this branch's Method, when one did.
-	// `namespaceName` is the Namespace whose conformance put the Method in
-	// reach, which declares no Method of that name — so this is what sends the
-	// emission to the shared const, and what a name alone can not say.
+	// NOTE: The identity of the Protocol that provided this branch's Method,
+	// when one did. `namespaceName` declares no Method of that name, so this is
+	// what sends the emission to the shared const.
 	providedBy?: string
 }
 

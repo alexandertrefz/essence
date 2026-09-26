@@ -1,10 +1,13 @@
-import { builtinTypes } from "@essence-lang/compiler/enricher/builtins"
+import {
+	builtinProtocols,
+	builtinTypes,
+} from "@essence-lang/compiler/enricher/builtins"
 import type { ImportedNames } from "@essence-lang/compiler/modules"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
-import { typedProgramSections } from "./sections"
+import { typedProgramNodes, typedProgramSections } from "./sections"
 
 // NOTE: What a bare NAME names in the TYPE space where the cursor stands — the
 // Language Server's mirror of the Enricher's `findTypeInScope`, which is the
@@ -39,6 +42,7 @@ export function typeNamedAt(
 		depth: -1,
 	}
 	let visited = new WeakSet<object>()
+	let boundIdentity = boundIdentities(program, imported)
 
 	function record(type: common.Type, depth: number) {
 		if (depth > found.depth) {
@@ -67,7 +71,7 @@ export function typeNamedAt(
 					: {
 							type: "GenericUse",
 							name,
-							constraint: generic.constraint,
+							constraint: boundIdentity(generic.constraint),
 						},
 				depth,
 			)
@@ -275,4 +279,26 @@ export function typeNamedAt(
 	// for a name the document declares nothing under — a Program writing its
 	// own `choice Side` means that one.
 	return found.type ?? imported?.types[name] ?? builtinTypes()[name] ?? null
+}
+
+// NOTE: A typed Generic Declaration holds its bound as written, and a
+// GenericUse holds the Protocol's identity, which is what the listings read.
+// A bound woven onto a Namespace Generic already holds one.
+function boundIdentities(
+	program: common.typed.Program,
+	imported: ImportedNames | null,
+): (bound: string) => string {
+	let protocols: Record<string, common.ProtocolType> = {
+		...builtinProtocols(),
+		...imported?.protocols,
+	}
+
+	for (let node of typedProgramNodes(program)) {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocols[node.name.content] = node.protocolType
+		}
+	}
+
+	return (bound) =>
+		Object.hasOwn(protocols, bound) ? protocols[bound]!.identity : bound
 }

@@ -3954,6 +3954,38 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The nested `Sized` shadows the name, and is a Protocol of its
+		// own, so `IntegerCounted` conforms to nothing `measure` asks for.
+		it("should refuse a bound only a nested Protocol of its name meets", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Sized {
+						size() -> Integer
+					}
+
+					function measure <infer Item is Sized>(_ item: Item) -> Integer {
+						<- item::size()
+					}
+
+					function inner() -> Integer {
+						protocol Sized {
+							count() -> Integer
+						}
+
+						namespace IntegerCounted for Integer is Sized {
+							count() -> Integer {
+								<- 100
+							}
+						}
+
+						<- measure(3)
+					}
+				}`).map((diagnostic) => [diagnostic.code, diagnostic.message]),
+			).toEqual([
+				["unsatisfied-bound", "Integer does not conform to 'Sized'"],
+			])
+		})
+
 		it("should resolve Self Parameters through a Protocol bound", () => {
 			expect(
 				diagnosticsFor(`implementation {

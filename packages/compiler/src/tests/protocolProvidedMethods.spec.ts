@@ -181,30 +181,63 @@ describe("Protocol-provided Methods", () => {
 		// missing, or the reader is left with "the Namespaces were searched" and
 		// nothing to do about it.
 		it("should name the Protocol a Module has not got", () => {
-			let source = [
-				"implementation {",
-				"\ttype Square = { side: Rational }",
-				"",
-				"\tnamespace Squares for Square is Shape {",
-				"\t\tarea() -> Rational {",
-				"\t\t\t<- @.side",
-				"\t\t}",
-				"\t}",
-				"",
-				"\tconstant square: Square = { side = 3/1 }",
-				"\tTerminal.inspect(square::describe())",
-				"}",
-			].join("\n")
+			let directory = mkdtempSync(
+				join(tmpdir(), "essence-protocol-unimported-"),
+			)
 
-			expect(codesOf(source)).toEqual([
-				"unknown-protocol",
-				"unknown-method",
-			])
-			expect(
-				diagnosticsOf(source)
-					.flatMap((diagnostic) => diagnostic.helps)
-					.filter((help) => help.startsWith("Import 'Shape'")),
-			).toHaveLength(1)
+			try {
+				writeFileSync(
+					join(directory, "Shapes.es"),
+					[
+						"implementation {",
+						SHAPE,
+						"}",
+						"",
+						"export {",
+						"\tShape",
+						"\tSquare",
+						"\tSquares",
+						"}",
+					].join("\n"),
+				)
+				writeFileSync(
+					join(directory, "Main.es"),
+					[
+						"import {",
+						'\tfrom "./Shapes.es" {',
+						"\t\tSquare",
+						"\t\tSquares",
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\tconstant square: Square = { side = 3/1 }",
+						"\tTerminal.inspect(square::describe())",
+						"}",
+					].join("\n"),
+				)
+
+				let reported = [
+					...linkModuleGraph(
+						loadModuleGraph(
+							join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					).modules.values(),
+				].flatMap((module) => module.diagnostics)
+
+				expect(reported.map((diagnostic) => diagnostic.code)).toEqual([
+					"unknown-method",
+					"unused-import",
+				])
+				expect(
+					reported
+						.flatMap((diagnostic) => diagnostic.helps)
+						.filter((help) => help.startsWith("Import 'Shape'")),
+				).toHaveLength(1)
+			} finally {
+				rmSync(directory, { recursive: true, force: true })
+			}
 		})
 
 		it("should not owe a provided Method at the conformance declaration", () => {
@@ -2341,6 +2374,57 @@ describe("two Protocols of one name", () => {
 			"$es_Tagged__describe",
 			"$es_Tagged_2__describe",
 		])
+	})
+
+	// NOTE: Two nested Protocols of one name in one file are two Protocols, and
+	// each conformer runs its own Protocol's body.
+	it("should run the body each of two nested Protocols provides", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tfunction one() -> String {",
+					"\t\tprotocol Tagged {",
+					"\t\t\ttag() -> String",
+					"",
+					"\t\t\tshout() -> String {",
+					'\t\t\t\t<- "one"',
+					"\t\t\t}",
+					"\t\t}",
+					"",
+					"\t\tnamespace IntegerTagged for Integer is Tagged {",
+					"\t\t\ttag() -> String {",
+					'\t\t\t\t<- "a"',
+					"\t\t\t}",
+					"\t\t}",
+					"",
+					"\t\t<- 1::shout()",
+					"\t}",
+					"",
+					"\tfunction two() -> String {",
+					"\t\tprotocol Tagged {",
+					"\t\t\ttag() -> String",
+					"",
+					"\t\t\tshout() -> String {",
+					'\t\t\t\t<- "two"',
+					"\t\t\t}",
+					"\t\t}",
+					"",
+					"\t\tnamespace BooleanTagged for Boolean is Tagged {",
+					"\t\t\ttag() -> String {",
+					'\t\t\t\t<- "b"',
+					"\t\t\t}",
+					"\t\t}",
+					"",
+					"\t\t<- true::shout()",
+					"\t}",
+					"",
+					"\tTerminal.inspect(one())",
+					"\tTerminal.inspect(two())",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(['"one"', '"two"'])
 	})
 
 	it("should emit two declarations that provide different Methods", () => {

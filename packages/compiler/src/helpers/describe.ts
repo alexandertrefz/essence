@@ -44,6 +44,10 @@ export function displayGenericName(name: common.GenericName): string {
 export function undispatchableHelps(
 	memberTypes: Array<common.Type>,
 	valueName: string | null,
+	// NOTE: The name the reader's file reads a Parameter's bound under.
+	spellBound: (
+		parameter: common.GenericUse & { constraint: string },
+	) => string,
 ): Array<string> {
 	let parameters = memberTypes.filter(
 		(memberType): memberType is common.GenericUse =>
@@ -57,8 +61,8 @@ export function undispatchableHelps(
 	}
 
 	let bounds = new Set(parameters.map((parameter) => parameter.constraint))
-	let bound = bounds.size === 1 ? [...bounds][0] : undefined
-	let declaration = `<infer Item${bound === undefined ? "" : ` is ${bound}`}>`
+	let bounded = parameters[0]
+	let declaration = `<infer Item${bounds.size !== 1 || bounded.constraint === undefined ? "" : ` is ${spellBound({ ...bounded, constraint: bounded.constraint })}`}>`
 	let spelling =
 		valueName === null
 			? `'${declaration}', with the Parameter declared as an 'Item'`

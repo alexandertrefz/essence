@@ -62,6 +62,15 @@ describe("A Module described", () => {
 		})
 	}
 
+	it("shows a bound by its Protocol's name and never its path", () => {
+		let measure = moduleDescriptor("Bounded.es").exports.measure
+
+		expect(measure?.kind === "function" ? measure.of.shown : null).toBe(
+			"<Item is Sized>(_ Item) -> Integer",
+		)
+		expect(JSON.stringify(measure)).not.toContain(canonicalPath(FILES))
+	})
+
 	// NOTE: A Case tag is entry-relative, and the Descriptor is where that
 	// spelling is decided once — every value the interpreter builds carries what
 	// is written here, so this is the one place the rule can be read.

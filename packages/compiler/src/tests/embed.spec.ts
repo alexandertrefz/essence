@@ -430,6 +430,42 @@ export {
 		)
 	})
 
+	it("shows a bound by its Protocol's name and never its path", async () => {
+		await withProject(
+			{
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	function measure<infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	Sized
+	measure
+}
+`,
+			},
+			async (directory) => {
+				let entry = path.join(directory, "Sized.es")
+				let result = await compileToMemory(entry)
+
+				expect(result.diagnostics).toEqual([])
+
+				let measure = describeModule(result.surface, entry).exports
+					.measure
+
+				expect(
+					measure?.kind === "function" ? measure.of.shown : null,
+				).toBe("<Item is Sized>(_ Item) -> Integer")
+				expect(JSON.stringify(measure)).not.toContain(directory)
+			},
+		)
+	})
+
 	// NOTE: One Module per arm of the walk, each with its ONLY Dictionary behind
 	// that arm. A broken arm is not a smaller bundle: the door is missing for a
 	// boundary that needs it, and the marshaller refuses a legal value at run

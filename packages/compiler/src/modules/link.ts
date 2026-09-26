@@ -1551,8 +1551,12 @@ function usedNames(
 	// conformance, which is the one way a Module reads an imported name without
 	// writing it anywhere. See `collectDerivedTypeNames`.
 	derivedTypeNames: Set<string>,
+	// NOTE: The Protocols this Module's Scope binds, by local name. The typed
+	// tree names a Protocol by identity, and every name bound to one is read.
+	protocols: Record<string, common.ProtocolType>,
 ): Set<string> {
 	let names = new Set(derivedTypeNames)
+	let identities = new Set<string>()
 
 	let visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
@@ -1599,7 +1603,7 @@ function usedNames(
 		// `describe`'s declaration anywhere else. Reaching a provided Method
 		// needs the Protocol in Scope, so an import that carries it is used.
 		if (typeof record["providedBy"] === "string") {
-			names.add(record["providedBy"])
+			identities.add(record["providedBy"])
 		}
 
 		// NOTE: The BOUND a Method's Type Parameter carries, off the
@@ -1610,7 +1614,7 @@ function usedNames(
 		// the Protocol is read by every such call, exactly as `providedBy`
 		// above is.
 		if (typeof record["protocolName"] === "string") {
-			names.add(record["protocolName"])
+			identities.add(record["protocolName"])
 		}
 
 		if (
@@ -1643,6 +1647,12 @@ function usedNames(
 	visit(module.program.tests)
 	visit(program)
 
+	for (let [name, protocol] of Object.entries(protocols)) {
+		if (identities.has(protocol.identity)) {
+			names.add(name)
+		}
+	}
+
 	return names
 }
 
@@ -1672,7 +1682,12 @@ function reportUnusedImports(
 		return
 	}
 
-	let used = usedNames(state.module, program, derivedTypeNames)
+	let used = usedNames(
+		state.module,
+		program,
+		derivedTypeNames,
+		state.scope.protocols,
+	)
 
 	for (let binding of bound) {
 		if (used.has(binding.localName)) {

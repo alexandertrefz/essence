@@ -619,11 +619,9 @@ export interface LookupNode {
 	member: IdentifierNode
 	position: Position
 	type: Type
-	// NOTE: The Protocol that PROVIDED this member, where the base is a
-	// Namespace and the name is one a conformance put in reach rather than one
-	// the Namespace declares. `Number.isLessThan(a, b)` reads the one const
-	// every conformer shares, so the Rewriter has to be told that the member is
-	// not a member of the Namespace it is written on.
+	// NOTE: The identity of the Protocol that provided this member of a
+	// Namespace, so the Rewriter reads the const every conformer shares, as for
+	// `Number.isLessThan(a, b)`.
 	providedBy?: string
 	// NOTE: The runtime tags of a Choice's Cases, in declaration order, where
 	// this Lookup is a DERIVED `Enumerable::cases` — `Side.cases` is answered by
@@ -1177,7 +1175,12 @@ export interface GenericDeclarationNode {
 	name: string
 	defaultType: Type | null
 	inferred: boolean
+	// NOTE: The bound as written, or its identity on a Namespace Generic that
+	// carries a woven bound and on a provided Method's `Self`.
 	constraint: string | null
+	// NOTE: How the file names a woven bound's Protocol, for a Help that
+	// writes the bound.
+	spelling?: string
 	position: Position
 }
 

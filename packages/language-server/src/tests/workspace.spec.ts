@@ -1053,6 +1053,35 @@ describe("Workspace", () => {
 				)
 			})
 
+			// NOTE: `Measurable` is only how `Main.es` spells `Sizable`, and the
+			// bound the call resolves through is the Protocol `Sizable.es`
+			// declares.
+			it("should move the requirement from a call bounded under an alias", () => {
+				let aliased = main
+					.replace(
+						'\tfrom "./Sizable.es" { Sizable }',
+						'\tfrom "./Sizable.es" { Sizable as Measurable }',
+					)
+					.replace("is Sizable>", "is Measurable>")
+				let { workspace, pathOf } = makeWorkspace({
+					...files,
+					"Main.es": aliased,
+				})
+
+				expect(
+					renameAcross(
+						workspace,
+						pathOf("Main.es"),
+						cursorAt(aliased, 9, "size"),
+						"extent",
+					),
+				).toEqual({
+					"Sizable.es": sizable.replaceAll("size", "extent"),
+					"Bag.es": bag.replaceAll("size", "extent"),
+					"Main.es": aliased.replaceAll("size", "extent"),
+				})
+			})
+
 			// NOTE: One rename group, but each call still has its own definition.
 			it("should keep each call's definition where its Method is written", () => {
 				let { workspace, pathOf } = makeWorkspace(files)
@@ -4134,6 +4163,61 @@ describe("Workspace", () => {
 					.get(pathOf("Broken.es"))
 					?.map((diagnostic) => diagnostic.code),
 			).toContain("unknown-name")
+		})
+
+		// NOTE: `Item` is bounded by the `Sized` that `SizedBox` demands, which
+		// `Boxes.es` never imports and `Box.es` keeps to itself. The file is
+		// being edited, so the member is read off a relink of the edited text.
+		it("should complete a member of a bound private to another Module", () => {
+			let written = [
+				"import {",
+				'\tfrom "./Box.es" { SizedBox }',
+				"}",
+				"",
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for SizedBox<Item> {",
+				"\t\tsized() -> Integer {",
+				"\t\t\t<- match @ -> Integer {",
+				"\t\t\t\tcase #Box({ item }) { <- 1 }",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+			let { workspace, pathOf } = makeWorkspace({
+				"Box.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tchoice SizedBox<Item is Sized> {",
+					"\t\tBox { item: Item },",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSizedBox",
+					"}",
+					"",
+				].join("\n"),
+				"Boxes.es": written,
+			})
+			let boxesPath = pathOf("Boxes.es")
+			let edited = written.replace("{ <- 1 }", "{ <- item:: }")
+
+			let entries = findCompletions(
+				edited,
+				cursorPast(edited, 9, "item::"),
+				boxesPath,
+				{
+					offers: workspace.offersFor(boxesPath),
+					namespaces: workspace.namespaceOffersFor(boxesPath),
+				},
+			)
+
+			expect(entries.map((entry) => entry.label)).toContain("size")
 		})
 
 		it("should leave a Program that writes neither section exactly as it was", () => {

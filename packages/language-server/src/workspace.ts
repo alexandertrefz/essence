@@ -13,7 +13,10 @@ import {
 	canonicalPath,
 	isStdlibDocument,
 } from "@essence-lang/compiler/documents"
-import { patternBindings } from "@essence-lang/compiler/helpers"
+import {
+	displayProtocolName,
+	patternBindings,
+} from "@essence-lang/compiler/helpers"
 import {
 	type LinkedGraph,
 	type ModuleHost,
@@ -1989,6 +1992,40 @@ function joinComponent(
 		return undefined
 	}
 
+	// NOTE: The same for a Protocol the typed tree names by identity, which
+	// names the Module that declares it. A bare identity is a standard library
+	// Protocol's, and no rename reaches its members.
+	let identityMemberKey = (
+		identity: string,
+		memberName: string,
+	): string | typeof builtinMember | undefined => {
+		let separator = identity.lastIndexOf("#")
+
+		if (separator === -1) {
+			return undefined
+		}
+
+		let modulePath = identity.slice(0, separator)
+		let name = displayProtocolName(identity)
+		let declaringIndex = indices.get(modulePath)
+		let member = declaringIndex?.protocolMembers.get(name)?.get(memberName)
+
+		if (member !== undefined) {
+			return declarationKeys.get(modulePath)?.get(member)
+		}
+
+		for (let extended of declaringIndex?.protocolExtensions.get(name) ??
+			[]) {
+			let key = protocolMemberKey(modulePath, extended, memberName)
+
+			if (key !== undefined) {
+				return key
+			}
+		}
+
+		return undefined
+	}
+
 	// NOTE: Last, because a Method dispatching through an imported Namespace can
 	// only be bound once the entry that brought that Namespace in has been
 	// joined — the Declaration it names is in another file, and which file that
@@ -2004,8 +2041,7 @@ function joinComponent(
 			let memberKey: string | undefined
 
 			if (reference.protocol === true) {
-				let key = protocolMemberKey(
-					filePath,
+				let key = identityMemberKey(
 					reference.namespaceName,
 					reference.memberName,
 				)

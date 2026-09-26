@@ -154,13 +154,9 @@ export type Scope = {
 	// resolved to nothing can say WHICH of the two `@` is here, and offer the
 	// one edit that reaches the receiver again from inside a Handler.
 	isMatchHandlerBody?: boolean
-	// NOTE: The Protocol whose provided Method this Scope is the body of. A
-	// provided Method is emitted ONCE, above every Program that reaches it, so
-	// a name the Program itself declares — a Constant, a Function, a Namespace
-	// — is not in scope where the body lands however plainly it is in scope
-	// where the body is written. It is a BARRIER rather than a missing
-	// binding: the name resolves, and resolves to something the emitted const
-	// can not see, so the walk has to notice that it CROSSED this Scope.
+	// NOTE: The identity of the Protocol whose provided Method this Scope is the
+	// body of. The body is emitted once, outside every Program that reaches it,
+	// so the name walk reports a Program's name read from inside it.
 	//
 	// Read by the name walk only, and only to report — the Type the name
 	// resolves to still stands, so one out-of-reach name reports once instead

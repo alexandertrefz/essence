@@ -545,9 +545,9 @@ export function loadStdlibFrom(
 	//
 	// The tags sit on a PARENT Scope rather than in the declaring one, because
 	// the two questions asked about a name answer differently and have to. A
-	// lookup walks the chain — `findTypeInScope` and `findProtocolInScope` both
-	// do — so `Integer` the Type resolves from anywhere. "Is this name already
-	// taken?" does NOT walk it: the Module linker's `isTaken` reads the own
+	// lookup walks the chain, as `findTypeInScope` and `resolveWrittenProtocol`
+	// do, so `Integer` the Type resolves from anywhere. Whether a name is taken
+	// is not asked of the chain: the Module linker's `isTaken` reads the own
 	// tables alone, so a file writing `import { from "./Integer.es" { Integer } }`
 	// would otherwise collide with the TAG rather than with the Namespace it
 	// asked for, be refused as a `duplicate-import`, and lose Integer dispatch

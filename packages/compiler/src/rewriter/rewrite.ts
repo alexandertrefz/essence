@@ -18,6 +18,7 @@ import {
 	structurallyEquatableNamespaces,
 } from "../helpers/conformance"
 import { openArgumentHoles } from "../helpers/defaults"
+import { displayProtocolName } from "../helpers/describe"
 import { typeContainsRefinement, withoutRecordNames } from "../helpers/types"
 import {
 	defaultOptimiserOptions,
@@ -5137,7 +5138,7 @@ function protocolPreludeNamespaces(
 				found.push({
 					name: protocol.name.name,
 					protocol: true,
-					identity: protocol.name.name,
+					identity: protocol.identity,
 					node: {
 						nodeType: "NamespaceDefinitionStatement",
 						name: protocol.name,
@@ -5270,7 +5271,7 @@ function providedMemberIdentifier(
 ): string {
 	return (
 		emission.providedMembers.get(identity)?.get(memberName) ??
-		protocolMemberIdentifier(identity, memberName)
+		protocolMemberIdentifier(displayProtocolName(identity), memberName)
 	)
 }
 

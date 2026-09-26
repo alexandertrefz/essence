@@ -450,6 +450,16 @@ export declare const Rectangle: {
 		expect(text).not.toContain("undefined | undefined")
 	})
 
+	it("declares a bounded Function without its Protocol's path", async () => {
+		let text = await declarationsOf(clientFixture("Bounded.es"))
+
+		expect(text).toContain("export type Sized = unknown")
+		expect(text).toContain("export declare function measure(p0: never")
+		expect(text).not.toContain(
+			canonicalPath(path.dirname(clientFixture("Bounded.es"))),
+		)
+	})
+
 	it("declares a Protocol as a Type nothing holds", async () => {
 		expect(
 			await declarationsOf(clientFixture("Declarations.es")),

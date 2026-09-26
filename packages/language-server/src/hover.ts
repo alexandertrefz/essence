@@ -1,6 +1,7 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
 	caseDefaults,
+	displayProtocolName,
 	isSynthesizedName,
 	parameterDefaults,
 	parameterInternalName,
@@ -258,7 +259,10 @@ function considerSignatures(
 	let documentation = renderDocumentation(
 		documentationFor(signatures, fallback),
 	)
-	let provided = providedBy === null ? null : `Provided by \`${providedBy}\`.`
+	let provided =
+		providedBy === null
+			? null
+			: `Provided by \`${displayProtocolName(providedBy)}\`.`
 
 	state.best = {
 		position,
@@ -1032,7 +1036,9 @@ function aliasedRecordShape(type: common.Type): common.Type | null {
 function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	let inferKeyword = generic.infer ? "infer " : ""
 	let constraint =
-		generic.constraint == null ? "" : ` is ${generic.constraint}`
+		generic.constraint == null
+			? ""
+			: ` is ${displayProtocolName(generic.constraint)}`
 
 	return `${inferKeyword}${generic.name}${constraint}`
 }

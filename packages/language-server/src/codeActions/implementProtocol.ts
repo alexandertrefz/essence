@@ -7,6 +7,7 @@ import {
 } from "@essence-lang/compiler/enricher/resolvers"
 import {
 	applyGenericBindings,
+	displayProtocolName,
 	flattenUnionMembers,
 	missingRequirements,
 	providedMethodProtocol,
@@ -345,7 +346,7 @@ function signatureOf(
 							`${generic.infer ? "infer " : ""}${generic.name}${
 								generic.constraint == null
 									? ""
-									: ` is ${generic.constraint}`
+									: ` is ${displayProtocolName(generic.constraint)}`
 							}`,
 					)
 					.join(", ")}>`
@@ -381,15 +382,15 @@ function derives(protocol: common.ProtocolType, conformer: Conformer): boolean {
 		return false
 	}
 
-	if (protocol.name === printableProtocolName) {
+	if (protocol.identity === printableProtocolName) {
 		return derivedPrintableNamespaceForChoice(target) !== null
 	}
 
-	if (protocol.name === enumerableProtocolName) {
+	if (protocol.identity === enumerableProtocolName) {
 		return derivedEnumerableNamespaceForChoice(target, protocol) !== null
 	}
 
-	return protocol.name === equatableProtocolName && isChoice(target)
+	return protocol.identity === equatableProtocolName && isChoice(target)
 }
 
 // NOTE: Equality derives for EVERY Choice, payload or no payload, so this is
@@ -401,13 +402,21 @@ function isChoice(type: common.Type): boolean {
 	return cases.length > 0 && cases.every((member) => member.type === "Case")
 }
 
+// NOTE: `granted` holds identities, as a Namespace's `conformsTo` does.
 function providerIn(
 	protocols: Record<string, common.ProtocolType>,
 	granted: ReadonlyArray<string>,
 ): (methodName: string) => string | null {
+	let byIdentity = new Map(
+		Object.values(protocols).map((protocol) => [
+			protocol.identity,
+			protocol,
+		]),
+	)
+
 	return (methodName) => {
-		for (let name of granted) {
-			let protocol = protocols[name]
+		for (let identity of granted) {
+			let protocol = byIdentity.get(identity)
 			let provider =
 				protocol === undefined
 					? null

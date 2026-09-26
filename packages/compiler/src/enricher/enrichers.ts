@@ -26,6 +26,7 @@ import {
 	describeType,
 	displayChoiceName,
 	displayGenericName,
+	displayProtocolName,
 	undispatchableHelps,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
@@ -105,11 +106,10 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
-	dropRefusedConditions,
+	describeProtocol,
 	enclosingNamespaceOf,
 	enumerableMethodName,
 	findCaseTypesInScope,
-	findProtocolInScope,
 	getAllNamespacesInScope,
 	impliedTargetBounds,
 	isStaticMethod,
@@ -125,6 +125,9 @@ import {
 	lookupTypeOf,
 	type MemberAccessContext,
 	namespaceNamedByType,
+	protocolNameTaken,
+	protocolOf,
+	protocolSpelling,
 	providedNamespaceMember,
 	recordValueTypeOf,
 	parameterDocumentation,
@@ -146,6 +149,7 @@ import {
 	resolveProtocolDeclarationStatementType,
 	resolveSelfType,
 	resolveType,
+	resolveWrittenProtocol,
 	scopeWithGenerics,
 	protocolsDeclaringMethod,
 	silentCheckedConformances,
@@ -5733,9 +5737,10 @@ function predicateSignatures(
 	let method = namespace.methods[conjunct.methodName]
 
 	if (method === undefined) {
-		for (let protocolName of namespace.conformsTo ?? []) {
-			let protocol = findProtocolInScope(protocolName, scope)
-			let provided = protocol?.methods[conjunct.methodName]
+		for (let identity of namespace.conformsTo ?? []) {
+			let provided = protocolOf(identity, scope).methods[
+				conjunct.methodName
+			]
 
 			if (provided !== undefined) {
 				method = provided
@@ -7584,7 +7589,7 @@ function weaveMethodBounds(
 				labels: [
 					primary(
 						position,
-						`Method '${methodName}' would need both '${generic} is ${existing}' and '${generic} is ${wanted}'`,
+						`Method '${methodName}' would need both '${generic} is ${describeProtocol(existing, scope)}' and '${generic} is ${describeProtocol(wanted, scope)}'`,
 					),
 				],
 				notes: [
@@ -7614,7 +7619,8 @@ function weaveMethodBounds(
 		for (let methodName of fulfillingMethods) {
 			let clause = node.conformsTo.find(
 				(candidate) =>
-					candidate.protocol.content === conformance.protocolName,
+					resolveWrittenProtocol(candidate.protocol, scope)
+						?.identity === conformance.protocolName,
 			)
 
 			for (let bounds of boundsFor(methodName)) {
@@ -7738,18 +7744,21 @@ function weaveMethodBounds(
 								candidate.name === generic.name.content,
 						),
 				)
-				.map(
-					(generic): common.typed.GenericDeclarationNode => ({
+				.map((generic): common.typed.GenericDeclarationNode => {
+					let identity = entryBounds.get(generic.name.content)!
+
+					return {
 						nodeType: "GenericDeclaration",
 						name: generic.name.content,
 						inferred: generic.inferred,
 						defaultType: generic.defaultType
 							? resolveType(generic.defaultType, scope)
 							: null,
-						constraint: entryBounds.get(generic.name.content)!,
+						constraint: identity,
+						spelling: describeProtocol(identity, scope),
 						position: generic.position,
-					}),
-				)
+					}
+				})
 		})
 
 		if (injected.some((list) => list.length > 0)) {
@@ -7917,7 +7926,7 @@ function enrichProvidedMethods(
 
 		if (
 			providedMethodProtocol(protocolType, methodName) !==
-			node.name.content
+			protocolType.identity
 		) {
 			continue
 		}
@@ -7927,17 +7936,17 @@ function enrichProvidedMethods(
 			name: "Self",
 			inferred: true,
 			defaultType: null,
-			constraint: node.name.content,
+			constraint: protocolType.identity,
 			position: node.name.position,
 		}
 		let boundSelf: common.GenericUse = {
 			type: "GenericUse",
 			name: "Self",
-			constraint: node.name.content,
+			constraint: protocolType.identity,
 		}
 		let bodyScope = childScope(scope, {
 			types: { Self: boundSelf },
-			providedMethodOf: node.name.content,
+			providedMethodOf: protocolType.identity,
 		})
 		let type = resolveFunctionValueType(body, bodyScope)
 
@@ -13370,29 +13379,31 @@ function reportUnknownMethod(
 	// bound was searched through. It is the Diagnostic a provided Method's body
 	// meets whenever it reaches past the Protocol's surface.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
-		let protocol = findProtocolInScope(baseType.constraint, scope)
-		let surface = Object.keys(protocol?.methods ?? {}).sort()
+		let surface = Object.keys(
+			protocolOf(baseType.constraint, scope).methods,
+		).sort()
+		let bound = describeProtocol(baseType.constraint, scope)
 
 		reportError(
-			`'${baseType.constraint}' has no Method named '${node.member.content}'`,
+			`'${bound}' has no Method named '${node.member.content}'`,
 			node.member.position,
 			{
 				code: "method-not-on-protocol",
 				labels: [
 					primary(
 						node.member.position,
-						`'${baseType.constraint}' does not declare this Method`,
+						`'${bound}' does not declare this Method`,
 					),
 					secondary(
 						node.base.position,
-						`'${baseType.name}' is only known to conform to '${baseType.constraint}'`,
+						`'${baseType.name}' is only known to conform to '${bound}'`,
 					),
 				],
 				notes:
 					surface.length === 0
-						? [`'${baseType.constraint}' declares no Methods.`]
+						? [`'${bound}' declares no Methods.`]
 						: [
-								`'${baseType.constraint}' declares ${surface
+								`'${bound}' declares ${surface
 									.map((name) => `'${name}'`)
 									.join(", ")}.`,
 							],
@@ -13400,7 +13411,7 @@ function reportUnknownMethod(
 					...(suggestion === null
 						? []
 						: [`Did you mean '${suggestion}'?`]),
-					`Declare '${node.member.content}' on '${baseType.constraint}', or bound '${baseType.name}' by a Protocol that has it.`,
+					`Declare '${node.member.content}' on '${bound}', or bound '${baseType.name}' by a Protocol that has it.`,
 				],
 				...suggestionData(suggestion),
 			},
@@ -13551,22 +13562,34 @@ function undeclaredProtocolHelps(
 	namespaces: Map<string, common.NamespaceType>,
 	scope: enricher.Scope,
 ): Array<string> {
-	let missing = new Set<string>()
+	let missing = new Map<string, string>()
 
 	for (let namespace of namespaces.values()) {
-		for (let protocolName of namespace.conformsTo ?? []) {
-			if (findProtocolInScope(protocolName, scope) === null) {
-				missing.add(protocolName)
+		for (let identity of namespace.conformsTo ?? []) {
+			let name = displayProtocolName(identity)
+
+			if (protocolSpelling(identity, scope) !== null) {
+				continue
 			}
+
+			// NOTE: Where something here holds the name, the import needs one of
+			// its own.
+			let taken = protocolNameTaken(identity, scope)
+			let holder =
+				taken === "protocol"
+					? `the '${name}' named here is a different Protocol`
+					: `this file binds '${name}' already`
+
+			missing.set(
+				name,
+				taken === null
+					? `Import '${name}' — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.`
+					: `Import '${name}' under a name of its own, '${name} as …' — this value conforms to it, and ${holder}.`,
+			)
 		}
 	}
 
-	return [...missing]
-		.sort()
-		.map(
-			(protocolName) =>
-				`Import '${protocolName}' — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.`,
-		)
+	return [...missing.keys()].sort().map((name) => missing.get(name)!)
 }
 
 // NOTE: The Method is there, it is simply not called this way — which is a
@@ -13756,6 +13779,7 @@ function methodCandidates(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
+	scope: enricher.Scope,
 ): Array<OverloadCandidate> {
 	return [...specializedNamespacesFor(namespaces, baseType)].flatMap(
 		([namespaceName, namespaceType]) => {
@@ -13768,7 +13792,7 @@ function methodCandidates(
 				qualifier:
 					namespaceType.providedBy === undefined
 						? ""
-						: ` (provided by ${namespaceType.providedBy})`,
+						: ` (provided by ${describeProtocol(namespaceType.providedBy, scope)})`,
 				signature,
 				receiverParameters,
 			}))
@@ -14503,8 +14527,11 @@ function candidateNamespaceName(
 function candidateSpecifierName(
 	key: string,
 	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
 ): string {
-	return namespaceType.providedBy ?? key
+	return namespaceType.providedBy === undefined
+		? key
+		: describeProtocol(namespaceType.providedBy, scope)
 }
 
 // NOTE: What one candidate DECLARES, as a note. A written Method is the
@@ -14518,10 +14545,11 @@ function describeCandidateDeclaration(
 	key: string,
 	namespaceType: common.NamespaceType,
 	methodName: string,
+	scope: enricher.Scope,
 ): string {
 	return namespaceType.providedBy === undefined
 		? `'${key}' declares '${methodName}'.`
-		: `'${namespaceType.providedBy}' provides '${methodName}' for '${namespaceType.name}'.`
+		: `'${describeProtocol(namespaceType.providedBy, scope)}' provides '${methodName}' for '${namespaceType.name}'.`
 }
 
 // NOTE: A DERIVE is a fallback: it answers only where no written Namespace
@@ -14605,7 +14633,7 @@ function reportNoMatchingOverload(
 	)
 	let { labels, notes, helps, data } = overloadRefusalReport(
 		refusedCandidates(
-			methodCandidates(node, namespaces, receiverType),
+			methodCandidates(node, namespaces, receiverType, scope),
 			matchableArguments,
 		),
 		matchableArguments,
@@ -15077,10 +15105,12 @@ function resolveMethodInvocation(
 					method.namespace.name,
 					method.namespace.type,
 					node.member.content,
+					scope,
 				),
 				specifier: candidateSpecifierName(
 					method.namespace.name,
 					method.namespace.type,
+					scope,
 				),
 			})),
 		)
@@ -15362,10 +15392,11 @@ function resolveUnionMethodDispatch(
 							method.namespaceName,
 							method.namespaceType,
 							node.member.content,
+							scope,
 						),
 					),
 					helps: [
-						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType)}>${node.member.content}(…)'.`,
+						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType, scope)}>${node.member.content}(…)'.`,
 					],
 					// NOTE: As at the report for a receiver that is no Union —
 					// a specifier written at the call picks the candidate for
@@ -15376,6 +15407,7 @@ function resolveUnionMethodDispatch(
 							candidateSpecifierName(
 								method.namespaceName,
 								method.namespaceType,
+								scope,
 							),
 						),
 					},
@@ -15482,6 +15514,8 @@ function resolveUnionMethodDispatch(
 					node.base.nodeType === "Identifier"
 						? node.base.content
 						: null,
+					(parameter) =>
+						describeProtocol(parameter.constraint, scope),
 				),
 			},
 		)
@@ -19846,7 +19880,7 @@ export function deriveProvidedPredicateAliases(
 	let selfType: common.GenericUse = {
 		type: "GenericUse",
 		name: "Self",
-		constraint: node.name.content,
+		constraint: protocolType.identity,
 	}
 	let container: AliasContainer = {
 		selfNamespaceName: null,
@@ -19874,7 +19908,7 @@ export function deriveProvidedPredicateAliases(
 			entry?.type !== "SimpleMethod" ||
 			entry.returnType.type !== "Boolean" ||
 			providedMethodProtocol(protocolType, methodName) !==
-				node.name.content
+				protocolType.identity
 		) {
 			continue
 		}
@@ -19887,7 +19921,7 @@ export function deriveProvidedPredicateAliases(
 
 		bodyScope ??= childScope(scope, {
 			types: { Self: selfType },
-			providedMethodOf: node.name.content,
+			providedMethodOf: protocolType.identity,
 		})
 
 		let reading = aliasCandidateOf(
@@ -20683,60 +20717,7 @@ export function resolveNamespaceDefinitionStatementType(
 	let impliedBounds = impliedTargetBounds(node, scope)
 	let genericScope = scopeWithGenerics(node.generics, scope, impliedBounds)
 
-	let conformanceConditions: Record<
-		string,
-		Array<{ generic: string; protocol: string }>
-	> = {}
-	// NOTE: The Protocols this Namespace conforms to, EXPANDED through every
-	// extension: `is Orderable` also says `is Comparable`, because a Protocol
-	// extension is a promise about its conformers. Written flat here rather
-	// than walked at every use site, so that the one question everything else
-	// asks — does this Namespace conform to that Protocol — stays a lookup.
-	//
-	// A conditional clause's conditions ride along to each granted name: the
-	// conditions are what makes the conformance hold at all, and they hold the
-	// ancestor's exactly as they hold the descendant's.
-	let conformsTo: Array<string> = []
-	// NOTE: The Protocols some clause grants outright, so a later conditional
-	// clause reaching the same one can not put conditions back on it.
-	let unconditional = new Set<string>()
-
-	for (let clause of node.conformsTo) {
-		let conditions =
-			clause.conditions.length === 0
-				? null
-				: clause.conditions.map((condition) => ({
-						generic: condition.generic.content,
-						protocol: condition.protocol.content,
-					}))
-
-		let protocol = findProtocolInScope(clause.protocol.content, scope)
-
-		for (let name of [
-			clause.protocol.content,
-			...(protocol?.conformsTo ?? []),
-		]) {
-			if (!conformsTo.includes(name)) {
-				conformsTo.push(name)
-			}
-
-			// NOTE: The WEAKEST grant wins. Two clauses may reach one Protocol —
-			// `is Ordered where Item is Ordered, is Ranked`, where both extend
-			// `Named` — and if either grants it without conditions then the
-			// Namespace conforms without them. Keeping the first clause's
-			// conditions would refuse a receiver the second clause conforms for,
-			// with a `where` the reader never wrote about that Protocol.
-			if (conditions === null) {
-				unconditional.add(name)
-				delete conformanceConditions[name]
-			} else if (
-				!unconditional.has(name) &&
-				conformanceConditions[name] === undefined
-			) {
-				conformanceConditions[name] = conditions
-			}
-		}
-	}
+	let clauses = resolveConformanceClauses(node, scope)
 
 	// NOTE: The maps the Type is built from are the ones it CARRIES, filled in
 	// place as they resolve, so the Namespace injected into its own body sees
@@ -20762,8 +20743,12 @@ export function resolveNamespaceDefinitionStatementType(
 		),
 		properties,
 		methods,
-		conformsTo,
-		conformanceConditions,
+		conformsTo: clauses.conformsTo,
+		conformanceConditions: clauses.conformanceConditions,
+	}
+
+	if (clauses.unsettled && options.deferOnPendingConformance !== undefined) {
+		unsettledNamespaces.add(resultType)
 	}
 
 	// NOTE: The natives first, and in one pass of their own: a value-LESS
@@ -20851,11 +20836,128 @@ export function resolveNamespaceDefinitionStatementType(
 			scope,
 			false,
 		)
-	} else {
-		dropRefusedConditions(resultType, scope)
 	}
 
 	return resultType
+}
+
+// NOTE: The Namespace Types hoisted while a clause or a `where` condition
+// named nothing yet, which a Protocol imported from a cycle partner does until
+// the import is seeded. `settleConformanceClauses` reads them again.
+let unsettledNamespaces = new WeakSet<common.NamespaceType>()
+
+// NOTE: A Namespace's `is` clauses as identities, each expanded through every
+// Protocol it extends. A name that resolves to nothing is left out and makes
+// the answer `unsettled`; `checkProtocolConformance` is what reports it.
+function resolveConformanceClauses(
+	node: parser.NamespaceDefinitionStatementNode,
+	scope: enricher.Scope,
+): {
+	conformsTo: Array<string>
+	conformanceConditions: Record<
+		string,
+		Array<{ generic: string; protocol: string }>
+	>
+	unsettled: boolean
+} {
+	let conformanceConditions: Record<
+		string,
+		Array<{ generic: string; protocol: string }>
+	> = {}
+	// NOTE: Every Protocol a clause names and each one it extends, kept flat
+	// so asking about a conformance stays a lookup. A clause's conditions ride
+	// along to each Protocol it grants, since they hold the ancestor's as well.
+	let conformsTo: Array<string> = []
+	// NOTE: The Protocols some clause grants outright, so a later conditional
+	// clause reaching the same one can not put conditions back on it.
+	let unconditional = new Set<string>()
+	let unsettled = false
+
+	for (let clause of node.conformsTo) {
+		let conditions =
+			clause.conditions.length === 0
+				? null
+				: clause.conditions.flatMap((condition) => {
+						let protocol = resolveWrittenProtocol(
+							condition.protocol,
+							scope,
+						)
+
+						if (protocol === null) {
+							unsettled = true
+
+							return []
+						}
+
+						return [
+							{
+								generic: condition.generic.content,
+								protocol: protocol.identity,
+							},
+						]
+					})
+
+		let protocol = resolveWrittenProtocol(clause.protocol, scope)
+
+		if (protocol === null) {
+			unsettled = true
+
+			continue
+		}
+
+		for (let identity of [
+			protocol.identity,
+			...(protocol.conformsTo ?? []),
+		]) {
+			if (!conformsTo.includes(identity)) {
+				conformsTo.push(identity)
+			}
+
+			// NOTE: The weakest grant wins: in `is Ordered where Item is
+			// Ordered, is Ranked`, both extending `Named`, the second grants it
+			// outright.
+			if (conditions === null) {
+				unconditional.add(identity)
+				delete conformanceConditions[identity]
+			} else if (
+				!unconditional.has(identity) &&
+				conformanceConditions[identity] === undefined
+			) {
+				conformanceConditions[identity] = conditions
+			}
+		}
+	}
+
+	return { conformsTo, conformanceConditions, unsettled }
+}
+
+// NOTE: Reads a hoisted Namespace's clauses again once every import is bound,
+// and writes the answer into the list and record every copy of the Type shares.
+// Answers false where the Type has nothing to settle.
+export function settleConformanceClauses(
+	type: common.NamespaceType,
+	node: parser.NamespaceDefinitionStatementNode,
+	scope: enricher.Scope,
+): boolean {
+	if (!unsettledNamespaces.has(type)) {
+		return false
+	}
+
+	unsettledNamespaces.delete(type)
+
+	let settled = resolveConformanceClauses(node, scope)
+	let conformsTo = type.conformsTo ?? []
+	let conditions = type.conformanceConditions ?? {}
+
+	conformsTo.splice(0, conformsTo.length, ...settled.conformsTo)
+
+	for (let identity of Object.keys(conditions)) {
+		delete conditions[identity]
+	}
+
+	Object.assign(conditions, settled.conformanceConditions)
+
+	return true
 }
 
 // NOTE: The qualified spelling is shown rather than described — "prefix it

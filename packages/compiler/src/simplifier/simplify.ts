@@ -1155,7 +1155,7 @@ function simplifyProtocolDeclarationStatement(
 		methods: simplifyMethods(node.methods, {
 			type: "GenericUse",
 			name: "Self",
-			constraint: node.name.content,
+			constraint: node.protocolType.identity,
 		}),
 		position: node.position,
 	}

@@ -224,6 +224,16 @@ type WalkContext = {
 	// NOTE: The Protocols each Protocol declared here extends, as its `is` list
 	// writes them. A requirement is looked for through them as well.
 	protocolExtensions: Map<string, Array<string>>
+	// NOTE: The name of each Protocol declared here, by the identity the typed
+	// tree names it by, filled as the typed pass reaches each declaration.
+	ownProtocols: Map<string, string>
+	// NOTE: The references a Protocol answers, bound once the typed pass has
+	// met every Protocol the file declares, wherever it stands.
+	protocolMemberReferences: Array<{
+		identity: string
+		memberName: string
+		position: common.Position
+	}>
 	conformances: Array<ConformanceLink>
 	// NOTE: Every Method and Property reference whose Namespace this file does
 	// not declare, by the name the reference resolved through. A Namespace an
@@ -248,9 +258,9 @@ type ExternalMemberReference = {
 	namespaceName: string
 	memberName: string
 	position: common.Position
-	// NOTE: Set where an imported Protocol answers the call. The workspace index
-	// then resolves the name among the file's Types and the member among the
-	// Protocol's members.
+	// NOTE: Set where a Protocol this file does not declare answers the call.
+	// `namespaceName` is then the Protocol's identity, which names the Module
+	// that declares it, and the workspace index looks the member up there.
 	protocol?: true
 }
 
@@ -494,7 +504,7 @@ export type ProgramIndex = {
 	// import may not shadow a declaration either.
 	namespaceMembers: Map<string, Map<string, Declaration>>
 	// NOTE: The same, for the Methods a Protocol declares, reached through the
-	// entry that imports the Protocol.
+	// entry that imports the Protocol or by its identity.
 	protocolMembers: Map<string, Map<string, Declaration>>
 	protocolExtensions: Map<string, Array<string>>
 	externalMembers: Array<ExternalMemberReference>
@@ -516,6 +526,8 @@ export function indexProgram(
 		namespaceMembers: new Map(),
 		protocolMembers: new Map(),
 		protocolExtensions: new Map(),
+		ownProtocols: new Map(),
+		protocolMemberReferences: [],
 		conformances: [],
 		externalMembers: [],
 		recordSites: [],
@@ -597,6 +609,8 @@ export function indexProgram(
 			walkTypedBody(section.nodes, context)
 		}
 	}
+
+	bindProtocolMembers(context)
 
 	resolveRecordMembers(context)
 
@@ -2763,19 +2777,26 @@ function bindNamespaceMember(
 	memberName: string,
 	position: common.Position,
 	context: WalkContext,
-	// NOTE: Set where a Protocol answers the call: the writer of a provided
-	// body, or a bounded receiver's bound. The Invocation names a Namespace
-	// without the member, such as `Value__conformance`.
-	protocolName: string | undefined = undefined,
+	// NOTE: Set where a Protocol answers the call, to its identity: the writer
+	// of a provided body, or a bounded receiver's bound. The Invocation names a
+	// Namespace without the member, such as `Value__conformance`.
+	protocolIdentity: string | undefined = undefined,
 ) {
-	let declaringName = protocolName ?? namespaceName
+	if (protocolIdentity !== undefined) {
+		context.protocolMemberReferences.push({
+			identity: protocolIdentity,
+			memberName,
+			position,
+		})
 
-	// NOTE: Builtin Namespaces and Protocols have no source declaration —
-	// their members stay unbound and are therefore not renameable.
-	let declaration =
-		protocolName === undefined
-			? context.namespaceMembers.get(declaringName)?.get(memberName)
-			: protocolMember(context, declaringName, memberName)
+		return
+	}
+
+	// NOTE: Builtin Namespaces have no source declaration, so their members stay
+	// unbound and are not renameable.
+	let declaration = context.namespaceMembers
+		.get(namespaceName)
+		?.get(memberName)
 
 	if (declaration !== undefined) {
 		record(declaration, memberName, position, context.index)
@@ -2787,12 +2808,35 @@ function bindNamespaceMember(
 	// have a source declaration — in the Module that wrote it. Kept so the
 	// workspace index can bind it there; a single file's index has no way to
 	// tell the two apart and does not have to.
-	context.externalMembers.push({
-		namespaceName: declaringName,
+	context.externalMembers.push({ namespaceName, memberName, position })
+}
+
+// NOTE: A reference to a member of a Protocol this file declares is bound
+// here. Any other Protocol's, a builtin's included, goes to the workspace
+// index by identity, which leaves a builtin's unbound.
+function bindProtocolMembers(context: WalkContext) {
+	for (let {
+		identity,
 		memberName,
 		position,
-		...(protocolName === undefined ? {} : { protocol: true as const }),
-	})
+	} of context.protocolMemberReferences) {
+		let ownProtocol = context.ownProtocols.get(identity)
+		let declaration =
+			ownProtocol === undefined
+				? undefined
+				: protocolMember(context, ownProtocol, memberName)
+
+		if (declaration !== undefined) {
+			record(declaration, memberName, position, context.index)
+		} else {
+			context.externalMembers.push({
+				namespaceName: identity,
+				memberName,
+				position,
+				protocol: true,
+			})
+		}
+	}
 }
 
 function boundProtocol(type: common.Type | null): string | undefined {
@@ -2885,6 +2929,10 @@ function walkTypedNode(
 
 			return
 		case "ProtocolDeclarationStatement":
+			context.ownProtocols.set(
+				node.protocolType.identity,
+				node.name.content,
+			)
 			walkTypedMethods(node.methods, context)
 			return
 		case "IfStatement":

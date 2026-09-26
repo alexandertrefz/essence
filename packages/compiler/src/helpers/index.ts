@@ -29,6 +29,7 @@ export {
 	displayChoiceName,
 	displayedRefinementArguments,
 	displayGenericName,
+	displayProtocolName,
 	lastRequiredParameterIndex,
 	requiredParameterCount,
 	withArticle,

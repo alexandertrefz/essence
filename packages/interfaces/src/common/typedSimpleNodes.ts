@@ -475,9 +475,9 @@ export interface ConformanceValueNode {
 	nodeType: "ConformanceValue"
 	namespaceName: string
 	methodMap: Record<string, string>
-	// NOTE: As on the ConformanceSource — the Protocol's provided Methods this
-	// conformer does not override, each under the Protocol that wrote the body.
-	// The Rewriter curries the finished witness onto each of them.
+	// NOTE: As on the ConformanceSource: the Protocol's provided Methods this
+	// conformer does not override, each under the identity of the Protocol that
+	// wrote the body. The Rewriter curries the finished witness onto each.
 	providedMethods?: Record<string, string>
 	// NOTE: The witness values for this Namespace's own `where` conditions, in
 	// Generic declaration order. Empty for an unconditional conformance, which
@@ -537,14 +537,9 @@ export interface MethodInvocationNode {
 	// for an all-structural Record, which keeps emitting the builtin
 	// `Record.is`/`Record.toString` it always did, byte for byte.
 	derivedMembers?: Array<string>
-	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
-	// `namespaceName` is the Namespace whose conformance put the Method in
-	// reach — `Integer` for `5::isNot(3)` — and that Namespace declares no
-	// Method of the name, so this is what sends the emission to the one const
-	// every conformer shares. It is a flag rather than a name comparison
-	// because a Program may declare `protocol Integer` beside the standard
-	// library's `Integer` Namespace, and a name alone can not say which
-	// answered.
+	// NOTE: The identity of the Protocol that provided this Method, if any. The
+	// `base`, such as `Integer` for `5::isNot(3)`, declares no Method of the name,
+	// so the emission reads the const every conformer shares.
 	providedBy?: string
 	type: Type
 	position?: Position
@@ -722,9 +717,9 @@ export interface LookupNode {
 	member: IdentifierNode
 	type: Type
 	position?: Position
-	// NOTE: As on the typed Node — the Protocol that provided a member read off
-	// a Namespace, which is what sends the emission to the shared const rather
-	// than to a member of that Namespace.
+	// NOTE: As on the typed Node: the identity of the Protocol that provided a
+	// member read off a Namespace, which sends the emission to the shared const
+	// rather than to a member of that Namespace.
 	providedBy?: string
 	// NOTE: As on the typed Node — a derived `Enumerable::cases`, and the tags
 	// its answer is built from.
@@ -1245,11 +1240,9 @@ export type DispatchChainCase = {
 	// for an all-structural Record, which keeps emitting the builtin
 	// `Record.is`/`Record.toString` it always did, byte for byte.
 	derivedMembers?: Array<string>
-	// NOTE: The Protocol that PROVIDED this branch's Method, carried over from
-	// the dispatch case this branch was built from. `namespaceName` is the
-	// Namespace whose conformance offered it, so it is this that names the
-	// const — and the tree-shaking walk reads it here to draw the edge to that
-	// const, which nothing else in a compiled chain names.
+	// NOTE: The identity of the Protocol that provided this branch's Method,
+	// from its dispatch case. It names the const, which the tree-shaking walk
+	// finds nowhere else in a compiled chain.
 	providedBy?: string
 }
 
