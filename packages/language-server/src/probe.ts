@@ -118,21 +118,28 @@ type OpenBracket = {
 }
 
 // NOTE: The Keyword is read as a whole word, so `redefine` opens no `define`,
-// off text `stripNoise` has blanked String text and Comments out of. The next
-// opening bracket claims it, and only a `{` is then the `define`'s block:
-// `define -> Type {` loses it wherever its Type writes a bracket of its own,
-// such as a Function Type's `(` or a Record Type's `{`.
+// off text `stripNoise` has blanked String text and Comments out of. As in the
+// Parser, its block is the first `{` at its own depth past its return Type: a
+// `{` where that Type still expects a Type opens a Record Type instead.
 function openBrackets(
 	text: string,
 	openHoles: Array<number>,
 ): Array<OpenBracket> {
 	let stack: Array<OpenBracket> = []
 	let word = ""
-	let pendingDefine = false
+	// NOTE: The depth of the `define` whose block has not opened yet, or -1.
+	let pendingDefine = -1
+	// NOTE: The last two characters read that are not blank.
+	let previous = ""
 	let holes = new Set(openHoles)
 
 	for (let index = 0; index < text.length; index++) {
 		let character = text[index]!
+		let before = previous
+
+		if (!/\s/.test(character)) {
+			previous = `${previous}${character}`.slice(-2)
+		}
 
 		if (/[A-Za-z0-9_]/.test(character)) {
 			word += character
@@ -141,7 +148,7 @@ function openBrackets(
 		}
 
 		if (word === "define") {
-			pendingDefine = true
+			pendingDefine = stack.length
 		}
 
 		word = ""
@@ -153,23 +160,35 @@ function openBrackets(
 			character === "(" ||
 			character === "["
 		) {
-			stack.push({
-				opener: character,
-				opensDefine: character === "{" && pendingDefine,
-			})
+			let opensDefine =
+				character === "{" &&
+				stack.length === pendingDefine &&
+				!expectsType.test(before)
 
-			pendingDefine = false
+			stack.push({ opener: character, opensDefine })
+
+			if (opensDefine) {
+				pendingDefine = -1
+			}
 		} else if (
 			character === "}" ||
 			character === ")" ||
 			character === "]"
 		) {
 			stack.pop()
+
+			if (stack.length < pendingDefine) {
+				pendingDefine = -1
+			}
 		}
 	}
 
 	return stack
 }
+
+// NOTE: A Type is still expected after an arrow, a Union's `|`, or the `<` or
+// `,` of a Type Argument list.
+const expectsType = /(->|[|<,])$/
 
 // NOTE: `declarationIndex` names the one open `(` to close as a Declaration's
 // parameter list rather than as a call's Argument list — see `probeSourcesFor`.

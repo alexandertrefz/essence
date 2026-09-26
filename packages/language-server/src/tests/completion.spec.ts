@@ -2940,6 +2940,62 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
+	// NOTE: The `define`'s block is the `{` after its return Type, however many
+	// brackets that Type writes of its own.
+	it("should complete inside an arm's brace under a Record return Type", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction show (_ team: Team) -> { label: String } {",
+			"\t\t<- define -> { label: String } {",
+			"\t\t\tas { label = team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 22 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
+	it("should complete inside an arm's brace under a Function return Type", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction bonus (_ team: Team) -> (_: Integer) -> Integer {",
+			"\t\t<- define -> (_: Integer) -> Integer {",
+			"\t\t\tas (_ extra: Integer) -> Integer { <- team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 47 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
+	it("should complete inside an arm's brace under a Generic return Type", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, points: Integer }",
+			"\tfunction show (_ team: Team) -> List<{ label: String }> {",
+			"\t\t<- define -> List<{ label: String }> {",
+			"\t\t\tas [{ label = team.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 23 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
 	// NOTE: And a `define` written inside an arm of another one wants both
 	// blocks closed — the inner by the tail the cursor needs, the outer by the
 	// `otherwise` its own arm is one word short of.

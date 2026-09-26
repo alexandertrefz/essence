@@ -66,6 +66,47 @@ describe("the define arm readings", () => {
 		).toBe(false)
 	})
 
+	// NOTE: The `define`'s block is the `{` after its return Type, however many
+	// brackets that Type writes of its own.
+	for (let returnType of [
+		"{ a: Integer }",
+		"(_: Integer) -> Integer",
+		"(_: { a: Integer }) -> Integer",
+		"List<{ a: Integer }>",
+		"Integer | { a: Integer }",
+		"Dictionary<String, { a: Integer }>",
+	]) {
+		it(`closes the define's block past a return Type of ${returnType}`, () => {
+			let head = [
+				"implementation {",
+				`\tconstant x = define -> ${returnType} {`,
+				"\t\tas { a = y",
+			].join("\n")
+
+			let sources = probeSourcesFor(head, "::lspProbeMember()")
+
+			expect(sources).toContain(`${head}::lspProbeMember()} otherwise}}`)
+			expect(sources).toContain(
+				`${head}::lspProbeMember()} as {} otherwise}}`,
+			)
+		})
+	}
+
+	it("closes an enclosing define's block past its return Type", () => {
+		let head = [
+			"implementation {",
+			"\tconstant x = define -> { a: Integer } {",
+			"\t\tas define {",
+			"\t\t\tas { a = y",
+		].join("\n")
+
+		let sources = probeSourcesFor(head, "::lspProbeMember()")
+
+		expect(sources).toContain(
+			`${head}::lspProbeMember()} otherwise} otherwise}}`,
+		)
+	})
+
 	// NOTE: `stripNoise` blanks Strings and Comments before the Keyword is
 	// looked for, so a `define` that is only ever mentioned costs nothing.
 	it("reads no define out of a String or a Comment", () => {
