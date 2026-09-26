@@ -110,14 +110,9 @@
  * is out of reach of any scoped rule; this has to be global.
  */
 
-.ref__lede code,
-.read__body code {
+.ref__lede code {
 	font-family: var(--font-mono);
 	font-size: 0.92em;
-}
-
-.read__body code {
-	color: var(--code-text);
 }
 
 /* Lists. The marker is an accent em-dash. */
