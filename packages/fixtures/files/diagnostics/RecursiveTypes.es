@@ -41,6 +41,22 @@ implementation {
 	§ this is a cycle of one.
 	type Boxed<Item = Boxed<Integer>> = { value: Item }
 
+	§ recursive-type-declaration — two predicates, each checking a value against
+	§ the other's refinement, so neither can be read first. Both report.
+	type Low = Integer where @::isBelow(5)
+
+	type High = Integer where @::isAbove(5)
+
+	namespace Bounds for Integer {
+		isBelow(_ limit: High) -> Boolean {
+			<- @::isLessThan(limit)
+		}
+
+		isAbove(_ limit: Low) -> Boolean {
+			<- @::isGreaterThan(limit)
+		}
+	}
+
 	§ Silent: `Node` is one of the names above, declared as the Type nothing can
 	§ be checked against, so naming it is not an error of its own.
 	type Alongside = { node: Node }

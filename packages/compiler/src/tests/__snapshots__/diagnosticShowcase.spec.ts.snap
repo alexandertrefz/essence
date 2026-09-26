@@ -2825,7 +2825,35 @@ Error: Type 'Boxed' names itself
     │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
 ────╯
 
-─── 6 errors
+[recursive-type-declaration]
+Error: The predicate of 'Low' depends on itself through 'High'
+    ╭─┤ RecursiveTypes.es:46:27 │
+    │
+ 46 │     type Low = Integer where @::isBelow(5)
+    │                              ──────┬──────  
+    │                                    ╰──────── reading this checks a value against 'High'
+    │ 
+    │ Help: Break the cycle, so that no predicate checks a value against a refinement that depends on it.
+    │ 
+    │ Note 1: 'Low' depends on 'High', which depends on 'Low' again.
+    │ Note 2: Reading a predicate typechecks it, so one that checks a value against its own refinement, directly or through others, can never be read.
+────╯
+
+[recursive-type-declaration]
+Error: The predicate of 'High' depends on itself through 'Low'
+    ╭─┤ RecursiveTypes.es:48:28 │
+    │
+ 48 │     type High = Integer where @::isAbove(5)
+    │                               ──────┬──────  
+    │                                     ╰──────── reading this checks a value against 'Low'
+    │ 
+    │ Help: Break the cycle, so that no predicate checks a value against a refinement that depends on it.
+    │ 
+    │ Note 1: 'High' depends on 'Low', which depends on 'High' again.
+    │ Note 2: Reading a predicate typechecks it, so one that checks a value against its own refinement, directly or through others, can never be read.
+────╯
+
+─── 8 errors
 "
 `;
 

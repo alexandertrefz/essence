@@ -1923,7 +1923,7 @@ Give it a path that returns without calling itself, such as `if @::isLessThanOrE
 
 ### `recursive-type-declaration`
 
-**Error.** A type alias or a choice names itself, directly or through other declarations. Recursive type declarations are refused.
+**Error.** A type alias or a choice names itself, directly or through other declarations, or a refinement's predicate depends on itself. Recursive type declarations are refused.
 
 <div class="error-output">
 
@@ -1944,9 +1944,33 @@ Error: Type 'Node' names itself
 
 </div>
 
-A choice that names itself reports the same code, with `Choice 'Tree' names itself` and a note about payloads being substituted eagerly at each use.
+A choice that names itself reports the same code, with `Choice 'Tree' names itself` and the same note.
 
 Break the cycle. A `List` does not break it: a member typed `List<Node>` still names `Node`, and reports this code too. To hold a tree, keep its nodes in a list and give each node the positions of its children in that list, as in `type Node = { value: Integer, children: List<Integer> }`. Or key the nodes in a dictionary.
+
+A refinement's predicate reports the same code when reading it would check a value against that same refinement, directly or through others. Here `isBelow` takes a `High` and `isAbove` takes a `Low`, so neither predicate can be read before the other:
+
+<div class="error-output">
+
+```
+[recursive-type-declaration]
+Error: The predicate of 'Low' depends on itself through 'High'
+    ╭─┤ RecursiveTypes.es:46:27 │
+    │
+ 46 │     type Low = Integer where @::isBelow(5)
+    │                              ──────┬──────  
+    │                                    ╰──────── reading this checks a value against 'High'
+    │ 
+    │ Help: Break the cycle, so that no predicate checks a value against a refinement that depends on it.
+    │ 
+    │ Note 1: 'Low' depends on 'High', which depends on 'Low' again.
+    │ Note 2: Reading a predicate typechecks it, so one that checks a value against its own refinement, directly or through others, can never be read.
+────╯
+```
+
+</div>
+
+`High` reports the same, through `Low`. Had `isBelow` taken a `Low`, the report would read `The predicate of 'Low' depends on itself`, with only the second note. Give the methods parameters of the base type, `isBelow(_ limit: Integer)` and `isAbove(_ limit: Integer)`, and both predicates can be read.
 
 Taught on: [Unions and type aliases › An alias is not a new type](/docs/language/unions-and-type-aliases#an-alias-is-not-a-new-type)
 
