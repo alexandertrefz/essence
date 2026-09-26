@@ -3622,6 +3622,33 @@ describe("formatter", () => {
 				"= #Value(\n\t\tvalue::value(defaultingTo 0)::multiply(with 10)::add(digit)\n\t)\n",
 			)
 		})
+
+		it("breaks a Case payload's parentheses before a Function literal's Parameters", () => {
+			let source =
+				"implementation {\n\tconstant boxed: Step<Integer, (_ x: Integer) -> Integer> = #Done((_ x: Integer) -> Integer { <- x })\n\n\tconstant wrapped = #Wrap(#Done((_ first: Integer, _ second: Integer) -> Integer { <- first }))\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant boxed: Step<Integer, (_ x: Integer) -> Integer> = #Done(\n\t\t(_ x: Integer) -> Integer { <- x }\n\t)\n\n\tconstant wrapped = #Wrap(#Done(\n\t\t(_ first: Integer, _ second: Integer) -> Integer { <- first }\n\t))\n}\n",
+			)
+		})
+
+		it("breaks a Case payload's parentheses before a match head that does not fit", () => {
+			let source =
+				"implementation {\n\tconstant longerNameForThisOne: Step<Integer, Integer> = #Done(match someValueWithAName -> Integer { case #A { <- 1 } case #B { <- 2 } })\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant longerNameForThisOne: Step<Integer, Integer> = #Done(\n\t\tmatch someValueWithAName -> Integer {\n\t\t\tcase #A { <- 1 }\n\t\t\tcase #B { <- 2 }\n\t\t}\n\t)\n}\n",
+			)
+		})
+
+		it("keeps a Function literal payload hugged while its head fits", () => {
+			let source =
+				"implementation {\n\tconstant step = #Done((_ first: Integer, _ second: Integer) -> Integer {\n\t\tconstant sum = first::add(second)\n\n\t\t<- sum\n\t})\n\n\tconstant s = #Done((_ x: Integer) -> Integer { <- x::add(1)::add(2)::add(3)::add(4)::add(5)::add(6) })\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant step = #Done((_ first: Integer, _ second: Integer) -> Integer {\n\t\tconstant sum = first::add(second)\n\n\t\t<- sum\n\t})\n\n\tconstant s = #Done((_ x: Integer) -> Integer {\n\t\t<- x::add(1)::add(2)::add(3)::add(4)::add(5)::add(6)\n\t})\n}\n",
+			)
+		})
 	})
 
 	describe("chains", () => {

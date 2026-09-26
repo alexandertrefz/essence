@@ -2988,29 +2988,35 @@ export class Printer {
 
 		parts.push(text("#" + node.caseName.content))
 
-		// NOTE: The payload is hugged when it brings braces of its own —
-		// `#Rectangle({ … })` — and otherwise laid out like a one-Argument
-		// list without the trailing comma the grammar does not allow, so a
-		// chain in it breaks inside the parentheses rather than dangling out
-		// of them. A payload that is itself a Case hugs whenever the payload
-		// at the bottom of the stack does: `#Wrong(#OutOfStock({` opens on
-		// one line and `}))` closes it, where each wrapper laid out as a list
-		// of its own would add a step to a staircase.
+		// NOTE: A payload with braces of its own hugs its parentheses, through
+		// any Cases wrapping it, so `}))` closes the stack without a staircase;
+		// one that opens a block hugs only while its head fits, as a trailing
+		// Argument does. Anything else is one Argument, without the trailing
+		// comma the grammar refuses.
 		if (node.value !== null) {
 			let value = this.printHeldExpression(node.value)
-
-			parts.push(
-				hugsPayload(node.value)
-					? concat([text("("), value, text(")")])
-					: group(
-							concat([
-								text("("),
-								indent(concat([softline, value])),
-								softline,
-								text(")"),
-							]),
-						),
+			let listed = group(
+				concat([
+					text("("),
+					indent(concat([softline, value])),
+					softline,
+					text(")"),
+				]),
 			)
+
+			if (!hugsPayload(node.value)) {
+				parts.push(listed)
+			} else if (!opensBlock(node.value)) {
+				parts.push(text("("), value, text(")"))
+			} else {
+				parts.push(
+					renderFlat(value) === null ? breakParent : EMPTY,
+					conditionalGroup([
+						concat([text("("), expand(value), text(")")]),
+						listed,
+					]),
+				)
+			}
 		}
 
 		return concat(parts)
@@ -4018,9 +4024,8 @@ function isBodiedProtocolMethod(
 	}
 }
 
-// NOTE: Whether a Case payload is written against its parentheses — a value
-// that lays itself out over several lines and closes with a brace of its own,
-// or a Case wrapping one of those, however deep.
+// NOTE: Whether a Case payload may be written against its parentheses: a value
+// that closes with a brace of its own, or a Case wrapping one, however deep.
 function hugsPayload(value: parser.ExpressionNode): boolean {
 	return (
 		isBlockLike(value) ||
