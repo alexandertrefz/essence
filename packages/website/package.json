@@ -19,6 +19,7 @@
 		"@astrojs/mdx": "7.0.3",
 		"@essence-lang/cli": "workspace:*",
 		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/fixtures": "workspace:*",
 		"@essence-lang/formatter": "workspace:*",
 		"@essence-lang/interfaces": "workspace:*",
 		"@essence-lang/standard-library": "workspace:*",

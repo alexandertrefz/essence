@@ -1216,7 +1216,7 @@ protocols ambiguous.
 ```
 [duplicate-property]
 Error: Property 'retries' is already defined
-   ╭─┤ Defaults.es:4:10 │
+   ╭─┤ Retries.es:4:10 │
    │
  3 │        static retries = 3
    │               ───┬───  
@@ -4578,8 +4578,7 @@ Error: 'Item' is already this Namespace's Type Parameter
     │             ──┬─  
     │               ╰─── 'Shadowing' declares 'Item' already
     │ 
-    │ Help 1: Drop 'Item' from 'held's Type Parameters.
-    │ Help 2: Or bound it for this Method: '<Item is …>' with the Protocol 'held' needs.
+    │ Help: Drop 'Item' from 'held's Type Parameters.
     │ 
     │ Note: 'Item' is worked out from the receiver at every call to 'held', so a second one here could only shadow it — and nothing would ever bind that.
 ────╯
@@ -6540,7 +6539,7 @@ Taught on: [Asynchrony › One run, read many times](/docs/language/asynchrony#o
 ```
 [unobserved-started]
 Advice: Nothing waits for this
-    ╭─┤ Report.es:27:2 │
+    ╭─┤ AsynchronyStatements.es:27:2 │
     │
  27 │     start headline()
     │     ────────┬───────  
