@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+
 // NOTE: A comment that names code by a name nothing declares sends its reader
 // looking for a Function, a Type or a Method label that is not there. A rename
 // leaves such names behind: the code moves on and the note above it keeps the
@@ -519,19 +521,16 @@ const scannedExtensions = /\.(?:[cm]?[jt]sx?|es|astro)$/
 // comments name what it declares.
 const generatedFile = /\.generated\.ts$/
 
-function trackedFiles(): Array<string> {
-	let listed = Bun.spawnSync(["git", "ls-files", "-z"], {
+async function trackedFiles(): Promise<Array<string>> {
+	let listed = await spawnAndWait(["git", "ls-files", "-z"], {
 		cwd: REPOSITORY_ROOT,
 	})
 
-	if (listed.exitCode !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr.toString()}`)
+	if (listed.code !== 0) {
+		throw new Error(`git ls-files failed: ${listed.stderr}`)
 	}
 
-	return listed.stdout
-		.toString()
-		.split("\0")
-		.filter((file) => file !== "")
+	return listed.stdout.split("\0").filter((file) => file !== "")
 }
 
 function scanFile(file: string, source: string): Scanned {
@@ -555,7 +554,7 @@ type Repository = {
 
 let repository: Repository | null = null
 
-function readRepository(): Repository {
+async function readRepository(): Promise<Repository> {
 	if (repository !== null) {
 		return repository
 	}
@@ -563,7 +562,7 @@ function readRepository(): Repository {
 	let runs: Array<CommentRun> = []
 	let codes: Array<string> = []
 	let words = new Set<string>()
-	let files = trackedFiles()
+	let files = await trackedFiles()
 	let fileCount = 0
 
 	for (let file of files) {
@@ -823,12 +822,12 @@ type Report = {
 
 let report: Report | null = null
 
-export function danglingNames(): Report {
+export async function danglingNames(): Promise<Report> {
 	if (report !== null) {
 		return report
 	}
 
-	let { runs, codes, words } = readRepository()
+	let { runs, codes, words } = await readRepository()
 	let quoted = runs.flatMap(quotedNames)
 	let codeWords = [...words]
 	let findings: Array<Finding> = []
@@ -1056,13 +1055,13 @@ describe("Names Comments Quote", () => {
 		})
 	})
 
-	it("should find names to check", () => {
+	it("should find names to check", async () => {
 		// NOTE: A guard on the scanners. The checks that follow pass on an
 		// empty report, so a scanner that read no file, or that found no
 		// comment in the files it read, would make this whole file a no-op
 		// that nobody notices.
-		let { fileCount } = readRepository()
-		let { quotedCount, checkedCount, selectorCount } = danglingNames()
+		let { fileCount } = await readRepository()
+		let { quotedCount, checkedCount, selectorCount } = await danglingNames()
 
 		expect(fileCount).toBeGreaterThan(500)
 		expect(quotedCount).toBeGreaterThan(10_000)
@@ -1070,15 +1069,15 @@ describe("Names Comments Quote", () => {
 		expect(selectorCount).toBeGreaterThan(100)
 	})
 
-	it("should find every name a comment quotes in the code", () => {
-		expect(reportOf(danglingNames().findings)).toBe("")
+	it("should find every name a comment quotes in the code", async () => {
+		expect(reportOf((await danglingNames()).findings)).toBe("")
 	})
 
 	// NOTE: An allowed name no comment quotes any more, or one the code now
 	// writes, allows nothing, and it would allow the next stale reference
 	// that happened to spell it.
-	it("should allow only names a comment quotes and the code lacks", () => {
-		let { allowedInUse } = danglingNames()
+	it("should allow only names a comment quotes and the code lacks", async () => {
+		let { allowedInUse } = await danglingNames()
 
 		expect(
 			[...OUTSIDE_NAMES.keys(), ...ABSENT_NAMES.keys()].filter(
