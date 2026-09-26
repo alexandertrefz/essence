@@ -1776,6 +1776,58 @@ describe("CLI on a Module graph", () => {
 		})
 	})
 
+	// NOTE: The entry reaches the broken file only through a facade, and still
+	// answers for itself on the import that leads there.
+	it("reports a dependency broken behind a re-export on the entry", async () => {
+		await withModules(
+			{
+				"Dep.es": brokenDependency["Dep.es"],
+				"Facade.es": [
+					"implementation {}",
+					"",
+					"export {",
+					'\tfrom "./Dep.es" { halve }',
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": brokenDependency["Main.es"].replace(
+					"./Dep.es",
+					"./Facade.es",
+				),
+			},
+			async (directory) => {
+				let report = await checkAsJSON([
+					path.join(directory, "Main.es"),
+				])
+
+				expect(report.ok).toBe(false)
+				expect(
+					report.files[0]!.diagnostics.map((diagnostic) => [
+						path.basename(diagnostic.file),
+						diagnostic.code,
+						diagnostic.message,
+					]),
+				).toEqual([
+					[
+						"Dep.es",
+						"return-type-mismatch",
+						"This value does not fit the declared return Type",
+					],
+					[
+						"Facade.es",
+						"dependency-has-errors",
+						"./Dep.es has errors of its own",
+					],
+					[
+						"Main.es",
+						"dependency-has-errors",
+						"./Facade.es has errors of its own",
+					],
+				])
+			},
+		)
+	})
+
 	// NOTE: Both files built in one invocation, so the dependency's typed
 	// Program is the one the entry's graph holds: it is emitted from twice, and
 	// the session simplifies it once.

@@ -5464,7 +5464,7 @@ Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
 **Error.** An imported module has errors of its own, reported on the import line — in the editor, so you see it without opening the other file, and in the terminal, which prints the other file's own errors beside it. It is why a module nothing is wrong with does not compile.
 
-It is reported against **direct** dependencies only. With `Main.es` importing `Middle.es` importing `Bottom.es`, and the error in `Bottom.es`, the report lands on `Middle.es`'s import line. `Main.es` gets nothing — in the editor it is clean, while `essence check Main.es` still refuses, because the terminal reports every module of the graph and the error in `Bottom.es` is among them.
+It travels up the whole chain, re-exports included. With `Main.es` importing `Middle.es` importing `Bottom.es`, and the error in `Bottom.es`, `Middle.es` gets it on its import of `Bottom.es` and `Main.es` on its import of `Middle.es`, so every file names the import to follow. In a cycle, a module is not told about an import whose only problem leads back to the module itself.
 
 Fix the errors in the imported module.
 

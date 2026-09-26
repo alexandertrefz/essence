@@ -1539,6 +1539,42 @@ describe("the Server's request loop", () => {
 		}
 	})
 
+	// NOTE: The entry reaches the broken file only through a facade that
+	// re-exports from it, and its own Problems still say which import to follow.
+	it("should report on the entry a broken Module it reaches through a re-export", async () => {
+		let measure = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
+		let facade = `implementation {}\n\nexport {\n\tfrom "./Measure.es" { amount }\n}\n`
+		let main = `import {\n\tfrom "./Facade.es" { amount }\n}\n\nimplementation {\n\tTerminal.print(amount::toString())\n}\n`
+		let files = makeSessionWorkspace({
+			"Facade.es": facade,
+			"Main.es": main,
+			"Measure.es": measure,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Main.es"), main)
+			await session.settle()
+
+			expect(session.codesFor(files.pathOf("Measure.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+			expect(session.codesFor(files.pathOf("Facade.es"))).toEqual([
+				"dependency-has-errors",
+			])
+			expect(session.codesFor(files.pathOf("Main.es"))).toEqual([
+				"dependency-has-errors",
+			])
+			expect(
+				session.diagnosticsFor(files.pathOf("Main.es"))?.[0]?.message,
+			).toStartWith("./Facade.es has errors of its own")
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
 	// NOTE: The debounced analysis is a timer callback, and a throw out of one is
 	// the process — no request left to answer, no Diagnostic, nothing in the log.
 	// The Parser reaching that state is not hypothetical: see `unparseableSource`.

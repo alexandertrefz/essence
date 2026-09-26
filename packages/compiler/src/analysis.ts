@@ -131,6 +131,8 @@ export function analyseLinkedModules(
 		analyses.set(filePath, diagnostics)
 	}
 
+	let reachesFailure = failureReach(modules, failed)
+
 	for (let module of modules) {
 		if (isCancelled(options.cancellation)) {
 			return null
@@ -144,16 +146,79 @@ export function analyseLinkedModules(
 				...analyses.get(filePath)!,
 				...brokenDependencyDiagnostics(
 					module.module.program,
-					(specifier) =>
-						failed.has(
-							module.module.resolutions.get(specifier) ?? "",
-						),
+					(specifier) => {
+						let dependency =
+							module.module.resolutions.get(specifier)
+
+						return (
+							dependency !== undefined &&
+							reachesFailure(filePath, dependency)
+						)
+					},
 				),
 			]),
 		)
 	}
 
 	return analyses
+}
+
+// NOTE: Whether an importer's dependency did not compile: it has errors of its
+// own, or it reaches a Module that has. Paths back through the importer do not
+// count, so no Module is told about its own failure coming round a cycle.
+function failureReach(
+	modules: Array<LinkedModule>,
+	failed: Set<string>,
+): (importer: string, dependency: string) => boolean {
+	let dependenciesOf = new Map<string, Array<string>>()
+	let importersOf = new Map<string, Array<string>>()
+
+	for (let module of modules) {
+		dependenciesOf.set(module.module.filePath, module.module.dependencies)
+
+		for (let dependency of module.module.dependencies) {
+			let importers = importersOf.get(dependency) ?? []
+
+			importers.push(module.module.filePath)
+			importersOf.set(dependency, importers)
+		}
+	}
+
+	// NOTE: Every Module with some path to a failed one, so that no walk from a
+	// dependency enters a part of the graph that compiled.
+	let reaching = new Set(failed)
+	let pending = [...failed]
+
+	while (pending.length > 0) {
+		for (let importer of importersOf.get(pending.pop()!) ?? []) {
+			if (!reaching.has(importer)) {
+				reaching.add(importer)
+				pending.push(importer)
+			}
+		}
+	}
+
+	return (importer, dependency) => {
+		let seen = new Set([importer])
+		let walk = [dependency]
+
+		while (walk.length > 0) {
+			let current = walk.pop()!
+
+			if (seen.has(current) || !reaching.has(current)) {
+				continue
+			}
+
+			if (failed.has(current)) {
+				return true
+			}
+
+			seen.add(current)
+			walk.push(...(dependenciesOf.get(current) ?? []))
+		}
+
+		return false
+	}
 }
 
 // NOTE: The Validator, run over a Program that may be nothing like whole — and

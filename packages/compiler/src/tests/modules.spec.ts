@@ -3023,6 +3023,288 @@ export {
 		)
 	})
 
+	// NOTE: A facade that only forwards names did not compile when what it
+	// forwards did not, so the file importing it through the facade is told so.
+	it("reports a broken Module through a facade that re-exports it", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Facade.es" { measure }
+}
+
+implementation {
+	Terminal.inspect(measure(4)::toString())
+}
+`,
+				"Facade.es": `implementation {}
+
+export {
+	from "./Measure.es" { measure }
+}
+`,
+				"Measure.es": `implementation {
+	function measure(_ amount: Integer) -> Integer {
+		<- "not a Number"
+	}
+}
+
+export {
+	measure
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Measure.es")),
+				).toEqual(["return-type-mismatch"])
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Facade.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Measure.es has errors of its own",
+					],
+				])
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Facade.es has errors of its own",
+					],
+				])
+			},
+		)
+	})
+
+	// NOTE: Every file on the chain is told about the one import it can follow
+	// towards the mistake, however far down the mistake is.
+	it("reports a broken Module on every file of a chain of imports", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Top.es" { top }
+}
+
+implementation {
+	Terminal.inspect(top()::toString())
+}
+`,
+				"Top.es": `import {
+	from "./Middle.es" { middle }
+}
+
+implementation {
+	function top() -> Integer {
+		<- middle()
+	}
+}
+
+export {
+	top
+}
+`,
+				"Middle.es": `import {
+	from "./Bottom.es" { bottom }
+}
+
+implementation {
+	function middle() -> Integer {
+		<- bottom()
+	}
+}
+
+export {
+	middle
+}
+`,
+				"Bottom.es": `implementation {
+	function bottom() -> Integer {
+		<- "zero"
+	}
+}
+
+export {
+	bottom
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Bottom.es")),
+				).toEqual(["return-type-mismatch"])
+				expect(
+					["Middle.es", "Top.es", "Main.es"].map((name) =>
+						reportsOf(analysedAt(directory, "Main.es", name)),
+					),
+				).toEqual([
+					[
+						[
+							"dependency-has-errors",
+							"./Bottom.es has errors of its own",
+						],
+					],
+					[
+						[
+							"dependency-has-errors",
+							"./Middle.es has errors of its own",
+						],
+					],
+					[
+						[
+							"dependency-has-errors",
+							"./Top.es has errors of its own",
+						],
+					],
+				])
+			},
+		)
+	})
+
+	// NOTE: `Loop.es` is the broken one. Its failure comes back to it round the
+	// cycle through `Circle.es`, which is no second mistake for it to fix, while
+	// the file importing the cycle from above is told.
+	it("reports a broken member of a cycle to the cycle's importers alone", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Circle.es" { circled }
+}
+
+implementation {
+	Terminal.inspect(circled(1)::toString())
+}
+`,
+				"Circle.es": `import {
+	from "./Loop.es" { flagged }
+}
+
+implementation {
+	function circled(_ n: Integer) -> Integer {
+		<- flagged(n)
+	}
+}
+
+export {
+	circled
+}
+`,
+				"Loop.es": `import {
+	from "./Circle.es" { circled }
+}
+
+implementation {
+	constant broken: Integer = "no"
+
+	function flagged(_ n: Integer) -> Integer {
+		<- circled(n)
+	}
+}
+
+export {
+	broken
+	flagged
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Loop.es")),
+				).toEqual(["assignment-type-mismatch"])
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Circle.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Loop.es has errors of its own",
+					],
+				])
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Circle.es has errors of its own",
+					],
+				])
+			},
+		)
+	})
+
+	// NOTE: `Ping.es` fails only because `Pong.es` does, so `Pong.es` is told
+	// about `Broken.es` and not about `Ping.es` as well.
+	it("reports a cycle member only the imports that reach a mistake past it", () => {
+		withProject(
+			{
+				"Ping.es": `import {
+	from "./Pong.es" { pong }
+}
+
+implementation {
+	function ping(_ n: Integer) -> Integer {
+		<- pong(n)
+	}
+}
+
+export {
+	ping
+}
+`,
+				"Pong.es": `import {
+	from "./Broken.es" { broken }
+	from "./Ping.es" { ping }
+}
+
+implementation {
+	function pong(_ n: Integer) -> Integer {
+		<- broken(n)
+	}
+
+	function again(_ n: Integer) -> Integer {
+		<- ping(n)
+	}
+}
+
+export {
+	again
+	pong
+}
+`,
+				"Broken.es": `implementation {
+	function broken(_ n: Integer) -> Integer {
+		<- "zero"
+	}
+}
+
+export {
+	broken
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Ping.es", "Broken.es")),
+				).toEqual(["return-type-mismatch"])
+				expect(
+					reportsOf(analysedAt(directory, "Ping.es", "Pong.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Broken.es has errors of its own",
+					],
+				])
+				expect(
+					reportsOf(analysedAt(directory, "Ping.es", "Ping.es")),
+				).toEqual([
+					[
+						"dependency-has-errors",
+						"./Pong.es has errors of its own",
+					],
+				])
+			},
+		)
+	})
+
 	// NOTE: What the Module's canonical path is FOR: a Choice takes its nominal
 	// identity from the Module that declares it, so two files each declaring
 	// `choice Outcome` declare two Types — and linking is where that path is
