@@ -19,8 +19,8 @@ private, and the VS Code extension ships to the Marketplace instead, via
    `packages/*/package.json`. The versions move in lockstep, and the staging
    script reads them from the manifests — the manifests are the single source
    of truth, there is no version anywhere else. The one consumer to carry
-   along: the VS Code extension pins `@essence-lang/language-server` and
-   `@essence-lang/standard-library` by exact version in its `devDependencies`.
+   along: the VS Code extension pins each `@essence-lang/*` package in its
+   `devDependencies` by exact version.
 2. `bun install`, `bun run test`, `bun run typecheck` — the tree the release
    is cut from is green.
 3. `bun run publish:smoke` — stages everything and proves the *artifacts*:

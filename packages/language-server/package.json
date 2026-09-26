@@ -30,6 +30,7 @@
 		"@essence-lang/compiler": "workspace:*",
 		"@essence-lang/formatter": "workspace:*",
 		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/runtime": "workspace:*",
 		"vscode-languageserver": "10.1.0",
 		"vscode-languageserver-textdocument": "1.0.12"
 	},

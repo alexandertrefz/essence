@@ -67,6 +67,7 @@
 	},
 	"devDependencies": {
 		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/formatter": "workspace:*",
 		"@types/estree": "1.0.9"
 	}
 }

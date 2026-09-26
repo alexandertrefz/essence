@@ -31,6 +31,9 @@
 		"bun": ">=1.0.x"
 	},
 	"devDependencies": {
+		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/language-server": "workspace:*",
 		"@types/bun": "1.4.2",
 		"oxfmt": "0.60.0",
 		"oxlint": "1.75.0",

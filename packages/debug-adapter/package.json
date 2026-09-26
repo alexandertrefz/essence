@@ -28,6 +28,7 @@
 		"debugger"
 	],
 	"dependencies": {
+		"@essence-lang/compiler": "workspace:*",
 		"@vscode/debugadapter": "1.68.0",
 		"@vscode/debugprotocol": "1.68.0",
 		"source-map": "0.6.1"

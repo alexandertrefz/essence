@@ -5,6 +5,9 @@
     "": {
       "name": "essence-compiler",
       "devDependencies": {
+        "@essence-lang/compiler": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/language-server": "workspace:*",
         "@types/bun": "1.4.2",
         "oxfmt": "0.60.0",
         "oxlint": "1.75.0",
@@ -100,6 +103,7 @@
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/formatter": "workspace:*",
         "@types/estree": "1.0.9",
       },
     },
@@ -110,6 +114,7 @@
         "esdap": "bin/esdap",
       },
       "dependencies": {
+        "@essence-lang/compiler": "workspace:*",
         "@vscode/debugadapter": "1.68.0",
         "@vscode/debugprotocol": "1.68.0",
         "source-map": "0.6.1",
@@ -163,6 +168,7 @@
         "@essence-lang/compiler": "workspace:*",
         "@essence-lang/formatter": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
         "vscode-languageserver": "10.1.0",
         "vscode-languageserver-textdocument": "1.0.12",
       },
@@ -192,7 +198,9 @@
       "name": "essence-language",
       "version": "0.7.0",
       "devDependencies": {
+        "@essence-lang/compiler": "0.5.0",
         "@essence-lang/language-server": "0.5.0",
+        "@essence-lang/runtime": "0.5.0",
         "@essence-lang/standard-library": "0.5.0",
         "@vscode/vsce": "3.9.2",
         "minimatch": "10.2.5",
