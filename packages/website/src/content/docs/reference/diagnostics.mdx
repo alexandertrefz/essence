@@ -4237,7 +4237,14 @@ one way around it — a protocol that extends both.
 A bound is the protocol the function's own module resolved, so a call needs no
 import of it. What the call needs in scope is the conformance: a namespace that
 declares it, or the choice whose conformance is derived. This report spells the
-protocol the way the file does, under an import alias where it has one.
+protocol the way the file does, under an import alias where it has one. Where
+the file has no name for it, an edit that writes the protocol needs its import
+as well: the Help names the module, `'Sized' is declared in Sized.es — import
+it here.`, and the **Quick Fix** writes the entry beside the bound. Where that
+module keeps the protocol private, the Help asks for the export too and no fix
+is offered. Where the file binds that name to something other than a type
+parameter, the Help asks for the import under a name of its own,
+`'Sized as …'`, written in the bound or the namespace, and no fix is offered.
 
 Where the name the report spells is the file's name for another protocol, a
 note says so: `'Sized' here is the Protocol this file declares; the bound asks for

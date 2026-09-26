@@ -6663,6 +6663,323 @@ export {
 		)
 	})
 
+	// NOTE: `Main.es` binds no name for `Sized`, so the bound can be written
+	// only beside an import of it, and the fix carries that import.
+	it("carries the import a Type Parameter's bound needs", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare it as '<infer Item is Sized>'.",
+					"'Sized' is declared in Sized.es — import it here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "required-protocol",
+					protocol: "Sized",
+					parameter: "Item",
+					import: {
+						name: "Sized",
+						modulePath: path.join(directory, "Sized.es"),
+					},
+				})
+			},
+		)
+	})
+
+	it("asks for the export of a bound's Protocol its Module keeps private", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule.replace("\tSized\n", ""),
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare it as '<infer Item is Sized>'.",
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	// NOTE: The file's own `Sized` takes the name, so the other one can be
+	// named here only under an alias, which no fix chooses.
+	it("asks for an aliased import where another Protocol takes its name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	protocol Sized {
+		count() -> Integer
+	}
+
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es — import it under a name of its own, 'Sized as …', and bound 'Item' by that name, since this file binds 'Sized' already.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	// NOTE: The file's `type Sized` takes the name an import would bind, so a
+	// bound or a Namespace can name the Protocol only under an alias.
+	it("asks for an aliased import where a Type of the file takes a Protocol's name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	type Sized = { count: Integer }
+
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+
+	Terminal.inspect(measure("abc"))
+}
+
+export {
+	relay
+	Sized
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				expect(
+					analysedAt(directory, "Main.es", "Main.es")
+						.filter(
+							(diagnostic) =>
+								diagnostic.code === "unsatisfied-bound",
+						)
+						.map((diagnostic) => [
+							diagnostic.message,
+							diagnostic.helps,
+							diagnostic.data,
+						]),
+				).toEqual([
+					[
+						"Type Parameter 'Item' does not conform to 'Sized'",
+						[
+							"'Sized' is declared in Sized.es — import it under a name of its own, 'Sized as …', and bound 'Item' by that name, since this file binds 'Sized' already.",
+						],
+						undefined,
+					],
+					[
+						"String does not conform to 'Sized'",
+						[
+							"'Sized' is declared in Sized.es — import it under a name of its own, 'Sized as …', and write that name in a Namespace 'for String is …', since this file binds 'Sized' already.",
+						],
+						undefined,
+					],
+				])
+			},
+		)
+	})
+
+	it("asks for the export of a private Protocol whose name a Function takes", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	function Sized() -> Integer {
+		<- 1
+	}
+
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule.replace("\tSized\n", ""),
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it under a name of its own, 'Sized as …', and bound 'Item' by that name, since this file binds 'Sized' already.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	it("asks for a condition's Protocol under a name of its own where the file takes it", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		measure
+	}
+}
+
+implementation {
+	type Weighed = { heft: Integer }
+
+	Terminal.inspect(measure([1, 2]))
+}
+
+export {
+	Weighed
+}
+`,
+				"Sized.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	ListSized
+	Weighed
+	measure
+}
+`,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) =>
+						diagnostic.code === "unsatisfied-conformance-condition",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Weighed' is declared in Sized.es — import it under a name of its own, 'Weighed as …', and write that name in a Namespace 'for Integer is …', since this file binds 'Weighed' already.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	it("asks for a Namespace and the import of a Protocol the file can not name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule
+					.replace(
+						`
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @
+		}
+	}
+`,
+						"",
+					)
+					.replace("\tIntegerSized\n", ""),
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare a Namespace 'for Integer is Sized'.",
+					"'Sized' is declared in Sized.es — import it here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "required-protocol",
+					protocol: "Sized",
+					parameter: null,
+					import: {
+						name: "Sized",
+						modulePath: path.join(directory, "Sized.es"),
+					},
+				})
+			},
+		)
+	})
+
 	it("names a Protocol as the calling file spells it", () => {
 		withProject(
 			{

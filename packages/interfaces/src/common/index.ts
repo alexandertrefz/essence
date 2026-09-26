@@ -250,12 +250,18 @@ export type DiagnosticData =
 			kind: "required-protocol"
 			protocol: string
 			parameter: string | null
+			import?: ProtocolImport
 	  }
 	// NOTE: A bound a NAMESPACE's Type Parameter needs, which is carried by the
 	// Method the call stands in rather than by a declaration — the counterpart
 	// of `required-protocol`, told apart by it because the two edits land in
 	// different places and only one of them can be right.
-	| { kind: "method-bound"; protocol: string; parameter: string }
+	| {
+			kind: "method-bound"
+			protocol: string
+			parameter: string
+			import?: ProtocolImport
+	  }
 	// NOTE: A Method's `<…>` entry that names one of its Namespace's own Type
 	// Parameters, for the two fixes that rewrite the entry rather than the
 	// Method. The span is the entry's, so a fix has only to say what goes there:
@@ -1347,6 +1353,13 @@ export type ProvidedWitness = {
 export type SharedCondition = {
 	condition: number
 	witness: number
+}
+
+// NOTE: The import a bound's fix writes as well, where the file binds no name
+// for the Protocol: its declared name and its Module's canonical path.
+export type ProtocolImport = {
+	name: string
+	modulePath: string
 }
 
 export type Conformance = {

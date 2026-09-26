@@ -2297,6 +2297,192 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
+		// NOTE: `Main.es` binds no name for `Sized`, so the bound and its import
+		// are one edit, and nothing is left to report once both stand.
+		it("should bound a Type Parameter and import its Protocol in one fix", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSized",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction relay <infer Item>(_ item: Item) -> Integer {",
+					"\t\t<- measure(item)",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\trelay",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 7, "measure(item)")
+
+			expect(fix.title).toBe(
+				"Declare it as '<infer Item is Sized>', importing 'Sized' from ./Sized.es",
+			)
+
+			let result = applyEdits(source, fix.edits)
+
+			expect(result.split("\n").slice(0, 10)).toEqual([
+				"import {",
+				'\tfrom "./Sized.es" {',
+				"\t\tSized",
+				"\t\tmeasure",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\tfunction relay <infer Item is Sized>(_ item: Item) -> Integer {",
+				"\t\t<- measure(item)",
+			])
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		it("should bound a Namespace's Type Parameter for one Method and import its Protocol", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSized",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Holder<Item> = { item: Item }",
+					"",
+					"\tnamespace Holders<infer Item> for Holder<Item> {",
+					"\t\ttotal() -> Integer {",
+					"\t\t\t<- measure(@.item)",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 10, "measure(@.item)")
+
+			expect(fix.title).toBe(
+				"Bound it for this Method: '<Item is Sized>', importing 'Sized' from ./Sized.es",
+			)
+
+			let result = applyEdits(source, fix.edits)
+
+			expect(result.split("\n").slice(0, 14)).toEqual([
+				"import {",
+				'\tfrom "./Sized.es" {',
+				"\t\tSized",
+				"\t\tmeasure",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\ttype Holder<Item> = { item: Item }",
+				"",
+				"\tnamespace Holders<infer Item> for Holder<Item> {",
+				"\t\ttotal<Item is Sized>() -> Integer {",
+				"\t\t\t<- measure(@.item)",
+				"\t\t}",
+			])
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		// NOTE: An import of `Sized` beside the file's own Type of that name
+		// would be refused, so there is no fix to offer.
+		it("should offer no bound whose import a Type of the file would collide with", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSized",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Sized = { count: Integer }",
+					"",
+					"\tfunction relay <infer Item>(_ item: Item) -> Integer {",
+					"\t\t<- measure(item)",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\trelay",
+					"\tSized",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+
+			expect(
+				codesAfter(
+					workspace,
+					mainPath,
+					workspace.sourceOf(mainPath) ?? "",
+				),
+			).toEqual(["unsatisfied-bound"])
+			expect(fixesFor(workspace, mainPath, 9, "measure(item)")).toEqual(
+				[],
+			)
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

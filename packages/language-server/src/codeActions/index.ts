@@ -634,8 +634,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		staticCallActions(diagnostic, program, lines),
 	"unclosed-string": ({ diagnostic, lines }) =>
 		listed(closeStringAction(diagnostic, lines)),
-	"undeclared-conformance": ({ diagnostic, program }) =>
-		listed(declareConformanceAction(diagnostic, program)),
+	"undeclared-conformance": ({ diagnostic, program, imports }) =>
+		listed(declareConformanceAction(diagnostic, program, imports)),
 	"undocumented-parameter": ({ diagnostic, lines }) =>
 		listed(documentationLineAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
@@ -712,8 +712,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// never imported is an edit to the import block. Neither answers the other's
 	// data, so the pair is a concatenation rather than a choice.
 	"unsatisfied-bound": ({ diagnostic, program, imports }) => [
-		...listed(boundParameterAction(diagnostic, program)),
-		...listed(methodBoundAction(diagnostic, program)),
+		...listed(boundParameterAction(diagnostic, program, imports)),
+		...listed(methodBoundAction(diagnostic, program, imports)),
 		...listed(declarationImportAction(diagnostic, imports)),
 	],
 	"shadowed-type-parameter": ({ diagnostic, program, lines }) =>

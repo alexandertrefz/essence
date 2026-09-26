@@ -1484,6 +1484,7 @@ export function staticCallActions(
 export function boundParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
+	imports: ImportContext | null,
 ): CodeActionEntry | null {
 	if (
 		diagnostic.data?.kind !== "required-protocol" ||
@@ -1498,8 +1499,13 @@ export function boundParameterAction(
 		parameter,
 		diagnostic.position,
 	)
+	let importing = protocolImportEdit(diagnostic.data.import, imports)
 
-	if (declared === null || declared.constraint !== null) {
+	if (
+		declared === null ||
+		declared.constraint !== null ||
+		importing === null
+	) {
 		return null
 	}
 
@@ -1512,7 +1518,7 @@ export function boundParameterAction(
 	let written = declared.inferred ? `infer ${parameter}` : parameter
 
 	return {
-		title: `Declare it as '<${written} is ${protocol}>'`,
+		title: `Declare it as '<${written} is ${protocol}>'${importing.title}`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
@@ -1525,8 +1531,39 @@ export function boundParameterAction(
 				},
 				newText: ` is ${protocol}`,
 			},
+			...importing.edits,
 		],
 	}
+}
+
+// NOTE: The import entry a bound's fix writes beside its own edit, where the
+// file binds no name for the Protocol. Null where that entry can not be
+// written, and then there is no fix: the bound alone would name nothing.
+function protocolImportEdit(
+	wanted: common.ProtocolImport | undefined,
+	imports: ImportContext | null,
+): { edits: Array<CodeActionEdit>; title: string } | null {
+	if (wanted === undefined) {
+		return { edits: [], title: "" }
+	}
+
+	if (imports === null) {
+		return null
+	}
+
+	let specifier = relativeSpecifier(imports.filePath, wanted.modulePath)
+	let edit = insertImportEdit(imports.documentText, imports.program, {
+		name: wanted.name,
+		alias: null,
+		specifier,
+	})
+
+	return edit === null
+		? null
+		: {
+				edits: [edit],
+				title: `, importing '${wanted.name}' from ${specifier}`,
+			}
 }
 
 // NOTE: A bound on one of the NAMESPACE's Type Parameters, written onto the
@@ -1541,14 +1578,16 @@ export function boundParameterAction(
 export function methodBoundAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
+	imports: ImportContext | null,
 ): CodeActionEntry | null {
 	if (diagnostic.data?.kind !== "method-bound") {
 		return null
 	}
 
 	let found = enclosingNamespaceMethod(program, diagnostic.position)
+	let importing = protocolImportEdit(diagnostic.data.import, imports)
 
-	if (found === null) {
+	if (found === null || importing === null) {
 		return null
 	}
 
@@ -1577,12 +1616,12 @@ export function methodBoundAction(
 				}
 
 	return {
-		title: `Bound it for this Method: '<${entry}>'`,
+		title: `Bound it for this Method: '<${entry}>'${importing.title}`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [edit],
+		edits: [edit, ...importing.edits],
 	}
 }
 
@@ -1685,6 +1724,7 @@ export function reDeclaredParameterAction(
 export function declareConformanceAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
+	imports: ImportContext | null,
 ): CodeActionEntry | null {
 	if (
 		diagnostic.data?.kind !== "required-protocol" ||
@@ -1696,15 +1736,16 @@ export function declareConformanceAction(
 	let namespace = enclosingNamespace(program, diagnostic.position)
 	let last = namespace?.conformsTo.at(-1)
 	let after = last?.position.end ?? namespace?.targetType?.position.end
+	let importing = protocolImportEdit(diagnostic.data.import, imports)
 
-	if (namespace === null || after === undefined) {
+	if (namespace === null || after === undefined || importing === null) {
 		return null
 	}
 
 	let { protocol } = diagnostic.data
 
 	return {
-		title: `Declare the conformance: 'is ${protocol}'`,
+		title: `Declare the conformance: 'is ${protocol}'${importing.title}`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
@@ -1715,6 +1756,7 @@ export function declareConformanceAction(
 				newText:
 					last === undefined ? ` is ${protocol}` : `, is ${protocol}`,
 			},
+			...importing.edits,
 		],
 	}
 }

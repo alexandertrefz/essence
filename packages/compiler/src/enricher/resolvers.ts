@@ -7161,9 +7161,16 @@ function conformanceRemedy(
 	// literally is handed a syntax error. A Help is an edit that works or it is
 	// not offered; what is left is the Note, which is the fact.
 	//
-	// Withheld as well, with its data, where no name here binds the Protocol:
-	// a clause written here could not name it.
+	// Where no name here binds the Protocol, a clause can name it only beside
+	// an import of it, under a name of its own where its declared one is taken.
 	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
+	let importing =
+		spelling === null ? protocolImport(protocolName, scope) : null
+	let written =
+		spelling ??
+		(importing?.exported === true && !importing.taken
+			? importing.name
+			: null)
 
 	return {
 		notes: undeclarable
@@ -7172,26 +7179,46 @@ function conformanceRemedy(
 				]
 			: [],
 		helps:
-			undeclarable || spelling === null
+			undeclarable || (spelling === null && importing === null)
 				? []
-				: [
-						protocolName === printableProtocolName &&
-						choiceCasesArePayloadFree(culprit)
-							? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-							: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
-					],
+				: importing?.taken === true
+					? [
+							declaredInHelp(
+								importing.name,
+								importing,
+								true,
+								`write that name in a Namespace 'for ${describeType(culprit)} is …'`,
+							),
+						]
+					: [
+							protocolName === printableProtocolName &&
+							choiceCasesArePayloadFree(culprit)
+								? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+								: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
+							...(importing === null
+								? []
+								: [declaredInHelp(importing.name, importing)]),
+						],
 		// NOTE: No Parameter, because the Type that failed is a concrete one —
 		// what this asks for is a Namespace declaring the conformance, which is
 		// a Declaration rather than an edit to a span, and no fix answers it.
 		// The Protocol is carried all the same: it is the fact, and what is done
 		// with it is not this site's to decide.
-		...(spelling === null
+		...(written === null
 			? {}
 			: {
 					data: {
 						kind: "required-protocol" as const,
-						protocol: spelling,
+						protocol: written,
 						parameter: null,
+						...(importing === null
+							? {}
+							: {
+									import: {
+										name: importing.name,
+										modulePath: importing.modulePath,
+									},
+								}),
 					},
 				}),
 	}
@@ -7748,6 +7775,17 @@ export function resolveConformances(
 					scope,
 					carried,
 				)
+				// NOTE: Where no name here binds the Protocol, the bound can be
+				// written only beside an import of it, which the fix writes too.
+				let importing =
+					spelling === null
+						? protocolImport(generic.constraint, scope)
+						: null
+				let written =
+					spelling ??
+					(importing?.exported === true && !importing.taken
+						? importing.name
+						: null)
 
 				reportError(
 					`Type Parameter '${shown}' does not conform to '${wanted}'`,
@@ -7775,7 +7813,27 @@ export function resolveConformances(
 							...homonymNotes(generic.constraint, scope, "bound"),
 							...bound.notes,
 						],
-						helps: bound.helps,
+						helps:
+							spelling !== null
+								? bound.helps
+								: importing === null || bound.helps.length === 0
+									? []
+									: importing.taken
+										? [
+												declaredInHelp(
+													importing.name,
+													importing,
+													true,
+													`bound '${shown}' by that name`,
+												),
+											]
+										: [
+												...bound.helps,
+												declaredInHelp(
+													importing.name,
+													importing,
+												),
+											],
 						// NOTE: The Type Parameter the bound has to be written
 						// on, beside the Protocol it has to be bound by — a
 						// Quick Fix writes it somewhere that is nowhere near the
@@ -7787,23 +7845,28 @@ export function resolveConformances(
 						// again: `bounded` is `none` exactly where the text
 						// withheld its edit, and a Quick Fix offered there is
 						// the refused edit — applying it turned one error into
-						// two. Left out too where no name here binds the
-						// Protocol, which the fix would have to write.
-						...(bound.bounded === "none" || spelling === null
+						// two. Left out too where the Protocol can not be named
+						// here or imported under its name.
+						...(bound.bounded === "none" || written === null
 							? {}
 							: {
-									data:
-										bound.bounded === "declaration"
-											? {
-													kind: "required-protocol" as const,
-													protocol: spelling,
-													parameter: shown,
-												}
+									data: {
+										kind:
+											bound.bounded === "declaration"
+												? ("required-protocol" as const)
+												: ("method-bound" as const),
+										protocol: written,
+										parameter: shown,
+										...(importing === null
+											? {}
 											: {
-													kind: "method-bound" as const,
-													protocol: spelling,
-													parameter: shown,
-												},
+													import: {
+														name: importing.name,
+														modulePath:
+															importing.modulePath,
+													},
+												}),
+									},
 								}),
 					},
 				)
@@ -7930,16 +7993,51 @@ export function reportUnknownProtocol(
 	})
 }
 
+// NOTE: How this file could come to name a Protocol it binds no name for: an
+// import of it, which needs a name of its own where its declared name is
+// `taken` here. Null where there is no such import to write.
+function protocolImport(
+	identity: string,
+	scope: enricher.Scope,
+): {
+	name: string
+	modulePath: string
+	exported: boolean
+	taken: boolean
+} | null {
+	let separator = identity.lastIndexOf("#")
+	let name = displayProtocolName(identity)
+
+	if (separator === -1 || identity.slice(separator + 1) !== name) {
+		return null
+	}
+
+	let modulePath = identity.slice(0, separator)
+	let declaration = protocolDeclarationsOf(scope, name).find(
+		(candidate) => candidate.modulePath === modulePath,
+	)
+
+	return declaration === undefined
+		? null
+		: {
+				name,
+				modulePath,
+				exported: declaration.exported,
+				taken: protocolNameTaken(identity, scope) !== null,
+			}
+}
+
 // NOTE: `taken` where this Module binds the name already, so that the import
-// needs a name of its own and what was written has to become it.
+// needs a name of its own, and `writing` says where that name goes.
 function declaredInHelp(
 	protocolName: string,
 	{ modulePath, exported }: enricher.ProtocolDeclaration,
 	taken: boolean = false,
+	writing: string = "write that name here",
 ): string {
 	let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
 	let importing = taken
-		? `import it under a name of its own, '${protocolName} as …', and write that name here, since this file binds '${protocolName}' already`
+		? `import it under a name of its own, '${protocolName} as …', and ${writing}, since this file binds '${protocolName}' already`
 		: "import it here"
 
 	return exported
