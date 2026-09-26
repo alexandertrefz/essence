@@ -1606,17 +1606,6 @@ function usedNames(
 			identities.add(record["providedBy"])
 		}
 
-		// NOTE: The BOUND a Method's Type Parameter carries, off the
-		// `Conformance` the call resolved. `numbers::sort()` spells neither
-		// `Comparable` nor the witness it threads, and the Enricher can not
-		// build that witness at all unless the Protocol is in Scope — it
-		// throws an Internal Compiler Error instead. So an import carrying
-		// the Protocol is read by every such call, exactly as `providedBy`
-		// above is.
-		if (typeof record["protocolName"] === "string") {
-			identities.add(record["protocolName"])
-		}
-
 		if (
 			record["kind"] === "namespace" &&
 			typeof record["name"] === "string"

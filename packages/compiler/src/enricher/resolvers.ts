@@ -5440,19 +5440,6 @@ export function solveConformance(
 		return { ok: false, chain: [] }
 	}
 
-	// NOTE: A Protocol no name in this Scope binds has no witness to give, and
-	// the culprit is what `missingConformance` answers with the import. A bound
-	// or condition refused where it is written is not carried, so it never asks.
-	if (protocolSpelling(protocolName, scope) === null) {
-		return {
-			ok: false,
-			chain: [
-				`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
-			],
-			culprit: { type: binding, protocolName },
-		}
-	}
-
 	let protocol = protocolOf(protocolName, scope)
 	let key = conformanceKey(protocolName, binding)
 	let state = conformanceStateFor(scope)
@@ -5809,11 +5796,10 @@ function orderConditions(
 	)
 }
 
-// NOTE: What to say about a concrete Type with no conforming Namespace. Five
-// answers, because five different things are actually wrong, and the plain
+// NOTE: What to say about a concrete Type with no conforming Namespace. Four
+// answers, because four different things are actually wrong, and the plain
 // "declare a Namespace" is only the last of them:
 //
-// - The Protocol is not in this Scope, so the edit is an import of it.
 // - A bare Case binds the CASE. `namespace X for Colour#Red is Enumerable` does
 //   not parse and never will — a Namespace targets a Type, and one Case of a
 //   Choice is not one — so what the reader edits is the value's annotation.
@@ -5849,11 +5835,6 @@ function missingConformance(
 	describesWork?: true
 } {
 	let spelling = protocolSpelling(protocolName, scope)
-
-	if (spelling === null) {
-		return protocolOutOfScope(protocolName, scope)
-	}
-
 	let protocol = describeProtocol(protocolName, scope)
 
 	// NOTE: A bare Case is typed as the CASE and not as its Choice, and no
@@ -5925,6 +5906,9 @@ function missingConformance(
 	// following "Declare a Namespace 'for (_: Integer) -> Integer is Equatable'"
 	// literally is handed a syntax error. A Help is an edit that works or it is
 	// not offered; what is left is the Note, which is the fact.
+	//
+	// Withheld as well, with its data, where no name here binds the Protocol:
+	// a clause written here could not name it.
 	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
 
 	return {
@@ -5933,24 +5917,29 @@ function missingConformance(
 					`No Namespace can be declared for ${describeType(culprit)} — a 'for' clause takes a named Type.`,
 				]
 			: [],
-		helps: undeclarable
-			? []
-			: [
-					protocolName === printableProtocolName &&
-					choiceCasesArePayloadFree(culprit)
-						? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-						: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
-				],
+		helps:
+			undeclarable || spelling === null
+				? []
+				: [
+						protocolName === printableProtocolName &&
+						choiceCasesArePayloadFree(culprit)
+							? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+							: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
+					],
 		// NOTE: No Parameter, because the Type that failed is a concrete one —
 		// what this asks for is a Namespace declaring the conformance, which is
 		// a Declaration rather than an edit to a span, and no fix answers it.
 		// The Protocol is carried all the same: it is the fact, and what is done
 		// with it is not this site's to decide.
-		data: {
-			kind: "required-protocol",
-			protocol: spelling,
-			parameter: null,
-		},
+		...(spelling === null
+			? {}
+			: {
+					data: {
+						kind: "required-protocol" as const,
+						protocol: spelling,
+						parameter: null,
+					},
+				}),
 	}
 }
 
@@ -6287,21 +6276,10 @@ export function resolveConformances(
 		// caller Type Parameter spelled like a callee's was rewritten with it.
 		let binding = bound
 
-		// NOTE: No witness can be solved without the bound's Protocol, so a call
-		// that binds no name for it is refused. A bound refused where it is
-		// written is not carried, and asks nothing of the call.
+		// NOTE: The bound is the Protocol the callee's Module resolved, and the
+		// caller needs no name for it. A bound refused where it is written is
+		// not carried, and asks nothing of the call.
 		let spelling = protocolSpelling(generic.constraint, scope)
-
-		if (spelling === null) {
-			reportProtocolOutOfScope(
-				binding,
-				generic.constraint,
-				scope,
-				position,
-			)
-
-			continue
-		}
 
 		// NOTE: A GenericUse binding keeps its own tailored Diagnostic — the
 		// bound was carried by an unbounded Type Parameter, which is a distinct
@@ -6384,8 +6362,9 @@ export function resolveConformances(
 						// again: `bounded` is `none` exactly where the text
 						// withheld its edit, and a Quick Fix offered there is
 						// the refused edit — applying it turned one error into
-						// two.
-						...(bound.bounded === "none"
+						// two. Left out too where no name here binds the
+						// Protocol, which the fix would have to write.
+						...(bound.bounded === "none" || spelling === null
 							? {}
 							: {
 									data:
@@ -6500,67 +6479,6 @@ export function resolveConformances(
 	}
 
 	return conformances
-}
-
-function reportProtocolOutOfScope(
-	binding: common.Type,
-	protocolName: string,
-	scope: enricher.Scope,
-	position: common.Position,
-): void {
-	let subject =
-		binding.type === "GenericUse"
-			? `Type Parameter '${displayGenericName(binding.name)}'`
-			: describeType(binding)
-	let missing = protocolOutOfScope(protocolName, scope)
-	let protocol = displayProtocolName(protocolName)
-
-	reportError(`${subject} does not conform to '${protocol}'`, position, {
-		code: "unsatisfied-bound",
-		labels: [
-			primary(
-				position,
-				`this binds a Type Parameter bound to '${protocol}'`,
-			),
-		],
-		notes: missing.notes,
-		helps: missing.helps,
-		...(missing.data === undefined ? {} : { data: missing.data }),
-	})
-}
-
-// NOTE: A bound's Protocol out of this Scope. The Modules this one reaches that
-// declare its name are named, and the one import a Quick Fix can write is
-// offered where only one of them declares it and exports it.
-function protocolOutOfScope(
-	identity: string,
-	scope: enricher.Scope,
-): {
-	notes: Array<string>
-	helps: Array<string>
-	data?: common.DiagnosticData
-} {
-	let protocolName = displayProtocolName(identity)
-	let declarations = protocolDeclarationsOf(scope, protocolName)
-	let only = declarations.length === 1 ? declarations[0] : undefined
-
-	return {
-		notes: [
-			`A conformance is found through the Protocol it names, and '${protocolName}' is not in scope here.`,
-		],
-		helps: declarations.map((declaration) =>
-			declaredInHelp(protocolName, declaration),
-		),
-		...(only?.exported === true
-			? {
-					data: {
-						kind: "import-declaration" as const,
-						name: protocolName,
-						modulePath: only.modulePath,
-					},
-				}
-			: {}),
-	}
 }
 
 // NOTE: An unknown Protocol name where it is written. The Helps name the Modules

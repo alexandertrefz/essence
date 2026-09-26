@@ -323,6 +323,8 @@ console.log(new Money(1700).format()) // format came with the object
 
 A JavaScript method sits on the class's prototype, so it arrives with every object of the class. An Essence namespace is an export of its own, and a file that does not import it cannot call its methods. More on [Coming from JavaScript › Namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
 
+A protocol that a function you call is bounded by does not have to be imported, only what makes the value conform to it: the namespace that declares the conformance, or the choice whose conformance is derived, as [Protocols](/docs/language/protocols#what-a-provided-body-can-call) explains.
+
 Two imported namespaces can offer the same method for one value. `MoneyPlain.es` declares a second `format` for `Money`:
 
 ```essence

@@ -2427,6 +2427,36 @@ describe("two Protocols of one name", () => {
 		).toEqual(['"one"', '"two"'])
 	})
 
+	// NOTE: The nested `Printable` shadows the name and is a Protocol of its
+	// own, so a String hole still asks for the standard library's.
+	it("should keep a nested Protocol apart from the standard library's", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tfunction inner() -> Integer {",
+					"\t\tprotocol Printable {",
+					"\t\t\tcount() -> Integer",
+					"\t\t}",
+					"",
+					"\t\tnamespace IntegerCounted for Integer is Printable {",
+					"\t\t\tcount() -> Integer {",
+					"\t\t\t\t<- 100",
+					"\t\t\t}",
+					"\t\t}",
+					"",
+					'\t\tTerminal.inspect("{3}")',
+					"",
+					"\t\t<- 3::count()",
+					"\t}",
+					"",
+					"\tTerminal.inspect(inner())",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(['"3"', "100"])
+	})
+
 	it("should emit two declarations that provide different Methods", () => {
 		let emitted = [
 			...rewriteModules(

@@ -2589,11 +2589,10 @@ export {
 }
 `
 
-	// NOTE: A call's witnesses are solved against the Protocols in the caller's
-	// Scope. `measure` is bounded by a Protocol `Main.es` never imported, so the
-	// call can not be given its witness and has to be refused.
-	it("refuses a call bounded by a Protocol the calling Module never imported", () => {
-		withProject(
+	// NOTE: `measure`'s bound is the Protocol `Sized.es` resolved, so `Main.es`
+	// needs the Namespace that conforms to it and no name for the Protocol.
+	it("calls a Function bounded by a Protocol the calling Module never imported", async () => {
+		await withBuiltProject(
 			{
 				"Main.es": `import {
 	from "./Sized.es" {
@@ -2608,33 +2607,19 @@ implementation {
 `,
 				"Sized.es": sizedModule,
 			},
-			(directory) => {
-				let main = analysedAt(directory, "Main.es", "Main.es")
-				let refusal = main.find(
-					(diagnostic) => diagnostic.code === "unsatisfied-bound",
-				)
-
-				expect(codesOf(main)).not.toContain("internal-error")
-				expect(refusal?.message).toBe(
-					"Integer does not conform to 'Sized'",
-				)
-				expect(refusal?.helps).toEqual([
-					"'Sized' is declared in Sized.es — import it here.",
-				])
-				expect(refusal?.data).toEqual({
-					kind: "import-declaration",
-					name: "Sized",
-					modulePath: path.join(directory, "Sized.es"),
-				})
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3"])
 			},
 		)
 	})
 
-	// NOTE: Importing is not enough where the declaring Module keeps the
-	// Protocol private, so the Help asks for the export as well and no import
-	// is offered as a Quick Fix.
-	it("asks for the export of a bounding Protocol its Module keeps private", () => {
-		withProject(
+	it("calls a Function bounded by a Protocol its Module keeps private", async () => {
+		await withBuiltProject(
 			{
 				"Main.es": `import {
 	from "./Sized.es" {
@@ -2649,24 +2634,20 @@ implementation {
 `,
 				"Sized.es": sizedModule.replace("\tSized\n", ""),
 			},
-			(directory) => {
-				let main = analysedAt(directory, "Main.es", "Main.es")
-				let refusal = main.find(
-					(diagnostic) => diagnostic.code === "unsatisfied-bound",
-				)
-
-				expect(codesOf(main)).not.toContain("internal-error")
-				expect(refusal?.helps).toEqual([
-					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here.",
-				])
-				expect(refusal?.data).toBeUndefined()
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3"])
 			},
 		)
 	})
 
-	// NOTE: `Sized.es` is outside what `Main.es` reaches, so the Help and the
-	// Quick Fix read the same whichever entry the graph was loaded from.
-	it("names only the Modules the caller reaches as declaring the Protocol", () => {
+	// NOTE: `Other.es` declares a `Sized` of its own, which the graph reaches
+	// from `Entry.es` and which is no concern of `measure`'s bound.
+	it("resolves a bound alike whichever entry the graph was loaded from", () => {
 		withProject(
 			{
 				"Entry.es": `import {
@@ -2717,30 +2698,22 @@ export {
 						],
 					)
 
-				expect(answersFrom("Entry.es")).toEqual(answersFrom("Main.es"))
-				expect(answersFrom("Entry.es")).toContainEqual([
-					"unsatisfied-bound",
-					["'Sized' is declared in Sized.es — import it here."],
-					{
-						kind: "import-declaration",
-						name: "Sized",
-						modulePath: path.join(directory, "Sized.es"),
-					},
-				])
+				expect(answersFrom("Entry.es")).toEqual([])
+				expect(answersFrom("Main.es")).toEqual([])
 			},
 		)
 	})
 
-	// NOTE: A `where` condition is solved in the caller's Scope as well, so the
-	// Protocol it names has to be imported where `ListSized` is used.
-	it("refuses a call whose conformance has a condition the caller can not see", () => {
-		withProject(
+	// NOTE: A `where` condition is solved in the caller's Scope under the
+	// Protocol its Namespace resolved, so `Main.es` needs `IntegerWeighed` and
+	// no name for `Weighed`.
+	it("calls a Function whose conformance has a condition the caller never names", async () => {
+		await withBuiltProject(
 			{
 				"Main.es": `import {
 	from "./Sized.es" {
 		IntegerWeighed
 		ListSized
-		Sized
 		measure
 	}
 }
@@ -2786,29 +2759,13 @@ export {
 }
 `,
 			},
-			(directory) => {
-				let main = analysedAt(directory, "Main.es", "Main.es")
-				let refusal = main.find(
-					(diagnostic) =>
-						diagnostic.code === "unsatisfied-conformance-condition",
-				)
-
-				expect(codesOf(main)).not.toContain("internal-error")
-				expect(refusal?.message).toBe(
-					"List<Integer> does not conform to 'Sized'",
-				)
-				expect(refusal?.notes).toEqual([
-					"Integer does not conform to 'Weighed'.",
-					"A conformance is found through the Protocol it names, and 'Weighed' is not in scope here.",
-				])
-				expect(refusal?.helps).toEqual([
-					"'Weighed' is declared in Sized.es — import it here.",
-				])
-				expect(refusal?.data).toEqual({
-					kind: "import-declaration",
-					name: "Weighed",
-					modulePath: path.join(directory, "Sized.es"),
-				})
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["2"])
 			},
 		)
 	})
@@ -3018,7 +2975,6 @@ export {
 				"Main.es": `import {
 	from "./Sized.es" {
 		ListSized
-		Sized
 		measure
 	}
 	from "./Weighed.es" { IntegerWeighed }
@@ -3088,10 +3044,7 @@ export {
 			{
 				"Main.es": `import {
 	from "./Measure.es" { measure }
-	from "./Sized.es" {
-		IntegerSized
-		Sized
-	}
+	from "./Sized.es" { IntegerSized }
 }
 
 implementation {
@@ -4719,6 +4672,447 @@ export {
 						directory,
 					),
 				).toEqual(["5"])
+			},
+		)
+	})
+
+	// NOTE: `IntegerSized` is what meets `measure`'s bound, and `Main.es`'s own
+	// `Sized` is no concern of it.
+	it("calls a Function whose bound another Protocol of its name does not meet", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	protocol Sized {
+		count() -> Integer
+	}
+
+	namespace IntegerCounted for Integer is Sized {
+		count() -> Integer {
+			<- 100
+		}
+	}
+
+	Terminal.inspect(measure(3))
+	Terminal.inspect(3::count())
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3", "100"])
+			},
+		)
+	})
+
+	it("calls a Function bounded by a Protocol whose name another Module reuses", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Other.es" { weigh }
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(weigh()))
+}
+`,
+				"Other.es": `implementation {
+	protocol Sized {
+		weight() -> Integer
+	}
+
+	function weigh() -> Integer {
+		<- 3
+	}
+}
+
+export {
+	weigh
+}
+`,
+				"Sized.es": sizedModule.replace("\tSized\n", ""),
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3"])
+			},
+		)
+	})
+
+	// NOTE: `Main.es` and `Sized.es` import each other, which is what the one
+	// Warning says; the bound needs nothing more.
+	it("calls a Function bounded by a cycle partner's Protocol", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(run())
+
+	function run() -> Integer {
+		<- measure(3)
+	}
+
+	function base() -> Integer {
+		<- 10
+	}
+}
+
+export {
+	base
+	run
+}
+`,
+				"Sized.es": `import {
+	from "./Main.es" { base }
+}
+
+implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @::add(base())
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	IntegerSized
+	Sized
+	measure
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkProject(directory, "Main.es")
+
+				expect(
+					codesOf(linkedAt(directory, linked, "Main.es").diagnostics),
+				).toEqual(["cyclic-side-effects"])
+				expect(
+					codesOf(
+						linkedAt(directory, linked, "Sized.es").diagnostics,
+					),
+				).toEqual([])
+				expect(
+					await runBundle(
+						rewriteModules(
+							[...linked.modules.values()].map((module) => ({
+								filePath: module.module.filePath,
+								program: optimise(simplify(module.program)),
+							})),
+							linked.entryPath,
+						),
+						directory,
+					),
+				).toEqual(["13"])
+			},
+		)
+	})
+
+	// NOTE: `Item` carries the `Sized` that `SizedBox` demands, private to
+	// `Box.es`, and `weigh` wants a `Weighed`. The one-bound rule is what is
+	// left to say, and `Other.es`'s `Sized` has no part in it.
+	it("reports a bound a Type Parameter carrying a private bound can not meet", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Box.es" { SizedBox }
+	from "./Other.es" { one }
+	from "./Weighed.es" { weigh }
+}
+
+implementation {
+	namespace Boxes<infer Item> for SizedBox<Item> {
+		weighed() -> Integer {
+			<- match @ -> Integer {
+				case #Box({ item }) { <- weigh(item) }
+			}
+		}
+	}
+
+	Terminal.inspect(one())
+}
+`,
+				"Box.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	choice SizedBox<Item is Sized> {
+		Box { item: Item },
+	}
+}
+
+export {
+	SizedBox
+}
+`,
+				"Other.es": `implementation {
+	protocol Sized {
+		other() -> Integer
+	}
+
+	function one() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	one
+}
+`,
+				"Weighed.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	namespace IntegerWeighed for Integer is Weighed {
+		weight() -> Integer {
+			<- @
+		}
+	}
+
+	function weigh <infer T is Weighed>(_ t: T) -> Integer {
+		<- t::weight()
+	}
+}
+
+export {
+	IntegerWeighed
+	Weighed
+	weigh
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(reportsOf(main)).toEqual([
+					[
+						"unsatisfied-bound",
+						"Type Parameter 'Item' does not conform to 'Weighed'",
+					],
+				])
+				expect(main[0]?.position?.start.line).toBe(11)
+				expect(main[0]?.labels.map((label) => label.message)).toEqual([
+					"bound here to a Type Parameter bounded by 'Sized'",
+				])
+				expect(JSON.stringify(main)).not.toContain("Other.es")
+				expect(main[0]?.helps).toEqual([])
+			},
+		)
+	})
+
+	it("refuses a condition no Namespace in the caller's Scope meets", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure([1, 2]))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace IntegerWeighed for Integer is Weighed {
+		weight() -> Integer {
+			<- @
+		}
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	IntegerWeighed
+	ListSized
+	measure
+}
+`,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) =>
+						diagnostic.code === "unsatisfied-conformance-condition",
+				)
+
+				expect(refusal?.message).toBe(
+					"List<Integer> does not conform to 'Sized'",
+				)
+				expect(refusal?.position?.start.line).toBe(9)
+				expect(refusal?.notes).toEqual([
+					"Integer does not conform to 'Weighed'.",
+				])
+			},
+		)
+	})
+
+	it("keeps a nested Protocol apart from a standard library one of its name", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `implementation {
+	function inner() -> Integer {
+		protocol Printable {
+			count() -> Integer
+		}
+
+		namespace IntegerCounted for Integer is Printable {
+			count() -> Integer {
+				<- 100
+			}
+		}
+
+		Terminal.print(3)
+
+		<- 3::count()
+	}
+
+	Terminal.inspect(inner())
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3", "100"])
+			},
+		)
+	})
+
+	// NOTE: The witness `Main.es` hands `big` carries `isBig`, which `Sized`
+	// provides, although `Main.es` has no name for `Sized`.
+	it("hands a witness the provided Methods of a Protocol the caller never imports", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		big
+	}
+}
+
+implementation {
+	Terminal.inspect(big(3))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+
+		isBig() -> Boolean {
+			<- @::size()::isGreaterThan(2)
+		}
+	}
+
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @
+		}
+	}
+
+	function big <infer Item is Sized>(_ item: Item) -> Boolean {
+		<- item::isBig()
+	}
+}
+
+export {
+	IntegerSized
+	Sized
+	big
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["true"])
+			},
+		)
+	})
+
+	it("reports a Protocol imported only for a bound as unused", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		Sized
+		measure
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					["unused-import", "'Sized' is imported and never used"],
+				])
 			},
 		)
 	})

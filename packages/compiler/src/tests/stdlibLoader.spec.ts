@@ -1355,35 +1355,20 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/Constants\.BASE/)
 	})
 
-	// NOTE: `NumberList.es` imports `Comparable` only because its `@::sort()`
-	// calls are bounded by it. Without the entry, the call has to be refused
-	// with a Diagnostic, not emitted without its witness.
-	it("reports a bound whose Protocol the calling file does not import", () => {
-		let entry = '\tfrom "./Comparable.es" { Comparable }\n'
-		let sources = readStdlibFiles().map(({ filePath, sourceText }) => {
-			if (!filePath.endsWith("/NumberList.es")) {
-				return parseStdlibSource(filePath, sourceText)
-			}
-
-			expect(sourceText).toContain(entry)
-
-			return parseStdlibSource(filePath, sourceText.replace(entry, ""))
-		})
-
-		let message = ""
-
-		try {
-			loadStdlibFrom(sources)
-		} catch (error) {
-			message = error instanceof Error ? error.message : String(error)
-		}
-
-		expect(message).toContain("standard library failed to enrich")
-		expect(message).toContain("[unsatisfied-bound]")
-		expect(message).toContain(
-			"'Comparable' is declared in Comparable.es — import it here",
+	// NOTE: `NumberList.es` calls `@::sort()`, which is bounded by `Comparable`,
+	// and does not import it: a bound is the Protocol its callee's Module
+	// resolved.
+	it("loads a file whose bounded calls name a Protocol it does not import", () => {
+		let sources = readStdlibFiles().map(({ filePath, sourceText }) =>
+			parseStdlibSource(filePath, sourceText),
 		)
-		expect(message).not.toContain("internal-error")
+		let numberList = sources.find((source) =>
+			source.fileName.endsWith("/NumberList.es"),
+		)
+
+		expect(numberList?.sourceText).toContain("@::sort()")
+		expect(numberList?.sourceText).not.toContain('"./Comparable.es"')
+		expect(() => loadStdlibFrom(sources)).not.toThrow()
 	})
 
 	// NOTE: Every Documentation a consumer can reach has to be sourceless — a

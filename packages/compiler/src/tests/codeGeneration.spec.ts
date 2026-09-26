@@ -3616,7 +3616,6 @@ describe("Code Generation", () => {
 	from "./Dictionary.es" { Dictionary }
 	from "./Enumerable.es" { Enumerable }
 	from "./List.es" { NonEmptyList }
-	from "./Protocols.es" { Equatable }
 	from "./String.es" { String }
 }
 

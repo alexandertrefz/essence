@@ -2130,10 +2130,9 @@ describe("Workspace", () => {
 		})
 
 		// NOTE: `measure` is bounded by a Protocol `Main.es` never imported, and
-		// a witness is solved against the Protocols in the caller's Scope. The
-		// Compiler names the Module that declares it, and importing it from
-		// there is the whole edit.
-		it("should answer a bound whose Protocol is out of scope with the import", () => {
+		// the bound is the Protocol `Sized.es` resolved, so there is nothing to
+		// report and nothing to fix.
+		it("should leave a call bounded by a Protocol the file never imports alone", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Sized.es": [
 					"implementation {",
@@ -2176,32 +2175,12 @@ describe("Workspace", () => {
 
 			let mainPath = pathOf("Main.es")
 			let source = workspace.sourceOf(mainPath) ?? ""
-			let reported = analyseDocument(source, mainPath, {
-				host: workspace.host,
-			}).diagnostics.find(
-				(diagnostic) => diagnostic.code === "unsatisfied-bound",
-			)
 
-			expect(reported?.helps).toEqual([
-				"'Sized' is declared in Sized.es — import it here.",
-			])
-
-			let [fix] = fixesFor(workspace, mainPath, 9, "measure(3)")
-
-			expect(fix.title).toBe("Import 'Sized' from ./Sized.es")
-
-			let result = applyEdits(source, fix.edits)
-
-			expect(result.split("\n").slice(0, 7)).toEqual([
-				"import {",
-				'\tfrom "./Sized.es" {',
-				"\t\tIntegerSized",
-				"\t\tSized",
-				"\t\tmeasure",
-				"\t}",
-				"}",
-			])
-			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+			expect(
+				analyseDocument(source, mainPath, { host: workspace.host })
+					.diagnostics,
+			).toEqual([])
+			expect(fixesFor(workspace, mainPath, 9, "measure(3)")).toEqual([])
 		})
 
 		// NOTE: `Main.es` bounds its own Function by a `Sized` it never imported.

@@ -661,12 +661,6 @@ rule stated there.
   `__overload$N` name the Simplifier emits and therefore the runtime export it
   binds to, natives included. Reordering an `overload` block silently rebinds
   every Overload in it.
-- **A file calling a Method whose Type Parameter carries a bound imports the
-  PROTOCOL.** `@::sort()` threads a conformance witness the Enricher can only
-  build with the bound's Protocol in Scope, and a file calling it need spell
-  `Comparable` nowhere else. Without the import the load fails with
-  `unsatisfied-bound`, whose Help names the file to import it from.
-  `NumberList.es` imports `Comparable` for this reason alone.
 - **A named Union is only NAMED.** `type Number = Integer | Rational |
   Irrational` gives the Union a name, and Hovers, Inlay Hints and Diagnostics
   print it — `Number`, not the three members spelled out. Assignability ignores
