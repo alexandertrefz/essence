@@ -240,7 +240,9 @@ export function resultKey(parts: ResultKeyParts): string {
 // out of the Program's own values.
 //
 // NOTE: `Terminal`'s reads are not among them, though they reach a host
-// descriptor: the test runtime hands every test an empty input.
+// descriptor. Every test reads an empty input, and an entry whose bundle read
+// the host's as it loaded says so through `hasReadHostInput` and is not
+// remembered.
 //
 // NOTE: Spelled as esbuild LABELS it. Every module a bundle inlines is written
 // into the output under its path relative to the runtime directory — see

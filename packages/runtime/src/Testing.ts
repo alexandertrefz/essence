@@ -23,6 +23,7 @@ import { caseText, kindOf } from "./registry"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
+	hasReadHostInput,
 	type OutputStream,
 	withInputSource,
 	withOutputSink,
@@ -2867,6 +2868,10 @@ export const entryPoints = {
 	// table the Compiler emitted — so it crosses the boundary safely once it
 	// has been asked for in here.
 	coverage,
+	// NOTE: Whether this bundle read the host's input. Every test reads an
+	// empty one, so the reads it reports are a Module's own statements, run as
+	// the bundle loaded.
+	hasReadHostInput,
 }
 
 // #endregion

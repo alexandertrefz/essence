@@ -3153,6 +3153,40 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
+	const readsAtLoad = [
+		"implementation {",
+		'\tconstant team = Terminal.readLine()::value(defaultingTo "nobody")',
+		"}",
+		"",
+		"tests {",
+		'\ttest "loaded the team it was piped" {',
+		'\t\texpect team::is("Tigers")',
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: A test reads an empty input, but a Module's own statements read the
+	// run's as the bundle loads, and the key holds none of it.
+	it("never remembers an entry whose Module read its input as it loaded", async () => {
+		await withResults(async (store) => {
+			await withFiles(
+				{ "Team.tests.es": readsAtLoad },
+				async (directory) => {
+					let first = await runTestsIn(directory, [], "Tigers\n")
+
+					expect(first.code).toBe(EXIT_SUCCESS)
+					expect(records(store)).toHaveLength(0)
+
+					let second = await runTestsIn(directory, [], "Foxes\n")
+
+					expect(second.out).not.toContain("entries cached")
+					expect(second.code).toBe(EXIT_FAILURE)
+				},
+			)
+		})
+	})
+
 	// NOTE: Fresh entropy every run is what a property test IS. Freezing a
 	// hundred cases under a name would end its search, and the values it has
 	// already failed on are the corpus's business rather than this store's.

@@ -1377,6 +1377,12 @@ export async function runTest(
 				continue
 			}
 
+			// NOTE: A test reads an empty input, but a Module's own statements
+			// read the run's as the bundle loads, and the key holds none of it.
+			if (suite.tests.hasReadHostInput()) {
+				continue
+			}
+
 			// NOTE: Asked on the way IN rather than on the way out. An entry
 			// whose bundle reaches the world is never written here, so there is
 			// nothing for a later run to find — which is what keeps the warm

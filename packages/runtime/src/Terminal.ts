@@ -656,6 +656,15 @@ const INPUT_BUFFER_LENGTH = 65536
 
 let inputBuffer: Uint8Array | null = null
 
+// NOTE: Whether a read has reached the host's own input rather than a staged
+// one. A runner that remembers results asks it after a run, since the host's
+// input is in no key.
+let hostInputRead = false
+
+export function hasReadHostInput(): boolean {
+	return hostInputRead
+}
+
 // NOTE: One crossing, and what it produced added to the buffer. A decode of a
 // chunk ending mid-character adds nothing at all, which is why every caller
 // asks again rather than assuming a pull made progress.
@@ -668,6 +677,7 @@ function pull(): void {
 		return
 	}
 
+	hostInputRead = true
 	inputBuffer ??= new Uint8Array(INPUT_BUFFER_LENGTH)
 	input.decoder ??= new TextDecoder()
 
