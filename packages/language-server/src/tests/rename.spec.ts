@@ -1153,6 +1153,36 @@ describe("Rename to an asynchrony Keyword", () => {
 	})
 })
 
+// NOTE: A provided body is a Method body like any other, so the call it makes
+// to another Method of its Protocol is an occurrence of that Method.
+const PROVIDED_BODY_CALL = [
+	"implementation {",
+	"\tprotocol Sizable {",
+	"\t\tsize() -> Integer",
+	"",
+	"\t\tisEmpty() -> Boolean {",
+	"\t\t\t<- @::size()::is(0)",
+	"\t\t}",
+	"",
+	"\t\thasItems() -> Boolean {",
+	"\t\t\t<- @::isEmpty()::negate()",
+	"\t\t}",
+	"\t}",
+	"",
+	"\ttype Bag = { count: Integer }",
+	"",
+	"\tnamespace Bags for Bag is Sizable {",
+	"\t\tsize() -> Integer {",
+	"\t\t\t<- @.count",
+	"\t\t}",
+	"\t}",
+	"",
+	"\tconstant bag: Bag = { count = 0 }",
+	"",
+	"\tTerminal.inspect(bag::isEmpty())",
+	"}",
+].join("\n")
+
 describe("findOccurrence (References)", () => {
 	function occurrencesOf(source: string, cursor: common.Cursor) {
 		let { program } = parseWithDiagnostics(source)
@@ -1213,6 +1243,24 @@ describe("findOccurrence (References)", () => {
 		let occurrence = occurrencesOf(source, { line: 7, column: 23 })
 
 		expect(occurrence?.declaration.occurrences).toHaveLength(3)
+	})
+
+	it("should report the call a provided body makes to a provided Method", () => {
+		let occurrence = occurrencesOf(PROVIDED_BODY_CALL, {
+			line: 24,
+			column: 24,
+		})
+
+		expect(
+			occurrence?.declaration.occurrences.map((site) => [
+				site.position.start.line,
+				site.position.start.column,
+			]),
+		).toEqual([
+			[5, 3],
+			[10, 10],
+			[24, 24],
+		])
 	})
 })
 
@@ -1294,6 +1342,24 @@ describe("findOccurrences (Document Highlight)", () => {
 		).toEqual([
 			[2, "read"],
 			[3, "read"],
+		])
+	})
+
+	it("should highlight the call a provided body makes to a provided Method", () => {
+		let occurrences = occurrencesOf(PROVIDED_BODY_CALL, {
+			line: 10,
+			column: 10,
+		})
+
+		expect(
+			occurrences.map((occurrence) => [
+				occurrence.position.start.line,
+				occurrence.access,
+			]),
+		).toEqual([
+			[5, "write"],
+			[10, "read"],
+			[24, "read"],
 		])
 	})
 })
@@ -1452,6 +1518,18 @@ describe("identifierPattern", () => {
 			expect(rename(SIZABLE, { line: 21, column: 24 }, "vacant")).toBe(
 				SIZABLE.replaceAll("isEmpty", "vacant"),
 			)
+		})
+
+		it("should rename the call a provided body makes to a provided Method", () => {
+			expect(
+				rename(PROVIDED_BODY_CALL, { line: 5, column: 3 }, "vacant"),
+			).toBe(PROVIDED_BODY_CALL.replaceAll("isEmpty", "vacant"))
+		})
+
+		it("should rename a provided Method from a call inside a provided body", () => {
+			expect(
+				rename(PROVIDED_BODY_CALL, { line: 10, column: 10 }, "vacant"),
+			).toBe(PROVIDED_BODY_CALL.replaceAll("isEmpty", "vacant"))
 		})
 
 		it("should not rename a builtin Protocol's provided Method", () => {

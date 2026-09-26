@@ -891,6 +891,73 @@ describe("Workspace", () => {
 			expect(renamed?.["Sizable.es"]).toContain("\t\tvacant() -> Boolean")
 			expect(renamed?.["Main.es"]).toContain("<- bag::vacant()")
 		})
+
+		it("should rename the call a provided body makes from an importer's call site", () => {
+			let sizable = [
+				"implementation {",
+				"",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tisEmpty() -> Boolean {",
+				"\t\t\t<- @::size()::is(0)",
+				"\t\t}",
+				"",
+				"\t\thasItems() -> Boolean {",
+				"\t\t\t<- @::isEmpty()::negate()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Sizable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"\tBag",
+				"\tBags",
+				"}",
+				"",
+			].join("\n")
+			let main = [
+				"import {",
+				'\tfrom "./Sizable.es" { Sizable }',
+				'\tfrom "./Sizable.es" { Bag }',
+				'\tfrom "./Sizable.es" { Bags }',
+				"}",
+				"",
+				"implementation {",
+				"\tfunction report(_ bag: Bag) -> Boolean {",
+				"\t\t<- bag::isEmpty()",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+
+			let { workspace, pathOf } = makeWorkspace({
+				"Sizable.es": sizable,
+				"Main.es": main,
+			})
+
+			let renamed = renameAcross(
+				workspace,
+				pathOf("Main.es"),
+				cursorAt(main, 9, "isEmpty"),
+				"vacant",
+			)
+
+			expect(renamed?.["Sizable.es"]).toBe(
+				sizable.replaceAll("isEmpty", "vacant"),
+			)
+			expect(renamed?.["Main.es"]).toBe(
+				main.replaceAll("isEmpty", "vacant"),
+			)
+		})
 	})
 
 	describe("workspace symbols", () => {

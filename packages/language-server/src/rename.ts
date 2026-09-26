@@ -2630,6 +2630,21 @@ function walkTypedParameterDefaults(
 	}
 }
 
+function walkTypedMethods(methods: common.typed.Methods, context: WalkContext) {
+	for (let member of Object.values(methods)) {
+		let entries =
+			member.nodeType === "OverloadedMethod" ||
+			member.nodeType === "OverloadedStaticMethod"
+				? member.methods
+				: [member.method]
+
+		for (let method of entries) {
+			walkTypedParameterDefaults(method.value.parameters, context)
+			walkTypedBody(method.value.body, context)
+		}
+	}
+}
+
 function walkTypedNode(
 	node: common.typed.ImplementationNode,
 	context: WalkContext,
@@ -2649,18 +2664,7 @@ function walkTypedNode(
 				walkTypedNode(property.value, context)
 			}
 
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					walkTypedParameterDefaults(method.value.parameters, context)
-					walkTypedBody(method.value.body, context)
-				}
-			}
+			walkTypedMethods(node.methods, context)
 
 			// NOTE: A native Method has no typed body, and the frame the
 			// Compiler synthesizes for its defaults is where its Expressions
@@ -2670,6 +2674,9 @@ function walkTypedNode(
 				walkTypedParameterDefaults(shim.parameters, context)
 			}
 
+			return
+		case "ProtocolDeclarationStatement":
+			walkTypedMethods(node.methods, context)
 			return
 		case "IfStatement":
 			walkTypedNode(node.condition, context)
