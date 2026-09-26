@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "essence-compiler",
+      "name": "essence",
       "devDependencies": {
         "@essence-lang/compiler": "workspace:*",
         "@essence-lang/fixtures": "workspace:*",
