@@ -182,6 +182,7 @@ export function topLevelScope(
 		constantValues: scopeMap(),
 		types: scopeMap(withoutShadowed(builtinTypes(), shadowed?.types)),
 		protocols,
+		preludeProtocols: new Set(Object.keys(protocols)),
 		protocolRegistry: protocolRegistryFor(protocols),
 		programTop: true,
 	}

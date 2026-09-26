@@ -39,6 +39,7 @@ import {
 	displayProtocolName,
 	protocolIdentity,
 	recordMismatchEvidence,
+	specifierTo,
 	undecidedSlotEvidence,
 	unwaitedWorkReport,
 	withArticle,
@@ -5201,6 +5202,7 @@ export function routedRecordCall(
 				solved.culprit?.protocolName ?? protocolName,
 				scope,
 				position,
+				"condition",
 			)
 
 			let protocol = describeProtocol(protocolName, scope)
@@ -7021,15 +7023,7 @@ function orderConditions(
 //   carry no payload the body of it may be EMPTY, since declaring the
 //   conformance is the whole of what such a Choice needs — a fact worth saying,
 //   because writing `toString` by hand is what a reader otherwise sets out to do.
-function missingConformance(
-	culprit: common.Type,
-	protocolName: string,
-	scope: enricher.Scope,
-	// NOTE: Where the refusal is being made, which only the bare-Case branch
-	// below reads — it asks a conformance question of its own, quietly, and
-	// every question about a conformance is asked somewhere.
-	position: common.Position,
-): {
+type ConformanceRemedy = {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
@@ -7039,7 +7033,36 @@ function missingConformance(
 	// it takes anything, and printing a description of work instead of its
 	// answer is the one outcome nobody wanted. The edit is the missing word.
 	describesWork?: true
-} {
+}
+
+// NOTE: The remedy, led by what a reader is told where the name the report
+// spells binds another Protocol here.
+function missingConformance(
+	culprit: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	// NOTE: Where the refusal is being made, which only the bare-Case branch
+	// reads, for the conformance question it asks of its own.
+	position: common.Position,
+	asker: "bound" | "condition",
+): ConformanceRemedy {
+	let remedy = conformanceRemedy(culprit, protocolName, scope, position)
+	let homonyms = [
+		...homonymNotes(protocolName, scope, asker),
+		...homonymConformerNotes(protocolName, culprit, scope),
+	]
+
+	return homonyms.length === 0
+		? remedy
+		: { ...remedy, notes: [...homonyms, ...remedy.notes] }
+}
+
+function conformanceRemedy(
+	culprit: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): ConformanceRemedy {
 	let spelling = protocolSpelling(protocolName, scope)
 	let protocol = describeProtocol(protocolName, scope)
 
@@ -7070,7 +7093,7 @@ function missingConformance(
 			}
 		}
 
-		return missingConformance(choice, protocolName, scope, position)
+		return conformanceRemedy(choice, protocolName, scope, position)
 	}
 
 	let unwaited = unwaitedWorkReport(
@@ -7191,6 +7214,157 @@ function declaresConformanceFor(
 	return namespace.generics.length === 0
 		? matchesType(namespace.targetType, type)
 		: bindNamespaceTarget(namespace, type) !== null
+}
+
+// NOTE: Said where the name a report spells binds another Protocol in this
+// Scope, or no Protocol at all, which is what a reader would otherwise take the
+// report to be about.
+function homonymNotes(
+	identity: string,
+	scope: enricher.Scope,
+	asker: "bound" | "condition",
+): Array<string> {
+	let name = displayProtocolName(identity)
+	let local = protocolNamed(name, scope)
+
+	if (protocolSpelling(identity, scope) !== null) {
+		return []
+	}
+
+	if (local === null) {
+		let kind = bindingKindNamed(name, scope)
+
+		return kind === null
+			? []
+			: [
+					`'${name}' here is ${kind}; the ${asker} asks for the Protocol '${name}' that ${declarationOf(identity, identity, scope)}.`,
+				]
+	}
+
+	if (local.identity === identity) {
+		return []
+	}
+
+	return [
+		`'${name}' here is the Protocol ${declarationOf(local.identity, identity, scope)}; the ${asker} asks for the '${name}' that ${declarationOf(identity, local.identity, scope)}.`,
+	]
+}
+
+// NOTE: What a name that is no Protocol's binds in this Scope, as a report
+// names it, or null where it binds nothing.
+function bindingKindNamed(name: string, scope: enricher.Scope): string | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		// NOTE: A Type Parameter of the name can take the Protocol as its bound,
+		// as the Help says, so it is no misreading.
+		if (Object.hasOwn(current.types, name)) {
+			return current.types[name]!.type === "GenericUse" ? null : "a Type"
+		}
+
+		if (Object.hasOwn(current.members, name)) {
+			let member = current.members[name]!
+
+			return member.type === "Namespace"
+				? "a Namespace"
+				: member.type === "Function"
+					? "a Function"
+					: "a value"
+		}
+	}
+
+	return null
+}
+
+// NOTE: The Namespaces in scope that make the Type conform to that other
+// Protocol, which is the conformance the reader meant to be used.
+function homonymConformerNotes(
+	identity: string,
+	type: common.Type,
+	scope: enricher.Scope,
+): Array<string> {
+	let name = displayProtocolName(identity)
+	let local = protocolNamed(name, scope)
+
+	if (local === null || local.identity === identity) {
+		return []
+	}
+
+	return [...getAllNamespacesInScope(scope, null)]
+		.filter(([, namespace]) =>
+			declaresConformanceFor(namespace, local.identity, type),
+		)
+		.map(
+			([namespaceName]) =>
+				`'${namespaceName}' conforms to the '${name}' ${declarationOf(local.identity, identity, scope)}, which is a different Protocol.`,
+		)
+}
+
+// NOTE: Who declares a Protocol, as this Scope's reader says it: this file,
+// another Module, or the standard library, with the line for a nested one, and
+// at its top level where this file declares `beside` as well.
+function declarationOf(
+	identity: string,
+	beside: string,
+	scope: enricher.Scope,
+): string {
+	let declarer = declarerOf(identity, scope, beside)
+	let nested = identity.slice(identity.lastIndexOf("#") + 1).split("@")[1]
+
+	if (nested !== undefined) {
+		return `${declarer} declares on line ${nested.split(":")[0]}`
+	}
+
+	return declarer === "this file" && declarerOf(beside, scope) === declarer
+		? `${declarer} declares at its top level`
+		: `${declarer} declares`
+}
+
+// NOTE: Another Module is named by its file name, or by the specifier this
+// file would import it by where the Module declaring `beside` has that name too.
+function declarerOf(
+	identity: string,
+	scope: enricher.Scope,
+	beside: string = identity,
+): string {
+	let modulePath = identityModulePath(identity)
+	let reader = modulePathOf(scope)
+
+	if (modulePath === null) {
+		return preludeProtocolsOf(scope)?.has(identity) === true
+			? "the standard library"
+			: "this file"
+	}
+
+	if (modulePath === reader) {
+		return "this file"
+	}
+
+	let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
+	let besidePath = identityModulePath(beside)
+
+	return reader !== null &&
+		besidePath !== null &&
+		besidePath !== modulePath &&
+		besidePath.slice(besidePath.lastIndexOf("/") + 1) === fileName
+		? specifierTo(reader, modulePath)
+		: fileName
+}
+
+function preludeProtocolsOf(scope: enricher.Scope): ReadonlySet<string> | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.preludeProtocols !== undefined) {
+			return current.preludeProtocols
+		}
+	}
+
+	return null
 }
 
 // NOTE: The Choice this Type is, when it was declared in a DIFFERENT Module of
@@ -7598,6 +7772,7 @@ export function resolveConformances(
 										`'${shown}' carries no '${wanted}' bound of its own, so it can not satisfy one.`,
 									]
 								: []),
+							...homonymNotes(generic.constraint, scope, "bound"),
 							...bound.notes,
 						],
 						helps: bound.helps,
@@ -7673,6 +7848,7 @@ export function resolveConformances(
 			culpritProtocol,
 			scope,
 			position,
+			result.chain.length === 1 ? "bound" : "condition",
 		)
 		let wanted = describeProtocol(generic.constraint, scope)
 		let message = `${describeType(binding)} does not conform to '${wanted}'`

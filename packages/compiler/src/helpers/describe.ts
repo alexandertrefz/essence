@@ -1,3 +1,5 @@
+import * as path from "node:path"
+
 import type { common, enricher } from "@essence-lang/interfaces"
 
 import { primary, secondary } from "../diagnostics/index"
@@ -122,6 +124,17 @@ export function displayProtocolName(identity: string): string {
 	let suffix = name.indexOf("@")
 
 	return suffix === -1 ? name : name.slice(0, suffix)
+}
+
+// NOTE: How a Diagnostic names another Module: the specifier an import in this
+// one would write, never the canonical path, which differs per checkout.
+export function specifierTo(importerPath: string, filePath: string): string {
+	let relative = path
+		.relative(path.dirname(importerPath), filePath)
+		.split(path.sep)
+		.join("/")
+
+	return relative.startsWith("../") ? relative : `./${relative}`
 }
 
 // NOTE: The Cases of the Choice a Type Alias declares, or null for an alias such

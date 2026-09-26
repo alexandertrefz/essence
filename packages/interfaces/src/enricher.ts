@@ -173,6 +173,9 @@ export type Scope = {
 	// name whatever its file imports, because all of it is emitted above the
 	// Program too.
 	preludeNames?: ReadonlySet<string>
+	// NOTE: The same for the Protocols, which is how a report tells a standard
+	// library Protocol from one a single file declares under a bare identity.
+	preludeProtocols?: ReadonlySet<string>
 	// NOTE: The names a Statement the Parser ABANDONED would have declared, and
 	// the text each one's silence covers — see `parser.Recovery` and
 	// `declarationWasAbandoned`. Set on the top level Scope and read through the

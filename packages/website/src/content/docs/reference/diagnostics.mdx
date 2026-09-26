@@ -4239,6 +4239,17 @@ import of it. What the call needs in scope is the conformance: a namespace that
 declares it, or the choice whose conformance is derived. This report spells the
 protocol the way the file does, under an import alias where it has one.
 
+Where the name the report spells is the file's name for another protocol, a
+note says so: `'Sized' here is the Protocol this file declares; the bound asks for
+the 'Sized' that Sized.es declares.` Where the two modules share a file name, each
+is named by the path this file would import it by, such as `./other/Sized.es`.
+A second note names each namespace in scope that conforms to the file's protocol
+of that name instead, since that is the conformance the call was meant to use.
+Where the file gives the name to a type, a function, a namespace or a value
+instead, the note names that: `'Sized' here is a Type; the bound asks for the
+Protocol 'Sized' that Sized.es declares.` A type parameter of that name gets no
+note, since it can take the protocol as its bound.
+
 Taught on: [Protocols › Declared, not structural](/docs/language/protocols#declared-not-structural)
 
 ### `interpolation-not-printable`
@@ -4774,7 +4785,9 @@ one call and leaves every other list of that record unsorted.
 A condition is solved where the call is, under the protocol its namespace
 resolved, so it needs no import of that protocol either. What has to be in
 scope is a namespace that meets it, as [`unsatisfied-bound`](#unsatisfied-bound)
-says of a bound.
+says of a bound. Where the file gives the condition protocol's name to another
+protocol, the note that says so reads `the condition asks for` rather than `the
+bound asks for`.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

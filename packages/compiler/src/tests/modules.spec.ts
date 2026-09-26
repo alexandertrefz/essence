@@ -5529,6 +5529,11 @@ implementation {
 					"Integer does not conform to 'Sized'",
 				)
 				expect(refusal?.position?.start.line).toBe(16)
+				expect(refusal?.notes).toEqual([
+					"No Namespace in scope makes Integer conform to 'Sized'.",
+					"'Sized' here is the Protocol this file declares; the bound asks for the 'Sized' that Sized.es declares.",
+					"'IntegerCounted' conforms to the 'Sized' this file declares, which is a different Protocol.",
+				])
 				expect(refusal?.helps).toEqual([
 					"'IntegerSized' in ./Sized.es makes Integer conform to 'Sized' — import it.",
 				])
@@ -5584,6 +5589,11 @@ export {
 					"Integer does not conform to 'Sized'",
 				)
 				expect(refusal?.position?.start.line).toBe(21)
+				expect(refusal?.notes).toEqual([
+					"No Namespace in scope makes Integer conform to 'Sized'.",
+					"'Sized' here is the Protocol this file declares on line 11; the bound asks for the 'Sized' that this file declares at its top level.",
+					"'IntegerCounted' conforms to the 'Sized' this file declares on line 11, which is a different Protocol.",
+				])
 			},
 		)
 	})
@@ -6264,6 +6274,311 @@ implementation {
 					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
 				).toEqual([
 					["unused-import", "'Sized' is imported and never used"],
+				])
+			},
+		)
+	})
+
+	// NOTE: `Item` is bounded by the `Sized` this file declares, which asks
+	// for what the other one asks for and is still another Protocol.
+	it("tells a Type Parameter's bound from another Protocol of its name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	function relay <infer Item is Sized>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.message).toBe(
+					"Type Parameter 'Item' does not conform to 'Sized'",
+				)
+				expect(refusal?.labels.map((label) => label.message)).toEqual([
+					"bound here to a Type Parameter bounded by 'Sized'",
+				])
+				expect(refusal?.notes).toEqual([
+					"'Sized' here is the Protocol this file declares; the bound asks for the 'Sized' that Sized.es declares.",
+					"'Item' is bounded by 'Sized' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.",
+					"A Protocol that extends both is how a Parameter asks for two, and only Types this Program can declare that conformance for can satisfy it.",
+				])
+			},
+		)
+	})
+
+	// NOTE: `Sized` here is the file's own Type, so no bound written here can
+	// name the Protocol `measure` asks for.
+	it("tells a bound's Protocol from a Type of its name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	type Sized = { count: Integer }
+
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+
+	Terminal.inspect(measure("abc"))
+}
+
+export {
+	relay
+	Sized
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusals = analysedAt(
+					directory,
+					"Main.es",
+					"Main.es",
+				).filter(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusals.map((refusal) => refusal.notes)).toEqual([
+					[
+						"'Item' carries no 'Sized' bound of its own, so it can not satisfy one.",
+						"'Sized' here is a Type; the bound asks for the Protocol 'Sized' that Sized.es declares.",
+					],
+					[
+						"No Namespace in scope makes String conform to 'Sized'.",
+						"'Sized' here is a Type; the bound asks for the Protocol 'Sized' that Sized.es declares.",
+					],
+				])
+			},
+		)
+	})
+
+	it("tells a bound's Protocol from a Function of its name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	function Sized() -> Integer {
+		<- 1
+	}
+
+	Terminal.inspect(measure("abc"))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.notes).toEqual([
+					"No Namespace in scope makes String conform to 'Sized'.",
+					"'Sized' here is a Function; the bound asks for the Protocol 'Sized' that Sized.es declares.",
+				])
+			},
+		)
+	})
+
+	// NOTE: Both Modules are called `Sized.es`, so each is named by the
+	// specifier this file would import it by.
+	it("tells two Protocols apart whose Modules share a file name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+	from "./other/Sized.es" {
+		IntegerCounted
+		Sized
+	}
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+				"other/Sized.es": countedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.notes).toEqual([
+					"No Namespace in scope makes Integer conform to 'Sized'.",
+					"'Sized' here is the Protocol ./other/Sized.es declares; the bound asks for the 'Sized' that ./Sized.es declares.",
+					"'IntegerCounted' conforms to the 'Sized' ./other/Sized.es declares, which is a different Protocol.",
+				])
+			},
+		)
+	})
+
+	// NOTE: The Type Parameter can take the Protocol as its bound, which is what
+	// the Help writes, so no Note tells the two apart.
+	it("leaves a Type Parameter of the bound's name unsaid", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	function relay <infer Sized>(_ item: Sized) -> Integer {
+		<- measure(item)
+	}
+}
+
+export {
+	relay
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.notes).toEqual([
+					"'Sized' carries no 'Sized' bound of its own, so it can not satisfy one.",
+				])
+				expect(refusal?.helps[0]).toBe(
+					"Declare it as '<infer Sized is Sized>'.",
+				)
+			},
+		)
+	})
+
+	// NOTE: The report spells the bound's Protocol by the alias, so the file's
+	// own `Sized` is no reading of it, while its conformer is still worth naming.
+	it("leaves a namesake unsaid where the report spells the bound by an alias", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		Sized as Measurable
+		measure
+	}
+}
+
+implementation {
+	protocol Sized {
+		count() -> Integer
+	}
+
+	namespace IntegerCounted for Integer is Sized {
+		count() -> Integer {
+			<- 100
+		}
+	}
+
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.message).toBe(
+					"Integer does not conform to 'Measurable'",
+				)
+				expect(refusal?.notes).toEqual([
+					"No Namespace in scope makes Integer conform to 'Measurable'.",
+					"'IntegerCounted' conforms to the 'Sized' this file declares, which is a different Protocol.",
+				])
+			},
+		)
+	})
+
+	it("says a condition asks for a Protocol another in scope shares a name with", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		measure
+	}
+}
+
+implementation {
+	protocol Weighed {
+		heft() -> Integer
+	}
+
+	namespace IntegerHefty for Integer is Weighed {
+		heft() -> Integer {
+			<- 1
+		}
+	}
+
+	Terminal.inspect(measure([1, 2]))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Weighed {
+		weight() -> Integer
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	namespace ListSized<infer ItemType> for List<ItemType>
+		is Sized where ItemType is Weighed
+	{
+		size() -> Integer {
+			<- 2
+		}
+	}
+
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- item::size()
+	}
+}
+
+export {
+	ListSized
+	measure
+}
+`,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) =>
+						diagnostic.code === "unsatisfied-conformance-condition",
+				)
+
+				expect(refusal?.notes).toEqual([
+					"Integer does not conform to 'Weighed'.",
+					"'Weighed' here is the Protocol this file declares; the condition asks for the 'Weighed' that Sized.es declares.",
+					"'IntegerHefty' conforms to the 'Weighed' this file declares, which is a different Protocol.",
 				])
 			},
 		)

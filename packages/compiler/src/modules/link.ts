@@ -1,5 +1,3 @@
-import * as path from "node:path"
-
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { type CompileMode, modeOf } from "../compileMode"
@@ -13,6 +11,7 @@ import {
 import { enrichPrograms, topLevelScope } from "../enricher/index"
 import { invalidateNamespacesInScope } from "../enricher/resolvers"
 import { countTypeDeclaration } from "../enricher/scope"
+import { specifierTo } from "../helpers/describe"
 import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
 import type { Module, ModuleGraph } from "./graph"
@@ -233,19 +232,6 @@ function compareEntries(left: parser.ImportNode, right: parser.ImportNode) {
 	}
 
 	return 0
-}
-
-// NOTE: How a Diagnostic names another Module: the specifier an entry in THIS
-// one would write for it. A canonical path is what the Compiler keys on and is
-// the one thing a report must not print — it names a place on the machine that
-// compiled, so it would differ per checkout and per reader.
-function specifierTo(importerPath: string, filePath: string): string {
-	let relative = path
-		.relative(path.dirname(importerPath), filePath)
-		.split(path.sep)
-		.join("/")
-
-	return relative.startsWith("../") ? relative : `./${relative}`
 }
 
 type ImportBinding = {
