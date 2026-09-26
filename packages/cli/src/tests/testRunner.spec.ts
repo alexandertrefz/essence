@@ -850,6 +850,14 @@ describe("essence test — running", () => {
 		})
 	})
 
+	it("warns about a filter no test matches", async () => {
+		await withFiles({ "Rules.es": passing }, async (directory) => {
+			let { err } = await runTests(directory, ["-f", "negative"])
+
+			expect(err).toContain('no test matches "negative"')
+		})
+	})
+
 	// NOTE: Both files are entries, and the graph of the second holds the
 	// first, so both bundles carry the first Module's manifest. Running it
 	// twice would report every test of every shared Module once per entry that
@@ -2726,6 +2734,124 @@ describe("essence test — benchmarks", () => {
 			await runTests(directory, ["--bench", "--update"])
 
 			expect(readFileSync(filePath, "utf8")).toContain('benchmark "gone"')
+		})
+	})
+
+	// NOTE: Two suites holding a benchmark of the same name, both a long way
+	// off their baselines. A filter spelled the way the file heads an entry
+	// re-records that one and leaves the other alone.
+	it("re-records the one benchmark a suite path names", async () => {
+		let twice = [
+			"implementation {",
+			"\tfunction double(_ value: Integer) -> Integer {",
+			"\t\t<- value::add(value)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\tsuite "small" {',
+			'\t\tbenchmark "doubling" {',
+			"\t\t\texpect double(2)::is(4)",
+			"\t\t}",
+			"\t}",
+			"",
+			'\tsuite "large" {',
+			'\t\tbenchmark "doubling" {',
+			"\t\t\texpect double(500)::is(1000)",
+			"\t\t}",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Doubling.es": twice }, async (directory) => {
+			let filePath = baselineFile(directory)
+
+			mkdirSync(path.dirname(filePath), { recursive: true })
+			writeFileSync(
+				filePath,
+				[
+					'benchmark "large/doubling"',
+					"\t1 ns",
+					"",
+					'benchmark "small/doubling"',
+					"\t1 ns",
+					"",
+				].join("\n"),
+			)
+
+			let { code } = await runTests(directory, [
+				"--bench",
+				"--update",
+				"--filter",
+				"small/doubling",
+			])
+			let written = readFileSync(filePath, "utf8")
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(written).toContain('benchmark "large/doubling"\n\t1 ns\n')
+			expect(written).toMatch(/benchmark "small\/doubling"\n\t\d+ ns\n/)
+			expect(written).not.toContain(
+				'benchmark "small/doubling"\n\t1 ns\n',
+			)
+		})
+	})
+
+	// NOTE: The rows of a table benchmark share their suites and their name,
+	// and only the heading a row is stored under ends in the row. Given whole,
+	// that heading re-records the one row.
+	it("re-records the one row of a table benchmark its heading names", async () => {
+		let rows = [
+			"implementation {",
+			"\tfunction double(_ value: Integer) -> Integer {",
+			"\t\t<- value::add(value)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\tsuite "sizes" {',
+			'\t\tbenchmark "doubles {size}" across [2, 20] (size: Integer) {',
+			"\t\t\texpect double(size)::is(size::add(size))",
+			"\t\t}",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Doubling.es": rows }, async (directory) => {
+			let filePath = baselineFile(directory)
+
+			mkdirSync(path.dirname(filePath), { recursive: true })
+			writeFileSync(
+				filePath,
+				[
+					'benchmark "sizes/doubles {size}/0"',
+					"\t1 ns",
+					"",
+					'benchmark "sizes/doubles {size}/1"',
+					"\t1 ns",
+					"",
+				].join("\n"),
+			)
+
+			let { code } = await runTests(directory, [
+				"--bench",
+				"--update",
+				"--filter",
+				"sizes/doubles {size}/0",
+			])
+			let written = readFileSync(filePath, "utf8")
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(written).toMatch(
+				/benchmark "sizes\/doubles \{size\}\/0"\n\t\d+ ns\n/,
+			)
+			expect(written).not.toContain(
+				'benchmark "sizes/doubles {size}/0"\n\t1 ns\n',
+			)
+			expect(written).toContain(
+				'benchmark "sizes/doubles {size}/1"\n\t1 ns\n',
+			)
 		})
 	})
 

@@ -760,7 +760,7 @@ export function reportUnmatchedFilter(
 	context.terminal.err(
 		`  ${context.palette.warning(
 			context.theme.symbols.warning,
-		)} ${context.palette.muted(`no test name contains "${filter}"`)}`,
+		)} ${context.palette.muted(`no test matches "${filter}"`)}`,
 	)
 }
 

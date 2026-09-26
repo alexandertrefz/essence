@@ -476,11 +476,12 @@ export const commands: Array<CommandSpec> = [
 				"written at. Whatever a failing test printed is shown with it " +
 				"rather than interleaved with the report.",
 			"Selection happens here rather than in the source: --filter " +
-				"matches a substring of a test's name, --tag runs only the " +
-				"tests carrying one of the given tags and --skip-tag leaves " +
-				"them out. --skip-tag wins over --tag. A project may skip tags " +
-				`by default by writing them in the ${PROJECT_FILE} at its ` +
-				`root, which ${PROGRAM} init writes to start from:`,
+				"matches a substring of a test's suites and name joined by /, " +
+				"--tag runs only the tests carrying one of the given tags and " +
+				"--skip-tag leaves them out. --skip-tag wins over --tag. A " +
+				"project may skip tags by default by writing them in the " +
+				`${PROJECT_FILE} at its root, which ${PROGRAM} init writes to ` +
+				"start from:",
 			'    { "test": { "skipTags": ["slow"] } }',
 			"A tag that list leaves out still runs when --tag asks for it by " +
 				"name, which is how a nightly job runs what a working day " +
@@ -567,13 +568,19 @@ export const commands: Array<CommandSpec> = [
 				short: "f",
 				type: "string",
 				placeholder: "text",
-				summary: "Run only the tests whose name contains this",
+				summary:
+					"Run only the tests whose suites and name contain this",
 				details:
-					"Matched against the name as the report shows it, and " +
-					"against the template it was written as — so a row of a " +
-					"table test is selected by what fills its holes, and a " +
-					"name with a hole in it is still selected by the text " +
-					"around them. A filter that names no test says so.",
+					"Matched against the enclosing suites and the name joined " +
+					'by /: -f "totals/sums a column" picks that test in the ' +
+					"suite totals rather than every test of its name, and a " +
+					"suite's name picks every test in it. The name is matched " +
+					"as the report shows it and as the template it was written " +
+					"as — so a row of a table test is selected by what fills " +
+					"its holes, and a name with a hole in it is still selected " +
+					"by the text around them. A benchmark's baseline heading, " +
+					"given whole, picks the one entry it heads, a row of a " +
+					"table included. A filter that names no test says so.",
 			},
 			{
 				name: "tag",

@@ -185,7 +185,7 @@ An argument is a path, not a name filter as in `vitest points`. `essence test Po
 
 <StepItem title="Choose which tests run">
 
-`-f`, short for `--filter`, runs only the tests whose name contains the text you give:
+`-f`, short for `--filter`, runs only the tests whose suites and name contain the text you give:
 
 ```sh
 $ essence test -f "2–2"
@@ -199,7 +199,7 @@ $ essence test -f "2–2"
  1 passed  6 deselected  ·  0.71 ms  ·  compile cache warm
 ```
 
-The filter matches the name as the report prints it, and also its template. So `-f "2–2"` picks one row of the table test, and `-f "is worth"` picks all three rows. The text is matched as written, case included, and is not a regular expression: `-f "win|draw"` selects nothing. Suite names never match either, so `-f outcomes` selects nothing, although a suite is called `outcomes`. Vitest's `-t` takes a pattern and matches the `describe` names too. A filter that matches no test prints `⚠ no test name contains "outcomes"`, and the run exits with `0`.
+The filter matches the name as the report prints it, and also its template. So `-f "2–2"` picks one row of the table test, and `-f "is worth"` picks all three rows. The names of the suites around a test are matched too, joined to its name by `/`: `-f outcomes` picks both tests of the `outcomes` suite, and `-f "outcomes/calls a level"` picks one of them. That spelling is how to pick a test whose name another suite also uses. The text is matched as written, case included, and is not a regular expression: `-f "win|draw"` selects nothing. Vitest's `-t` takes a pattern instead. A filter that matches no test prints `⚠ no test matches "draws"`, and the run exits with `0`.
 
 A tag is a name a test carries, written after the test's name with the [`tagged`](/docs/reference/syntax-glossary#modifiers) modifier. The property test in `Season.tests.es` is `tagged slow`. A test carries its own tags and the tags of every suite around it. [`--tag slow`](/docs/reference/cli#test--tag) runs only the tests that carry `slow`, and [`--skip-tag slow`](/docs/reference/cli#test--skip-tag) leaves them out. `essence test --skip-tag slow` reports `6 passed  1 deselected`.
 

@@ -2094,11 +2094,10 @@ export type EventSink = (event: TestEvent) => void
 // #region Selection
 
 export type Filters = {
-	// NOTE: A substring of the test's name, matched against what a reader SEES —
-	// the rendered name — and against the template it was written as. An
-	// interpolated name has to be rendered before it can be matched, which means
-	// evaluating each Module's setup: `selectTests` does that once, and only
-	// where a filter was given and some name of the registry interpolates.
+	// NOTE: A substring of the test's suites and name joined by `/`, the name as
+	// rendered and as written, or the whole `key` a stored baseline is headed
+	// with. Rendering an interpolated name evaluates its Module's setup, which
+	// `selectTests` does once, and only under a filter.
 	filter?: string | null
 	tags?: Array<string>
 	skipTags?: Array<string>
@@ -2173,10 +2172,16 @@ export async function selectTests(
 		filter === null
 			? new Map<string, string>()
 			: (rendered ?? (await renderedNames(registry)))
+	// NOTE: The key is compared whole because a table's rows differ only in its
+	// last step, and row 1's key is the start of row 10's.
 	let matches = (entry: TestManifestEntry): boolean =>
 		filter === null ||
-		entry.name.includes(filter) ||
-		(names.get(entry.id) ?? "").includes(filter)
+		entry.key === filter ||
+		[entry.name, names.get(entry.id)].some(
+			(name) =>
+				name !== undefined &&
+				[...entry.suitePath, name].join("/").includes(filter),
+		)
 
 	let selections = registry.tests.map((test): Selection => {
 		let entry = test.entry

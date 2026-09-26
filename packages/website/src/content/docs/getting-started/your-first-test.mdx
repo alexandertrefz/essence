@@ -268,7 +268,7 @@ The `require` failed, so the test ended on that line and the `expect` below it n
 Put the `"3"` back and both tests pass again. Three more pieces:
 
 - A [`suite "…" { … }`](/docs/reference/syntax-glossary#suite) groups tests, like Vitest's `describe`, and the report indents them under the suite's name.
-- [`essence test --filter three`](/docs/reference/cli#test--filter) runs only the tests whose name contains `three`, like `vitest -t three`.
+- [`essence test --filter three`](/docs/reference/cli#test--filter) runs only the tests whose name or suite contains `three`, like `vitest -t three`.
 - [`essence test --watch`](/docs/reference/cli#test--watch) keeps running and runs the tests again each time you save.
 
 [Running tests](/docs/guides/running-tests) covers these flags and the rest of the command. The Tests page shows how to skip or tag a test, run it once per row of a table, run it against generated values, or record a snapshot.

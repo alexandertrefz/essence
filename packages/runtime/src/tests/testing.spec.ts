@@ -578,6 +578,138 @@ describe("Selection", () => {
 			),
 		).toEqual(["run", "filter"])
 	})
+
+	// NOTE: Two suites may hold a test of the same name, and a baseline is
+	// headed by its suites and its name joined by `/`, so that spelling is what
+	// names exactly one of them.
+	test("filters on the suite path joined to the name", async () => {
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a", {
+						name: "builds a thousand",
+						suitePath: ["Record keys"],
+					}),
+					manifest("/b", {
+						name: "builds a thousand",
+						suitePath: ["Choice keys"],
+					}),
+					manifest("/c", {
+						name: "looks a thousand up",
+						suitePath: ["Choice keys"],
+					}),
+				],
+				() => {},
+			),
+		])
+		let states = async (filter: string) =>
+			(await selectTests(registry, { filter })).selections.map(
+				(selection) => selection.state,
+			)
+
+		expect(await states("Choice keys/builds a thousand")).toEqual([
+			"deselected",
+			"run",
+			"deselected",
+		])
+		expect(await states("Choice keys")).toEqual([
+			"deselected",
+			"run",
+			"run",
+		])
+		expect(await states("builds a thousand")).toEqual([
+			"run",
+			"run",
+			"deselected",
+		])
+	})
+
+	test("filters on the suite path joined to the name a run renders", async () => {
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a", {
+						name: "{scored}–{conceded}",
+						interpolated: true,
+						suitePath: ["wins"],
+					}),
+					manifest("/b", { name: "2–0", suitePath: ["draws"] }),
+				],
+				(context) => {
+					entry(context, 0, string("2–0"), () => {})
+				},
+			),
+		])
+		let { selections, matched } = await selectTests(registry, {
+			filter: "wins/2–0",
+		})
+
+		expect(selections.map((selection) => selection.state)).toEqual([
+			"run",
+			"deselected",
+		])
+		expect(matched).toBe(1)
+	})
+
+	// NOTE: The rows of a table share their suites and their name, so only the
+	// key a row's baseline is headed with tells them apart. Given whole, it
+	// names that row, and row 1's key does not also pick row 10.
+	test("filters on the whole key a row is stored under", async () => {
+		let registry = registryOf([
+			module(
+				[0, 1, 10].map((row) =>
+					manifest(`/doubles/${row}`, {
+						name: "doubles",
+						row,
+						suitePath: ["sizes"],
+						key: `sizes/doubles/${row}`,
+					}),
+				),
+				() => {},
+			),
+		])
+		let states = async (filter: string) =>
+			(await selectTests(registry, { filter })).selections.map(
+				(selection) => selection.state,
+			)
+
+		expect(await states("sizes/doubles/0")).toEqual([
+			"run",
+			"deselected",
+			"deselected",
+		])
+		expect(await states("sizes/doubles/1")).toEqual([
+			"deselected",
+			"run",
+			"deselected",
+		])
+		expect(await states("sizes/doubles")).toEqual(["run", "run", "run"])
+	})
+
+	// NOTE: A key escapes a `/` inside a step, and the plain spelling still
+	// matches the joined names.
+	test("filters on the key of a name holding a slash", async () => {
+		let registry = registryOf([
+			module(
+				[
+					manifest("/a", {
+						name: "per km/h",
+						suitePath: ["speeds"],
+						key: "speeds/per km\\/h",
+					}),
+					manifest("/b"),
+				],
+				() => {},
+			),
+		])
+		let states = async (filter: string) =>
+			(await selectTests(registry, { filter })).selections.map(
+				(selection) => selection.state,
+			)
+
+		expect(await states("speeds/per km\\/h")).toEqual(["run", "deselected"])
+		expect(await states("speeds/per km/h")).toEqual(["run", "deselected"])
+	})
 })
 
 describe("The event stream", () => {

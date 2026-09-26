@@ -493,7 +493,7 @@ Stays running and runs the tests again on every save. Only the entries whose mod
 
 ### <span id="test--filter">`-f`, `--filter <text>`</span>
 
-Runs only the tests whose name contains the text, and counts the rest as deselected. The text is matched as written, case included, and is not a pattern. It is matched against the name the report prints and against the name as written, so `-f "3–1"` picks one row of a table test. A suite's name does not match, where Jest's `-t` also matches the `describe` text. A filter that matches no test prints `⚠ no test name contains "zebra"` and exits with 0.
+Runs only the tests whose suites and name contain the text, and counts the rest as deselected. The text is matched as written, case included, and is not a pattern. It is matched against the names of the suites around a test and the test's own name, joined by `/`. So `-f totals` picks every test in the suite `totals`, and `-f "totals/is zero"` picks the test `is zero` in that suite rather than every test of that name. Jest's `-t` joins the `describe` text with a space instead. The test's name is matched as the report prints it and as written, so `-f "3–1"` picks one row of a table test. A filter that matches no test prints `⚠ no test matches "zebra"` and exits with 0.
 
 ### <span id="test--tag">`--tag <tag>`</span>
 

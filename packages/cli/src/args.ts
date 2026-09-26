@@ -75,9 +75,9 @@ export type OptionValues = {
 	// that quietly does nothing.
 	withoutOptimisation: Array<string>
 	jobs: number | undefined
-	// NOTE: How `essence test` narrows a run — a substring of a test's name,
-	// the tags to run, and the tags to leave out. Repeats are unions and
-	// `skipTag` wins over `tag`; see the Command's own details.
+	// NOTE: How `essence test` narrows a run: a substring of a test's suites and
+	// name joined by `/`, the tags to run, and the tags to leave out. Repeats are
+	// unions and `skipTag` wins over `tag`; see the Command's own details.
 	filter: string | undefined
 	tag: Array<string>
 	skipTag: Array<string>
