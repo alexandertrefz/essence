@@ -19,6 +19,7 @@ import {
 	type GenericBindings,
 	providedMethodProtocol,
 } from "@essence-lang/compiler/helpers"
+import { spellProtocol } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
@@ -213,7 +214,7 @@ export function matchingNamespaces(
 		return [
 			{
 				type: "Namespace",
-				name: protocol.name,
+				name: spellProtocol(protocol.identity),
 				targetType: baseType,
 				generics: [],
 				properties: {},
@@ -340,7 +341,7 @@ function providedNamespaceOf(
 
 	return {
 		type: "Namespace",
-		name: protocol.name,
+		name: spellProtocol(protocol.identity),
 		targetType: baseType,
 		generics: [],
 		properties: {},

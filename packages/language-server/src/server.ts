@@ -1179,6 +1179,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				program: cached.program,
 				enrichedProgram: cached.enrichedProgram,
 				index: cached.index,
+				module: cached.module,
 				// NOTE: Only Hover asks for these, and collecting them for a
 				// Module of a component whose analysis was anchored elsewhere
 				// costs one more link — so they are asked for and not merely
@@ -1207,7 +1208,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 			logInternalError(filePath, error)
 		}
 
-		return { program, enrichedProgram, annotations, index: null }
+		return {
+			program,
+			enrichedProgram,
+			annotations,
+			index: null,
+			module: null,
+		}
 	}
 
 	// NOTE: A Compiler throw that a request answers around without the typed
@@ -1615,6 +1622,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			parsed.program,
 			parsed.annotations,
 			sourceDocument(params.textDocument.uri)?.getText() ?? null,
+			parsed.module?.imported.protocols,
 		)
 
 		if (hover === null) {
@@ -1911,9 +1919,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		return findDocumentSymbols(parsed.program, parsed.enrichedProgram).map(
-			toLspDocumentSymbol,
-		)
+		return findDocumentSymbols(
+			parsed.program,
+			parsed.enrichedProgram,
+			parsed.module?.imported.protocols,
+		).map(toLspDocumentSymbol)
 	})
 
 	connection.onDocumentFormatting((params) => {

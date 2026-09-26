@@ -1,7 +1,6 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
 	caseDefaults,
-	displayProtocolName,
 	isSynthesizedName,
 	parameterDefaults,
 	parameterInternalName,
@@ -14,7 +13,9 @@ import {
 	printSignature,
 	printType,
 	signaturesOf,
+	spellProtocol,
 	withoutSelf,
+	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
@@ -22,6 +23,7 @@ import { defineExpressions } from "./defineArmChildren"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
+import { protocolSpellings } from "./protocolSpellings"
 import {
 	programNodes,
 	typedProgramNodes,
@@ -96,6 +98,21 @@ export function findHover(
 	parserProgram: parser.Program | null = null,
 	annotations: Array<common.TypeAnnotation> = [],
 	text: string | null = null,
+	// NOTE: The Protocols the document's import block bound, which is how a
+	// Protocol imported under an alias is spelled the way the document does.
+	imported: Record<string, common.ProtocolType> = {},
+): HoverInfo | null {
+	return withProtocolSpellings(protocolSpellings(program, imported), () =>
+		hoverAt(program, cursor, parserProgram, annotations, text),
+	)
+}
+
+function hoverAt(
+	program: common.typed.Program,
+	cursor: common.Cursor,
+	parserProgram: parser.Program | null,
+	annotations: Array<common.TypeAnnotation>,
+	text: string | null,
 ): HoverInfo | null {
 	if (text !== null && isInMargin(text, cursor)) {
 		return null
@@ -262,7 +279,7 @@ function considerSignatures(
 	let provided =
 		providedBy === null
 			? null
-			: `Provided by \`${displayProtocolName(providedBy)}\`.`
+			: `Provided by \`${spellProtocol(providedBy)}\`.`
 
 	state.best = {
 		position,
@@ -1038,7 +1055,7 @@ function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	let constraint =
 		generic.constraint == null
 			? ""
-			: ` is ${displayProtocolName(generic.constraint)}`
+			: ` is ${spellProtocol(generic.constraint)}`
 
 	return `${inferKeyword}${generic.name}${constraint}`
 }

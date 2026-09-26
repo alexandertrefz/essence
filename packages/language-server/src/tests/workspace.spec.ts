@@ -463,6 +463,92 @@ describe("Workspace", () => {
 		})
 	})
 
+	// NOTE: `Main.es` imports `Sized` as `Measurable`, so that is what a Hover
+	// there calls it, while `Sized.es` goes on calling it by its own name.
+	describe("a Protocol imported under an alias", () => {
+		const sized = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tisBig() -> Boolean {",
+			"\t\t\t<- @::size()::isGreaterThan(2)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+			"\t\t<- item::size()",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\tSized",
+			"\tmeasure",
+			"}",
+			"",
+		].join("\n")
+		const main = [
+			"import {",
+			'\tfrom "./Sized.es" {',
+			"\t\tSized as Measurable",
+			"\t\tmeasure",
+			"\t}",
+			"}",
+			"",
+			"implementation {",
+			"\tnamespace IntegerMeasured for Integer is Measurable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tTerminal.inspect(measure(3))",
+			"\tTerminal.inspect(3::isBig())",
+			"}",
+			"",
+		].join("\n")
+
+		function hoverIn(
+			fileName: string,
+			source: string,
+			line: number,
+			needle: string,
+		) {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": main,
+				"Sized.es": sized,
+			})
+			let filePath = pathOf(fileName)
+			let document = workspace.documentOf(filePath)
+
+			expect(document?.enrichedProgram).not.toBeNull()
+
+			return findHover(
+				document!.enrichedProgram!,
+				cursorAt(source, line, needle),
+				document!.program,
+				workspace.annotationsOf(filePath),
+				source,
+				document!.module?.imported.protocols,
+			)
+		}
+
+		it("should spell a bound the way each file names its Protocol", () => {
+			expect(hoverIn("Main.es", main, 15, "measure")?.content).toBe(
+				"measure<Item is Measurable>(_ Item) -> Integer",
+			)
+			expect(hoverIn("Sized.es", sized, 10, "measure")?.content).toBe(
+				"function measure<Item is Sized>(_ Item) -> Integer",
+			)
+		})
+
+		it("should name the Protocol that provides a Method by the file's alias", () => {
+			expect(
+				hoverIn("Main.es", main, 16, "isBig")?.documentation,
+			).toContain("Provided by `Measurable`.")
+		})
+	})
+
 	describe("rename", () => {
 		it("should rewrite a declaration, its export entry and every importer", () => {
 			let { workspace, pathOf } = makeWorkspace({

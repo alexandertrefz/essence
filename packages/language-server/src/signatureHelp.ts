@@ -7,6 +7,7 @@ import {
 	describeSignature,
 	type ParameterRange,
 	signaturesOf,
+	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
@@ -19,6 +20,7 @@ import { documentAnalysisOf, enrichProbe } from "./moduleLink"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
+import { documentProtocolSpellings } from "./protocolSpellings"
 import { typedProgramNodes } from "./sections"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
@@ -68,6 +70,24 @@ export function findSignatureHelp(
 	// NOTE: Told of a Compiler throw the help is answered around, so the Server
 	// can log it.
 	onInternalError: (error: unknown) => void = () => {},
+): SignatureHelpInfo | null {
+	return withProtocolSpellings(documentProtocolSpellings(analysis), () =>
+		signatureHelpAt(
+			documentText,
+			cursor,
+			documentPath,
+			analysis,
+			onInternalError,
+		),
+	)
+}
+
+function signatureHelpAt(
+	documentText: string,
+	cursor: common.Cursor,
+	documentPath: string | undefined,
+	analysis: DocumentAnalysis | null,
+	onInternalError: (error: unknown) => void,
 ): SignatureHelpInfo | null {
 	// NOTE: The same reading Completion makes, for the same reason; see
 	// `findCompletions`.

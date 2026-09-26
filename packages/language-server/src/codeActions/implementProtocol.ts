@@ -97,6 +97,7 @@ export function implementProtocolAction(
 	return entryFor(
 		conformer,
 		protocol,
+		protocolName,
 		// NOTE: Held to the Protocol in hand. The payload is the Enricher's
 		// answer about a Protocol this Server looked up a second time, and a
 		// name that is no requirement of it is a name nothing here can write a
@@ -174,6 +175,7 @@ export function implementProtocolActions(
 				...entryFor(
 					conformer,
 					protocol,
+					clause.name,
 					owed,
 					lines,
 					"refactor.rewrite",
@@ -190,6 +192,8 @@ export function implementProtocolActions(
 function entryFor(
 	conformer: Conformer,
 	protocol: common.ProtocolType,
+	// NOTE: The Protocol as the conformer's file names it.
+	spelling: string,
 	methods: Array<string>,
 	lines: Array<string>,
 	kind: "quickfix" | "refactor.rewrite",
@@ -208,7 +212,7 @@ function entryFor(
 
 	return [
 		{
-			title: `Implement '${protocol.name}'`,
+			title: `Implement '${spelling}'`,
 			kind,
 			diagnosticCode: diagnostic?.code ?? null,
 			diagnosticPosition: diagnostic?.position ?? null,

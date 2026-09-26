@@ -7,6 +7,30 @@ import {
 	displayedRefinementArguments,
 } from "./helpers/describe"
 
+// NOTE: How the file a signature is printed for names a Protocol, by the
+// identity a bound holds. A Language Server request sets it for its document;
+// everything else prints the declared name.
+let protocolSpeller: (identity: string) => string = displayProtocolName
+
+export function withProtocolSpellings<Value>(
+	spell: (identity: string) => string,
+	run: () => Value,
+): Value {
+	let outer = protocolSpeller
+
+	protocolSpeller = spell
+
+	try {
+		return run()
+	} finally {
+		protocolSpeller = outer
+	}
+}
+
+export function spellProtocol(identity: string): string {
+	return protocolSpeller(identity)
+}
+
 // NOTE: A human-oriented Type printer for Hovers. `describeType` is its
 // Diagnostics-oriented sibling. Where that one names an Overload set
 // "Function", this one prints its first signature and counts the rest.
@@ -307,7 +331,7 @@ export function describeSignature(
 						// depends on rather than a bare `ItemType`.
 						generic.constraint == null
 							? generic.name
-							: `${generic.name} is ${displayProtocolName(generic.constraint)}`,
+							: `${generic.name} is ${spellProtocol(generic.constraint)}`,
 					)
 					.join(", ")}>`
 

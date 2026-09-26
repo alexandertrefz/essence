@@ -8,6 +8,7 @@ import type { Hover } from "vscode-languageserver"
 import {
 	CodeActionRequest,
 	CompletionRequest,
+	DocumentSymbolRequest,
 	HoverRequest,
 	InlayHintRequest,
 	PrepareRenameRequest,
@@ -1111,6 +1112,69 @@ describe("the Server's request loop", () => {
 			)
 
 			expect(halved?.detail).toBe("() -> Amount")
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: The file binds `Sized` only as `Measurable`, so an outline that
+	// wrote `Sized` would name a Protocol the file can not read.
+	it("should spell a bound in the outline the way the document names its Protocol", async () => {
+		let sized = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"",
+			"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+			"\t\t<- item::size()",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\tSized",
+			"\tmeasure",
+			"}",
+			"",
+		].join("\n")
+		let main = [
+			"import {",
+			'\tfrom "./Sized.es" {',
+			"\t\tSized as Measurable",
+			"\t\tmeasure",
+			"\t}",
+			"}",
+			"",
+			"implementation {",
+			"\tfunction relay <infer Item is Measurable>(_ item: Item) -> Integer {",
+			"\t\t<- measure(item)",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\trelay",
+			"}",
+			"",
+		].join("\n")
+		let files = makeSessionWorkspace({ "Main.es": main, "Sized.es": sized })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Main.es"), main)
+			await session.settle()
+
+			let symbols = await session.request<
+				Array<{ name: string; detail?: string }>
+			>(DocumentSymbolRequest.type, {
+				textDocument: { uri: uriFor(files.pathOf("Main.es")) },
+			})
+
+			expect(
+				symbols.result.find((symbol) => symbol.name === "relay")
+					?.detail,
+			).toBe("<Item is Measurable>(_ Item) -> Integer")
 		} finally {
 			await session.dispose()
 			files.dispose()

@@ -7,6 +7,7 @@ import {
 	printSignatureSummary,
 	printType,
 	signaturesOf,
+	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
@@ -14,6 +15,7 @@ import { typedAssertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
+import { protocolSpellings } from "./protocolSpellings"
 import { typedProgramBodies } from "./sections"
 
 // NOTE: The outline is built from the Parser AST alone — it must work while
@@ -66,11 +68,20 @@ export type DocumentSymbolEntry = {
 export function findDocumentSymbols(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null = null,
+	// NOTE: The Protocols the document's import block bound, so that a detail
+	// spells a bound the way the document does.
+	imported: Record<string, common.ProtocolType> = {},
 ): Array<DocumentSymbolEntry> {
 	let symbols = symbolsOfBody(program.implementation.nodes)
 
 	if (enrichedProgram !== null) {
-		symbols = withDetails(symbols, detailsOf(enrichedProgram))
+		symbols = withDetails(
+			symbols,
+			withProtocolSpellings(
+				protocolSpellings(enrichedProgram, imported),
+				() => detailsOf(enrichedProgram),
+			),
+		)
 	}
 
 	// NOTE: What the file PROVES, below what it does — read off the Parser like

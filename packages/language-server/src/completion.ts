@@ -10,6 +10,7 @@ import {
 	printSignatureSummary,
 	printType,
 	signaturesOf,
+	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
@@ -47,6 +48,7 @@ import {
 } from "./namespaces"
 import { isAtOrBefore } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
+import { documentProtocolSpellings } from "./protocolSpellings"
 import {
 	type Declaration,
 	type DeclarationKind,
@@ -268,6 +270,26 @@ export function findCompletions(
 	// NOTE: Told of a Compiler throw the list is answered around, so the Server
 	// can log it.
 	onInternalError: (error: unknown) => void = () => {},
+): Array<CompletionEntry> {
+	return withProtocolSpellings(documentProtocolSpellings(analysis), () =>
+		completionsAt(
+			documentText,
+			cursor,
+			documentPath,
+			workspace,
+			analysis,
+			onInternalError,
+		),
+	)
+}
+
+function completionsAt(
+	documentText: string,
+	cursor: common.Cursor,
+	documentPath: string | undefined,
+	workspace: WorkspaceCompletions,
+	analysis: DocumentAnalysis | null,
+	onInternalError: (error: unknown) => void,
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
