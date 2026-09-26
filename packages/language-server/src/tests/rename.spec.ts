@@ -851,6 +851,29 @@ describe("Rename of Methods and Record members", () => {
 		expect(rename(source, { line: 10, column: 25 }, "isTiny")).toBe(renamed)
 	})
 
+	it("should rename a Method a checked refinement's predicate calls", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Checks for Integer {",
+			"\t\tisSmall() -> Boolean {",
+			"\t\t\t<- @::isLessThan(10)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Small = Integer where @::isSmall()",
+			"",
+			"\tTerminal.inspect(4::isSmall())",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 3, column: 4 }, "isTiny")).toBe(
+			source.replaceAll("isSmall", "isTiny"),
+		)
+		expect(rename(source, { line: 8, column: 33 }, "isTiny")).toBe(
+			source.replaceAll("isSmall", "isTiny"),
+		)
+	})
+
 	it("should rename a Case Matcher's payload binding from Matcher, Guard and body", () => {
 		// NOTE: The Case's own member keeps its name — a payload binding is a
 		// local name for the value, not a second spelling of the member.

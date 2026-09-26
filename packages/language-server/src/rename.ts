@@ -2814,7 +2814,14 @@ function walkTypedNode(
 		case "ChoiceDeclarationStatement":
 			walkTypedCaseDefaults(node.cases, context)
 			return
+		// NOTE: A checked refinement's predicate calls Methods, and only the
+		// typed predicate knows which Namespace answered them.
 		case "TypeAliasStatement":
+			if (node.predicate !== null) {
+				walkTypedNode(node.predicate, context)
+			}
+
+			return
 		case "Identifier":
 		case "Self":
 		case "StringValue":
