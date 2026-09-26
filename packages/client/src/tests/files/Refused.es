@@ -12,7 +12,9 @@ implementation {
 		Plain,
 	}
 
-	function nested(_ value: Optional<Optional<Integer>>) -> Optional<Optional<Integer>> {
+	function nested(
+		_ value: Optional<Optional<Integer>>,
+	) -> Optional<Optional<Integer>> {
 		<- value
 	}
 
@@ -43,11 +45,15 @@ implementation {
 	§ The two places an Optional can stand between a bare Case and a String,
 	§ and neither hides the collision: `Optional` is spelled by absence, so what
 	§ it holds stands in the position beside everything else.
-	function noted(_ value: Optional<String> | Direction) -> Optional<String> | Direction {
+	function noted(
+		_ value: Optional<String> | Direction,
+	) -> Optional<String> | Direction {
 		<- value
 	}
 
-	function wrapped(_ value: Optional<Direction | String>) -> Optional<Direction | String> {
+	function wrapped(
+		_ value: Optional<Direction | String>,
+	) -> Optional<Direction | String> {
 		<- value
 	}
 
@@ -55,25 +61,25 @@ implementation {
 		<- value::multiply(with 2)
 	}
 
-	constant deep: Optional<Optional<Integer>> = #Value(#Empty)
+	constant deep: Optional<Optional<Integer>>    = #Value(#Empty)
 	constant shallow: Optional<Optional<Integer>> = #Empty
-	constant root = 2::squareRoot()
+	constant root   = 2::squareRoot()
 	constant answer = 42
 }
 
 export {
+	Direction
 	Nest
 	Tagged
+	answer
+	deep
+	doubled
+	nameOf
 	nested
 	nesting
-	nameOf
-	tagged
-	Direction
 	noted
-	wrapped
-	doubled
-	deep
-	shallow
 	root
-	answer
+	shallow
+	tagged
+	wrapped
 }

@@ -284,7 +284,7 @@ implementation {
 		}
 	}
 
-	constant sizes: Dictionary<String, Integer> = ["small" = 1, "large" = 2]
+	constant sizes: Dictionary<String, Integer>   = ["small" = 1, "large" = 2]
 	constant nothing: Dictionary<String, Integer> = [=]
 
 	constant answer        = 42

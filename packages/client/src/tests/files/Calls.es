@@ -61,10 +61,7 @@ implementation {
 	§ A callback handed a Record — which crosses OUT to reach it, the way round
 	§ the Function itself did not. Every Parameter carries a label, so it can be
 	§ called with one object as well.
-	function measured(
-		box: Box,
-		by measure: (_: Box) -> Integer,
-	) -> Integer {
+	function measured(box: Box, by measure: (_: Box) -> Integer) -> Integer {
 		<- measure(box)
 	}
 

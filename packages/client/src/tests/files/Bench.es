@@ -45,7 +45,9 @@ implementation {
 				position = state.position::add(1),
 				cells = state.cells::append({
 					index = total,
-					status = labels::item(at state.position)::value(defaultingTo "none"),
+					status = labels
+						::item(at state.position)
+						::value(defaultingTo "none"),
 				}),
 			}
 		})
@@ -57,8 +59,8 @@ implementation {
 	function resize(_ panel: Panel, _ amount: Integer) -> Panel {
 		<- {
 			panel with
-			width = panel.width::add(amount),
-			height = panel.height::add(amount),
+				width = panel.width::add(amount),
+				height = panel.height::add(amount),
 		}
 	}
 }

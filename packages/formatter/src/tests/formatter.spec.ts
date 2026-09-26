@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import {
 	readStdlibFiles,
 	STDLIB_DIRECTORY,
@@ -11,9 +12,9 @@ import {
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"
 
-// NOTE: Every `.es` source in the standard library, the fixtures and the
-// examples, which is what a formatter has to survive before it is allowed
-// anywhere near a source tree. The client's own test Modules are not read.
+// NOTE: Every `.es` source in the standard library, the fixtures, the
+// examples and the client's test Modules, which is what a formatter has to
+// survive before it is allowed anywhere near a source tree.
 //
 // The Diagnostic showcase files are included deliberately: all but the ones in
 // `REFUSED` carry no Parser error at all and only fail later, so a formatter
@@ -48,16 +49,24 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		})
 	}
 
+	for (let filePath of essenceFilesUnder(CLIENT_MODULES_DIRECTORY)) {
+		files.push({
+			name: "client/" + path.relative(CLIENT_MODULES_DIRECTORY, filePath),
+			filePath,
+			source: readFileSync(filePath, "utf8"),
+		})
+	}
+
 	return files
 }
 
-const EXAMPLES_DIRECTORY = path.join(
-	import.meta.dirname,
-	"..",
-	"..",
-	"..",
-	"..",
-	"examples",
+const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
+
+const EXAMPLES_DIRECTORY = path.join(REPOSITORY_ROOT, "examples")
+
+const CLIENT_MODULES_DIRECTORY = path.join(
+	REPOSITORY_ROOT,
+	"packages/client/src/tests/files",
 )
 
 function essenceFilesUnder(directory: string): Array<string> {
@@ -111,6 +120,27 @@ const SHAPED = new Set(["diagnostics/GenericChoice.es"])
 describe("formatter", () => {
 	it("finds the corpus", () => {
 		expect(CORPUS.length).toBeGreaterThan(30)
+	})
+
+	// NOTE: A tracked `.es` file the corpus does not read is one the formatter
+	// is never held to, so the corpus is checked against what git tracks.
+	it("holds every tracked Essence file", async () => {
+		let listed = await spawnAndWait(
+			["git", "ls-files", "-z", "--", "*.es"],
+			{
+				cwd: REPOSITORY_ROOT,
+			},
+		)
+		let held = new Set(
+			CORPUS.map((file) => path.relative(REPOSITORY_ROOT, file.filePath)),
+		)
+
+		expect(listed.code).toBe(0)
+		expect(
+			listed.stdout
+				.split("\0")
+				.filter((file) => file !== "" && !held.has(file)),
+		).toEqual([])
 	})
 
 	describe("corpus", () => {

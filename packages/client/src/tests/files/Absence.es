@@ -16,10 +16,7 @@ implementation {
 	§ from every position it appears in.
 	constant boxed = { held = Optional<Integer>#Value(3) }
 
-	constant listed = [
-		Optional<Integer>#Value(3),
-		Optional<Integer>#Value(4),
-	]
+	constant listed = [Optional<Integer>#Value(3), Optional<Integer>#Value(4)]
 }
 
 export {

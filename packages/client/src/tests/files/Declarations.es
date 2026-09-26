@@ -32,6 +32,6 @@ export {
 	Rectangle
 	RectangleMeasurable
 	firstOf
-	widths
 	ratio
+	widths
 }

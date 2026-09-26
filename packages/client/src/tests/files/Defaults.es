@@ -82,13 +82,11 @@ implementation {
 	function fetched(_ request: Fetch) -> String {
 		<- match request -> String {
 			case #Get({ url, retries, tags, headers, limits, mode }) {
-				<- "{url}|{retries}|{tags::length()}|{headers::join(with ",")}|{
-					limits.calls
-				}|{spelled(mode)}"
+				<- "{url}|{retries}|{tags::length()}|{
+					headers::join(with ",")
+				}|{limits.calls}|{spelled(mode)}"
 			}
-			case #Ping                                               {
-				<- "ping"
-			}
+			case #Ping { <- "ping" }
 		}
 	}
 
