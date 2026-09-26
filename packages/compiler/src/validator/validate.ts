@@ -953,7 +953,10 @@ function checkWitnessScope(
 
 	for (let conformance of conformances) {
 		if (conformance.source.kind === "namespace") {
-			checkWitnessScope(conformance.source.conditions, describeSite)
+			checkWitnessScope(
+				witnessConditionsOf(conformance.source),
+				describeSite,
+			)
 
 			continue
 		}
@@ -966,6 +969,14 @@ function checkWitnessScope(
 			)
 		}
 	}
+}
+
+// NOTE: The conditions of a witness and of every witness built together with
+// it, each spelled into the same Argument list.
+function witnessConditionsOf(
+	source: Extract<common.ConformanceSource, { kind: "namespace" }>,
+): Array<common.Conformance> {
+	return [...source.conditions, ...(source.groupConditions ?? [])]
 }
 
 // NOTE: A `namespace` source is spelled into the Argument list of the CALL, not
@@ -1001,7 +1012,7 @@ function checkWitnessNamespacesAreDeclared(
 				)
 			}
 
-			collect(conformance.source.conditions)
+			collect(witnessConditionsOf(conformance.source))
 		}
 	}
 

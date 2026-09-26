@@ -396,6 +396,105 @@ describe("A conformance a Namespace does not fulfil", () => {
 	})
 })
 
+describe("A requirement another conformance provides a body for", () => {
+	// NOTE: `Counted` provides a `describe` that does not fulfil the one
+	// `Described` requires. Where a `describe` written as `Described` declares it
+	// does not fulfil `Counted`'s either, writing it refuses `is Counted`.
+	let conforming = (
+		described: string,
+		counted: string,
+		...namespaces: Array<string>
+	) => `implementation {
+		protocol Described {
+			describe() -> ${described}
+		}
+
+		protocol Counted {
+			describe() -> ${counted} {
+				<- 7
+			}
+		}
+
+		${namespaces.join("\n\n\t\t")}
+
+		function show<infer Item is Described>(_ item: Item) -> ${described} {
+			<- item::describe()
+		}
+
+		function count<infer Item is Counted>(_ item: Item) -> ${counted} {
+			<- item::describe()
+		}
+
+		Terminal.print("ok")
+	}`
+	let apart = (...namespaces: Array<string>) =>
+		conforming("String", "Integer", ...namespaces)
+	let accepted = (...namespaces: Array<string>) =>
+		conforming("Integer", "Number", ...namespaces)
+
+	it("should send the conformance to a Namespace of its own", () => {
+		let refused = firstOf(
+			apart(
+				"namespace IntegerBoth for Integer is Described, is Counted {}",
+			),
+			"nonconforming-namespace",
+		)
+
+		expect(refused.helps).toEqual([
+			"Declare 'is Described' on a Namespace of its own that writes 'describe' as 'Described' declares it, or drop the 'is Described'.",
+		])
+		expect(refused.data).toBeUndefined()
+	})
+
+	it("should not ask for the Method that refuses the other conformance", () => {
+		expect(
+			firstOf(
+				apart(
+					'namespace IntegerBoth for Integer is Described, is Counted {\n\t\t\tdescribe() -> String {\n\t\t\t\t<- "three"\n\t\t\t}\n\t\t}',
+				),
+				"nonconforming-namespace",
+			).message,
+		).toBe("Namespace 'IntegerBoth' does not conform to 'Counted'")
+	})
+
+	it("should compile once the conformance is on a Namespace of its own", () => {
+		expect(
+			compiles(
+				apart(
+					"namespace IntegerCounted for Integer is Counted {}",
+					'namespace IntegerDescribed for Integer is Described {\n\t\t\tdescribe() -> String {\n\t\t\t\t<- "three"\n\t\t\t}\n\t\t}',
+				).replace('Terminal.print("ok")', "Terminal.print(show(3))"),
+			),
+		).toBe(true)
+	})
+
+	it("should compile once the conformance is dropped", () => {
+		expect(
+			compiles(apart("namespace IntegerBoth for Integer is Counted {}")),
+		).toBe(true)
+	})
+
+	it("should ask for the Method where the other conformance accepts it", () => {
+		let refused = firstOf(
+			accepted(
+				"namespace IntegerBoth for Integer is Described, is Counted {}",
+			),
+			"nonconforming-namespace",
+		)
+
+		expect(refused.helps).toEqual([
+			"Write 'describe' as 'Described' declares it, or drop the 'is Described'.",
+		])
+		expect(
+			compiles(
+				accepted(
+					"namespace IntegerBoth for Integer is Described, is Counted {\n\t\t\tdescribe() -> Integer {\n\t\t\t\t<- 3\n\t\t\t}\n\t\t}",
+				).replace('Terminal.print("ok")', "Terminal.print(show(3))"),
+			),
+		).toBe(true)
+	})
+})
+
 describe("A Type in want of a conformance", () => {
 	// NOTE: The Type to do something about is the LAST link of the chain, not
 	// the one the bound was written on: a Namespace `for Result<String, Problem>`
@@ -667,5 +766,72 @@ describe("Two bounds on one Type Parameter", () => {
 				"unsatisfied-bound",
 			).message,
 		).toBe("Type Parameter 'Item' does not conform to 'Comparable'")
+	})
+})
+
+describe("A Protocol restating a Method it extends", () => {
+	let restating = (...restated: Array<string>) => `implementation {
+		protocol Labelled {
+			tag() -> String
+		}
+
+		protocol Coded is Labelled {
+			${restated.join("\n\t\t\t")}
+		}
+
+		namespace IntegerCoded for Integer is Coded {
+			tag() -> String {
+				<- "i{@}"
+			}
+		}
+
+		function label<infer T is Labelled>(_ t: T) -> String {
+			<- t::tag()
+		}
+
+		Terminal.print(label(3))
+	}`
+
+	it("should ask for the signature the extended Protocol declares", () => {
+		expect(
+			firstOf(restating("tag() -> Integer"), "incompatible-restatement")
+				.helps,
+		).toEqual([
+			"Restate 'tag' with the signature 'Labelled' declares for it, 'tag() -> String', or give this Method a name of its own.",
+		])
+	})
+
+	it("should compile with the signature it asks for", () => {
+		expect(compiles(restating("tag() -> String"))).toBe(true)
+	})
+
+	it("should ask an overload block for the one signature and new names", () => {
+		expect(
+			firstOf(
+				restating(
+					"overload tag {",
+					"\t() -> String",
+					"\t(_ n: Integer) -> String",
+					"}",
+				),
+				"incompatible-restatement",
+			).helps,
+		).toEqual([
+			"Restate 'tag' as the one signature 'Labelled' declares for it, 'tag() -> String', and give the other signatures a name of their own.",
+		])
+	})
+
+	it("should compile with the one signature and a new name", () => {
+		expect(
+			compiles(
+				restating(
+					"tag() -> String",
+					"taggedWith(_ n: Integer) -> String",
+				).replace(
+					'<- "i{@}"\n\t\t\t}',
+					'<- "i{@}"\n\t\t\t}\n\n\t\t\ttaggedWith(_ n: Integer) -> String {\n\t\t\t\t<- "i{n}"\n\t\t\t}',
+				),
+			),
+		).toBe(true)
 	})
 })

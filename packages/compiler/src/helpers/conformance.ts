@@ -321,6 +321,92 @@ export function providedMethodProtocol(
 		: null
 }
 
+// NOTE: Whether a provided body answers the requirement of its name. A body is
+// Simple, so it answers a Simple requirement alone, and only where its signature
+// fulfils the requirement's with `Self` bound to the conformer's target.
+export function providedBodyFulfils(
+	methodName: string,
+	requirement: common.MethodType | undefined,
+	body: common.MethodType | undefined,
+	target: common.Type,
+): boolean {
+	if (requirement?.type !== "SimpleMethod" || body?.type !== "SimpleMethod") {
+		return false
+	}
+
+	let selfBindings: GenericBindings = new Map([["Self", target]])
+
+	return (
+		findFulfillingMethod(
+			methodName,
+			applyGenericBindings(
+				requirement,
+				selfBindings,
+			) as common.SimpleMethodType,
+			false,
+			applyGenericBindings(body, selfBindings) as common.MethodType,
+		) !== null
+	)
+}
+
+// NOTE: Whether a Method written as a requirement declares it fulfils another
+// Protocol's entry with a body, which a Namespace writing it replaces and is held
+// to. Only a Simple entry carries a body, so any other is not asked about.
+export function writtenRequirementFulfils(
+	methodName: string,
+	requirement: common.MethodType,
+	entry: common.MethodType,
+	target: common.Type,
+): boolean {
+	if (entry.type !== "SimpleMethod") {
+		return true
+	}
+
+	let selfBindings: GenericBindings = new Map([["Self", target]])
+
+	return (
+		findFulfillingMethod(
+			methodName,
+			applyGenericBindings(
+				entry,
+				selfBindings,
+			) as common.SimpleMethodType,
+			false,
+			applyGenericBindings(
+				requirement,
+				selfBindings,
+			) as common.MethodType,
+		) !== null
+	)
+}
+
+// NOTE: Whether a descendant Protocol's entry for an inherited name can stand in
+// for the ancestor's, as its witness does wherever the ancestor is asked for: of
+// the same kind, so it sits under the same keys, and fulfilling each signature.
+export function restatementAccepts(
+	methodName: string,
+	inherited: common.MethodType,
+	restated: common.MethodType,
+): boolean {
+	let signatures = (method: common.MethodType): Array<common.BaseFunction> =>
+		method.type === "SimpleMethod" || method.type === "StaticMethod"
+			? [method]
+			: method.overloads
+	let restatedSignatures = signatures(restated)
+
+	return (
+		inherited.type === restated.type &&
+		signatures(inherited).length === restatedSignatures.length &&
+		signatures(inherited).every(
+			(signature, index) =>
+				findFulfillingMethod(methodName, signature, false, {
+					...restatedSignatures[index]!,
+					type: "SimpleMethod",
+				}) !== null,
+		)
+	)
+}
+
 // NOTE: Every requirement of a Protocol a Namespace has not written, in the
 // order the Protocol declares them. The check below answers with the FIRST one
 // it meets, because one missing Method is enough to refuse a conformance — and
@@ -364,12 +450,18 @@ export type ConformanceCheckResult =
 			// the witness like everything else — a bounded call must reach the
 			// same Method a direct one does — but they are not Methods of the
 			// Namespace, so they are kept apart from the map that names its
-			// Methods and are emitted as the shared const, curried with the
-			// finished witness.
+			// Methods and are emitted as the shared const, curried with a
+			// witness of the Protocol that wrote it.
 			providedMethods: ConformanceMethodMap
 	  }
 	| { kind: "missing"; methodName: string }
-	| { kind: "mismatched"; methodName: string }
+	| {
+			kind: "mismatched"
+			methodName: string
+			// NOTE: The Protocol whose provided body fulfils the requirement at
+			// the conformer's target and not at the narrower binding.
+			provider?: string
+	  }
 	// NOTE: The fulfilling Method matches the Protocol's signature, but carries
 	// a Protocol bound of its own (`<infer Item is Comparable>`) that the
 	// conformance has not been told to assume. The conformance is sound only
@@ -443,7 +535,7 @@ export function computeConformanceMethodMap(
 		// the check a requirement gets — hence the same `mismatched` answer.
 		//
 		// A Namespace that writes none is entered as the PROVIDED const, which
-		// takes the witness it is read off as its own trailing Argument.
+		// takes a witness of its own Protocol as its trailing Argument.
 		let providingProtocol = providerOf(methodName)
 
 		if (providingProtocol !== null) {

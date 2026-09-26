@@ -967,10 +967,25 @@ function walkChildren(
 			let conditions = mapArray(node.conditions, (condition) =>
 				walkExpression(condition, rewrites),
 			)
+			// NOTE: A witness of the group is no value of its own, and its
+			// conditions stand in the group's.
+			let groupConditions =
+				node.groupConditions === undefined
+					? undefined
+					: mapArray(node.groupConditions, (condition) =>
+							walkExpression(condition, rewrites),
+						)
 
-			return conditions === node.conditions
+			return conditions === node.conditions &&
+				groupConditions === node.groupConditions
 				? node
-				: { ...node, conditions }
+				: {
+						...node,
+						conditions,
+						...(groupConditions === undefined
+							? {}
+							: { groupConditions }),
+					}
 		}
 		case "CaseValue": {
 			let value =

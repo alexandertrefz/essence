@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
+import { afterAll, beforeAll, describe, expect, it, spyOn } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -17,6 +17,7 @@ import {
 	type Stdlib,
 	useStdlib,
 } from "../enricher/stdlib"
+import * as conformance from "../helpers/conformance"
 import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { linkModuleGraph } from "../modules/link"
@@ -79,6 +80,14 @@ function notesOf(source: string): Array<string> {
 
 function helpsOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps)
+}
+
+function refusalsOf(source: string): Array<[string, string, Array<string>]> {
+	return diagnosticsOf(source).map((diagnostic) => [
+		diagnostic.code,
+		diagnostic.message,
+		diagnostic.labels.map((label) => label.message),
+	])
 }
 
 function generate(source: string): string {
@@ -554,6 +563,2802 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
+	// NOTE: A provided body calls the Methods of the Protocol that wrote it, so
+	// a bound's witness curries it with the conformer's witness for that
+	// Protocol, whichever Protocol the bound names.
+	describe("the witness a provided body runs with", () => {
+		const SIZED = [
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"\t\tdescribe() -> String",
+			"\t}",
+		]
+
+		const BIG = [
+			"\tprotocol Big is Sized {",
+			"\t\textra() -> Integer",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "big {@::extra()}"',
+			"\t\t}",
+			"\t}",
+		]
+
+		// NOTE: The declarations, then a bounded `gauge`, then the lines that
+		// call it.
+		function gaugeProgram(
+			declarations: Array<string>,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				...SIZED,
+				"",
+				...declarations,
+				"",
+				"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+				"\t\t<- item::describe()",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		function integerNamespace(
+			clauses: string,
+			...methods: Array<[string, string]>
+		): Array<string> {
+			return [
+				`\tnamespace IntegerAll for Integer ${clauses} {`,
+				...methods.flatMap(([signature, body], index) => [
+					...(index === 0 ? [] : [""]),
+					`\t\t${signature} {`,
+					`\t\t\t<- ${body}`,
+					"\t\t}",
+				]),
+				"\t}",
+			]
+		}
+
+		it("should run a descendant's body with the descendant's witness", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							...BIG,
+							"",
+							...integerNamespace(
+								"is Big",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+							),
+						],
+						"\tTerminal.inspect(gauge(3))",
+						"\tTerminal.inspect(3::describe())",
+					),
+				),
+			).toEqual(['"big 7"', '"big 7"'])
+		})
+
+		it("should run an unrelated Protocol's body with that Protocol's witness", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							"\tprotocol Counted {",
+							"\t\tcount() -> Integer",
+							"",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "counted {@::count()}"',
+							"\t\t}",
+							"\t}",
+							"",
+							...BIG,
+							"",
+							...integerNamespace(
+								"is Counted, is Big",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+								["count() -> Integer", "9"],
+							),
+						],
+						"\tTerminal.inspect(gauge(3))",
+					),
+				),
+			).toEqual(['"counted 9"'])
+		})
+
+		it("should reach a provided Method of the body's own Protocol", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							"\tprotocol Shown {",
+							"\t\tsize() -> Integer",
+							"",
+							"\t\thelper() -> String {",
+							'\t\t\t<- "h{@::size()}"',
+							"\t\t}",
+							"",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "shown {@::helper()}"',
+							"\t\t}",
+							"\t}",
+							"",
+							...BIG,
+							"",
+							...integerNamespace(
+								"is Shown, is Big",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+							),
+						],
+						"\tTerminal.inspect(gauge(3))",
+					),
+				),
+			).toEqual(['"shown h3"'])
+		})
+
+		// NOTE: Of two Protocols that do not extend each other the first the
+		// clauses reach provides the body, and of two that do the more derived.
+		it("should answer with the first of two unrelated bodies the clauses reach", async () => {
+			let shown = [
+				"\tprotocol Shown {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "shown {@::size()}"',
+				"\t\t}",
+				"\t}",
+			]
+
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							...shown,
+							"",
+							...BIG,
+							"",
+							"\tprotocol Bigger is Big {",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "bigger {@::size()}"',
+							"\t\t}",
+							"\t}",
+							"",
+							...integerNamespace(
+								"is Bigger, is Shown",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+							),
+							"",
+							"\tnamespace StringAll for String is Shown, is Bigger {",
+							"\t\tsize() -> Integer {",
+							"\t\t\t<- @::length()",
+							"\t\t}",
+							"",
+							"\t\textra() -> Integer {",
+							"\t\t\t<- 8",
+							"\t\t}",
+							"\t}",
+						],
+						"\tTerminal.inspect(gauge(3))",
+						'\tTerminal.inspect(gauge("ab"))',
+					),
+				),
+			).toEqual(['"bigger 3"', '"shown 2"'])
+		})
+
+		// NOTE: `Shown` comes first, and its body answers with an Integer where
+		// `Sized` asks for a String.
+		it("should pass over a body whose signature does not fulfil the requirement", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							"\tprotocol Shown {",
+							"\t\tsize() -> Integer",
+							"",
+							"\t\tdescribe() -> Integer {",
+							"\t\t\t<- @::size()::multiply(with 100)",
+							"\t\t}",
+							"\t}",
+							"",
+							...BIG,
+							"",
+							...integerNamespace(
+								"is Shown, is Big",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+							),
+						],
+						"\tTerminal.inspect(gauge(3))",
+						"\tTerminal.inspect(gauge(3)::length())",
+					),
+				),
+			).toEqual(['"big 7"', "5"])
+		})
+
+		it("should report a requirement no provided body fulfils at the conformance", () => {
+			let source = gaugeProgram(
+				[
+					"\tprotocol Shown {",
+					"\t\tsize() -> Integer",
+					"",
+					"\t\tdescribe() -> Integer {",
+					"\t\t\t<- @::size()::multiply(with 100)",
+					"\t\t}",
+					"\t}",
+					"",
+					...integerNamespace("is Sized, is Shown", [
+						"size() -> Integer",
+						"@",
+					]),
+				],
+				"\tTerminal.inspect(gauge(3))",
+			)
+			let [declaration, call] = diagnosticsOf(source)
+
+			expect(declaration.code).toBe("nonconforming-namespace")
+			expect(declaration.position?.start.line).toBe(15)
+			expect(declaration.labels.map((label) => label.message)).toEqual([
+				"Method 'describe' is missing",
+			])
+			expect(declaration.notes).toEqual([
+				"'Shown' provides a 'describe' whose signature does not fulfil the one 'Sized' declares.",
+				"'Sized' and 'Shown' declare 'describe' apart, so a 'describe' written as 'Sized' declares it refuses the 'is Shown' here.",
+			])
+			expect(declaration.helps).toEqual([
+				"Declare 'is Sized' on a Namespace of its own that writes 'size', 'describe' as 'Sized' declares them, or drop the 'is Sized'.",
+			])
+			expect(declaration.data).toBeUndefined()
+			expect(call.notes).toEqual([
+				"'IntegerAll' does not write 'describe', which 'Sized' requires.",
+				"'Shown' provides a 'describe' whose signature does not fulfil the one 'Sized' declares.",
+			])
+		})
+
+		// NOTE: A `describe` answering a String fulfils the one `Shown` provides
+		// as well, so writing it is the answer.
+		it("should ask for a requirement another conformance accepts written as declared", () => {
+			let source = gaugeProgram(
+				[
+					"\tprotocol Shown {",
+					"\t\tsize() -> Integer",
+					"",
+					"\t\tdescribe() -> Integer | String {",
+					"\t\t\t<- @::size()",
+					"\t\t}",
+					"\t}",
+					"",
+					...integerNamespace("is Sized, is Shown", [
+						"size() -> Integer",
+						"@",
+					]),
+				],
+				"\tTerminal.inspect(gauge(3))",
+			)
+			let [declaration] = diagnosticsOf(source)
+
+			expect(declaration.notes).toEqual([
+				"'Shown' provides a 'describe' whose signature does not fulfil the one 'Sized' declares.",
+			])
+			expect(declaration.helps).toEqual([
+				"Write 'describe' as 'Sized' declares it, or drop the 'is Sized'.",
+			])
+			expect(declaration.data).toEqual({
+				kind: "missing-requirements",
+				protocol: "Sized",
+				methods: ["describe"],
+			})
+		})
+
+		// NOTE: A body is Simple, so it answers no overloaded requirement.
+		it("should not answer an overloaded requirement with a provided body", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\toverload describe {",
+				"\t\t\t() -> String",
+				"\t\t\t(_ prefix: String) -> String",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Shown {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "shown {@::size()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				...integerNamespace("is Sized, is Shown", [
+					"size() -> Integer",
+					"@",
+				]),
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["nonconforming-namespace"])
+			expect(labelsOf(source)).toEqual(["Method 'describe' is missing"])
+		})
+
+		// NOTE: A body is chosen at the Namespace's declared target, as the
+		// declaration judges it, and has to fulfil its requirement at the value's
+		// Type as well, so no value runs another body.
+		function describing(
+			parameter: string,
+			target: string,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				`\t\tdescribe(_ other: ${parameter}) -> String`,
+				"\t}",
+				"",
+				"\tprotocol Alpha {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe(_ other: Self) -> String {",
+				'\t\t\t<- "alpha {@::size()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Beta {",
+				"\t\tsize() -> Integer",
+				"",
+				`\t\tdescribe(_ other: ${parameter}) -> String {`,
+				'\t\t\t<- "beta {@::size()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				`\tnamespace All${target} is Sized, is Alpha, is Beta {`,
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+				"\t\t<- item::describe(2)",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		it("should run the body the declaration chose for a value of the target", async () => {
+			expect(
+				await run(
+					describing(
+						"Number",
+						" for Number",
+						"\tconstant n: Number = 3",
+						"\tTerminal.inspect(gauge(n))",
+					),
+				),
+			).toEqual(['"alpha 1"'])
+		})
+
+		// NOTE: The body takes as `Self` what the requirement takes as a Number,
+		// so it would be handed a Rational as an Integer.
+		it("should refuse a narrower value the chosen body takes as `Self`", () => {
+			expect(
+				refusalsOf(
+					describing(
+						"Number",
+						" for Number",
+						"\tTerminal.inspect(gauge(3))",
+						"\tTerminal.inspect(gauge(0.5))",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'All' does not conform to 'Sized'",
+					["this needs Integer to conform"],
+				],
+				[
+					"nonconforming-namespace",
+					"Namespace 'All' does not conform to 'Sized'",
+					["this needs Rational to conform"],
+				],
+			])
+		})
+
+		it("should say which body refuses a narrower value, and how it narrows", () => {
+			let source = describing(
+				"Number",
+				" for Number",
+				"\tTerminal.inspect(gauge(3))",
+			)
+
+			expect(notesOf(source)).toEqual([
+				"'describe' runs the body 'Alpha' provides, whose Parameter 1 is 'Self': at Integer it takes an Integer, where 'Sized' accepts any Number.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Take 'Number' as Parameter 1 in the body 'Alpha' provides, or declare a Namespace for Integer that conforms to 'Sized'.",
+			])
+		})
+
+		it("should run the body a generic Namespace's declaration chose for every item", async () => {
+			expect(
+				await run(
+					describing(
+						"List<Integer>",
+						"<infer Item> for List<Item>",
+						"\tfunction outer<infer Thing>(_ things: List<Thing>) -> String {",
+						"\t\t<- gauge(things)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(gauge([1, 2]))",
+						"\tTerminal.inspect(outer([1, 2]))",
+						'\tTerminal.inspect(outer(["a"]))',
+					).replace("item::describe(2)", "item::describe([2])"),
+				),
+			).toEqual(['"beta 1"', '"beta 1"', '"beta 1"'])
+		})
+
+		it("should refuse a narrower value where the one body fulfils only at the target", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"\t\tdescribe(_ other: Number) -> String",
+						"\t}",
+						"",
+						"\tprotocol Shown {",
+						"\t\tsize() -> Integer",
+						"\t\textra() -> String",
+						"",
+						"\t\tdescribe(_ other: Self) -> String {",
+						'\t\t\t<- "shown {@::size()} {@::extra()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace NumberBoth for Number is Sized, is Shown {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\textra() -> String {",
+						'\t\t\t<- "e"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+						"\t\t<- item::describe(2)",
+						"\t}",
+						"",
+						"\tconstant n: Number = 3",
+						"\tTerminal.inspect(gauge(n))",
+						"\tTerminal.inspect(gauge(3))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'NumberBoth' does not conform to 'Sized'",
+					["this needs Integer to conform"],
+				],
+			])
+		})
+
+		it("should say which one body refuses a narrower value, and how it narrows", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t\tdescribe(_ other: Number) -> String",
+				"\t}",
+				"",
+				"\tprotocol Shown {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe(_ other: Self) -> String {",
+				'\t\t\t<- "shown {@::size()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace NumberBoth for Number is Sized, is Shown {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+				"\t\t<- item::describe(2)",
+				"\t}",
+				"",
+				"\tTerminal.print(gauge(3))",
+				"\tTerminal.print(gauge(0.5))",
+				"}",
+			].join("\n")
+
+			expect(notesOf(source)).toEqual([
+				"'describe' runs the body 'Shown' provides, whose Parameter 1 is 'Self': at Integer it takes an Integer, where 'Sized' accepts any Number.",
+				"'describe' runs the body 'Shown' provides, whose Parameter 1 is 'Self': at Rational it takes a Rational, where 'Sized' accepts any Number.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Take 'Number' as Parameter 1 in the body 'Shown' provides, or declare a Namespace for Integer that conforms to 'Sized'.",
+				"Take 'Number' as Parameter 1 in the body 'Shown' provides, or declare a Namespace for Rational that conforms to 'Sized'.",
+			])
+		})
+
+		it("should run a standard library body a covering Union's Namespace fulfils with", async () => {
+			let source = (...lines: Array<string>) =>
+				[
+					"implementation {",
+					"\ttype Key = Integer | String",
+					"",
+					"\tprotocol Ranked {",
+					"\t\tisLessThan(_ other: Key) -> Boolean",
+					"\t}",
+					"",
+					"\tnamespace Keys for Key is Ranked, is Comparable {",
+					"\t\tcompare(to other: Key) -> Ordering {",
+					"\t\t\t<- @::toString()::length()::compare(to other::toString()::length())",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction smaller<infer Item is Ranked>(_ a: Item, _ b: Key) -> Boolean {",
+					"\t\t<- a::isLessThan(b)",
+					"\t}",
+					"",
+					...lines,
+					"}",
+				].join("\n")
+
+			expect(
+				await run(
+					source(
+						"\tconstant k: Key = 5",
+						"\tconstant l: Key = 123",
+						'\tTerminal.inspect(smaller(k, "abc"))',
+						'\tTerminal.inspect(smaller(l, "a"))',
+					),
+				),
+			).toEqual(["true", "false"])
+			expect(
+				refusalsOf(source('\tTerminal.inspect(smaller(123, "a"))')),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'Keys' does not conform to 'Ranked'",
+					["this needs Integer to conform"],
+				],
+			])
+		})
+
+		// NOTE: `Maker`'s body answers `Sized`'s requirement, and `Maker` is solved
+		// at the value's Type, where the Namespace's `make` answers too wide a Type.
+		function makerProgram(
+			requirement: string,
+			body: string,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				`\t\t${requirement}`,
+				"\t}",
+				"",
+				"\tprotocol Maker {",
+				"\t\tmake() -> Self",
+				"",
+				`\t\t${requirement} {`,
+				`\t\t\t<- ${body}`,
+				"\t\t}",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		const MIXED = [
+			"\tnamespace Mixed for Integer | String is Sized, is Maker {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- 1",
+			"\t\t}",
+			"",
+			"\t\tmake() -> Integer | String {",
+			'\t\t\t<- "str"',
+			"\t\t}",
+			"\t}",
+			"",
+		]
+
+		const MIXED_REFUSAL: [string, string, Array<string>] = [
+			"nonconforming-namespace",
+			"Namespace 'Mixed' does not conform to 'Sized'",
+			["this needs Integer to conform"],
+		]
+
+		it("should refuse a body whose Protocol a covering Union's Namespace answers only at the Union", () => {
+			expect(
+				refusalsOf(
+					makerProgram(
+						"twin() -> Self",
+						"@::make()",
+						...MIXED,
+						"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+						"\t\t<- x::twin()",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3)",
+						'\tTerminal.print("{r} {r::is(3)}")',
+					),
+				),
+			).toEqual([MIXED_REFUSAL])
+		})
+
+		it("should refuse it where the body hands its `Self` to a Function the caller passes", () => {
+			expect(
+				refusalsOf(
+					makerProgram(
+						"visit(_ f: (_: Self) -> String) -> String",
+						"f(@::make())",
+						...MIXED,
+						"\tfunction gauge<infer T is Sized>(_ x: T, _ f: (_: T) -> String) -> String {",
+						"\t\t<- x::visit(f)",
+						"\t}",
+						"",
+						'\tTerminal.print(gauge(3, (n) { <- "{n::add(1)}" }))',
+					),
+				),
+			).toEqual([MIXED_REFUSAL])
+		})
+
+		it("should refuse a body whose Protocol a Choice's Namespace answers only at the Choice", () => {
+			expect(
+				refusalsOf(
+					makerProgram(
+						"twin() -> Self",
+						"@::make()",
+						"\tchoice Shape {",
+						"\t\tCircle { radius: Integer },",
+						"\t\tSquare { side: Integer },",
+						"\t}",
+						"",
+						"\tnamespace Shapes for Shape is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\tmake() -> Shape {",
+						"\t\t\t<- #Square(4)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+						"\t\t<- x::twin()",
+						"\t}",
+						"",
+						"\tconstant c = Shape#Circle(2)",
+						"\tTerminal.print(gauge(c).radius::add(1))",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'Shapes' does not conform to 'Sized'",
+					["this needs Shape#Circle to conform"],
+				],
+			])
+		})
+
+		it("should refuse a body whose Protocol a Record's Namespace answers only at the Record", () => {
+			expect(
+				refusalsOf(
+					makerProgram(
+						"twin() -> Self",
+						"@::make()",
+						"\ttype Box = { n: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.n",
+						"\t\t}",
+						"",
+						"\t\tmake() -> Box {",
+						"\t\t\t<- { n = 0 }",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+						"\t\t<- x::twin()",
+						"\t}",
+						"",
+						"\tconstant w: { n: Integer, m: Integer } = { n = 1, m = 2 }",
+						"\tTerminal.print(gauge(w).m::add(1))",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'Boxes' does not conform to 'Sized'",
+					["this needs { n: Integer, m: Integer } to conform"],
+				],
+			])
+		})
+
+		// NOTE: `Alpha`'s body answers `twin` with the target's Type, which is no
+		// `Self` of a narrower value.
+		function alphaProgram(
+			target: string,
+			answer: string,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t\ttwin() -> Self",
+				"\t}",
+				"",
+				"\tprotocol Alpha {",
+				`\t\ttwin() -> ${target} {`,
+				`\t\t\t<- ${answer}`,
+				"\t\t}",
+				"\t}",
+				"",
+				...lines,
+				"",
+				"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+				"\t\t<- x::twin()",
+				"\t}",
+				"}",
+			].join("\n")
+		}
+
+		it("should refuse a narrower value a body answers with its target's Type", () => {
+			expect(
+				refusalsOf(
+					alphaProgram(
+						"Number",
+						"1/2",
+						"\tnamespace NumberAll for Number is Sized, is Alpha {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3)",
+						"\tTerminal.inspect(r)",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'NumberAll' does not conform to 'Sized'",
+					["this needs Integer to conform"],
+				],
+			])
+		})
+
+		it("should say what a body answers a narrower value with", () => {
+			let source = alphaProgram(
+				"Number",
+				"1/2",
+				"\tnamespace NumberAll for Number is Sized, is Alpha {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant r: Integer = gauge(3)",
+				"\tTerminal.inspect(r)",
+			)
+
+			expect(notesOf(source)).toEqual([
+				"'twin' runs the body 'Alpha' provides, which answers a Number at Integer, where 'Sized' answers an Integer.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Answer 'Self' from the body 'Alpha' provides, or declare a Namespace for Integer that conforms to 'Sized'.",
+			])
+		})
+
+		it("should refuse a Case a body answers with its Choice", () => {
+			expect(
+				refusalsOf(
+					alphaProgram(
+						"Shape",
+						"#Square(4)",
+						"\tchoice Shape {",
+						"\t\tCircle { radius: Integer },",
+						"\t\tSquare { side: Integer },",
+						"\t}",
+						"",
+						"\tnamespace Shapes for Shape is Sized, is Alpha {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant c = Shape#Circle(2)",
+						"\tTerminal.inspect(gauge(c))",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'Shapes' does not conform to 'Sized'",
+					["this needs Shape#Circle to conform"],
+				],
+			])
+		})
+
+		it("should offer to annotate a Case a body answers with its Choice", () => {
+			expect(
+				helpsOf(
+					alphaProgram(
+						"Shape",
+						"#Square(4)",
+						"\tchoice Shape {",
+						"\t\tCircle { radius: Integer },",
+						"\t\tSquare { side: Integer },",
+						"\t}",
+						"",
+						"\tnamespace Shapes for Shape is Sized, is Alpha {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant c = Shape#Circle(2)",
+						"\tTerminal.inspect(gauge(c))",
+					),
+				),
+			).toEqual([
+				"Answer 'Self' from the body 'Alpha' provides, or annotate the value at 'Shape', since a bare Case binds the Case, not the Choice.",
+			])
+		})
+
+		// NOTE: The requirement takes any Number where the body takes `Self`, so
+		// the body would answer an Integer's `pick` with a Rational.
+		it("should refuse a narrower value a body takes a wider Argument for as `Self`", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"\t\tpick(_ other: Number) -> Self",
+						"\t}",
+						"",
+						"\tprotocol Alpha {",
+						"\t\tpick(_ other: Self) -> Self {",
+						"\t\t\t<- other",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace NumberAll for Number is Sized, is Alpha {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+						"\t\t<- x::pick(1/2)",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3)",
+						"\tTerminal.inspect(r::isEven())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'NumberAll' does not conform to 'Sized'",
+					["this needs Integer to conform"],
+				],
+			])
+		})
+
+		// NOTE: `Sized` requires the `make` `Maker`'s body reads, as the Type the
+		// Namespace answers it with, so the witness being solved answers it too.
+		function madeProgram(made: string, ...lines: Array<string>): string {
+			return [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				`\t\tmake() -> ${made}`,
+				"\t\ttwin() -> Self",
+				"\t}",
+				"",
+				"\tprotocol Maker {",
+				"\t\tmake() -> Self",
+				"",
+				"\t\ttwin() -> Self {",
+				"\t\t\t<- @::make()",
+				"\t\t}",
+				"\t}",
+				"",
+				...lines,
+				"",
+				"\tfunction gauge<infer T is Sized>(_ x: T) -> T {",
+				"\t\t<- x::twin()",
+				"\t}",
+				"}",
+			].join("\n")
+		}
+
+		const NUMBER_MAKER_REFUSAL: [string, string, Array<string>] = [
+			"nonconforming-namespace",
+			"Namespace 'NumberAll' does not conform to 'Sized'",
+			["this needs Integer to conform"],
+		]
+
+		it("should refuse a body whose Protocol a narrower value does not hold where the witness being solved answers what it reads", () => {
+			expect(
+				refusalsOf(
+					madeProgram(
+						"Number",
+						"\tnamespace NumberAll for Number is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\tmake() -> Number {",
+						"\t\t\t<- 1/2",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3)",
+						"\tTerminal.inspect(r::add(1))",
+					),
+				),
+			).toEqual([NUMBER_MAKER_REFUSAL])
+		})
+
+		it("should refuse it where a covering Union's Namespace answers what the body reads", () => {
+			expect(
+				refusalsOf(
+					madeProgram(
+						"Integer | String",
+						...MIXED,
+						"\tconstant r: Integer = gauge(3)",
+						"\tTerminal.inspect(r::add(1))",
+					),
+				),
+			).toEqual([MIXED_REFUSAL])
+		})
+
+		it("should refuse it where a Choice's Namespace answers what the body reads", () => {
+			expect(
+				refusalsOf(
+					madeProgram(
+						"Shape",
+						"\tchoice Shape {",
+						"\t\tCircle { radius: Integer },",
+						"\t\tSquare { side: Integer },",
+						"\t}",
+						"",
+						"\tnamespace Shapes for Shape is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\tmake() -> Shape {",
+						"\t\t\t<- #Square(4)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant c = Shape#Circle(2)",
+						"\tTerminal.print(gauge(c).radius::add(1))",
+					),
+				),
+			).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'Shapes' does not conform to 'Sized'",
+					["this needs Shape#Circle to conform"],
+				],
+			])
+		})
+
+		it("should refuse it where a third Protocol's body answers what the body reads", () => {
+			expect(
+				refusalsOf(
+					madeProgram(
+						"Number",
+						"\tprotocol Halver {",
+						"\t\tmake() -> Number {",
+						"\t\t\t<- 1/2",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace NumberAll for Number is Sized, is Maker, is Halver {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3)",
+						"\tTerminal.inspect(r::add(1))",
+					),
+				),
+			).toEqual([NUMBER_MAKER_REFUSAL])
+		})
+
+		it("should refuse it where the body hands a wider Argument on as `Self`", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"\t\tkeep(_ other: Number) -> Number",
+						"\t\tpick(_ other: Self) -> Self",
+						"\t}",
+						"",
+						"\tprotocol Maker {",
+						"\t\tkeep(_ other: Self) -> Self",
+						"",
+						"\t\tpick(_ other: Self) -> Self {",
+						"\t\t\t<- @::keep(other)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace NumberAll for Number is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\tkeep(_ other: Number) -> Number {",
+						"\t\t\t<- other::add(1/2)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer T is Sized>(_ x: T, _ y: T) -> T {",
+						"\t\t<- x::pick(y)",
+						"\t}",
+						"",
+						"\tconstant r: Integer = gauge(3, 4)",
+						"\tTerminal.inspect(r::add(1))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([NUMBER_MAKER_REFUSAL])
+		})
+
+		it("should say which entry a body reads a narrower value answers otherwise", () => {
+			let source = madeProgram(
+				"Number",
+				"\tnamespace NumberAll for Number is Sized, is Maker {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"",
+				"\t\tmake() -> Number {",
+				"\t\t\t<- 1/2",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant r: Integer = gauge(3)",
+				"\tTerminal.inspect(r::add(1))",
+			)
+
+			expect(notesOf(source)).toEqual([
+				"'twin' runs the body 'Maker' provides, which reads 'make': at Integer 'NumberAll' answers it with a Number, where 'Maker' answers an Integer.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Declare a Namespace for Integer that conforms to 'Sized'.",
+			])
+		})
+
+		// NOTE: `Sized` does not require the `twin` the body reads, so only the
+		// body's own Protocol holds it.
+		it("should say which entry a body reads where the bound does not require it", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tdescribe() -> String",
+				"\t}",
+				"",
+				"\tprotocol Twinned {",
+				"\t\ttwin() -> Self",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\tconstant t: Self = @::twin()",
+				'\t\t\t<- "d{[t]::length()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace NumberN for Number is Sized, is Twinned {",
+				"\t\ttwin() -> Number {",
+				"\t\t\t<- 1/2",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction gauge<infer T is Sized>(_ t: T) -> String {",
+				"\t\t<- t::describe()",
+				"\t}",
+				"",
+				"\tconstant n: Number = 3",
+				"\tTerminal.print(gauge(n))",
+				"\tTerminal.print(gauge(3))",
+				"}",
+			].join("\n")
+
+			expect(refusalsOf(source)).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'NumberN' does not conform to 'Sized'",
+					["this needs Integer to conform"],
+				],
+			])
+			expect(notesOf(source)).toEqual([
+				"'describe' runs the body 'Twinned' provides, which reads 'twin': at Integer 'NumberN' answers it with a Number, where 'Twinned' answers an Integer.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Declare a Namespace for Integer that conforms to 'Sized'.",
+			])
+		})
+
+		it("should offer to annotate a Case whose Namespace answers an entry a body reads with its Choice", () => {
+			expect(
+				helpsOf(
+					madeProgram(
+						"Shape",
+						"\tchoice Shape {",
+						"\t\tCircle { radius: Integer },",
+						"\t\tSquare { side: Integer },",
+						"\t}",
+						"",
+						"\tnamespace Shapes for Shape is Sized, is Maker {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
+						"\t\tmake() -> Shape {",
+						"\t\t\t<- #Square(4)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant c = Shape#Circle(2)",
+						"\tTerminal.print(gauge(c).radius::add(1))",
+					),
+				),
+			).toEqual([
+				"Annotate the value at 'Shape', since a bare Case binds the Case, not the Choice.",
+			])
+		})
+
+		it("should say how a body that a body reads answers a narrower value", () => {
+			let source = madeProgram(
+				"Number",
+				"\tprotocol Halver {",
+				"\t\tmake() -> Number {",
+				"\t\t\t<- 1/2",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace NumberAll for Number is Sized, is Maker, is Halver {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant r: Integer = gauge(3)",
+				"\tTerminal.inspect(r::add(1))",
+			)
+
+			expect(notesOf(source)).toEqual([
+				"'twin' runs the body 'Maker' provides, which reads 'make'.",
+				"'make' runs the body 'Halver' provides, which answers a Number at Integer, where 'Maker' answers an Integer.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Answer 'Self' from the body 'Halver' provides, or declare a Namespace for Integer that conforms to 'Sized'.",
+			])
+		})
+
+		// NOTE: Each Protocol provides what the other requires, so each body is
+		// curried with the other's witness.
+		it("should build the witnesses of two Protocols that provide for each other", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"\t\tshown() -> String",
+						"",
+						"\t\tlabel() -> String {",
+						'\t\t\t<- "s{@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Tagged {",
+						"\t\ttag() -> String",
+						"\t\tlabel() -> String",
+						"",
+						"\t\tshown() -> String {",
+						'\t\t\t<- "t{@::tag()} {@::label()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						...integerNamespace(
+							"is Sized, is Tagged",
+							["size() -> Integer", "@"],
+							["tag() -> String", '"i"'],
+						),
+						"",
+						"\tfunction bySize<infer Item is Sized>(_ item: Item) -> String {",
+						"\t\t<- item::shown()",
+						"\t}",
+						"",
+						"\tfunction byTag<infer Item is Tagged>(_ item: Item) -> String {",
+						"\t\t<- item::label()",
+						"\t}",
+						"",
+						"\tTerminal.inspect(bySize(3))",
+						"\tTerminal.inspect(byTag(4))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"ti s3"', '"s4"'])
+		})
+
+		it("should curry each body of a chain with its own Protocol's witness", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							"\tprotocol Big is Sized {",
+							"\t\textra() -> Integer",
+							"\t\tlabel() -> String",
+							"",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "big {@::extra()} {@::label()}"',
+							"\t\t}",
+							"\t}",
+							"",
+							"\tprotocol Labelled {",
+							"\t\tname() -> String",
+							"",
+							"\t\tlabel() -> String {",
+							'\t\t\t<- "labelled {@::name()}"',
+							"\t\t}",
+							"\t}",
+							"",
+							...integerNamespace(
+								"is Big, is Labelled",
+								["size() -> Integer", "@"],
+								["extra() -> Integer", "7"],
+								["name() -> String", '"n"'],
+							),
+						],
+						"\tTerminal.inspect(gauge(3))",
+					),
+				),
+			).toEqual(['"big 7 labelled n"'])
+		})
+
+		// NOTE: The body's Protocol is conformed to under a condition the one
+		// being solved does not carry, and the witness still needs it.
+		const SHOWN_LISTS = [
+			"\tprotocol Shown {",
+			"\t\tfirst() -> String",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "shown {@::first()}"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tnamespace Lists<infer Item> for List<Item> is Sized, is Shown where Item is Printable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @::length()",
+			"\t\t}",
+			"",
+			"\t\tfirst<Item is Printable>() -> String {",
+			"\t\t\t<- @::toString()",
+			"\t\t}",
+			"\t}",
+		]
+
+		it("should solve the conditions of the Protocol a body is curried for", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						SHOWN_LISTS,
+						"\tTerminal.inspect(gauge([1, 2]))",
+					),
+				),
+			).toEqual(['"shown [1, 2]"'])
+		})
+
+		it("should refuse a call where that Protocol's conditions do not hold", () => {
+			let source = gaugeProgram(
+				[...SHOWN_LISTS, "", "\ttype Opaque = { run: () -> Integer }"],
+				"\tconstant opaque: Opaque = { run = () -> Integer { <- 1 } }",
+				"\tTerminal.inspect(gauge([opaque]))",
+			)
+
+			expect(codesOf(source)).toEqual([
+				"unsatisfied-conformance-condition",
+			])
+			expect(notesOf(source).slice(0, 3)).toEqual([
+				"'describe' runs the body 'Shown' provides, which needs the conformance to 'Shown'.",
+				"List<Opaque> does not conform to 'Shown'.",
+				"Opaque does not conform to 'Printable'.",
+			])
+		})
+
+		// NOTE: Where the witness being solved holds every Method the body's
+		// Protocol has, and the same answer for each, the body is curried with
+		// it.
+		it("should curry a body with the witness being solved where that holds its Protocol", () => {
+			let emitted = generate(
+				gaugeProgram(
+					[
+						"\tprotocol Walled {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "walled {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						...integerNamespace("is Walled, is Sized", [
+							"size() -> Integer",
+							"@",
+						]),
+					],
+					"\tTerminal.inspect(gauge(3))",
+				),
+			)
+
+			expect(emitted).toContain("$type.providedConformance(")
+			expect(emitted).not.toContain("$type.providedConformances(")
+		})
+
+		it("should build the witnesses together where a body's Protocol asks for more", () => {
+			let emitted = generate(
+				gaugeProgram(
+					[
+						...BIG,
+						"",
+						...integerNamespace(
+							"is Big",
+							["size() -> Integer", "@"],
+							["extra() -> Integer", "7"],
+						),
+					],
+					"\tTerminal.inspect(gauge(3))",
+				),
+			)
+
+			expect(emitted).toContain("$type.providedConformances(")
+		})
+
+		// NOTE: The witness being solved holds everything the body reads, so it is
+		// the witness the body is curried with, whatever else its Protocol asks
+		// for and under whichever conditions.
+		function expectOneWitness(emitted: string): void {
+			expect(emitted).toContain("$type.providedConformance(")
+			expect(emitted).not.toContain("$type.providedConformances(")
+		}
+
+		// NOTE: `Big`'s body hands `@` on as another Protocol, which reads only
+		// that Protocol's Methods off the witness.
+		function handingOnProgram(
+			sizedIs: string,
+			bigIs: string,
+			answer: string,
+			...method: Array<string>
+		): string {
+			return [
+				"implementation {",
+				`\tprotocol Sized${sizedIs} {`,
+				"\t\tsize() -> Integer",
+				"\t\tdescribe() -> String",
+				"\t}",
+				"",
+				`\tprotocol Big ${bigIs} {`,
+				"\t\textra() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				`\t\t\t<- ${answer}`,
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Box = { value: Integer }",
+				"",
+				"\tnamespace Boxes for Box is Big {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.value",
+				"\t\t}",
+				"",
+				"\t\textra() -> String {",
+				'\t\t\t<- "e"',
+				"\t\t}",
+				"",
+				...method,
+				"\t}",
+				"",
+				"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+				"\t\t<- item::describe()",
+				"\t}",
+				"",
+				"\tconstant box: Box = { value = 3 }",
+				"\tTerminal.inspect(gauge(box))",
+				"}",
+			].join("\n")
+		}
+
+		const BOX_TO_STRING = [
+			"\t\ttoString() -> String {",
+			'\t\t\t<- "box{@.value}"',
+			"\t\t}",
+		]
+
+		it("should curry a body that interpolates `@` with the witness being solved where that is Printable", async () => {
+			let source = handingOnProgram(
+				" is Printable",
+				"is Sized",
+				'"Big {@}"',
+				...BOX_TO_STRING,
+			)
+
+			expect(await run(source)).toEqual(['"Big box3"'])
+			expectOneWitness(generate(source))
+		})
+
+		it("should curry a body that hands `@` on as Equatable with the witness being solved where that is", async () => {
+			let source = handingOnProgram(
+				" is Equatable",
+				"is Sized",
+				'"Big {[@]::contains(@)}"',
+				"\t\tis(_ other: Box) -> Boolean {",
+				"\t\t\t<- @.value::is(other.value)",
+				"\t\t}",
+			)
+
+			expect(await run(source)).toEqual(['"Big true"'])
+			expectOneWitness(generate(source))
+		})
+
+		it("should build the witnesses together where the one being solved is not Printable", async () => {
+			let source = handingOnProgram(
+				"",
+				"is Sized, is Printable",
+				'"Big {@}"',
+				...BOX_TO_STRING,
+			)
+
+			expect(await run(source)).toEqual(['"Big box3"'])
+			expect(generate(source)).toContain("$type.providedConformances(")
+		})
+
+		const SHOWN_ON_NOTHING = [
+			"\tprotocol Shown {",
+			"\t\tfirst() -> String",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "shown"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tnamespace Lists<infer Item> for List<Item> is Sized, is Shown where Item is Printable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @::length()",
+			"\t\t}",
+			"",
+			"\t\tfirst<Item is Printable>() -> String {",
+			'\t\t\t<- "first"',
+			"\t\t}",
+			"\t}",
+		]
+
+		it("should not ask for the conditions of a Protocol whose body reads nothing more", async () => {
+			let source = gaugeProgram(
+				[
+					...SHOWN_ON_NOTHING,
+					"",
+					"\ttype Opaque = { run: () -> Integer }",
+				],
+				"\tconstant opaque: Opaque = { run = () -> Integer { <- 1 } }",
+				"\tTerminal.inspect(gauge([opaque]))",
+				"\tTerminal.inspect([opaque]::size())",
+			)
+
+			expect(await run(source)).toEqual(['"shown"', "1"])
+			expectOneWitness(generate(source))
+		})
+
+		it("should pool the witness a generic caller builds where the body reads nothing more", async () => {
+			let source = gaugeProgram(
+				[
+					...SHOWN_ON_NOTHING,
+					"",
+					"\tfunction outer<infer Thing is Printable>(_ thing: Thing) -> String {",
+					"\t\t<- gauge([thing, thing])",
+					"\t}",
+					"",
+					"\tfunction unbounded<infer Thing>(_ thing: Thing) -> String {",
+					"\t\t<- gauge([thing])",
+					"\t}",
+				],
+				"\tTerminal.inspect(outer(4))",
+				"\tTerminal.inspect(unbounded(5))",
+			)
+			let emitted = generate(source)
+
+			expect(await run(source)).toEqual(['"shown"', '"shown"'])
+			expect(emitted).toMatch(
+				/const \$pool_\d+ = \$type\.providedConformance\(/,
+			)
+			expectOneWitness(emitted)
+		})
+
+		const BIG_ON_SIZE = [
+			"\tprotocol Big is Sized {",
+			"\t\textra() -> String",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "Big {@::size()}"',
+			"\t\t}",
+			"\t}",
+		]
+
+		it("should curry a descendant's body that reads its ancestor with the ancestor's witness", async () => {
+			let source = gaugeProgram(
+				[
+					...BIG_ON_SIZE,
+					"",
+					...integerNamespace(
+						"is Big",
+						["size() -> Integer", "@"],
+						["extra() -> String", '"e"'],
+					),
+				],
+				"\tTerminal.inspect(gauge(3))",
+			)
+
+			expect(await run(source)).toEqual(['"Big 3"'])
+			expectOneWitness(generate(source))
+		})
+
+		it("should curry it so under a condition a generic caller hands on", async () => {
+			let source = gaugeProgram(
+				[
+					...BIG_ON_SIZE,
+					"",
+					"\tnamespace ListBig<infer ItemType> for List<ItemType> is Big where ItemType is Printable {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- @::length()",
+					"\t\t}",
+					"",
+					"\t\textra() -> String {",
+					"\t\t\t<- @::length()::toString()",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction outer<infer Thing is Printable>(_ thing: Thing) -> String {",
+					"\t\t<- gauge([thing, thing])",
+					"\t}",
+				],
+				"\tTerminal.inspect(outer(4))",
+				'\tTerminal.inspect(outer("a"))',
+			)
+
+			expect(await run(source)).toEqual(['"Big 2"', '"Big 2"'])
+			expectOneWitness(generate(source))
+		})
+
+		// NOTE: `Coded` restates the `tag` that `Labelled`'s body reads.
+		function restatingProgram(
+			tagged: string,
+			restated: string,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Labelled {",
+				"\t\tname() -> String",
+				"",
+				`\t\ttag() -> ${tagged} {`,
+				'\t\t\t<- "L"',
+				"\t\t}",
+				"",
+				"\t\tlabel() -> String {",
+				'\t\t\t<- "{@::tag()}!"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Coded is Labelled {",
+				`\t\ttag() -> ${restated} {`,
+				'\t\t\t<- "C"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace IntegerCoded for Integer is Coded {",
+				"\t\tname() -> String {",
+				'\t\t\t<- "i"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction byLabelled<infer T is Labelled>(_ t: T) -> String {",
+				"\t\t<- t::label()",
+				"\t}",
+				"",
+				"\tfunction byCoded<infer T is Coded>(_ t: T) -> String {",
+				"\t\t<- t::label()",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		it("should curry an ancestor's body with the witness being solved where a descendant restates what it reads", async () => {
+			expect(
+				await run(
+					restatingProgram(
+						"String",
+						"String",
+						"\tTerminal.inspect(byLabelled(3))",
+						"\tTerminal.inspect(3::label())",
+						"\tTerminal.inspect(byCoded(3))",
+					),
+				),
+			).toEqual(['"C!"', '"C!"', '"C!"'])
+		})
+
+		it("should refuse a descendant restating what an ancestor's body reads with another Type", () => {
+			expect(
+				refusalsOf(
+					restatingProgram(
+						"String",
+						"Integer",
+						"\tTerminal.inspect(byCoded(3))",
+					).replace('<- "C"', "<- 7"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Coded' restates 'tag' with a signature 'Labelled' does not accept",
+					["'Labelled' declares it as 'tag() -> String'"],
+				],
+			])
+		})
+
+		it("should refuse a Protocol whose two extensions declare what a body reads apart", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"\t}",
+						"",
+						"\tprotocol Labelled is Named {",
+						"\t\ttag() -> String {",
+						'\t\t\t<- "L"',
+						"\t\t}",
+						"",
+						"\t\tlabel() -> String {",
+						'\t\t\t<- @::tag()::append("?")',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Coded is Named {",
+						"\t\ttag() -> Integer {",
+						"\t\t\t<- 5",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Both is Labelled, is Coded {",
+						"\t\textra() -> String",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Both' inherits 'tag' with a signature 'Labelled' does not accept",
+					[
+						"'tag' comes from 'Coded' as 'tag() -> Integer'",
+						"'Labelled' declares it as 'tag() -> String'",
+					],
+				],
+			])
+		})
+
+		it("should refuse a descendant restating a requirement an ancestor's body reads", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\tshow() -> String {",
+						'\t\t\t<- "n {@::name()::append("?")}"',
+						"\t\t}",
+						"",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @::name()::length()",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Coded is Named {",
+						"\t\tname() -> List<Integer>",
+						"\t}",
+						"",
+						"\tnamespace IntegerCoded for Integer is Coded {",
+						"\t\tname() -> List<Integer> {",
+						"\t\t\t<- [@, @, @]",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction byCoded<infer T is Coded>(_ x: T) -> String {",
+						'\t\t<- "{x::show()} {x::size()::add(1)}"',
+						"\t}",
+						"",
+						"\tTerminal.print(byCoded(4))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Coded' restates 'name' with a signature 'Named' does not accept",
+					["'Named' declares it as 'name() -> String'"],
+				],
+			])
+		})
+
+		// NOTE: `merge` answers `Self` with the Namespace's target, which a value
+		// narrower than the target does not; the body reads only `size`.
+		it("should curry a body with the witness a narrower value is solved for", async () => {
+			let source = gaugeProgram(
+				[
+					"\tprotocol Merged {",
+					"\t\tsize() -> Integer",
+					"\t\tmerge(_ other: Self) -> Self",
+					"",
+					"\t\tdescribe() -> String {",
+					'\t\t\t<- "merged {@::size()}"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tchoice Color {",
+					"\t\tRed,",
+					"\t\tGreen,",
+					"\t}",
+					"",
+					"\ttype Circle = { radius: Integer }",
+					"\ttype Square = { side: Integer }",
+					"\ttype Shape = Circle | Square",
+					"",
+					...[
+						["NumberBoth", "Number", "1"],
+						["Colors", "Color", "2"],
+						["Shapes", "Shape", "3"],
+					].flatMap(([name, target, size]) => [
+						`\tnamespace ${name} for ${target} is Sized, is Merged {`,
+						"\t\tsize() -> Integer {",
+						`\t\t\t<- ${size}`,
+						"\t\t}",
+						"",
+						`\t\tmerge(_ other: ${target}) -> ${target} {`,
+						"\t\t\t<- @",
+						"\t\t}",
+						"\t}",
+						"",
+					]),
+				],
+				"\tconstant circle: Circle = { radius = 2 }",
+				"\tTerminal.inspect(gauge(3))",
+				"\tTerminal.inspect(gauge(Color#Red))",
+				"\tTerminal.inspect(gauge(circle))",
+			)
+
+			expect(await run(source)).toEqual([
+				'"merged 1"',
+				'"merged 2"',
+				'"merged 3"',
+			])
+			expectOneWitness(generate(source))
+		})
+
+		// NOTE: `Equatable`'s `isNot` reads `is`, which the Choices derive.
+		it("should curry a body with the equality a Choice derives", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Differ {",
+						"\t\tisNot(_ other: Self) -> Boolean",
+						"\t}",
+						"",
+						"\ttype Box = { n: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Equatable {",
+						"\t\tis(_ other: Box) -> Boolean {",
+						"\t\t\t<- true",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Color {",
+						"\t\tRed,",
+						"\t\tGreen,",
+						"\t}",
+						"",
+						"\tchoice Crate {",
+						"\t\tFull { box: Box },",
+						"\t\tEmpty,",
+						"\t}",
+						"",
+						"\tnamespace Colors for Color is Equatable, is Differ {}",
+						"",
+						"\tnamespace Crates for Crate is Equatable, is Differ {}",
+						"",
+						"\tfunction differs<infer Item is Differ>(_ a: Item, _ b: Item) -> Boolean {",
+						"\t\t<- a::isNot(b)",
+						"\t}",
+						"",
+						"\tconstant red: Color = Color#Red",
+						"\tconstant one: Crate = Crate#Full({ box = { n = 1 } })",
+						"\tconstant two: Crate = Crate#Full({ box = { n = 2 } })",
+						"\tconstant empty: Crate = Crate#Empty",
+						"\tTerminal.inspect(differs(red, Color#Green))",
+						"\tTerminal.inspect(differs(red, red))",
+						"\tTerminal.inspect(differs(one, two))",
+						"\tTerminal.inspect(differs(one, empty))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "false", "false", "true"])
+		})
+
+		it("should report nothing more of a Choice that names itself", () => {
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						"\tprotocol Differ {",
+						"\t\tisNot(_ o: Self) -> Boolean",
+						"\t}",
+						"",
+						"\tchoice Tree {",
+						"\t\tLeaf,",
+						"\t\tNode { kids: List<Tree> },",
+						"\t}",
+						"",
+						"\tnamespace Trees for Tree is Differ, is Equatable {}",
+						"",
+						"\tfunction differs<infer Item is Differ>(_ a: Item, _ b: Item) -> Boolean {",
+						"\t\t<- a::isNot(b)",
+						"\t}",
+						"",
+						"\tconstant leaf: Tree = Tree#Leaf",
+						"\tTerminal.inspect(differs(leaf, Tree#Node([Tree#Leaf])))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["recursive-type-declaration", "nonconforming-namespace"])
+		})
+
+		// NOTE: A body that hands `@` on reads its witness whole.
+		it("should curry a body that hands its value on with its own Protocol's witness", async () => {
+			expect(
+				await run(
+					gaugeProgram(
+						[
+							"\tprotocol Shown is Printable {",
+							"\t\textra() -> Integer",
+							"",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "shown {@}"',
+							"\t\t}",
+							"\t}",
+							"",
+							"\ttype Box = { n: Integer }",
+							"",
+							"\tnamespace Boxes for Box is Sized, is Shown {",
+							"\t\tsize() -> Integer {",
+							"\t\t\t<- @.n",
+							"\t\t}",
+							"",
+							"\t\textra() -> Integer {",
+							"\t\t\t<- 1",
+							"\t\t}",
+							"",
+							"\t\ttoString() -> String {",
+							'\t\t\t<- "box {@.n}"',
+							"\t\t}",
+							"\t}",
+						],
+						"\tconstant box: Box = { n = 3 }",
+						"\tTerminal.inspect(gauge(box))",
+					),
+				),
+			).toEqual(['"shown box 3"'])
+		})
+
+		// NOTE: The literal's Parameter is a `Self`, from the requirement it is
+		// handed to, and sorting or searching a List of it hands the witness on.
+		// `Walker` holds `visit` too, so its witness holds all the body names.
+		function visiting(
+			extending: string,
+			written: Array<string>,
+			...body: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Walker {",
+				"\t\tvisit(_ f: (_: Self) -> String) -> String",
+				"\t\tdescribe() -> String",
+				"\t}",
+				"",
+				`\tprotocol Visited is ${extending} {`,
+				"\t\tvisit(_ f: (_: Self) -> String) -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::visit((item) {",
+				...body.map((line) => `\t\t\t\t${line}`),
+				"\t\t\t})",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Box = { n: Integer }",
+				"",
+				"\tnamespace Boxes for Box is Walker, is Visited {",
+				"\t\tvisit(_ f: (_: Box) -> String) -> String {",
+				"\t\t\t<- f(@)",
+				"\t\t}",
+				"",
+				...written.map((line) => `\t\t${line}`),
+				"\t}",
+				"",
+				"\tfunction walk<infer Item is Walker>(_ item: Item) -> String {",
+				"\t\t<- item::describe()",
+				"\t}",
+				"",
+				"\tconstant box: Box = { n = 3 }",
+				"\tTerminal.inspect(walk(box))",
+				"\tTerminal.inspect(box::describe())",
+				"}",
+			].join("\n")
+		}
+
+		it("should curry a body whose Function literal sorts its `Self` with its own Protocol's witness", async () => {
+			expect(
+				await run(
+					visiting(
+						"Comparable",
+						[
+							"compare(to other: Box) -> Ordering {",
+							"\t<- @.n::compare(to other.n)",
+							"}",
+						],
+						"constant sorted = [item, item]::sort()",
+						"",
+						'<- "sorted {sorted::length()}"',
+					),
+				),
+			).toEqual(['"sorted 2"', '"sorted 2"'])
+		})
+
+		it("should curry a body whose Function literal searches for its `Self` with its own Protocol's witness", async () => {
+			expect(
+				await run(
+					visiting(
+						"Equatable",
+						[
+							"is(_ other: Box) -> Boolean {",
+							"\t<- @.n::is(other.n)",
+							"}",
+						],
+						"constant found = [item]::contains(item)",
+						"",
+						'<- "found {found}"',
+					),
+				),
+			).toEqual(['"found true"', '"found true"'])
+		})
+
+		// NOTE: `Shown`'s body builds a List of `@` and only counts it, so it
+		// reads nothing of its witness and its Protocol's condition is not asked
+		// for. Sorting the List instead hands the witness on.
+		function counting(item: string, ...body: Array<string>): string {
+			return gaugeProgram(
+				[
+					"\tprotocol Tagged {",
+					"\t\ttag() -> String",
+					"\t}",
+					"",
+					"\tprotocol Shown is Comparable {",
+					"\t\textra() -> String",
+					"",
+					"\t\tdescribe() -> String {",
+					...body.map((line) => `\t\t\t${line}`),
+					"\t\t}",
+					"\t}",
+					"",
+					"\ttype Box<Item> = { item: Item }",
+					"",
+					"\tnamespace Boxes<infer Item> for Box<Item> is Sized, is Shown where Item is Tagged {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"",
+					"\t\textra<Item is Tagged>() -> String {",
+					"\t\t\t<- @.item::tag()",
+					"\t\t}",
+					"",
+					"\t\tcompare<Item is Tagged>(to other: Box<Item>) -> Ordering {",
+					"\t\t\t<- @.item::tag()::compare(to other.item::tag())",
+					"\t\t}",
+					"\t}",
+					"",
+					"\ttype Opaque = { n: Integer }",
+					"",
+					"\tnamespace IntegerTagged for Integer is Tagged {",
+					"\t\ttag() -> String {",
+					'\t\t\t<- "t{@}"',
+					"\t\t}",
+					"\t}",
+				],
+				"\tconstant opaque: Opaque = { n = 1 }",
+				`\tconstant box: Box<${item}> = { item = ${item === "Opaque" ? "opaque" : "2"} }`,
+				"\tTerminal.inspect(gauge(box))",
+			)
+		}
+
+		it("should not ask for the condition of a Protocol whose body only counts a List of `@`", async () => {
+			let source = counting(
+				"Opaque",
+				"constant items = [@]",
+				"",
+				'<- "shown {items::length()}"',
+			)
+
+			expect(await run(source)).toEqual(['"shown 1"'])
+			expectOneWitness(generate(source))
+		})
+
+		it("should ask for it where the body sorts that List", () => {
+			expect(
+				codesOf(
+					counting(
+						"Opaque",
+						"constant items = [@, @]::sort()",
+						"",
+						'<- "shown {items::length()}"',
+					),
+				),
+			).toEqual(["unsatisfied-conformance-condition"])
+		})
+
+		it("should build the witnesses together where the body sorts that List", async () => {
+			let source = counting(
+				"Integer",
+				"constant items = [@, @]::sort()",
+				"",
+				'<- "shown {items::length()} {@::extra()}"',
+			)
+
+			expect(await run(source)).toEqual(['"shown 2 t2"'])
+			expect(generate(source)).toContain("$type.providedConformances(")
+		})
+
+		// NOTE: A provided `toString` stands in the group beside a body curried
+		// with another witness, and is curried with its own.
+		it("should curry a provided toString in a group with its own witness", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Shown {",
+						"\t\ttoString() -> String",
+						"\t\tdescribe() -> String",
+						"\t}",
+						"",
+						"\tprotocol Named {",
+						"\t\ttoString() -> String {",
+						'\t\t\t<- "named"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Big {",
+						"\t\textra() -> String",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "big {@::extra()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { n: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Shown, is Named, is Big {",
+						"\t\textra() -> String {",
+						'\t\t\t<- "e"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Shown>(_ item: Item) -> String {",
+						"\t\t<- item::describe()::append(item::toString())",
+						"\t}",
+						"",
+						"\tconstant box: Box = { n = 1 }",
+						"\tTerminal.inspect(show(box))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"big enamed"'])
+		})
+
+		// NOTE: Both of the Namespace's clauses carry `where Item is Sized`, so
+		// the group for a nested List builds that condition once, not once per
+		// member, and its size grows with the nesting rather than doubling.
+		function nestedProgram(depth: number, ...lines: Array<string>): string {
+			return gaugeProgram(
+				[
+					"\tprotocol Shown {",
+					"\t\tfirst() -> String",
+					"",
+					"\t\tdescribe() -> String {",
+					'\t\t\t<- "shown {@::first()}"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tnamespace Lists<infer Item> for List<Item> is Sized where Item is Sized, is Shown where Item is Sized {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- @::length()",
+					"\t\t}",
+					"",
+					"\t\tfirst() -> String {",
+					'\t\t\t<- @::map((_ item: Item) -> String { <- item::describe() })::join(with " ")',
+					"\t\t}",
+					"\t}",
+					"",
+					...integerNamespace(
+						"is Sized",
+						["size() -> Integer", "@"],
+						["describe() -> String", '"i{@}"'],
+					),
+					"",
+					`\tfunction deep<infer Element is Sized>(_ items: ${"List<".repeat(depth)}Element${">".repeat(depth)}) -> String {`,
+					"\t\t<- gauge(items)",
+					"\t}",
+				],
+				...lines,
+			)
+		}
+
+		function nested(depth: number): string {
+			return `${"[".repeat(depth)}1${"]".repeat(depth)}`
+		}
+
+		it("should build each condition of a group once however deep the Type nests", async () => {
+			expect(
+				await run(
+					nestedProgram(
+						1,
+						`\tTerminal.inspect(gauge(${nested(10)}))`,
+					),
+				),
+			).toEqual([`"${"shown ".repeat(10)}i1"`])
+		})
+
+		it("should hand a generic caller's group each condition once", async () => {
+			let source = nestedProgram(
+				6,
+				`\tTerminal.inspect(deep(${nested(6)}))`,
+			)
+			let emitted = generate(source)
+
+			expect(await run(source)).toEqual([`"${"shown ".repeat(6)}i1"`])
+			expect(
+				emitted.split("$type.providedConformances(").length - 1,
+			).toBe(6)
+			expect(
+				emitted.split("$type.boundConformance(").length - 1,
+			).toBeLessThanOrEqual(6)
+		})
+
+		// NOTE: Each Protocol's body reads what only the other's witness holds,
+		// so a nested List's group holds both, and each is built once however
+		// deep the List. `deep` is declared only where it is called.
+		function answeringProgram(depth: number, caller: string): string {
+			return [
+				"implementation {",
+				"\tprotocol Ay {",
+				"\t\ta() -> String",
+				"\t\tx() -> String",
+				"",
+				"\t\ty() -> String {",
+				'\t\t\t<- "ay {@::a()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Be {",
+				"\t\tb() -> String",
+				"\t\ty() -> String",
+				"",
+				"\t\tx() -> String {",
+				'\t\t\t<- "bx {@::b()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Both is Ay, is Be {}",
+				"",
+				"\tnamespace Lists<infer Item> for List<Item> is Ay where Item is Ay, is Be where Item is Be {",
+				"\t\ta() -> String {",
+				'\t\t\t<- @::map((_ item: Item) -> String { <- item::y() })::join(with " ")',
+				"\t\t}",
+				"",
+				"\t\tb() -> String {",
+				'\t\t\t<- @::map((_ item: Item) -> String { <- item::y() })::join(with " ")',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace IntegerBoth for Integer is Both {",
+				"\t\ta() -> String {",
+				'\t\t\t<- "a{@}"',
+				"\t\t}",
+				"",
+				"\t\tb() -> String {",
+				'\t\t\t<- "b{@}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction gauge<infer Item is Ay>(_ item: Item) -> String {",
+				"\t\t<- item::x()",
+				"\t}",
+				"",
+				...(caller === "deep"
+					? [
+							`\tfunction deep<infer Element is Both>(_ items: ${"List<".repeat(depth)}Element${">".repeat(depth)}) -> String {`,
+							"\t\t<- gauge(items)",
+							"\t}",
+							"",
+						]
+					: []),
+				`\tTerminal.inspect(${caller}(${nested(depth)}))`,
+				"}",
+			].join("\n")
+		}
+
+		// NOTE: An Integer's witnesses are a group of their own, and `deep`
+		// hands its Element's witness in whole.
+		it("should build each witness of a nested List's groups once", async () => {
+			for (let [caller, groups] of [
+				["deep", 4],
+				["gauge", 5],
+			] as const) {
+				let source = answeringProgram(4, caller)
+
+				expect(await run(source)).toEqual(['"bx ay ay ay ay a1"'])
+				expect(
+					generate(source).split("$type.providedConformances(")
+						.length - 1,
+				).toBe(groups)
+			}
+		})
+
+		// NOTE: A chain of Protocols whose bodies each read their own requirement,
+		// with a call bounded by each. The entries solved grow with the cube of
+		// the depth where every inherited body's whole witness is solved.
+		it("should solve a chain of bounds in work that grows with the square of its depth", () => {
+			let chain = (depth: number): string =>
+				[
+					"implementation {",
+					...Array.from({ length: depth }, (_, k) => [
+						`\tprotocol P${k}${k === 0 ? "" : ` is P${k - 1}`} {`,
+						`\t\tm${k}() -> String`,
+						"",
+						`\t\tk${k}() -> String {`,
+						`\t\t\t<- @::m${k}()`,
+						"\t\t}",
+						"\t}",
+						"",
+					]).flat(),
+					`\tnamespace IntegerN for Integer is P${depth - 1} {`,
+					...Array.from({ length: depth }, (_, k) => [
+						`\t\tm${k}() -> String {`,
+						`\t\t\t<- "m${k}"`,
+						"\t\t}",
+						"",
+					]).flat(),
+					"\t}",
+					"",
+					...Array.from({ length: depth }, (_, k) => [
+						`\tfunction via${k}<infer T is P${k}>(_ t: T) -> String {`,
+						`\t\t<- t::k${k}()`,
+						"\t}",
+						"",
+						`\tTerminal.inspect(via${k}(3))`,
+					]).flat(),
+					"}",
+				].join("\n")
+			let solved = (depth: number): number => {
+				let solving = spyOn(conformance, "computeConformanceMethodMap")
+
+				try {
+					expect(
+						containsErrors(
+							enrich(parseWithDiagnostics(chain(depth)).program)
+								.diagnostics,
+						),
+					).toBe(false)
+
+					return solving.mock.calls
+						.filter(([protocol]) => /^P[0-9]+$/.test(protocol.name))
+						.reduce(
+							(entries, [protocol]) =>
+								entries + Object.keys(protocol.methods).length,
+							0,
+						)
+				} finally {
+					solving.mockRestore()
+				}
+			}
+
+			expect(solved(32) / solved(16)).toBeLessThan(5)
+		})
+
+		// NOTE: Two Protocols providing `describe` beside `Sized`, and which of
+		// them answers `gauge`'s bound. Whichever body runs can call every
+		// Method of its own Protocol.
+		describe("the body each conformer's bound runs", () => {
+			function providing(
+				name: string,
+				extending: string,
+				requirements: Array<string>,
+				body: string,
+				returns: string = "String",
+			): Array<string> {
+				return [
+					`\tprotocol ${name}${extending === "" ? "" : ` is ${extending}`} {`,
+					...requirements.map((requirement) => `\t\t${requirement}`),
+					...(requirements.length === 0 ? [] : [""]),
+					`\t\tdescribe() -> ${returns} {`,
+					`\t\t\t<- ${body}`,
+					"\t\t}",
+					"\t}",
+					"",
+				]
+			}
+
+			const walled = providing(
+				"Walled",
+				"",
+				["size() -> Integer"],
+				'"W {@::size()}"',
+			)
+			const bigOnSize = providing("Big", "Sized", [], '"B {@::size()}"')
+			const other = ["\tprotocol Other is Big {}", ""]
+			const bigger = providing(
+				"Bigger",
+				"Big",
+				["extra() -> Integer"],
+				'"X {@::extra()}"',
+			)
+			const bigOnExtra = providing(
+				"Big",
+				"Sized",
+				["extra() -> String"],
+				'"Big {@::extra()}"',
+			)
+			const bigBesideExtra = providing(
+				"Big",
+				"Sized",
+				["extra() -> String"],
+				'"Big {@::size()}"',
+			)
+			const shown = providing(
+				"Shown",
+				"",
+				["size() -> Integer"],
+				'"Shown {@::size()}"',
+			)
+			const shownAsInteger = providing(
+				"Shown",
+				"",
+				["size() -> Integer"],
+				"@::size()::multiply(with 100)",
+				"Integer",
+			)
+			const size: [string, string] = ["size() -> Integer", "@"]
+			const extraString: [string, string] = ["extra() -> String", '"e"']
+			const extraInteger: [string, string] = ["extra() -> Integer", "7"]
+
+			const cases: Array<{
+				shape: string
+				declarations: Array<string>
+				lines?: Array<string>
+				printed: Array<string>
+			}> = [
+				{
+					shape: "Walled before a Protocol extending Big twice over",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...other,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Other, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					printed: ['"W 3"'],
+				},
+				{
+					shape: "Walled before Big and a descendant of Big",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Big, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					printed: ['"W 3"'],
+				},
+				{
+					shape: "Walled before a descendant of Big",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					printed: ['"W 3"'],
+				},
+				{
+					shape: "Big before Shown",
+					declarations: [
+						...bigBesideExtra,
+						...shown,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Big 3"'],
+				},
+				{
+					shape: "Big before a Shown answering an Integer",
+					declarations: [
+						...bigBesideExtra,
+						...shownAsInteger,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					lines: ["\tTerminal.inspect(gauge(3)::length())"],
+					printed: ['"Big 3"', "5"],
+				},
+				{
+					shape: "a Shown answering an Integer before Big",
+					declarations: [
+						...bigBesideExtra,
+						...shownAsInteger,
+						...integerNamespace(
+							"is Shown, is Big",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Big 3"'],
+				},
+				{
+					shape: "a Shown that asks for more than Sized before Big",
+					declarations: [
+						...bigOnExtra,
+						...providing(
+							"Shown",
+							"",
+							["size() -> Integer", "other() -> Integer"],
+							'"Shown {@::size()}"',
+						),
+						...integerNamespace(
+							"is Shown, is Big",
+							size,
+							["other() -> Integer", "5"],
+							extraString,
+						),
+					],
+					printed: ['"Shown 3"'],
+				},
+				{
+					shape: "Shown before a Big that asks for its extra",
+					declarations: [
+						...bigOnExtra,
+						...shown,
+						...integerNamespace(
+							"is Shown, is Big",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Shown 3"'],
+				},
+				{
+					shape: "a Big that asks for its extra before Shown",
+					declarations: [
+						...bigOnExtra,
+						...shown,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Big e"'],
+				},
+				{
+					shape: "Shown before a Big on size",
+					declarations: [
+						...bigBesideExtra,
+						...shown,
+						...integerNamespace(
+							"is Shown, is Big",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Shown 3"'],
+				},
+				{
+					shape: "Big before Shown, beside a pick of Big",
+					declarations: [
+						...bigBesideExtra,
+						...shown,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					lines: ["\tTerminal.inspect(3::<Big>describe())"],
+					printed: ['"Big 3"', '"Big 3"'],
+				},
+				{
+					shape: "a Counted on size before Big",
+					declarations: [
+						...providing(
+							"Counted",
+							"",
+							["size() -> Integer"],
+							'"C {@::size()}"',
+						),
+						...providing(
+							"Big",
+							"Sized",
+							["extra() -> Integer"],
+							'"B {@::extra()}"',
+						),
+						...integerNamespace(
+							"is Counted, is Big",
+							size,
+							extraInteger,
+						),
+					],
+					printed: ['"C 3"'],
+				},
+			]
+
+			for (let { shape, declarations, lines, printed } of cases) {
+				it(`should run the body the rule picks for ${shape}`, async () => {
+					expect(
+						await run(
+							gaugeProgram(
+								declarations,
+								"\tTerminal.inspect(gauge(3))",
+								...(lines ?? []),
+							),
+						),
+					).toEqual(printed)
+				})
+			}
+
+			it("should still tie the two at a call that names neither", () => {
+				let source = gaugeProgram(
+					[
+						...bigOnExtra,
+						...shown,
+						...integerNamespace(
+							"is Shown, is Big",
+							size,
+							extraString,
+						),
+					],
+					"\tTerminal.inspect(3::describe())",
+				)
+
+				expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+			})
+		})
+	})
+
+	// NOTE: What a body reads decides whether the witness being solved can be
+	// curried onto it, so it is pinned on the standard library's bodies and on
+	// the shapes that hand `@` on.
+	describe("what a provided body reads", () => {
+		function readsOf(
+			returns: string,
+			...body: Array<string>
+		): Array<string> {
+			let enriched = enrich(
+				parseWithDiagnostics(
+					[
+						"implementation {",
+						"\tprotocol Shown is Equatable {",
+						"\t\tsize() -> Integer",
+						"\t\tmerge(_ other: Self) -> Self",
+						"\t\tvisit(_ f: (_: Self) -> Boolean) -> Boolean",
+						"",
+						"\t\toverload label {",
+						"\t\t\t() -> String",
+						"\t\t\t(_ prefix: String) -> String",
+						"\t\t}",
+						"",
+						`\t\tdescribe(_ other: Self) -> ${returns} {`,
+						...body.map((line) => `\t\t\t${line}`),
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				).program,
+			)
+
+			expect(containsErrors(enriched.diagnostics)).toBe(false)
+
+			let declaration = enriched.program.implementation.nodes.find(
+				(node) => node.nodeType === "ProtocolDeclarationStatement",
+			) as common.typed.ProtocolDeclarationStatementNode
+
+			return declaration.protocolType.providedReads?.describe ?? []
+		}
+
+		it("should read the Methods its body calls on `@` and on values of `Self`", () => {
+			expect(
+				readsOf(
+					"Boolean",
+					"<- @::merge(other)::is(other)::and(@::size()::isZero())",
+				),
+			).toEqual(["is", "size", "merge"])
+		})
+
+		it("should read every Overload of a Method it calls", () => {
+			expect(readsOf("String", "<- @::label()")).toEqual([
+				"label__overload$1",
+				"label__overload$2",
+			])
+		})
+
+		it("should read nothing where it answers with `@`", () => {
+			expect(
+				readsOf(
+					"Self",
+					"<- define {",
+					"\tas other if true",
+					"\tas @ otherwise",
+					"}",
+				),
+			).toEqual([])
+		})
+
+		it("should read the entries of the Protocol it hands `@` on as", () => {
+			expect(readsOf("String", '<- "{[@, other]::contains(@)}"')).toEqual(
+				["is", "isNot"],
+			)
+			expect(readsOf("Boolean", "<- [other]::contains(@)")).toEqual([
+				"is",
+				"isNot",
+			])
+		})
+
+		it("should read the entries of the Protocol `@` keys a Dictionary by", () => {
+			expect(readsOf("Boolean", '<- [@ = "a"]::isEmpty()')).toEqual([
+				"is",
+				"isNot",
+			])
+		})
+
+		// NOTE: The literal's Parameter is a `Self`, from the requirement it is
+		// handed to.
+		it("should read what a Function literal calls on the `Self` it is handed", () => {
+			expect(
+				readsOf(
+					"Boolean",
+					"<- @::visit((item) { <- item::size()::isZero() })",
+				),
+			).toEqual(["size", "visit"])
+		})
+
+		it("should read what a Function literal hands its `Self` on as", () => {
+			expect(
+				readsOf(
+					"Boolean",
+					"<- @::visit((item) {",
+					"\tconstant found = [item]::contains(item)",
+					"",
+					"\t<- found",
+					"})",
+				),
+			).toEqual(["is", "isNot", "visit"])
+		})
+
+		// NOTE: The body is typed once before the Program is, to read it, and
+		// that typing leaves nothing behind for the one reported.
+		it("should keep the report of a Function literal nothing types", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Ranked is Comparable {",
+				"\t\tsorter() -> (_: Self) -> Integer {",
+				"\t\t\t<- (item) { <- [item, item]::sort()::length() }",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toContain("uninferable-parameter-type")
+		})
+
+		// NOTE: Nothing the List is asked takes a witness for its items.
+		it("should read nothing where a List of `@` is only counted", () => {
+			expect(
+				readsOf(
+					"Boolean",
+					"constant items = [@, other]",
+					"",
+					"<- items::length()::isZero()",
+				),
+			).toEqual([])
+		})
+
+		it("should read what each standard library body calls", () => {
+			let { protocols } = loadStdlib()
+
+			expect(protocols.Equatable?.providedReads).toEqual({
+				isNot: ["is"],
+			})
+			expect(protocols.Comparable?.providedReads).toEqual({
+				isLessThan: ["compare"],
+				isLessThanOrEqualTo: ["isGreaterThan"],
+				isGreaterThan: ["compare"],
+				isGreaterThanOrEqualTo: ["isLessThan"],
+			})
+			expect(protocols.Orderable?.providedReads).toEqual({
+				isBetween: [
+					"isLessThanOrEqualTo",
+					"isGreaterThan",
+					"isGreaterThanOrEqualTo",
+				],
+				clamp: ["isLessThan", "isGreaterThan"],
+			})
+		})
+	})
+
 	describe("the body's surface", () => {
 		it("should refuse a call the Protocol does not declare", () => {
 			let source = [
@@ -819,6 +3624,45 @@ describe("Protocol-provided Methods", () => {
 			])
 			expect(labelsOf(source)).toEqual([
 				"this needs the 'Sized' conformance that 'IntegerSized' declares",
+			])
+		})
+
+		// NOTE: `Boxes` writes nothing for Equatable, and the witness `contains`
+		// needs is built together with its `Keyed` one, which reads `key` off it.
+		it("should refuse a witness a group builds from a Namespace the Program declares", () => {
+			let source = [
+				"implementation {",
+				"\ttype Box = { n: Integer }",
+				"",
+				"\tprotocol Keyed {",
+				"\t\tkey() -> Integer",
+				"",
+				"\t\tis(_ other: Self) -> Boolean {",
+				"\t\t\t<- @::key()::is(other::key())",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Boxes for Box is Equatable, is Keyed {",
+				"\t\tkey() -> Integer { <- @.n }",
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\tconstant box: Box = { n = @::size() }",
+				"",
+				'\t\t\t<- "held {[box]::contains(box)}"',
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(messagesOf(source)).toEqual([
+				"'Boxes' can not be reached from a provided Method",
+			])
+			expect(labelsOf(source)).toEqual([
+				"this needs the 'Keyed' conformance that 'Boxes' declares",
 			])
 		})
 
@@ -2359,6 +5203,700 @@ describe("Protocol-provided Methods", () => {
 			expect(codesOf(source)).toEqual([
 				"recursive-protocol",
 				"recursive-protocol",
+			])
+		})
+	})
+
+	// NOTE: A descendant's witness answers every bound on its ancestors, so each
+	// Method it restates keeps a signature the ancestor accepts under its key.
+	describe("a restated Method", () => {
+		// NOTE: `A` and a descendant `B`, a Namespace conforming to `B`, and a
+		// Function bounded by `B` that hands its value on to one bounded by `A`.
+		function handedOnProgram(
+			ancestor: Array<string>,
+			descendant: Array<string>,
+			conformer: Array<string>,
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol A {",
+				...ancestor,
+				"\t}",
+				"",
+				"\tprotocol B is A {",
+				...descendant,
+				"\t}",
+				"",
+				"\tnamespace IntegerB for Integer is B {",
+				...conformer,
+				"\t}",
+				"",
+				"\tfunction viaA<infer T is A>(_ t: T) -> String {",
+				'\t\t<- "{t::z()}"',
+				"\t}",
+				"",
+				"\tfunction hand<infer T is B>(_ t: T) -> String {",
+				"\t\t<- viaA(t)",
+				"\t}",
+				"",
+				"\tTerminal.inspect(viaA(3))",
+				"\tTerminal.inspect(hand(3))",
+				"}",
+			].join("\n")
+		}
+
+		const OVERLOADED = [
+			"\t\toverload z {",
+			"\t\t\t() -> String",
+			"\t\t\t(_ n: Integer) -> String",
+			"\t\t}",
+		]
+
+		const OVERLOADS_WRITTEN = [
+			"\t\toverload z {",
+			"\t\t\t() -> String {",
+			'\t\t\t\t<- "Nz"',
+			"\t\t\t}",
+			"",
+			"\t\t\t(_ n: Integer) -> String {",
+			'\t\t\t\t<- "Nz{n}"',
+			"\t\t\t}",
+			"\t\t}",
+		]
+
+		const REFUSED_Z: [string, string, Array<string>] = [
+			"incompatible-restatement",
+			"Protocol 'B' restates 'z' with a signature 'A' does not accept",
+			["'A' declares it as 'z() -> String'"],
+		]
+
+		it("should refuse restating a provided Method as an overload", () => {
+			let source = handedOnProgram(
+				[
+					"\t\ta() -> String",
+					"",
+					"\t\tz() -> String {",
+					'\t\t\t<- "Az"',
+					"\t\t}",
+				],
+				OVERLOADED,
+				[
+					"\t\ta() -> String {",
+					'\t\t\t<- "ia"',
+					"\t\t}",
+					"",
+					...OVERLOADS_WRITTEN,
+				],
+			)
+
+			expect(refusalsOf(source)).toEqual([REFUSED_Z])
+			expect(notesOf(source)).toEqual([
+				"Whatever conforms to 'B' conforms to 'A' as well, so a call through 'A' reaches this 'z' and calls it as 'A' declares it.",
+				"A call through 'A' reaches the one 'z' it declares, and an 'overload' block keeps each of its signatures as an entry of its own, so none of them is that one.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Restate 'z' as the one signature 'A' declares for it, 'z() -> String', and give the other signatures a name of their own.",
+			])
+		})
+
+		it("should refuse restating a requirement as an overload", () => {
+			expect(
+				refusalsOf(
+					handedOnProgram(
+						["\t\tz() -> String"],
+						OVERLOADED,
+						OVERLOADS_WRITTEN,
+					),
+				),
+			).toEqual([REFUSED_Z])
+		})
+
+		it("should refuse restating a provided Method with another Type", () => {
+			expect(
+				refusalsOf(
+					handedOnProgram(
+						[
+							"\t\ta() -> String",
+							"",
+							"\t\tz() -> String {",
+							'\t\t\t<- "Az"',
+							"\t\t}",
+						],
+						["\t\tz() -> Integer {", "\t\t\t<- 7", "\t\t}"],
+						["\t\ta() -> String {", '\t\t\t<- "ia"', "\t\t}"],
+					),
+				),
+			).toEqual([REFUSED_Z])
+		})
+
+		it("should refuse restating it with a Parameter the ancestor's does not take", () => {
+			expect(
+				refusalsOf(
+					handedOnProgram(
+						["\t\tz() -> String {", '\t\t\t<- "Az"', "\t\t}"],
+						["\t\tz(_ n: Integer) -> String"],
+						[
+							"\t\tz(_ n: Integer) -> String {",
+							'\t\t\t<- "Nz{n}"',
+							"\t\t}",
+						],
+					),
+				),
+			).toEqual([REFUSED_Z])
+		})
+
+		it("should refuse restating a standard library requirement as an overload", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Odd is Equatable {",
+						"\t\toverload is {",
+						"\t\t\t(_ other: Self) -> Boolean",
+						"\t\t\t(_ other: Integer) -> Boolean",
+						"\t\t}",
+						"",
+						"\t\thas(_ o: Self) -> Boolean {",
+						"\t\t\t<- [@]::contains(o)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Bag = { k: Integer }",
+						"",
+						"\tnamespace Bags for Bag is Odd {",
+						"\t\toverload is {",
+						"\t\t\t(_ other: Bag) -> Boolean {",
+						"\t\t\t\t<- @.k::is(other.k)",
+						"\t\t\t}",
+						"",
+						"\t\t\t(_ other: Integer) -> Boolean {",
+						"\t\t\t\t<- @.k::is(other)",
+						"\t\t\t}",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction viaUser<infer T is Odd>(_ a: T, _ b: T) -> Boolean {",
+						"\t\t<- [a]::contains(b)",
+						"\t}",
+						"",
+						"\tconstant a: Bag = { k = 1 }",
+						"\tTerminal.inspect(viaUser(a, a))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Odd' restates 'is' with a signature 'Equatable' does not accept",
+					["'Equatable' declares it as 'is(_ Self) -> Boolean'"],
+				],
+			])
+		})
+
+		it("should refuse a Protocol whose two extensions declare one Method apart", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Labelled {",
+				"\t\ttag() -> String {",
+				'\t\t\t<- "L"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Coded {",
+				"\t\ttag() -> Integer {",
+				"\t\t\t<- 5",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Both is Labelled, is Coded {}",
+				"}",
+			].join("\n")
+
+			expect(refusalsOf(source)).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Both' inherits 'tag' with a signature 'Labelled' does not accept",
+					[
+						"'tag' comes from 'Coded' as 'tag() -> Integer'",
+						"'Labelled' declares it as 'tag() -> String'",
+					],
+				],
+			])
+			expect(helpsOf(source)).toEqual([
+				"Declare 'tag' with one signature in 'Coded' and 'Labelled', or give one of the two Methods a name of its own.",
+			])
+		})
+
+		it("should report a conformance a refused restatement breaks only there", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"\t\tdescribe() -> String",
+						"\t}",
+						"",
+						"\tprotocol Base {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "base {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Derived is Base {",
+						"\t\tdescribe(_ p: String) -> String {",
+						'\t\t\t<- "derived {p} {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace IntegerD for Integer is Sized, is Derived {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction gauge<infer Item is Sized>(_ item: Item) -> String {",
+						"\t\t<- item::describe()",
+						"\t}",
+						"",
+						"\tTerminal.print(gauge(3))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Derived' restates 'describe' with a signature 'Base' does not accept",
+					["'Base' declares it as 'describe() -> String'"],
+				],
+			])
+		})
+
+		it("should hand a value on through a requirement restated with its signature", async () => {
+			expect(
+				await run(
+					handedOnProgram(
+						["\t\tz() -> String"],
+						["\t\tz() -> String"],
+						["\t\tz() -> String {", '\t\t\t<- "Nz"', "\t\t}"],
+					),
+				),
+			).toEqual(['"Nz"', '"Nz"'])
+		})
+
+		it("should hand a value on through a body restated with a narrower answer", async () => {
+			expect(
+				await run(
+					handedOnProgram(
+						["\t\tz() -> Number {", "\t\t\t<- 1/2", "\t\t}"],
+						["\t\tz() -> Integer {", "\t\t\t<- 7", "\t\t}"],
+						[],
+					),
+				),
+			).toEqual(['"7"', '"7"'])
+		})
+
+		it("should hand a value on through an overload restated as its ancestor declares it", async () => {
+			expect(
+				await run(
+					handedOnProgram(
+						OVERLOADED,
+						OVERLOADED,
+						OVERLOADS_WRITTEN,
+					).replace('"{t::z()}"', '"{t::z()} {t::z(5)}"'),
+				),
+			).toEqual(['"Nz Nz5"', '"Nz Nz5"'])
+		})
+
+		it("should accept a Method two extensions reach from one ancestor", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Top {",
+						"\t\tbase() -> String",
+						"\t}",
+						"",
+						"\tprotocol Left is Top {",
+						"\t\tleft() -> String {",
+						'\t\t\t<- "l {@::base()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Right is Top {",
+						"\t\tright() -> String {",
+						'\t\t\t<- "r {@::base()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Both is Left, is Right {}",
+						"",
+						"\tnamespace IntegerBoth for Integer is Both {",
+						"\t\tbase() -> String {",
+						'\t\t\t<- "b"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction viaTop<infer T is Top>(_ t: T) -> String {",
+						"\t\t<- t::base()",
+						"\t}",
+						"",
+						"\tfunction viaBoth<infer T is Both>(_ t: T) -> String {",
+						'\t\t<- "{viaTop(t)} {t::left()} {t::right()}"',
+						"\t}",
+						"",
+						"\tTerminal.inspect(viaBoth(3))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"b l b r b"'])
+		})
+
+		// NOTE: `Narrow` restates `Base`'s `z` with a narrower answer and `Reader`
+		// inherits it as `Base` declares it, so `Both` takes `Narrow`'s whichever
+		// clause comes first.
+		function narrowedDiamond(clauses: string): string {
+			return [
+				"implementation {",
+				"\tprotocol Base {",
+				"\t\tz() -> Number",
+				"\t}",
+				"",
+				"\tprotocol Narrow is Base {",
+				"\t\tz() -> Integer",
+				"\t}",
+				"",
+				"\tprotocol Reader is Base {",
+				"\t\tw() -> String {",
+				'\t\t\t<- "w{@::z()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				`\tprotocol Both is ${clauses} {}`,
+				"",
+				"\tnamespace IntegerBoth for Integer is Both {",
+				"\t\tz() -> Integer {",
+				"\t\t\t<- @::add(1)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction viaNarrow<infer T is Narrow>(_ t: T) -> Integer {",
+				"\t\t<- t::z()",
+				"\t}",
+				"",
+				"\tfunction viaReader<infer T is Reader>(_ t: T) -> String {",
+				"\t\t<- t::w()",
+				"\t}",
+				"",
+				"\tfunction viaBoth<infer T is Both>(_ t: T) -> String {",
+				"\t\tconstant i: Integer = viaNarrow(t)",
+				'\t\t<- "{i} {viaReader(t)} {t::z()::add(1)}"',
+				"\t}",
+				"",
+				"\tTerminal.inspect(viaBoth(3))",
+				"}",
+			].join("\n")
+		}
+
+		it("should take the entry of one extension the other accepts, in either clause order", async () => {
+			for (let clauses of ["Narrow, is Reader", "Reader, is Narrow"]) {
+				expect(await run(narrowedDiamond(clauses))).toEqual([
+					'"4 w4 5"',
+				])
+			}
+		})
+
+		// NOTE: `Counted` provides a `z` answering an Integer and `Weighed` one
+		// answering a Number, so `Both` takes `Counted`'s entry and its body.
+		it("should run the body of the extension whose entry it takes, in either clause order", async () => {
+			for (let clauses of [
+				"Counted, is Weighed",
+				"Weighed, is Counted",
+			]) {
+				expect(
+					await run(
+						[
+							"implementation {",
+							"\tprotocol Counted {",
+							"\t\tv() -> Integer",
+							"",
+							"\t\tz() -> Integer {",
+							"\t\t\t<- @::v()",
+							"\t\t}",
+							"\t}",
+							"",
+							"\tprotocol Weighed {",
+							"\t\tw() -> Integer",
+							"",
+							"\t\tz() -> Number {",
+							"\t\t\t<- @::w()",
+							"\t\t}",
+							"\t}",
+							"",
+							`\tprotocol Both is ${clauses} {}`,
+							"",
+							"\tnamespace IntegerBoth for Integer is Both {",
+							"\t\tv() -> Integer {",
+							"\t\t\t<- 10",
+							"\t\t}",
+							"",
+							"\t\tw() -> Integer {",
+							"\t\t\t<- 20",
+							"\t\t}",
+							"\t}",
+							"",
+							"\tfunction viaWeighed<infer T is Weighed>(_ t: T) -> Number {",
+							"\t\t<- t::z()",
+							"\t}",
+							"",
+							"\tfunction viaCounted<infer T is Counted>(_ t: T) -> Integer {",
+							"\t\t<- t::z()",
+							"\t}",
+							"",
+							"\tfunction viaBoth<infer T is Both>(_ t: T) -> String {",
+							'\t\t<- "{viaWeighed(t)} {viaCounted(t)} {t::z()}"',
+							"\t}",
+							"",
+							"\tTerminal.inspect(viaBoth(1))",
+							"\tTerminal.inspect(viaWeighed(2))",
+							"}",
+						].join("\n"),
+					),
+				).toEqual(['"10 10 10"', "10"])
+			}
+		})
+
+		// NOTE: `Halved` provides a `z` answering a Number and `Counted` one
+		// answering an Integer, and a Function bounded by the extending Protocol
+		// hands its value on to one bounded by `Halved`.
+		function answeredApart(
+			declarations: Array<string>,
+			conformances: string,
+			extending: string,
+			written: Array<string> = [],
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Halved {",
+				"\t\th() -> Integer",
+				"",
+				"\t\tz() -> Number {",
+				"\t\t\t<- @::h()::add(1/2)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Counted {",
+				"\t\tv() -> Integer",
+				"",
+				"\t\tz() -> Integer {",
+				"\t\t\t<- @::v()",
+				"\t\t}",
+				"\t}",
+				"",
+				...declarations,
+				"",
+				`\tnamespace IntegerN for Integer is ${conformances} {`,
+				...written,
+				"\t\th() -> Integer {",
+				"\t\t\t<- 20",
+				"\t\t}",
+				"",
+				"\t\tv() -> Integer {",
+				"\t\t\t<- 30",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction viaHalved<infer T is Halved>(_ t: T) -> Number {",
+				"\t\t<- t::z()",
+				"\t}",
+				"",
+				`\tfunction hand<infer T is ${extending}>(_ t: T) -> Number {`,
+				"\t\t<- viaHalved(t)",
+				"\t}",
+				"",
+				'\tTerminal.inspect("{viaHalved(3)} {hand(3)}")',
+				"}",
+			].join("\n")
+		}
+
+		const APART = [
+			{
+				shape: "an extension taking the other's entry",
+				declarations: ["\tprotocol Both is Counted, is Halved {}"],
+				conformances: "Halved, is Both",
+				extending: "Both",
+			},
+			{
+				shape: "an extension taking the other's entry, clauses swapped",
+				declarations: ["\tprotocol Both is Halved, is Counted {}"],
+				conformances: "Halved, is Both",
+				extending: "Both",
+			},
+			{
+				shape: "an extension restating the Method as a requirement",
+				declarations: [
+					"\tprotocol Whole is Halved {",
+					"\t\tz() -> Integer",
+					"\t}",
+				],
+				conformances: "Whole, is Counted",
+				extending: "Whole",
+			},
+		]
+
+		for (let { shape, declarations, conformances, extending } of APART) {
+			it(`should refuse a Namespace answering a Method with two bodies through ${shape}`, () => {
+				let source = answeredApart(
+					declarations,
+					conformances,
+					extending,
+				)
+
+				expect(refusalsOf(source)).toEqual([
+					[
+						"nonconforming-namespace",
+						`Namespace 'IntegerN' does not conform to '${extending}'`,
+						[
+							`Method 'z' runs one body for '${extending}' and another for 'Halved'`,
+						],
+					],
+				])
+				expect(notesOf(source)).toEqual([
+					`'z' runs the body 'Counted' provides for '${extending}', and the body 'Halved' provides for 'Halved'.`,
+					`A value bounded by '${extending}' can be handed to a bound on 'Halved', and a bound runs one body.`,
+				])
+				expect(helpsOf(source)).toEqual([
+					`Write 'z' in 'IntegerN' as '${extending}' declares it, so one Method answers both.`,
+				])
+			})
+
+			it(`should run the Method the Namespace writes for both through ${shape}`, async () => {
+				expect(
+					await run(
+						answeredApart(declarations, conformances, extending, [
+							"\t\tz() -> Integer {",
+							"\t\t\t<- 7",
+							"\t\t}",
+							"",
+						]),
+					),
+				).toEqual(['"7 7"'])
+			})
+		}
+
+		// NOTE: `Named` declares a `z` answering a String, so no `z` the
+		// Namespace writes answers both it and `Both`.
+		it("should ask a conformance declaring the Method apart to move before the Namespace writes it", async () => {
+			let named = [
+				"\tprotocol Both is Counted, is Halved {}",
+				"",
+				"\tprotocol Named {",
+				"\t\tz() -> String {",
+				'\t\t\t<- "named"',
+				"\t\t}",
+				"\t}",
+			]
+			let source = answeredApart(
+				named,
+				"Halved, is Both, is Named",
+				"Both",
+			)
+
+			expect(refusalsOf(source)).toEqual([
+				[
+					"nonconforming-namespace",
+					"Namespace 'IntegerN' does not conform to 'Both'",
+					[
+						"Method 'z' runs one body for 'Both' and another for 'Halved'",
+					],
+				],
+			])
+			expect(notesOf(source)).toEqual([
+				"'z' runs the body 'Counted' provides for 'Both', and the body 'Halved' provides for 'Halved'.",
+				"A value bounded by 'Both' can be handed to a bound on 'Halved', and a bound runs one body.",
+				"'Both' and 'Named' declare 'z' apart, so a 'z' written as 'Both' declares it refuses the 'is Named' here.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Declare 'is Named' on a Namespace of its own, and write 'z' in 'IntegerN' as 'Both' declares it.",
+			])
+			expect(
+				await run(
+					answeredApart(
+						[
+							...named,
+							"",
+							"\tnamespace IntegerNamed for Integer is Named {}",
+						],
+						"Halved, is Both",
+						"Both",
+						["\t\tz() -> Integer {", "\t\t\t<- 7", "\t\t}", ""],
+					),
+				),
+			).toEqual(['"7 7"'])
+		})
+
+		it("should refuse two extensions declaring one Method apart, in either clause order", () => {
+			for (let [clauses, from, refused] of [
+				["Labelled, is Coded", "Coded", "Labelled"],
+				["Coded, is Labelled", "Labelled", "Coded"],
+			] as const) {
+				let signature = (name: string) =>
+					`'tag() -> ${name === "Coded" ? "Integer" : "String"}'`
+
+				expect(
+					refusalsOf(
+						[
+							"implementation {",
+							"\tprotocol Labelled {",
+							"\t\ttag() -> String",
+							"\t}",
+							"",
+							"\tprotocol Coded {",
+							"\t\ttag() -> Integer",
+							"\t}",
+							"",
+							`\tprotocol Both is ${clauses} {}`,
+							"}",
+						].join("\n"),
+					),
+				).toEqual([
+					[
+						"incompatible-restatement",
+						`Protocol 'Both' inherits 'tag' with a signature '${refused}' does not accept`,
+						[
+							`'tag' comes from '${from}' as ${signature(from)}`,
+							`'${refused}' declares it as ${signature(refused)}`,
+						],
+					],
+				])
+			}
+		})
+
+		it("should report an extension's refused restatement where it is made alone", () => {
+			expect(
+				refusalsOf(
+					[
+						"implementation {",
+						"\tprotocol Labelled {",
+						"\t\ttag() -> String",
+						"\t}",
+						"",
+						"\tprotocol Coded is Labelled {",
+						"\t\ttag() -> Integer",
+						"\t}",
+						"",
+						"\tprotocol Both is Labelled, is Coded {}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				[
+					"incompatible-restatement",
+					"Protocol 'Coded' restates 'tag' with a signature 'Labelled' does not accept",
+					["'Labelled' declares it as 'tag() -> String'"],
+				],
 			])
 		})
 	})

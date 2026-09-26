@@ -5529,6 +5529,63 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// NOTE: `Shown` provides a `describe` answering any Number, which is no
+		// answer to the one `Sized` requires, and an Integer answers both.
+		let describing = (sized: string, shown: string): Array<string> => [
+			"implementation {",
+			"\tprotocol Sized {",
+			`\t\tdescribe() -> ${sized}`,
+			"\t}",
+			"",
+			"\tprotocol Shown {",
+			`\t\tdescribe() -> ${shown} {`,
+			"\t\t\t<- 1",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tnamespace IntegerBoth for Integer is Sized, is Shown {",
+			"\t}",
+			"}",
+		]
+
+		it("should write a requirement another Protocol's body does not fulfil", () => {
+			let lines = describing("Integer", "Number")
+			let refactors = actionsOf(lines, {
+				start: { line: 12, column: 2 },
+				end: { line: 12, column: 11 },
+			})
+
+			expect(refactors.map((refactor) => refactor.title)).toEqual([
+				"Implement 'Sized'",
+			])
+			expect(applied(lines, refactors[0]!)[12]).toBe(
+				"\t\tdescribe() -> Integer {}",
+			)
+			expect(codesOf(applied(lines, refactors[0]!))).not.toContain(
+				"nonconforming-namespace",
+			)
+		})
+
+		// NOTE: A `describe` answering a String replaces the one `Shown`
+		// provides without fulfilling it, so the stub would be refused as well.
+		it("should offer no stub another conformance would refuse", () => {
+			let lines = describing("String", "Integer")
+
+			expect(
+				titles(actionsOf(lines)).filter((title) =>
+					title.startsWith("Implement"),
+				),
+			).toEqual([])
+			expect(
+				titles(
+					actionsOf(lines, {
+						start: { line: 12, column: 2 },
+						end: { line: 12, column: 11 },
+					}),
+				),
+			).not.toContain("Implement 'Sized'")
+		})
+
 		// NOTE: The refactoring stands down on the clause itself rather than
 		// offering the reader one edit under one title twice.
 		it("should not repeat the Quick Fix on the clause it answers", () => {

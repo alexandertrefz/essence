@@ -562,6 +562,7 @@ export type DiagnosticCode =
 	| "where-on-protocol-extension"
 	| "unwritable-provided-method"
 	| "recursive-protocol"
+	| "incompatible-restatement"
 	| "method-not-on-protocol"
 	| "provided-method-out-of-reach"
 	| "clashing-provided-method"
@@ -999,6 +1000,10 @@ export type ProtocolType = {
 	// that wrote it, this one or an ancestor. A name in here is not a
 	// requirement: a conformer that writes nothing still answers it.
 	providedMethods?: Record<string, string>
+	// NOTE: For each body this Protocol wrote, the entries of its witness the
+	// body reads. A witness of another Protocol may stand in for it where it
+	// holds each of them under the same answer.
+	providedReads?: Record<string, Array<string>>
 	// NOTE: The identities of every Protocol this one extends, directly or not,
 	// so that "does conforming to this grant that" is a lookup, not a walk.
 	conformsTo?: Array<string>
@@ -1275,12 +1280,23 @@ export type ConformanceSource =
 			kind: "namespace"
 			name: string
 			methodMap: Record<string, string>
-			// NOTE: The Protocol's provided Methods this conformer does not
-			// override, each under the identity of the Protocol that wrote the
-			// body. They are no Methods of the Namespace: the emitted const takes
-			// the finished witness as its trailing Argument. Absent where the
-			// Protocol provides nothing, so such a witness is a plain object.
+			// NOTE: The provided Methods this conformer does not override, each
+			// under the identity of the Protocol whose body answers it. Absent
+			// where there are none, so such a witness is a plain object.
 			providedMethods?: Record<string, string>
+			// NOTE: For a provided Method whose body reads more than this witness
+			// holds, the index of the witness it is curried with: 0 for this one,
+			// and n for the n-th of `providedWitnesses`.
+			curriedWith?: Record<string, number>
+			// NOTE: This conformer's witnesses for the Protocols whose bodies
+			// `curriedWith` sends elsewhere, built together with this one.
+			providedWitnesses?: Array<ProvidedWitness>
+			// NOTE: The conditions those witnesses take that `conditions` does
+			// not hold, so the group solves and builds each condition once.
+			groupConditions?: Array<Conformance>
+			// NOTE: The conditions those witnesses take that the group of one of
+			// `conditions` or `groupConditions` builds, taken from that group.
+			sharedConditions?: Array<SharedCondition>
 			// NOTE: The recursively solved conformances for this Namespace's
 			// own `where` conditions, ordered by its Generic declaration order
 			// so they line up with the fulfilling Methods' hidden trailing
@@ -1308,6 +1324,31 @@ export type ConformanceSource =
 			derivedCases?: Array<string>
 	  }
 	| { kind: "parameter"; name: string }
+
+// NOTE: One more witness of a `namespace` source's conformer, for the Protocol
+// that wrote a body the source runs. Its `curriedWith` counts as the source's
+// does.
+export type ProvidedWitness = {
+	// NOTE: The identity of the Protocol the witness is for.
+	protocolName: string
+	// NOTE: The Namespace its map reads off: the source's, or the one a Choice
+	// derives, with the plan a generic Choice's equality follows.
+	name: string
+	derivedDescriptor?: DerivedEquatableDescriptor
+	methodMap: Record<string, string>
+	providedMethods?: Record<string, string>
+	curriedWith?: Record<string, number>
+	// NOTE: The conditions curried onto its map, by index into the source's
+	// `conditions`, then its `groupConditions`, then its `sharedConditions`.
+	conditionIndices: Array<number>
+}
+
+// NOTE: A witness another condition's group builds: that condition's index,
+// and the witness's in its group, where 0 is the one the group answers with.
+export type SharedCondition = {
+	condition: number
+	witness: number
+}
 
 export type Conformance = {
 	genericName: string

@@ -3085,6 +3085,37 @@ describe("Enricher", () => {
 				"Namespace 'VectorCreatable' does not conform to 'Creatable'",
 			)
 		})
+
+		it("should say at a bounded call which requirement the Namespace does not write", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Described {
+					describe() -> String
+				}
+
+				namespace IntegerDescribed for Integer is Described {}
+
+				function show<infer Item is Described>(_ item: Item) -> String {
+					<- item::describe()
+				}
+
+				constant shown: String = show(3)
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.notes,
+				]),
+			).toEqual([
+				["nonconforming-namespace", []],
+				[
+					"nonconforming-namespace",
+					[
+						"'IntegerDescribed' does not write 'describe', which 'Described' requires.",
+					],
+				],
+			])
+		})
 	})
 
 	describe("Conditional Conformance", () => {

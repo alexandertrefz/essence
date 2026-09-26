@@ -3675,6 +3675,227 @@ function isStructurallyEquatable(
 function rewriteConformanceValue(
 	node: common.typedSimple.ConformanceValueNode,
 ): estree.ObjectExpression | estree.CallExpression {
+	if (node.providedWitnesses !== undefined) {
+		return rewriteWitnessGroup(node, node.providedWitnesses)
+	}
+
+	let witness = rewriteWitnessMethods(node)
+	let provided = Object.entries(node.providedMethods ?? {})
+
+	if (provided.length === 0) {
+		return witness
+	}
+
+	// NOTE: OUTSIDE `boundConformance`, never inside it: a provided const takes
+	// the witness of `Self` alone, and the conditions belong to the Methods the
+	// Namespace WROTE. Wrapping the other way round would curry a `where`
+	// condition's witness onto a body that never declared one.
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "providedConformance" },
+			computed: false,
+		},
+		arguments: [
+			witness,
+			{
+				type: "ObjectExpression",
+				properties: provided.map(
+					([memberName, protocolName]): estree.Property => ({
+						type: "Property",
+						key: memberKey(memberName),
+						value: {
+							type: "Identifier",
+							name: providedMemberIdentifier(
+								protocolName,
+								memberName,
+							),
+						},
+						kind: "init",
+						method: false,
+						shorthand: false,
+						computed: false,
+					}),
+				),
+			},
+		],
+	}
+}
+
+// NOTE: A conformer's witnesses, built in one call so each provided body can
+// name the one it is curried with, and each condition is built once:
+// `$type.providedConformances(methods, provided, conditions, curried, shared)`.
+function rewriteWitnessGroup(
+	node: common.typedSimple.ConformanceValueNode,
+	others: Array<common.typedSimple.ConformanceValueNode>,
+): estree.CallExpression {
+	let group = [node, ...others]
+	let conditions = [...node.conditions, ...(node.groupConditions ?? [])]
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "providedConformances" },
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "ArrayExpression",
+				elements: group.map(witnessMethodMap),
+			},
+			{
+				type: "ArrayExpression",
+				elements: group.map(
+					(member, index): estree.ObjectExpression => ({
+						type: "ObjectExpression",
+						properties: Object.entries(
+							member.providedMethods ?? {},
+						).map(
+							([memberName, protocolName]): estree.Property => ({
+								type: "Property",
+								key: memberKey(memberName),
+								value: {
+									type: "ArrayExpression",
+									elements: [
+										{
+											type: "Identifier",
+											name: providedMemberIdentifier(
+												protocolName,
+												memberName,
+											),
+										},
+										{
+											type: "Literal",
+											value: curriedIndexOf(
+												member,
+												memberName,
+												index,
+											),
+										},
+									],
+								},
+								kind: "init",
+								method: false,
+								shorthand: false,
+								computed: false,
+							}),
+						),
+					}),
+				),
+			},
+			...(conditions.length === 0
+				? []
+				: [
+						{
+							type: "ArrayExpression" as const,
+							elements: conditions.map((condition) =>
+								rewriteExpression(condition),
+							),
+						},
+						{
+							type: "ArrayExpression" as const,
+							elements: group.map(
+								(member, index): estree.ArrayExpression => ({
+									type: "ArrayExpression",
+									elements: (index === 0
+										? node.conditions.map((_, at) => at)
+										: (member.conditionIndices ?? [])
+									).map((value) => ({
+										type: "Literal",
+										value,
+									})),
+								}),
+							),
+						},
+					]),
+			...(node.sharedConditions === undefined
+				? []
+				: [
+						{
+							type: "ArrayExpression" as const,
+							elements: node.sharedConditions.map(
+								(shared): estree.ArrayExpression => ({
+									type: "ArrayExpression",
+									elements: [
+										{
+											type: "Literal",
+											value: shared.condition,
+										},
+										{
+											type: "Literal",
+											value: shared.witness,
+										},
+									],
+								}),
+							),
+						},
+					]),
+		],
+	}
+}
+
+// NOTE: The witness a provided body is curried with, by its index in the group.
+// `Object.hasOwn`, since a body named `toString` would read the prototype's.
+function curriedIndexOf(
+	member: common.typedSimple.ConformanceValueNode,
+	memberName: string,
+	own: number,
+): number {
+	return member.curriedWith !== undefined &&
+		Object.hasOwn(member.curriedWith, memberName)
+		? member.curriedWith[memberName]!
+		: own
+}
+
+// NOTE: The witness's own Methods, with the conditions curried on: everything
+// but its provided bodies.
+function rewriteWitnessMethods(
+	node: common.typedSimple.ConformanceValueNode,
+): estree.ObjectExpression | estree.CallExpression {
+	let methodMap = witnessMethodMap(node)
+
+	// NOTE: An unconditional witness is the plain method-map literal, so its
+	// emission stays byte-identical. A conditional one is
+	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each on.
+	if (node.conditions.length === 0) {
+		return methodMap
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "boundConformance" },
+			computed: false,
+		},
+		arguments: [
+			methodMap,
+			{
+				type: "ArrayExpression",
+				elements: node.conditions.map((condition) =>
+					rewriteExpression(condition),
+				),
+			},
+		],
+	}
+}
+
+// NOTE: The witness's own Methods as the object literal that maps them, before
+// any condition is curried on.
+function witnessMethodMap(
+	node: common.typedSimple.ConformanceValueNode,
+): estree.ObjectExpression {
 	let methodMap: estree.ObjectExpression = {
 		type: "ObjectExpression",
 		properties: Object.entries(node.methodMap).map(
@@ -3722,82 +3943,7 @@ function rewriteConformanceValue(
 		})
 	}
 
-	// NOTE: An unconditional conformance with nothing provided is exactly the
-	// plain method-map object literal — kept byte-identical so its emit
-	// snapshots do not churn, the brand above being the one thing that may
-	// stand in it. A conditional one wraps it in
-	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each `where`
-	// condition's witness onto every Method so the bounded runtime helpers
-	// receive them as hidden trailing Arguments.
-	let witness: estree.Expression = methodMap
-
-	if (node.conditions.length > 0) {
-		witness = {
-			type: "CallExpression",
-			optional: false,
-			callee: {
-				type: "MemberExpression",
-				optional: false,
-				object: { type: "Identifier", name: "$type" },
-				property: { type: "Identifier", name: "boundConformance" },
-				computed: false,
-			},
-			arguments: [
-				methodMap,
-				{
-					type: "ArrayExpression",
-					elements: node.conditions.map((condition) =>
-						rewriteExpression(condition),
-					),
-				},
-			],
-		}
-	}
-
-	let provided = Object.entries(node.providedMethods ?? {})
-
-	if (provided.length === 0) {
-		return witness
-	}
-
-	// NOTE: OUTSIDE `boundConformance`, never inside it: a provided const takes
-	// the witness of `Self` alone, and the conditions belong to the Methods the
-	// Namespace WROTE. Wrapping the other way round would curry a `where`
-	// condition's witness onto a body that never declared one.
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
-			type: "MemberExpression",
-			optional: false,
-			object: { type: "Identifier", name: "$type" },
-			property: { type: "Identifier", name: "providedConformance" },
-			computed: false,
-		},
-		arguments: [
-			witness,
-			{
-				type: "ObjectExpression",
-				properties: provided.map(
-					([memberName, protocolName]): estree.Property => ({
-						type: "Property",
-						key: memberKey(memberName),
-						value: {
-							type: "Identifier",
-							name: providedMemberIdentifier(
-								protocolName,
-								memberName,
-							),
-						},
-						kind: "init",
-						method: false,
-						shorthand: false,
-						computed: false,
-					}),
-				),
-			},
-		],
-	}
+	return methodMap
 }
 
 function rewriteVariableAssignmentStatement(

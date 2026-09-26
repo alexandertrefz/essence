@@ -13,6 +13,7 @@ import {
 } from "../diagnostics/index"
 import { oneBoundOnly } from "../helpers/bounds"
 import {
+	type ConformanceCheckResult,
 	type ConformanceMethodMap,
 	computeConformanceMethodMap,
 	conformanceIsStructural,
@@ -22,12 +23,16 @@ import {
 	derivedPrintableNamespaceName,
 	equatableProtocolName,
 	missingRequirements,
+	providedBodyFulfils,
 	providedMethodProtocol,
+	restatementAccepts,
+	writtenRequirementFulfils,
 } from "../helpers/conformance"
 import { recordDefaultMembers, recordDefaultNesting } from "../helpers/defaults"
 import {
 	choiceIdentity,
 	countOf,
+	describeParameter,
 	describeType,
 	displayChoiceName,
 	displayGenericName,
@@ -52,6 +57,7 @@ import {
 	parameterInternalName,
 } from "../helpers/names"
 import { type NamespaceReach } from "../helpers/providedReach"
+import { methodsRead, providedBodyReads } from "../helpers/providedReads"
 import { closestMatch } from "../helpers/suggest"
 import {
 	applyGenericBindings,
@@ -70,6 +76,7 @@ import {
 	typeContainsError,
 	typeMentionsGeneric,
 } from "../helpers/types"
+import { printType } from "../printType"
 import { recordAnnotation } from "./annotations"
 import {
 	bodyCanWait,
@@ -2637,6 +2644,8 @@ export function resolveProtocolDeclarationStatementType(
 	// emitted once, under its writer, however far down the chain it is reached.
 	let providedMethods: Record<string, string> = {}
 	let conformsTo: Array<string> = []
+	let ancestors: Array<DeclaredAncestor> = []
+	let inherited = new Map<string, Array<common.MethodType>>()
 
 	// NOTE: The ancestors first, so the Protocol's own entries below overwrite
 	// them — writing a Method of an inherited name replaces it here exactly as
@@ -2649,6 +2658,8 @@ export function resolveProtocolDeclarationStatementType(
 				continue
 			}
 
+			ancestors.push({ clause, ancestor })
+
 			for (let ancestorIdentity of [
 				ancestor.identity,
 				...(ancestor.conformsTo ?? []),
@@ -2658,8 +2669,25 @@ export function resolveProtocolDeclarationStatementType(
 				}
 			}
 
-			Object.assign(methods, ancestor.methods)
+			for (let [methodName, method] of Object.entries(ancestor.methods)) {
+				inherited.set(methodName, [
+					...(inherited.get(methodName) ?? []),
+					method,
+				])
+			}
+
 			Object.assign(providedMethods, ancestor.providedMethods ?? {})
+		}
+	}
+
+	for (let [methodName, entries] of inherited) {
+		let entry = inheritedEntry(methodName, entries)
+		let writer = inheritedBodyWriter(methodName, entry, ancestors)
+
+		methods[methodName] = entry
+
+		if (writer !== null) {
+			providedMethods[methodName] = writer
 		}
 	}
 
@@ -2680,7 +2708,21 @@ export function resolveProtocolDeclarationStatementType(
 		}
 	}
 
-	return {
+	let providedReads: Record<string, Array<string>> = {}
+
+	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		let body = protocolMethodBody(methodValue)
+
+		if (body !== null) {
+			providedReads[methodName] = providedBodyReads(
+				body.value,
+				methods[methodName]!,
+				methods,
+			)
+		}
+	}
+
+	let protocol: common.ProtocolType = {
 		type: "Protocol",
 		name: node.name.content,
 		identity,
@@ -2688,9 +2730,191 @@ export function resolveProtocolDeclarationStatementType(
 		...(Object.keys(providedMethods).length === 0
 			? {}
 			: { providedMethods }),
+		...(Object.keys(providedReads).length === 0 ? {} : { providedReads }),
 		...(conformsTo.length === 0 ? {} : { conformsTo }),
 		documentation: node.documentation ?? undefined,
 	}
+
+	declaredAncestors.set(protocol, ancestors)
+
+	return protocol
+}
+
+type DeclaredAncestor = {
+	clause: parser.ConformanceClauseNode
+	ancestor: common.ProtocolType
+}
+
+// NOTE: The Protocol each clause of a declaration extends, as the clause read
+// where it is written, since by the time anything asks the name may bind the
+// declaration itself.
+let declaredAncestors = new WeakMap<
+	common.ProtocolType,
+	Array<DeclaredAncestor>
+>()
+
+export type IncompatibleRestatement = {
+	methodName: string
+	// NOTE: The clause whose Protocol declares the Method in a way the entry
+	// does not accept.
+	refused: DeclaredAncestor
+	// NOTE: The clause the entry came from, or null where the Protocol writes it.
+	source: DeclaredAncestor | null
+}
+
+// NOTE: Of the entries the extensions hold under one name, the one each of the
+// others accepts in its place, or the last where none is, which is refused.
+function inheritedEntry(
+	methodName: string,
+	entries: Array<common.MethodType>,
+): common.MethodType {
+	return (
+		entries.findLast((entry) =>
+			entries.every(
+				(other) =>
+					other === entry ||
+					typeContainsError(other) ||
+					typeContainsError(entry) ||
+					restatementAccepts(methodName, other, entry),
+			),
+		) ?? entries.at(-1)!
+	)
+}
+
+// NOTE: The Protocol whose body goes with an inherited entry: the body of the
+// extension the entry comes from, or else the last body that fulfils it, or null
+// where none does, which leaves the last extension's.
+function inheritedBodyWriter(
+	methodName: string,
+	entry: common.MethodType,
+	ancestors: Array<DeclaredAncestor>,
+): string | null {
+	let writing = ancestors.filter(
+		({ ancestor }) => providedMethodProtocol(ancestor, methodName) !== null,
+	)
+	let carrying =
+		writing.findLast(
+			({ ancestor }) => ancestor.methods[methodName] === entry,
+		) ??
+		writing.findLast(({ ancestor }) => {
+			let inherited = ancestor.methods[methodName]
+
+			return (
+				inherited !== undefined &&
+				restatementAccepts(methodName, entry, inherited)
+			)
+		})
+
+	return carrying === undefined
+		? null
+		: providedMethodProtocol(carrying.ancestor, methodName)
+}
+
+let restatementsOf = new WeakMap<
+	common.ProtocolType,
+	Array<IncompatibleRestatement>
+>()
+
+// NOTE: The entries a Protocol holds under an inherited name that do not take
+// every call a bound granting the ancestor makes, refused where it is declared,
+// except one an extension is refused for itself, which is reported there.
+export function incompatibleRestatements(
+	protocol: common.ProtocolType,
+): Array<IncompatibleRestatement> {
+	let known = restatementsOf.get(protocol)
+
+	if (known !== undefined) {
+		return known
+	}
+
+	let ancestors = declaredAncestors.get(protocol) ?? []
+	let found: Array<IncompatibleRestatement> = []
+	let refusesItself = (ancestor: common.ProtocolType, methodName: string) =>
+		incompatibleRestatements(ancestor).some(
+			(restatement) => restatement.methodName === methodName,
+		)
+
+	for (let [methodName, entry] of Object.entries(protocol.methods)) {
+		let refused = ancestors.find(({ ancestor }) => {
+			if (!Object.hasOwn(ancestor.methods, methodName)) {
+				return false
+			}
+
+			let inherited = ancestor.methods[methodName]
+
+			return (
+				inherited !== entry &&
+				!typeContainsError(inherited) &&
+				!typeContainsError(entry) &&
+				!restatementAccepts(methodName, inherited, entry)
+			)
+		})
+		let source =
+			ancestors.findLast(
+				({ ancestor }) => ancestor.methods[methodName] === entry,
+			) ?? null
+
+		if (
+			refused !== undefined &&
+			(source === null ||
+				(!refusesItself(source.ancestor, methodName) &&
+					!refusesItself(refused.ancestor, methodName)))
+		) {
+			found.push({ methodName, refused, source })
+		}
+	}
+
+	restatementsOf.set(protocol, found)
+
+	return found
+}
+
+// NOTE: A mismatch of a Method a Protocol the Namespace conforms to is refused
+// for restating repeats that refusal: silent where this Module reports it, and
+// with a Note naming it where another does, as each Module is checked alone.
+function restatementEcho(
+	namespace: common.NamespaceType,
+	methodNames: ReadonlyArray<string>,
+	scope: enricher.Scope,
+): { silent: boolean; notes: Array<string> } {
+	for (let identity of namespace.conformsTo ?? []) {
+		let protocol = protocolOf(identity, scope)
+		let restatement = incompatibleRestatements(protocol).find(
+			({ methodName }) => methodNames.includes(methodName),
+		)
+
+		if (restatement === undefined) {
+			continue
+		}
+
+		let modulePath = identityModulePath(protocol.identity)
+		let reader = modulePathOf(scope)
+
+		if (modulePath === reader) {
+			return { silent: true, notes: [] }
+		}
+
+		let restates = restatement.source === null ? "restates" : "inherits"
+		let declared =
+			modulePath === null || reader === null
+				? "where it is declared"
+				: `where ${modulePath.slice(modulePath.lastIndexOf("/") + 1)} declares it`
+
+		return {
+			silent: false,
+			notes: [
+				`'${describeProtocol(protocol.identity, scope)}' ${restates} '${restatement.methodName}' with a signature '${describeProtocol(restatement.refused.ancestor.identity, scope)}' does not accept, and is refused ${declared}.`,
+			],
+		}
+	}
+
+	return { silent: false, notes: [] }
+}
+
+function identityModulePath(identity: string): string | null {
+	let separator = identity.lastIndexOf("#")
+
+	return separator === -1 ? null : identity.slice(0, separator)
 }
 
 // NOTE: One `is X` of a Protocol's extension list, resolved — or null where it
@@ -4532,7 +4756,12 @@ function derivedConformanceSource(
 		binding,
 		new Map(),
 		conformanceGrantsIn(scope),
-		conformanceProvidersIn(derived.conformsTo ?? [], scope),
+		conformanceProvidersIn(
+			derived.conformsTo ?? [],
+			protocol,
+			derived.targetType ?? binding,
+			scope,
+		),
 	)
 
 	if (result.kind !== "conforms") {
@@ -4733,11 +4962,15 @@ function memberConformance(
 		solveConformance(memberType, protocolName, scope, position),
 	)
 
+	// NOTE: A member whose Type holds an Error is reported where the Error
+	// arises, and an ambiguity about it would only repeat that Error.
 	return {
 		result: collected.result,
-		ambiguities: collected.diagnostics.filter(
-			(diagnostic) => diagnostic.code === "ambiguous-conformance",
-		),
+		ambiguities: typeContainsError(memberType)
+			? []
+			: collected.diagnostics.filter(
+					(diagnostic) => diagnostic.code === "ambiguous-conformance",
+				),
 	}
 }
 
@@ -5096,19 +5329,27 @@ function conformanceGrantsIn(
 	return (declared, wanted) => protocolGrants(declared, wanted, scope)
 }
 
-// NOTE: The `providerOf` question `computeConformanceMethodMap` asks about a
-// name, bound to a Scope and to the identities of everything the conformer
-// conforms to. The Protocol a witness is being solved for answers with the body
-// IT knows about, which is the ancestor's where a descendant re-provided the
-// name — and the descendant's is what a direct call runs. The most DERIVED
-// provider among the conformer's Protocols is the one both spellings then agree
-// on, which is the same descendant-wins rule the two call-side walks already
-// run.
+// NOTE: Whose body answers a name `solving` requires, of everything the
+// conformer conforms to: one that fulfils the requirement, the more derived of
+// two related Protocols', and of two unrelated ones the first the clauses reach.
 function conformanceProvidersIn(
 	identities: Iterable<string>,
+	solving: common.ProtocolType,
+	// NOTE: The conformer's declared target, never a narrower value, so every
+	// call runs the body the declaration chose.
+	target: common.Type,
 	scope: enricher.Scope,
 ): (methodName: string) => string | null {
 	let reached = [...identities].map((identity) => protocolOf(identity, scope))
+	let fulfils = (provider: string, methodName: string): boolean => {
+		let requirement = solving.methods[methodName]
+		let body = protocolOf(provider, scope).methods[methodName]
+
+		return (
+			(requirement?.type === "SimpleMethod" && requirement === body) ||
+			providedBodyFulfils(methodName, requirement, body, target)
+		)
+	}
 
 	return (methodName) => {
 		let winner: string | null = null
@@ -5118,13 +5359,130 @@ function conformanceProvidersIn(
 
 			if (
 				candidate !== null &&
-				(winner === null || protocolGrants(candidate, winner, scope))
+				candidate !== winner &&
+				(winner === null || protocolGrants(candidate, winner, scope)) &&
+				fulfils(candidate, methodName)
 			) {
 				winner = candidate
 			}
 		}
 
 		return winner
+	}
+}
+
+// NOTE: What a call says of a requirement the Namespace does not answer: that
+// it writes none, and whose body of the name does not fulfil it where one does.
+function missingRequirementNotes(
+	namespaceName: string,
+	namespace: common.NamespaceType,
+	methodName: string,
+	protocolName: string,
+	scope: enricher.Scope,
+): Array<string> {
+	let spelled = describeProtocol(protocolName, scope)
+	let writer = (namespace.conformsTo ?? [])
+		.map((identity) =>
+			providedMethodProtocol(protocolOf(identity, scope), methodName),
+		)
+		.find((provider) => provider !== null)
+
+	return [
+		`'${namespaceName}' does not write '${methodName}', which '${spelled}' requires.`,
+		...(writer === undefined
+			? []
+			: [
+					`'${describeProtocol(writer, scope)}' provides a '${methodName}' whose signature does not fulfil the one '${spelled}' declares.`,
+				]),
+	]
+}
+
+// NOTE: A body chosen at the declared target runs with `Self` bound to the
+// binding, so it has to fulfil its requirement there as well.
+function fulfilledAt(
+	result: ConformanceCheckResult,
+	protocol: common.ProtocolType,
+	binding: common.Type,
+	scope: enricher.Scope,
+): ConformanceCheckResult {
+	if (result.kind !== "conforms") {
+		return result
+	}
+
+	for (let [methodName, provider] of Object.entries(result.providedMethods)) {
+		let requirement = protocol.methods[methodName]
+		let body = protocolOf(provider, scope).methods[methodName]
+
+		if (
+			body !== requirement &&
+			!providedBodyFulfils(methodName, requirement, body, binding)
+		) {
+			return { kind: "mismatched", methodName, provider }
+		}
+	}
+
+	return result
+}
+
+// NOTE: What a report says of a body that fulfils its requirement at the
+// Namespace's target and not at the narrower binding: the first Parameter it
+// takes narrower than the requirement accepts, or else its answer.
+function narrowedBodyReport(
+	protocol: common.ProtocolType,
+	methodName: string,
+	provider: string,
+	binding: common.Type,
+	scope: enricher.Scope,
+	// NOTE: The Protocol the call asks for, where a body of another reads this.
+	askedFor: string = protocol.identity,
+): { notes: Array<string>; helps: Array<string> } {
+	let requirement = protocol.methods[methodName] as common.SimpleMethodType
+	let body = protocolOf(provider, scope).methods[
+		methodName
+	] as common.SimpleMethodType
+	let bindings: GenericBindings = new Map([["Self", binding]])
+	let required = applyGenericBindings(
+		requirement,
+		bindings,
+	) as common.SimpleMethodType
+	let narrowed = applyGenericBindings(
+		body,
+		bindings,
+	) as common.SimpleMethodType
+	let theBody = `the body '${describeProtocol(provider, scope)}' provides`
+	let asked = describeProtocol(protocol.identity, scope)
+	let at = describeType(binding)
+	let elsewhere =
+		binding.type === "Case"
+			? `or annotate the value at '${displayChoiceName(binding.choice)}', since a bare Case binds the Case, not the Choice.`
+			: `or declare a Namespace for ${at} that conforms to '${describeProtocol(askedFor, scope)}'.`
+
+	// NOTE: The first Parameter is `Self`, the receiver, which both take.
+	for (let index = 1; index < required.parameterTypes.length; index++) {
+		let accepted = required.parameterTypes[index]!
+		let taken = narrowed.parameterTypes[index]!
+
+		if (!matchesType(taken.type, accepted.type)) {
+			let parameter = describeParameter(accepted, index - 1)
+
+			return {
+				notes: [
+					`'${methodName}' runs ${theBody}, whose ${parameter} is '${printType(body.parameterTypes[index]!.type)}': at ${at} it takes ${withArticle(describeType(taken.type))}, where '${asked}' accepts any ${describeType(accepted.type)}.`,
+				],
+				helps: [
+					`Take '${printType(requirement.parameterTypes[index]!.type)}' as ${parameter} in ${theBody}, ${elsewhere}`,
+				],
+			}
+		}
+	}
+
+	return {
+		notes: [
+			`'${methodName}' runs ${theBody}, which answers ${withArticle(describeType(narrowed.returnType))} at ${at}, where '${asked}' answers ${withArticle(describeType(required.returnType))}.`,
+		],
+		helps: [
+			`Answer '${printType(requirement.returnType)}' from ${theBody}, ${elsewhere}`,
+		],
 	}
 }
 
@@ -5617,6 +5975,23 @@ export function solveConformance(
 	}
 }
 
+type ConformanceCandidate = {
+	name: string
+	type: common.NamespaceType
+	// NOTE: The Namespace's target Type and Generics as DECLARED — `type` is
+	// specialized against the binding below, which erases exactly the
+	// difference the specificity order needs to see between a hand written
+	// `for List<Integer>` and `List<ItemType>` reached with an Integer item.
+	declaredTarget: NamespaceTarget & { targetType: common.Type }
+	// NOTE: The Namespace's own `where` conditions for this Protocol, and
+	// the bindings that map each condition's Generic to a concrete Type, so
+	// the conditions can be solved recursively. Ordered by the Namespace's
+	// Generic declaration order to line the witnesses up with the hidden
+	// conformance Parameters.
+	conditions: Array<{ generic: string; protocol: string }>
+	conditionBindings: GenericBindings
+}
+
 function solveNamespaceConformance(
 	binding: common.Type,
 	protocol: common.ProtocolType,
@@ -5624,22 +5999,7 @@ function solveNamespaceConformance(
 	scope: enricher.Scope,
 	position: common.Position,
 ): ConformanceSolveResult {
-	let candidates: Array<{
-		name: string
-		type: common.NamespaceType
-		// NOTE: The Namespace's target Type and Generics as DECLARED — `type` is
-		// specialized against the binding below, which erases exactly the
-		// difference the specificity order needs to see between a hand written
-		// `for List<Integer>` and `List<ItemType>` reached with an Integer item.
-		declaredTarget: NamespaceTarget
-		// NOTE: The Namespace's own `where` conditions for this Protocol, and
-		// the bindings that map each condition's Generic to a concrete Type, so
-		// the conditions can be solved recursively. Ordered by the Namespace's
-		// Generic declaration order to line the witnesses up with the hidden
-		// conformance Parameters.
-		conditions: Array<{ generic: string; protocol: string }>
-		conditionBindings: GenericBindings
-	}> = []
+	let candidates: Array<ConformanceCandidate> = []
 
 	for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
 		if (
@@ -5769,13 +6129,23 @@ function solveNamespaceConformance(
 		]),
 	)
 
-	let result = computeConformanceMethodMap(
+	let result = fulfilledAt(
+		computeConformanceMethodMap(
+			protocol,
+			candidate.type,
+			binding,
+			assumptions,
+			conformanceGrantsIn(scope),
+			conformanceProvidersIn(
+				candidate.type.conformsTo ?? [],
+				protocol,
+				candidate.declaredTarget.targetType,
+				scope,
+			),
+		),
 		protocol,
-		candidate.type,
 		binding,
-		assumptions,
-		conformanceGrantsIn(scope),
-		conformanceProvidersIn(candidate.type.conformsTo ?? [], scope),
+		scope,
 	)
 
 	if (result.kind !== "conforms") {
@@ -5795,6 +6165,15 @@ function solveNamespaceConformance(
 			return { ok: true, source: derived }
 		}
 
+		let echo =
+			result.kind === "needs-condition"
+				? { silent: false, notes: [] }
+				: restatementEcho(candidate.type, [result.methodName], scope)
+
+		if (echo.silent) {
+			return { ok: false, chain: [] }
+		}
+
 		// NOTE: Reachable when the Namespace covers the binding through a wider
 		// target Type (a Union) but a `Self` position makes the signatures
 		// incompatible for this narrower binding, or a fulfilling Method still
@@ -5803,6 +6182,16 @@ function solveNamespaceConformance(
 			result.kind === "needs-condition"
 				? `Method '${result.methodName}' needs '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'`
 				: `this needs ${describeType(binding)} to conform`
+		let narrowed =
+			result.kind === "mismatched" && result.provider !== undefined
+				? narrowedBodyReport(
+						protocol,
+						result.methodName,
+						result.provider,
+						binding,
+						scope,
+					)
+				: { notes: [], helps: [] }
 
 		reportError(
 			`Namespace '${candidate.name}' does not conform to '${describeProtocol(protocolName, scope)}'`,
@@ -5810,6 +6199,20 @@ function solveNamespaceConformance(
 			{
 				code: "nonconforming-namespace",
 				labels: [primary(position, label)],
+				notes: [
+					...(result.kind === "missing"
+						? missingRequirementNotes(
+								candidate.name,
+								candidate.type,
+								result.methodName,
+								protocolName,
+								scope,
+							)
+						: []),
+					...narrowed.notes,
+					...echo.notes,
+				],
+				helps: narrowed.helps,
 			},
 		)
 
@@ -5819,20 +6222,99 @@ function solveNamespaceConformance(
 	// NOTE: Recursively solve the chosen Namespace's own `where` conditions —
 	// their bindings come from the unification above. A failure bubbles up as
 	// a because-chain with this level prepended.
-	let conditions: Array<common.Conformance> = []
+	let solvedConditions = solveCandidateConditions(
+		candidate.conditions,
+		candidate.conditionBindings,
+		binding,
+		protocolName,
+		scope,
+		position,
+	)
 
-	for (let condition of candidate.conditions) {
-		let conditionBinding = candidate.conditionBindings.get(
-			condition.generic,
+	if (!solvedConditions.ok) {
+		return solvedConditions
+	}
+
+	let conditions = solvedConditions.conditions
+
+	// NOTE: And the one candidate whose conditions are not written anywhere: the
+	// library's blanket Record Namespace conforms `for Record`, and which
+	// members a particular Record HAS is the only thing that can say whether its
+	// `is` — the universal structural comparison — is the answer its members
+	// would give. A Record whose members all agree with it answers null here and
+	// keeps the plain, unconditional, byte-identical witness it always had.
+	//
+	// It stands after the written conditions rather than instead of them because
+	// the two can not both apply: the library's Namespace declares none.
+	if (isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)) {
+		let routed = routedRecordSource(
+			binding,
+			protocolName,
+			result.methodMap,
+			providedMethodsOf(result),
+			scope,
+			position,
 		)
 
-		// NOTE: The unification above reached the candidate without pinning this
-		// condition's Generic, which an empty List Literal does: `List<ItemType>`
-		// accepts a `List<Unknown>` receiver outright, binding nothing. There is
-		// no witness to hand over — skipping the condition used to emit a plain
-		// method map where the fulfilling Method expects a curried one, and the
-		// Program died reading `compare` off `undefined`. Binding the Generic
-		// to Unknown instead would only move the lie one level down.
+		if (routed !== null) {
+			return routed
+		}
+	}
+
+	let group = providedWitnessGroup(
+		{
+			protocol,
+			name: candidate.name,
+			methodMap: result.methodMap,
+			providedMethods: result.providedMethods,
+			declared: candidate.conditions,
+			conditions,
+		},
+		candidate,
+		binding,
+		scope,
+		position,
+	)
+
+	if (!group.ok) {
+		return group
+	}
+
+	return {
+		ok: true,
+		source: {
+			kind: "namespace",
+			name: candidate.name,
+			methodMap: result.methodMap,
+			...providedMethodsOf(result),
+			...group.fields,
+			conditions,
+		},
+	}
+}
+
+type SolvedConditions =
+	| { ok: true; conditions: Array<common.Conformance> }
+	| Extract<ConformanceSolveResult, { ok: false }>
+
+// NOTE: A candidate's `where` conditions for one of its Protocols, each solved
+// against the binding the unification gave its Generic.
+function solveCandidateConditions(
+	declared: Array<{ generic: string; protocol: string }>,
+	conditionBindings: GenericBindings,
+	binding: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): SolvedConditions {
+	let conditions: Array<common.Conformance> = []
+
+	for (let condition of declared) {
+		let conditionBinding = conditionBindings.get(condition.generic)
+
+		// NOTE: An empty List Literal reaches the candidate without pinning
+		// this condition's Generic, and a Method expecting its witness would
+		// read `compare` off `undefined`. Binding it to Unknown hides that.
 		if (conditionBinding === undefined) {
 			return {
 				ok: false,
@@ -5880,40 +6362,627 @@ function solveNamespaceConformance(
 		})
 	}
 
-	// NOTE: And the one candidate whose conditions are not written anywhere: the
-	// library's blanket Record Namespace conforms `for Record`, and which
-	// members a particular Record HAS is the only thing that can say whether its
-	// `is` — the universal structural comparison — is the answer its members
-	// would give. A Record whose members all agree with it answers null here and
-	// keeps the plain, unconditional, byte-identical witness it always had.
-	//
-	// It stands after the written conditions rather than instead of them because
-	// the two can not both apply: the library's Namespace declares none.
-	if (isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)) {
-		let routed = routedRecordSource(
+	return { ok: true, conditions }
+}
+
+// NOTE: One witness of a conformer's group, and the member each of its provided
+// bodies is curried with where that is another. Its conditions are solved as it
+// joins, except the root's and those of a witness a Choice derives.
+type GroupWitness = {
+	protocol: common.ProtocolType
+	name: string
+	methodMap: Record<string, string>
+	providedMethods: Record<string, string>
+	declared: Array<{ generic: string; protocol: string }>
+	conditions: Array<common.Conformance> | null
+	conditionIndices?: Array<number>
+	derivedDescriptor?: common.DerivedEquatableDescriptor
+	curriedWith?: Record<string, number>
+}
+
+// NOTE: A body runs with the witness being solved where that answers each entry
+// it reads as its own Protocol's witness does, or else with that witness. If
+// that fails, the call is refused unless those entries hold and answer alike.
+function providedWitnessGroup(
+	root: GroupWitness & { conditions: Array<common.Conformance> },
+	candidate: ConformanceCandidate,
+	binding: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+):
+	| {
+			ok: true
+			fields: {
+				curriedWith?: Record<string, number>
+				providedWitnesses?: Array<common.ProvidedWitness>
+				groupConditions?: Array<common.Conformance>
+				sharedConditions?: Array<common.SharedCondition>
+			}
+	  }
+	| Extract<ConformanceSolveResult, { ok: false }> {
+	let group: Array<GroupWitness> = [root]
+	let solved = new Map<string, GroupWitness | null>([
+		[root.protocol.identity, root],
+	])
+	// NOTE: Every condition of the group once, the root's first. Members share
+	// their Namespace's condition bindings, so a condition two of them take is
+	// one witness. A slot keeps its Generic where the Namespace declares it.
+	let slots: Array<
+		| { conformance: common.Conformance; generic: string | null }
+		| { shared: common.SharedCondition }
+	> = root.conditions.map((conformance) => ({
+		conformance,
+		generic: conformance.genericName,
+	}))
+	let conditionAt = new Map(
+		root.declared.map((condition, index) => [
+			JSON.stringify([condition.generic, condition.protocol]),
+			index,
+		]),
+	)
+
+	let witnessFor = (identity: string): GroupWitness | null => {
+		let known = solved.get(identity)
+
+		if (known !== undefined) {
+			return known
+		}
+
+		let witness = bodyProtocolWitness(
+			protocolOf(identity, scope),
+			candidate,
 			binding,
-			protocolName,
-			result.methodMap,
-			providedMethodsOf(result),
 			scope,
 			position,
 		)
 
-		if (routed !== null) {
-			return routed
+		solved.set(identity, witness)
+
+		return witness
+	}
+
+	// NOTE: The witness of only the Methods a body reads of its Protocol.
+	let readWitness = (
+		identity: string,
+		reads: Array<string>,
+	): GroupWitness | null => {
+		let protocol = protocolOf(identity, scope)
+
+		return bodyProtocolWitness(
+			{ ...protocol, methods: methodsRead(reads, protocol.methods) },
+			candidate,
+			binding,
+			scope,
+			position,
+		)
+	}
+
+	// NOTE: The witness a condition asks for, where the group of a condition of
+	// the same Generic already builds it from the same Namespace. Taking it
+	// from there builds each witness once however deep the Type nests.
+	let sharedFor = (
+		condition: common.Conformance,
+	): common.SharedCondition | null => {
+		let source = condition.source
+
+		if (
+			source.kind !== "namespace" ||
+			source.derivedMembers !== undefined ||
+			source.derivedCases !== undefined
+		) {
+			return null
+		}
+
+		for (let [index, slot] of slots.entries()) {
+			if (
+				!("conformance" in slot) ||
+				slot.generic !== condition.genericName ||
+				slot.conformance.source.kind !== "namespace"
+			) {
+				continue
+			}
+
+			let witness = (
+				slot.conformance.source.providedWitnesses ?? []
+			).findIndex(
+				(member) =>
+					member.protocolName === condition.protocolName &&
+					member.name === source.name &&
+					isDeepStrictEqual(
+						member.derivedDescriptor,
+						source.derivedDescriptor,
+					) &&
+					isDeepStrictEqual(member.methodMap, source.methodMap) &&
+					isDeepStrictEqual(
+						member.providedMethods ?? {},
+						source.providedMethods ?? {},
+					),
+			)
+
+			if (witness !== -1) {
+				return { condition: index, witness: witness + 1 }
+			}
+		}
+
+		return null
+	}
+
+	let joinConditions = (
+		own: GroupWitness,
+		methodName: string,
+		provider: string,
+	): Extract<ConformanceSolveResult, { ok: false }> | null => {
+		if (own.conditions !== null) {
+			own.conditionIndices = own.conditions.map(
+				(conformance) => slots.push({ conformance, generic: null }) - 1,
+			)
+
+			return null
+		}
+
+		own.conditionIndices = []
+
+		for (let condition of own.declared) {
+			let key = JSON.stringify([condition.generic, condition.protocol])
+			let slot = conditionAt.get(key)
+
+			if (slot === undefined) {
+				let joined = solveCandidateConditions(
+					[condition],
+					candidate.conditionBindings,
+					binding,
+					provider,
+					scope,
+					position,
+				)
+
+				if (!joined.ok) {
+					return joined.chain.length === 0
+						? joined
+						: {
+								...joined,
+								chain: [
+									`${describeType(binding)} does not conform to '${describeProtocol(root.protocol.identity, scope)}'.`,
+									`'${methodName}' runs the body '${describeProtocol(provider, scope)}' provides, which needs the conformance to '${describeProtocol(provider, scope)}'.`,
+									...joined.chain,
+								],
+							}
+				}
+
+				let conformance = joined.conditions[0]!
+				let shared = sharedFor(conformance)
+
+				slot =
+					slots.push(
+						shared === null
+							? { conformance, generic: condition.generic }
+							: { shared },
+					) - 1
+				conditionAt.set(key, slot)
+			}
+
+			own.conditionIndices.push(slot)
+		}
+
+		return null
+	}
+
+	for (let index = 0; index < group.length; index++) {
+		let member = group[index]!
+
+		for (let [methodName, provider] of Object.entries(
+			member.providedMethods,
+		)) {
+			// NOTE: A body of the member's own Protocol runs with the member. An
+			// ancestor's is asked like any other, since a descendant may restate
+			// what it reads.
+			if (provider === member.protocol.identity) {
+				continue
+			}
+
+			let reads = providedReadsOf(provider, methodName, scope)
+
+			if (reads.length === 0) {
+				continue
+			}
+
+			// NOTE: A read entry is solved alike in the whole witness and in the
+			// one of the entries read, so the whole one is solved only where the
+			// member answers some entry otherwise.
+			let restricted = readWitness(provider, reads)
+			let answersAlike = (answers: GroupWitness | null): boolean =>
+				answers !== null &&
+				reads.every((entry) => {
+					let answer = witnessAnswer(member, entry)
+
+					return (
+						answer !== undefined &&
+						answer === witnessAnswer(answers, entry)
+					)
+				})
+
+			if (answersAlike(restricted)) {
+				continue
+			}
+
+			let own = witnessFor(provider)
+
+			if (answersAlike(own)) {
+				continue
+			}
+
+			if (own === null) {
+				let echo = restatementEcho(candidate.type, reads, scope)
+
+				if (!echo.silent) {
+					let unanswered = unansweredReadReport(
+						{ methodName, provider },
+						reads,
+						candidate,
+						binding,
+						root.protocol.identity,
+						scope,
+					)
+
+					reportError(
+						`Namespace '${candidate.name}' does not conform to '${describeProtocol(root.protocol.identity, scope)}'`,
+						position,
+						{
+							code: "nonconforming-namespace",
+							labels: [
+								primary(
+									position,
+									`this needs ${describeType(binding)} to conform`,
+								),
+							],
+							notes: [...unanswered.notes, ...echo.notes],
+							helps: unanswered.helps,
+						},
+					)
+				}
+
+				return { ok: false, chain: [] }
+			}
+
+			let at = group.indexOf(own)
+
+			if (at === -1) {
+				let refused = joinConditions(own, methodName, provider)
+
+				if (refused !== null) {
+					return refused
+				}
+
+				at = group.push(own) - 1
+			}
+
+			member.curriedWith = { ...member.curriedWith, [methodName]: at }
+		}
+	}
+
+	// NOTE: The shared slots are emitted after every built one, so each slot's
+	// index is renumbered: the built ones in order, then the shared ones.
+	let conditions: Array<common.Conformance> = []
+	let shared: Array<common.SharedCondition> = []
+	let renumbered: Array<number> = []
+
+	for (let [index, slot] of slots.entries()) {
+		if ("conformance" in slot) {
+			renumbered[index] = conditions.push(slot.conformance) - 1
+		}
+	}
+
+	for (let [index, slot] of slots.entries()) {
+		if ("shared" in slot) {
+			renumbered[index] =
+				conditions.length +
+				shared.push({
+					condition: renumbered[slot.shared.condition]!,
+					witness: slot.shared.witness,
+				}) -
+				1
 		}
 	}
 
 	return {
 		ok: true,
-		source: {
-			kind: "namespace",
-			name: candidate.name,
-			methodMap: result.methodMap,
-			...providedMethodsOf(result),
-			conditions,
+		fields: {
+			...(root.curriedWith === undefined
+				? {}
+				: { curriedWith: root.curriedWith }),
+			...(group.length === 1
+				? {}
+				: {
+						providedWitnesses: group.slice(1).map((member) => ({
+							protocolName: member.protocol.identity,
+							name: member.name,
+							...(member.derivedDescriptor === undefined
+								? {}
+								: {
+										derivedDescriptor:
+											member.derivedDescriptor,
+									}),
+							methodMap: member.methodMap,
+							...providedMethodsOf(member),
+							...(member.curriedWith === undefined
+								? {}
+								: { curriedWith: member.curriedWith }),
+							conditionIndices: (
+								member.conditionIndices ?? []
+							).map((index) => renumbered[index]!),
+						})),
+					}),
+			...(conditions.length === root.conditions.length
+				? {}
+				: {
+						groupConditions: conditions.slice(
+							root.conditions.length,
+						),
+					}),
+			...(shared.length === 0 ? {} : { sharedConditions: shared }),
 		},
 	}
+}
+
+// NOTE: The conformer's witness at the binding for the Protocol that wrote a
+// body, as a bound of that Protocol solves it, or the one a Choice derives.
+function bodyProtocolWitness(
+	protocol: common.ProtocolType,
+	candidate: ConformanceCandidate,
+	binding: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): GroupWitness | null {
+	let { declared, result } = bodyProtocolCheck(
+		protocol,
+		candidate,
+		binding,
+		scope,
+	)
+
+	if (result.kind === "conforms") {
+		return {
+			protocol,
+			name: candidate.name,
+			methodMap: result.methodMap,
+			providedMethods: result.providedMethods,
+			declared,
+			conditions: null,
+		}
+	}
+
+	let derived = derivedConformanceSource(
+		binding,
+		protocol.identity,
+		candidate.type,
+		scope,
+		position,
+	)
+
+	return derived === null || derived.kind !== "namespace"
+		? null
+		: {
+				protocol,
+				name: derived.name,
+				methodMap: derived.methodMap,
+				providedMethods: derived.providedMethods ?? {},
+				declared: [],
+				conditions: derived.conditions,
+				...(derived.derivedDescriptor === undefined
+					? {}
+					: { derivedDescriptor: derived.derivedDescriptor }),
+			}
+}
+
+// NOTE: The conformer's conformance at the binding to the Protocol that wrote a
+// body, as the Namespace declares it, before a Choice's derive is asked.
+function bodyProtocolCheck(
+	protocol: common.ProtocolType,
+	candidate: ConformanceCandidate,
+	binding: common.Type,
+	scope: enricher.Scope,
+): {
+	declared: Array<{ generic: string; protocol: string }>
+	result: ConformanceCheckResult
+} {
+	let declared = orderConditions(
+		candidate.type.conformanceConditions?.[protocol.identity] ?? [],
+		candidate.declaredTarget.generics,
+	)
+	let assumptions = new Map(
+		declared.map((condition) => [condition.generic, condition.protocol]),
+	)
+	let providers = conformanceProvidersIn(
+		candidate.type.conformsTo ?? [],
+		protocol,
+		candidate.declaredTarget.targetType,
+		scope,
+	)
+
+	return {
+		declared,
+		result: fulfilledAt(
+			computeConformanceMethodMap(
+				protocol,
+				candidate.type,
+				binding,
+				assumptions,
+				conformanceGrantsIn(scope),
+				providers,
+			),
+			protocol,
+			binding,
+			scope,
+		),
+	}
+}
+
+// NOTE: What a report says of a body whose own Protocol's witness fails at the
+// binding: the first entry it reads that the conformer does not answer there as
+// that Protocol declares it, or else that it needs the whole conformance.
+function unansweredReadReport(
+	body: { methodName: string; provider: string },
+	reads: Array<string>,
+	candidate: ConformanceCandidate,
+	binding: common.Type,
+	asked: string,
+	scope: enricher.Scope,
+): { notes: Array<string>; helps: Array<string> } {
+	let protocol = protocolOf(body.provider, scope)
+	let { result } = bodyProtocolCheck(
+		{ ...protocol, methods: methodsRead(reads, protocol.methods) },
+		candidate,
+		binding,
+		scope,
+	)
+	let at = describeType(binding)
+	let provides = `'${body.methodName}' runs the body '${describeProtocol(body.provider, scope)}' provides`
+	let target = candidate.declaredTarget.targetType
+	// NOTE: Only a value narrower than the Namespace's target has another
+	// Namespace to reach; at the target the conformance itself is at fault.
+	let helps =
+		!matchesType(target, binding) || matchesType(binding, target)
+			? []
+			: [
+					binding.type === "Case"
+						? `Annotate the value at '${displayChoiceName(binding.choice)}', since a bare Case binds the Case, not the Choice.`
+						: `Declare a Namespace for ${at} that conforms to '${describeProtocol(asked, scope)}'.`,
+				]
+
+	if (result.kind === "conforms") {
+		return {
+			notes: [
+				`${provides}, which needs '${candidate.name}' to conform to '${describeProtocol(body.provider, scope)}' at ${at}.`,
+			],
+			helps,
+		}
+	}
+
+	let reading = `${provides}, which reads '${result.methodName}'`
+
+	if (result.kind === "mismatched" && result.provider !== undefined) {
+		let narrowed = narrowedBodyReport(
+			protocol,
+			result.methodName,
+			result.provider,
+			binding,
+			scope,
+			asked,
+		)
+
+		return {
+			notes: [`${reading}.`, ...narrowed.notes],
+			helps: narrowed.helps,
+		}
+	}
+
+	if (result.kind === "missing") {
+		return {
+			notes: [`${reading}, and '${candidate.name}' does not write it.`],
+			helps,
+		}
+	}
+
+	if (result.kind === "needs-condition") {
+		return {
+			notes: [
+				`${reading}, and '${candidate.name}' answers it only where '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'.`,
+			],
+			helps,
+		}
+	}
+
+	let mismatch = writtenMismatch(
+		protocol.methods[result.methodName],
+		candidate.type.methods[result.methodName],
+		binding,
+	)
+
+	return {
+		notes: [
+			mismatch === null
+				? `${reading}, and at ${at} '${candidate.name}' does not write it as '${describeProtocol(body.provider, scope)}' declares it.`
+				: mismatch.parameter === null
+					? `${reading}: at ${at} '${candidate.name}' answers it with ${withArticle(describeType(mismatch.written))}, where '${describeProtocol(body.provider, scope)}' answers ${withArticle(describeType(mismatch.required))}.`
+					: `${reading}: at ${at} '${describeProtocol(body.provider, scope)}' passes it ${withArticle(describeType(mismatch.required))} as ${mismatch.parameter}, where '${candidate.name}' takes ${withArticle(describeType(mismatch.written))}.`,
+		],
+		helps,
+	}
+}
+
+// NOTE: The first Parameter a written Method takes narrower than a requirement
+// passes at the binding, or else its answer where that is wider, or null where
+// the two are not both Simple.
+function writtenMismatch(
+	requirement: common.MethodType | undefined,
+	written: common.MethodType | undefined,
+	binding: common.Type,
+): {
+	parameter: string | null
+	written: common.Type
+	required: common.Type
+} | null {
+	if (
+		requirement?.type !== "SimpleMethod" ||
+		written?.type !== "SimpleMethod" ||
+		requirement.parameterTypes.length !== written.parameterTypes.length
+	) {
+		return null
+	}
+
+	let required = applyGenericBindings(
+		requirement,
+		new Map([["Self", binding]]),
+	) as common.SimpleMethodType
+
+	// NOTE: The first Parameter is `Self`, the receiver, which both take.
+	for (let index = 1; index < required.parameterTypes.length; index++) {
+		let passed = required.parameterTypes[index]!
+		let taken = written.parameterTypes[index]!
+
+		if (!matchesType(taken.type, passed.type)) {
+			return {
+				parameter: describeParameter(passed, index - 1),
+				written: taken.type,
+				required: passed.type,
+			}
+		}
+	}
+
+	return matchesType(required.returnType, written.returnType)
+		? null
+		: {
+				parameter: null,
+				written: written.returnType,
+				required: required.returnType,
+			}
+}
+
+// NOTE: The entries a provided body reads. A Protocol with no record of them
+// is taken to read every Method it has.
+function providedReadsOf(
+	identity: string,
+	methodName: string,
+	scope: enricher.Scope,
+): Array<string> {
+	let protocol = protocolOf(identity, scope)
+
+	return protocol.providedReads?.[methodName] ?? Object.keys(protocol.methods)
+}
+
+// NOTE: What a witness answers for one of its entries: the Method it reads off
+// its Namespace, or the Protocol whose body it runs.
+function witnessAnswer(
+	witness: GroupWitness,
+	entry: string,
+): string | undefined {
+	if (Object.hasOwn(witness.methodMap, entry)) {
+		return `method ${witness.name}.${witness.methodMap[entry]}`
+	}
+
+	return Object.hasOwn(witness.providedMethods, entry)
+		? `body ${witness.providedMethods[entry]}`
+		: undefined
 }
 
 // NOTE: Orders a Protocol's `where` conditions by the Namespace's Generic
@@ -6710,10 +7779,66 @@ function whereConditionRejection(
 	return null
 }
 
+// NOTE: The Protocol that wrote a body of the name for one of a Namespace's
+// clauses, where one did. Asked of a requirement no body answered.
+function clauseBodyWriter(
+	node: parser.NamespaceDefinitionStatementNode,
+	methodName: string,
+	scope: enricher.Scope,
+): string | null {
+	for (let clause of node.conformsTo) {
+		let protocol = resolveWrittenProtocol(clause.protocol, scope)
+		let writer =
+			protocol === null
+				? null
+				: providedMethodProtocol(protocol, methodName)
+
+		if (writer !== null) {
+			return writer
+		}
+	}
+
+	return null
+}
+
+// NOTE: The first requirement a Namespace owes that a Method written as declared
+// would not answer for another clause's Protocol, whose body it replaces. Where
+// there is one, no stub is offered and the conformance moves to its own Namespace.
+function clauseRefusingRequirement(
+	node: parser.NamespaceDefinitionStatementNode,
+	solving: common.ProtocolType,
+	owed: ReadonlyArray<string>,
+	target: common.Type,
+	scope: enricher.Scope,
+): { methodName: string; protocol: string } | null {
+	for (let methodName of owed) {
+		for (let clause of node.conformsTo) {
+			let protocol = resolveWrittenProtocol(clause.protocol, scope)
+
+			if (
+				protocol !== null &&
+				providedMethodProtocol(protocol, methodName) !== null &&
+				!writtenRequirementFulfils(
+					methodName,
+					solving.methods[methodName],
+					protocol.methods[methodName],
+					target,
+				)
+			) {
+				return { methodName, protocol: protocol.identity }
+			}
+		}
+	}
+
+	return null
+}
+
 // NOTE: `conformanceProvidersIn` over the Protocols a Namespace's clauses name
 // where they are written, leaving out any that names none.
 function clauseProvidersIn(
 	node: parser.NamespaceDefinitionStatementNode,
+	solving: common.ProtocolType,
+	target: common.Type,
 	scope: enricher.Scope,
 ): (methodName: string) => string | null {
 	return conformanceProvidersIn(
@@ -6722,8 +7847,156 @@ function clauseProvidersIn(
 
 			return protocol === null ? [] : [protocol.identity]
 		}),
+		solving,
+		target,
 		scope,
 	)
+}
+
+// NOTE: A value bounded by a Protocol can be handed to a bound on one it
+// extends, which then reads its witness, so a Namespace conforming to both has
+// to answer each provided name of the extended one with the same body.
+function reportSplitProvidedBodies(
+	node: parser.NamespaceDefinitionStatementNode,
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+): void {
+	let target = namespaceType.targetType
+	let identities = namespaceType.conformsTo ?? []
+
+	if (target === null) {
+		return
+	}
+
+	let candidate: ConformanceCandidate = {
+		name: namespaceType.name,
+		type: namespaceType,
+		declaredTarget: {
+			targetType: target,
+			generics: namespaceType.generics,
+		},
+		conditions: [],
+		conditionBindings: new Map(),
+	}
+	let answers = new Map<string, Record<string, string> | null>()
+	let bodiesOf = (identity: string): Record<string, string> => {
+		if (!answers.has(identity)) {
+			let { result } = bodyProtocolCheck(
+				protocolOf(identity, scope),
+				candidate,
+				target,
+				scope,
+			)
+
+			answers.set(
+				identity,
+				result.kind === "conforms" ? result.providedMethods : null,
+			)
+		}
+
+		return answers.get(identity) ?? {}
+	}
+
+	for (let extending of identities) {
+		for (let extended of identities) {
+			if (
+				extending === extended ||
+				!protocolGrants(extending, extended, scope)
+			) {
+				continue
+			}
+
+			for (let [methodName, ancestorBody] of Object.entries(
+				bodiesOf(extended),
+			)) {
+				let body = bodiesOf(extending)[methodName]
+
+				if (body === undefined || body === ancestorBody) {
+					continue
+				}
+
+				let echo = restatementEcho(namespaceType, [methodName], scope)
+
+				if (echo.silent || echo.notes.length > 0) {
+					continue
+				}
+
+				let clauses = node.conformsTo.flatMap((written) => {
+					let protocol = resolveWrittenProtocol(
+						written.protocol,
+						scope,
+					)
+
+					return protocol === null
+						? []
+						: [{ position: written.protocol.position, protocol }]
+				})
+				let clause = clauses.find(({ protocol }) =>
+					protocolGrants(protocol.identity, extending, scope),
+				)
+				let position = clause?.position ?? node.name.position
+				let spelled = describeProtocol(extending, scope)
+				let ancestor = describeProtocol(extended, scope)
+				let entry = protocolOf(extending, scope).methods[methodName]!
+				// NOTE: The clauses whose Protocols declare the name apart, so a
+				// Method written as `extending` declares it does not answer them,
+				// and they move to a Namespace of their own before it is written.
+				let refusing = clauses
+					.filter(({ protocol }) =>
+						[
+							protocol.identity,
+							...(protocol.conformsTo ?? []),
+						].some((identity) => {
+							let declared = protocolOf(identity, scope).methods[
+								methodName
+							]
+
+							return (
+								declared !== undefined &&
+								!writtenRequirementFulfils(
+									methodName,
+									entry,
+									declared,
+									target,
+								)
+							)
+						}),
+					)
+					.map(({ protocol }) =>
+						describeProtocol(protocol.identity, scope),
+					)
+
+				reportError(
+					`Namespace '${namespaceType.name}' does not conform to '${describeProtocol(clause?.protocol.identity ?? extending, scope)}'`,
+					position,
+					{
+						code: "nonconforming-namespace",
+						labels: [
+							primary(
+								position,
+								`Method '${methodName}' runs one body for '${spelled}' and another for '${ancestor}'`,
+							),
+						],
+						notes: [
+							`'${methodName}' runs the body '${describeProtocol(body, scope)}' provides for '${spelled}', and the body '${describeProtocol(ancestorBody, scope)}' provides for '${ancestor}'.`,
+							`A value bounded by '${spelled}' can be handed to a bound on '${ancestor}', and a bound runs one body.`,
+							...refusing.map(
+								(protocol) =>
+									`'${spelled}' and '${protocol}' declare '${methodName}' apart, so a '${methodName}' written as '${spelled}' declares it refuses the 'is ${protocol}' here.`,
+							),
+						],
+						helps: [
+							refusing.length === 0
+								? `Write '${methodName}' in '${namespaceType.name}' as '${spelled}' declares it, so one Method answers both.`
+								: `Declare ${refusing.map((protocol) => `'is ${protocol}'`).join(" and ")} on ${refusing.length === 1 ? "a Namespace of its own" : "Namespaces of their own"}, and write '${methodName}' in '${namespaceType.name}' as '${spelled}' declares it.`,
+						],
+					},
+				)
+
+				return
+			}
+		}
+	}
 }
 
 // NOTE: What `checkProtocolConformance` would find, with nothing reported and
@@ -6762,11 +8035,6 @@ export function silentCheckedConformances(
 			}
 		}
 	}
-
-	// NOTE: The providers of every clause, for every clause: a Method one
-	// clause's Protocol only requires may be provided by another's, and then
-	// the Namespace owes nothing for it.
-	let providers = clauseProvidersIn(node, scope)
 
 	for (let clause of node.conformsTo) {
 		let protocol = resolveWrittenProtocol(clause.protocol, scope)
@@ -6809,7 +8077,10 @@ export function silentCheckedConformances(
 			namespaceType.targetType,
 			assumptions,
 			conformanceGrantsIn(scope),
-			providers,
+			// NOTE: The providers of every clause: a Method this clause's
+			// Protocol only requires may be provided by another's, and then the
+			// Namespace owes nothing for it.
+			clauseProvidersIn(node, protocol, namespaceType.targetType, scope),
 		)
 
 		if (result.kind === "conforms") {
@@ -6840,10 +8111,6 @@ export function checkProtocolConformance(
 	let declaredGenerics = new Set(
 		node.generics.map((generic) => generic.name.content),
 	)
-	// NOTE: As in the silent twin — a name one clause's Protocol requires may
-	// be provided by another's, and the Namespace owes nothing for it then.
-	let providers = clauseProvidersIn(node, scope)
-
 	for (let clause of node.conformsTo) {
 		let identifier = clause.protocol
 		let protocol = resolveWrittenProtocol(identifier, scope)
@@ -6990,6 +8257,15 @@ export function checkProtocolConformance(
 			})
 		}
 
+		// NOTE: As in the silent twin, a name this clause's Protocol requires may
+		// be provided by another clause's, and the Namespace owes nothing for it
+		// then.
+		let providers = clauseProvidersIn(
+			node,
+			protocol,
+			namespaceType.targetType,
+			scope,
+		)
 		let result = computeConformanceMethodMap(
 			protocol,
 			namespaceType,
@@ -7024,6 +8300,15 @@ export function checkProtocolConformance(
 			continue
 		}
 
+		let echo =
+			result.kind === "missing" || result.kind === "mismatched"
+				? restatementEcho(namespaceType, [result.methodName], scope)
+				: { silent: false, notes: [] }
+
+		if (echo.silent) {
+			continue
+		}
+
 		let spelled = describeProtocol(protocol.identity, scope)
 
 		if (result.kind === "needs-condition") {
@@ -7055,6 +8340,18 @@ export function checkProtocolConformance(
 				},
 			)
 		} else if (result.kind === "missing") {
+			let unfulfilling = clauseBodyWriter(node, result.methodName, scope)
+			let owed = missingRequirements(protocol, namespaceType, providers)
+			let refusing = clauseRefusingRequirement(
+				node,
+				protocol,
+				owed,
+				namespaceType.targetType,
+				scope,
+			)
+			let declared = (methodNames: Array<string>): string =>
+				`${methodNames.map((methodName) => `'${methodName}'`).join(", ")} as '${spelled}' declares ${methodNames.length === 1 ? "it" : "them"}`
+
 			reportError(
 				`Namespace '${namespaceType.name}' does not conform to '${spelled}'`,
 				identifier.position,
@@ -7066,26 +8363,35 @@ export function checkProtocolConformance(
 							`Method '${result.methodName}' is missing`,
 						),
 					],
+					notes: [
+						...(unfulfilling === null
+							? []
+							: [
+									`'${describeProtocol(unfulfilling, scope)}' provides a '${result.methodName}' whose signature does not fulfil the one '${spelled}' declares.`,
+								]),
+						...(refusing === null
+							? []
+							: [
+									`'${spelled}' and '${describeProtocol(refusing.protocol, scope)}' declare '${refusing.methodName}' apart, so a '${refusing.methodName}' written as '${spelled}' declares it refuses the 'is ${describeProtocol(refusing.protocol, scope)}' here.`,
+								]),
+						...echo.notes,
+					],
 					// NOTE: The whole list, named rather than left to the Quick
 					// Fix alone — a reader reading the report in a terminal has
 					// no fix to apply, and what a conformance OWES is the one
 					// thing this report knows and never said.
 					helps: [
-						`Write ${missingRequirements(
-							protocol,
-							namespaceType,
-							providers,
-						)
-							.map((methodName) => `'${methodName}'`)
-							.join(", ")} as '${spelled}' declares ${
-							missingRequirements(
-								protocol,
-								namespaceType,
-								providers,
-							).length === 1
-								? "it"
-								: "them"
-						}, or drop the 'is ${spelled}'.`,
+						refusing === null
+							? `Write ${declared(owed)}, or drop the 'is ${spelled}'.`
+							: `Declare 'is ${spelled}' on a Namespace of its own that writes ${declared(
+									Object.keys(protocol.methods).filter(
+										(methodName) =>
+											providedMethodProtocol(
+												protocol,
+												methodName,
+											) === null,
+									),
+								)}, or drop the 'is ${spelled}'.`,
 					],
 					// NOTE: The whole list, where the Label names the one the
 					// check stopped at — a fix that writes the stubs writes
@@ -7095,15 +8401,15 @@ export function checkProtocolConformance(
 					// none: a signature that does not MATCH is a Method to
 					// correct rather than one to write, and a missing `where`
 					// is a clause to add to the conformance itself.
-					data: {
-						kind: "missing-requirements",
-						protocol: spelled,
-						methods: missingRequirements(
-							protocol,
-							namespaceType,
-							providers,
-						),
-					},
+					...(refusing === null
+						? {
+								data: {
+									kind: "missing-requirements",
+									protocol: spelled,
+									methods: owed,
+								},
+							}
+						: {}),
 				},
 			)
 		} else if (result.kind === "mismatched") {
@@ -7118,6 +8424,7 @@ export function checkProtocolConformance(
 							`Method '${result.methodName}' does not match the Protocol's signature`,
 						),
 					],
+					notes: echo.notes,
 					// NOTE: A Method to CORRECT rather than one to write, so no
 					// stub is offered and the Help says where the shape it has
 					// to take is written down. Which part of the signature
@@ -7137,6 +8444,7 @@ export function checkProtocolConformance(
 		}
 	}
 
+	reportSplitProvidedBodies(node, namespaceType, scope)
 	reportUndeclaredDerivedConformance(node, namespaceType, scope)
 
 	return checked
@@ -8174,6 +9482,12 @@ export function invalidateNamespacesInScope(
 		return
 	}
 
+	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
+}
+
+// NOTE: Drops what this Scope and every Scope nested in it memoised about the
+// Namespaces they see and the witnesses those build.
+export function invalidateConformancesInScope(scope: enricher.Scope): void {
 	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
 }
 

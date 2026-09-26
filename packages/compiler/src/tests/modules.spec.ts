@@ -2645,6 +2645,458 @@ implementation {
 		)
 	})
 
+	// NOTE: `Big`'s body asks for `extra`, which a witness for `Sized` does not
+	// hold, and neither Protocol is imported where the witness is built.
+	it("runs another Module's provided body with its own Protocol's witness", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerBig
+		gauge
+	}
+}
+
+implementation {
+	Terminal.inspect(gauge(3))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+		describe() -> String
+	}
+
+	protocol Big is Sized {
+		extra() -> Integer
+
+		describe() -> String {
+			<- "big {@::extra()}"
+		}
+	}
+
+	namespace IntegerBig for Integer is Big {
+		size() -> Integer {
+			<- @
+		}
+
+		extra() -> Integer {
+			<- 7
+		}
+	}
+
+	function gauge <infer Item is Sized>(_ item: Item) -> String {
+		<- item::describe()
+	}
+}
+
+export {
+	IntegerBig
+	gauge
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"big 7"'])
+			},
+		)
+	})
+
+	// NOTE: `Ranked`'s body hands the `Self` its Function literal is given to
+	// `sort`, which reads `compare` off the witness, and `Sized` holds none.
+	it("runs another Module's provided body whose Function literal sorts its `Self`", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { gauge }
+	from "./Boxes.es" {
+		Boxes
+		box
+	}
+}
+
+implementation {
+	Terminal.inspect(gauge(box(3)))
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		visit(_ f: (_: Self) -> String) -> String
+		describe() -> String
+	}
+
+	function gauge <infer Item is Sized>(_ item: Item) -> String {
+		<- item::describe()
+	}
+}
+
+export {
+	Sized
+	gauge
+}
+`,
+				"Ranked.es": `implementation {
+	protocol Ranked is Comparable {
+		visit(_ f: (_: Self) -> String) -> String
+
+		describe() -> String {
+			<- @::visit((item) {
+				constant sorted = [item, item]::sort()
+
+				<- "sorted {sorted::length()}"
+			})
+		}
+	}
+}
+
+export {
+	Ranked
+}
+`,
+				"Boxes.es": `import {
+	from "./Ranked.es" { Ranked }
+	from "./Sized.es" { Sized }
+}
+
+implementation {
+	type Box = { n: Integer }
+
+	namespace Boxes for Box is Sized, is Ranked {
+		visit(_ f: (_: Box) -> String) -> String {
+			<- f(@)
+		}
+
+		compare(to other: Box) -> Ordering {
+			<- @.n::compare(to other.n)
+		}
+	}
+
+	function box(_ n: Integer) -> Box {
+		<- { n }
+	}
+}
+
+export {
+	Box
+	Boxes
+	box
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"sorted 2"'])
+			},
+		)
+	})
+
+	// NOTE: `B.es` restates the `z` of `A.es`'s Protocol with another Type and is
+	// refused there. `Main.es` is judged on its own, so what that breaks in it
+	// is reported in it, with a Note naming the refusal.
+	const restatingModules = {
+		"A.es": `implementation {
+	protocol A {
+		z() -> String
+
+		y() -> String {
+			<- "y{@::z()}"
+		}
+	}
+
+	function relay <infer T is A>(_ t: T) -> String {
+		<- t::y()
+	}
+}
+
+export {
+	A
+	relay
+}
+`,
+		"B.es": `import {
+	from "./A.es" { A as Base }
+}
+
+implementation {
+	protocol B is Base {
+		z() -> Integer
+	}
+}
+
+export {
+	B
+}
+`,
+	}
+
+	it("reports what another Module's refused restatement breaks at a bounded call", () => {
+		withProject(
+			{
+				...restatingModules,
+				"Main.es": `import {
+	from "./A.es" { relay }
+	from "./B.es" { B }
+}
+
+implementation {
+	namespace IntegerB for Integer is B {
+		z() -> Integer {
+			<- 7
+		}
+	}
+
+	function hand <infer T is B>(_ t: T) -> String {
+		<- relay(t)
+	}
+
+	Terminal.print(relay(3))
+	Terminal.print(hand(3))
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(reportsOf(main)).toEqual([
+					["dependency-has-errors", "./B.es has errors of its own"],
+					[
+						"nonconforming-namespace",
+						"Namespace 'IntegerB' does not conform to 'A'",
+					],
+					[
+						"nonconforming-namespace",
+						"Namespace 'IntegerB' does not conform to 'B'",
+					],
+				])
+				expect(
+					main.slice(1).map((diagnostic) => diagnostic.notes),
+				).toEqual([
+					[
+						"'B' restates 'z' with a signature 'A' does not accept, and is refused where B.es declares it.",
+					],
+					[
+						"'y' runs the body 'A' provides, which reads 'z': at Integer 'IntegerB' answers it with an Integer, where 'A' answers a String.",
+						"'B' restates 'z' with a signature 'A' does not accept, and is refused where B.es declares it.",
+					],
+				])
+				expect(main.flatMap((diagnostic) => diagnostic.helps)).toEqual([
+					"Open ./B.es — its own Diagnostics say what is wrong there.",
+				])
+			},
+		)
+	})
+
+	it("reports what another Module's refused restatement breaks at a provided Method's call", () => {
+		withProject(
+			{
+				...restatingModules,
+				"Main.es": `import {
+	from "./A.es" { A }
+	from "./B.es" { B }
+}
+
+implementation {
+	namespace IntegerB for Integer is B {
+		z() -> Integer {
+			<- 7
+		}
+	}
+
+	Terminal.print(3::y())
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(reportsOf(main)).toEqual([
+					["dependency-has-errors", "./B.es has errors of its own"],
+					[
+						"nonconforming-namespace",
+						"Namespace 'IntegerB' does not conform to 'A'",
+					],
+				])
+				expect(main[1]!.notes).toEqual([
+					"'B' restates 'z' with a signature 'A' does not accept, and is refused where B.es declares it.",
+				])
+			},
+		)
+	})
+
+	// NOTE: `Halved` provides a `z` answering a Number and `Counted` one
+	// answering an Integer, and `Main.es` hands a value bounded by an extension
+	// of one or both on to a bound on `Halved`.
+	const apartProtocols = (
+		extension: string,
+		name: string,
+	) => `implementation {
+	protocol Halved {
+		h() -> Integer
+
+		z() -> Number {
+			<- @::h()::add(1/2)
+		}
+	}
+
+	protocol Counted {
+		v() -> Integer
+
+		z() -> Integer {
+			<- @::v()
+		}
+	}
+
+	${extension}
+
+	function viaHalved <infer T is Halved>(_ t: T) -> Number {
+		<- t::z()
+	}
+}
+
+export {
+	Counted
+	Halved
+	${name}
+	viaHalved
+}
+`
+
+	const apartMain = (
+		names: Array<string>,
+		conformances: string,
+		extending: string,
+		written: string = "",
+	) => `import {
+	from "./Protocols.es" {
+		${names.join("\n\t\t")}
+	}
+}
+
+implementation {
+	namespace IntegerN for Integer is ${conformances} {
+		${written}h() -> Integer {
+			<- 20
+		}
+
+		v() -> Integer {
+			<- 30
+		}
+	}
+
+	function hand <infer T is ${extending}>(_ t: T) -> Number {
+		<- viaHalved(t)
+	}
+
+	Terminal.print("{viaHalved(3)} {hand(3)}")
+}
+`
+
+	const apartShapes = [
+		{
+			shape: "an extension taking the other's entry",
+			extension: "protocol Both is Counted, is Halved {}",
+			names: ["Both", "Halved", "viaHalved"],
+			conformances: "Halved, is Both",
+			extending: "Both",
+		},
+		{
+			shape: "an extension taking the other's entry, clauses swapped",
+			extension: "protocol Both is Halved, is Counted {}",
+			names: ["Both", "Halved", "viaHalved"],
+			conformances: "Halved, is Both",
+			extending: "Both",
+		},
+		{
+			shape: "an extension restating the Method as a requirement",
+			extension: `protocol Whole is Halved {
+		z() -> Integer
+	}`,
+			names: ["Counted", "Whole", "viaHalved"],
+			conformances: "Whole, is Counted",
+			extending: "Whole",
+		},
+	]
+
+	for (let {
+		shape,
+		extension,
+		names,
+		conformances,
+		extending,
+	} of apartShapes) {
+		it(`refuses a Namespace answering a Method with two bodies through ${shape}`, () => {
+			withProject(
+				{
+					"Protocols.es": apartProtocols(extension, extending),
+					"Main.es": apartMain(names, conformances, extending),
+				},
+				(directory) => {
+					let main = analysedAt(directory, "Main.es", "Main.es")
+
+					expect(
+						main.map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.message,
+							diagnostic.position?.start.line,
+							diagnostic.labels.map((label) => label.message),
+						]),
+					).toEqual([
+						[
+							"nonconforming-namespace",
+							`Namespace 'IntegerN' does not conform to '${extending}'`,
+							10,
+							[
+								`Method 'z' runs one body for '${extending}' and another for 'Halved'`,
+							],
+						],
+					])
+					expect(main[0]!.notes).toEqual([
+						`'z' runs the body 'Counted' provides for '${extending}', and the body 'Halved' provides for 'Halved'.`,
+						`A value bounded by '${extending}' can be handed to a bound on 'Halved', and a bound runs one body.`,
+					])
+					expect(main[0]!.helps).toEqual([
+						`Write 'z' in 'IntegerN' as '${extending}' declares it, so one Method answers both.`,
+					])
+				},
+			)
+		})
+
+		it(`runs the Method the Namespace writes for both through ${shape}`, async () => {
+			await withBuiltProject(
+				{
+					"Protocols.es": apartProtocols(extension, extending),
+					"Main.es": apartMain(
+						names,
+						conformances,
+						extending,
+						`z() -> Integer {
+			<- 7
+		}
+
+		`,
+					),
+				},
+				async (directory) => {
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["7 7"])
+				},
+			)
+		})
+	}
+
 	// NOTE: `Other.es` declares a `Sized` of its own, which the graph reaches
 	// from `Entry.es` and which is no concern of `measure`'s bound.
 	it("resolves a bound alike whichever entry the graph was loaded from", () => {

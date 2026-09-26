@@ -51,6 +51,7 @@ import {
 	refinementInside,
 } from "../helpers/predicateEval"
 import { typedBodyNamespaceReaches } from "../helpers/providedReach"
+import { readsEveryEntry, typedBodyReads } from "../helpers/providedReads"
 import { closestMatch, editDistance } from "../helpers/suggest"
 import {
 	answersForBase,
@@ -92,7 +93,7 @@ import {
 	unfreshenBindings,
 	unionMembersKeepingNames,
 } from "../helpers/types"
-import { printType, signaturesOf } from "../printType"
+import { printSignature, printType, signaturesOf } from "../printType"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -113,6 +114,7 @@ import {
 	findCaseTypesInScope,
 	getAllNamespacesInScope,
 	impliedTargetBounds,
+	incompatibleRestatements,
 	isStaticMethod,
 	methodGenericSplits,
 	type MethodGenericSplit,
@@ -126,6 +128,7 @@ import {
 	lookupTypeOf,
 	type MemberAccessContext,
 	namespaceNamedByType,
+	knownProtocol,
 	protocolNameTaken,
 	protocolOf,
 	protocolSpelling,
@@ -7881,6 +7884,12 @@ function enrichProtocolDeclarationStatement(
 		declareProtocolInScope(node.name, protocolType, scope)
 	}
 
+	// NOTE: A Protocol is not a Type, so its name carries Unknown rather than a
+	// Type borrowed from something else.
+	let name = enrichIdentifier(node.name, scope, { type: "Unknown" })
+
+	refuseIncompatibleRestatements(node, protocolType, scope)
+
 	let methods = enrichProvidedMethods(node, protocolType, scope)
 
 	for (let method of Object.values(methods)) {
@@ -7893,11 +7902,18 @@ function enrichProtocolDeclarationStatement(
 		}
 	}
 
+	// NOTE: Nothing solved before this point reaches a Protocol that did not
+	// hoist, so its bodies' typed reads stand in before anything asks.
+	if (hoistedType === undefined) {
+		Object.assign(
+			protocolType.providedReads ?? {},
+			narrowedReads(protocolType, methods, scope),
+		)
+	}
+
 	return {
 		nodeType: "ProtocolDeclarationStatement",
-		// NOTE: A Protocol is not a Type, so its name carries no Type of its
-		// own — Unknown, rather than misleadingly borrowing one.
-		name: enrichIdentifier(node.name, scope, { type: "Unknown" }),
+		name,
 		protocolType,
 		conformsTo: node.conformsTo.map((clause) => ({
 			name: clause.protocol.content,
@@ -7988,6 +8004,64 @@ function enrichProvidedMethods(
 	return methods
 }
 
+// NOTE: What each body the syntactic reading takes to read its whole witness
+// reads once typed. The typing is a probe that reports and records nothing, and
+// says nothing where it finds an Error, since the typing kept may then differ.
+export function typedProvidedReads(
+	node: parser.ProtocolDeclarationStatementNode,
+	protocolType: common.ProtocolType,
+	scope: enricher.Scope,
+): Record<string, Array<string>> {
+	if (
+		!Object.values(protocolType.providedReads ?? {}).some((reads) =>
+			readsEveryEntry(reads, protocolType.methods),
+		)
+	) {
+		return {}
+	}
+
+	try {
+		let typed = probeContextualFunctionTypes(() =>
+			collectDiagnostics(() =>
+				enrichProvidedMethods(node, protocolType, scope),
+			),
+		).result
+
+		return containsErrors(typed.diagnostics)
+			? {}
+			: narrowedReads(protocolType, typed.result, scope)
+	} catch {
+		return {}
+	}
+}
+
+function narrowedReads(
+	protocolType: common.ProtocolType,
+	methods: common.typed.Methods,
+	scope: enricher.Scope,
+): Record<string, Array<string>> {
+	let narrowed: Record<string, Array<string>> = {}
+
+	for (let [methodName, reads] of Object.entries(
+		protocolType.providedReads ?? {},
+	)) {
+		let method = methods[methodName]
+
+		if (
+			method?.nodeType === "SimpleMethod" &&
+			readsEveryEntry(reads, protocolType.methods)
+		) {
+			narrowed[methodName] = typedBodyReads(
+				method.method.value,
+				protocolType.methods,
+				(identity) => knownProtocol(identity, scope)?.methods ?? null,
+			)
+		}
+	}
+
+	return narrowed
+}
+
 // NOTE: A body on a `static` or an `overload` entry. Both would need a rail of
 // their own — a static Method takes no receiver for `Self` to be read off, and
 // an Overload's const is named for its slot in a Method Type this side of the
@@ -8038,6 +8112,104 @@ function refuseUnwritableProvidedMethod(
 			],
 		},
 	)
+}
+
+// NOTE: Reported where the Protocol is declared rather than where a value
+// bounded by it is handed on to a bound of the ancestor.
+function refuseIncompatibleRestatements(
+	node: parser.ProtocolDeclarationStatementNode,
+	protocolType: common.ProtocolType,
+	scope: enricher.Scope,
+): void {
+	for (let { methodName, refused, source } of incompatibleRestatements(
+		protocolType,
+	)) {
+		let inherited = refused.ancestor.methods[methodName]
+		let ancestorName = describeProtocol(refused.ancestor.identity, scope)
+		let declared = quotedSignatures(methodName, inherited)
+		let conforms = `Whatever conforms to '${node.name.content}' conforms to '${ancestorName}' as well, so a call through '${ancestorName}'`
+
+		if (source === null) {
+			let written = node.methods[methodName]
+			let overloads =
+				written.nodeType === "OverloadedProtocolMethod" &&
+				inherited.type === "SimpleMethod"
+
+			reportError(
+				`Protocol '${node.name.content}' restates '${methodName}' with a signature '${ancestorName}' does not accept`,
+				written.name.position,
+				{
+					code: "incompatible-restatement",
+					labels: [
+						primary(
+							written.name.position,
+							`'${ancestorName}' declares it as ${declared}`,
+						),
+					],
+					notes: [
+						`${conforms} reaches this '${methodName}' and calls it as '${ancestorName}' declares it.`,
+						...(overloads
+							? [
+									`A call through '${ancestorName}' reaches the one '${methodName}' it declares, and an 'overload' block keeps each of its signatures as an entry of its own, so none of them is that one.`,
+								]
+							: []),
+					],
+					helps: [
+						overloads
+							? `Restate '${methodName}' as the one signature '${ancestorName}' declares for it, ${declared}, and give the other signatures a name of their own.`
+							: `Restate '${methodName}' with the signature '${ancestorName}' declares for it, ${declared}, or give this Method a name of its own.`,
+					],
+				},
+			)
+
+			continue
+		}
+
+		let sourceName = describeProtocol(source.ancestor.identity, scope)
+
+		reportError(
+			`Protocol '${node.name.content}' inherits '${methodName}' with a signature '${ancestorName}' does not accept`,
+			source.clause.protocol.position,
+			{
+				code: "incompatible-restatement",
+				labels: [
+					primary(
+						source.clause.protocol.position,
+						`'${methodName}' comes from '${sourceName}' as ${quotedSignatures(methodName, protocolType.methods[methodName])}`,
+					),
+					secondary(
+						refused.clause.protocol.position,
+						`'${ancestorName}' declares it as ${declared}`,
+					),
+				],
+				notes: [
+					`${conforms} reaches the '${methodName}' '${sourceName}' declares and calls it as '${ancestorName}' declares it.`,
+				],
+				helps: [
+					`Declare '${methodName}' with one signature in '${sourceName}' and '${ancestorName}', or give one of the two Methods a name of its own.`,
+				],
+			},
+		)
+	}
+}
+
+// NOTE: A Method's signatures as a reader writes them, each quoted.
+function quotedSignatures(
+	methodName: string,
+	method: common.MethodType,
+): string {
+	let prefix =
+		method.type === "StaticMethod" ||
+		method.type === "OverloadedStaticMethod"
+			? "static "
+			: ""
+
+	return (signaturesOf(method) ?? [])
+		.map(
+			(signature) =>
+				`'${prefix}${printSignature(signature, methodName)}'`,
+		)
+		.join(" and ")
 }
 
 // NOTE: `infer` marks a Type Parameter a USE works out for itself, from the

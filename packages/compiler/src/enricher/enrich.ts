@@ -37,11 +37,13 @@ import {
 	resolveTypeAliasStatementSkeleton,
 	resolveTypeAliasStatementType,
 	settleConformanceClauses,
+	typedProvidedReads,
 } from "./enrichers"
 import { exampleSuite, exampleTestsOf } from "./examples"
 import {
 	collectDerivedTypeNames,
 	forgetNamespaceTargets,
+	invalidateConformancesInScope,
 	invalidateNamespacesInScope,
 	referencedTypeNames,
 	resolveChoiceDeclarationStatementType,
@@ -1921,6 +1923,41 @@ function hoistDeclarationsInner(
 		scope.types[node.name.content] = result
 		countTypeDeclaration()
 		hoistedTypes.set(node, result)
+	}
+
+	// NOTE: A body whose `@` the syntactic reading loses reads what its typing
+	// says, where every declaration hoisted so the in-order typing agrees. Each
+	// is typed against the others' syntactic reads, which only ask for more.
+	if (pendingNodes.length === 0) {
+		let narrowed = units.flatMap((unit) =>
+			unit.nodes.flatMap((node) => {
+				let type = hoistedTypes.get(node)
+
+				return node.nodeType === "ProtocolDeclarationStatement" &&
+					type?.type === "Protocol"
+					? [
+							{
+								type,
+								reads: typedProvidedReads(
+									node,
+									type,
+									unit.scope,
+								),
+							},
+						]
+					: []
+			}),
+		)
+
+		for (let { type, reads } of narrowed) {
+			Object.assign(type.providedReads ?? {}, reads)
+		}
+
+		if (narrowed.some(({ reads }) => Object.keys(reads).length > 0)) {
+			for (let scope of new Set(units.map((unit) => unit.scope))) {
+				invalidateConformancesInScope(scope)
+			}
+		}
 	}
 
 	return hoistedTypes

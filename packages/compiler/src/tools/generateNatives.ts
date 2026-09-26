@@ -802,12 +802,9 @@ function renderFunctionsAssertion(section: NativesSection): string {
 // Protocol Method with its own bounded Generic); none occur in the current
 // Protocols.
 //
-// NOTE: A PROVIDED Method is in a witness like everything else, and at the
-// requirement's own arity: the conformer's override where it wrote one, and the
-// shared const curried with the finished witness where it did not. A native
-// handed a witness may therefore call it, which is why it is declared. What the
-// Compiler emits and what this declares have to agree, and this is where the
-// agreement is written down.
+// NOTE: A provided Method is in a witness at the requirement's own arity: the
+// conformer's override, or the shared const curried with a witness of its own
+// Protocol. A native may call it, so this declares it as the Compiler emits it.
 function renderConformanceType(
 	protocol: common.ProtocolType,
 	ctx: RenderContext,

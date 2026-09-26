@@ -10,7 +10,9 @@ export {
 	conformanceKey,
 	type ConformanceMethodMap,
 	missingRequirements,
+	providedBodyFulfils,
 	providedMethodProtocol,
+	writtenRequirementFulfils,
 } from "./conformance"
 export {
 	caseDefaults,

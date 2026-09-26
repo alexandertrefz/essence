@@ -4398,14 +4398,16 @@ Error: Namespace 'Points' does not conform to 'Printable'
 
 </div>
 
-Write the missing method, here `toString() -> String { … }`. A choice whose cases carry no payload gets `is Printable` without writing a method. The Help names
+Write the missing method, here `toString() -> String { … }`. A choice whose cases carry no payload gets `is Printable` without writing a method. A method another protocol of the namespace provides answers the requirement only where its signature fulfils it; where it does not, a Note names that protocol. Where the requirement written as declared does not fulfil that protocol's method either, writing it would refuse that conformance instead, so a second Note says the two protocols declare the method apart, the Help sends the conformance to a namespace of its own, and no stub is offered. A call that the missing method refuses reports this code too, with a Note naming the method the namespace does not write. The Help names
 **every** requirement the conformance owes, not only the one the label stopped
 at — a namespace that declares a conformance and writes nothing owes all of them.
 
-Two other shapes report under the same code, each with its own Help:
+Four other shapes report under the same code:
 
 - **A method whose signature does not match.** `Write 'toString' with the signature 'Printable' declares for it.` No stub is offered: this is a method to correct rather than one to write.
 - **A method that needs a `where` condition.** `Add 'where Item is Printable' to this conformance.` — unless that type parameter already carries a bound here, in which case a second one is refused and the Help sends the conformance to a namespace of its own instead.
+- **A call whose value is narrower than the target type.** The label reads `this needs Integer to conform`. A method, or a body another protocol provides, answers for the whole target type, such as `make() -> Integer | String`, where the call binds `Self` to `Integer` alone. For a body, a Note says where it narrows, `'describe' runs the body 'Shown' provides, whose Parameter 1 is 'Self': at Integer it takes an Integer, where 'Sized' accepts any Number.`, and the Help offers to take `Number` in the body or to declare a namespace for `Integer`. For a body that reads a method the namespace answers for the whole target type, the Note names it, `'twin' runs the body 'Maker' provides, which reads 'make': at Integer 'NumberAll' answers it with a Number, where 'Maker' answers an Integer.`, and the Help offers to declare a namespace for `Integer`.
+- **A method that runs one body for a protocol and another for one it extends.** A value bounded by `Both` can be handed to a bound on `Halved`, where it runs the body it runs for `Both`, so a namespace conforming to both has to answer them with one body. The label reads `Method 'z' runs one body for 'Both' and another for 'Halved'`, a Note names both bodies, `'z' runs the body 'Counted' provides for 'Both', and the body 'Halved' provides for 'Halved'.`, and the Help asks to write the method in the namespace as the extending protocol declares it. Where another protocol of the namespace declares the method apart, a Note names it and the Help first moves its conformance to a namespace of its own.
 
 Quick Fix: **Implement 'Printable'** writes an empty method for each missing
 requirement, as `name() -> String {}` on one line — the shape `esfmt` leaves
@@ -4858,6 +4860,37 @@ Error: Protocol 'Listed' extends itself through 'Sorted'
 </div>
 
 Drop one of the extensions.
+
+Taught on: [Protocols › Extending a protocol](/docs/language/protocols#extending-a-protocol)
+
+### `incompatible-restatement`
+
+**Error.** A protocol that extends another restates one of its methods with a signature the other does not accept, such as `tag() -> Integer` for `tag() -> String`, or as an `overload` block.
+
+<div class="error-output">
+
+```
+[incompatible-restatement]
+Error: Protocol 'Coded' restates 'tag' with a signature 'Labelled' does not accept
+   ╭─┤ Coded.es:9:3 │
+   │
+ 9 │        tag() -> Integer {
+   │        ─┬─  
+   │         ╰─── 'Labelled' declares it as 'tag() -> String'
+   │ 
+   │ Help: Restate 'tag' with the signature 'Labelled' declares for it, 'tag() -> String', or give this Method a name of its own.
+   │ 
+   │ Note: Whatever conforms to 'Coded' conforms to 'Labelled' as well, so a call through 'Labelled' reaches this 'tag' and calls it as 'Labelled' declares it.
+───╯
+```
+
+</div>
+
+A value bounded by `Coded` can be handed to a function bounded by `Labelled`, and a call there reaches the restated method. So a restatement, with a body or as a requirement, keeps a signature the extended protocol accepts: the same one, or one that takes wider arguments or answers a narrower type. A call through `Labelled` reaches the one `tag` it declares, and an `overload` block keeps each of its signatures as an entry of its own, so an `overload` block restating one method is refused as well.
+
+The same code reports a protocol that extends two others declaring one method where neither signature accepts the other, as `protocol Tagged is Labelled, is Counted` does where `Counted` declares `tag() -> Integer`. Where one of them accepts the other, as `tag() -> Number` accepts `tag() -> Integer`, the extending protocol takes the one accepted, in either clause order. The label names the clause the method comes from. Declare the method with one signature in both, or rename it in one of them.
+
+A module that imports a refused protocol reports what the refusal breaks there as [`nonconforming-namespace`](#nonconforming-namespace), with a Note that names the refused protocol and the module that declares it.
 
 Taught on: [Protocols › Extending a protocol](/docs/language/protocols#extending-a-protocol)
 

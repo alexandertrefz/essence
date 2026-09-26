@@ -111,13 +111,18 @@ export function typedBodyNamespaceReaches(
 			typeof record.protocolName === "string" &&
 			isNamespaceSource(record.source)
 		) {
-			if (Object.keys(record.source.methodMap).length > 0) {
-				reach({
-					kind: "witness",
-					namespace: record.source.name,
-					protocol: record.protocolName,
-					position,
-				})
+			for (let witness of [
+				{ ...record.source, protocolName: record.protocolName },
+				...(record.source.providedWitnesses ?? []),
+			]) {
+				if (Object.keys(witness.methodMap).length > 0) {
+					reach({
+						kind: "witness",
+						namespace: witness.name,
+						protocol: witness.protocolName,
+						position,
+					})
+				}
 			}
 		}
 

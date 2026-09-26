@@ -550,6 +550,40 @@ function conformanceExpression(
 		...(conformance.source.providedMethods === undefined
 			? {}
 			: { providedMethods: conformance.source.providedMethods }),
+		...(conformance.source.curriedWith === undefined
+			? {}
+			: { curriedWith: conformance.source.curriedWith }),
+		...(conformance.source.providedWitnesses === undefined
+			? {}
+			: {
+					providedWitnesses: conformance.source.providedWitnesses.map(
+						(witness): common.typedSimple.ConformanceValueNode => ({
+							nodeType: "ConformanceValue",
+							namespaceName: witness.name,
+							methodMap: witness.methodMap,
+							...(witness.providedMethods === undefined
+								? {}
+								: { providedMethods: witness.providedMethods }),
+							...(witness.curriedWith === undefined
+								? {}
+								: { curriedWith: witness.curriedWith }),
+							conditionIndices: witness.conditionIndices,
+							conditions: [],
+							derivedDescriptor: witness.derivedDescriptor,
+							type: { type: "Unknown" },
+						}),
+					),
+				}),
+		...(conformance.source.groupConditions === undefined
+			? {}
+			: {
+					groupConditions: conformance.source.groupConditions.map(
+						conformanceExpression,
+					),
+				}),
+		...(conformance.source.sharedConditions === undefined
+			? {}
+			: { sharedConditions: conformance.source.sharedConditions }),
 		conditions: conformance.source.conditions.map(conformanceExpression),
 		derivedDescriptor: conformance.source.derivedDescriptor,
 		// NOTE: The routed member names a Record's conditional witness is built

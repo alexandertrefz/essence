@@ -10,7 +10,9 @@ import {
 	displayProtocolName,
 	flattenUnionMembers,
 	missingRequirements,
+	providedBodyFulfils,
 	providedMethodProtocol,
+	writtenRequirementFulfils,
 } from "@essence-lang/compiler/helpers"
 import { printType, withoutSelf } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
@@ -140,20 +142,39 @@ export function implementProtocolActions(
 				continue
 			}
 
+			let owed = missingRequirements(
+				protocol,
+				conformer.typed.type,
+				// NOTE: Asked of every Protocol the Namespace conforms
+				// to, not of this one alone — a Method one clause only
+				// REQUIRES may carry another's body, and then nothing
+				// is owed for it. The Enricher's own check asks the
+				// same question the same way.
+				providerIn(
+					protocols,
+					granted,
+					protocol,
+					conformer.typed.type.targetType,
+				),
+			)
+
+			if (
+				refusedElsewhere(
+					protocols,
+					granted,
+					protocol,
+					owed,
+					conformer.typed.type.targetType,
+				)
+			) {
+				continue
+			}
+
 			entries.push(
 				...entryFor(
 					conformer,
 					protocol,
-					missingRequirements(
-						protocol,
-						conformer.typed.type,
-						// NOTE: Asked of every Protocol the Namespace conforms
-						// to, not of this one alone — a Method one clause only
-						// REQUIRES may carry another's body, and then nothing
-						// is owed for it. The Enricher's own check asks the
-						// same question the same way.
-						providerIn(protocols, granted),
-					),
+					owed,
 					lines,
 					"refactor.rewrite",
 					null,
@@ -402,10 +423,14 @@ function isChoice(type: common.Type): boolean {
 	return cases.length > 0 && cases.every((member) => member.type === "Case")
 }
 
-// NOTE: `granted` holds identities, as a Namespace's `conformsTo` does.
+// NOTE: `granted` holds identities, as a Namespace's `conformsTo` does. A body
+// counts only where it fulfils the requirement `solving` has of its name, and
+// one whose Protocol is out of reach here is taken to fulfil it.
 function providerIn(
 	protocols: Record<string, common.ProtocolType>,
 	granted: ReadonlyArray<string>,
+	solving: common.ProtocolType,
+	target: common.Type | null,
 ): (methodName: string) => string | null {
 	let byIdentity = new Map(
 		Object.values(protocols).map((protocol) => [
@@ -413,6 +438,20 @@ function providerIn(
 			protocol,
 		]),
 	)
+	let fulfils = (provider: string, methodName: string): boolean => {
+		let body = byIdentity.get(provider)?.methods[methodName]
+
+		return (
+			target === null ||
+			body === undefined ||
+			providedBodyFulfils(
+				methodName,
+				solving.methods[methodName],
+				body,
+				target,
+			)
+		)
+	}
 
 	return (methodName) => {
 		for (let identity of granted) {
@@ -422,13 +461,44 @@ function providerIn(
 					? null
 					: providedMethodProtocol(protocol, methodName)
 
-			if (provider !== null) {
+			if (provider !== null && fulfils(provider, methodName)) {
 				return provider
 			}
 		}
 
 		return null
 	}
+}
+
+// NOTE: Whether a stub written as `solving` declares it would refuse another
+// conformance whose body of the name it replaces, as the Enricher judges it.
+// The Enricher offers no stub there either.
+function refusedElsewhere(
+	protocols: Record<string, common.ProtocolType>,
+	granted: ReadonlyArray<string>,
+	solving: common.ProtocolType,
+	owed: Array<string>,
+	target: common.Type | null,
+): boolean {
+	let reached = Object.values(protocols).filter((protocol) =>
+		granted.includes(protocol.identity),
+	)
+
+	return (
+		target !== null &&
+		owed.some((methodName) =>
+			reached.some(
+				(protocol) =>
+					providedMethodProtocol(protocol, methodName) !== null &&
+					!writtenRequirementFulfils(
+						methodName,
+						solving.methods[methodName]!,
+						protocol.methods[methodName]!,
+						target,
+					),
+			),
+		)
+	)
 }
 
 // NOTE: The document's own Protocols over the ones it inherits — a standard

@@ -149,6 +149,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"dictionary-entry-syntax",
 		"duplicate-type-parameter",
 		"foreign-syntax",
+		"incompatible-restatement",
 		"incomplete-record-argument",
 		"invalid-escape",
 		"malformed-unicode-escape",

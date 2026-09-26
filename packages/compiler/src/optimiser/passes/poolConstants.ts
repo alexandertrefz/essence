@@ -195,34 +195,37 @@ function conformanceKeyOf(
 		return null
 	}
 
-	let conditions: Array<string> = []
+	let conditions = conditionKeysOf(node.conditions, declaredNamespaces)
+	let groupConditions =
+		node.groupConditions === undefined
+			? undefined
+			: conditionKeysOf(node.groupConditions, declaredNamespaces)
 
-	for (let condition of node.conditions) {
-		let key = conditionKeyOf(condition, declaredNamespaces)
+	if (conditions === null || groupConditions === null) {
+		return null
+	}
+
+	let witnesses: Array<string> = []
+
+	for (let witness of node.providedWitnesses ?? []) {
+		let key = conformanceKeyOf(witness, declaredNamespaces)
 
 		if (key === null) {
 			return null
 		}
 
-		conditions.push(key)
+		witnesses.push(key)
 	}
 
-	// NOTE: Everything about a witness that reaches the emitted JavaScript, and
-	// nothing else — the Namespace, the map, the plan a generic Choice's
-	// equality follows, and the KEY of each condition curried onto it. The
-	// conditions are read as keys rather than as Namespaces because that is the
-	// whole of what tells two curried witnesses apart: sorting a
-	// `List<List<Box>>` and sorting a `List<Box>` both build
-	// `{ compare: List.compare }` and differ in nothing but which witness is
-	// curried onto it, so a key that dropped the difference would declare one
-	// const, hand it to both, and compare the deeper Lists by the shallower
-	// one's comparison. The witness's `type` is left out: it is what the
-	// Compiler called the conformance, and two witnesses spelled alike emit
-	// alike whatever it says.
+	// NOTE: What of a witness reaches the emitted JavaScript: the Namespace, the
+	// maps, the witness each body is curried with, a generic Choice's equality
+	// plan, and each condition's key, which tells a `List<List<Box>>` apart.
 	return `conformance:${serializeKey({
 		namespace: node.namespaceName,
 		methods: node.methodMap,
 		provided: node.providedMethods ?? null,
+		curried: node.curriedWith ?? null,
+		witnesses,
 		descriptor: node.derivedDescriptor ?? null,
 		// NOTE: LOAD-BEARING for the Case listing a Choice derives, and for the
 		// members a Record routes — the same rule twice. Every Choice's witness
@@ -239,7 +242,30 @@ function conformanceKeyOf(
 		cases: node.derivedCases ?? null,
 		members: node.derivedMembers ?? null,
 		conditions,
+		groupConditions,
+		shared: node.sharedConditions ?? null,
+		indices: node.conditionIndices,
 	})}`
+}
+
+// NOTE: The key of every condition, or null where one can not be pooled.
+function conditionKeysOf(
+	conditions: Array<common.typedSimple.ExpressionNode>,
+	declaredNamespaces: DeclaredNamespaces,
+): Array<string> | null {
+	let keys: Array<string> = []
+
+	for (let condition of conditions) {
+		let key = conditionKeyOf(condition, declaredNamespaces)
+
+		if (key === null) {
+			return null
+		}
+
+		keys.push(key)
+	}
+
+	return keys
 }
 
 // NOTE: The walk is BOTTOM-UP, so a condition that CAN be pooled already IS by

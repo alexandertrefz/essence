@@ -169,21 +169,9 @@ export function boundConformance(
 	return bound
 }
 
-// NOTE: The other runtime half of a witness — the Protocol's PROVIDED Methods,
-// which are one const each for the whole Program and take the witness they were
-// read off as their own trailing conformance Argument. That Argument is the
-// finished map, this one, which is why they can not simply stand in the object
-// literal: an object can not name itself while it is being written.
-//
-// So the map is built first, and each provided entry is a closure over it. A
-// conformer that OVERRIDES a provided Method is already in `methods` and never
-// reaches here, which is what makes a bounded call answer with the override.
-//
-// The Rewriter emits this only where a Protocol provides something the conformer
-// does not override; every other witness is the plain object literal it has
-// always been, and a conditional one is `boundConformance`'s answer handed in
-// here so the conditions are curried on before the provided Methods close over
-// it.
+// NOTE: A witness whose provided bodies are each curried with the witness
+// itself. The map is built first and every body closes over it, since an object
+// can not name itself while it is being written.
 // NOTE: The `structural` brand rides through untouched, whether it stood in a
 // plain map or `boundConformance` put it there: the spread copies it and the
 // loop below only ever writes the names the Protocol PROVIDES, which a brand is
@@ -201,6 +189,66 @@ export function providedConformance(
 	}
 
 	return witness
+}
+
+// NOTE: Every group built, under the witness it answers with.
+const groups = new WeakMap<object, Array<unknown>>()
+
+// NOTE: One conformer's witnesses for several Protocols, the first being the
+// answer. `curried` indexes `conditions` and then the `shared` ones; every map
+// is built before a body closes over one, so bodies may call across witnesses.
+export function providedConformances(
+	methods: Array<Record<string, ((...args: Array<any>) => unknown) | true>>,
+	provided: Array<Record<string, [(...args: Array<any>) => unknown, number]>>,
+	conditions: Array<unknown> = [],
+	curried: Array<Array<number>> = [],
+	shared: Array<[number, number]> = [],
+): Record<string, ((...args: Array<any>) => unknown) | true> {
+	let taken = [
+		...conditions,
+		...shared.map(([at, witness]) => groupOf(conditions[at])[witness]),
+	]
+	let witnesses = methods.map(
+		(
+			entries,
+			index,
+		): Record<string, ((...args: Array<any>) => unknown) | true> => {
+			let curriedOn = curried[index] ?? []
+
+			return curriedOn.length === 0
+				? { ...entries }
+				: boundConformance(
+						entries,
+						curriedOn.map((at) => taken[at]),
+					)
+		},
+	)
+
+	for (let [index, entries] of provided.entries()) {
+		for (let [name, [method, curried]] of Object.entries(entries)) {
+			witnesses[index]![name] = (...args: Array<unknown>) =>
+				method(...args, witnesses[curried])
+		}
+	}
+
+	groups.set(witnesses[0]!, witnesses)
+
+	return witnesses[0]!
+}
+
+function groupOf(witness: unknown): Array<unknown> {
+	let group =
+		typeof witness === "object" && witness !== null
+			? groups.get(witness)
+			: undefined
+
+	if (group === undefined) {
+		throw new Error(
+			"A condition taken from a group names a witness no group built. This is a bug in the Compiler.",
+		)
+	}
+
+	return group
 }
 
 // NOTE: The runtime shape of a constructed Choice Case — the payload's

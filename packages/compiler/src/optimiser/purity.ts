@@ -84,7 +84,10 @@ export function isPureExpression(
 		// of them — and a conditional one curries the witnesses below it onto
 		// those references. Nothing in either runs.
 		case "ConformanceValue":
-			return node.conditions.every(isPure)
+			return (
+				node.conditions.every(isPure) &&
+				(node.groupConditions ?? []).every(isPure)
+			)
 		// NOTE: A call, and the whole of what this function refuses. A
 		// Function-valued Expression is whatever was bound to it — a native free
 		// Function such as `loop`, which runs the callbacks it is handed, among
