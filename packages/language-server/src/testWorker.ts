@@ -49,7 +49,9 @@ type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
 let staging: string | null = null
-let loaded = 0
+// NOTE: Keyed by the staged file, which is what `import()` caches a Module
+// under, so running a bundle again does not count toward `BUNDLE_LIMIT`.
+let loaded = new Set<string>()
 
 function stagingDirectory(): string {
 	if (staging === null) {
@@ -59,9 +61,9 @@ function stagingDirectory(): string {
 	return staging
 }
 
-// NOTE: The bundle is named after its own hash, so an edit that changed nothing
-// the Compiler emits — a comment, a reformat — is a file that is already there
-// and already imported, and the run costs one evaluation rather than a load.
+// NOTE: The bundle is named after its own hash, so sources this Worker compiled
+// before, such as a file run again unchanged or an edit undone, name a file it
+// already imported, and the run reuses that Module rather than loading another.
 function stage(hash: string, code: string): string {
 	let directory = path.join(stagingDirectory(), hash)
 	let file = path.join(directory, "tests.mjs")
@@ -207,7 +209,7 @@ async function runEntry(
 		)) as LoadedTestBundle
 		let tests = module.$tests
 
-		loaded += 1
+		loaded.add(bundle)
 
 		if (tests === undefined) {
 			return answer([], [], false, true, null)
@@ -340,7 +342,7 @@ async function handle(request: TestWorkerRequest): Promise<void> {
 	send({
 		kind: "done",
 		run: request.run,
-		exhausted: loaded >= BUNDLE_LIMIT,
+		exhausted: loaded.size >= BUNDLE_LIMIT,
 	})
 }
 
