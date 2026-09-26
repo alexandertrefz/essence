@@ -108,14 +108,9 @@ const choiceHoldingListIs = boundChoiceIs({
 const holding = (items: ListType<IntegerType>) =>
 	({ [typeKeySymbol]: "Held#Items", items }) as never
 
-// NOTE: Reports the item it is asked ABOUT rather than the one it is compared
-// against, which is the other way round from `visiting` further down.
-// The scan path in `keyEncoding` calls the witness as `is(storedKey, key)`,
-// so the second Argument is the item the walk has just reached — a receiver
-// item while the key set is built, and an ARGUMENT item while the argument is
-// looked up. Reporting the first one instead would never name an argument
-// item at all, and an entry that can not name one can not see a write into
-// one: `visiting` left these three blind to their own hazard.
+// NOTE: Reports the second Argument, because a key scan calls the witness as
+// `is(storedKey, key)`: the second is the item the walk has just reached, and
+// the first is one it has passed, which can never show a write still ahead.
 function visitingKey(visit: (item: IntegerType) => void) {
 	return {
 		is: (first: IntegerType, second: IntegerType) => (
@@ -1101,12 +1096,13 @@ describe("reentrancy", () => {
 					),
 				}),
 		],
+		// NOTE: The second of the pair is the item the walk has just reached.
 		[
 			"isSorted",
 			(list, visit) =>
 				void isSorted(list, ascending, {
 					compare: (first: IntegerType, second: IntegerType) => (
-						visit(first),
+						visit(second),
 						compareIntegers(first, second)
 					),
 				}),
@@ -1161,7 +1157,7 @@ describe("reentrancy", () => {
 		],
 		[
 			"removeDuplicates",
-			(list, visit) => void removeDuplicates(list, visiting(visit)),
+			(list, visit) => void removeDuplicates(list, visitingKey(visit)),
 		],
 		[
 			"removeDuplicates(on:)",
@@ -1174,7 +1170,7 @@ describe("reentrancy", () => {
 		],
 		[
 			"hasDuplicates",
-			(list, visit) => void hasDuplicates(list, visiting(visit)),
+			(list, visit) => void hasDuplicates(list, visitingKey(visit)),
 		],
 		[
 			"hasDuplicates(on:)",
@@ -1185,19 +1181,21 @@ describe("reentrancy", () => {
 					integerEquality,
 				),
 		],
+		// NOTE: A one-item argument, whose key set is built without asking the
+		// witness, so the first write comes from inside the receiver's walk.
 		[
 			"everyItem(alsoIn:)",
 			(list, visit) =>
-				void everyItemIn(list, integers([1, 2]), visiting(visit)),
+				void everyItemIn(list, integers([1]), visitingKey(visit)),
 		],
 		[
 			"removeEvery(contentsOf:)",
 			(list, visit) =>
-				void removeEveryIn(list, integers([1, 2]), visiting(visit)),
+				void removeEveryIn(list, integers([1]), visitingKey(visit)),
 		],
 		[
 			"contains(everyItemOf:)",
-			(list, visit) => void contains(list, list, visiting(visit)),
+			(list, visit) => void contains(list, list, visitingKey(visit)),
 		],
 		[
 			"group(on:)",
@@ -1220,18 +1218,6 @@ describe("reentrancy", () => {
 		["tally", (list, visit) => void tally(list, visitingKey(visit))],
 	]
 
-	// NOTE: A witness that reports every item it is asked about. The set-shaped
-	// natives reach their items through `keyEncoding`, which asks the witness
-	// rather than the walk, so this is how a visit is seen from there.
-	function visiting(visit: (item: IntegerType) => void) {
-		return {
-			is: (first: IntegerType, second: IntegerType) => (
-				visit(first),
-				createBoolean(first.value === second.value)
-			),
-		}
-	}
-
 	for (let [label, walk] of walks) {
 		test(`${label} over a List its callback writes sees the entry items`, () => {
 			let list = logged([1, 2, 3, 4, 5])
@@ -1240,7 +1226,9 @@ describe("reentrancy", () => {
 
 			walk(list, (item) => {
 				visited.push(Number(item.value))
-				latest = written(latest, 99, 4)
+				// NOTE: Both ends, so a walk that runs backwards, as
+				// `lastIndex(where:)` does, still has a write ahead of it.
+				latest = written(written(latest, 99, 0), 99, 4)
 			})
 
 			expect(visited.length).toBeGreaterThan(0)
@@ -1250,7 +1238,7 @@ describe("reentrancy", () => {
 			}
 
 			expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
-			expect(itemsOf(latest)).toEqual([1, 2, 3, 4, 99])
+			expect(itemsOf(latest)).toEqual([99, 2, 3, 4, 99])
 		})
 	}
 
