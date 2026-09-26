@@ -920,6 +920,157 @@ describe("Workspace", () => {
 				main.replaceAll("isEmpty", "vacant"),
 			)
 		})
+
+		// NOTE: The requirement, the conformer reaching it through an extension
+		// written in a third Module, and a call through a bounded Type are each
+		// in a file of their own.
+		describe("a Protocol requirement", () => {
+			const sizable = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"}",
+				"",
+			].join("\n")
+			const listed = [
+				"import {",
+				'\tfrom "./Sizable.es" { Sizable }',
+				"}",
+				"",
+				"implementation {",
+				"\tprotocol Listed is Sizable {",
+				"\t\tfirst() -> Integer",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tListed",
+				"}",
+				"",
+			].join("\n")
+			const bag = [
+				"import {",
+				'\tfrom "./Listed.es" { Listed }',
+				"}",
+				"",
+				"implementation {",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Listed {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"",
+				"\t\tfirst() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tBag",
+				"\tBags",
+				"}",
+				"",
+			].join("\n")
+			const main = [
+				"import {",
+				'\tfrom "./Sizable.es" { Sizable }',
+				'\tfrom "./Bag.es" { Bag }',
+				'\tfrom "./Bag.es" { Bags }',
+				"}",
+				"",
+				"implementation {",
+				"\tfunction measure <infer Value is Sizable>(_ value: Value) -> Integer {",
+				"\t\t<- value::size()",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 0 }",
+				"",
+				"\tTerminal.inspect(bag::size())",
+				"\tTerminal.inspect(measure(bag))",
+				"}",
+				"",
+			].join("\n")
+			const files = {
+				"Sizable.es": sizable,
+				"Listed.es": listed,
+				"Bag.es": bag,
+				"Main.es": main,
+			}
+
+			let expectEverySizeMoved = (
+				renamed: Record<string, string> | null,
+			): void => {
+				expect(renamed).toEqual({
+					"Sizable.es": sizable.replaceAll("size", "extent"),
+					"Bag.es": bag.replaceAll("size", "extent"),
+					"Main.es": main.replaceAll("size", "extent"),
+				})
+			}
+
+			it("should move every conformer and bounded call from the requirement", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expectEverySizeMoved(
+					renameAcross(
+						workspace,
+						pathOf("Sizable.es"),
+						cursorAt(sizable, 3, "size"),
+						"extent",
+					),
+				)
+			})
+
+			it("should move the requirement from a conformer's implementation", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expectEverySizeMoved(
+					renameAcross(
+						workspace,
+						pathOf("Bag.es"),
+						cursorAt(bag, 9, "size"),
+						"extent",
+					),
+				)
+			})
+
+			it("should move the requirement from a call through a bounded Type", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expectEverySizeMoved(
+					renameAcross(
+						workspace,
+						pathOf("Main.es"),
+						cursorAt(main, 9, "size"),
+						"extent",
+					),
+				)
+			})
+
+			// NOTE: One rename group, but each call still has its own definition.
+			it("should keep each call's definition where its Method is written", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+				let conformerCall = workspace.symbolAt(
+					pathOf("Main.es"),
+					cursorAt(main, 14, "size"),
+				)
+				let boundedCall = workspace.symbolAt(
+					pathOf("Main.es"),
+					cursorAt(main, 9, "size"),
+				)
+
+				expect(conformerCall?.filePath).toBe(pathOf("Bag.es"))
+				expect(conformerCall?.definition?.start.line).toBe(9)
+				expect(boundedCall?.filePath).toBe(pathOf("Sizable.es"))
+				expect(boundedCall?.definition?.start.line).toBe(3)
+			})
+		})
 	})
 
 	describe("workspace symbols", () => {

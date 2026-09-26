@@ -1578,6 +1578,199 @@ describe("identifierPattern", () => {
 
 			expect(findOccurrence(source, { line: 2, column: 38 })).toBeNull()
 		})
+
+		// NOTE: A requirement and its conformers' Methods rename as one. `Pairs`
+		// conforms through an extension, and `measure` and the provided body
+		// call through a bounded Type.
+		const REQUIREMENTS = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"\t\tstatic empty() -> Self",
+			"",
+			"\t\tisEmpty() -> Boolean {",
+			"\t\t\t<- @::size()::is(0)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tprotocol Listed is Sizable {",
+			"\t\tfirst() -> Integer",
+			"\t}",
+			"",
+			"\ttype Bag = { count: Integer }",
+			"",
+			"\tnamespace Bags for Bag is Sizable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.count",
+			"\t\t}",
+			"",
+			"\t\tstatic empty() -> Bag {",
+			"\t\t\t<- { count = 0 }",
+			"\t\t}",
+			"",
+			"\t\tisEmpty() -> Boolean {",
+			"\t\t\t<- @.count::is(0)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Pair = { left: Integer, right: Integer }",
+			"",
+			"\tnamespace Pairs for Pair is Listed {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- 2",
+			"\t\t}",
+			"",
+			"\t\tstatic empty() -> Pair {",
+			"\t\t\t<- { left = 0, right = 0 }",
+			"\t\t}",
+			"",
+			"\t\tfirst() -> Integer {",
+			"\t\t\t<- @.left",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction measure <infer Value is Listed>(_ value: Value) -> Integer {",
+			"\t\t<- value::size()::add(Value.empty()::size())",
+			"\t}",
+			"",
+			"\tconstant bag: Bag = { count = 0 }",
+			"",
+			"\tTerminal.inspect(bag::size())",
+			"\tTerminal.inspect(Bags.size(bag))",
+			"\tTerminal.inspect(bag::isEmpty())",
+			"\tTerminal.inspect(measure({ left = 1, right = 2 }))",
+			"}",
+		].join("\n")
+
+		it("should rename every conformer's implementation with a requirement", () => {
+			expect(rename(REQUIREMENTS, { line: 3, column: 3 }, "extent")).toBe(
+				REQUIREMENTS.replaceAll("size", "extent"),
+			)
+		})
+
+		it("should rename a requirement from a conformer's implementation", () => {
+			expect(
+				rename(REQUIREMENTS, { line: 18, column: 3 }, "extent"),
+			).toBe(REQUIREMENTS.replaceAll("size", "extent"))
+			expect(
+				rename(REQUIREMENTS, { line: 34, column: 3 }, "extent"),
+			).toBe(REQUIREMENTS.replaceAll("size", "extent"))
+		})
+
+		it("should rename a requirement from a call through a bounded Type", () => {
+			expect(
+				rename(REQUIREMENTS, { line: 48, column: 13 }, "extent"),
+			).toBe(REQUIREMENTS.replaceAll("size", "extent"))
+			expect(
+				rename(REQUIREMENTS, { line: 7, column: 10 }, "extent"),
+			).toBe(REQUIREMENTS.replaceAll("size", "extent"))
+		})
+
+		it("should rename a static requirement with its conformers and a bounded Type's call", () => {
+			expect(rename(REQUIREMENTS, { line: 4, column: 10 }, "blank")).toBe(
+				REQUIREMENTS.replaceAll("empty", "blank"),
+			)
+			expect(
+				rename(REQUIREMENTS, { line: 48, column: 31 }, "blank"),
+			).toBe(REQUIREMENTS.replaceAll("empty", "blank"))
+		})
+
+		// NOTE: Left behind, the override would stop overriding and every
+		// call through `Sizable` would quietly run the provided body instead.
+		it("should rename a conformer's override of a provided Method with it", () => {
+			expect(rename(REQUIREMENTS, { line: 6, column: 3 }, "vacant")).toBe(
+				REQUIREMENTS.replaceAll("isEmpty", "vacant"),
+			)
+			expect(
+				rename(REQUIREMENTS, { line: 55, column: 24 }, "vacant"),
+			).toBe(REQUIREMENTS.replaceAll("isEmpty", "vacant"))
+		})
+
+		it("should rename an overloaded requirement with every Overload a conformer writes", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Growable {",
+				"\t\toverload grow {",
+				"\t\t\t(_ other: Self) -> Self",
+				"\t\t\t(by amount: Integer) -> Self",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Growable {",
+				"\t\toverload grow {",
+				"\t\t\t(_ other: Bag) -> Bag {",
+				"\t\t\t\t<- { count = @.count::add(other.count) }",
+				"\t\t\t}",
+				"",
+				"\t\t\t(by amount: Integer) -> Bag {",
+				"\t\t\t\t<- { count = @.count::add(amount) }",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction twice <infer Value is Growable>(_ value: Value) -> Value {",
+				"\t\t<- value::grow(value)::grow(by 1)",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 1 }",
+				"",
+				"\tTerminal.inspect(bag::grow(by 2))",
+				"\tTerminal.inspect(twice(bag))",
+				"}",
+			].join("\n")
+
+			expect(rename(source, { line: 3, column: 12 }, "enlarge")).toBe(
+				source.replaceAll("grow", "enlarge"),
+			)
+			expect(rename(source, { line: 29, column: 24 }, "enlarge")).toBe(
+				source.replaceAll("grow", "enlarge"),
+			)
+		})
+
+		it("should leave a same-named Method of a Namespace that does not conform alone", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Sizable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Unrelated for Integer {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(3::size())",
+				"}",
+			].join("\n")
+
+			let lines = source.split("\n")
+			let renamedAt = (renamed: Array<number>) =>
+				lines
+					.map((line, index) =>
+						renamed.includes(index + 1)
+							? line.replace("size", "extent")
+							: line,
+					)
+					.join("\n")
+
+			expect(rename(source, { line: 3, column: 3 }, "extent")).toBe(
+				renamedAt([3, 9]),
+			)
+			expect(rename(source, { line: 15, column: 3 }, "extent")).toBe(
+				renamedAt([15, 20]),
+			)
+		})
 	})
 })
 

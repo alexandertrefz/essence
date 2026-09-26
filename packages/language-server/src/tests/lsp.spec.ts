@@ -39,6 +39,7 @@ import {
 	HoverRequest,
 	LogMessageNotification,
 	MessageType,
+	PrepareRenameRequest,
 	RenameRequest,
 	SignatureHelpRequest,
 	WillRenameFilesRequest,
@@ -1868,6 +1869,78 @@ describe("A rename asked of the Server", () => {
 				{ at: "factor:", newName: "start" },
 			]),
 		).toEqual([{ lines: [1, 3, 4] }, { lines: [9, 10] }])
+	})
+
+	// NOTE: The conformer is inside the workspace and its requirement is not,
+	// so renaming the one would rename the other in a file nothing indexed.
+	it("should refuse a Method whose requirement is declared outside the workspace", async () => {
+		let bag = [
+			"import {",
+			'\tfrom "../lib/Sizable.es" { Sizable }',
+			"}",
+			"",
+			"implementation {",
+			"\ttype Bag = { count: Integer }",
+			"",
+			"\tnamespace Bags for Bag is Sizable {",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.count",
+			"\t\t}",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+		let files = makeSessionWorkspace({
+			"lib/Sizable.es": [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"}",
+				"",
+			].join("\n"),
+			"app/Bag.es": bag,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.pathOf("app")])
+			await session.open(files.pathOf("app/Bag.es"), bag)
+			await session.settle()
+
+			let prepare = (line: number, needle: string) =>
+				session
+					.request(PrepareRenameRequest.type, {
+						textDocument: {
+							uri: uriOf(files.pathOf("app/Bag.es")),
+						},
+						position: {
+							line,
+							character: bag.split("\n")[line]!.indexOf(needle),
+						},
+					})
+					.then(
+						() => "accepted",
+						(error: { code: number; message: string }) => ({
+							code: error.code,
+							message: error.message,
+						}),
+					)
+
+			expect(await prepare(8, "size")).toEqual({
+				code: ErrorCodes.InvalidRequest,
+				message:
+					"'size' is declared outside this workspace, so its other uses can not be found.",
+			})
+			expect(await prepare(7, "Bags")).toBe("accepted")
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
 	})
 })
 

@@ -137,6 +137,8 @@ export type Declaration = {
 	// declaration site. Constants and Variables are deliberately not hoisted,
 	// so they only become visible after their declaring Statement.
 	visibleFrom: common.Cursor | null
+	// NOTE: Shared with every Declaration this one renames with, as a Method
+	// does with the requirement it answers (`shareConformanceSites`).
 	occurrences: Array<RenameSite>
 }
 
@@ -211,14 +213,14 @@ type WalkContext = {
 	// NOTE: Property and Method Declarations per Namespace name — the typed
 	// AST identifies resolved Namespaces by name.
 	namespaceMembers: Map<string, Map<string, Declaration>>
-	// NOTE: The same, per PROTOCOL name, for the Methods a Protocol PROVIDES.
-	// A separate table because a Protocol and a Namespace may be spelled alike
-	// and their members are different declarations — which is the distinction
-	// `providedBy` draws on the resolved Invocation, and the one this reads.
-	//
-	// Only provided Methods bind through it. A requirement's use site resolves
-	// to the Namespace that WROTE the Method, and is bound there.
+	// NOTE: The same, per Protocol name, apart because a Protocol and a
+	// Namespace may be spelled alike. Calls a Protocol answers bind here: a
+	// provided Method, and any Method called on a bounded Type.
 	protocolMembers: Map<string, Map<string, Declaration>>
+	// NOTE: The Protocols each Protocol declared here extends, as its `is` list
+	// writes them. A requirement is looked for through them as well.
+	protocolExtensions: Map<string, Array<string>>
+	conformances: Array<ConformanceLink>
 	// NOTE: Every Method and Property reference whose Namespace this file does
 	// not declare, by the name the reference resolved through. A Namespace an
 	// `import { … }` entry brought in has its Methods declared in another file
@@ -242,11 +244,20 @@ type ExternalMemberReference = {
 	namespaceName: string
 	memberName: string
 	position: common.Position
-	// NOTE: Set where the name is a PROTOCOL's — a provided Method reached
-	// through an imported Protocol. The workspace index then looks the name up
-	// among the Types an importing file binds rather than among its values, and
-	// the member among the declaring file's Protocol members.
+	// NOTE: Set where an imported Protocol answers the call. The workspace index
+	// then resolves the name among the file's Types and the member among the
+	// Protocol's members.
 	protocol?: true
+}
+
+// NOTE: A Method written by a Namespace that conforms to a Protocol, or by a
+// Protocol that extends one, under a name that Protocol's surface may hold. If
+// it does, the two are one name: renaming either alone breaks the conformance.
+export type ConformanceLink = {
+	declaration: Declaration
+	// NOTE: As the `is` clause writes it, which may be an import's local name.
+	protocolName: string
+	memberName: string
 }
 
 // NOTE: These ARE the top level Scope the Enricher starts from — derived
@@ -462,10 +473,15 @@ export type ProgramIndex = {
 	// Namespaces sharing a name is a duplicate the Enricher rejects, and an
 	// import may not shadow a declaration either.
 	namespaceMembers: Map<string, Map<string, Declaration>>
-	// NOTE: The same, for the Methods a Protocol PROVIDES — reached from an
-	// importing file through the entry that brought the Protocol in.
+	// NOTE: The same, for the Methods a Protocol declares, reached through the
+	// entry that imports the Protocol.
 	protocolMembers: Map<string, Map<string, Declaration>>
+	protocolExtensions: Map<string, Array<string>>
 	externalMembers: Array<ExternalMemberReference>
+	// NOTE: Every link, including the ones this file resolves itself. The
+	// workspace index resolves them all again, so a Protocol in another Module
+	// joins the group the same way a local one does.
+	conformances: Array<ConformanceLink>
 }
 
 export function indexProgram(
@@ -479,6 +495,8 @@ export function indexProgram(
 		pendingLabelReferences: [],
 		namespaceMembers: new Map(),
 		protocolMembers: new Map(),
+		protocolExtensions: new Map(),
+		conformances: [],
 		externalMembers: [],
 		recordSites: [],
 		recordLookups: [],
@@ -562,12 +580,16 @@ export function indexProgram(
 
 	resolveRecordMembers(context)
 
+	shareConformanceSites(context)
+
 	return {
 		index: context.index,
 		scopes: context.scopes,
 		namespaceMembers: context.namespaceMembers,
 		protocolMembers: context.protocolMembers,
+		protocolExtensions: context.protocolExtensions,
 		externalMembers: context.externalMembers,
+		conformances: context.conformances,
 	}
 }
 
@@ -1775,6 +1797,15 @@ function walkProtocolDeclaration(
 		reference(scope, "types", clause.protocol, context)
 	}
 
+	let extensions = context.protocolExtensions.get(node.name.content)
+
+	if (extensions === undefined) {
+		extensions = []
+		context.protocolExtensions.set(node.name.content, extensions)
+	}
+
+	extensions.push(...node.conformsTo.map((clause) => clause.protocol.content))
+
 	// NOTE: `Self` is visible inside the signatures — builtin, so it colours
 	// like a Type Parameter but can not be renamed.
 	let selfScope = createScope(scope)
@@ -1788,10 +1819,9 @@ function walkProtocolDeclaration(
 	})
 
 	// NOTE: Declared under the Protocol's name, in the table that answers a
-	// call whose Invocation said a Protocol provided the Method — which is how
-	// a PROVIDED Method's use sites reach this declaration and move with it.
-	// A REQUIREMENT's use sites still do not: they resolve to the Namespace
-	// that wrote the Method, and are bound to that Namespace's declaration.
+	// call a Protocol resolved: a provided Method, or any Method called on a
+	// bounded Type. A call on a conformer binds to the conformer's own Method,
+	// which joins this one through `conformances`.
 	let memberDeclarations = context.protocolMembers.get(node.name.content)
 
 	if (memberDeclarations === undefined) {
@@ -1824,6 +1854,8 @@ function walkProtocolDeclaration(
 			context.index,
 			"write",
 		)
+
+		linkConformances(declaration, member.name.content, node, context)
 
 		let signatures =
 			member.nodeType === "OverloadedProtocolMethod" ||
@@ -1944,6 +1976,8 @@ function walkNamespaceDefinition(
 			context.index,
 			"write",
 		)
+
+		linkConformances(declaration, member.name.content, node, context)
 	}
 
 	if (node.targetType !== null) {
@@ -2544,6 +2578,119 @@ function resolveRecordMembers(context: WalkContext) {
 	})
 }
 
+/****************/
+/* Conformances */
+/****************/
+
+function linkConformances(
+	declaration: Declaration,
+	memberName: string,
+	node:
+		| parser.NamespaceDefinitionStatementNode
+		| parser.ProtocolDeclarationStatementNode,
+	context: WalkContext,
+) {
+	for (let clause of node.conformsTo) {
+		context.conformances.push({
+			declaration,
+			protocolName: clause.protocol.content,
+			memberName,
+		})
+	}
+}
+
+// NOTE: Undefined where the Protocol, or the one it extends that holds the
+// member, is not declared in this file. The workspace index follows the chain
+// there.
+function protocolMember(
+	context: WalkContext,
+	protocolName: string,
+	memberName: string,
+	visited: Set<string> = new Set(),
+): Declaration | undefined {
+	if (visited.has(protocolName)) {
+		return undefined
+	}
+
+	visited.add(protocolName)
+
+	let member = context.protocolMembers.get(protocolName)?.get(memberName)
+
+	if (member !== undefined) {
+		return member
+	}
+
+	for (let extended of context.protocolExtensions.get(protocolName) ?? []) {
+		let found = protocolMember(context, extended, memberName, visited)
+
+		if (found !== undefined) {
+			return found
+		}
+	}
+
+	return undefined
+}
+
+// NOTE: The linked Declarations share one list of sites, so a rename, a
+// reference search or a linked edit started at any of them reaches all. Each
+// keeps its own definition, which is where a call bound to it still leads.
+function shareConformanceSites(context: WalkContext) {
+	let parents = new Map<Declaration, Declaration>()
+
+	let findRoot = (declaration: Declaration): Declaration => {
+		let parent = parents.get(declaration)
+
+		if (parent === undefined || parent === declaration) {
+			return declaration
+		}
+
+		let root = findRoot(parent)
+
+		parents.set(declaration, root)
+
+		return root
+	}
+
+	for (let link of context.conformances) {
+		let member = protocolMember(context, link.protocolName, link.memberName)
+
+		if (member === undefined) {
+			continue
+		}
+
+		let left = findRoot(link.declaration)
+		let right = findRoot(member)
+
+		if (left !== right) {
+			parents.set(left, right)
+		}
+	}
+
+	let groups = new Map<Declaration, Array<Declaration>>()
+
+	for (let declaration of parents.keys()) {
+		let root = findRoot(declaration)
+		let group = groups.get(root) ?? [root]
+
+		group.push(declaration)
+		groups.set(root, group)
+	}
+
+	for (let group of groups.values()) {
+		let sites = [...new Set(group.flatMap((member) => member.occurrences))]
+
+		sites.sort(
+			(a, b) =>
+				a.position.start.line - b.position.start.line ||
+				a.position.start.column - b.position.start.column,
+		)
+
+		for (let member of group) {
+			member.occurrences = sites
+		}
+	}
+}
+
 /**************/
 /* Typed pass */
 /**************/
@@ -2553,24 +2700,19 @@ function bindNamespaceMember(
 	memberName: string,
 	position: common.Position,
 	context: WalkContext,
-	// NOTE: Set where a PROTOCOL wrote the body the call reached. The
-	// Invocation is named after the NAMESPACE whose conformance put the Method
-	// in reach — `Integer` for `5::isNot(3)` — so the declaration is looked up
-	// under the Protocol instead, which is where the one body every conformer
-	// shares is written.
-	providedBy: string | undefined = undefined,
+	// NOTE: Set where a Protocol answers the call: the writer of a provided
+	// body, or a bounded receiver's bound. The Invocation names a Namespace
+	// without the member, such as `Value__conformance`.
+	protocolName: string | undefined = undefined,
 ) {
-	let declaringName = providedBy ?? namespaceName
+	let declaringName = protocolName ?? namespaceName
 
 	// NOTE: Builtin Namespaces and Protocols have no source declaration —
 	// their members stay unbound and are therefore not renameable.
-	let declaration = (
-		providedBy === undefined
-			? context.namespaceMembers
-			: context.protocolMembers
-	)
-		.get(declaringName)
-		?.get(memberName)
+	let declaration =
+		protocolName === undefined
+			? context.namespaceMembers.get(declaringName)?.get(memberName)
+			: protocolMember(context, declaringName, memberName)
 
 	if (declaration !== undefined) {
 		record(declaration, memberName, position, context.index)
@@ -2586,8 +2728,12 @@ function bindNamespaceMember(
 		namespaceName: declaringName,
 		memberName,
 		position,
-		...(providedBy === undefined ? {} : { protocol: true as const }),
+		...(protocolName === undefined ? {} : { protocol: true as const }),
 	})
+}
+
+function boundProtocol(type: common.Type | null): string | undefined {
+	return type?.type === "GenericUse" ? type.constraint : undefined
 }
 
 function walkTypedBody(
@@ -2707,9 +2853,11 @@ function walkTypedNode(
 				context,
 				// NOTE: As in the Hover — a bounded receiver resolves through
 				// the witness, whose members are provided and required alike, so
-				// which Protocol wrote the body is a per member answer there.
+				// which Protocol wrote the body is a per member answer there. A
+				// required one is declared by the bound or a Protocol it extends.
 				node.namespace.type.providedBy ??
-					node.namespace.type.providedMembers?.[node.member.name],
+					node.namespace.type.providedMembers?.[node.member.name] ??
+					boundProtocol(node.namespace.type.targetType),
 			)
 			walkTypedNode(node.base, context)
 			walkTypedArguments(node.arguments, context)
@@ -2738,6 +2886,20 @@ function walkTypedNode(
 					// Program it was renamed in.
 					node.providedBy,
 				)
+			} else if (baseType.type === "GenericUse") {
+				// NOTE: `Value.empty()` on a bounded Type Parameter reads a static
+				// member of its bound.
+				let bound = boundProtocol(baseType)
+
+				if (bound !== undefined) {
+					bindNamespaceMember(
+						bound,
+						node.member.content,
+						node.member.position,
+						context,
+						node.providedBy ?? bound,
+					)
+				}
 			} else if (baseType.type === "Record") {
 				context.recordLookups.push({
 					names: Object.keys(baseType.members),

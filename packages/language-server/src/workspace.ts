@@ -112,6 +112,9 @@ export type WorkspaceSymbol = {
 	// that renaming it stays possible where it IS written.
 	filePath: string | null
 	definition: common.Position | null
+	// NOTE: Every file a declaration of the symbol is written in: one, unless
+	// it renames with others, as a requirement does with its conformers' Methods.
+	declaredIn: Array<string>
 	occurrences: Array<WorkspaceOccurrence>
 }
 
@@ -1555,6 +1558,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			labelled: occurrence.declaration.labelled,
 			filePath,
 			definition: occurrence.declaration.definition,
+			declaredIn: [filePath],
 			occurrences: occurrence.declaration.occurrences.map((site) => ({
 				filePath,
 				position: site.position,
@@ -1871,6 +1875,83 @@ function joinComponent(
 		}
 	}
 
+	// NOTE: The Declaration a name written in this file resolves to, wherever
+	// that is declared. A Protocol is not a value, so its name binds among the
+	// Types.
+	let declaringSiteOf = (
+		filePath: string,
+		name: string,
+		space: "values" | "types",
+	): { filePath: string; name: string } | null => {
+		let topLevel = indices
+			.get(filePath)
+			?.scopes.find((entry) => entry.range === null)?.scope
+		let binding = topLevel?.[space].get(name)
+		let localKey =
+			binding === undefined || binding.builtin
+				? undefined
+				: declarationKeys.get(filePath)?.get(binding)
+
+		if (localKey === undefined) {
+			return null
+		}
+
+		let declaring = declaringSite(sites, find, localKey)
+
+		return declaring === null || declaring.filePath === null
+			? null
+			: { filePath: declaring.filePath, name: declaring.name }
+	}
+
+	// NOTE: A Protocol's member, looked for through the Protocols it extends,
+	// each resolved from the file whose `is` list names it.
+	let protocolMemberKey = (
+		filePath: string,
+		protocolName: string,
+		memberName: string,
+		visited: Set<string> = new Set(),
+	): string | undefined => {
+		let declaring = declaringSiteOf(filePath, protocolName, "types")
+
+		if (declaring === null) {
+			return undefined
+		}
+
+		let seen = `${declaring.filePath}:${declaring.name}`
+
+		if (visited.has(seen)) {
+			return undefined
+		}
+
+		visited.add(seen)
+
+		let declaringIndex = indices.get(declaring.filePath)
+		let member = declaringIndex?.protocolMembers
+			.get(declaring.name)
+			?.get(memberName)
+
+		if (member !== undefined) {
+			return declarationKeys.get(declaring.filePath)?.get(member)
+		}
+
+		for (let extended of declaringIndex?.protocolExtensions.get(
+			declaring.name,
+		) ?? []) {
+			let key = protocolMemberKey(
+				declaring.filePath,
+				extended,
+				memberName,
+				visited,
+			)
+
+			if (key !== undefined) {
+				return key
+			}
+		}
+
+		return undefined
+	}
+
 	// NOTE: Last, because a Method dispatching through an imported Namespace can
 	// only be bound once the entry that brought that Namespace in has been
 	// joined — the Declaration it names is in another file, and which file that
@@ -1882,44 +1963,34 @@ function joinComponent(
 			continue
 		}
 
-		let topLevel = index.scopes.find((entry) => entry.range === null)?.scope
-
 		for (let reference of index.externalMembers) {
-			// NOTE: A Protocol's name binds among the TYPES an entry brings
-			// in, not among the values — a Protocol is not a value — and its
-			// provided Methods are declared in their own table on the far
-			// side. Everything between is the same join.
-			let binding =
-				reference.protocol === true
-					? topLevel?.types.get(reference.namespaceName)
-					: topLevel?.values.get(reference.namespaceName)
-			let localKey =
-				binding === undefined
-					? undefined
-					: declarationKeys.get(filePath)?.get(binding)
+			let memberKey: string | undefined
 
-			if (localKey === undefined) {
-				continue
+			if (reference.protocol === true) {
+				memberKey = protocolMemberKey(
+					filePath,
+					reference.namespaceName,
+					reference.memberName,
+				)
+			} else {
+				let declaring = declaringSiteOf(
+					filePath,
+					reference.namespaceName,
+					"values",
+				)
+				let member =
+					declaring === null
+						? undefined
+						: indices
+								.get(declaring.filePath)
+								?.namespaceMembers.get(declaring.name)
+								?.get(reference.memberName)
+
+				memberKey =
+					declaring === null || member === undefined
+						? undefined
+						: declarationKeys.get(declaring.filePath)?.get(member)
 			}
-
-			let declaring = declaringSite(sites, find, localKey)
-
-			if (declaring === null || declaring.filePath === null) {
-				continue
-			}
-
-			let declaringIndex = indices.get(declaring.filePath)
-			let member = (
-				reference.protocol === true
-					? declaringIndex?.protocolMembers
-					: declaringIndex?.namespaceMembers
-			)
-				?.get(declaring.name)
-				?.get(reference.memberName)
-			let memberKey =
-				member === undefined
-					? undefined
-					: declarationKeys.get(declaring.filePath)?.get(member)
 
 			if (memberKey === undefined) {
 				continue
@@ -1931,12 +2002,35 @@ function joinComponent(
 				access: "read",
 			})
 		}
+
+		// NOTE: A conformer's Method and the member it answers are one rename,
+		// whichever Modules the Namespace, the Protocol and its extensions are
+		// written in.
+		for (let link of index.conformances) {
+			let ownKey = declarationKeys.get(filePath)?.get(link.declaration)
+			let memberKey = protocolMemberKey(
+				filePath,
+				link.protocolName,
+				link.memberName,
+			)
+
+			if (ownKey !== undefined && memberKey !== undefined) {
+				union(memberKey, ownKey)
+			}
+		}
 	}
 
 	let symbolOf = (key: string): WorkspaceSymbol | null => {
 		let root = find(key)
 		let members = [...sites].filter(([siteKey]) => find(siteKey) === root)
-		let anchor = declaringSite(sites, find, key) ?? sites.get(key) ?? null
+		let own = sites.get(key)
+		// NOTE: A declaration answers for itself even where it renames with
+		// others: a conformer's Method is still where a call bound to it leads.
+		let anchor =
+			(own !== undefined && isDeclaration(own) ? own : null) ??
+			declaringSite(sites, find, key) ??
+			own ??
+			null
 
 		if (anchor === null) {
 			return null
@@ -1948,6 +2042,15 @@ function joinComponent(
 			labelled: anchor.labelled,
 			filePath: anchor.filePath,
 			definition: anchor.definition,
+			declaredIn: [
+				...new Set(
+					members.flatMap(([, site]) =>
+						site.filePath !== null && isDeclaration(site)
+							? [site.filePath]
+							: [],
+					),
+				),
+			],
 			occurrences: members.flatMap(([, site]) => site.occurrences),
 		}
 	}
@@ -2003,6 +2106,16 @@ function exportedDeclarations(
 	remember(topLevel?.types.get(name.content))
 
 	return found
+}
+
+// NOTE: Written in a file, as opposed to a name an entry carries or publishes.
+function isDeclaration(site: SiteData): boolean {
+	return (
+		site.definition !== null &&
+		site.filePath !== null &&
+		site.kind !== null &&
+		site.kind !== "import"
+	)
 }
 
 // NOTE: The one site of a joined symbol that is a declaration in a file rather
