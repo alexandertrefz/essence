@@ -552,7 +552,7 @@ Error: This default makes two Overloads accept the same call
     ╭─┤ Defaults.es:47:24 │
     │
  43 │ ╭─▶          () -> String {
-    ┆ ┆   
+ 44 │ │             <- @
  45 │ ├─▶          }
     │ │                
     │ ╰──────────────── this entry takes no Arguments
@@ -575,7 +575,7 @@ Error: This default makes two Overloads accept the same Record
     │                                               ╰───────── a Record written without 'retries' still fits Options
     │ 
  64 │ ╭─▶          (using options: { host: String }) -> String {
-    ┆ ┆   
+ 65 │ │             <- options.host
  66 │ ├─▶          }
     │ │                
     │ ╰──────────────── and fits this entry's { host: String }
@@ -640,7 +640,7 @@ Warning: This 'define' has no cases
     ╭─┤ Define.es:17:21 │
     │
  17 │ ╭─▶     constant unrated = define {
-    ┆ ┆   
+ 18 │ │          as "unrated" otherwise
  19 │ ├─▶     }
     │ │           
     │ ╰─────────── nothing here is decided by cases
@@ -698,7 +698,7 @@ Error: Nothing decides what this 'define' answers
  22 │ │          as #Empty if skipped
     │ │             ───┬──  
     │ │                ╰──── this arm has none of its own to lend it
-    ┆ ┆   
+ 23 │ │          as Optional<Integer>#Value(1) otherwise
  24 │ ├─▶     }
     │ │           
     │ ╰─────────── this 'define' has no answer Type
@@ -732,7 +732,7 @@ Error: Nothing decides what this 'define' answers
  30 │ │          as #Empty if skipped
     │ │             ───┬──  
     │ │                ╰──── this arm has none of its own to lend it
-    ┆ ┆   
+ 31 │ │          as Optional<Integer>#Value(2) otherwise
  32 │ ├─▶     })
     │ │            
     │ ╰──────────── this 'define' has no answer Type
@@ -768,7 +768,7 @@ Error: This 'define' has no 'otherwise' arm
     ╭─┤ DefineSyntax.es:13:19 │
     │
  13 │ ╭─▶     constant grade = define {
-    ┆ ┆   
+ 14 │ │          as "A" if score::isGreaterThanOrEqualTo(90)
  15 │ ├─▶     }
     │ │           
     │ ╰─────────── every value here has a condition on it
@@ -2503,7 +2503,7 @@ Error: A static Protocol Method can not carry a body
     ╭─┤ Protocols.es:62:16 │
     │
  62 │ ╭─▶        static create() -> Self {
-    ┆ ┆   
+ 63 │ │            <- @
  64 │ ├─▶        }
     │ │              
     │ ╰────────────── this body has no receiver to run on
@@ -2518,7 +2518,7 @@ Error: An overloaded Protocol Method can not carry a body
     ╭─┤ Protocols.es:67:4 │
     │
  67 │ ╭─▶          (_ other: Self) -> Self {
-    ┆ ┆   
+ 68 │ │             <- other
  69 │ ├─▶          }
     │ │                
     │ ╰──────────────── this body has no name of its own to be emitted under
@@ -2996,7 +2996,7 @@ Error: Not every path through this Function returns
     ╭─┤ Staged.es:16:2 │
     │
  16 │ ╭─▶     function shifted(_ point: Point) -> Point {
-    ┆ ┆   
+ 17 │ │          constant moved = { point with x = point.x::add(1) }
  18 │ ├─▶     }
     │ │           
     │ ╰─────────── this path falls off the end

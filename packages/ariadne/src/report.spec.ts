@@ -1,8 +1,8 @@
 // Port of ariadne's snapshot test suite (`src/report/tests.rs`). The
 // expected outputs are taken verbatim from upstream, which is what makes the
 // renderer port verifiable, except in this port's own tests: a code on a line
-// of its own, a display line offset that moves the margin, and the colour and
-// ANSI-stripping tests.
+// of its own, a display line offset that moves the margin, a lone middle line
+// that is shown rather than elided, and the colour and ANSI-stripping tests.
 
 import { describe, expect, test } from "bun:test"
 
@@ -651,8 +651,75 @@ describe("ariadne report rendering", () => {
 			   ╭─┤ <unknown>:1:1 │
 			   │
 			 1 │ ╭─▶ apple
-			   ┆ ┆
+			 2 │ │   ==
 			 3 │ ├─▶ orange
+			   │ │
+			   │ ╰─────────── illegal comparison
+			───╯
+			`,
+		)
+	})
+
+	// An ellipsis row takes as much room as the line it replaces, so a single
+	// hidden line is shown instead; two or more still collapse into one row.
+	test("a multiline label shows a lone middle line rather than eliding it", () => {
+		let source = "apple\n==\norange\n!=\npear"
+		let message = new Report({
+			kind: "error",
+			span: { start: 0, end: 0 },
+			labels: [
+				new Label(
+					{ start: 0, end: source.length },
+					{ message: "illegal comparison" },
+				),
+				new Label({ start: 9, end: 15 }, { message: "an orange" }),
+			],
+			config: noColor(),
+		}).render(source)
+
+		expectOutput(
+			message,
+			`
+			Error:
+			   ╭─┤ <unknown>:1:1 │
+			   │
+			 1 │ ╭─▶ apple
+			 2 │ │   ==
+			 3 │ │   orange
+			   │ │   ───┬──
+			   │ │      ╰──── an orange
+			 4 │ │   !=
+			 5 │ ├─▶ pear
+			   │ │
+			   │ ╰───────── illegal comparison
+			───╯
+			`,
+		)
+	})
+
+	test("a multiline label elides two middle lines", () => {
+		let source = "apple\n==\n!=\norange"
+		let message = new Report({
+			kind: "error",
+			span: { start: 0, end: 0 },
+			labels: [
+				new Label(
+					{ start: 0, end: source.length },
+					{ message: "illegal comparison" },
+				),
+			],
+			config: noColor(),
+		}).render(source)
+
+		expectOutput(
+			message,
+			`
+			Error:
+			   ╭─┤ <unknown>:1:1 │
+			   │
+			 1 │ ╭─▶ apple
+			   ┆ ┆
+			 4 │ ├─▶ orange
 			   │ │
 			   │ ╰─────────── illegal comparison
 			───╯
@@ -693,7 +760,7 @@ describe("ariadne report rendering", () => {
 			   │ │ ╭─────╯
 			   │ │ │     │
 			   │ │ │ ╭───╯
-			   ┆ ┆ ┆ ┆
+			 2 │ │ │ │   ==
 			 3 │ ├─│─│─▶ orange
 			   │ │ │ │        ▲
 			   │ ╰─│─│────────│── illegal comparison

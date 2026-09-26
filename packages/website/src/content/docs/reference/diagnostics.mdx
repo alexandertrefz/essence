@@ -942,7 +942,7 @@ Error: The 'export { … }' block belongs below the implementation
    │        ╰──── this block is written above the implementation
    │ 
  3 │ ╭─▶ implementation {
-   ┆ ┆   
+ 4 │ │       constant answer = 42
  5 │ ├─▶ }
    │ │       
    │ ╰─────── the implementation block is here
@@ -2721,7 +2721,7 @@ Error: A Namespace without a target Type can only hold static Methods
    ╭─┤ Tools.es:3:8 │
    │
  3 │ ╭─▶        shout() -> String {
-   ┆ ┆   
+ 4 │ │            <- "HEY"
  5 │ ├─▶        }
    │ │              
    │ ╰────────────── this Method is not static
@@ -2812,7 +2812,7 @@ Error: This default makes two Overloads accept the same call
    │                                      ╰── leaving this out takes no Arguments
    │ 
  7 │ ╭─▶          () -> String {
-   ┆ ┆   
+ 8 │ │             <- @
  9 │ ├─▶          }
    │ │                
    │ ╰──────────────── this entry takes no Arguments
@@ -3712,7 +3712,7 @@ Error: This 'define' has no 'otherwise' arm
    ╭─┤ Label.es:4:19 │
    │
  4 │ ╭─▶     constant label = define {
-   ┆ ┆   
+ 5 │ │          as "go" if ready
  6 │ ├─▶     }
    │ │           
    │ ╰─────────── every value here has a condition on it
@@ -3775,7 +3775,7 @@ Error: Nothing decides what this 'define' answers
  5 │ │          as #Empty    if skipped
    │ │             ───┬──  
    │ │                ╰──── this arm has none of its own to lend it
-   ┆ ┆   
+ 6 │ │          as #Value(1) otherwise
  7 │ ├─▶     }
    │ │           
    │ ╰─────────── this 'define' has no answer Type
@@ -3807,7 +3807,7 @@ Warning: This 'define' has no cases
    ╭─┤ Label.es:2:19 │
    │
  2 │ ╭─▶     constant label = define {
-   ┆ ┆   
+ 3 │ │          as "wait" otherwise
  4 │ ├─▶     }
    │ │           
    │ ╰─────────── nothing here is decided by cases
@@ -4789,7 +4789,7 @@ Error: A static Protocol Method can not carry a body
    ╭─┤ Sized.es:5:14 │
    │
  5 │ ╭─▶        static make() -> Integer {
-   ┆ ┆   
+ 6 │ │            <- 0
  7 │ ├─▶        }
    │ │              
    │ ╰────────────── this body has no receiver to run on

@@ -62,6 +62,8 @@ for everything that can be tuned.
   color, rather than sharing the header line and the kind's color.
 - A source's `displayLineOffset` shifts the line numbers in the gutter as well
   as the header location; upstream shifts only the header.
+- A multi-line label never elides a single middle line, since the `┆` row
+  would take the same room; upstream elides it.
 - Character display widths use a compact approximation of the Unicode
   East-Asian-width tables rather than the full `unicode-width` data.
 

@@ -654,6 +654,37 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 			}
 		}
 
+		// Whether no label is drawn on a line and it lies outside the display
+		// area of every label, which is what lets a line be skipped.
+		const isUnlabelledLine = (index: number): boolean => {
+			let line = source.line(index)
+			if (line === null) {
+				return false
+			}
+			let lineSpan = line.span
+
+			return (
+				multiLabelsWithMessage.every(
+					(label) =>
+						!rangeContains(lineSpan, label.charSpan.start) &&
+						!rangeContains(lineSpan, lastOffset(label)),
+				) &&
+				group.labels.every(
+					(label) =>
+						label.kind !== "inline" ||
+						label.charSpan.start < lineSpan.start ||
+						label.charSpan.end > lineSpan.end,
+				) &&
+				group.labels.every(
+					(label) =>
+						Math.min(
+							Math.abs(label.startLine - index),
+							Math.abs(label.endLine - index),
+						) > config.contextLines,
+				)
+			)
+		}
+
 		let isEllipsis = false
 
 		for (
@@ -754,19 +785,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 				}
 			}
 
-			// Skip this line if we don't have labels for it...
-			if (
-				lineLabels.length === 0 &&
-				marginLabel === null &&
-				// ...and it does not intersect the display area of any labels
-				group.labels.every(
-					(label) =>
-						Math.min(
-							Math.abs(label.startLine - index),
-							Math.abs(label.endLine - index),
-						) > config.contextLines,
-				)
-			) {
+			if (isUnlabelledLine(index)) {
 				let withinLabel = multiLabels.some((label) =>
 					rangeContains(label.charSpan, line.span.start),
 				)
@@ -785,7 +804,9 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 									label.label.showLines,
 						)
 
-					if (!shouldShow) {
+					// NOTE: An ellipsis row takes as much room as one line, so a
+					// lone hidden line is shown instead. Upstream elides it.
+					if (!shouldShow && isUnlabelledLine(index + 1)) {
 						isEllipsis = true
 					}
 				} else {
