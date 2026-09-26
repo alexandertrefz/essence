@@ -1127,6 +1127,9 @@ describe("reentrancy", () => {
 					),
 				}),
 		],
+		// NOTE: `sort(in:)` and `sort(by:)` compare a copy of the run, so these two
+		// entries hold with or without the seal. They are here because every native
+		// taking a comparison is.
 		[
 			"sort(in:)",
 			(list, visit) =>
