@@ -755,9 +755,16 @@ export function closePendingRefinementCopies(): void {
 export class NotHoistedYet {
 	name = "NotHoistedYet"
 	message: string
+	// NOTE: The refinement whose unread predicate was asked for, which is how
+	// the fill tells which predicate waits on which.
+	refinement: common.RefinementType | null
 
-	constructor(message: string) {
+	constructor(
+		message: string,
+		refinement: common.RefinementType | null = null,
+	) {
 		this.message = message
+		this.refinement = refinement
 	}
 
 	toString(): string {
@@ -768,10 +775,14 @@ export class NotHoistedYet {
 // NOTE: During a hoist a predicate still unread asks the rounds to retry its
 // reader once the predicate is filled. Outside one nothing is left to fill it,
 // so reading it is a Compiler bug.
-export function refusePendingPredicate(name: string): never {
-	let message = `Internal Compiler Error: the predicate of refinement '${name}' was read before it resolved`
+export function refusePendingPredicate(
+	refinement: common.RefinementType,
+): never {
+	let message = `Internal Compiler Error: the predicate of refinement '${refinement.name}' was read before it resolved`
 
-	throw openHoists === 0 ? new Error(message) : new NotHoistedYet(message)
+	throw openHoists === 0
+		? new Error(message)
+		: new NotHoistedYet(message, refinement)
 }
 
 // NOTE: THE door every copy of a refinement goes through, and the reason there
@@ -794,7 +805,7 @@ function trackedRefinementCopy(
 	// NOTE: Outside an open hoist no fill is left to complete the copy, so a
 	// pending refinement reaching here is a Compiler bug.
 	if (openHoists === 0) {
-		refusePendingPredicate(source.name)
+		refusePendingPredicate(source)
 	}
 
 	let copies = pendingRefinementCopies.get(source)
@@ -1734,7 +1745,7 @@ export function provenConjuncts(
 	refinement: common.RefinementType,
 ): Array<common.PredicateConjunct> {
 	if (refinement.conjuncts === null) {
-		refusePendingPredicate(refinement.name)
+		refusePendingPredicate(refinement)
 	}
 
 	return refinement.conjuncts

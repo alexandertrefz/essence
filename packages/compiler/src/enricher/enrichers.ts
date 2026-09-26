@@ -73,6 +73,7 @@ import {
 	mergedRecordType,
 	namespaceAnswersForBase,
 	negatedPredicateConjunct,
+	NotHoistedYet,
 	pairArguments,
 	predicateConjunctKey,
 	provenConjuncts,
@@ -20101,12 +20102,29 @@ function aliasCandidateOf(
 		return NO_ALIAS
 	}
 
-	let { result, diagnostics } = collectDiagnostics(() =>
-		enrichExpression(
-			body.expression,
-			aliasBodyScope(definition, entry, scope, container),
-		),
-	)
+	let reading: {
+		result: common.typed.ExpressionNode
+		diagnostics: Array<common.Diagnostic>
+	}
+
+	// NOTE: A body that checks a value against a refinement whose predicate is
+	// still unread is offered again later, as an unresolved call is.
+	try {
+		reading = collectDiagnostics(() =>
+			enrichExpression(
+				body.expression,
+				aliasBodyScope(definition, entry, scope, container),
+			),
+		)
+	} catch (error) {
+		if (error instanceof NotHoistedYet) {
+			return UNRESOLVED_ALIAS
+		}
+
+		throw error
+	}
+
+	let { result, diagnostics } = reading
 
 	// NOTE: A call that did not resolve is a call whose Namespace has not
 	// hoisted YET — the two numeric kinds name each other's Methods, and one of

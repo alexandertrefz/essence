@@ -1551,6 +1551,131 @@ export {
 		)
 	})
 
+	// NOTE: `Fits` is read once `Fitting` is bound in `B.es`, and reading it
+	// checks the `5` against `Small`, whose predicate is still unread then.
+	it("fills a predicate across a cycle that waits on another one", () => {
+		withProject(
+			{
+				"A.es": `import {
+	from "./B.es" { Fits }
+}
+
+implementation {
+	type Small = Integer where @::isLessThan(10)
+
+	namespace Fitting for Integer {
+		fits(_ limit: Small) -> Boolean {
+			<- @::isLessThan(limit)
+		}
+	}
+
+	function checked(_ value: Fits) -> Integer {
+		<- value
+	}
+}
+
+export {
+	Fitting
+	checked
+}
+`,
+				"B.es": `import {
+	from "./A.es" { Fitting }
+}
+
+implementation {
+	type Fits = Integer where @::fits(5)
+}
+
+export {
+	Fits
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+
+				for (let name of ["A.es", "B.es"]) {
+					expect([
+						name,
+						reportsOf(
+							linkedAt(directory, linked, name).diagnostics,
+						),
+					]).toEqual([name, []])
+				}
+			},
+		)
+	})
+
+	// NOTE: `Five` is read through the body of `fitsFive`, which waits on
+	// `Small`. `Greeter` waits on `Five`, so it hoists only if the round that
+	// fills `Small` is followed by one that reads the body again.
+	it("hoists a declaration across a cycle that waits on a predicate read through a Method body", () => {
+		withProject(
+			{
+				"A.es": `import {
+	from "./B.es" { Five }
+}
+
+implementation {
+	function greeting() -> Integer {
+		<- Greeter.hello
+	}
+
+	type Small = Integer where @::isLessThan(10)
+
+	namespace Fitting for Integer {
+		fits(_ limit: Small) -> Boolean {
+			<- @::isLessThan(limit)
+		}
+
+		fitsFive() -> Boolean {
+			<- @::fits(5)
+		}
+	}
+
+	function checked(_ value: Five) -> Integer {
+		<- value
+	}
+
+	namespace Greeter {
+		static hello = checked(3)
+	}
+}
+
+export {
+	Fitting
+	greeting
+}
+`,
+				"B.es": `import {
+	from "./A.es" { Fitting }
+}
+
+implementation {
+	type Five = Integer where @::fitsFive()
+}
+
+export {
+	Five
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+
+				for (let name of ["A.es", "B.es"]) {
+					expect([
+						name,
+						reportsOf(
+							linkedAt(directory, linked, name).diagnostics,
+						),
+					]).toEqual([name, []])
+				}
+			},
+		)
+	})
+
 	// NOTE: The one kind a cycle can not carry, because it is the one kind that
 	// does not hoist — and it is genuinely broken at runtime, not merely
 	// unsupported: the emitted binding is read in its temporal dead zone.

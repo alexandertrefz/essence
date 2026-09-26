@@ -280,9 +280,7 @@ function stableSerialize(value: unknown): string {
 				(value as Record<string, unknown>).type === "Refinement" &&
 				(value as Record<string, unknown>).conjuncts === null
 			) {
-				refusePendingPredicate(
-					String((value as Record<string, unknown>).name),
-				)
+				refusePendingPredicate(value as common.RefinementType)
 			}
 
 			// NOTE: A Record's display fields are skipped here rather than at the

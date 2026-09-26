@@ -1437,6 +1437,203 @@ describe("Enricher", () => {
 				],
 			])
 		})
+
+		// NOTE: Reading `Fits` checks the `5` against `Small`, whose predicate
+		// is still unread when `Fits` is reached.
+		it("should read a predicate that checks a value against a refinement still pending", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Small = Integer where @::isLessThan(10)
+
+				namespace Fitting for Integer {
+					fits(_ limit: Small) -> Boolean {
+						<- @::isLessThan(limit)
+					}
+				}
+
+				type Fits = Integer where @::fits(5)
+			}`)
+			let fits = program.implementation.nodes.findLast(
+				(node) => node.nodeType === "TypeAliasStatement",
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(fits?.type).toEqual({
+				type: "Refinement",
+				name: "Fits",
+				base: { type: "Integer" },
+				conjuncts: [
+					{
+						namespaceName: "Integer",
+						methodName: "isLessThan",
+						negated: false,
+						args: ["5"],
+						spelling: { methodName: "fits", args: ["5"] },
+					},
+				],
+			})
+		})
+
+		// NOTE: `Greeter` waits on `Fits` and `Fits` on `Small`, so both have to
+		// be filled in the round `Greeter` is retried in. Left to the in-order
+		// enrichment instead, `Greeter` is not declared where `greeting` reads it.
+		it("should hoist a declaration waiting on a predicate that waits on another", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function greeting() -> Integer {
+						<- Greeter.hello
+					}
+
+					type Small = Integer where @::isLessThan(10)
+
+					namespace Fitting for Integer {
+						fits(_ limit: Small) -> Boolean {
+							<- @::isLessThan(limit)
+						}
+					}
+
+					type Fits = Integer where @::fits(5)
+
+					function checked(_ value: Fits) -> Integer {
+						<- value
+					}
+
+					namespace Greeter {
+						static hello = checked(3)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: `Five` is read through the body of `fitsFive`, which can only be
+		// read once `Small` is filled, so a round that only fills `Small` still
+		// has to be followed by one that reads the body again.
+		it("should hoist a declaration waiting on a predicate read through a Method body that waits on another", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function greeting() -> Integer {
+						<- Greeter.hello
+					}
+
+					type Small = Integer where @::isLessThan(10)
+
+					namespace Fitting for Integer {
+						fits(_ limit: Small) -> Boolean {
+							<- @::isLessThan(limit)
+						}
+
+						fitsFive() -> Boolean {
+							<- @::fits(5)
+						}
+					}
+
+					type Five = Integer where @::fitsFive()
+
+					function checked(_ value: Five) -> Integer {
+						<- value
+					}
+
+					namespace Greeter {
+						static hello = checked(3)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should read a Method body that checks a value against a refinement still pending", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Small = Integer where @::isLessThan(10)
+
+					namespace Fitting for Integer {
+						fits(_ limit: Small) -> Boolean {
+							<- @::isLessThan(limit)
+						}
+
+						fitsFive() -> Boolean {
+							<- @::fits(5)
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should read a provided Method body that checks a value against a refinement still pending", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Small = Integer where @::isLessThan(10)
+
+					protocol Sized {
+						fits(_ limit: Small) -> Boolean
+
+						fitsFive() -> Boolean {
+							<- @::fits(5)
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: `Middle` only waits on the cycle, so it is read once the cycle
+		// is reported and reports nothing itself.
+		it("should report predicates that wait on each other", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Low = Integer where @::isBelow(5)
+					type High = Integer where @::isAbove(5)
+
+					namespace Bounds for Integer {
+						isBelow(_ limit: High) -> Boolean {
+							<- @::isLessThan(limit)
+						}
+
+						isAbove(_ limit: Low) -> Boolean {
+							<- @::isGreaterThan(limit)
+						}
+					}
+
+					type Middle = Integer where @::isBelow(7)
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				[
+					"recursive-type-declaration",
+					"The predicate of 'Low' depends on itself through 'High'",
+					2,
+				],
+				[
+					"recursive-type-declaration",
+					"The predicate of 'High' depends on itself through 'Low'",
+					3,
+				],
+			])
+		})
+
+		it("should report a predicate that waits on itself", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Fitting = Integer where @::fitsUnder(5)
+
+					namespace Fits for Integer {
+						fitsUnder(_ limit: Fitting) -> Boolean {
+							<- @::isLessThan(limit)
+						}
+					}
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.labels.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"recursive-type-declaration",
+					"The predicate of 'Fitting' depends on itself",
+					["reading this checks a value against 'Fitting'"],
+				],
+			])
+		})
 	})
 
 	describe("Generic Inference", () => {

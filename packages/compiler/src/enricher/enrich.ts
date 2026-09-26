@@ -625,6 +625,40 @@ type PendingPredicate = {
 	refinement: common.RefinementType
 }
 
+// NOTE: A reading that checks a value against a refinement still unread waits,
+// and is retried once a pass settles something. In the final call the readings
+// still waiting wait on each other, and each cycle among them is reported.
+function fillPendingPredicates(
+	pending: Array<PendingPredicate>,
+	sink: HoistDiagnosticSink,
+	hoistedTypes: HoistedTypes,
+	final: boolean,
+	unread?: (conjunct: common.PredicateConjunct) => boolean,
+): void {
+	for (;;) {
+		let unsettled = pending.length
+		let waiting = readPendingPredicates(
+			pending,
+			sink,
+			hoistedTypes,
+			final,
+			unread,
+		)
+
+		if (waiting.size === 0) {
+			return
+		}
+
+		if (pending.length === unsettled) {
+			if (!final) {
+				return
+			}
+
+			reportPredicateCycle(pending, waiting, sink, hoistedTypes)
+		}
+	}
+}
+
 // NOTE: One attempt at reading each pending predicate, entries dropping off the
 // list as they resolve. During the rounds (`final` false) a Diagnostic means
 // "not this round" and the entry stays — the Namespace it needs may be one
@@ -641,39 +675,55 @@ type PendingPredicate = {
 // Namespace ANSWERING a predicate apply the Alias in its own signatures: it
 // hoists holding pending copies, and this is where they are finished.
 //
-// The final call decides, but it does NOT report. A predicate that still does
-// not resolve — after every Namespace that will ever hoist has — is handed back
-// to the in-order enrichment whole: the object already bound into signatures is
-// poisoned to its base in place, and the Alias is UNREGISTERED, so the in-order
-// pass resolves and reports it exactly as it resolves any declaration hoisting
-// gave up on. That pass is the one with the Program's Constants in Scope, and
-// the difference shows: a predicate naming one (`@::isLessThan(limit)`) is
-// refused there for the Argument it is, not for a name hoisting cannot see.
-function fillPendingPredicates(
+// The final pass decides every reading that does not wait. A predicate that
+// still does not resolve is poisoned to its base in place and its Alias
+// unregistered unreported, so the in-order pass reports it with the Program's
+// Constants in Scope. The readings that waited are answered, each with the
+// refinement it waited on.
+function readPendingPredicates(
 	pending: Array<PendingPredicate>,
 	sink: HoistDiagnosticSink,
 	hoistedTypes: HoistedTypes,
 	final: boolean,
 	unread?: (conjunct: common.PredicateConjunct) => boolean,
-): void {
-	for (let index = pending.length - 1; index >= 0; index--) {
-		let { node, scope, refinement } = pending[index]
+): Map<PendingPredicate, common.RefinementType | null> {
+	let waiting = new Map<PendingPredicate, common.RefinementType | null>()
 
-		let { result, diagnostics } = collectDiagnostics(
-			(): Array<common.PredicateConjunct> | null =>
-				node.predicate === null
-					? null
-					: resolveRefinementConjuncts(
-							node.predicate,
-							refinement.base,
-							// NOTE: Rebuilt per attempt rather than kept from the
-							// round the Alias hoisted in, so that a Namespace
-							// hoisted since is in Scope: the Parameters are added
-							// to a CHILD of the Alias' own Scope, which keeps
-							// growing underneath it.
-							refinementPredicateScope(node, scope),
-						),
-		)
+	for (let index = pending.length - 1; index >= 0; index--) {
+		let entry = pending[index]
+		let { node, scope, refinement } = entry
+		let reading: {
+			result: Array<common.PredicateConjunct> | null
+			diagnostics: Array<common.Diagnostic>
+		}
+
+		try {
+			reading = collectDiagnostics(
+				(): Array<common.PredicateConjunct> | null =>
+					node.predicate === null
+						? null
+						: resolveRefinementConjuncts(
+								node.predicate,
+								refinement.base,
+								// NOTE: Rebuilt per attempt rather than kept from the
+								// round the Alias hoisted in, so that a Namespace
+								// hoisted since is in Scope: the Parameters are added
+								// to a CHILD of the Alias' own Scope, which keeps
+								// growing underneath it.
+								refinementPredicateScope(node, scope),
+							),
+			)
+		} catch (error) {
+			if (!(error instanceof NotHoistedYet)) {
+				throw error
+			}
+
+			waiting.set(entry, error.refinement)
+
+			continue
+		}
+
+		let { result, diagnostics } = reading
 
 		if (!final && (containsErrors(diagnostics) || result === null)) {
 			continue
@@ -689,29 +739,13 @@ function fillPendingPredicates(
 			continue
 		}
 
-		let copies = pendingRefinementCopiesOf(refinement)
-
 		if (result === null) {
-			// NOTE: Each copy is poisoned to ITS OWN base — the instantiated one,
-			// `List<Integer>` where the Alias' is `List<Item>` — so a signature that
-			// applied the Alias goes on saying what it applied it to. No Diagnostic
-			// is reported for any of them: the Alias is unregistered just below, and
-			// the in-order enrichment reports the clause ONCE, with the Program's
-			// Constants in Scope.
-			poisonRefinementToBase(refinement)
-
-			for (let copy of copies) {
-				poisonRefinementToBase(copy)
-			}
-
-			hoistedTypes.delete(node)
-			delete scope.types[node.name.content]
-			countTypeDeclaration()
+			abandonPendingPredicate(entry, hoistedTypes)
 		} else {
 			sink(node, diagnostics)
 			refinement.conjuncts = result
 
-			for (let copy of copies) {
+			for (let copy of pendingRefinementCopiesOf(refinement)) {
 				copy.conjuncts = result
 			}
 
@@ -725,6 +759,114 @@ function fillPendingPredicates(
 		}
 
 		pending.splice(index, 1)
+	}
+
+	return waiting
+}
+
+// NOTE: Each copy is poisoned to its own instantiated base, so a signature that
+// applied the Alias keeps saying what it applied it to. The Alias is
+// unregistered, and the in-order enrichment resolves and reports it.
+function abandonPendingPredicate(
+	{ node, scope, refinement }: PendingPredicate,
+	hoistedTypes: HoistedTypes,
+): void {
+	let copies = pendingRefinementCopiesOf(refinement)
+
+	poisonRefinementToBase(refinement)
+
+	for (let copy of copies) {
+		poisonRefinementToBase(copy)
+	}
+
+	hoistedTypes.delete(node)
+	delete scope.types[node.name.content]
+	countTypeDeclaration()
+}
+
+// NOTE: Every reading still waiting waits on another, so the walk from one of
+// them comes back round. The members of that cycle are reported and abandoned,
+// and whatever waited on them is read in the next pass.
+function reportPredicateCycle(
+	pending: Array<PendingPredicate>,
+	waiting: Map<PendingPredicate, common.RefinementType | null>,
+	sink: HoistDiagnosticSink,
+	hoistedTypes: HoistedTypes,
+): void {
+	let path: Array<PendingPredicate> = []
+	let next: PendingPredicate | undefined = pending[pending.length - 1]
+
+	while (next !== undefined && !path.includes(next)) {
+		path.push(next)
+
+		let awaited: common.RefinementType | null = waiting.get(next) ?? null
+
+		next =
+			awaited === null
+				? undefined
+				: pending.find(
+						(entry) =>
+							entry.refinement === awaited ||
+							pendingRefinementCopiesOf(
+								entry.refinement,
+							).includes(awaited),
+					)
+	}
+
+	// NOTE: A wait leading off the list is a Compiler bug. The entry is
+	// abandoned unreported, and the in-order enrichment meets the unread
+	// predicate outside a hoist, where reading it reports as one.
+	let cycle = next === undefined ? [] : path.slice(path.indexOf(next))
+
+	// NOTE: Reported in the order the Aliases hoisted in, not the order the
+	// walk met them.
+	for (let entry of [...cycle].sort(
+		(left, right) => pending.indexOf(left) - pending.indexOf(right),
+	)) {
+		let at = cycle.indexOf(entry)
+		let names = [...cycle.slice(at), ...cycle.slice(0, at)].map(
+			(member) => member.node.name.content,
+		)
+		let name = entry.node.name.content
+		let awaited = names[1] ?? name
+		let position = (entry.node.predicate ?? entry.node).position
+		let sentence = `'${name}' depends on '${awaited}'`
+
+		for (let step of [...names.slice(2), name]) {
+			sentence += `, which depends on '${step}'`
+		}
+
+		let { diagnostics } = collectDiagnostics((): void => {
+			reportError(
+				names.length === 1
+					? `The predicate of '${name}' depends on itself`
+					: `The predicate of '${name}' depends on itself through '${awaited}'`,
+				position,
+				{
+					code: "recursive-type-declaration",
+					labels: [
+						primary(
+							position,
+							`reading this checks a value against '${awaited}'`,
+						),
+					],
+					notes: [
+						...(names.length === 1 ? [] : [`${sentence} again.`]),
+						"Reading a predicate typechecks it, so one that checks a value against its own refinement, directly or through others, can never be read.",
+					],
+					helps: [
+						"Break the cycle, so that no predicate checks a value against a refinement that depends on it.",
+					],
+				},
+			)
+		})
+
+		sink(entry.node, diagnostics)
+	}
+
+	for (let entry of next === undefined ? path.slice(-1) : cycle) {
+		abandonPendingPredicate(entry, hoistedTypes)
+		pending.splice(pending.indexOf(entry), 1)
 	}
 }
 
@@ -1367,13 +1509,9 @@ function hoistDeclarationsInner(
 	// alias already known. A reading that succeeds drops out of the list.
 	//
 	// NOTE: A reading is offered again only once something it could have been
-	// waiting FOR has arrived — a Namespace hoisting, or a round of seeding
-	// binding an import. Reading a body means enriching it, and a body naming
-	// something hoisting will never put in Scope (a Program's Constant) is
-	// indistinguishable from one waiting on a Namespace: it fails every time.
-	// Without this a Program with a deep chain of Protocols paid for every such
-	// body once per round, and 20 of them over 30 rounds cost more than the
-	// rest of the enrichment together.
+	// waiting for has arrived: a Namespace hoisting, an import binding or a
+	// predicate filling. A body naming something hoisting never puts in Scope,
+	// such as a Program's Constant, fails every time and is not worth rereading.
 	let hoistGeneration = 0
 	let unreadAliases: Array<{
 		blocks: (conjunct: common.PredicateConjunct) => boolean
@@ -1416,6 +1554,9 @@ function hoistDeclarationsInner(
 		// round — a bodied static Property enriched while its Namespace resolves —
 		// has to find them written in.
 		rereadAliases(false)
+
+		let unfilled = pendingPredicates.length
+
 		fillPendingPredicates(
 			pendingPredicates,
 			sink,
@@ -1423,6 +1564,15 @@ function hoistDeclarationsInner(
 			false,
 			unreadLeaf,
 		)
+
+		// NOTE: A filled predicate is something a body or a declaration can have
+		// been waiting for, so it counts as progress even if nothing hoists.
+		let filled = pendingPredicates.length < unfilled
+
+		if (filled) {
+			hoistGeneration++
+		}
+
 		let remainingNodes: Array<PendingDeclaration> = []
 		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
 		// conforming to one of them can not have its conditional bounds woven yet
@@ -1679,7 +1829,11 @@ function hoistDeclarationsInner(
 			}
 		}
 
-		if (remainingNodes.length === pendingNodes.length && !seeded) {
+		if (
+			remainingNodes.length === pendingNodes.length &&
+			!seeded &&
+			!filled
+		) {
 			break
 		}
 
@@ -1692,14 +1846,11 @@ function hoistDeclarationsInner(
 	// an import naming it still has to bind before the bodies are enriched.
 	seedRound?.(true)
 
-	// NOTE: The predicates still pending get their FINAL reading, after that
-	// seeding for the same reason the seeding itself runs — an answering
-	// Namespace hoisted in the last round may reach the Alias' Scope only
-	// through an import bound just now. This time the answer stands either way:
-	// the conjuncts are written in, or the Alias is poisoned and unregistered
-	// for the in-order enrichment to resolve and report. Nothing past hoisting
-	// ever meets `conjuncts: null` — that is the promise every thrown guard on
-	// it stands on.
+	// NOTE: The final reading of the predicates still pending, after the seeding
+	// since an answering Namespace may reach the Alias' Scope only through an
+	// import bound just now. Each is written in, or poisoned and unregistered: a
+	// cycle of them is reported here, any other failure by the in-order
+	// enrichment. Nothing past hoisting meets `conjuncts: null`.
 	rereadAliases(true)
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
