@@ -4956,34 +4956,6 @@ A call such as `@::size()::shout()`, where the program's `namespace Helpers for 
 
 Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
 
-### `clashing-provided-method`
-
-**Error.** Two modules each declare a protocol of the same name, and both provide a method of the same name.
-
-<div class="error-output">
-
-```
-[clashing-provided-method]
-Error: Two Protocols named 'Sized' provide a Method named 'isEmpty'
-   ╭─┤ Crates.es:2:11 │
-   │
- 2 │     protocol Sized {
-   │              ──┬──  
-   │                ╰──── this provides 'isEmpty' too
-   │ 
-   │ Help: Declare 'Sized' once and import it where it is needed, or rename one of the two.
-   │ 
-   │ Note 1: A provided Method is emitted once, under the Protocol's name and the Method's, and shared by every conformer — so only one 'Sized' in a compilation may provide 'isEmpty'.
-   │ Note 2: The other 'Sized' is declared in Boxes.es.
-───╯
-```
-
-</div>
-
-Rename one of the two, as in `protocol Measured` in `Crates.es`, and import it under that name. Or declare the protocol once and import it where it is needed.
-
-Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
-
 ## Documentation comments
 
 Warnings about `§§` blocks. The program compiles either way.

@@ -200,10 +200,9 @@ export function typeNamedAt(
 	// Expression Node in the language, kept in step by hand.
 	//
 	// Types are stepped over: they are most of what a typed Program weighs,
-	// they hold no Statement, and they are where its only cycles are. The same
-	// three keys `providedMethodDeclarations` steps over, and for the same
-	// reasons — with a `visited` set behind them, because a Language Server
-	// that walks into a cycle stops answering at all.
+	// they hold no Statement, and they are where its only cycles are. A
+	// `visited` set stands behind them, because a Language Server that walks
+	// into a cycle stops answering at all.
 	function visitChildren(node: object, depth: number) {
 		for (let [key, entry] of Object.entries(node)) {
 			if (

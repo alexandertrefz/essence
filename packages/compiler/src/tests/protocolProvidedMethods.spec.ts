@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, spyOn } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as path from "node:path"
@@ -8,6 +14,7 @@ import type { common } from "@essence-lang/interfaces"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { readStdlibFiles } from "@essence-lang/standard-library"
 
+import { bundle } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import {
@@ -6070,14 +6077,9 @@ describe("Protocol-provided Methods", () => {
 	})
 })
 
-// NOTE: One const per Protocol name AND Method name, which holds only while no
-// two Protocol declarations provide the same pair. Two Modules of a graph each
-// declaring a `Tagged` that provides `describe` would both emit
-// `$es_Tagged__describe` and the second would answer for the first — a Program
-// that compiles green and runs the wrong body. The graph is asked once it is
-// linked, where both declarations are known; the emitter keeps its own throw
-// as a last word, and both are asked about the PAIR, so two same-named
-// Protocols providing different Methods still emit.
+// NOTE: One const per Protocol and Method. Two Protocols of one name are two
+// Protocols, so the second to provide a Method gets a numbered const of its
+// own; the emitter throws only where one identity provides a Method twice.
 describe("two Protocols of one name", () => {
 	function programWith(body: string): common.typedSimple.Program {
 		let parsed = parseWithDiagnostics(body)
@@ -6287,62 +6289,122 @@ describe("two Protocols of one name", () => {
 		expect(emitted).toContain("$es_Tagged__announce")
 	})
 
-	// NOTE: What a compile actually meets — the linker, which has both
-	// declarations and a Position for each, so the report names a file and a
-	// line instead of arriving as a Compiler bug with neither.
-	it("should report the clash on the second Module, positioned", () => {
-		let directory = mkdtempSync(join(tmpdir(), "essence-protocol-clash-"))
-
-		// NOTE: Each Module keeps its Protocol to itself and exports a
-		// Function — neither can see the other's `Tagged`, and each compiles
-		// on its own, which is what makes the clash the graph's and not
-		// either file's.
-		function taggedModule(
-			typeName: string,
-			memberName: string,
-			functionName: string,
-		): string {
-			return [
-				"implementation {",
-				"\tprotocol Tagged {",
-				"\t\ttag() -> String",
-				"",
-				"\t\tdescribe() -> String {",
-				"\t\t\t<- @::tag()",
-				"\t\t}",
-				"\t}",
-				"",
-				`\ttype ${typeName} = { ${memberName}: String }`,
-				"",
-				`\tnamespace ${typeName}s for ${typeName} is Tagged {`,
-				"\t\ttag() -> String {",
-				`\t\t\t<- @.${memberName}`,
-				"\t\t}",
-				"\t}",
-				"",
-				`\tfunction ${functionName}() -> String {`,
-				`\t\t<- { ${memberName} = "x" }::describe()`,
-				"\t}",
-				"}",
-				"",
-				"export {",
-				`\t${functionName}`,
-				"}",
-			].join("\n")
-		}
+	// NOTE: Writes a Module graph into a directory of its own, and removes it
+	// whatever the spec asks of it.
+	async function withModules(
+		files: Record<string, string>,
+		ask: (directory: string) => Promise<void>,
+	): Promise<void> {
+		let directory = mkdtempSync(join(tmpdir(), "essence-protocol-twice-"))
 
 		try {
-			writeFileSync(
-				join(directory, "A.es"),
-				taggedModule("Dog", "name", "loud"),
-			)
-			writeFileSync(
-				join(directory, "B.es"),
-				taggedModule("Mouse", "title", "quiet"),
-			)
-			writeFileSync(
-				join(directory, "Main.es"),
-				[
+			for (let [name, source] of Object.entries(files)) {
+				mkdirSync(path.dirname(join(directory, name)), {
+					recursive: true,
+				})
+				writeFileSync(join(directory, name), source)
+			}
+
+			await ask(directory)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	}
+
+	function emitModules(directory: string, entry: string) {
+		let linked = linkModuleGraph(
+			loadModuleGraph(join(directory, entry), diskModuleHost),
+		)
+
+		expect(
+			[...linked.modules.values()].flatMap(
+				(module) => module.diagnostics,
+			),
+		).toEqual([])
+
+		return rewriteModules(
+			[...linked.modules.values()].map((module) => ({
+				filePath: module.module.filePath,
+				program: optimise(simplify(module.program)),
+			})),
+			linked.entryPath,
+		)
+	}
+
+	// NOTE: A bundle file per name, since an imported file runs once.
+	async function printedBy(
+		directory: string,
+		sources: ReturnType<typeof rewriteModules>,
+		name: string = "bundle",
+	): Promise<string> {
+		let file = join(directory, `${name}.mjs`)
+		let result = await bundle(sources, {
+			sourceFileName: "Main.es",
+			outputFileName: file,
+		})
+
+		writeFileSync(file, result.outputs[0]!.contents)
+
+		let printed = ""
+		let originalWrite = process.stdout.write
+
+		process.stdout.write = ((chunk: unknown) => {
+			printed += String(chunk)
+
+			return true
+		}) as typeof process.stdout.write
+
+		try {
+			await import(file)
+		} finally {
+			process.stdout.write = originalWrite
+		}
+
+		return printed
+	}
+
+	function taggedModule(
+		typeName: string,
+		memberName: string,
+		functionName: string,
+	): string {
+		return [
+			"implementation {",
+			"\tprotocol Tagged {",
+			"\t\ttag() -> String",
+			"",
+			"\t\tdescribe() -> String {",
+			`\t\t\t<- "${typeName} {@::tag()}"`,
+			"\t\t}",
+			"\t}",
+			"",
+			`\ttype ${typeName} = { ${memberName}: String }`,
+			"",
+			`\tnamespace ${typeName}s for ${typeName} is Tagged {`,
+			"\t\ttag() -> String {",
+			`\t\t\t<- @.${memberName}`,
+			"\t\t}",
+			"\t}",
+			"",
+			`\tfunction ${functionName}() -> String {`,
+			`\t\t<- { ${memberName} = "x" }::describe()`,
+			"\t}",
+			"}",
+			"",
+			"export {",
+			`\t${functionName}`,
+			"}",
+		].join("\n")
+	}
+
+	// NOTE: Each Module keeps its `Tagged` to itself, so neither can see the
+	// other's, and each provides a `describe` of its own.
+	it("should run each Module's own body for two Protocols of one name", async () => {
+		await withModules(
+			{
+				"A.es": taggedModule("Dog", "name", "loud"),
+				"B.es": taggedModule("Mouse", "title", "quiet"),
+				"Main.es": [
 					"import {",
 					'\tfrom "./A.es" { loud }',
 					'\tfrom "./B.es" { quiet }',
@@ -6353,25 +6415,199 @@ describe("two Protocols of one name", () => {
 					"\tTerminal.print(quiet())",
 					"}",
 				].join("\n"),
-			)
+			},
+			async (directory) => {
+				let sources = emitModules(directory, "Main.es")
+				let emitted = [...sources.sources.values()].join("\n")
 
-			let linked = linkModuleGraph(
-				loadModuleGraph(join(directory, "Main.es"), diskModuleHost),
-			)
-			let reported = [...linked.modules.values()].flatMap(
-				(module) => module.diagnostics,
-			)
+				expect(emitted).toContain("const $es_Tagged__describe =")
+				expect(emitted).toContain("const $es_Tagged_2__describe =")
+				expect(await printedBy(directory, sources)).toBe(
+					"Dog x\nMouse x\n",
+				)
+			},
+		)
+	})
 
-			expect(reported.map((diagnostic) => diagnostic.code)).toEqual([
-				"clashing-provided-method",
-			])
-			expect(reported[0]!.message).toBe(
-				"Two Protocols named 'Tagged' provide a Method named 'describe'",
-			)
-			expect(reported[0]!.position).not.toBeNull()
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
+	// NOTE: The const a Module's body is emitted under follows the Module's path,
+	// so a graph loaded from an entry in another directory names it alike.
+	it("should name each Module's const alike from any entry", async () => {
+		let main = (a: string, b: string) =>
+			[
+				"import {",
+				`\tfrom "${a}" { loud }`,
+				`\tfrom "${b}" { quiet }`,
+				"}",
+				"",
+				"implementation {",
+				"\tTerminal.print(loud())",
+				"\tTerminal.print(quiet())",
+				"}",
+			].join("\n")
+
+		await withModules(
+			{
+				"a/Tagged.es": taggedModule("Dog", "name", "loud"),
+				"b/Tagged.es": taggedModule("Mouse", "title", "quiet"),
+				"Main.es": main("./a/Tagged.es", "./b/Tagged.es"),
+				"a/Main.es": main("./Tagged.es", "../b/Tagged.es"),
+			},
+			async (directory) => {
+				for (let entry of ["Main.es", "a/Main.es"]) {
+					let sources = emitModules(directory, entry)
+					let prelude = sources.sources.get("essence:$prelude")!
+					let first = prelude.indexOf("const $es_Tagged__describe =")
+
+					expect([entry, prelude.slice(first, first + 200)]).toEqual([
+						entry,
+						expect.stringContaining('"Dog "'),
+					])
+					expect(
+						await printedBy(
+							directory,
+							sources,
+							entry.replace("/", "-"),
+						),
+					).toBe("Dog x\nMouse x\n")
+				}
+			},
+		)
+	})
+
+	// NOTE: One Namespace conforms to both, and neither extends the other, so
+	// both bounds run the first clause's body, with that Protocol's witness. A
+	// pick reaches either body.
+	it("should answer both bounds of one conformer with the first same-named body", async () => {
+		let sized = (requirement: string, letter: string, gauge: string) =>
+			[
+				"implementation {",
+				"\tprotocol Sized {",
+				`\t\t${requirement}() -> Integer`,
+				"",
+				"\t\tdescribe() -> String {",
+				`\t\t\t<- "${letter} {@::${requirement}()}"`,
+				"\t\t}",
+				"\t}",
+				"",
+				`\tfunction ${gauge} <infer Item is Sized>(_ item: Item) -> String {`,
+				"\t\t<- item::describe()",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSized",
+				`\t${gauge}`,
+				"}",
+			].join("\n")
+
+		await withModules(
+			{
+				"A.es": sized("size", "A", "gaugeA"),
+				"B.es": sized("count", "B", "gaugeB"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./A.es" {',
+					"\t\tSized as SizedA",
+					"\t\tgaugeA",
+					"\t}",
+					'\tfrom "./B.es" {',
+					"\t\tSized as SizedB",
+					"\t\tgaugeB",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tnamespace IntegerBoth for Integer is SizedA, is SizedB {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- @",
+					"\t\t}",
+					"",
+					"\t\tcount() -> Integer {",
+					"\t\t\t<- @::multiply(with 10)",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tTerminal.print(gaugeA(3))",
+					"\tTerminal.print(gaugeB(3))",
+					"\tTerminal.print(3::<SizedA>describe())",
+					"\tTerminal.print(3::<SizedB>describe())",
+					"}",
+				].join("\n"),
+			},
+			async (directory) => {
+				expect(
+					await printedBy(
+						directory,
+						emitModules(directory, "Main.es"),
+					),
+				).toBe("A 3\nA 3\nA 3\nB 30\n")
+			},
+		)
+	})
+
+	// NOTE: The same where one is imported under an alias, and a pick through
+	// the alias reaches that Protocol's body.
+	it("should reach the body of a Protocol imported under an alias beside its namesake", async () => {
+		let tagged = (letter: string, show: string) =>
+			[
+				"implementation {",
+				"\tprotocol Tagged {",
+				"\t\ttag() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				`\t\t\t<- "${letter} {@::tag()}"`,
+				"\t\t}",
+				"\t}",
+				"",
+				`\tfunction ${show} <infer Item is Tagged>(_ item: Item) -> String {`,
+				"\t\t<- item::describe()",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tTagged",
+				`\t${show}`,
+				"}",
+			].join("\n")
+
+		await withModules(
+			{
+				"A.es": tagged("A", "showA"),
+				"B.es": tagged("B", "showB"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./A.es" {',
+					"\t\tTagged",
+					"\t\tshowA",
+					"\t}",
+					'\tfrom "./B.es" {',
+					"\t\tTagged as Marked",
+					"\t\tshowB",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tnamespace IntegerBoth for Integer is Tagged, is Marked {",
+					"\t\ttag() -> String {",
+					'\t\t\t<- "i"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tTerminal.print(showA(1))",
+					"\tTerminal.print(showB(1))",
+					"\tTerminal.print(1::<Marked>describe())",
+					"}",
+				].join("\n"),
+			},
+			async (directory) => {
+				expect(
+					await printedBy(
+						directory,
+						emitModules(directory, "Main.es"),
+					),
+				).toBe("A i\nA i\nB i\n")
+			},
+		)
 	})
 })
 
