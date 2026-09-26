@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -7,7 +7,11 @@ import { Worker } from "node:worker_threads"
 
 import { canonicalPath } from "@essence-lang/compiler/documents"
 
-import type { TestWorkerRequest, TestWorkerResponse } from "../testProtocol"
+import type {
+	TestWorkerData,
+	TestWorkerRequest,
+	TestWorkerResponse,
+} from "../testProtocol"
 
 // NOTE: The Worker driven over its own messages without a session, so a spec
 // can hand it more cycles than a debounced session would start in a test's time.
@@ -15,8 +19,11 @@ import type { TestWorkerRequest, TestWorkerResponse } from "../testProtocol"
 // NOTE: The Worker's `BUNDLE_LIMIT`.
 const bundleLimit = 128
 
+const workerPath = fileURLToPath(new URL("../testWorker.ts", import.meta.url))
+
 let root: string
 let file: string
+let workers = 0
 
 function source(value: number): string {
 	return [
@@ -27,6 +34,33 @@ function source(value: number): string {
 		"}",
 		"",
 	].join("\n")
+}
+
+function runRequest(run: number, text: string): TestWorkerRequest {
+	return {
+		kind: "run",
+		run,
+		entries: [
+			{
+				filePath: file,
+				skipTags: [],
+				contracts: false,
+			},
+		],
+		overlays: { [file]: text },
+		filters: {},
+		ids: [],
+		update: false,
+		coverage: false,
+	}
+}
+
+// NOTE: Under `root`, which this spec removes. A session names one per Worker
+// the same way.
+function stagingDirectory(): string {
+	workers += 1
+
+	return path.join(root, `staging-${workers}`)
 }
 
 beforeAll(() => {
@@ -45,16 +79,11 @@ type Cycle = { exhausted: boolean; passed: number }
 // NOTE: One run per source, each handing the Worker the whole buffer of the
 // same file. The Worker answers them in the order they were sent.
 async function runEach(sources: Array<string>): Promise<Array<Cycle>> {
-	let worker = new Worker(
-		fileURLToPath(new URL("../testWorker.ts", import.meta.url)),
-		{
-			stdout: true,
-			stderr: true,
-			// NOTE: The Worker never removes its staging directory, so it is
-			// put under `root`, which this spec does remove.
-			env: { ...process.env, TMPDIR: root },
-		},
-	)
+	let worker = new Worker(workerPath, {
+		stdout: true,
+		stderr: true,
+		workerData: { staging: stagingDirectory() } satisfies TestWorkerData,
+	})
 	let cycles: Array<Cycle> = []
 	let passed = 0
 
@@ -64,24 +93,7 @@ async function runEach(sources: Array<string>): Promise<Array<Cycle>> {
 			worker.on("message", (message: TestWorkerResponse) => {
 				if (message.kind === "ready") {
 					for (let [index, text] of sources.entries()) {
-						let request: TestWorkerRequest = {
-							kind: "run",
-							run: index + 1,
-							entries: [
-								{
-									filePath: file,
-									skipTags: [],
-									contracts: false,
-								},
-							],
-							overlays: { [file]: text },
-							filters: {},
-							ids: [],
-							update: false,
-							coverage: false,
-						}
-
-						worker.postMessage(request)
+						worker.postMessage(runRequest(index + 1, text))
 					}
 				} else if (message.kind === "entry") {
 					passed += message.events.filter(
@@ -123,5 +135,39 @@ describe("The test Worker's bundle limit", () => {
 		expect(cycles.findIndex((cycle) => cycle.exhausted)).toBe(
 			bundleLimit - 1,
 		)
+	})
+})
+
+describe("The test Worker's staging directory", () => {
+	it("stages in the directory it was handed and removes it once told to close", async () => {
+		let staging = stagingDirectory()
+		let worker = new Worker(workerPath, {
+			stdout: true,
+			stderr: true,
+			workerData: { staging } satisfies TestWorkerData,
+		})
+		let stagedWhileRunning = false
+
+		try {
+			await new Promise<void>((resolve, reject) => {
+				worker.on("error", reject)
+				worker.on("exit", () => resolve())
+				worker.on("message", (message: TestWorkerResponse) => {
+					if (message.kind === "ready") {
+						worker.postMessage(runRequest(1, source(1)))
+					} else if (message.kind === "done") {
+						stagedWhileRunning = existsSync(staging)
+						worker.postMessage({
+							kind: "close",
+						} satisfies TestWorkerRequest)
+					}
+				})
+			})
+		} finally {
+			await worker.terminate()
+		}
+
+		expect(stagedWhileRunning).toBe(true)
+		expect(existsSync(staging)).toBe(false)
 	})
 })

@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
@@ -24,9 +25,15 @@ import {
 	TEST_RUN_VERSION,
 	type TestRunNotification,
 	type TestSite,
+	type TestWorkerData,
 	type TestWorkerRequest,
 	type TestWorkerResponse,
 } from "./testProtocol"
+import {
+	removeStagingDirectory,
+	stagingDirectoryIn,
+	sweepStagingDirectories,
+} from "./testStaging"
 
 // NOTE: One test session per workspace. It watches what the analysis already
 // watches — the files an Editor opens and the ones that change on disk — works
@@ -91,6 +98,9 @@ type TestSessionOptions = {
 	debounce?: number
 	// NOTE: Overridable so a spec can wait a millisecond rather than a minute.
 	deadline?: number
+	// NOTE: Where each Worker's staging directory goes. Overridable so a spec
+	// can watch them come and go.
+	stagingRoot?: string
 }
 
 export type TestSession = {
@@ -177,6 +187,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let workerPath = options.workerPath ?? defaultWorkerPath()
 	let debounce = options.debounce ?? debounceInMilliseconds
 	let deadline = options.deadline ?? deadlineInMilliseconds
+	let stagingRoot = options.stagingRoot ?? tmpdir()
+	let sweeping = sweepStagingDirectories(stagingRoot)
 	let enabled = true
 	let coverageEnabled = false
 	// NOTE: Laid over cycle by cycle. A cycle covers what a change reached and
@@ -277,12 +289,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			return worker
 		}
 
+		let staging = stagingDirectoryIn(stagingRoot)
 		let started = new Worker(workerPath, {
 			// NOTE: The Worker's own stdout, kept out of the Server's. The
 			// Server speaks LSP over stdio, and one `Terminal.print` from a
 			// Program being tested would corrupt the connection.
 			stdout: true,
 			stderr: true,
+			workerData: { staging } satisfies TestWorkerData,
 		})
 
 		started.on("message", (message: TestWorkerResponse) => {
@@ -294,6 +308,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// that fails to start would otherwise be started again forever.
 			worker = null
 			finish(false)
+		})
+		// NOTE: However it ended: closed, crashed, or terminated to cancel a
+		// run, to replace it once exhausted, or to dispose of the session.
+		started.on("exit", () => {
+			removeStagingDirectory(staging)
 		})
 		started.unref()
 		worker = started
@@ -1022,6 +1041,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			await worker?.terminate()
 
 			worker = null
+
+			await sweeping
 		},
 	}
 

@@ -1,8 +1,7 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
-import { parentPort } from "node:worker_threads"
+import { parentPort, workerData } from "node:worker_threads"
 
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
@@ -24,9 +23,11 @@ import {
 import type {
 	TestEntry,
 	TestSite,
+	TestWorkerData,
 	TestWorkerRequest,
 	TestWorkerResponse,
 } from "./testProtocol"
+import { removeStagingDirectory } from "./testStaging"
 
 // NOTE: The other end of the session — see `testProtocol.ts` for why a Worker
 // exists at all. It compiles each entry with the tests enriched, writes the
@@ -48,27 +49,19 @@ const BUNDLE_LIMIT = 128
 type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
-let staging: string | null = null
+let { staging } = workerData as TestWorkerData
 // NOTE: Keyed by the staged file, which is what `import()` caches a Module
 // under, so running a bundle again does not count toward `BUNDLE_LIMIT`.
 let loaded = new Set<string>()
-
-function stagingDirectory(): string {
-	if (staging === null) {
-		staging = mkdtempSync(path.join(tmpdir(), "essence-lsp-tests-"))
-	}
-
-	return staging
-}
 
 // NOTE: The bundle is named after its own hash, so sources this Worker compiled
 // before, such as a file run again unchanged or an edit undone, name a file it
 // already imported, and the run reuses that Module rather than loading another.
 function stage(hash: string, code: string): string {
-	let directory = path.join(stagingDirectory(), hash)
+	let directory = path.join(staging, hash)
 	let file = path.join(directory, "tests.mjs")
 
-	mkdirSync(directory, { recursive: true })
+	mkdirSync(directory, { recursive: true, mode: 0o700 })
 	writeFileSync(file, code)
 
 	return file
@@ -330,6 +323,7 @@ function send(message: TestWorkerResponse): void {
 
 async function handle(request: TestWorkerRequest): Promise<void> {
 	if (request.kind === "close") {
+		removeStagingDirectory(staging)
 		parentPort?.close()
 
 		return

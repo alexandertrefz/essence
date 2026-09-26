@@ -256,6 +256,13 @@ export type TestEntry = {
 	contracts: boolean
 }
 
+// NOTE: What the Worker is started with. `staging` is the directory it writes
+// its bundles into: named by the session, created when the first bundle is
+// staged, and removed once the Worker closes or exits.
+export type TestWorkerData = {
+	staging: string
+}
+
 export type TestWorkerRequest =
 	| {
 			kind: "run"

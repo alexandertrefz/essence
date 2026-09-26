@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import {
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -254,6 +255,192 @@ describe("A session whose run never ends", () => {
 			rmSync(file, { force: true })
 		}
 	}, 60_000)
+})
+
+// NOTE: Every Worker stages the bundles it imports in a directory of its own,
+// under `stagingRoot` here so that a spec can watch them come and go.
+describe("A session's staging directories", () => {
+	const quick = (value: number): string =>
+		[
+			"tests {",
+			'\ttest "holds" {',
+			`\t\texpect ${value}::is(${value})`,
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+	function staged(stagingRoot: string): Array<string> {
+		return readdirSync(stagingRoot).sort()
+	}
+
+	function staging(file: string): {
+		session: TestSession
+		stagingRoot: string
+		overlays: Record<string, string>
+		runs: () => number
+		waitFor: (count: number) => Promise<void>
+	} {
+		let stagingRoot = mkdtempSync(path.join(root, "staging-"))
+		let notifications: Array<TestRunNotification> = []
+		let overlays: Record<string, string> = {}
+		let session = createTestSession({
+			settingsFor: projectSettings(),
+			testFiles: () => [file],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => overlays,
+			notify: (notification) => notifications.push(notification),
+			onResults: () => {},
+			debounce: 20,
+			stagingRoot,
+		})
+		let runs = () =>
+			notifications.filter((notification) => notification.kind === "end")
+				.length
+
+		return {
+			session,
+			stagingRoot,
+			overlays,
+			runs,
+			waitFor: async (count) => {
+				let until = Date.now() + 30_000
+
+				while (runs() < count && Date.now() < until) {
+					await new Promise((resolve) => setTimeout(resolve, 25))
+				}
+			},
+		}
+	}
+
+	// NOTE: A Worker's directory goes on its `exit`, which follows a
+	// termination the session does not wait for.
+	async function waitUntil(condition: () => boolean): Promise<void> {
+		let until = Date.now() + 10_000
+
+		while (!condition() && Date.now() < until) {
+			await new Promise((resolve) => setTimeout(resolve, 25))
+		}
+	}
+
+	it("removes its Worker's directory when it is disposed", async () => {
+		let file = path.join(root, "Disposed.tests.es")
+
+		writeFileSync(file, quick(1))
+
+		let { session, stagingRoot, waitFor } = staging(file)
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			let names = staged(stagingRoot)
+
+			expect(names).toHaveLength(1)
+			expect(names[0]).toStartWith(`essence-lsp-tests-${process.pid}-`)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+
+		expect(staged(stagingRoot)).toEqual([])
+	})
+
+	it("removes the directory of a Worker it replaced once that Worker was exhausted", async () => {
+		let file = path.join(root, "Exhausted.tests.es")
+
+		writeFileSync(file, quick(0))
+
+		let { session, stagingRoot, overlays, waitFor } = staging(file)
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			let retired = staged(stagingRoot)
+
+			expect(retired).toHaveLength(1)
+
+			// NOTE: Up to the Worker's `BUNDLE_LIMIT` of distinct bundles, the
+			// last of which retires it.
+			for (let index = 1; index < 128; index += 1) {
+				overlays[file] = quick(index)
+				session.run({ files: [file] })
+
+				await waitFor(index + 1)
+			}
+
+			await waitUntil(() => staged(stagingRoot).length === 0)
+
+			expect(staged(stagingRoot)).toEqual([])
+
+			overlays[file] = quick(128)
+			session.run({ files: [file] })
+
+			await waitFor(129)
+
+			let replacement = staged(stagingRoot)
+
+			expect(replacement).toHaveLength(1)
+			expect(replacement).not.toEqual(retired)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+
+		expect(staged(stagingRoot)).toEqual([])
+	}, 60_000)
+
+	it("sweeps the directories of Servers that stopped and leaves every other one", async () => {
+		let stagingRoot = mkdtempSync(path.join(root, "swept-"))
+		let stopped = Bun.spawn([process.execPath, "--version"], {
+			stdout: "ignore",
+		})
+
+		await stopped.exited
+
+		let running = Bun.spawn(
+			[process.execPath, "--eval", "setTimeout(() => {}, 60_000)"],
+			{ stdout: "ignore" },
+		)
+		let names = {
+			stopped: `essence-lsp-tests-${stopped.pid}-stopped`,
+			running: `essence-lsp-tests-${running.pid}-running`,
+			own: `essence-lsp-tests-${process.pid}-own`,
+			unowned: "essence-lsp-tests-AbC123",
+			other: "unrelated-directory",
+		}
+
+		for (let name of Object.values(names)) {
+			mkdirSync(path.join(stagingRoot, name, "bundle"), {
+				recursive: true,
+			})
+		}
+
+		try {
+			let session = createTestSession({
+				settingsFor: projectSettings(),
+				testFiles: () => [],
+				dependentsOf: (filePath) => [filePath],
+				overlays: () => ({}),
+				notify: () => {},
+				onResults: () => {},
+				stagingRoot,
+			})
+
+			await session.dispose()
+		} finally {
+			running.kill("SIGKILL")
+
+			await running.exited
+		}
+
+		expect(staged(stagingRoot)).toEqual(
+			[names.running, names.own, names.unowned, names.other].sort(),
+		)
+	})
 })
 
 // NOTE: A request that lands while a run is in flight is DEFERRED rather than
