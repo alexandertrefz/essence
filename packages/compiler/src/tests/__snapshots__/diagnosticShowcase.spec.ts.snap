@@ -3762,26 +3762,26 @@ Error: A Module can not import itself
 
 [unknown-export]
 Error: ./Shapes.es declares nothing named 'aera'
-   ╭─┤ Mirror.es:9:3 │
-   │
- 9 │        aera
-   │        ──┬─  
-   │          ╰─── no such name in that Module
-   │ 
-   │ Help 1: Did you mean 'area'?
-   │ Help 2: Check the spelling, and that the specifier names the file you meant.
-   │ 
-   │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
-───╯
+    ╭─┤ Mirror.es:11:3 │
+    │
+ 11 │        aera
+    │        ──┬─  
+    │          ╰─── no such name in that Module
+    │ 
+    │ Help 1: Did you mean 'area'?
+    │ Help 2: Check the spelling, and that the specifier names the file you meant.
+    │ 
+    │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+────╯
 
 [duplicate-import]
 Error: 'area' is already declared here
-    ╭─┤ Mirror.es:13:3 │
+    ╭─┤ Mirror.es:16:3 │
     │
- 12 │        area
+ 15 │        area
     │        ──┬─  
     │          ╰─── first declared here
- 13 │        area
+ 16 │        area
     │        ──┬─  
     │          ╰─── this binds 'area' a second time
     │ 

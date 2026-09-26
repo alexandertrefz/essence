@@ -44,6 +44,10 @@ type Entry = {
 	// every such block by hand, and a reader scanning for the next member
 	// looks for the gap before the name.
 	bodied?: boolean
+	// NOTE: Whether a blank line goes above the entry, where whoever built it
+	// decides that rather than the source: a sorted list's neighbours are not
+	// the ones the source has.
+	blankAbove?: boolean
 }
 
 const EMPTY = text("")
@@ -114,11 +118,12 @@ export class Printer {
 
 			if (
 				previousBodied ||
-				(previousEnd !== null &&
-					this.source.hasBlankLineBetween(
-						previousEnd,
-						entry.startLine,
-					))
+				(entry.blankAbove ??
+					(previousEnd !== null &&
+						this.source.hasBlankLineBetween(
+							previousEnd,
+							entry.startLine,
+						)))
 			) {
 				parts.push(hardline)
 			}
@@ -761,14 +766,17 @@ export class Printer {
 		let bare: Array<SectionEntry> = []
 		let groups: Array<SectionGroup> = []
 
-		for (let member of writtenMembers(section)) {
+		for (let [written, member] of writtenMembers(section).entries()) {
 			if (member.nodeType === "Export") {
-				bare.push(this.sectionEntry(member))
+				bare.push(this.sectionEntry(member, written))
 			} else {
-				groups.push(this.sectionGroup(member))
+				groups.push(this.sectionGroup(member, written))
 			}
 		}
 
+		// NOTE: A Comment written below the last member belongs to no member,
+		// so nothing carries it — it is written where it stands, above the
+		// block's closing brace.
 		let loose = this.trivia.takeBefore(section.position.end.line)
 
 		bare.sort((left, right) => compareEntries(left.node, right.node))
@@ -776,47 +784,85 @@ export class Printer {
 			compareGroups(groupHead(left), groupHead(right)),
 		)
 
-		let lines: Array<Doc> = []
+		let lines = this.sectionLines(
+			[
+				...bare.map((entry) => ({
+					...entry,
+					doc: this.entryDoc(entry),
+				})),
+				...groups.map((group) => ({
+					...group,
+					doc: this.groupDoc(group),
+				})),
+			],
+			loose,
+		)
 
-		for (let entry of bare) {
-			lines.push(...this.entryLines(entry))
-		}
-
-		for (let group of groups) {
-			for (let comment of group.leading) {
-				lines.push(verbatim(comment.text))
-			}
-
-			lines.push(this.groupDoc(group))
-		}
-
-		// NOTE: A Comment written below the last member belongs to no member,
-		// so nothing carries it — it is written where it stands, above the
-		// block's closing brace.
-		for (let comment of loose) {
-			lines.push(verbatim(comment.text))
-		}
-
-		// NOTE: Every line is laid out as if it were on line 0, which leaves
-		// `layout` no blank line to find between any two of them. A Module section
-		// is one sorted list: which two entries a gap the author left would end up
-		// between is decided by the sort rather than by anything the author said.
 		return concat([
 			text(keyword + " "),
-			this.block(
-				lines.map((doc): Entry => ({ startLine: 0, endLine: 0, doc })),
-				null,
-				false,
-				opening,
-			),
+			this.block(lines, null, false, opening),
 		])
 	}
 
-	private sectionEntry(node: parser.ImportNode | parser.ExportNode) {
+	// NOTE: The lines of a sorted list, each member's Comments above it. A blank
+	// line the author wrote is kept where the sort leaves the lines either side
+	// of it together; anywhere else it would part two the author never parted.
+	private sectionLines(
+		members: Array<SectionMember>,
+		loose: Array<Comment>,
+	): Array<Entry> {
+		let lines: Array<Entry> = []
+		// NOTE: Where the line above ends in the source, or null when the line
+		// above is not the one written above.
+		let previousEnd: number | null = null
+
+		let add = (doc: Doc, startLine: number, endLine: number) => {
+			lines.push({
+				startLine,
+				endLine,
+				doc,
+				blankAbove:
+					previousEnd !== null &&
+					this.source.hasBlankLineBetween(previousEnd, startLine),
+			})
+			previousEnd = endLine
+		}
+
+		for (let [index, member] of members.entries()) {
+			if (members[index - 1]?.written !== member.written - 1) {
+				previousEnd = null
+			}
+
+			for (let comment of member.leading) {
+				add(verbatim(comment.text), comment.startLine, comment.endLine)
+			}
+
+			add(
+				member.doc,
+				member.node.position.start.line,
+				member.node.position.end.line,
+			)
+		}
+
+		if (members[members.length - 1]?.written !== members.length - 1) {
+			previousEnd = null
+		}
+
+		for (let comment of loose) {
+			add(verbatim(comment.text), comment.startLine, comment.endLine)
+		}
+
+		return lines
+	}
+
+	private sectionEntry(
+		node: parser.ImportNode | parser.ExportNode,
+		written: number,
+	): SectionEntry {
 		let leading = this.trivia.takeBefore(node.position.start.line)
 		let trailing = this.trivia.claimTrailingOn(node.position.end.line)
 
-		return { node, leading, trailing }
+		return { node, leading, trailing, written }
 	}
 
 	// NOTE: The Comments of a group are claimed around its entries: what is
@@ -827,34 +873,27 @@ export class Printer {
 	// line if the group is ever written out.
 	private sectionGroup(
 		node: parser.ImportGroupNode | parser.ExportGroupNode,
+		written: number,
 	): SectionGroup {
 		let leading = this.trivia.takeBefore(node.position.start.line)
-		let entries = node.entries.map((entry) => this.sectionEntry(entry))
+		let entries = node.entries.map((entry, index) =>
+			this.sectionEntry(entry, index),
+		)
 		let loose = this.trivia.takeBefore(node.position.end.line)
 		let opening = this.trivia.claimTrailingOn(node.position.start.line)
 		let closing = this.trivia.claimTrailingOn(node.position.end.line)
 
 		entries.sort((left, right) => compareEntries(left.node, right.node))
 
-		return { node, leading, opening, entries, loose, closing }
+		return { node, leading, opening, entries, loose, closing, written }
 	}
 
-	private entryLines(entry: SectionEntry): Array<Doc> {
-		let lines: Array<Doc> = []
-
-		for (let comment of entry.leading) {
-			lines.push(verbatim(comment.text))
-		}
-
+	private entryDoc(entry: SectionEntry): Doc {
 		let doc: Doc = text(entryHead(entry.node))
 
-		if (entry.trailing !== null) {
-			doc = concat([doc, lineSuffix(" " + entry.trailing.text)])
-		}
-
-		lines.push(doc)
-
-		return lines
+		return entry.trailing === null
+			? doc
+			: concat([doc, lineSuffix(" " + entry.trailing.text)])
 	}
 
 	// NOTE: `from "./Module.es" { … }`. A group of one name is written on one
@@ -866,26 +905,17 @@ export class Printer {
 	// node, for the same reason every String Literal is — the Lexer strips the
 	// quotes and leaves the escapes unprocessed.
 	private groupDoc(group: SectionGroup): Doc {
-		let lines: Array<Doc> = []
-
-		for (let entry of group.entries) {
-			lines.push(...this.entryLines(entry))
-		}
-
-		for (let comment of group.loose) {
-			lines.push(verbatim(comment.text))
-		}
+		let lines = this.sectionLines(
+			group.entries.map((entry) => ({
+				...entry,
+				doc: this.entryDoc(entry),
+			})),
+			group.loose,
+		)
 
 		let doc: Doc = concat([
 			text("from " + this.source.slice(group.node.source.position) + " "),
-			this.block(
-				lines.map(
-					(line): Entry => ({ startLine: 0, endLine: 0, doc: line }),
-				),
-				null,
-				true,
-				group.opening,
-			),
+			this.block(lines, null, true, group.opening),
 		])
 
 		if (group.closing !== null) {
@@ -3826,10 +3856,12 @@ function assignmentKind(node: AssignmentNode): AssignmentKind {
 
 // NOTE: One name of a Module section with everything that rides along when the
 // block is sorted: the Comments written above it and the one trailing it.
+// `written` is its place in the order its list was written in.
 type SectionEntry = {
 	node: parser.ImportNode | parser.ExportNode
 	leading: Array<Comment>
 	trailing: Comment | null
+	written: number
 }
 
 // NOTE: One group with what rides along with it: the Comments above its
@@ -3842,6 +3874,15 @@ type SectionGroup = {
 	entries: Array<SectionEntry>
 	loose: Array<Comment>
 	closing: Comment | null
+	written: number
+}
+
+// NOTE: A name or a group as its sorted list lays it out.
+type SectionMember = {
+	node: { position: common.Position }
+	leading: Array<Comment>
+	written: number
+	doc: Doc
 }
 
 function entryHead(entry: parser.ImportNode | parser.ExportNode): string {

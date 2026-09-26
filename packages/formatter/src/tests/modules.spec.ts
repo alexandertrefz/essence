@@ -144,10 +144,10 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: A blank line the author left between two groups cannot survive
-		// the sort — which two groups the gap would end up between is decided by
-		// the sort rather than by anything the author said.
-		it("drops a blank line written between two groups", () => {
+		// NOTE: A blank line survives only where the sort leaves the lines either
+		// side of it side by side, in the order they were written. Anywhere else
+		// the sort chose the neighbours, and the gap would part two other lines.
+		it("drops a blank line written between two groups the sort parts", () => {
 			expect(
 				formatted(
 					source(
@@ -170,6 +170,104 @@ describe("module sections", () => {
 					"implementation {}",
 				),
 			)
+		})
+
+		it("drops a blank line written between two names the sort parts", () => {
+			expect(
+				formatted(
+					source(
+						"import {",
+						'\tfrom "./Geometry.es" {',
+						"\t\tCircle",
+						"",
+						"\t\tarea",
+						"\t\tRectangle",
+						"\t}",
+						"}",
+						"",
+						"implementation {}",
+					),
+				),
+			).toBe(
+				source(
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\tCircle",
+					"\t\tRectangle",
+					"\t\tarea",
+					"\t}",
+					"}",
+					"",
+					"implementation {}",
+				),
+			)
+		})
+
+		it("keeps a blank line written between two groups the sort leaves side by side", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./Mirror.es" { mirrored }',
+				"",
+				'\tfrom "./Shapes.es" { Rectangle }',
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a blank line written between two names the sort leaves side by side", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./Shapes.es" {',
+				"\t\tRectangle",
+				"",
+				"\t\t§ the near miss",
+				"\t\taera",
+				"\t\tarea",
+				"",
+				"\t\t§ below the last name",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a blank line written between the local names and the re-exports", () => {
+			let text = source(
+				"implementation {",
+				"\tconstant alpha = 1",
+				"}",
+				"",
+				"export {",
+				"\talpha",
+				"",
+				'\tfrom "./Geometry.es" { Rectangle }',
+				"}",
+			)
+
+			expect(formatted(text)).toBe(text)
+		})
+
+		it("keeps a blank line written between a Comment and the name below it", () => {
+			let text = source(
+				"import {",
+				'\tfrom "./Geometry.es" {',
+				"\t\tCircle",
+				"\t\t§ the shapes with corners",
+				"",
+				"\t\tRectangle",
+				"\t}",
+				"}",
+				"",
+				"implementation {}",
+			)
+
+			expect(formatted(text)).toBe(text)
 		})
 	})
 
