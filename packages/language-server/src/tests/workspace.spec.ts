@@ -1071,6 +1071,154 @@ describe("Workspace", () => {
 				expect(boundedCall?.definition?.start.line).toBe(3)
 			})
 		})
+
+		// NOTE: The alias is a name of the importing file alone, so the members
+		// are read off the Module that declares the Protocol under its own name.
+		describe("a Protocol imported under an alias", () => {
+			const sizable = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"}",
+				"",
+			].join("\n")
+			const bag = [
+				"import {",
+				'\tfrom "./Sizable.es" { Sizable as Measurable }',
+				"}",
+				"",
+				"implementation {",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Measurable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tBag",
+				"\tBags",
+				"}",
+				"",
+			].join("\n")
+			const main = [
+				"import {",
+				'\tfrom "./Sizable.es" { Sizable as Measurable }',
+				'\tfrom "./Bag.es" { Bag }',
+				'\tfrom "./Bag.es" { Bags }',
+				"}",
+				"",
+				"implementation {",
+				"\tfunction measure <infer Value is Measurable>(_ value: Value) -> Integer {",
+				"\t\t<- value::size()",
+				"\t}",
+				"",
+				"\tconstant bag: Bag = { count = 0 }",
+				"",
+				"\tTerminal.inspect(bag::size())",
+				"\tTerminal.inspect(measure(bag))",
+				"}",
+				"",
+			].join("\n")
+			const files = {
+				"Sizable.es": sizable,
+				"Bag.es": bag,
+				"Main.es": main,
+			}
+
+			let expectEverySizeMoved = (
+				renamed: Record<string, string> | null,
+			): void => {
+				expect(renamed).toEqual({
+					"Sizable.es": sizable.replaceAll("size", "extent"),
+					"Bag.es": bag.replaceAll("size", "extent"),
+					"Main.es": main.replaceAll("size", "extent"),
+				})
+			}
+
+			it("should move every conformer and bounded call from the requirement", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expectEverySizeMoved(
+					renameAcross(
+						workspace,
+						pathOf("Sizable.es"),
+						cursorAt(sizable, 3, "size"),
+						"extent",
+					),
+				)
+			})
+
+			it("should move the requirement from a conformer's implementation", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expectEverySizeMoved(
+					renameAcross(
+						workspace,
+						pathOf("Bag.es"),
+						cursorAt(bag, 9, "size"),
+						"extent",
+					),
+				)
+			})
+
+			it("should hold every file that declares the name", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+				let symbol = workspace.symbolAt(
+					pathOf("Bag.es"),
+					cursorAt(bag, 9, "size"),
+				)
+
+				expect(symbol?.declaredIn.sort()).toEqual(
+					[pathOf("Bag.es"), pathOf("Sizable.es")].sort(),
+				)
+			})
+		})
+
+		it("should rename a Method across the files that import its Namespace under an alias", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					'\tfrom "./Geometry.es" { RectangleMeasurable as Measures }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction describe(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape::area()",
+					"\t}",
+					"",
+					"\tconstant unit = Measures.area({ width = 1, height = 1 })",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let renamed = renameAcross(
+				workspace,
+				pathOf("Geometry.es"),
+				cursorAt(geometry, 6, "area"),
+				"surface",
+			)
+
+			expect(Object.keys(renamed ?? {}).sort()).toEqual([
+				"Geometry.es",
+				"Main.es",
+			])
+			expect(renamed?.["Geometry.es"]).toContain(
+				"\t\tsurface() -> Integer",
+			)
+			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
+			expect(renamed?.["Main.es"]).toContain("Measures.surface({")
+		})
 	})
 
 	describe("workspace symbols", () => {

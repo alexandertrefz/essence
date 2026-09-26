@@ -1650,6 +1650,9 @@ function joinComponent(
 	let parents = new Map<string, string>()
 	let declarationKeys = new Map<string, Map<Declaration, string>>()
 	let indices = new Map<string, ProgramIndex>()
+	// NOTE: An aliased import's own site, to the name the other Module exports.
+	// The two rename apart, so this is the one place they are followed across.
+	let aliasedImports = new Map<string, string>()
 
 	let find = (key: string): string => {
 		let parent = parents.get(key)
@@ -1791,6 +1794,10 @@ function joinComponent(
 					position: entry.name.position,
 					access: "read",
 				})
+
+				if (localKey !== undefined) {
+					aliasedImports.set(localKey, remote)
+				}
 			}
 		}
 
@@ -1876,8 +1883,8 @@ function joinComponent(
 	}
 
 	// NOTE: The Declaration a name written in this file resolves to, wherever
-	// that is declared. A Protocol is not a value, so its name binds among the
-	// Types.
+	// that is declared, and under the name it is declared with there. A Protocol
+	// is not a value, so its name binds among the Types.
 	let declaringSiteOf = (
 		filePath: string,
 		name: string,
@@ -1896,7 +1903,11 @@ function joinComponent(
 			return null
 		}
 
-		let declaring = declaringSite(sites, find, localKey)
+		let declaring = declaringSite(
+			sites,
+			find,
+			aliasedImports.get(localKey) ?? localKey,
+		)
 
 		return declaring === null || declaring.filePath === null
 			? null
