@@ -2763,6 +2763,57 @@ implementation {
 		)
 	})
 
+	// NOTE: `outer`'s own bound is refused where it is written, so its `Item`
+	// asks nothing of `measure`, directly or through the `where` of `ListSized`.
+	it("stays quiet at a call made with a Type Parameter whose bound was refused", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		ListSized
+		Sized
+		measure
+	}
+}
+
+implementation {
+	function outer <infer Item is Sizd>(_ item: Item) -> Integer {
+		<- measure(item)::add(measure([item]))
+	}
+
+	Terminal.inspect(outer(3))
+}
+`,
+				"Sized.es": sizedModule
+					.replace(
+						"\tfunction measure",
+						`\tnamespace ListSized<infer ItemType> for List<ItemType>
+\t\tis Sized where ItemType is Sized
+\t{
+\t\tsize() -> Integer {
+\t\t\t<- 2
+\t\t}
+\t}
+
+\tfunction measure`,
+					)
+					.replace(
+						"\tIntegerSized\n",
+						"\tIntegerSized\n\tListSized\n",
+					),
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					"unused-import",
+					"unused-import",
+					"unknown-protocol",
+				])
+			},
+		)
+	})
+
 	// NOTE: A bound is resolved where it is written, so `Main.es` has to import a
 	// Protocol it names itself, and the Module that declares one is the answer.
 	it("names the Module that declares a Protocol a bound names unimported", () => {

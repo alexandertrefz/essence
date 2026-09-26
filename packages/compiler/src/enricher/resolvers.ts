@@ -5403,9 +5403,11 @@ export function solveConformance(
 
 		return {
 			ok: false,
-			chain: [
-				`Type Parameter '${displayGenericName(binding.name)}' does not conform to '${protocolName}'.`,
-			],
+			chain: carriesRefusedBound(binding, scope)
+				? []
+				: [
+						`Type Parameter '${displayGenericName(binding.name)}' does not conform to '${protocolName}'.`,
+					],
 		}
 	}
 
@@ -5768,6 +5770,18 @@ function solveNamespaceConformance(
 			conditions,
 		},
 	}
+}
+
+// NOTE: A Type Parameter whose bound names no Protocol was refused where it is
+// declared, and that report stands for whatever the Parameter can not satisfy.
+function carriesRefusedBound(
+	binding: common.GenericUse,
+	scope: enricher.Scope,
+): boolean {
+	return (
+		binding.constraint !== undefined &&
+		findProtocolInScope(binding.constraint, scope) === null
+	)
 }
 
 // NOTE: Orders a Protocol's `where` conditions by the Namespace's Generic
@@ -6275,7 +6289,7 @@ export function resolveConformances(
 						name: conformanceParameterName(binding.name),
 					},
 				})
-			} else {
+			} else if (!carriesRefusedBound(binding, scope)) {
 				// NOTE: Under the name the SOURCE wrote. A callee's Generics
 				// are alpha-renamed for the span of one invocation — `ItemType`
 				// becomes `ItemType`, a zero-width space and a counter — and a

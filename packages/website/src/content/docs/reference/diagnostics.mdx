@@ -1513,6 +1513,9 @@ declares it, the Help names that module, `'Sized' is declared in Sized.es —
 import it here.`, and a **Quick Fix** writes the entry. Where the file binds
 that name already, the Help asks for the import under a name of its own.
 
+A refused bound asks nothing of the calls it reaches. The type parameter's own
+calls to bounded functions are not refused over it a second time.
+
 Quick Fix: **Change to 'Comparable'** when a protocol name is close.
 
 Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
