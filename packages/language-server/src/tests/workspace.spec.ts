@@ -2237,6 +2237,66 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
+		// NOTE: `Main.es` names `Sized.es` and has not imported `IntegerSized`,
+		// the Namespace the call needs. The fix writes that entry, and nothing is
+		// left to report once it stands.
+		it("should answer a refused bound with the import of the Namespace that conforms", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tnamespace IntegerSized for Integer is Sized {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- @",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tIntegerSized",
+					"\tSized",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\tTerminal.inspect(measure(3))",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 6, "measure(3)")
+
+			expect(fix.title).toBe("Import 'IntegerSized' from ./Sized.es")
+
+			let result = applyEdits(source, fix.edits)
+
+			expect(result.split("\n").slice(0, 6)).toEqual([
+				"import {",
+				'\tfrom "./Sized.es" {',
+				"\t\tIntegerSized",
+				"\t\tmeasure",
+				"\t}",
+				"}",
+			])
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

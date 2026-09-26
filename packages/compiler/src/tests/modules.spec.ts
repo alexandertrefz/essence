@@ -3222,6 +3222,38 @@ export {
 		)
 	})
 
+	// NOTE: `IntegerSized` is what the call needs, and `Main.es` names the Module
+	// that exports it, so importing it is the edit rather than a second Namespace.
+	it("offers the import of a Namespace that makes a refused bound hold", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sizedModule,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'IntegerSized' in ./Sized.es makes Integer conform to 'Sized' — import it.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "import-declaration",
+					name: "IntegerSized",
+					modulePath: path.join(directory, "Sized.es"),
+				})
+			},
+		)
+	})
+
 	// NOTE: `Main.es` declares the bound itself without importing `Sized`, which
 	// is `unknown-protocol` there. The refused bound asks nothing of the call.
 	it("stays quiet at a call to a Function whose bound its own Module refused", () => {
@@ -5497,6 +5529,14 @@ implementation {
 					"Integer does not conform to 'Sized'",
 				)
 				expect(refusal?.position?.start.line).toBe(16)
+				expect(refusal?.helps).toEqual([
+					"'IntegerSized' in ./Sized.es makes Integer conform to 'Sized' — import it.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "import-declaration",
+					name: "IntegerSized",
+					modulePath: path.join(directory, "Sized.es"),
+				})
 			},
 		)
 	})
@@ -6101,6 +6141,14 @@ export {
 				expect(refusal?.notes).toEqual([
 					"Integer does not conform to 'Weighed'.",
 				])
+				expect(refusal?.helps).toEqual([
+					"'IntegerWeighed' in ./Sized.es makes Integer conform to 'Weighed' — import it.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "import-declaration",
+					name: "IntegerWeighed",
+					modulePath: path.join(directory, "Sized.es"),
+				})
 			},
 		)
 	})

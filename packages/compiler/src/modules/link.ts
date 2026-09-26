@@ -1647,7 +1647,12 @@ function unimportedNamespacesFor(
 				continue
 			}
 
-			candidates.push({ name, specifier, namespace: value })
+			candidates.push({
+				name,
+				specifier,
+				modulePath: dependencyPath,
+				namespace: value,
+			})
 		}
 	}
 

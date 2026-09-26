@@ -4210,11 +4210,12 @@ Error: { x: Integer } does not conform to 'Comparable'
 
 Pass a type that conforms, or declare a namespace that makes this type conform, as the Help shows.
 
-The Help is written for whatever the type turns out to be, and five shapes read
+The Help is written for whatever the type turns out to be, and six shapes read
 differently:
 
 - **A bare case.** `Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.` — `namespace X for Colour#Red is …` is not a spelling, so what moves is the value's annotation. That is the whole edit where the choice itself conforms. Where it does not, annotating only moves the refusal one type wider, so the choice's own Help is given in its place: declaring `namespace Doors for Door is Printable {}` makes a member written `Door#Open` print, with no annotation at all.
 - **A choice another module declares.** `'Problem' is declared in Parser.es — import it here, so its derived 'Equatable' is in scope.` A choice derives equality wherever it is in scope, so the edit is an import rather than a second conformance. A **Quick Fix** writes the entry.
+- **A namespace the file has not imported.** `'IntegerSized' in ./Sized.es makes Integer conform to 'Sized' — import it.` A module the file already imports from exports a namespace that makes the type conform, so the edit is an import of it. A **Quick Fix** writes the entry.
 - **A future.** `This describes work that has not run — add 'complete'.` Making futures `Printable` compiles and prints a description of the work, which is why the report never asks for it.
 - **A choice whose cases carry no payload.** The namespace's body may be empty: declaring `namespace Problems for Problem is Printable {}` is the whole of what such a choice needs.
 - **An unbounded type parameter.** `Declare it as '<infer Item is Comparable>'`, with a **Quick Fix** that writes the bound onto a declaration in this file.

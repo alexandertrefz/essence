@@ -88,6 +88,7 @@ import {
 	modulePathOf,
 	protocolDeclarationsOf,
 	protocolRegistryOf,
+	unimportedNamespacesOf,
 } from "./scope"
 
 // NOTE: Type resolution: the Types written in annotations and signatures, the
@@ -6999,8 +7000,8 @@ function orderConditions(
 	)
 }
 
-// NOTE: What to say about a concrete Type with no conforming Namespace. Four
-// answers, because four different things are actually wrong, and the plain
+// NOTE: What to say about a concrete Type with no conforming Namespace. Five
+// answers, because five different things are actually wrong, and the plain
 // "declare a Namespace" is only the last of them:
 //
 // - A bare Case binds the CASE. `namespace X for Colour#Red is Enumerable` does
@@ -7014,6 +7015,8 @@ function orderConditions(
 //   through a DERIVED conformance, which is in scope only where the Type is. The
 //   edit is an import, and the Namespace the old Help asked for is a second
 //   conformance for a Type that has one.
+// - A Module this one names exports a Namespace that conforms, so the edit is
+//   an import of it.
 // - Everything else owes a Namespace. Where the Type is a Choice whose Cases
 //   carry no payload the body of it may be EMPTY, since declaring the
 //   conformance is the whole of what such a Choice needs — a fact worth saying,
@@ -7102,6 +7105,31 @@ function missingConformance(
 		}
 	}
 
+	let unimported = unimportedNamespacesOf(scope).filter((candidate) =>
+		declaresConformanceFor(candidate.namespace, protocolName, culprit),
+	)
+
+	if (unimported.length > 0) {
+		let only = unimported.length === 1 ? unimported[0] : undefined
+
+		return {
+			notes: [],
+			helps: unimported.map(
+				(candidate) =>
+					`'${candidate.name}' in ${candidate.specifier} makes ${describeType(culprit)} conform to '${protocol}' — import it.`,
+			),
+			...(only === undefined
+				? {}
+				: {
+						data: {
+							kind: "import-declaration" as const,
+							name: only.name,
+							modulePath: only.modulePath,
+						},
+					}),
+		}
+	}
+
 	// NOTE: The Help is WITHHELD for the two Types a Namespace can not be
 	// declared for as they are spelled. `namespace X for (_ Integer) -> Integer`
 	// and `namespace X for Future<Integer>` are both refused by the Parser — a
@@ -7144,6 +7172,25 @@ function missingConformance(
 					},
 				}),
 	}
+}
+
+// NOTE: Whether a Namespace declares this conformance for a Type, by the target
+// test a solve puts each candidate to.
+function declaresConformanceFor(
+	namespace: common.NamespaceType,
+	protocolName: string,
+	type: common.Type,
+): boolean {
+	if (
+		namespace.targetType === null ||
+		namespace.conformsTo?.includes(protocolName) !== true
+	) {
+		return false
+	}
+
+	return namespace.generics.length === 0
+		? matchesType(namespace.targetType, type)
+		: bindNamespaceTarget(namespace, type) !== null
 }
 
 // NOTE: The Choice this Type is, when it was declared in a DIFFERENT Module of

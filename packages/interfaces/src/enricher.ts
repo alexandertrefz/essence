@@ -1,13 +1,12 @@
 import type * as common from "./common/index"
 
 // NOTE: A Namespace another Module in the graph exports and this one has not
-// imported, under the name that Module exports it as, with the specifier an
-// import of it would write. A Namespace has to be imported before a Method can
-// dispatch through it, so this is the useful half of "no such Method": which
-// Namespace that was never brought in declares the Method being asked for.
+// imported: its exported name, the specifier an import would write and the
+// Module's canonical path. It names what declares a Method no import reaches.
 export type UnimportedNamespace = {
 	name: string
 	specifier: string
+	modulePath: string
 	namespace: common.NamespaceType
 }
 
