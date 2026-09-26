@@ -40,7 +40,7 @@ declarations {
 
 		§§ Answers a source that draws one sequence for one seed.
 		§§
-		§§ The same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed, and two seeds that differ anywhere answer two sequences.
+		§§ The same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed. A seed is hashed to 32 bits, so two different seeds almost always answer two different sequences.
 		§§
 		§§ @param _ — the text the sequence is built from
 		§§ @returns — a source that replays.

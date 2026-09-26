@@ -48,7 +48,7 @@
 					"entries": [
 						{
 							"signature": "static seeded(_ seed: String) -> Randomness",
-							"summary": "Answers a source that draws one sequence for one seed.\n\nThe same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed, and two seeds that differ anywhere answer two sequences.",
+							"summary": "Answers a source that draws one sequence for one seed.\n\nThe same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed. A seed is hashed to 32 bits, so two different seeds almost always answer two different sequences.",
 							"parameters": [
 								{
 									"name": "_",
