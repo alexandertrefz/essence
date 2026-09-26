@@ -323,6 +323,7 @@ describe("A Descriptor", () => {
 // followed anywhere but a machine with a toolchain on it.
 describe("The runtime half", () => {
 	const RUNTIME_SAFE = ["./bare-cases", "./errors", "./rational"]
+	const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
 
 	function sourceOf(fileName: string): string {
 		return readFileSync(
@@ -331,15 +332,13 @@ describe("The runtime half", () => {
 		)
 	}
 
-	// NOTE: The marshaller and `bare-cases.ts`, rather than the marshaller
-	// alone. It imports `bare-cases.ts` for a VALUE — the one rule about a unit
-	// Choice, which the generated declarations read out of the same file — so a
-	// Compiler import added over there reaches a browser exactly as one added
-	// here would. A bundler follows `errors.ts` and `rational.ts` as well, and
-	// neither is read here.
-	const MARSHALLER = sourceOf("marshal-runtime.ts")
-	const SHARED_RULE = sourceOf("bare-cases.ts")
-	const SOURCES = [MARSHALLER, SHARED_RULE]
+	function needsAToolchain(specifier: string): boolean {
+		return (
+			specifier.startsWith("node:") ||
+			specifier.startsWith("@essence-lang/compiler") ||
+			specifier === "esbuild"
+		)
+	}
 
 	// NOTE: `[^"']*?` spans lines, which is what a formatted import list needs,
 	// and can not run past the specifier of the import it is reading.
@@ -354,18 +353,67 @@ describe("The runtime half", () => {
 		}))
 	}
 
-	let imports = SOURCES.flatMap(importsOf)
+	// NOTE: Every file a bundler reaches from the marshaller, in this package or
+	// the runtime, found by following the imports Bun's transpiler keeps. It
+	// erases a type-only import, so that is not followed.
+	function bundledFrom(entry: string): Map<string, string> {
+		let transpiler = new Bun.Transpiler({ loader: "ts" })
+		let bundled = new Map<string, string>()
+		let pending = [entry]
 
-	it("reads its own imports", () => {
-		expect(imports.length).toBeGreaterThan(0)
+		while (pending.length > 0) {
+			let file = pending.pop()!
+
+			if (bundled.has(file)) {
+				continue
+			}
+
+			let source = readFileSync(file, "utf8")
+
+			bundled.set(file, source)
+
+			for (let { path: specifier } of transpiler.scanImports(source)) {
+				if (!needsAToolchain(specifier)) {
+					pending.push(Bun.resolveSync(specifier, path.dirname(file)))
+				}
+			}
+		}
+
+		return bundled
+	}
+
+	const MARSHALLER = sourceOf("marshal-runtime.ts")
+	const SHARED_RULE = sourceOf("bare-cases.ts")
+	const BUNDLED = bundledFrom(
+		path.join(import.meta.dirname, "..", "marshal-runtime.ts"),
+	)
+
+	it("reads its own imports and follows them", () => {
+		expect(importsOf(MARSHALLER).length).toBeGreaterThan(0)
+		expect(BUNDLED.size).toBeGreaterThan(1)
 	})
 
+	// NOTE: Every specifier a bundled file names, the type-only ones as well.
 	it("imports nothing that needs a Compiler, a file system or a toolchain", () => {
-		for (let { specifier } of imports) {
-			expect(specifier.startsWith("node:")).toBe(false)
-			expect(specifier.startsWith("@essence-lang/compiler")).toBe(false)
-			expect(specifier).not.toBe("esbuild")
+		let transpiler = new Bun.Transpiler({ loader: "ts" })
+		let reached: Array<string> = []
+
+		for (let [file, source] of BUNDLED) {
+			let specifiers = new Set([
+				...importsOf(source).map((entry) => entry.specifier),
+				...transpiler.scanImports(source).map((entry) => entry.path),
+			])
+
+			for (let specifier of specifiers) {
+				if (needsAToolchain(specifier)) {
+					reached.push(
+						`${path.relative(REPOSITORY_ROOT, file)}: ${specifier}`,
+					)
+				}
+			}
 		}
+
+		expect(reached).toEqual([])
 	})
 
 	// NOTE: A type import is erased before anything runs, so `./descriptor` and
@@ -391,9 +439,9 @@ describe("The runtime half", () => {
 	})
 
 	// NOTE: And nothing reaches around the import list. A dynamic import or a
-	// `require` would be invisible to every assertion above.
+	// `require` may be handed a specifier no reader can follow.
 	it("reaches for nothing at run time either", () => {
-		for (let source of SOURCES) {
+		for (let source of BUNDLED.values()) {
 			expect(source).not.toMatch(/\bimport\s*\(/)
 			expect(source).not.toMatch(/\brequire\s*\(/)
 		}
