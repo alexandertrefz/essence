@@ -7539,7 +7539,7 @@ function weaveMethodBounds(
 		let splits =
 			methodNode === undefined
 				? []
-				: methodGenericSplits(methodNode, type.generics)
+				: methodGenericSplits(methodNode, type.generics, scope)
 
 		splitsOf.set(methodName, splits)
 
@@ -9460,9 +9460,11 @@ function enrichMethods(
 		}
 
 		let injected = injectedGenerics.get(memberKey) ?? []
-		let own = methodGenericSplits(memberValue, namespaceGenerics).map(
-			(split) => split.own,
-		)
+		let own = methodGenericSplits(
+			memberValue,
+			namespaceGenerics,
+			scope,
+		).map((split) => split.own)
 
 		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {

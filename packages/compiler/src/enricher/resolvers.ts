@@ -9931,6 +9931,7 @@ export type MethodGenericSplit = {
 export function splitMethodGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	namespaceGenerics: Array<common.GenericDeclaration>,
+	scope: enricher.Scope,
 ): MethodGenericSplit {
 	if (namespaceGenerics.length === 0) {
 		return { own: generics, bounds: new Map() }
@@ -9947,7 +9948,14 @@ export function splitMethodGenerics(
 			continue
 		}
 
-		if (generic.constraint !== null) {
+		if (generic.constraint === null) {
+			continue
+		}
+
+		// NOTE: Refused as a Method's own bound is, and not carried either.
+		if (findProtocolInScope(generic.constraint.content, scope) === null) {
+			reportUnknownProtocol(generic.constraint, scope)
+		} else {
 			bounds.set(generic.name.content, generic.constraint.content)
 		}
 	}
@@ -10122,9 +10130,10 @@ function normalizeMethod(
 export function methodGenericSplits(
 	node: parser.NamespaceMethods[string],
 	namespaceGenerics: Array<common.GenericDeclaration>,
+	scope: enricher.Scope,
 ): Array<MethodGenericSplit> {
 	return normalizeMethod(node).entries.map((entry) =>
-		splitMethodGenerics(entry.generics, namespaceGenerics),
+		splitMethodGenerics(entry.generics, namespaceGenerics, scope),
 	)
 }
 
@@ -10210,7 +10219,11 @@ export function resolveMethodType(
 		// would stop matching it. The bound reaches the same Parameter through
 		// `mergeNamespaceGenerics` instead, where it lands on the Namespace's
 		// entry and is carried into the one place the Rewriter reads.
-		let split = splitMethodGenerics(entry.generics, namespaceGenerics)
+		let split = splitMethodGenerics(
+			entry.generics,
+			namespaceGenerics,
+			scope,
+		)
 		let methodScope = scopeWithGenerics(split.own, scope)
 		let entryGenerics = resolveGenericDeclarations(split.own, scope)
 

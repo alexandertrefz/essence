@@ -339,6 +339,22 @@ ${words}
 		).toEqual(["restated-inferred-parameter"])
 	})
 
+	// NOTE: Refused where it is written, and not carried, so the call does not
+	// answer for it a second time.
+	it("refuses a bound that names no Protocol at the Method", () => {
+		expect(
+			diagnosticsOf(`implementation {
+	namespace Boxes<infer Item> for List<Item> {
+		firstSize<Item is Sizd>() -> Integer {
+			<- 1
+		}
+	}
+
+	Terminal.inspect([1, 2]::firstSize())
+}`),
+		).toEqual(["unknown-protocol"])
+	})
+
 	// NOTE: A Method that fulfils a requirement is promised by the conformance
 	// unconditionally, so a bound of its own is a promise the Namespace can not
 	// keep — the condition belongs on the conformance, and that is what the
