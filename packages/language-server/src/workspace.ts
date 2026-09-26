@@ -1664,9 +1664,10 @@ function joinComponent(
 	let parents = new Map<string, string>()
 	let declarationKeys = new Map<string, Map<Declaration, string>>()
 	let indices = new Map<string, ProgramIndex>()
-	// NOTE: An aliased import's own site, to the name the other Module exports.
-	// The two rename apart, so this is the one place they are followed across.
-	let aliasedImports = new Map<string, string>()
+	// NOTE: An aliased import's own site, or the name an aliased export
+	// publishes, to the name it stands for in the Module it comes from. The two
+	// rename apart, so this is the one place they are followed across.
+	let aliases = new Map<string, string>()
 
 	let find = (key: string): string => {
 		let parent = parents.get(key)
@@ -1810,7 +1811,7 @@ function joinComponent(
 				})
 
 				if (localKey !== undefined) {
-					aliasedImports.set(localKey, remote)
+					aliases.set(localKey, remote)
 				}
 			}
 		}
@@ -1892,6 +1893,7 @@ function joinComponent(
 					position: entry.alias.position,
 					access: "read",
 				})
+				aliases.set(publicKey, target)
 			}
 		}
 	}
@@ -1905,6 +1907,38 @@ function joinComponent(
 			.get(filePath)
 			?.scopes.find((entry) => entry.range === null)
 			?.scope[space].get(name)
+
+	// NOTE: Each alias by the group it stands in. No later union reaches one of
+	// these groups, since those merge Method Declarations alone.
+	let aliasOfGroup = new Map<string, string>()
+
+	for (let [from, to] of aliases) {
+		if (!aliasOfGroup.has(find(from))) {
+			aliasOfGroup.set(find(from), to)
+		}
+	}
+
+	// NOTE: The key a symbol's group reaches once every alias on the way to the
+	// Module that declares it is followed, an import's and a forwarding
+	// export's alike.
+	let followAliases = (key: string): string => {
+		let current = key
+		let seen = new Set<string>()
+
+		while (!seen.has(find(current))) {
+			seen.add(find(current))
+
+			let next = aliasOfGroup.get(find(current))
+
+			if (next === undefined) {
+				break
+			}
+
+			current = next
+		}
+
+		return current
+	}
 
 	// NOTE: The Declaration a name written in this file resolves to, wherever
 	// that is declared, and under the name it is declared with there. A Protocol
@@ -1924,11 +1958,7 @@ function joinComponent(
 			return null
 		}
 
-		let declaring = declaringSite(
-			sites,
-			find,
-			aliasedImports.get(localKey) ?? localKey,
-		)
+		let declaring = declaringSite(sites, find, followAliases(localKey))
 
 		return declaring === null || declaring.filePath === null
 			? null

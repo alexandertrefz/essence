@@ -1334,6 +1334,165 @@ describe("Workspace", () => {
 			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
 			expect(renamed?.["Main.es"]).toContain("Measures.surface({")
 		})
+
+		// NOTE: The alias is published by a Module that only forwards, so the
+		// members are read off the Module that declares the Protocol.
+		describe("a Protocol forwarded under an alias", () => {
+			const sizable = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSizable",
+				"}",
+				"",
+			].join("\n")
+			const facade = [
+				"implementation {}",
+				"",
+				"export {",
+				'\tfrom "./Sizable.es" { Sizable as Measurable }',
+				"}",
+				"",
+			].join("\n")
+			const bag = [
+				"import {",
+				'\tfrom "./Facade.es" { Measurable }',
+				"}",
+				"",
+				"implementation {",
+				"\ttype Bag = { count: Integer }",
+				"",
+				"\tnamespace Bags for Bag is Measurable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tBag",
+				"\tBags",
+				"}",
+				"",
+			].join("\n")
+			const files = {
+				"Sizable.es": sizable,
+				"Facade.es": facade,
+				"Bag.es": bag,
+			}
+			const moved = {
+				"Sizable.es": sizable.replaceAll("size", "extent"),
+				"Bag.es": bag.replaceAll("size", "extent"),
+			}
+
+			it("should move the conformer from the requirement", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expect(
+					renameAcross(
+						workspace,
+						pathOf("Sizable.es"),
+						cursorAt(sizable, 3, "size"),
+						"extent",
+					),
+				).toEqual(moved)
+			})
+
+			it("should move the requirement from the conformer", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+
+				expect(
+					renameAcross(
+						workspace,
+						pathOf("Bag.es"),
+						cursorAt(bag, 9, "size"),
+						"extent",
+					),
+				).toEqual(moved)
+			})
+
+			it("should move the conformer through a second forwarding alias", () => {
+				let gauged = bag
+					.replace(
+						'"./Facade.es" { Measurable }',
+						'"./Gauge.es" { Gaugeable }',
+					)
+					.replace("is Measurable", "is Gaugeable")
+				let { workspace, pathOf } = makeWorkspace({
+					"Sizable.es": sizable,
+					"Facade.es": facade,
+					"Gauge.es": [
+						"implementation {}",
+						"",
+						"export {",
+						'\tfrom "./Facade.es" { Measurable as Gaugeable }',
+						"}",
+						"",
+					].join("\n"),
+					"Bag.es": gauged,
+				})
+
+				expect(
+					renameAcross(
+						workspace,
+						pathOf("Sizable.es"),
+						cursorAt(sizable, 3, "size"),
+						"extent",
+					),
+				).toEqual({
+					"Sizable.es": sizable.replaceAll("size", "extent"),
+					"Bag.es": gauged.replaceAll("size", "extent"),
+				})
+			})
+		})
+
+		it("should rename a Method across the files that import its Namespace forwarded under an alias", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Facade.es": [
+					"implementation {}",
+					"",
+					"export {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					'\tfrom "./Geometry.es" { RectangleMeasurable as Measures }',
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Facade.es" { Rectangle }',
+					'\tfrom "./Facade.es" { Measures }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction describe(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape::area()",
+					"\t}",
+					"",
+					"\tconstant unit = Measures.area({ width = 1, height = 1 })",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let renamed = renameAcross(
+				workspace,
+				pathOf("Geometry.es"),
+				cursorAt(geometry, 6, "area"),
+				"surface",
+			)
+
+			expect(Object.keys(renamed ?? {}).sort()).toEqual([
+				"Geometry.es",
+				"Main.es",
+			])
+			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
+			expect(renamed?.["Main.es"]).toContain("Measures.surface({")
+		})
 	})
 
 	describe("workspace symbols", () => {
