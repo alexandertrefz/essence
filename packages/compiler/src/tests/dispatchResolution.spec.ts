@@ -1149,10 +1149,9 @@ describe("What a refused call is told", () => {
 		})
 	})
 
-	// NOTE: The A1 refusal, which is where this report is met on a Program that
-	// looks right: a fold's accumulator decided by what its combiner writes,
-	// handed to a Method over Numbers. "Parameter 1 is List<Integer>" with no
-	// word about what was passed left the one fact that explains it unsaid.
+	// NOTE: A fold's accumulator is decided by what its combiner writes, so
+	// `kept` is a `List<String>` handed to a Method over Numbers. A Label names
+	// the Type that was passed, the one fact that explains the refusal.
 	it("names the Type a Method over Numbers was handed instead", () => {
 		let diagnostics = diagnosticsFor(`implementation {
 			constant words = ["a", "bb"]

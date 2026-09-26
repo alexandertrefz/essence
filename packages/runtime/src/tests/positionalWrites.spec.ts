@@ -409,8 +409,7 @@ const saysEqual = (answer: AnyType): boolean =>
 // a missing seal can be seen in: the twin carries a log, is current for it and
 // has never been read, so a write from inside the witness would land in the very
 // Array the comparison is reading. A twin anything had read first would already
-// be sealed and the turn would prove nothing — which is exactly how the D1
-// review's first fuzzer came out green on the bug it was written to find.
+// be sealed and the turn would prove nothing.
 //
 // NOTE: The twin holds the receiver's own items, so `Equal` is the answer owed
 // whatever the schedule did beforehand, and the witness writes the twin at a
@@ -1220,10 +1219,9 @@ describe("reentrancy", () => {
 	// guard in this file. Each entry here is given a DISTINCT argument, freshly
 	// logged and never yet read, and the callback writes THAT one.
 	//
-	// NOTE: Never read before the call, and that is the whole of what makes the
-	// entries sharp. Sealing is permanent and per-Array, so one `itemsOf` of the
-	// argument beforehand would close its log and no missing seal could be seen
-	// again — the same trap the D1 review's first fuzzer fell into.
+	// NOTE: The argument is never read before the call. Sealing is permanent
+	// and per-Array, so one `itemsOf` of it beforehand would close its log and
+	// no missing seal could be seen again.
 	//
 	// NOTE: Each entry says what the native OWES for two Lists holding equal
 	// items, and the answer is checked as well as the items visited. That is what

@@ -284,9 +284,9 @@ describe("Patterns", () => {
 			).toEqual(["8"])
 		})
 
-		// NOTE: Decision 2 — construction answers the same fork by trying the
-		// payload Record first, and the Matcher mirrors it, so a reader who
-		// knows how a value is built knows how it comes apart.
+		// NOTE: Construction answers the same fork by trying the payload
+		// Record first, and the Matcher mirrors it, so a reader who knows how a
+		// value is built knows how it comes apart.
 		it("reads a one-member payload as the Record where that fits", async () => {
 			expect(
 				await run(`implementation {

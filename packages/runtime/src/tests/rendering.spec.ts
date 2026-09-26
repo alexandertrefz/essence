@@ -253,8 +253,9 @@ describe("rendering a Case", () => {
 	})
 
 	// NOTE: The rendering collides and the VALUES do not, which is the whole of
-	// what decision 4 traded away: the tag keeps its Module, so nominal identity
-	// is untouched, and only the two lines a reader sees are now the same.
+	// what a rendering without a Module path gives up: the tag keeps its Module,
+	// so nominal identity is untouched, and only the two lines a reader sees are
+	// the same.
 	test("the tag itself is untouched — two Modules' Doors stay distinct", () => {
 		let mine = caseValue("./Mine.es#Door#Open")
 		let yours = caseValue("./Yours.es#Door#Open")

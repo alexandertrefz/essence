@@ -36,8 +36,8 @@ const tag = `type Tag = { text: String }
 	constant news: Tag = { text = "News" }
 	constant lower: Tag = { text = "news" }`
 
-// NOTE: And the Choice DECISION 3 is written against — a non-generic one whose
-// payload holds a Tag, which is the pair the finding was reported on.
+// NOTE: And a non-generic Choice whose payload holds a Tag, the receiver for
+// the rule that a Case payload asks its members as a Record does.
 const box = `choice Box {
 		Full { tag: Tag },
 		Hollow,
@@ -445,9 +445,9 @@ describe("A Record asks its declared members", () => {
 	// NOTE: And a member whose Type is a bare STRUCTURAL Union is refused, for
 	// the reason a `List<Tag | Integer>` is refused today: no Namespace makes
 	// `Tag | Integer` Equatable, so there is no `is` for the member to be routed
-	// through. The Record's story and the List's are the same story, which is
-	// the whole point of decision 2 — and this is the case that proves it is,
-	// because it is the one a reader is most likely to meet by accident.
+	// through. A member with no conformance refuses the Record as an item with
+	// none refuses the List, and this is the case a reader is most likely to
+	// meet by accident.
 	it("refuses a member whose Union has no conformance, as a List is", () => {
 		let source = `implementation {
 			${tag}
@@ -502,11 +502,11 @@ describe("A Record asks its declared members", () => {
 })
 
 describe("A Record asks its declared members how to print", () => {
-	// NOTE: Decision 4 read from the other side. The structural walk writes a
-	// Case as `Door#Open` and a `Money` as `{ cents = 1999 }`; the Namespaces
-	// that own them answer `Open` and `EUR 1999`. A Record printed for a READER
-	// asks them, which is what `[EUR 1999]` and `["k" = EUR 1999]` have always
-	// done for a List and a Dictionary holding the same value.
+	// NOTE: The structural walk writes a Case as `Door#Open` and a `Money` as
+	// `{ cents = 1999 }`; the Namespaces that own them answer `Open` and
+	// `EUR 1999`. A Record printed for a READER asks them, which is what
+	// `[EUR 1999]` and `["k" = EUR 1999]` have always done for a List and a
+	// Dictionary holding the same value.
 	it("prints each member through its own toString", async () => {
 		expect(
 			await run(`implementation {
@@ -649,8 +649,8 @@ describe("A Record asks its declared members how to print", () => {
 	})
 
 	// NOTE: A member whose Choice nobody declared Printable takes the Record's
-	// printing away, which is decision 2 reaching further than a Function does:
-	// this is a Record that prints today.
+	// printing away, as a member with no conformance does, although the
+	// structural walk could print this Record.
 	it("is refused where a member's Choice is not Printable", () => {
 		let source = `implementation {
 			choice Door { Open, Shut }
@@ -725,10 +725,11 @@ describe("A Record asks its declared members how to print", () => {
 })
 
 describe("A Record whose member can not compare", () => {
-	// NOTE: Decision 2, and it reads like `List<Function>`'s refusal on purpose:
-	// the same `unsatisfied-conformance-condition`, the same because-chain shape,
-	// with one sentence more that NAMES the member. A reader who has met the one
-	// has met the other.
+	// NOTE: A member with no conformance refuses the Record, and the refusal
+	// reads like `List<Function>`'s on purpose: the same
+	// `unsatisfied-conformance-condition`, the same because-chain shape, with
+	// one sentence more that NAMES the member. A reader who has met the one has
+	// met the other.
 	it("is refused, naming the member", () => {
 		let source = `implementation {
 			constant run = (_ value: Integer) -> Integer { <- value }
@@ -808,9 +809,9 @@ describe("A Record whose member can not compare", () => {
 	// is whether a Record in such a scope quietly skips a member whose own `is`
 	// the shadowing Namespace writes. It can not: the shadowing takes the
 	// library's `String` Namespace out of that scope altogether, so `String` is
-	// not Equatable there and the Record is REFUSED — the same answer the member
-	// gets on its own, which is the whole of what decision 2 promises. At the top
-	// level the declaration is `duplicate-variable` and never compiles at all.
+	// not Equatable there and the Record is REFUSED, the same answer the member
+	// gets on its own. At the top level the declaration is `duplicate-variable`
+	// and never compiles at all.
 	it("is refused in a scope that shadows the member's Namespace", () => {
 		let source = `implementation {
 			function borrowers() -> Boolean {
@@ -922,14 +923,11 @@ describe("A Record whose member can not compare", () => {
 })
 
 describe("A Case payload asks its members", () => {
-	// NOTE: DECISION 3 — one rule for every derived composite. A generic
-	// Choice's derived `is` already routed its Type Parameters through the
-	// witnesses a call hands in; a NON-generic one compared every payload
-	// structurally, so `Box#Full({ tag = a })` and `Box#Full({ tag = b })` were
-	// unequal while `Optional<Tag>#Value(a)` and `Optional<Tag>#Value(b)` were
-	// equal. Same rule, one level down: the member is routed through its own
-	// Type's conformance, through the descriptor machinery that was already
-	// there rather than a second one.
+	// NOTE: One rule for every derived composite: it asks its members. A
+	// non-generic Choice's derived `is` routes each payload member through its
+	// own Type's conformance, so `Box#Full({ tag = news })` equals
+	// `Box#Full({ tag = lower })` as `Optional<Tag>#Value(news)` equals
+	// `Optional<Tag>#Value(lower)`.
 	it("compares a non-generic Choice's payload through the member's own is", async () => {
 		expect(
 			await run(`implementation {
@@ -1087,16 +1085,16 @@ describe("A Case payload asks its members", () => {
 		expect(js).toContain("choiceIs")
 	})
 
-	// NOTE: Decision 3's other half. A payload member with no equality means
-	// the Choice derives none, so `namespace Handlers for Handler is Equatable
-	// {}` is refused where it is WRITTEN — `nonconforming-namespace`, the same
-	// Diagnostic a Namespace that declares a conformance and writes none of it
-	// has always had. The call is refused after it, because the bound the
-	// routing put on the derived Method has nothing to bind either.
+	// NOTE: A payload member with no equality means the Choice derives none,
+	// so `namespace Handlers for Handler is Equatable {}` is refused where it
+	// is WRITTEN — `nonconforming-namespace`, the same Diagnostic a Namespace
+	// that declares a conformance and writes none of it has always had. The
+	// call is refused after it, because the bound the routing put on the
+	// derived Method has nothing to bind either.
 	//
 	// RESIDUAL: one mistake, two reports. Both sentences are true and they name
 	// two different edits, but the second is a cascade of the first and the
-	// house rule is one report per mistake. Listed in the report.
+	// house rule is one report per mistake.
 	it("refuses a call whose payload member can not compare", () => {
 		let source = `implementation {
 			choice Handler {
@@ -1140,13 +1138,13 @@ describe("A Case payload asks its members", () => {
 		])
 	})
 
-	// NOTE: RECURSION. The brief expected a self slot here and there is nothing
-	// to build one for: this language refuses a Choice that names itself, and a
-	// generic one that does, and two that name each other — before any
-	// conformance is ever asked about. The router still tells the cycle guard's
-	// refusal from a real one, because a Type Argument could close a loop the
-	// declaration checker never sees; this test is what says the declaration is
-	// refused, so that a reader meeting the NOTE knows why it has no companion.
+	// NOTE: RECURSION. There is no self slot to build: this language refuses a
+	// Choice that names itself, and a generic one that does, and two that name
+	// each other — before any conformance is ever asked about. The router
+	// still tells the cycle guard's refusal from a real one, because a Type
+	// Argument could close a loop the declaration checker never sees; this test
+	// is what says the declaration is refused, so that a reader meeting the
+	// NOTE knows why it has no companion.
 	it("has no recursive Choice to route, because the language has none", () => {
 		expect(
 			codesOf(`implementation {
@@ -1160,9 +1158,8 @@ describe("A Case payload asks its members", () => {
 		).toContain("recursive-type-declaration")
 	})
 
-	// NOTE: And decision 3 reaching the silence a Record's members reach: a
-	// payload member whose conformance can not be CHOSEN was left structural
-	// with nothing said. It is reported here without the sentence naming the
+	// NOTE: And a payload member whose conformance can not be CHOSEN, which is
+	// reported as a Record's member is, but without the sentence naming the
 	// member, which this rail has no name to write — the router is handed a
 	// member's Type and answers a slot, and the walk holding the names describes
 	// the whole Case. What a reader is told about `Tag` is what a direct use of
@@ -1201,7 +1198,7 @@ describe("A Case payload asks its members", () => {
 })
 
 describe("A routed key and the comparison agree", () => {
-	// NOTE: PART C, and it needs no code of its own: `boundConformance` brands a
+	// NOTE: A routed key needs no code of its own: `boundConformance` brands a
 	// witness structural only where the method map says so AND every curried
 	// condition is branded, and a Record that routes has, by construction, a
 	// condition whose witness is not — that is WHY it routes. So the brand can
@@ -1275,7 +1272,8 @@ describe("A routed key and the comparison agree", () => {
 		).toEqual(["true"])
 	})
 
-	// NOTE: And a routed CASE key, which is decision 3 reaching the same place.
+	// NOTE: And a routed CASE key, which a Case payload's routing reaches the
+	// same way.
 	it("finds a routed Case key the same way", async () => {
 		expect(
 			await run(`implementation {

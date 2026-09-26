@@ -384,12 +384,12 @@ ${words}
 	})
 })
 
-// NOTE: Gap analysis A14 — a bounded generic Choice could never be given a
-// Namespace, because the `for` line bound the Namespace's unbounded Parameter
-// to the Choice's requirement and was refused. Every value of `SortedBox<X>`
-// that can exist is already a proof that `X` is Comparable, so the bound is
-// read off the target and holds for every Method, with the witness solved from
-// the receiver at the call exactly as a written per-Method bound's is.
+// NOTE: A Namespace for a bounded generic Choice takes an unbounded Parameter
+// on its `for` line and does not restate the bound. Every value of
+// `SortedBox<X>` that can exist is already a proof that `X` is Comparable, so
+// the bound is read off the target and holds for every Method, with the
+// witness solved from the receiver at the call as a written per-Method
+// bound's is.
 describe("A Namespace for a bounded generic Choice", () => {
 	const sortedBox = `	choice SortedBox<Item is Comparable> {
 		Box { items: List<Item> },

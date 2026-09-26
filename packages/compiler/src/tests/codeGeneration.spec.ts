@@ -1851,7 +1851,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(a::compare(to b))
 			}`)
 
-			// NOTE: R7 — the hidden conformance Parameters follow the Namespace's
+			// NOTE: The hidden conformance Parameters follow the Namespace's
 			// Generic declaration order (Key, then Value), and the call site's
 			// witnesses appear in that same order so they line up.
 			expect(code).toContain(
@@ -2669,7 +2669,7 @@ describe("Code Generation", () => {
 			expect(stdlibPrelude()).toBe(stdlibPrelude())
 		})
 
-		// NOTE: R4 — the standard library's typed Programs are a process-wide
+		// NOTE: The standard library's typed Programs are a process-wide
 		// singleton. Building the prelude must leave them exactly as they were,
 		// or the Language Server and the tests would read the Rewriter's
 		// leavings.
