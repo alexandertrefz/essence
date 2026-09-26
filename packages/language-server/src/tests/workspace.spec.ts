@@ -21,6 +21,7 @@ import { findCompletions } from "../completion"
 import { findHover } from "../hover"
 import { uriOf } from "../server"
 import { createWorkspace, type Workspace } from "../workspace"
+import { applyEdits } from "./textEdits"
 
 // NOTE: A workspace is a directory of files, so these run against a real one.
 // The alternative — an in-memory host — would exercise everything except the
@@ -100,45 +101,6 @@ function spanOf(source: string, line: number, needle: string): common.Position {
 	let start = cursorAt(source, line, needle)
 
 	return { start, end: { line, column: start.column + needle.length } }
-}
-
-// NOTE: A Cursor as an offset into the text, which is what a textual edit is
-// applied by — the same conversion `codeActions.spec.ts` makes, since an
-// assertion on the resulting buffer is what catches an off-by-one in a range.
-function offsetOf(text: string, cursor: common.Cursor): number {
-	let lines = text.split("\n")
-	let offset = 0
-
-	for (let line = 1; line < cursor.line; line++) {
-		offset += (lines[line - 1] as string).length + 1
-	}
-
-	return offset + cursor.column - 1
-}
-
-function sliceUntil(text: string, cursor: common.Cursor): string {
-	return text.slice(0, offsetOf(text, cursor))
-}
-
-function sliceFrom(text: string, cursor: common.Cursor): string {
-	return text.slice(offsetOf(text, cursor))
-}
-
-// NOTE: What a file looks like once an action is applied — an assertion on the
-// resulting text catches an off-by-one in a range that an assertion on the
-// range itself only encodes. Back to front, so that every edit is measured
-// against the text it was computed from.
-function appliedTo(source: string, edits: Array<CodeActionEdit>): string {
-	let text = source
-
-	for (let edit of [...edits].reverse()) {
-		text =
-			text.slice(0, offsetOf(text, edit.range.start)) +
-			edit.newText +
-			text.slice(offsetOf(text, edit.range.end))
-	}
-
-	return text
 }
 
 // NOTE: Applies a workspace rename textually, file by file, so the expectations
@@ -1431,7 +1393,7 @@ describe("Workspace", () => {
 			).find((action) =>
 				action.title.startsWith("Remove the unused import"),
 			) as CodeActionEntry
-			let fixed = appliedTo(source, removal.edits)
+			let fixed = applyEdits(source, removal.edits)
 
 			expect(fixed.split("\n")[1]).toBe(
 				'\tfrom "./Geometry.es" { Rectangle }',
@@ -1473,7 +1435,7 @@ describe("Workspace", () => {
 			).find(
 				(action) => action.diagnosticCode === "duplicate-import",
 			) as CodeActionEntry
-			let fixed = appliedTo(source, removal.edits)
+			let fixed = applyEdits(source, removal.edits)
 
 			expect(fixed.split("\n")[1]).toBe(
 				'\tfrom "./Geometry.es" { Rectangle }',
@@ -1514,7 +1476,7 @@ describe("Workspace", () => {
 				mainPath,
 				workspace,
 			).find((action) => action.diagnosticCode === "duplicate-import")
-			let fixed = appliedTo(source, removal?.edits ?? [])
+			let fixed = applyEdits(source, removal?.edits ?? [])
 
 			expect(removal?.title).toBe(
 				"Remove the duplicate import of 'Rectangle'",
@@ -1695,16 +1657,6 @@ describe("Workspace", () => {
 			).filter((action) => action.kind === "quickfix")
 		}
 
-		function applied(source: string, entry: CodeActionEntry): string {
-			let text = source
-
-			for (let edit of [...entry.edits].reverse()) {
-				text = `${sliceUntil(text, edit.range.start)}${edit.newText}${sliceFrom(text, edit.range.end)}`
-			}
-
-			return text
-		}
-
 		function codesAfter(
 			workspace: Workspace,
 			filePath: string,
@@ -1774,7 +1726,7 @@ describe("Workspace", () => {
 			expect(fix.title).toBe("Import 'Problem' from ./Parser.es")
 			expect(fix.isPreferred).toBe(true)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n").slice(0, 5)).toEqual([
 				"import {",
@@ -1910,7 +1862,7 @@ describe("Workspace", () => {
 
 			expect(fix.title).toBe("Import 'Sized' from ./Sized.es")
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n").slice(0, 7)).toEqual([
 				"import {",
@@ -1947,7 +1899,7 @@ describe("Workspace", () => {
 			expect(fix.diagnosticCode).toBe("self-import")
 			expect(fix.isPreferred).toBe(true)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			// NOTE: The group goes and the section stays, which is what
 			// `removeImportAction` does with the last unused name of one too: an
@@ -1991,7 +1943,7 @@ describe("Workspace", () => {
 			let mainPath = pathOf("Main.es")
 			let source = workspace.sourceOf(mainPath) ?? ""
 			let [fix] = fixesFor(workspace, mainPath, 2, '"./Main.es"')
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
@@ -2024,7 +1976,7 @@ describe("Workspace", () => {
 			expect(fix.title).toBe("Write 'thing' as a bare entry")
 			expect(fix.isPreferred).toBe(false)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result).toBe(
 				[
@@ -2066,7 +2018,7 @@ describe("Workspace", () => {
 
 			expect(fix.title).toBe("Write the names as bare entries")
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result).toContain("\tthing as first\n\tother\n")
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
@@ -2097,7 +2049,7 @@ describe("Workspace", () => {
 			// hedges — so the reader applies it rather than the Editor.
 			expect(fix.isPreferred).toBe(false)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
@@ -2125,7 +2077,7 @@ describe("Workspace", () => {
 			expect(fix.title).toBe("Write './Other.es'")
 			expect(fix.isPreferred).toBe(true)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
@@ -2175,7 +2127,7 @@ describe("Workspace", () => {
 			// `constant-reassignment` the moment this lands.
 			expect(fix.isPreferred).toBe(false)
 
-			let result = applied(source, fix)
+			let result = applyEdits(source, fix.edits)
 
 			expect(result.split("\n")[1]).toBe("\tconstant counter = 1")
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
@@ -2274,7 +2226,7 @@ describe("Workspace", () => {
 			expect(action.diagnosticCode).toBeNull()
 			expect(action.isPreferred).toBe(false)
 
-			let result = appliedTo(
+			let result = applyEdits(
 				workspace.sourceOf(mainPath) ?? "",
 				action.edits,
 			)
@@ -2327,7 +2279,7 @@ describe("Workspace", () => {
 
 			let mainPath = pathOf("Main.es")
 			let action = organizeAction(workspace, mainPath) as CodeActionEntry
-			let result = appliedTo(
+			let result = applyEdits(
 				workspace.sourceOf(mainPath) ?? "",
 				action.edits,
 			)
@@ -2371,7 +2323,7 @@ describe("Workspace", () => {
 
 			let mainPath = pathOf("Main.es")
 			let action = organizeAction(workspace, mainPath) as CodeActionEntry
-			let result = appliedTo(
+			let result = applyEdits(
 				workspace.sourceOf(mainPath) ?? "",
 				action.edits,
 			)
@@ -2416,7 +2368,7 @@ describe("Workspace", () => {
 
 			let mainPath = pathOf("Main.es")
 			let action = organizeAction(workspace, mainPath) as CodeActionEntry
-			let result = appliedTo(
+			let result = applyEdits(
 				workspace.sourceOf(mainPath) ?? "",
 				action.edits,
 			)
@@ -2514,41 +2466,6 @@ describe("Workspace", () => {
 			}
 
 			return result
-		}
-
-		// NOTE: Back to front, so that every edit is applied at the offset it was
-		// computed for. The action's own order says nothing — an action that
-		// deletes an entry and writes it somewhere else hands both over as it
-		// found them.
-		function applyEdits(
-			text: string,
-			edits: Array<CodeActionEdit>,
-		): string {
-			let ordered = [...edits].sort(
-				(left, right) =>
-					offsetOf(text, right.range.start) -
-					offsetOf(text, left.range.start),
-			)
-
-			for (let edit of ordered) {
-				text =
-					text.slice(0, offsetOf(text, edit.range.start)) +
-					edit.newText +
-					text.slice(offsetOf(text, edit.range.end))
-			}
-
-			return text
-		}
-
-		function offsetOf(text: string, cursor: common.Cursor): number {
-			let lines = text.split("\n")
-			let offset = 0
-
-			for (let line = 1; line < cursor.line; line++) {
-				offset += (lines[line - 1] ?? "").length + 1
-			}
-
-			return offset + cursor.column - 1
 		}
 
 		// NOTE: The workspace with the action's result written back to disk,

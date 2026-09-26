@@ -69,6 +69,7 @@ import {
 	makeSessionWorkspace,
 	startSession,
 } from "./lspSession"
+import { applyEdits } from "./textEdits"
 
 describe("LSP", () => {
 	describe("analyse", () => {
@@ -1296,33 +1297,23 @@ describe("Code Actions for a client that can apply less", () => {
 })
 
 // NOTE: A list of protocol TextEdits applied to a buffer. The protocol counts
-// lines and characters from zero and requires the edits not to overlap, so they
-// are applied from the back and nothing has to be shifted.
+// lines and characters from zero, and the applier reads one-based Cursors.
 function applyLspEdits(text: string, edits: Array<TextEdit>): string {
-	let lines = text.split("\n")
-	let offsetOf = (position: { line: number; character: number }): number => {
-		let offset = 0
+	let cursorOf = (position: { line: number; character: number }) => ({
+		line: position.line + 1,
+		column: position.character + 1,
+	})
 
-		for (let line = 0; line < position.line; line++) {
-			offset += (lines[line] as string).length + 1
-		}
-
-		return offset + position.character
-	}
-
-	let sorted = [...edits].sort(
-		(a, b) => offsetOf(b.range.start) - offsetOf(a.range.start),
+	return applyEdits(
+		text,
+		edits.map((edit) => ({
+			range: {
+				start: cursorOf(edit.range.start),
+				end: cursorOf(edit.range.end),
+			},
+			newText: edit.newText,
+		})),
 	)
-	let written = text
-
-	for (let edit of sorted) {
-		written =
-			written.slice(0, offsetOf(edit.range.start)) +
-			edit.newText +
-			written.slice(offsetOf(edit.range.end))
-	}
-
-	return written
 }
 
 // NOTE: `essence.json` reaches this Server because the extension's document

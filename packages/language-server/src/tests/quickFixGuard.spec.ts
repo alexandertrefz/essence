@@ -21,6 +21,7 @@ import {
 	findCodeActions,
 } from "../codeActions"
 import { createWorkspace } from "../workspace"
+import { applyEdits } from "./textEdits"
 
 let madeFolders: Array<string> = []
 
@@ -320,47 +321,6 @@ function allowanceFor(entry: CodeActionEntry): Allowance | undefined {
 	}
 
 	return found
-}
-
-function offsetOf(text: string, cursor: common.Cursor): number {
-	let lines = text.split("\n")
-	let offset = 0
-
-	for (let line = 1; line < cursor.line; line++) {
-		offset += (lines[line - 1] as string).length + 1
-	}
-
-	return offset + cursor.column - 1
-}
-
-// NOTE: Spans are measured against the original text and written in position
-// order, since an action's own order means nothing; insertions at one point
-// keep the order listed, ahead of a replacement that starts there.
-function applyEdits(text: string, edits: Array<CodeActionEdit>): string {
-	let spans = edits
-		.map((edit) => ({
-			start: offsetOf(text, edit.range.start),
-			end: offsetOf(text, edit.range.end),
-			newText: edit.newText,
-		}))
-		.sort(
-			(left, right) =>
-				left.start - right.start ||
-				Number(left.end > left.start) - Number(right.end > right.start),
-		)
-	let result = ""
-	let cursor = 0
-
-	for (let span of spans) {
-		if (span.start < cursor) {
-			throw new Error(`overlapping edits at offset ${span.start}`)
-		}
-
-		result += text.slice(cursor, span.start) + span.newText
-		cursor = span.end
-	}
-
-	return result + text.slice(cursor)
 }
 
 // NOTE: A Diagnostic as the identity a loop is measured by: the same code, the
@@ -1150,51 +1110,5 @@ describe("The guard itself", () => {
 			"(iv) the error count rose from 1 to 2 in round 1, along Change to 'greeting' → Change to 'greeting'",
 			"(iv) the report count rose from 1 to 2 in round 1, along Change to 'greeting' → Change to 'greeting'",
 		])
-	})
-})
-
-describe("The edit applier", () => {
-	let text = "one two three"
-	let first: CodeActionEdit = {
-		range: { start: { line: 1, column: 1 }, end: { line: 1, column: 4 } },
-		newText: "1",
-	}
-	let last: CodeActionEdit = {
-		range: {
-			start: { line: 1, column: 9 },
-			end: { line: 1, column: 14 },
-		},
-		newText: "3",
-	}
-
-	it("applies an action's edits the same in whatever order it lists them", () => {
-		expect(applyEdits(text, [first, last])).toBe("1 two 3")
-		expect(applyEdits(text, [last, first])).toBe("1 two 3")
-	})
-
-	it("writes insertions at one point in the order the action lists them", () => {
-		let at = last.range.start
-
-		expect(
-			applyEdits(text, [
-				last,
-				{ range: { start: at, end: at }, newText: "a " },
-				{ range: { start: at, end: at }, newText: "b " },
-			]),
-		).toBe("one two a b 3")
-	})
-
-	it("refuses edits that overlap", () => {
-		let across: CodeActionEdit = {
-			range: {
-				start: { line: 1, column: 3 },
-				end: { line: 1, column: 6 },
-			},
-			newText: "",
-		}
-
-		expect(() => applyEdits(text, [first, across])).toThrow(
-			"overlapping edits",
-		)
 	})
 })

@@ -20,6 +20,7 @@ import {
 import { findSelectionRanges } from "../selectionRanges"
 import { findSemanticTokens } from "../semanticTokens"
 import { findSignatureHelp } from "../signatureHelp"
+import { applyEdits } from "./textEdits"
 
 // NOTE: What an editor answers over the third written container. A Dictionary
 // reaches every walk in the Language Server through a Node kind none of them
@@ -131,9 +132,8 @@ function spanOf(diagnostic: common.Diagnostic): string {
 }
 
 // NOTE: Every `wrong-update-brackets` Quick Fix a document offers, and the
-// document with them applied — last edit first, so an earlier one does not move
-// a later one's columns. What a Quick Fix is worth is the TEXT it leaves, and a
-// title alone says nothing about that.
+// document with them applied. What a Quick Fix is worth is the TEXT it leaves,
+// and a title alone says nothing about that.
 function actionsFor(source: string) {
 	let { enriched } = programs(source)
 	let [diagnostic] = enriched.diagnostics.filter(
@@ -147,26 +147,14 @@ function applied(
 	source: string,
 	actions: ReturnType<typeof findCodeActions>,
 ): string {
-	let lines = source.split("\n")
-	let edits = actions
-		.filter((action) => action.diagnosticCode === "wrong-update-brackets")
-		.flatMap((action) => action.edits)
-		.sort(
-			(a, b) =>
-				b.range.start.line - a.range.start.line ||
-				b.range.start.column - a.range.start.column,
-		)
-
-	for (let edit of edits) {
-		let index = edit.range.start.line - 1
-
-		lines[index] =
-			lines[index].slice(0, edit.range.start.column - 1) +
-			edit.newText +
-			lines[index].slice(edit.range.end.column - 1)
-	}
-
-	return lines.join("\n")
+	return applyEdits(
+		source,
+		actions
+			.filter(
+				(action) => action.diagnosticCode === "wrong-update-brackets",
+			)
+			.flatMap((action) => action.edits),
+	)
 }
 
 function textOf(source: string, span: string): string {

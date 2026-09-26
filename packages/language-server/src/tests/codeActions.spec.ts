@@ -42,6 +42,7 @@ import {
 } from "../codeActions/shorthandFixes"
 import { mergeModifierAction } from "../codeActions/testFixes"
 import { typedExpressionAt } from "../codeActions/typedLookups"
+import { applyEdits } from "./textEdits"
 
 // NOTE: Fixtures are joined line arrays with literal `\t`, so an assertion on
 // an inserted arm's indentation is an assertion on the exact characters —
@@ -88,16 +89,7 @@ function unknownCaseFixes(lines: Array<string>): Array<CodeActionEntry> {
 // on the resulting text catches an off-by-one in a range that an assertion on
 // the range itself only encodes.
 function applied(lines: Array<string>, entry: CodeActionEntry): Array<string> {
-	let text = lines.join("\n")
-
-	for (let edit of [...entry.edits].reverse()) {
-		text = `${sliceUntil(text, edit.range.start)}${edit.newText}${sliceFrom(
-			text,
-			edit.range.end,
-		)}`
-	}
-
-	return text.split("\n")
+	return applyEdits(lines.join("\n"), entry.edits).split("\n")
 }
 
 // NOTE: What the Compiler makes of the buffer the action produced — the only
@@ -169,25 +161,6 @@ function staleDiagnostic(
 // generator below has to leave behind.
 function refusalOf(lines: Array<string>): unknown {
 	return format(lines.join("\n")).refusal
-}
-
-function offsetOf(text: string, cursor: common.Cursor): number {
-	let lines = text.split("\n")
-	let offset = 0
-
-	for (let line = 1; line < cursor.line; line++) {
-		offset += (lines[line - 1] as string).length + 1
-	}
-
-	return offset + cursor.column - 1
-}
-
-function sliceUntil(text: string, cursor: common.Cursor): string {
-	return text.slice(0, offsetOf(text, cursor))
-}
-
-function sliceFrom(text: string, cursor: common.Cursor): string {
-	return text.slice(offsetOf(text, cursor))
 }
 
 // NOTE: The URI a refactoring needs to hand its rename command a document. Any
