@@ -63,7 +63,7 @@ resolves inside an Astro build.
 |---|---|
 | `docsExamples.spec.ts` | every Essence block on every page compiles as `essence check` compiles it, is byte-identical to `essence format`'s output, and prints what its `§ …` comments say |
 | `diagnosticCodes.spec.ts` | `/docs/reference/diagnostics` has one entry per `DiagnosticCode`, and none for a code that is gone |
-| `diagnosticReports.spec.ts` | every report `/docs/reference/diagnostics` quotes under the name of a showcase in `packages/fixtures/files/diagnostics/` is the report that showcase gives today, and no report a showcase gives is quoted under another name |
+| `diagnosticReports.spec.ts` | only the reports `/docs/reference/diagnostics` copies from a single-file showcase at the top of `packages/fixtures/files/diagnostics/`: each is quoted under that showcase's name and is the report that showcase gives today |
 | `optimisationPasses.spec.ts` | `/docs/reference/optimisations` lists every pass, in the order they run |
 | `cliHelp.spec.ts` | `/docs/reference/cli` has one entry per flag an `essence help` screen lists, and every address a screen prints is a page |
 | `projectSchema.spec.ts` | the served JSON Schema, one `/docs/reference/project-file` entry per setting, and the file `essence init` writes as two pages show it |
