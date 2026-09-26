@@ -4,6 +4,7 @@ import mdx from "@astrojs/mdx"
 import { defineConfig } from "astro/config"
 
 import { readSampleMarker } from "./src/lib/samples.ts"
+import { SITE_URL } from "./src/lib/site.ts"
 
 // NOTE: Read rather than `import … with { type: "json" }` so the grammar stays
 // a plain file read — the TextMate grammar lives in another package and is the
@@ -27,7 +28,7 @@ let essenceDark = readJson("./src/lib/shiki/essence-dark.json")
 let sampleFiles = new WeakMap<object, string>()
 
 export default defineConfig({
-	site: "https://essencelang.org",
+	site: SITE_URL,
 	output: "static",
 
 	// NOTE: A port of its own, and a refusal to drift off it. Astro's default
