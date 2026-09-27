@@ -50,6 +50,7 @@ import {
 	reducedRationalSpelling,
 	refinementInside,
 } from "../helpers/predicateEval"
+import { typedBodyNamespaceReaches } from "../helpers/providedReach"
 import { closestMatch, editDistance } from "../helpers/suggest"
 import {
 	answersForBase,
@@ -132,6 +133,7 @@ import {
 	recordValueTypeOf,
 	parameterDocumentation,
 	reportDocumentationParameters,
+	reportProvidedBodyReaches,
 	resolvedDocumentation,
 	resolveAliasedType,
 	resolveChoiceDeclarationStatementType,
@@ -7879,6 +7881,18 @@ function enrichProtocolDeclarationStatement(
 		declareProtocolInScope(node.name, protocolType, scope)
 	}
 
+	let methods = enrichProvidedMethods(node, protocolType, scope)
+
+	for (let method of Object.values(methods)) {
+		if (method.nodeType === "SimpleMethod") {
+			reportProvidedBodyReaches(
+				typedBodyNamespaceReaches(method.method),
+				protocolType.identity,
+				scope,
+			)
+		}
+	}
+
 	return {
 		nodeType: "ProtocolDeclarationStatement",
 		// NOTE: A Protocol is not a Type, so its name carries no Type of its
@@ -7889,7 +7903,7 @@ function enrichProtocolDeclarationStatement(
 			name: clause.protocol.content,
 			position: clause.protocol.position,
 		})),
-		methods: enrichProvidedMethods(node, protocolType, scope),
+		methods,
 		position: node.position,
 		headPosition: headPositionOf(node.position, [
 			node.name.position,

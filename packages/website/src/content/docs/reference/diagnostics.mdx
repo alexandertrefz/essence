@@ -4892,7 +4892,7 @@ Taught on: [Protocols › One bound per type parameter](/docs/language/protocols
 
 ### `provided-method-out-of-reach`
 
-**Error.** A provided method's body names something the program declares, such as a constant. A provided method can reach only the standard library.
+**Error.** A provided method's body reaches something the program declares: it names it, such as a constant, calls a method of the program's namespace on a value, or needs a conformance the program's namespace declares. A provided method can reach only the standard library.
 
 <div class="error-output">
 
@@ -4918,6 +4918,8 @@ Error: 'limit' can not be read from a provided Method
 </div>
 
 Add a requirement that the body calls on `@`, and let each conforming namespace supply the value.
+
+A call such as `@::size()::shout()`, where the program's `namespace Helpers for Integer` declares `shout`, is reported as "'shout' can not be called from a provided Method", labelled "this calls the 'shout' that 'Helpers' declares". A conformance the body needs is reported by the namespace that declares it: a string hole holding a value whose `Printable` conformance the program's `Boxes` declares is "'Boxes' can not be reached from a provided Method", labelled "this needs the 'Printable' conformance that 'Boxes' declares". Both take the same Note, and a Help that moves the call into each conforming namespace.
 
 Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
 

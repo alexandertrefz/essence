@@ -694,6 +694,283 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["provided-method-out-of-reach"])
 		})
 
+		// NOTE: The body writes no name the Program declares, and its emission
+		// still reads `Helpers.shout`.
+		it("should refuse a call of a Method a Namespace the Program declares", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Helpers for Integer {",
+				'\t\tshout() -> String { <- "H{@}" }',
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::size()::shout()",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["provided-method-out-of-reach"])
+			expect(messagesOf(source)).toEqual([
+				"'shout' can not be called from a provided Method",
+			])
+			expect(labelsOf(source)).toEqual([
+				"this calls the 'shout' that 'Helpers' declares",
+			])
+			expect(notesOf(source)).toEqual([
+				"A provided Method is emitted once, above every Program that reaches 'Sized', so its body can reach the standard library and nothing the Program declares.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Give 'Sized' a requirement the body calls on '@' in place of this call, and let each conforming Namespace call 'shout'.",
+			])
+		})
+
+		it("should name every Namespace a Union receiver may run the call off", () => {
+			expect(
+				labelsOf(
+					[
+						"implementation {",
+						"\ttype Box = { n: Integer }",
+						"",
+						"\tnamespace Boxes for Box {",
+						'\t\tshout() -> String { <- "box" }',
+						"\t}",
+						"",
+						"\tnamespace Texts for String {",
+						'\t\tshout() -> String { <- "text" }',
+						"\t}",
+						"",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						"\t\t\tconstant value: Box | String = { n = @::size() }",
+						"",
+						"\t\t\t<- value::shout()",
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				"this calls the 'shout' that 'Boxes' and 'Texts' declare",
+			])
+		})
+
+		it("should refuse a witness a Namespace the Program declares answers", () => {
+			let source = [
+				"implementation {",
+				"\ttype Box = { n: Integer }",
+				"",
+				"\tnamespace Boxes for Box is Printable {",
+				'\t\ttoString() -> String { <- "box" }',
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\tconstant box: Box = { n = @::size() }",
+				"",
+				'\t\t\t<- "held {box}"',
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["provided-method-out-of-reach"])
+			expect(messagesOf(source)).toEqual([
+				"'Boxes' can not be reached from a provided Method",
+			])
+			expect(labelsOf(source)).toEqual([
+				"this needs the 'Printable' conformance that 'Boxes' declares",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Give 'Sized' a requirement the body calls on '@' in place of this, and let each conforming Namespace write it.",
+			])
+		})
+
+		it("should refuse its own Protocol's conformance for a written value", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "size {@::size()}"',
+				"\t\t}",
+				"",
+				"\t\tcompared() -> String {",
+				'\t\t\t<- "{@::describe()} {7::describe()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace IntegerSized for Integer is Sized {",
+				"\t\tsize() -> Integer { <- @ }",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(messagesOf(source)).toEqual([
+				"'IntegerSized' can not be reached from a provided Method",
+			])
+			expect(labelsOf(source)).toEqual([
+				"this needs the 'Sized' conformance that 'IntegerSized' declares",
+			])
+		})
+
+		// NOTE: A witness names its Namespace once for each Method in its map, and
+		// `IntegerTagged` writes none.
+		it("should accept a witness whose Methods are all provided", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Tagged {",
+						'\t\ttag() -> String { <- "t" }',
+						"\t}",
+						"",
+						"\tnamespace IntegerTagged for Integer is Tagged {}",
+						"",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "{@::size()::tag()} {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace IntegerSized for Integer is Sized {",
+						"\t\tsize() -> Integer { <- @ }",
+						"\t}",
+						"",
+						"\tTerminal.inspect(3::describe())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"t 3"'])
+		})
+
+		it("should accept a Namespace the body declares itself", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tnamespace Helpers for Integer {",
+						'\t\tshout() -> String { <- "outer" }',
+						"\t}",
+						"",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						"\t\t\tnamespace Helpers for Integer {",
+						'\t\t\t\tshout() -> String { <- "inner" }',
+						"\t\t\t}",
+						"",
+						"\t\t\t<- @::size()::shout()",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace IntegerSized for Integer is Sized {",
+						"\t\tsize() -> Integer { <- @ }",
+						"\t}",
+						"",
+						"\tTerminal.inspect(3::describe())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"inner"'])
+		})
+
+		// NOTE: The `Helpers` the `if` branch declares is a class of that branch,
+		// so the `else` branch still reads the Program's.
+		it("should refuse a call beside a block declaring a Namespace of its name", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Helpers for Integer {",
+				'\t\tshout() -> String { <- "outer" }',
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\tif @::size()::isGreaterThan(100) {",
+				"\t\t\t\tnamespace Helpers for String {",
+				'\t\t\t\t\twhisper() -> String { <- "inner" }',
+				"\t\t\t\t}",
+				"",
+				'\t\t\t\t<- "a"::whisper()',
+				"\t\t\t} else {",
+				"\t\t\t\t<- @::size()::shout()",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["provided-method-out-of-reach"])
+			expect(labelsOf(source)).toEqual([
+				"this calls the 'shout' that 'Helpers' declares",
+			])
+		})
+
+		it("should accept a Namespace a block around the call declares", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\ttype Box = { n: Integer }",
+						"",
+						"\tnamespace Helpers for Integer {",
+						'\t\tshout() -> String { <- "outer" }',
+						"\t}",
+						"",
+						"\tnamespace Boxes for Box is Printable {",
+						'\t\ttoString() -> String { <- "outer" }',
+						"\t}",
+						"",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						"\t\t\tnamespace Helpers for Integer {",
+						'\t\t\t\twhisper() -> String { <- "inner{@}" }',
+						"\t\t\t}",
+						"",
+						"\t\t\tconstant size = @::size()",
+						"\t\t\tconstant whispered = () -> String {",
+						"\t\t\t\t<- size::whisper()",
+						"\t\t\t}",
+						"\t\t\tconstant boxed = (_ n: Integer) -> String {",
+						"\t\t\t\tnamespace Boxes for Box is Printable {",
+						'\t\t\t\t\ttoString() -> String { <- "box{@.n}" }',
+						"\t\t\t\t}",
+						"",
+						"\t\t\t\tconstant box: Box = { n = n }",
+						"",
+						'\t\t\t\t<- "{box}"',
+						"\t\t\t}",
+						"",
+						'\t\t\t<- "{whispered()} {boxed(size)}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace IntegerSized for Integer is Sized {",
+						"\t\tsize() -> Integer { <- @ }",
+						"\t}",
+						"",
+						"\tTerminal.inspect(3::describe())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"inner3 box3"'])
+		})
+
 		it("should accept a read of the standard library, which is emitted above it too", () => {
 			expect(
 				diagnosticsOf(

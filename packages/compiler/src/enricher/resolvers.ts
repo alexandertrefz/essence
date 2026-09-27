@@ -51,6 +51,7 @@ import {
 	conformanceParameterName,
 	parameterInternalName,
 } from "../helpers/names"
+import { type NamespaceReach } from "../helpers/providedReach"
 import { closestMatch } from "../helpers/suggest"
 import {
 	applyGenericBindings,
@@ -1258,6 +1259,139 @@ function reportProvidedMethodOutOfReach(
 			],
 		},
 	)
+}
+
+// NOTE: `provided-method-out-of-reach` for what the emitted body names and the
+// body never writes: a Method of a Namespace the Program declares, called on a
+// value or built into a witness a call in the body needs.
+export function reportProvidedBodyReaches(
+	reaches: Array<NamespaceReach>,
+	protocolIdentity: string,
+	scope: enricher.Scope,
+): void {
+	// NOTE: One report for each call, naming every Namespace a Union receiver
+	// may run it off.
+	let groups = new Map<
+		string,
+		{
+			reach: NamespaceReach
+			namespaces: Array<string>
+			declared: Array<common.DiagnosticLabel>
+		}
+	>()
+
+	for (let reach of reaches) {
+		let declaringScope = programNamespaceScope(reach.namespace, scope)
+
+		if (declaringScope === null) {
+			continue
+		}
+
+		let { line, column } = reach.position.start
+		let key = `${reach.kind === "call" ? reach.member : reach.namespace} ${line}:${column}`
+		let group = groups.get(key) ?? { reach, namespaces: [], declared: [] }
+		let declaration = declaringScope.declarations[reach.namespace]
+
+		groups.set(key, group)
+
+		if (!group.namespaces.includes(reach.namespace)) {
+			group.namespaces.push(reach.namespace)
+			group.declared.push(
+				...(declaration === undefined
+					? []
+					: [
+							secondary(
+								declaration,
+								`'${reach.namespace}' is declared here`,
+							),
+						]),
+			)
+		}
+	}
+
+	let protocol = describeProtocol(protocolIdentity, scope)
+	let note = `A provided Method is emitted once, above every Program that reaches '${protocol}', so its body can reach the standard library and nothing the Program declares.`
+
+	for (let { reach, namespaces, declared } of groups.values()) {
+		if (reach.kind === "call") {
+			let names = namespaces.map((name) => `'${name}'`)
+			let declaring =
+				names.length === 1
+					? `${names[0]} declares`
+					: `${names.slice(0, -1).join(", ")} and ${names.at(-1)} declare`
+
+			reportError(
+				`'${reach.member}' can not be called from a provided Method`,
+				reach.position,
+				{
+					code: "provided-method-out-of-reach",
+					labels: [
+						primary(
+							reach.position,
+							`this calls the '${reach.member}' that ${declaring}`,
+						),
+						...declared,
+					],
+					notes: [note],
+					helps: [
+						`Give '${protocol}' a requirement the body calls on '@' in place of this call, and let each conforming Namespace call '${reach.member}'.`,
+					],
+				},
+			)
+		} else {
+			reportError(
+				`'${reach.namespace}' can not be reached from a provided Method`,
+				reach.position,
+				{
+					code: "provided-method-out-of-reach",
+					labels: [
+						primary(
+							reach.position,
+							`this needs the '${describeProtocol(reach.protocol, scope)}' conformance that '${reach.namespace}' declares`,
+						),
+						...declared,
+					],
+					notes: [note],
+					helps: [
+						`Give '${protocol}' a requirement the body calls on '@' in place of this, and let each conforming Namespace write it.`,
+					],
+				},
+			)
+		}
+	}
+}
+
+// NOTE: The Scope that binds a Namespace name to a Namespace the Program
+// declares or imports, or null where the name is the prelude's or no Namespace.
+// The standard library's own load has no prelude snapshot, and reaches nothing.
+function programNamespaceScope(
+	name: string,
+	scope: enricher.Scope,
+): enricher.Scope | null {
+	let declaringScope: enricher.Scope | null = null
+	let hasPrelude = false
+
+	for (
+		let searchScope: enricher.Scope | null = scope;
+		searchScope !== null;
+		searchScope = searchScope.parent
+	) {
+		if (
+			declaringScope === null &&
+			Object.hasOwn(searchScope.members, name)
+		) {
+			declaringScope = searchScope
+		}
+
+		hasPrelude ||= searchScope.preludeNames !== undefined
+	}
+
+	return declaringScope === null ||
+		!hasPrelude ||
+		declaringScope.members[name]?.type !== "Namespace" ||
+		declaringScope.preludeNames?.has(name) === true
+		? null
+		: declaringScope
 }
 
 // NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup

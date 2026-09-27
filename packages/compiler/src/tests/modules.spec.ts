@@ -4221,6 +4221,658 @@ export { standardHeaders }
 	})
 })
 
+// NOTE: A provided Method is emitted once, in the bundle's band above every
+// Module, where no Namespace a Module declares or imports is bound.
+describe("What a provided body reaches", () => {
+	function refusalsIn(
+		files: Record<string, string>,
+		name: string,
+	): Array<[string, string, number | undefined]> {
+		return withProject(files, (directory) =>
+			analysedAt(directory, "Main.es", name).map((diagnostic) => [
+				diagnostic.code,
+				diagnostic.message,
+				diagnostic.position?.start.line,
+			]),
+		)
+	}
+
+	const helpersModule = `implementation {
+	namespace Helpers for Integer {
+		shout() -> String {
+			<- "H{@}"
+		}
+	}
+}
+
+export {
+	Helpers
+}
+`
+
+	const shoutingModule = `import {
+	from "./A.es" { Helpers }
+}
+
+implementation {
+	protocol Shouted {
+		size() -> Integer
+
+		describe() -> String {
+			<- @::size()::shout()
+		}
+	}
+}
+
+export {
+	Shouted
+}
+`
+
+	const shoutedMain = (imports: string, statements: string) => `import {
+	${imports}
+}
+
+implementation {
+	namespace IntegerShouted for Integer is Shouted {
+		size() -> Integer {
+			<- @::add(1)
+		}
+	}
+
+	${statements}
+}
+`
+
+	it("refuses a body calling a Method of a Namespace its Module imports or declares", () => {
+		expect(
+			refusalsIn(
+				{
+					"A.es": helpersModule,
+					"B.es": shoutingModule,
+					"Main.es": shoutedMain(
+						'from "./B.es" { Shouted }',
+						"Terminal.print(3::describe())",
+					),
+				},
+				"B.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				10,
+			],
+		])
+		expect(
+			refusalsIn(
+				{
+					"A.es": helpersModule,
+					"B.es": shoutingModule,
+					"Main.es": shoutedMain(
+						'from "./A.es" { Helpers }\n\tfrom "./B.es" { Shouted }',
+						"Terminal.print(3::describe())\n\tTerminal.print(4::shout())",
+					),
+				},
+				"B.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				10,
+			],
+		])
+		expect(
+			refusalsIn(
+				{
+					"B.es": `implementation {
+	namespace Helpers for Integer {
+		shout() -> String {
+			<- "H{@}"
+		}
+	}
+
+	protocol Shouted {
+		size() -> Integer
+
+		describe() -> String {
+			<- @::size()::shout()
+		}
+	}
+}
+
+export {
+	Shouted
+}
+`,
+					"Main.es": shoutedMain(
+						'from "./B.es" { Shouted }',
+						"Terminal.print(3::describe())",
+					),
+				},
+				"B.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				12,
+			],
+		])
+	})
+
+	// NOTE: `X`'s body answers `R`'s `m() -> String` with an Integer, so `Y`'s
+	// is the one that fulfils it.
+	const fulfillingProtocols = `protocol X {
+		m() -> Integer {
+			<- 7
+		}
+	}
+
+	protocol R {
+		m() -> String
+	}
+
+	namespace IntegerAll for Integer is X, is Y, is R {
+		size() -> Integer {
+			<- @::add(1)
+		}
+	}
+
+	function viaR <infer T is R>(_ t: T) -> String {
+		<- t::m()
+	}
+
+	Terminal.print(viaR(3))`
+
+	const yBody = `protocol Y {
+		size() -> Integer
+
+		m() -> String {
+			<- @::size()::shout()
+		}
+	}`
+
+	it("refuses the body that fulfils a requirement where it calls a Namespace of its Module", () => {
+		expect(
+			refusalsIn(
+				{
+					"Main.es": `implementation {
+	namespace Helpers for Integer {
+		shout() -> String {
+			<- "H{@}"
+		}
+	}
+
+	${yBody}
+
+	${fulfillingProtocols}
+}
+`,
+				},
+				"Main.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				12,
+			],
+		])
+	})
+
+	it("refuses that body where another Module declares it", () => {
+		let files = {
+			"A.es": helpersModule,
+			"B.es": `import {
+	from "./A.es" { Helpers }
+}
+
+implementation {
+	${yBody}
+}
+
+export {
+	Y
+}
+`,
+			"Main.es": `import {
+	from "./B.es" { Y }
+}
+
+implementation {
+	${fulfillingProtocols}
+}
+`,
+		}
+
+		expect(refusalsIn(files, "B.es")).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				10,
+			],
+		])
+		expect(refusalsIn(files, "Main.es").map(([code]) => code)).toEqual([
+			"dependency-has-errors",
+		])
+	})
+
+	it("refuses the body its own witness runs where it calls an imported Namespace", () => {
+		expect(
+			refusalsIn(
+				{
+					"A.es": `implementation {
+	namespace Helpers for Integer {
+		twice() -> Integer {
+			<- @::multiply(with 2)
+		}
+	}
+}
+
+export {
+	Helpers
+}
+`,
+					"B.es": `import {
+	from "./A.es" { Helpers }
+}
+
+implementation {
+	protocol Y {
+		k() -> Integer {
+			<- 21::twice()
+		}
+	}
+}
+
+export {
+	Y
+}
+`,
+					"Main.es": `import {
+	from "./B.es" { Y }
+}
+
+implementation {
+	protocol X {
+		k() -> Number {
+			<- 7
+		}
+	}
+
+	protocol S {
+		k() -> Number
+		describe() -> String
+	}
+
+	protocol Own {
+		k() -> Integer
+
+		describe() -> String {
+			<- "own {@::k()}"
+		}
+	}
+
+	namespace IntegerAll for Integer is X, is Y, is S, is Own {}
+
+	function viaS <infer T is S>(_ t: T) -> String {
+		<- "{t::k()} {t::describe()}"
+	}
+
+	Terminal.print(viaS(3))
+}
+`,
+				},
+				"B.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'twice' can not be called from a provided Method",
+				8,
+			],
+		])
+	})
+
+	it("refuses a body handing its witness to a Method of a generic Namespace", () => {
+		expect(
+			refusalsIn(
+				{
+					"Main.es": `implementation {
+	protocol Tagged {
+		tag() -> String
+	}
+
+	protocol Sized {
+		describe() -> String
+	}
+
+	protocol Listed is Tagged {
+		describe() -> String {
+			<- [@, @]::tagAll()
+		}
+	}
+
+	namespace Lists<infer Item> for List<Item> {
+		tagAll<Item is Tagged>() -> String {
+			<- @::map((_ i: Item) -> String { <- i::tag() })::join(with "+")
+		}
+	}
+
+	namespace IntegerL for Integer is Sized, is Listed {
+		tag() -> String {
+			<- "t{@}"
+		}
+	}
+
+	function gauge <infer T is Sized>(_ t: T) -> String {
+		<- t::describe()
+	}
+
+	Terminal.print(gauge(4))
+}
+`,
+				},
+				"Main.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'tagAll' can not be called from a provided Method",
+				12,
+			],
+		])
+	})
+
+	it("refuses a Function literal in a body calling a Namespace of its Module", () => {
+		expect(
+			refusalsIn(
+				{
+					"B.es": `implementation {
+	protocol Z {
+		zv() -> Integer
+	}
+
+	namespace IntegerZ for Integer is Z {
+		zv() -> Integer {
+			<- @::add(100)
+		}
+	}
+
+	protocol P {
+		size() -> Integer
+
+		describe() -> String {
+			<- "{@::size()} {[3]::map((_ i: Integer) -> Integer { <- i::zv() })}"
+		}
+	}
+}
+
+export {
+	P
+}
+`,
+					"Main.es": `import {
+	from "./B.es" { P }
+}
+
+implementation {
+	namespace IntegerP for Integer is P {
+		size() -> Integer {
+			<- @::add(1)
+		}
+	}
+
+	Terminal.print(3::describe())
+}
+`,
+				},
+				"B.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'zv' can not be called from a provided Method",
+				16,
+			],
+		])
+	})
+
+	it("refuses a body calling a Namespace another Module declares, in a cycle or not", () => {
+		let a = (imports: string) => `${imports}implementation {
+	namespace ShowB<infer Item> for NonEmptyList<Item> {
+		show<Item is Printable>() -> String {
+			<- "B{@::firstItem()}"
+		}
+	}
+}
+
+export {
+	ShowB
+}
+`
+		let files = (imports: string) => ({
+			"A.es": a(imports),
+			"B.es": `import {
+	from "./A.es" { ShowB }
+}
+
+implementation {
+	protocol P is Printable {
+		describe() -> String {
+			<- [@]::show()
+		}
+	}
+}
+
+export {
+	P
+}
+`,
+			"Main.es": `import {
+	from "./B.es" { P }
+}
+
+implementation {
+	type Box = { n: Integer }
+
+	namespace Boxes for Box is P {
+		toString() -> String {
+			<- "box"
+		}
+	}
+
+	constant b: Box = { n = 1 }
+	Terminal.print(b::describe())
+}
+`,
+		})
+		let refusal: Array<[string, string, number]> = [
+			[
+				"provided-method-out-of-reach",
+				"'show' can not be called from a provided Method",
+				8,
+			],
+		]
+
+		expect(refusalsIn(files(""), "B.es")).toEqual(refusal)
+		expect(
+			refusalsIn(files('import {\n\tfrom "./B.es" { P }\n}\n\n'), "B.es"),
+		).toEqual(refusal)
+	})
+
+	// NOTE: A Namespace a Function literal declares is a class of the literal's
+	// block, so the body around it still reads the Program's of that name.
+	const besideLiteral = (
+		declarations: string,
+		uses: string,
+	) => `implementation {
+	${declarations}
+
+	protocol P {
+		size() -> Integer
+
+		describe() -> String {
+			constant f = () -> String {
+				namespace Helpers for String {
+					whisper() -> String {
+						<- "inner{@}"
+					}
+				}
+
+				<- "a"::whisper()
+			}
+
+			${uses}
+		}
+	}
+
+	namespace IntegerP for Integer is P {
+		size() -> Integer {
+			<- @::add(1)
+		}
+	}
+
+	Terminal.print(3::describe())
+}
+`
+
+	it("refuses a call beside a Function literal declaring a Namespace of its name", () => {
+		expect(
+			refusalsIn(
+				{
+					"Main.es": besideLiteral(
+						`namespace Helpers for Integer {
+		shout() -> String {
+			<- "outer{@}"
+		}
+	}`,
+						'<- "{f()}/{@::size()::shout()}"',
+					),
+				},
+				"Main.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'shout' can not be called from a provided Method",
+				22,
+			],
+		])
+	})
+
+	it("refuses a witness beside a Function literal declaring a Namespace of its name", () => {
+		expect(
+			refusalsIn(
+				{
+					"Main.es": besideLiteral(
+						`type Box = { n: Integer }
+
+	namespace Helpers for Box is Printable {
+		toString() -> String {
+			<- "box{@.n}"
+		}
+	}`,
+						'constant b: Box = { n = @::size() }\n\n\t\t\t<- "{f()}/{b}"',
+					),
+				},
+				"Main.es",
+			),
+		).toEqual([
+			[
+				"provided-method-out-of-reach",
+				"'Helpers' can not be reached from a provided Method",
+				26,
+			],
+		])
+	})
+
+	it("runs a Function literal in a body calling the Namespace it declares", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": besideLiteral(
+					`namespace Helpers for Integer {
+		shout() -> String {
+			<- "outer{@}"
+		}
+	}`,
+					'<- "{f()}/{@::size()}"',
+				),
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["innera/4"])
+			},
+		)
+	})
+
+	it("runs a body that declares its Namespace, reads a Choice or builds an all-provided witness", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `implementation {
+	namespace Helpers for Integer {
+		shout() -> String {
+			<- "outer"
+		}
+	}
+
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	protocol Tagged {
+		tag() -> String {
+			<- "t"
+		}
+	}
+
+	namespace IntegerTagged for Integer is Tagged {}
+
+	protocol Sized {
+		size() -> Integer
+
+		describe() -> String {
+			namespace Helpers for Integer {
+				shout() -> String {
+					<- "inner"
+				}
+			}
+
+			constant colour = Colour#Red
+
+			<- "{@::size()::shout()} {colour::is(Colour#Green)} {[colour]::contains(Colour#Red)} {@::size()::tag()}"
+		}
+	}
+
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @
+		}
+	}
+
+	Terminal.print(3::describe())
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["inner false true t"])
+			},
+		)
+	})
+})
+
 // NOTE: A Protocol is known by the Module that declares it and its name. An
 // import alias is only a spelling, and two Modules' `Sized` are two Protocols.
 describe("Protocol identity", () => {
