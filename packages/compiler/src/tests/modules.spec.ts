@@ -1272,6 +1272,51 @@ export {
 		)
 	})
 
+	// NOTE: `B.es` declares `perimeter` at the Position `A.es` declares `area`
+	// at, and `A.es` forwards the one while keeping the other private.
+	it("does not take a forwarded declaration for a private one at its Position", () => {
+		withProject(
+			{
+				"Main.es": `import {\n\tfrom "./A.es" { area }\n}\n\nimplementation {}\n`,
+				"A.es": `implementation {
+	function area() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	from "./B.es" { perimeter }
+}
+`,
+				"B.es": `implementation {
+	function perimeter() -> Integer {
+		<- 4
+	}
+}
+
+export {
+	perimeter
+}
+`,
+			},
+			(directory) => {
+				let refusal = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				).diagnostics[0]
+
+				expect(refusal?.code).toBe("not-exported")
+				expect(refusal?.helps).toEqual([
+					"Add 'area' to the 'export { … }' block of ./A.es.",
+				])
+				expect(refusal?.notes).toEqual([
+					"A name is private unless the Module's 'export { … }' block lists it.",
+				])
+			},
+		)
+	})
+
 	// NOTE: All three collisions are the one Diagnostic, because they are the one
 	// mistake: the name an entry binds is taken. The entry is what gives way, so
 	// whatever held the name still means what it did — a builtin stays the

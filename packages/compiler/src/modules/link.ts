@@ -498,14 +498,15 @@ function reportDuplicateImport(
 // private and an importer asking for it has to ask for the other name — telling
 // them to add `area` to the block would publish one function twice. Matched on
 // the declaration's Position, which is what the surface records against each
-// public name.
+// public name, among the names it does not forward from another file.
 function exportedAs(
 	surface: ExportSurface,
 	declaration: Declaration,
 ): string | null {
 	return (
 		Object.entries(surface.declarations).find(
-			([, position]) =>
+			([publicName, position]) =>
+				!surface.forwarded.has(publicName) &&
 				position.start.line === declaration.position.start.line &&
 				position.start.column === declaration.position.start.column,
 		)?.[0] ?? null
