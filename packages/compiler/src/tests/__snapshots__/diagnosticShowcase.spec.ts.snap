@@ -2556,7 +2556,20 @@ Error: Protocol 'Sorted' extends itself through 'Listed'
     │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
 ────╯
 
-─── 9 errors
+[incompatible-restatement]
+Error: Protocol 'Coded' restates 'tag' with a signature 'Labelled' does not accept
+    ╭─┤ Protocols.es:97:3 │
+    │
+ 97 │        tag() -> Integer {
+    │        ─┬─  
+    │         ╰─── 'Labelled' declares it as 'tag() -> String'
+    │ 
+    │ Help: Restate 'tag' with the signature 'Labelled' declares for it, 'tag() -> String', or give this Method a name of its own.
+    │ 
+    │ Note: Whatever conforms to 'Coded' conforms to 'Labelled' as well, so a call through 'Labelled' reaches this 'tag' and calls it as 'Labelled' declares it.
+────╯
+
+─── 10 errors
 "
 `;
 

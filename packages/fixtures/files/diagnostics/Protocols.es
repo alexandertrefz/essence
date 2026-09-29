@@ -83,4 +83,19 @@ implementation {
 	protocol Sorted is Listed {
 		lowest() -> Integer
 	}
+
+	§ incompatible-restatement — whatever conforms to 'Coded' conforms to
+	§ 'Labelled' as well, so a call through 'Labelled' reaches the 'tag' that
+	§ 'Coded' restates and calls it as 'Labelled' declares it.
+	protocol Labelled {
+		tag() -> String
+	}
+
+	protocol Coded is Labelled {
+		code() -> Integer
+
+		tag() -> Integer {
+			<- 0
+		}
+	}
 }

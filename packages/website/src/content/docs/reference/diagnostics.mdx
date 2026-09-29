@@ -4893,16 +4893,16 @@ Taught on: [Protocols › Extending a protocol](/docs/language/protocols#extendi
 ```
 [incompatible-restatement]
 Error: Protocol 'Coded' restates 'tag' with a signature 'Labelled' does not accept
-   ╭─┤ Coded.es:9:3 │
-   │
- 9 │        tag() -> Integer {
-   │        ─┬─  
-   │         ╰─── 'Labelled' declares it as 'tag() -> String'
-   │ 
-   │ Help: Restate 'tag' with the signature 'Labelled' declares for it, 'tag() -> String', or give this Method a name of its own.
-   │ 
-   │ Note: Whatever conforms to 'Coded' conforms to 'Labelled' as well, so a call through 'Labelled' reaches this 'tag' and calls it as 'Labelled' declares it.
-───╯
+    ╭─┤ Protocols.es:97:3 │
+    │
+ 97 │        tag() -> Integer {
+    │        ─┬─  
+    │         ╰─── 'Labelled' declares it as 'tag() -> String'
+    │ 
+    │ Help: Restate 'tag' with the signature 'Labelled' declares for it, 'tag() -> String', or give this Method a name of its own.
+    │ 
+    │ Note: Whatever conforms to 'Coded' conforms to 'Labelled' as well, so a call through 'Labelled' reaches this 'tag' and calls it as 'Labelled' declares it.
+────╯
 ```
 
 </div>
@@ -4952,21 +4952,21 @@ Taught on: [Protocols › One bound per type parameter](/docs/language/protocols
 
 ```
 [provided-method-out-of-reach]
-Error: 'limit' can not be read from a provided Method
-   ╭─┤ Sized.es:8:32 │
-   │
- 2 │     constant limit = 10
-   │              ──┬──  
-   │                ╰──── 'limit' is declared here
-   │ 
- 8 │          <- @::size()::isGreaterThan(limit)
-   │                                      ──┬──  
-   │                                        ╰──── this is declared outside the Protocol
-   │ 
-   │ Help: Give 'Sized' a requirement the body calls on '@' instead, and let each conforming Namespace reach 'limit'.
-   │ 
-   │ Note: A provided Method is emitted once, above every Program that reaches 'Sized' — so its body can name the standard library and nothing the Program declares.
-───╯
+Error: 'unit' can not be read from a provided Method
+    ╭─┤ Protocols.es:33:22 │
+    │
+ 27 │     constant unit = " unit"
+    │              ──┬─  
+    │                ╰─── 'unit' is declared here
+    │ 
+ 33 │          <- "{@::amount()}{unit}{Sizes.suffix()}"
+    │                            ──┬─  
+    │                              ╰─── this is declared outside the Protocol
+    │ 
+    │ Help: Give 'Measured' a requirement the body calls on '@' instead, and let each conforming Namespace reach 'unit'.
+    │ 
+    │ Note: A provided Method is emitted once, above every Program that reaches 'Measured' — so its body can name the standard library and nothing the Program declares.
+────╯
 ```
 
 </div>
