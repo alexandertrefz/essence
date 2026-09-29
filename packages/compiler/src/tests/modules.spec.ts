@@ -4740,6 +4740,135 @@ export {
 		)
 	})
 
+	it("runs a `toString` another Module's Protocol provides on a Choice", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Named.es" { Named }
+}
+
+implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	namespace Colours for Colour is Printable, is Named {}
+
+	constant red: Colour = #Red
+
+	Terminal.print(red)
+	Terminal.print(red::toString())
+	Terminal.print("{red}")
+}
+`,
+				"Named.es": `implementation {
+	protocol Named {
+		toString() -> String {
+			<- "named"
+		}
+	}
+}
+
+export {
+	Named
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"named",
+					"named",
+					"named",
+				])
+			},
+		)
+	})
+
+	it("runs a Choice's derived printing where the providing conformance does not hold", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Tag.es" {
+		IntegerLoud
+		Named
+		Tag
+		Tags
+	}
+}
+
+implementation {
+	constant held: Tag<Integer> = Tag<Integer>#A
+	constant unheld: Tag<String> = Tag<String>#B
+
+	Terminal.print(held)
+	Terminal.print(held::toString())
+	Terminal.print(unheld)
+	Terminal.print(unheld::toString())
+}
+`,
+				"Tag.es": `implementation {
+	protocol Loud {
+		shout() -> String
+	}
+
+	namespace IntegerLoud for Integer is Loud {
+		shout() -> String {
+			<- "!"
+		}
+	}
+
+	protocol Named {
+		toString() -> String {
+			<- "named"
+		}
+	}
+
+	choice Tag<T> {
+		A,
+		B,
+	}
+
+	namespace Tags<infer T> for Tag<T> is Printable, is Named where T is Loud {}
+}
+
+export {
+	IntegerLoud
+	Named
+	Tag
+	Tags
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"named",
+					"named",
+					"B",
+					"B",
+				])
+			},
+		)
+	})
+
 	// NOTE: A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it

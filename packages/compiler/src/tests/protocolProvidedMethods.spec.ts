@@ -4077,6 +4077,295 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true", "false"])
 		})
 
+		// NOTE: A requirement a provided body fulfils is not owed, so the
+		// printing a Choice derives does not stand in for it on any path.
+		it("should run a provided `toString` on a Choice instead of the derived one", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\ttoString() -> String {",
+						'\t\t\t<- "N:{@::name()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Colour {",
+						"\t\tRed,",
+						"\t\tGreen,",
+						"\t}",
+						"",
+						"\tnamespace Colours for Colour is Printable, is Named {",
+						"\t\tname() -> String {",
+						'\t\t\t<- "c"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Printable>(_ item: Item) -> String {",
+						"\t\t<- item::toString()",
+						"\t}",
+						"",
+						"\tconstant red: Colour = #Red",
+						"\tTerminal.inspect(red::toString())",
+						"\tTerminal.inspect(show(red))",
+						"\tTerminal.inspect(Colours.toString(red))",
+						'\tTerminal.inspect("{red}")',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"N:c"', '"N:c"', '"N:c"', '"N:c"'])
+		})
+
+		it("should keep a Choice's derived printing where nothing provides `toString`", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\tshout() -> String {",
+						'\t\t\t<- "{@::name()}!"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Mood {",
+						"\t\tCalm,",
+						"\t\tLoud,",
+						"\t}",
+						"",
+						"\tnamespace Moods for Mood is Printable, is Named {",
+						"\t\tname() -> String {",
+						'\t\t\t<- "m"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Printable>(_ item: Item) -> String {",
+						"\t\t<- item::toString()",
+						"\t}",
+						"",
+						"\tconstant loud: Mood = #Loud",
+						"\tTerminal.inspect(loud::toString())",
+						"\tTerminal.inspect(show(loud))",
+						'\tTerminal.inspect("{loud}")',
+						"\tTerminal.inspect(loud::shout())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"Loud"', '"Loud"', '"Loud"', '"m!"'])
+		})
+
+		it("should run a provided `toString` a Choice's conditional conformance reaches", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\ttoString() -> String {",
+						'\t\t\t<- "named"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Tag<T> {",
+						"\t\tA,",
+						"\t\tB,",
+						"\t}",
+						"",
+						"\tnamespace Tags<infer T> for Tag<T> is Printable, is Named where T is Equatable {}",
+						"",
+						"\tfunction show<infer Item is Printable>(_ item: Item) -> String {",
+						"\t\t<- item::toString()",
+						"\t}",
+						"",
+						"\tconstant tag: Tag<Integer> = Tag<Integer>#A",
+						"\tTerminal.inspect(tag::toString())",
+						"\tTerminal.inspect(show(tag))",
+						'\tTerminal.inspect("{tag}")',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"named"', '"named"', '"named"'])
+		})
+
+		// NOTE: The body answers `Printable` only where the conformance that
+		// brings it in holds for the receiver. `Integer` is not `Loud`, so for a
+		// `Tag<Integer>` the requirement is owed, and the derive stands in.
+		describe("where the provider's condition does not hold", () => {
+			function unheldProgram(
+				body: string,
+				...lines: Array<string>
+			): string {
+				return [
+					"implementation {",
+					"\tprotocol Loud {",
+					"\t\tshout() -> String",
+					"\t}",
+					"",
+					"\tprotocol Named {",
+					"\t\tname() -> String",
+					"",
+					"\t\ttoString() -> String {",
+					`\t\t\t<- ${body}`,
+					"\t\t}",
+					"\t}",
+					"",
+					"\tchoice Tag<T> {",
+					"\t\tA,",
+					"\t\tB,",
+					"\t}",
+					"",
+					"\tnamespace Tags<infer T> for Tag<T> is Printable, is Named where T is Loud {",
+					"\t\tname() -> String {",
+					'\t\t\t<- "t"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction show<infer Item is Printable>(_ item: Item) -> String {",
+					"\t\t<- item::toString()",
+					"\t}",
+					"",
+					"\tconstant tag: Tag<Integer> = Tag<Integer>#A",
+					...lines,
+					"}",
+				].join("\n")
+			}
+
+			it("should run the derived printing on a direct call", async () => {
+				expect(
+					await run(
+						unheldProgram(
+							'"named"',
+							"\tTerminal.inspect(tag::toString())",
+						),
+					),
+				).toEqual(['"A"'])
+			})
+
+			it("should hand the derived printing to a bound and a hole", async () => {
+				expect(
+					await run(
+						unheldProgram(
+							'"named"',
+							"\tTerminal.inspect(show(tag))",
+							'\tTerminal.inspect("{tag}")',
+							"\tTerminal.inspect([tag]::toString())",
+						),
+					),
+				).toEqual(['"A"', '"A"', '"[A]"'])
+			})
+
+			it("should not ask for the conformance a body it does not run reads", async () => {
+				expect(
+					await run(
+						unheldProgram(
+							'"N:{@::name()}"',
+							"\tTerminal.inspect(show(tag))",
+							"\tTerminal.inspect(tag::toString())",
+						),
+					),
+				).toEqual(['"A"', '"A"'])
+			})
+
+			function underivedProgram(...declaration: Array<string>): string {
+				return [
+					"implementation {",
+					"\tprotocol Loud {",
+					"\t\tshout() -> String",
+					"\t}",
+					"",
+					"\tprotocol Named {",
+					"\t\ttoString() -> String {",
+					'\t\t\t<- "named"',
+					"\t\t}",
+					"\t}",
+					"",
+					...declaration,
+					'\tTerminal.inspect("{value}")',
+					"\tTerminal.inspect(value::toString())",
+					"}",
+				].join("\n")
+			}
+
+			// NOTE: Nothing is derived for a Choice with a payload, so there is
+			// nothing to stand in for the body: the bound keeps it, and only the
+			// direct call, which asks for `Named` itself, is refused.
+			it("should keep the body for a Choice with a payload, which derives nothing", () => {
+				let source = underivedProgram(
+					"\tchoice Shape<T> {",
+					"\t\tCircle { radius: T },",
+					"\t\tDot,",
+					"\t}",
+					"",
+					"\tnamespace Shapes<infer T> for Shape<T> is Printable, is Named where T is Loud {}",
+					"",
+					"\tconstant value: Shape<Integer> = Shape<Integer>#Dot",
+				)
+
+				expect(codesOf(source)).toEqual([
+					"unsatisfied-conformance-condition",
+				])
+				expect(notesOf(source)).toEqual([
+					"Integer does not conform to 'Loud'.",
+				])
+			})
+
+			it("should keep the body for a Record, which derives nothing", () => {
+				let source = underivedProgram(
+					"\ttype Box<T> = { value: T }",
+					"",
+					"\tnamespace Boxes<infer T> for Box<T> is Printable, is Named where T is Loud {}",
+					"",
+					"\tconstant value: Box<Integer> = { value = 1 }",
+				)
+
+				expect(codesOf(source)).toEqual([
+					"unsatisfied-conformance-condition",
+				])
+				expect(notesOf(source)).toEqual([
+					"Integer does not conform to 'Loud'.",
+				])
+			})
+		})
+
+		// NOTE: A body that does not fulfil `Printable`'s requirement leaves
+		// it owed, so the derive answers it on every path, and the body is
+		// still reached by naming its Protocol.
+		it("should keep a Choice's derived printing where the provided `toString` does not fulfil it", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\ttoString() -> Integer {",
+						"\t\t\t<- 7",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Colour {",
+						"\t\tRed,",
+						"\t\tGreen,",
+						"\t}",
+						"",
+						"\tnamespace Colours for Colour is Printable, is Named {}",
+						"",
+						"\tfunction show<infer Item is Printable>(_ item: Item) -> String {",
+						"\t\t<- item::toString()",
+						"\t}",
+						"",
+						"\tconstant red: Colour = #Red",
+						"\tTerminal.inspect(red::toString())",
+						"\tTerminal.inspect(show(red))",
+						'\tTerminal.inspect("{red}")',
+						"\tTerminal.inspect([red, Colour#Green]::toString())",
+						"\tTerminal.inspect(red::<Named>toString())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"Red"', '"Red"', '"Red"', '"[Red, Green]"', "7"])
+		})
+
 		// NOTE: An extension chain through one bound — `Orderable` grants
 		// `Comparable`, so a body bounded by the descendant reaches the
 		// ancestor's requirement and the descendant's provided Method off the

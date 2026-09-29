@@ -4674,16 +4674,102 @@ export function derivedPrintableNamespace(
 		return null
 	}
 
+	let protocol = knownProtocol(printableProtocolName, scope)
 	let declared = false
 
 	for (let namespace of namespaces) {
-		if (namespace.conformsTo?.includes(printableProtocolName)) {
-			declared = true
-			break
+		if (!namespace.conformsTo?.includes(printableProtocolName)) {
+			continue
 		}
+
+		// NOTE: A `toString` another of its Protocols provides fulfils the
+		// requirement, so nothing is owed and no derive stands in: the bound
+		// runs that body, and so must a direct call.
+		let provider =
+			protocol === null
+				? null
+				: conformanceProvidersIn(
+						namespace.conformsTo,
+						protocol,
+						namespace.targetType ?? baseType,
+						scope,
+					)("toString")
+		let bindings =
+			namespace.generics.length === 0
+				? new Map()
+				: bindNamespaceTarget(namespace, baseType)
+
+		if (
+			provider !== null &&
+			bindings !== null &&
+			providerConformanceHolds(
+				namespace,
+				bindings,
+				provider,
+				baseType,
+				scope,
+			)
+		) {
+			return null
+		}
+
+		declared = true
+		break
 	}
 
 	return declared ? derivedPrintableNamespaceForChoice(choiceType) : null
+}
+
+function derivesPrinting(binding: common.Type, scope: enricher.Scope): boolean {
+	let choiceType = choiceTypeOf(binding, scope)
+
+	return (
+		choiceType !== null &&
+		derivedPrintableNamespaceForChoice(choiceType) !== null
+	)
+}
+
+// NOTE: Where a silent solve stands. Nothing it reports is kept.
+const unplacedPosition: common.Position = {
+	start: { line: 1, column: 1 },
+	end: { line: 1, column: 1 },
+}
+
+// NOTE: Whether a Namespace's conformance that brings `provider`'s body in
+// holds for this receiver, its `where` included. Where none does, the body
+// fulfils nothing here: the requirement is owed, and a Choice's derive stands
+// in for it. Asked silently, since the call site reports what it solves.
+function providerConformanceHolds(
+	namespace: common.NamespaceType,
+	bindings: GenericBindings,
+	provider: string,
+	receiver: common.Type,
+	scope: enricher.Scope,
+): boolean {
+	return (namespace.conformsTo ?? []).some((declared) => {
+		if (!protocolGrants(declared, provider, scope)) {
+			return false
+		}
+
+		let conditions = orderConditions(
+			namespace.conformanceConditions?.[declared] ?? [],
+			namespace.generics,
+		)
+
+		return (
+			conditions.length === 0 ||
+			collectDiagnostics(() =>
+				solveCandidateConditions(
+					conditions,
+					bindings,
+					receiver,
+					declared,
+					scope,
+					unplacedPosition,
+				),
+			).result.ok
+		)
+	})
 }
 
 // NOTE: The witness a derive provides for a Choice, or null when none does.
@@ -6146,6 +6232,36 @@ function solveNamespaceConformance(
 		]),
 	)
 
+	let providers = conformanceProvidersIn(
+		candidate.type.conformsTo ?? [],
+		protocol,
+		candidate.declaredTarget.targetType,
+		scope,
+	)
+
+	// NOTE: As on the direct rail, a body whose own conformance does not hold
+	// for this binding fulfils nothing, and a Choice's derived printing is
+	// what answers instead. Only where there is one: a Choice with a payload
+	// derives none, and keeps the body.
+	let providerOf =
+		protocolName === printableProtocolName &&
+		derivesPrinting(binding, scope)
+			? (methodName: string): string | null => {
+					let provider = providers(methodName)
+
+					return provider !== null &&
+						!providerConformanceHolds(
+							candidate.type,
+							candidate.conditionBindings,
+							provider,
+							binding,
+							scope,
+						)
+						? null
+						: provider
+				}
+			: providers
+
 	let result = fulfilledAt(
 		computeConformanceMethodMap(
 			protocol,
@@ -6153,12 +6269,7 @@ function solveNamespaceConformance(
 			binding,
 			assumptions,
 			conformanceGrantsIn(scope),
-			conformanceProvidersIn(
-				candidate.type.conformsTo ?? [],
-				protocol,
-				candidate.declaredTarget.targetType,
-				scope,
-			),
+			providerOf,
 		),
 		protocol,
 		binding,
