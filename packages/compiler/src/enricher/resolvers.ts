@@ -65,6 +65,7 @@ import {
 	borrowedGenericName,
 	buildUnion,
 	bindNamespaceTarget,
+	disagreeingTypeArguments,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	isPartialOf,
@@ -3138,6 +3139,10 @@ type ConformanceSolveResult =
 			// composite's away, while one the guard closed the loop on is a
 			// RECURSIVE Type, which is a fine Program and must keep compiling.
 			cycle?: true
+			// NOTE: The Helps a refusal carries where no Namespace declared for
+			// the culprit would answer it, in place of the one that says to
+			// declare it.
+			helps?: Array<string>
 	  }
 
 type ScopeConformanceState = {
@@ -5569,10 +5574,19 @@ function specializedTargetFor(
 	}
 
 	let bindings = bindNamespaceTarget(namespace, baseType)
+	let targetType = namespace.targetType
 
-	return bindings === null
+	// NOTE: A Generic the receiver leaves open would stand in the target under
+	// the Namespace's own name, which no caller wrote and a later solve would
+	// read as a Type Parameter in scope, so the receiver stands in instead.
+	return bindings === null ||
+		namespace.generics.some(
+			(generic) =>
+				!bindings.has(generic.name) &&
+				typeMentionsGeneric(targetType, generic.name),
+		)
 		? baseType
-		: applyGenericBindings(namespace.targetType, bindings)
+		: applyGenericBindings(targetType, bindings)
 }
 
 // NOTE: Where a receiver's conformance to one Protocol comes from. Every
@@ -6232,6 +6246,7 @@ function solveNamespaceConformance(
 		protocolName,
 		scope,
 		position,
+		candidate.declaredTarget.targetType,
 	)
 
 	if (!solvedConditions.ok) {
@@ -6309,11 +6324,37 @@ function solveCandidateConditions(
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
+	// NOTE: The candidate's declared target, where a Choice's Cases may carry
+	// the Type Arguments that would have bound a condition's Generic.
+	target: common.Type | null = null,
 ): SolvedConditions {
 	let conditions: Array<common.Conformance> = []
 
 	for (let condition of declared) {
 		let conditionBinding = conditionBindings.get(condition.generic)
+		let differing =
+			conditionBinding === undefined && target !== null
+				? disagreeingTypeArguments(target, binding, condition.generic)
+				: null
+
+		// NOTE: Cases carrying different Type Arguments for the Generic, as a
+		// List of `Tag<Integer>#A` and `Tag<String>#B` holds, leave it open, and
+		// no Namespace can be declared for such a value.
+		if (differing !== null) {
+			let names = differing.typeArguments.map(describeType)
+			let application = `${displayChoiceName(differing.choice)}<${Array.from({ length: differing.arity }, () => "…").join(", ")}>`
+
+			return {
+				ok: false,
+				chain: [
+					`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
+					`Its Cases carry different Type Arguments for '${condition.generic}', ${names.slice(0, -1).join(", ")} and ${names.at(-1)}, so the condition on '${condition.generic}' has no one Type to be solved against.`,
+				],
+				helps: [
+					`Give every Case of the value the same Type Argument for '${condition.generic}', so that it is one '${application}'.`,
+				],
+			}
+		}
 
 		// NOTE: An empty List Literal reaches the candidate without pinning
 		// this condition's Generic, and a Method expecting its witness would
@@ -6355,6 +6396,7 @@ function solveCandidateConditions(
 				...(solved.culprit === undefined
 					? {}
 					: { culprit: solved.culprit }),
+				...(solved.helps === undefined ? {} : { helps: solved.helps }),
 			}
 		}
 
@@ -7708,6 +7750,9 @@ export function resolveConformances(
 	}
 
 	let conformances: Array<common.Conformance> = []
+	let unbound = generics
+		.filter((generic) => !bindings.has(generic.name))
+		.map((generic) => generic.name)
 
 	for (let generic of generics) {
 		if (generic.constraint == null) {
@@ -7716,9 +7761,14 @@ export function resolveConformances(
 
 		let bound = bindings.get(generic.name)
 
-		// NOTE: An unbound Type Parameter or an Error binding has already
-		// been diagnosed — stay silent to avoid cascades.
-		if (bound === undefined || bound.type === "Error") {
+		// NOTE: An unbound Type Parameter, a binding that names one (a pinned
+		// `Self` spelled `Tag<T>` where the call bound no `T`), or an Error
+		// binding has already been diagnosed — stay silent to avoid cascades.
+		if (
+			bound === undefined ||
+			bound.type === "Error" ||
+			unbound.some((name) => typeMentionsGeneric(bound, name))
+		) {
 			continue
 		}
 
@@ -7950,6 +8000,8 @@ export function resolveConformances(
 				...(missing.data === undefined ? {} : { data: missing.data }),
 			})
 		} else {
+			let own = result.helps
+
 			reportError(message, position, {
 				code: "unsatisfied-conformance-condition",
 				labels: [
@@ -7960,16 +8012,20 @@ export function resolveConformances(
 				],
 				notes: [
 					...withoutRepeatedHead(result.chain, message),
-					...missing.notes,
+					...(own === undefined ? missing.notes : []),
 				],
 				helps: [
 					...printingEscapeHelps(
 						generic.constraint,
-						atPrintingCall && missing.describesWork !== true,
+						atPrintingCall &&
+							(own !== undefined ||
+								missing.describesWork !== true),
 					),
-					...missing.helps,
+					...(own ?? missing.helps),
 				],
-				...(missing.data === undefined ? {} : { data: missing.data }),
+				...(own !== undefined || missing.data === undefined
+					? {}
+					: { data: missing.data }),
 			})
 		}
 	}

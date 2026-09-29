@@ -6360,6 +6360,193 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"made"', '"mademade"', '"mademade"'])
 		})
 	})
+
+	// NOTE: A Choice's Type Parameter that no payload mentions is decided by
+	// the Type Arguments alone, and a `where` on it is solved against them.
+	describe("a condition on a Choice's Type Parameter no payload mentions", () => {
+		function tagProgram(
+			condition: string,
+			...lines: Array<string>
+		): string {
+			return [
+				"implementation {",
+				"\tprotocol Named {",
+				"\t\tgreet() -> String {",
+				'\t\t\t<- "named"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Loud {",
+				"\t\tshout() -> String",
+				"\t}",
+				"",
+				"\tchoice Tag<T> {",
+				"\t\tA,",
+				"\t\tB,",
+				"\t}",
+				"",
+				`\tnamespace Tags<infer T> for Tag<T> is Named where T is ${condition} {}`,
+				"",
+				"\tfunction viaBound<infer Item is Named>(_ item: Item) -> String {",
+				"\t\t<- item::greet()",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		it("should solve it against an annotated and an inferred Type Argument", async () => {
+			expect(
+				await run(
+					tagProgram(
+						"Equatable",
+						"\tconstant annotated: Tag<Integer> = Tag<Integer>#A",
+						"\tconstant inferred = Tag<Integer>#B",
+						"\tTerminal.inspect(annotated::greet())",
+						"\tTerminal.inspect(inferred::greet())",
+						"\tTerminal.inspect(viaBound(annotated))",
+						"\tTerminal.inspect(viaBound(inferred))",
+					),
+				),
+			).toEqual(['"named"', '"named"', '"named"', '"named"'])
+		})
+
+		it("should refuse a Type Argument the condition does not hold for", () => {
+			let source = tagProgram(
+				"Loud",
+				"\tconstant held: Tag<Integer> = Tag<Integer>#A",
+				"\tTerminal.inspect(held::greet())",
+			)
+
+			expect(codesOf(source)).toEqual([
+				"unsatisfied-conformance-condition",
+			])
+			expect(notesOf(source)).toEqual([
+				"Integer does not conform to 'Loud'.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Declare a Namespace 'for Integer is Loud'.",
+			])
+		})
+
+		it("should still refuse a Case whose Type Arguments nothing decides", () => {
+			expect(
+				codesOf(
+					tagProgram(
+						"Equatable",
+						"\tconstant bare = Tag#A",
+						"\tTerminal.inspect(bare::greet())",
+					),
+				),
+			).toEqual(["undecided-type-arguments"])
+		})
+
+		it("should report only the Type Parameter a call naming the Namespace leaves unbound", () => {
+			expect(
+				codesOf(
+					tagProgram(
+						"Equatable",
+						"\tconstant annotated: Tag<Integer> = Tag<Integer>#A",
+						"\tTerminal.inspect(Tags.greet(annotated))",
+					),
+				),
+			).toEqual(["uninferable-type-parameter"])
+		})
+
+		function noisyProgram(...lines: Array<string>): string {
+			return [
+				"implementation {",
+				"\tprotocol Loud {",
+				"\t\tstatic noise() -> String",
+				"\t}",
+				"",
+				"\tnamespace IntegerNoise for Integer is Loud {",
+				"\t\tstatic noise() -> String {",
+				'\t\t\t<- "int"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace StringNoise for String is Loud {",
+				"\t\tstatic noise() -> String {",
+				'\t\t\t<- "str"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Named {",
+				"\t\tname() -> String",
+				"",
+				"\t\tgreet() -> String {",
+				'\t\t\t<- "hi {@::name()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tchoice Tag<T> {",
+				"\t\tA,",
+				"\t\tB,",
+				"\t}",
+				"",
+				"\tnamespace Tags<infer T> for Tag<T> is Named where T is Loud {",
+				"\t\tname() -> String {",
+				"\t\t\t<- T.noise()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction viaBound<infer Item is Named>(_ item: Item) -> String {",
+				"\t\t<- item::greet()",
+				"\t}",
+				"",
+				...lines,
+				"}",
+			].join("\n")
+		}
+
+		it("should run each value with its own Type Argument", async () => {
+			expect(
+				await run(
+					noisyProgram(
+						"\tconstant text: Tag<String> = Tag<String>#A",
+						"\tconstant number: Tag<Integer> = Tag<Integer>#B",
+						"\tTerminal.inspect(text::greet())",
+						"\tTerminal.inspect(viaBound(number))",
+					),
+				),
+			).toEqual(['"hi str"', '"hi int"'])
+		})
+
+		// NOTE: The List holds `Tag#A | Tag#B`, each Case keeping its own Type
+		// Argument, and no one binding of `T` is true of both.
+		it("should refuse a List whose Cases carry different Type Arguments", () => {
+			expect(
+				codesOf(
+					noisyProgram(
+						"\tconstant items = [Tag<Integer>#A, Tag<String>#B]",
+						"\tTerminal.inspect(items::map((entry) { <- entry::greet() }))",
+						"\tTerminal.inspect(items::map((entry) { <- viaBound(entry) }))",
+					),
+				),
+			).toEqual([
+				"unsatisfied-conformance-condition",
+				"unsatisfied-conformance-condition",
+			])
+		})
+
+		// NOTE: A `for` clause can not spell `Tag#A | Tag#B`, so the Help that
+		// works is the one that gives the Cases one Type Argument.
+		it("should say which Type Arguments differ, and offer no Namespace for the Cases", () => {
+			let source = noisyProgram(
+				"\tconstant items = [Tag<Integer>#A, Tag<String>#B]",
+				"\tTerminal.inspect(items::map((entry) { <- entry::greet() }))",
+			)
+
+			expect(notesOf(source)).toEqual([
+				"Its Cases carry different Type Arguments for 'T', Integer and String, so the condition on 'T' has no one Type to be solved against.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Give every Case of the value the same Type Argument for 'T', so that it is one 'Tag<…>'.",
+			])
+		})
+	})
 })
 
 // NOTE: One const per Protocol and Method. Two Protocols of one name are two

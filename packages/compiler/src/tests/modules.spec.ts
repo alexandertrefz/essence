@@ -4681,6 +4681,65 @@ export {
 		)
 	})
 
+	it("solves a condition on another Module's Choice from its Type Arguments", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Tag.es" {
+		Named
+		Tag
+		Tags
+	}
+}
+
+implementation {
+	constant annotated: Tag<Integer> = Tag<Integer>#A
+	constant inferred = Tag<String>#B
+
+	Terminal.print(annotated::greet())
+	Terminal.print(inferred::greet())
+}
+`,
+				"Tag.es": `implementation {
+	protocol Named {
+		greet() -> String {
+			<- "named"
+		}
+	}
+
+	choice Tag<T> {
+		A,
+		B,
+	}
+
+	namespace Tags<infer T> for Tag<T> is Named where T is Equatable {}
+}
+
+export {
+	Named
+	Tag
+	Tags
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"named",
+					"named",
+				])
+			},
+		)
+	})
+
 	// NOTE: A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it
