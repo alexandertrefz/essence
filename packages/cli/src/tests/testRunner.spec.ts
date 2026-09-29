@@ -2052,7 +2052,7 @@ describe("essence test — snapshots", () => {
 
 			expect(code).toBe(EXIT_SUCCESS)
 			expect(out).toContain("2 passed")
-			expect(out).not.toContain("snapshot written")
+			expect(out).not.toMatch(/snapshots? written/)
 		})
 	})
 
@@ -3220,6 +3220,10 @@ describe("essence test — the result cache", () => {
 		return readdirSync(store).filter((name) => name.endsWith(".json"))
 	}
 
+	// NOTE: The note a run that replayed anything ends on, in both spellings: a
+	// run of one entry says "1 of 1 entry cached".
+	const replayed = /\d+ of \d+ (entry|entries) cached/
+
 	function bundles(): Array<string> {
 		return readdirSync(bundleCache).filter((name) => name.endsWith(".mjs"))
 	}
@@ -3272,7 +3276,7 @@ describe("essence test — the result cache", () => {
 
 					expect(code).toBe(EXIT_SUCCESS)
 					expect(out).toContain("2 passed")
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 					expect(records(store)).toHaveLength(2)
 				},
 			)
@@ -3348,7 +3352,7 @@ describe("essence test — the result cache", () => {
 					let { code, out } = await runTests(directory)
 
 					expect(code).toBe(EXIT_FAILURE)
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 				},
 			)
 		})
@@ -3381,7 +3385,7 @@ describe("essence test — the result cache", () => {
 
 					let second = await runTestsIn(directory, [], "Foxes\n")
 
-					expect(second.out).not.toContain("entries cached")
+					expect(second.out).not.toMatch(replayed)
 					expect(second.code).toBe(EXIT_FAILURE)
 				},
 			)
@@ -3499,7 +3503,7 @@ describe("essence test — the result cache", () => {
 
 					let second = await runTests(directory)
 
-					expect(second.out).not.toContain("entries cached")
+					expect(second.out).not.toMatch(replayed)
 					expect(records(store)).toHaveLength(1)
 
 					let third = await runTests(directory)
@@ -3537,7 +3541,7 @@ describe("essence test — the result cache", () => {
 
 					let { code, out } = await runTests(directory)
 
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 					expect(code).toBe(EXIT_FAILURE)
 				},
 			)
@@ -3570,7 +3574,7 @@ describe("essence test — the result cache", () => {
 
 						let { out } = await runTests(directory, flags)
 
-						expect(out).not.toContain("entries cached")
+						expect(out).not.toMatch(replayed)
 					},
 				)
 			})
@@ -3597,7 +3601,7 @@ describe("essence test — the result cache", () => {
 					let { code, out } = await runTests(directory)
 
 					expect(code).toBe(EXIT_FOCUSED)
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 					expect(out).toContain("1 passed")
 					expect(out).toContain("2 not focused")
 					// NOTE: Nothing new was written: a focused run reports what a
@@ -3701,7 +3705,7 @@ describe("essence test — the result cache", () => {
 					expect(out).toContain("2 passed")
 					expect(out).toContain("the shared Module holds")
 					expect(out).toContain("reads the shared value")
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 				},
 			)
 		})
@@ -3821,7 +3825,7 @@ describe("essence test — the result cache", () => {
 
 					expect(code).toBe(EXIT_SUCCESS)
 					expect(out).toContain("1 passed")
-					expect(out).not.toContain("entries cached")
+					expect(out).not.toMatch(replayed)
 				},
 			)
 		})
