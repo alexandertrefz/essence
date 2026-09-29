@@ -14,6 +14,9 @@ import { typeNamedAt } from "./namedTypes"
 export type SpellingScope = {
 	program: common.typed.Program
 	cursor: common.Cursor
+	// NOTE: The Type Parameters the text is written under that no Scope of the
+	// Program declares, as the written target is for a Protocol's `Self`.
+	typeParameters?: ReadonlySet<string>
 }
 
 // NOTE: Whether a Type can be WRITTEN — the question `printType` does not
@@ -108,6 +111,8 @@ export function isSpellableType(
 					isSpellableType(typeArgument, at),
 				)
 			)
+		case "GenericUse":
+			return at?.typeParameters?.has(type.name) === true
 		default:
 			return false
 	}
@@ -249,6 +254,12 @@ function withoutUnreadableSpellings(
 						return type
 					}
 
+					let imported = importedSpelling(type, at)
+
+					if (imported !== null) {
+						return imported
+					}
+
 					let members: Record<string, common.Type> = {}
 
 					for (let [name, member] of Object.entries(type.members)) {
@@ -258,10 +269,17 @@ function withoutUnreadableSpellings(
 					return { type: "Record", members }
 				}
 				case "UnionType": {
-					if (
-						readable(type) ||
-						type.types.some((arm) => arm.type === "Case")
-					) {
+					if (readable(type)) {
+						return type
+					}
+
+					let imported = importedSpelling(type, at)
+
+					if (imported !== null) {
+						return imported
+					}
+
+					if (type.types.some((arm) => arm.type === "Case")) {
 						return type
 					}
 
@@ -306,4 +324,25 @@ function withoutUnreadableSpellings(
 	}
 
 	return strip(type)
+}
+
+// NOTE: The name the import block binds a named Type under where it is not the
+// declared one, as `Colour as Hue` binds a Choice. Null where no entry binds it.
+function importedSpelling(
+	type: common.RecordType | common.UnionType,
+	at: SpellingScope,
+): common.Type | null {
+	if (type.name === undefined) {
+		return null
+	}
+
+	for (let entry of at.program.imports?.entries ?? []) {
+		let local = entry.alias ?? entry.name
+
+		if (local !== type.name && namesTypeAt(local, type, at)) {
+			return { ...type, name: local }
+		}
+	}
+
+	return null
 }

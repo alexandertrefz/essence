@@ -3139,6 +3139,295 @@ describe("Workspace", () => {
 		})
 	})
 
+	// NOTE: A Protocol another Module declares reaches this file through its
+	// import block, under the name the entry binds, and so do the Types its
+	// requirements name. The stubs are written in those names or not at all.
+	describe("Implement a Protocol another Module declares", () => {
+		const sized = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\ttype Box = { count: Integer }",
+			"",
+			"\tprotocol Sized {",
+			"\t\tcolour() -> Colour",
+			"\t\tboxed() -> Box",
+			"\t\tstatic smallest() -> Self",
+			"\t}",
+			"}",
+			"",
+			"export {",
+			"\tBox",
+			"\tColour",
+			"\tSized",
+			"}",
+			"",
+		].join("\n")
+
+		function implementIn(
+			entries: Array<string>,
+			protocol: string,
+			line: number,
+			needle: string,
+		): {
+			source: string
+			actions: Array<CodeActionEntry>
+			workspace: Workspace
+			mainPath: string
+		} {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": sized,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" {',
+					...entries.map((entry) => `\t\t${entry}`),
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\ttype Bag = { count: Integer }",
+					"",
+					`\tnamespace Bags for Bag is ${protocol} {`,
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let actions = findCodeActions(
+				source,
+				spanOf(source, line, needle),
+				mainPath,
+				workspace,
+			).filter((action) => action.title.startsWith("Implement"))
+
+			return { source, actions, workspace, mainPath }
+		}
+
+		function codesAfter(
+			workspace: Workspace,
+			filePath: string,
+			text: string,
+		): Array<common.DiagnosticCode> {
+			return analyseDocument(text, filePath, {
+				host: workspace.host,
+			}).diagnostics.map((diagnostic) => diagnostic.code)
+		}
+
+		it("should implement an imported Protocol, as the Quick Fix and on the head", () => {
+			let entries = ["Box", "Colour", "Sized"]
+
+			for (let [needle, kind] of [
+				["Sized {", "quickfix"],
+				["namespace", "refactor.rewrite"],
+			] as const) {
+				let { source, actions, workspace, mainPath } = implementIn(
+					entries,
+					"Sized",
+					12,
+					needle,
+				)
+
+				expect(
+					actions.map((action) => [action.kind, action.title]),
+				).toEqual([[kind, "Implement 'Sized'"]])
+
+				let result = applyEdits(source, actions[0]!.edits)
+
+				expect(result.split("\n").slice(11, 18)).toEqual([
+					"\tnamespace Bags for Bag is Sized {",
+					"\t\tcolour() -> Colour {}",
+					"",
+					"\t\tboxed() -> Box {}",
+					"",
+					"\t\tstatic smallest() -> Bag {}",
+					"\t}",
+				])
+				expect(
+					new Set(codesAfter(workspace, mainPath, result)),
+				).toEqual(new Set(["missing-return"]))
+			}
+		})
+
+		it("should title and stub it in the names the file imports it under", () => {
+			let { source, actions, workspace, mainPath } = implementIn(
+				["Box as Crate", "Colour as Hue", "Sized as Measurable"],
+				"Measurable",
+				12,
+				"namespace",
+			)
+
+			expect(actions.map((action) => action.title)).toEqual([
+				"Implement 'Measurable'",
+			])
+
+			let result = applyEdits(source, actions[0]!.edits)
+
+			expect(result.split("\n").slice(11, 18)).toEqual([
+				"\tnamespace Bags for Bag is Measurable {",
+				"\t\tcolour() -> Hue {}",
+				"",
+				"\t\tboxed() -> Crate {}",
+				"",
+				"\t\tstatic smallest() -> Bag {}",
+				"\t}",
+			])
+			expect(new Set(codesAfter(workspace, mainPath, result))).toEqual(
+				new Set(["missing-return"]),
+			)
+		})
+
+		// NOTE: A Record has a shape to write in place of a name the file does
+		// not bind, and a Choice has none, so a requirement naming one the file
+		// never imported leaves nothing a stub could compile as.
+		it("should write a Record's shape and offer nothing for an unbound Choice", () => {
+			let bound = implementIn(
+				["Colour", "Sized"],
+				"Sized",
+				11,
+				"namespace",
+			)
+			let result = applyEdits(bound.source, bound.actions[0]!.edits)
+
+			expect(result.split("\n")[13]).toBe(
+				"\t\tboxed() -> { count: Integer } {}",
+			)
+
+			expect(
+				implementIn(["Sized"], "Sized", 10, "namespace").actions,
+			).toEqual([])
+		})
+
+		// NOTE: `Shown` provides a `describe` answering an Integer, and a stub
+		// written as `Described` declares one answering a String, which the
+		// conformance to `Shown` refuses.
+		it("should offer no stub another conformance would refuse", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Described.es": [
+					"implementation {",
+					"\tprotocol Described {",
+					"\t\tdescribe() -> String",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tDescribed",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Described.es" { Described }',
+					"}",
+					"",
+					"implementation {",
+					"\tprotocol Shown {",
+					"\t\tdescribe() -> Integer {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tnamespace IntegerBoth for Integer is Described, is Shown {",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+
+			for (let needle of ["namespace", "Described,"]) {
+				expect(
+					findCodeActions(
+						source,
+						spanOf(source, 12, needle),
+						mainPath,
+						workspace,
+					).map((action) => action.title),
+				).not.toContain("Implement 'Described'")
+			}
+		})
+	})
+
+	// NOTE: A Type the file imports under an alias is written under the alias,
+	// and a Choice has no shape to fall back on where it is not.
+	describe("an annotation naming an imported Type", () => {
+		it("should write the name the file imports the Type under", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Paint.es": [
+					"implementation {",
+					"\tchoice Colour {",
+					"\t\tRed,",
+					"\t\tGreen,",
+					"\t}",
+					"",
+					"\ttype Box = { count: Integer }",
+					"",
+					"\tfunction paint() -> Colour {",
+					"\t\t<- #Red",
+					"\t}",
+					"",
+					"\tfunction box() -> Box {",
+					"\t\t<- { count = 1 }",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tBox",
+					"\tColour",
+					"\tbox",
+					"\tpaint",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Paint.es" {',
+					"\t\tBox as Crate",
+					"\t\tColour as Hue",
+					"\t\tbox",
+					"\t\tpaint",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tconstant hue = paint()",
+					"\tconstant crate = box()",
+					"",
+					"\tTerminal.inspect(hue)",
+					"\tTerminal.inspect(crate)",
+					"}",
+					"",
+				].join("\n"),
+			})
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let annotated = (line: number, needle: string) => {
+				let [action] = findCodeActions(
+					source,
+					spanOf(source, line, needle),
+					mainPath,
+					workspace,
+				).filter((entry) =>
+					entry.title.startsWith("Add explicit Type annotation"),
+				)
+
+				return applyEdits(source, action?.edits ?? []).split("\n")[
+					line - 1
+				]
+			}
+
+			expect(annotated(11, "hue")).toBe("\tconstant hue: Hue = paint()")
+			expect(annotated(12, "crate")).toBe(
+				"\tconstant crate: Crate = box()",
+			)
+		})
+	})
+
 	// NOTE: The one SOURCE action this Server offers, and the only bulk rewrite
 	// it will ever offer: removing an entry nothing reads is unambiguous and
 	// leaves the Program's meaning alone, which is what a bulk action has to be.

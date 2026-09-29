@@ -14,7 +14,8 @@ import {
 	providedMethodProtocol,
 	writtenRequirementFulfils,
 } from "@essence-lang/compiler/helpers"
-import { printType, withoutSelf } from "@essence-lang/compiler/printType"
+import type { ImportedNames } from "@essence-lang/compiler/modules"
+import { withoutSelf } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "../positions"
@@ -68,7 +69,7 @@ type Conformer = {
 export function implementProtocolAction(
 	context: FixContext,
 ): Array<CodeActionEntry> {
-	let { diagnostic, program, enrichedProgram, lines } = context
+	let { diagnostic, program, enrichedProgram, imported, lines } = context
 
 	if (diagnostic.data?.kind !== "missing-requirements") {
 		return []
@@ -88,7 +89,7 @@ export function implementProtocolAction(
 		return []
 	}
 
-	let protocol = protocolsOf(enrichedProgram)[protocolName]
+	let protocol = protocolsOf(enrichedProgram, imported)[protocolName]
 
 	if (protocol === undefined) {
 		return []
@@ -113,10 +114,11 @@ export function implementProtocolAction(
 export function implementProtocolActions(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null,
+	imported: ImportedNames | null,
 	lines: Array<string>,
 	range: common.Position,
 ): Array<CodeActionEntry> {
-	let protocols = protocolsOf(enrichedProgram)
+	let protocols = protocolsOf(enrichedProgram, imported)
 	let entries: Array<CodeActionEntry> = []
 
 	for (let conformer of conformersOf(program, enrichedProgram)) {
@@ -227,8 +229,7 @@ function entryFor(
 
 // NOTE: Where the stubs are going to STAND — inside the Namespace, one line
 // above its closing brace — which is the Scope their signatures are read in.
-// Null where no typed Program was handed in: the names are then written as the
-// Protocol spells them, which is what this always did.
+// Null where no typed Program was handed in, and then no stub is written.
 function spelledAt(
 	conformer: Conformer,
 	program: common.typed.Program | null,
@@ -271,9 +272,16 @@ function stubsEdit(
 	// `scaled(by: Integer) -> { side: Integer }` — a signature that fulfills
 	// the requirement and says nothing a reader wrote.
 	let self = sliceOf(lines, node.targetType.position)
-	let stubs = methods
-		.map((name) => stubFor(name, protocol, self, member, at))
-		.join("\n")
+	let scope = at === null ? null : { ...at, typeParameters: new Set([self]) }
+	let stubbed = methods.map((name) =>
+		stubFor(name, protocol, self, member, scope),
+	)
+
+	if (stubbed.includes(null)) {
+		return null
+	}
+
+	let stubs = stubbed.join("\n")
 
 	// NOTE: A blank line in front of the first stub where the Namespace
 	// already holds something — its members stand one blank line apart, and a
@@ -302,7 +310,7 @@ function stubFor(
 	self: string,
 	indentation: string,
 	at: SpellingScope | null,
-): string {
+): string | null {
 	// NOTE: Bound to a Type that PRINTS as the written target and is nothing
 	// else — a GenericUse is exactly "a Type standing under a name", which is
 	// what the source wrote, and it substitutes wherever `Self` appears rather
@@ -318,15 +326,16 @@ function stubFor(
 		requirement.type === "OverloadedStaticMethod"
 	) {
 		let isStatic = requirement.type === "OverloadedStaticMethod"
-		let entries = requirement.overloads
-			.map(
-				(overload) =>
-					`${indentation}\t${signatureOf(
-						isStatic ? overload : withoutSelf(overload),
-						"",
-						at,
-					)} {}\n`,
-			)
+		let signatures = requirement.overloads.map((overload) =>
+			signatureOf(isStatic ? overload : withoutSelf(overload), "", at),
+		)
+
+		if (signatures.includes(null)) {
+			return null
+		}
+
+		let entries = signatures
+			.map((signature) => `${indentation}\t${signature} {}\n`)
 			.join("\n")
 
 		return `${indentation}overload ${isStatic ? "static " : ""}${name} {\n${entries}${indentation}}\n`
@@ -339,23 +348,30 @@ function stubFor(
 		at,
 	)
 
-	return `${indentation}${isStatic ? "static " : ""}${signature} {}\n`
+	return signature === null
+		? null
+		: `${indentation}${isStatic ? "static " : ""}${signature} {}\n`
 }
 
 // NOTE: Every Type in the signature is spelled as the NAMESPACE can read it,
 // not as the Protocol declares it: a requirement naming a Record another Module
 // declares is written as the shape where this file has no word for it, which is
 // the same Type and needs nothing imported. A Type with no spelling here at all
-// is written as the Protocol spells it and left to the reader — a stub is a
-// hole with a signature on it, and one name to correct is a better answer than
-// no stubs at all.
+// makes the signature null, and no stubs are offered: a stub naming what the
+// file can not read would be refused.
 function signatureOf(
 	signature: common.BaseFunction,
 	name: string,
 	at: SpellingScope | null,
-): string {
-	let spelled = (type: common.Type): string =>
-		spellTypeAt(type, at) ?? printType(type)
+): string | null {
+	let returnType = spellTypeAt(signature.returnType, at)
+	let parameterTypes = signature.parameterTypes.map((parameter) =>
+		spellTypeAt(parameter.type, at),
+	)
+
+	if (returnType === null || parameterTypes.includes(null)) {
+		return null
+	}
 
 	// NOTE: `Self` is never declared — it is the target Type, which the head
 	// already names, and `describeSignature` drops it for the same reason.
@@ -381,12 +397,12 @@ function signatureOf(
 		// Parameter that carries no label binds nothing at all until the reader
 		// names it, which is what `_: Type` says.
 		.map(
-			(parameter) =>
-				`${parameter.name ?? "_"}: ${spelled(parameter.type)}`,
+			(parameter, index) =>
+				`${parameter.name ?? "_"}: ${parameterTypes[index]}`,
 		)
 		.join(", ")
 
-	return `${name}${generics}(${parameters}) -> ${spelled(signature.returnType)}`
+	return `${name}${generics}(${parameters}) -> ${returnType}`
 }
 
 // NOTE: Whether this clause is answered by the Choice itself. A Namespace over
@@ -507,14 +523,15 @@ function refusedElsewhere(
 
 // NOTE: The document's own Protocols over the ones it inherits — a standard
 // library source declares the very Protocols the builtin tables hold, and the
-// document's is the one whose requirements belong to it. A Protocol another
-// Module publishes is in neither, and a Namespace conforming to one is offered
-// nothing: there is no declaration in reach to read a signature off.
+// document's is the one whose requirements belong to it. Each is keyed by the
+// name the document binds it under, which for an import is its alias.
 function protocolsOf(
 	enrichedProgram: common.typed.Program | null,
+	imported: ImportedNames | null,
 ): Record<string, common.ProtocolType> {
 	let protocols: Record<string, common.ProtocolType> = {
 		...builtinProtocols(),
+		...imported?.protocols,
 	}
 
 	if (enrichedProgram === null) {

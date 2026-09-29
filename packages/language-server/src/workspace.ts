@@ -955,6 +955,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			enrichedProgram: entry.enriched,
 			diagnostics: entry.diagnostics ?? [],
 			dependencies: entry.dependencyDiagnostics ?? new Map(),
+			imported: entry.module?.imported ?? null,
 		}
 	}
 

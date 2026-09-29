@@ -5586,6 +5586,27 @@ describe("Code Actions", () => {
 			).not.toContain("Implement 'Sized'")
 		})
 
+		// NOTE: A Function Type prints as no annotation the Parser reads back,
+		// so a stub written with one would not compile.
+		it("should offer no stub for a requirement it can not spell", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Mapped {",
+				"\t\tapply(_ step: (_ n: Integer) -> Integer) -> Integer",
+				"\t}",
+				"",
+				"\tnamespace IntegerMapped for Integer is Mapped {",
+				"\t}",
+				"}",
+			]
+
+			expect(
+				titles(actionsOf(lines)).filter((title) =>
+					title.startsWith("Implement"),
+				),
+			).toEqual([])
+		})
+
 		// NOTE: The refactoring stands down on the clause itself rather than
 		// offering the reader one edit under one title twice.
 		it("should not repeat the Quick Fix on the clause it answers", () => {

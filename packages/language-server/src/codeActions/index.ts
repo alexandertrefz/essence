@@ -1,3 +1,4 @@
+import type { ImportedNames } from "@essence-lang/compiler/modules"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
@@ -223,7 +224,7 @@ export function findCodeActions(
 			tests: true,
 		})
 
-	let { program, enrichedProgram, diagnostics } = analysis
+	let { program, enrichedProgram, diagnostics, imported } = analysis
 
 	if (program === null) {
 		return []
@@ -261,6 +262,7 @@ export function findCodeActions(
 			diagnostic,
 			program,
 			enrichedProgram,
+			imported,
 			lines,
 			imports,
 		})) {
@@ -286,7 +288,13 @@ export function findCodeActions(
 
 	if (wanted("quickfix")) {
 		entries.push(
-			...implementProtocolActions(program, enrichedProgram, lines, range),
+			...implementProtocolActions(
+				program,
+				enrichedProgram,
+				imported,
+				lines,
+				range,
+			),
 		)
 	}
 
@@ -420,14 +428,16 @@ function heldIndex(
 }
 
 // NOTE: Everything a fix is allowed to read: the Diagnostic it answers, the
-// Parser AST its edits are measured against, the enriched Program for a fix
-// that has to name a Type, the buffer's lines, and what an import can be
-// written from. One shape rather than a parameter list per code, so that a fix
-// which grows a need does not move the call site of every other fix.
+// Parser AST its edits are measured against, the enriched Program and what the
+// import block bound for a fix that has to name a Type or a Protocol, the
+// buffer's lines, and what an import can be written from. One shape rather than
+// a parameter list per code, so that a fix which grows a need does not move the
+// call site of every other fix.
 export type FixContext = {
 	diagnostic: common.Diagnostic & { position: common.Position }
 	program: parser.Program
 	enrichedProgram: common.typed.Program | null
+	imported: ImportedNames | null
 	lines: Array<string>
 	imports: ImportContext | null
 }

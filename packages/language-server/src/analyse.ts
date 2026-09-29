@@ -11,6 +11,7 @@ import {
 } from "@essence-lang/compiler/documents"
 import {
 	diskModuleHost,
+	type ImportedNames,
 	type LinkedGraph,
 	type ModuleHost,
 } from "@essence-lang/compiler/modules"
@@ -42,6 +43,10 @@ export type Analysis = {
 	// mistake in an unopened dependency visible at all — and what obliges the
 	// Server to clear them again, since nothing else will.
 	dependencies: Map<string, Array<common.Diagnostic>>
+	// NOTE: What the import block bound, for a Module. A Protocol imported to be
+	// conformed to is in no table of the typed Program, and an edit written
+	// against one reads its requirements here.
+	imported: ImportedNames | null
 }
 
 // NOTE: The typed view of ONE document, as every request that answers about the
@@ -145,6 +150,7 @@ export function analyseDocument(
 			enrichedProgram,
 			diagnostics: analysed.diagnostics,
 			dependencies: new Map(),
+			imported: null,
 		}
 	} catch (error) {
 		// NOTE: A compiler bug must never take down the Language Server, so
@@ -156,6 +162,7 @@ export function analyseDocument(
 			enrichedProgram,
 			diagnostics: [internalError(error)],
 			dependencies: new Map(),
+			imported: null,
 		}
 	}
 }
@@ -243,6 +250,7 @@ function analyseModuleGraph(
 		dependencies: new Map(
 			[...analyses].filter(([filePath]) => filePath !== entryPath),
 		),
+		imported: linked.modules.get(entryPath)?.imported ?? null,
 	}
 }
 
