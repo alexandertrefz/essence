@@ -6739,6 +6739,231 @@ export {
 		)
 	})
 
+	// NOTE: `Sized.es` publishes `Sized` as `Measurable`, which is the name an
+	// import of it writes and so the name the bound is written with.
+	it("writes a bound by the name its Protocol is exported under", async () => {
+		let main = (entries: string, bound: string) => `import {
+	from "./Sized.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function relay <infer Item${bound}>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+
+	Terminal.inspect(relay(3))
+}
+`
+		let sized = sizedModule.replace("\tSized\n", "\tSized as Measurable\n")
+
+		withProject(
+			{
+				"Main.es": main("IntegerSized\n\t\tmeasure", ""),
+				"Sized.es": sized,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare it as '<infer Item is Measurable>'.",
+					"'Sized' is declared in Sized.es, which exports it as 'Measurable' — import 'Measurable' here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "required-protocol",
+					protocol: "Measurable",
+					parameter: "Item",
+					import: {
+						name: "Measurable",
+						modulePath: path.join(directory, "Sized.es"),
+					},
+				})
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main("IntegerSized\n\t\tmeasure", " is Sized"),
+				"Sized.es": sized,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-protocol",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which exports it as 'Measurable' — import 'Measurable' and write that name here.",
+				])
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main("IntegerSized\n\t\tmeasure", " is Measurable"),
+				"Sized.es": sized,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-protocol",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Measurable' is exported by Sized.es — import it here.",
+				])
+			},
+		)
+
+		await withBuiltProject(
+			{
+				"Main.es": main(
+					"IntegerSized\n\t\tMeasurable\n\t\tmeasure",
+					" is Measurable",
+				),
+				"Sized.es": sized,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3"])
+			},
+		)
+	})
+
+	// NOTE: `Other.es` declares its Protocol at the Position `Sized.es` declares
+	// its own at, and `Sized.es` forwards `Other` while keeping `Sized` private.
+	it("does not take a forwarded Protocol for a private one declared at its Position", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		IntegerSized
+		measure
+	}
+}
+
+implementation {
+	function relay <infer Item>(_ item: Item) -> Integer {
+		<- measure(item)
+	}
+
+	Terminal.inspect(relay(3))
+}
+`,
+				"Other.es": `implementation {
+	protocol Other {
+		weight() -> Integer
+	}
+}
+
+export {
+	Other
+}
+`,
+				"Sized.es": sizedModule.replace(
+					"\tSized\n",
+					'\tfrom "./Other.es" { Other }\n',
+				),
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare it as '<infer Item is Sized>'.",
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here.",
+				])
+				expect(refusal?.data).toBeUndefined()
+			},
+		)
+	})
+
+	it("asks for a Namespace by the name its Protocol is exported under", async () => {
+		let sized = sizedModule
+			.replace(
+				`
+	namespace IntegerSized for Integer is Sized {
+		size() -> Integer {
+			<- @
+		}
+	}
+`,
+				"",
+			)
+			.replace("\tIntegerSized\n", "")
+			.replace("\tSized\n", "\tSized as Measurable\n")
+
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" { measure }
+}
+
+implementation {
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sized,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Declare a Namespace 'for Integer is Measurable'.",
+					"'Sized' is declared in Sized.es, which exports it as 'Measurable' — import 'Measurable' here.",
+				])
+				expect(refusal?.data).toEqual({
+					kind: "required-protocol",
+					protocol: "Measurable",
+					parameter: null,
+					import: {
+						name: "Measurable",
+						modulePath: path.join(directory, "Sized.es"),
+					},
+				})
+			},
+		)
+
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		Measurable
+		measure
+	}
+}
+
+implementation {
+	namespace IntegerMeasurable for Integer is Measurable {
+		size() -> Integer {
+			<- @
+		}
+	}
+
+	Terminal.inspect(measure(3))
+}
+`,
+				"Sized.es": sized,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3"])
+			},
+		)
+	})
+
 	// NOTE: The file's own `Sized` takes the name, so the other one can be
 	// named here only under an alias, which no fix chooses.
 	it("asks for an aliased import where another Protocol takes its name", () => {
@@ -7162,7 +7387,7 @@ implementation {
 				)
 
 				expect(refusal?.helps).toEqual([
-					"Import 'Sized' under a name of its own, 'Sized as …' — this value conforms to it, and the 'Sized' named here is a different Protocol.",
+					"Import 'Sized' from ./Sized.es under a name of its own, 'Sized as …' — this value conforms to it, and the 'Sized' named here is a different Protocol.",
 				])
 			},
 		)
@@ -7204,8 +7429,67 @@ implementation {
 				)
 
 				expect(refusal?.helps).toEqual([
-					"Import 'Sized' under a name of its own, 'Sized as …' — this value conforms to it, and this file binds 'Sized' already.",
+					"Import 'Sized' from ./Sized.es under a name of its own, 'Sized as …' — this value conforms to it, and this file binds 'Sized' already.",
 				])
+			},
+		)
+	})
+
+	// NOTE: Whether the import needs a name of its own is asked of the name it
+	// binds, `Measurable`, and not of the declared one, which a Type here may
+	// take without colliding with anything.
+	it("asks for the import of a provided Method's Protocol by the name it is exported under", async () => {
+		let main = (entries: string, declared: string) => `import {
+	from "./Sized.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	Terminal.inspect(3::isBig())
+}
+`
+		let sized = providingModule.replace(
+			"\tSized\n",
+			"\tSized as Measurable\n",
+		)
+		let helpsFor = (declared: string) =>
+			withProject(
+				{
+					"Main.es": main("IntegerSized", declared),
+					"Sized.es": sized,
+				},
+				(directory) =>
+					analysedAt(directory, "Main.es", "Main.es").find(
+						(diagnostic) => diagnostic.code === "unknown-method",
+					)?.helps,
+			)
+
+		expect(helpsFor("")).toEqual([
+			"Import 'Measurable' from ./Sized.es — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.",
+		])
+		expect(helpsFor("\n\ttype Sized = { count: Integer }\n")).toEqual([
+			"Import 'Measurable' from ./Sized.es — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.",
+		])
+		expect(helpsFor("\n\ttype Measurable = { count: Integer }\n")).toEqual([
+			"Import 'Measurable' from ./Sized.es under a name of its own, 'Measurable as …' — this value conforms to it, and this file binds 'Measurable' already.",
+		])
+
+		await withBuiltProject(
+			{
+				"Main.es": main(
+					"IntegerSized\n\t\tMeasurable",
+					"\n\ttype Sized = { count: Integer }\n",
+				),
+				"Sized.es": sized,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["true"])
 			},
 		)
 	})

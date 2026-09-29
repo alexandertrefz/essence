@@ -52,6 +52,10 @@ export type ExportSurface = {
 	declarations: Record<string, common.Position>
 	constants: Set<string>
 	kinds: Record<string, DeclaredKind>
+	// NOTE: The names an entry forwards from another Module, whose Position in
+	// `declarations` is one in that Module's file. A Position carries no file,
+	// so a match against this Module's own declarations skips them.
+	forwarded: Set<string>
 }
 
 export type LinkedModule = {
@@ -112,6 +116,7 @@ function emptySurface(): ExportSurface {
 		declarations: {},
 		constants: new Set(),
 		kinds: {},
+		forwarded: new Set(),
 	}
 }
 
@@ -1005,6 +1010,7 @@ function surfaceOf(
 		}
 
 		surface.kinds[publicName] = kind
+		surface.forwarded.add(publicName)
 
 		let forwardedValue = dependency.values[exportedName]
 
@@ -1651,8 +1657,9 @@ function unimportedNamespacesFor(
 }
 
 // NOTE: The Modules this one reaches that declare a Protocol of this name, read
-// off the declarations so that a private one is found too. Only what it reaches,
-// and by path, so that its Diagnostics do not depend on the graph's entry.
+// off the declarations so that a private one is found too, or that publish one
+// they declare under this name. Only what it reaches, and by path, so that its
+// Diagnostics do not depend on the graph's entry.
 function protocolDeclarationsFor(
 	state: ModuleState,
 	name: string,
@@ -1676,31 +1683,100 @@ function protocolDeclarationsFor(
 	let found: Array<enricher.ProtocolDeclaration> = []
 
 	for (let modulePath of [...reached].sort()) {
-		if (
-			modulePath === state.module.filePath ||
-			declarations.get(modulePath)?.get(name)?.kind !== "protocol"
-		) {
+		let local = declarations.get(modulePath)
+
+		if (local === undefined || modulePath === state.module.filePath) {
 			continue
 		}
 
-		let surface = surfaces.get(modulePath)
-		let entry = states.get(modulePath)?.exports.get(name)
+		let published = publishedProtocols(
+			local,
+			surfaces.get(modulePath) ?? null,
+			states.get(modulePath) ?? null,
+		)
 
-		if (surface !== undefined) {
+		if (published === null) {
+			continue
+		}
+
+		if (local.get(name)?.kind === "protocol") {
 			found.push({
 				modulePath,
-				exported: surface.kinds[name] === "protocol",
+				declares: true,
+				exportedAs: publishedName(name, published.get(name) ?? []),
 			})
-		} else if (states.has(modulePath)) {
-			found.push({
-				modulePath,
-				exported:
-					entry !== undefined &&
-					entry.source === null &&
-					entry.name.content === name,
-			})
+		} else if (
+			[...published.values()].some((names) => names.includes(name))
+		) {
+			found.push({ modulePath, declares: false, exportedAs: name })
 		}
 	}
 
 	return found
+}
+
+// NOTE: The names a Module publishes each Protocol it declares under, by the
+// declared name. A linked Module's surface is matched on the declaration's
+// Position among the names it does not forward, since a standard library
+// Protocol's identity carries no path. Null for a Module that is neither linked
+// nor being linked.
+function publishedProtocols(
+	local: Map<string, Declaration>,
+	surface: ExportSurface | null,
+	state: ModuleState | null,
+): Map<string, Array<string>> | null {
+	let published = new Map<string, Array<string>>()
+	let add = (declaredName: string, publicName: string) =>
+		published.set(declaredName, [
+			...(published.get(declaredName) ?? []),
+			publicName,
+		])
+
+	if (surface !== null) {
+		for (let [publicName, kind] of Object.entries(surface.kinds)) {
+			let position = surface.declarations[publicName]
+			let declared = [...local].find(
+				([, declaration]) =>
+					kind === "protocol" &&
+					!surface.forwarded.has(publicName) &&
+					declaration.kind === "protocol" &&
+					position !== undefined &&
+					declaration.position.start.line === position.start.line &&
+					declaration.position.start.column === position.start.column,
+			)
+
+			if (declared !== undefined) {
+				add(declared[0], publicName)
+			}
+		}
+
+		return published
+	}
+
+	if (state === null) {
+		return null
+	}
+
+	for (let [publicName, entry] of state.exports) {
+		if (
+			entry.source === null &&
+			local.get(entry.name.content)?.kind === "protocol"
+		) {
+			add(entry.name.content, publicName)
+		}
+	}
+
+	return published
+}
+
+// NOTE: The one name an import of a declaration is written with, out of those
+// its Module publishes it under: its own where that is one of them, since the
+// rest of a report spells it so, and otherwise the first the export block lists.
+function publishedName(
+	declaredName: string,
+	publicNames: Array<string>,
+): string | null {
+	return publicNames.includes(declaredName)
+		? declaredName
+		: (publicNames[0] ?? null)
 }

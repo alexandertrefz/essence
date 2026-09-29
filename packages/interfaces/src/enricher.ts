@@ -11,10 +11,14 @@ export type UnimportedNamespace = {
 }
 
 // NOTE: A Module that declares a Protocol at its top level, by its canonical
-// path, and whether its export block lists it under that name.
+// path, and the name its export block publishes it under, which an `as` may
+// make another than its own. Null where the Module keeps it private. Where
+// `declares` is false, the Module declares it under another name and publishes
+// it under the one asked for.
 export type ProtocolDeclaration = {
 	modulePath: string
-	exported: boolean
+	declares: boolean
+	exportedAs: string | null
 }
 
 // NOTE: One Declaration the Parser dropped, as the Enricher consults it — the

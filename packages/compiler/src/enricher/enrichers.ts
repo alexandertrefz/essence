@@ -27,6 +27,7 @@ import {
 	displayChoiceName,
 	displayGenericName,
 	displayProtocolName,
+	specifierTo,
 	undispatchableHelps,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
@@ -129,6 +130,7 @@ import {
 	type MemberAccessContext,
 	namespaceNamedByType,
 	knownProtocol,
+	protocolImport,
 	protocolNameTaken,
 	protocolOf,
 	protocolSpelling,
@@ -13758,19 +13760,29 @@ function undeclaredProtocolHelps(
 				continue
 			}
 
-			// NOTE: Where something here holds the name, the import needs one of
-			// its own.
-			let taken = protocolNameTaken(identity, scope)
+			// NOTE: Under the name its Module publishes it as, and where
+			// something here holds that name, the import needs one of its own.
+			let importing = protocolImport(identity, scope)
+			let imported = importing?.exportedAs ?? name
+			let taken =
+				importing === null
+					? protocolNameTaken(identity, scope)
+					: importing.taken
 			let holder =
 				taken === "protocol"
-					? `the '${name}' named here is a different Protocol`
-					: `this file binds '${name}' already`
+					? `the '${imported}' named here is a different Protocol`
+					: `this file binds '${imported}' already`
+			let importerPath = modulePathOf(scope)
+			let from =
+				importing === null || importerPath === null
+					? ""
+					: ` from ${specifierTo(importerPath, importing.modulePath)}`
 
 			missing.set(
 				name,
 				taken === null
-					? `Import '${name}' — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.`
-					: `Import '${name}' under a name of its own, '${name} as …' — this value conforms to it, and ${holder}.`,
+					? `Import '${imported}'${from} — this value conforms to it, and a Protocol's provided Methods are only reachable where the Protocol is.`
+					: `Import '${imported}'${from} under a name of its own, '${imported} as …' — this value conforms to it, and ${holder}.`,
 			)
 		}
 	}

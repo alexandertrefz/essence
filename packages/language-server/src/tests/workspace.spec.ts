@@ -2728,6 +2728,70 @@ describe("Workspace", () => {
 			)
 		})
 
+		// NOTE: `Sized.es` publishes `Sized` as `Measurable`, so the entry and
+		// the bound are both written by that name.
+		it("should bound a Type Parameter by the name its Protocol is exported under", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSized as Measurable",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction relay <infer Item>(_ item: Item) -> Integer {",
+					"\t\t<- measure(item)",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\trelay",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 7, "measure(item)")
+
+			expect(fix.title).toBe(
+				"Declare it as '<infer Item is Measurable>', importing 'Measurable' from ./Sized.es",
+			)
+
+			let result = applyEdits(source, fix.edits)
+
+			expect(result.split("\n").slice(0, 10)).toEqual([
+				"import {",
+				'\tfrom "./Sized.es" {',
+				"\t\tMeasurable",
+				"\t\tmeasure",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\tfunction relay <infer Item is Measurable>(_ item: Item) -> Integer {",
+				"\t\t<- measure(item)",
+			])
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

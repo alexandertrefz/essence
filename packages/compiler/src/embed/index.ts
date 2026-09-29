@@ -533,5 +533,6 @@ function emptySurface(): ExportSurface {
 		declarations: {},
 		constants: new Set(),
 		kinds: {},
+		forwarded: new Set(),
 	}
 }

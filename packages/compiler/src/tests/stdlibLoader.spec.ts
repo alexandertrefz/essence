@@ -1371,6 +1371,42 @@ describe("Standard Library Loader", () => {
 		expect(() => loadStdlibFrom(sources)).not.toThrow()
 	})
 
+	// NOTE: A standard library Protocol's identity carries no path, and the
+	// file that declares it publishes it all the same.
+	it("names the file that declares a Protocol a bound names unimported", () => {
+		let load = () =>
+			loadStdlibFrom([
+				parseStdlibSource(
+					"/std/A.es",
+					`declarations {
+	protocol Sized {
+		size() -> Integer
+	}
+
+	function helper() -> Integer {
+		<- 1
+	}
+}
+`,
+				),
+				parseStdlibSource(
+					"/std/B.es",
+					`import {
+	from "./A.es" { helper }
+}
+
+declarations {
+	function measure <infer Item is Sized>(_ item: Item) -> Integer {
+		<- helper()
+	}
+}
+`,
+				),
+			])
+
+		expect(load).toThrow("'Sized' is declared in A.es — import it here.")
+	})
+
 	// NOTE: Every Documentation a consumer can reach has to be sourceless — a
 	// Position pointing into a standard library file is a Position with no file
 	// attached, as far as every consumer of these tables is concerned.

@@ -7162,15 +7162,17 @@ function conformanceRemedy(
 	// not offered; what is left is the Note, which is the fact.
 	//
 	// Where no name here binds the Protocol, a clause can name it only beside
-	// an import of it, under a name of its own where its declared one is taken.
+	// an import of it, under a name of its own where the one it is published as
+	// is taken.
 	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
 	let importing =
 		spelling === null ? protocolImport(protocolName, scope) : null
 	let written =
 		spelling ??
-		(importing?.exported === true && !importing.taken
-			? importing.name
+		(importing !== null && importing.taken === null
+			? importing.exportedAs
 			: null)
+	let declaring = written ?? protocol
 
 	return {
 		notes: undeclarable
@@ -7181,7 +7183,7 @@ function conformanceRemedy(
 		helps:
 			undeclarable || (spelling === null && importing === null)
 				? []
-				: importing?.taken === true
+				: importing !== null && importing.taken !== null
 					? [
 							declaredInHelp(
 								importing.name,
@@ -7193,8 +7195,8 @@ function conformanceRemedy(
 					: [
 							protocolName === printableProtocolName &&
 							choiceCasesArePayloadFree(culprit)
-								? `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-								: `Declare a Namespace 'for ${describeType(culprit)} is ${protocol}'.`,
+								? `Declare a Namespace 'for ${describeType(culprit)} is ${declaring}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+								: `Declare a Namespace 'for ${describeType(culprit)} is ${declaring}'.`,
 							...(importing === null
 								? []
 								: [declaredInHelp(importing.name, importing)]),
@@ -7215,7 +7217,7 @@ function conformanceRemedy(
 							? {}
 							: {
 									import: {
-										name: importing.name,
+										name: written,
 										modulePath: importing.modulePath,
 									},
 								}),
@@ -7482,11 +7484,16 @@ export function typeParameterBoundReport(
 	// Type Parameter takes ONE bound, so every edit that would write a second
 	// is refused wherever it is written — see `oneBoundOnly`.
 	carriedBound: string | null = null,
+	// NOTE: The name a bound is written with where this Scope binds the
+	// Protocol under none, which an import alongside it binds.
+	importedAs: string | null = null,
 ): {
 	notes: Array<string>
 	helps: Array<string>
 	bounded: "declaration" | "method" | "none"
 } {
+	let wanted = importedAs ?? describeProtocol(protocolName, scope)
+
 	if (carriedBound !== null) {
 		return {
 			notes: oneBoundOnly(
@@ -7504,9 +7511,7 @@ export function typeParameterBoundReport(
 	if (namespaceType === null) {
 		return {
 			notes: [],
-			helps: [
-				`Declare it as '<infer ${parameter} is ${describeProtocol(protocolName, scope)}>'.`,
-			],
+			helps: [`Declare it as '<infer ${parameter} is ${wanted}>'.`],
 			bounded: "declaration",
 		}
 	}
@@ -7516,6 +7521,7 @@ export function typeParameterBoundReport(
 		parameter,
 		protocolName,
 		scope,
+		wanted,
 	)
 }
 
@@ -7545,6 +7551,7 @@ function namespaceParameterBound(
 	parameter: string,
 	protocolName: string,
 	scope: enricher.Scope,
+	wanted: string,
 ): {
 	notes: Array<string>
 	helps: Array<string>
@@ -7560,7 +7567,6 @@ function namespaceParameterBound(
 				protocolGrants(condition.protocol, protocolName, scope),
 		),
 	)
-	let wanted = describeProtocol(protocolName, scope)
 	let methodHelp = `Bound it for this Method: write '<${parameter} is ${wanted}>' after the Method's name.`
 	let first =
 		carrying[0] === undefined
@@ -7769,23 +7775,24 @@ export function resolveConformances(
 				let shown = displayGenericName(binding.name)
 				let carried = binding.constraint ?? null
 				let wanted = describeProtocol(generic.constraint, scope)
-				let bound = typeParameterBoundReport(
-					shown,
-					generic.constraint,
-					scope,
-					carried,
-				)
 				// NOTE: Where no name here binds the Protocol, the bound can be
 				// written only beside an import of it, which the fix writes too.
 				let importing =
 					spelling === null
 						? protocolImport(generic.constraint, scope)
 						: null
-				let written =
-					spelling ??
-					(importing?.exported === true && !importing.taken
-						? importing.name
-						: null)
+				let imported =
+					importing !== null && importing.taken === null
+						? importing.exportedAs
+						: null
+				let written = spelling ?? imported
+				let bound = typeParameterBoundReport(
+					shown,
+					generic.constraint,
+					scope,
+					carried,
+					imported,
+				)
 
 				reportError(
 					`Type Parameter '${shown}' does not conform to '${wanted}'`,
@@ -7818,7 +7825,7 @@ export function resolveConformances(
 								? bound.helps
 								: importing === null || bound.helps.length === 0
 									? []
-									: importing.taken
+									: importing.taken !== null
 										? [
 												declaredInHelp(
 													importing.name,
@@ -7846,7 +7853,7 @@ export function resolveConformances(
 						// withheld its edit, and a Quick Fix offered there is
 						// the refused edit — applying it turned one error into
 						// two. Left out too where the Protocol can not be named
-						// here or imported under its name.
+						// here or imported under the name it is published as.
 						...(bound.bounded === "none" || written === null
 							? {}
 							: {
@@ -7861,7 +7868,7 @@ export function resolveConformances(
 											? {}
 											: {
 													import: {
-														name: importing.name,
+														name: written,
 														modulePath:
 															importing.modulePath,
 													},
@@ -7978,14 +7985,18 @@ export function reportUnknownProtocol(
 	scope: enricher.Scope,
 ): void {
 	let name = identifier.content
-	let taken = moduleBindsName(scope, name)
 
 	reportError(`Protocol '${name}' is not declared`, identifier.position, {
 		code: "unknown-protocol",
 		labels: [primary(identifier.position, "no such Protocol")],
 		helps: [
 			...protocolDeclarationsOf(scope, name).map((declaration) =>
-				declaredInHelp(name, declaration, taken),
+				declaredInHelp(
+					name,
+					declaration,
+					moduleBindsName(scope, declaration.exportedAs ?? name),
+					"write that name here",
+				),
 			),
 			...suggestionHelps(name, scope, "protocols"),
 		],
@@ -7994,16 +8005,18 @@ export function reportUnknownProtocol(
 }
 
 // NOTE: How this file could come to name a Protocol it binds no name for: an
-// import of it, which needs a name of its own where its declared name is
-// `taken` here. Null where there is no such import to write.
-function protocolImport(
+// import of it under the name its Module publishes it as, which needs a name of
+// its own where that one is `taken` here. Null where there is no such import to
+// write.
+export function protocolImport(
 	identity: string,
 	scope: enricher.Scope,
 ): {
 	name: string
 	modulePath: string
-	exported: boolean
-	taken: boolean
+	declares: true
+	exportedAs: string | null
+	taken: "protocol" | "other" | null
 } | null {
 	let separator = identity.lastIndexOf("#")
 	let name = displayProtocolName(identity)
@@ -8014,7 +8027,8 @@ function protocolImport(
 
 	let modulePath = identity.slice(0, separator)
 	let declaration = protocolDeclarationsOf(scope, name).find(
-		(candidate) => candidate.modulePath === modulePath,
+		(candidate) =>
+			candidate.declares && candidate.modulePath === modulePath,
 	)
 
 	return declaration === undefined
@@ -8022,27 +8036,40 @@ function protocolImport(
 		: {
 				name,
 				modulePath,
-				exported: declaration.exported,
-				taken: protocolNameTaken(identity, scope) !== null,
+				declares: true,
+				exportedAs: declaration.exportedAs,
+				taken: protocolNameTaken(
+					identity,
+					scope,
+					declaration.exportedAs ?? name,
+				),
 			}
 }
 
-// NOTE: `taken` where this Module binds the name already, so that the import
-// needs a name of its own, and `writing` says where that name goes.
+// NOTE: `taken` where this Module binds the name an import of it would, so that
+// the import needs a name of its own, and `writing` says where the name the
+// import binds goes where no other Help writes it already.
 function declaredInHelp(
 	protocolName: string,
-	{ modulePath, exported }: enricher.ProtocolDeclaration,
+	{ modulePath, declares, exportedAs }: enricher.ProtocolDeclaration,
 	taken: boolean = false,
-	writing: string = "write that name here",
+	writing: string | null = null,
 ): string {
 	let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
+	let imported = exportedAs ?? protocolName
 	let importing = taken
-		? `import it under a name of its own, '${protocolName} as …', and ${writing}, since this file binds '${protocolName}' already`
-		: "import it here"
+		? `import it under a name of its own, '${imported} as …'${writing === null ? "" : `, and ${writing}`}, since this file binds '${imported}' already`
+		: imported === protocolName
+			? "import it here"
+			: `import '${imported}' ${writing === null ? "here" : `and ${writing}`}`
 
-	return exported
-		? `'${protocolName}' is declared in ${fileName} — ${importing}.`
-		: `'${protocolName}' is declared in ${fileName}, which does not export it — export it there and ${importing}.`
+	return !declares
+		? `'${protocolName}' is exported by ${fileName} — ${importing}.`
+		: exportedAs === null
+			? `'${protocolName}' is declared in ${fileName}, which does not export it — export it there and ${importing}.`
+			: imported === protocolName
+				? `'${protocolName}' is declared in ${fileName} — ${importing}.`
+				: `'${protocolName}' is declared in ${fileName}, which exports it as '${imported}' — ${importing}.`
 }
 
 // NOTE: The result of checking one conformance clause that holds — its
@@ -9701,14 +9728,15 @@ export function protocolSpelling(
 	return null
 }
 
-// NOTE: What holds a Protocol's declared name here, so that an import of it
-// under that name would collide or name something else: another Protocol, or a
-// Type or member of this Module. Null where the name is free.
+// NOTE: What holds a name here that an import of a Protocol would bind, its
+// declared one unless told another, so that the import would collide or name
+// something else: another Protocol, or a Type or member of this Module. Null
+// where the name is free.
 export function protocolNameTaken(
 	identity: string,
 	scope: enricher.Scope,
+	name: string = displayProtocolName(identity),
 ): "protocol" | "other" | null {
-	let name = displayProtocolName(identity)
 	let bound = protocolNamed(name, scope)
 
 	if (bound !== null) {
