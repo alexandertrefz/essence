@@ -4531,6 +4531,156 @@ export {
 		)
 	})
 
+	it("reaches a `constructor` a Protocol of another Module provides through a bound", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Shown.es" {
+		Shown
+		Named
+	}
+}
+
+implementation {
+	type Box = { size: Integer }
+
+	namespace Boxes for Box is Shown, is Named {
+		describe() -> String {
+			<- "box "
+		}
+	}
+
+	function show<infer Item is Shown>(_ item: Item) -> String {
+		<- item::describe()::append(item::constructor())
+	}
+
+	constant box: Box = { size = 3 }
+
+	Terminal.print(show(box))
+}
+`,
+				"Shown.es": `implementation {
+	protocol Shown {
+		constructor() -> String
+		describe() -> String
+	}
+
+	protocol Named {
+		constructor() -> String {
+			<- "named"
+		}
+	}
+}
+
+export {
+	Shown
+	Named
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"box named",
+				])
+			},
+		)
+	})
+
+	it("reads a static `constructor` off a bound of another Module's Protocol", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Made.es" {
+		Made
+		Echo
+		Box
+		Boxes
+		build
+	}
+}
+
+implementation {
+	function echo<infer Item is Echo>(_ item: Item) -> String {
+		<- item::twice()
+	}
+
+	function local<infer Item is Made>(_ item: Item) -> String {
+		<- Item.constructor()
+	}
+
+	constant box: Box = { n = 1 }
+
+	Terminal.print(build(box))
+	Terminal.print(echo(box))
+	Terminal.print(local(box))
+}
+`,
+				"Made.es": `implementation {
+	protocol Made {
+		static constructor() -> String
+		prototype() -> String
+	}
+
+	protocol Echo is Made {
+		twice() -> String {
+			<- Self.constructor()::append(@::prototype())
+		}
+	}
+
+	type Box = { n: Integer }
+
+	namespace Boxes for Box is Echo {
+		static constructor() -> String {
+			<- "made"
+		}
+
+		prototype() -> String {
+			<- "p{@.n}"
+		}
+	}
+
+	function build<infer Item is Made>(_ item: Item) -> String {
+		<- Item.constructor()::append(item::prototype())
+	}
+}
+
+export {
+	Made
+	Echo
+	Box
+	Boxes
+	build
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"madep1",
+					"madep1",
+					"made",
+				])
+			},
+		)
+	})
+
 	// NOTE: A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it

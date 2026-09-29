@@ -6076,8 +6076,9 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: Every JavaScript object answers `toString`, so a witness that maps
-	// no Method of the name must not be read as though it did.
+	// NOTE: Every JavaScript object answers `toString` and `constructor`, and
+	// a class refuses a member named `constructor` or `prototype`. A Method
+	// of any of these names is reached like any other.
 	describe("a Method named like an Object.prototype member", () => {
 		it("should print a Record through a `toString` another Protocol provides", async () => {
 			expect(
@@ -6135,6 +6136,228 @@ describe("Protocol-provided Methods", () => {
 					].join("\n"),
 				),
 			).toEqual(['"N:c"', '"[N:c, N:c]"'])
+		})
+
+		it("should reach a provided `constructor` through a bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Shown {",
+						"\t\tconstructor() -> String",
+						"\t\tdescribe() -> String",
+						"\t}",
+						"",
+						"\tprotocol Named {",
+						"\t\tconstructor() -> String {",
+						'\t\t\t<- "named"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Big {",
+						"\t\textra() -> String",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "big"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Shown, is Named, is Big {",
+						"\t\textra() -> String {",
+						'\t\t\t<- "e"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Shown>(_ item: Item) -> String {",
+						"\t\t<- item::describe()::append(item::constructor())",
+						"\t}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						"\tTerminal.inspect(show(box))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"bignamed"'])
+		})
+
+		it("should reach a provided `constructor` that reads another entry through a bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Shown {",
+						"\t\tconstructor() -> String",
+						"\t}",
+						"",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\tconstructor() -> String {",
+						'\t\t\t<- "made {@::name()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Shown, is Named {",
+						"\t\tname() -> String {",
+						'\t\t\t<- "box"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Shown>(_ item: Item) -> String {",
+						"\t\t<- item::constructor()",
+						"\t}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						"\tTerminal.inspect(show(box))",
+						"\tTerminal.inspect(box::constructor())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"made box"', '"made box"'])
+		})
+
+		it("should reach a written `constructor` through a bound and through `@`", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Shown {",
+						"\t\tconstructor() -> String",
+						"",
+						"\t\tgreet() -> String {",
+						'\t\t\t<- "hi {@::constructor()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Shown {",
+						"\t\tconstructor() -> String {",
+						'\t\t\t<- "box"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Item is Shown>(_ item: Item) -> String {",
+						"\t\t<- item::constructor()::append(item::greet())",
+						"\t}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						"\tTerminal.inspect(show(box))",
+						"\tTerminal.inspect(box::constructor()::append(box::greet()))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"boxhi box"', '"boxhi box"'])
+		})
+
+		it("should reach a `prototype` a conditional conformance writes through a bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Shown {",
+						"\t\tprototype() -> String",
+						"\t}",
+						"",
+						"\ttype Box<Item> = { value: Item }",
+						"",
+						"\tnamespace Boxes<infer Item> for Box<Item> is Shown where Item is Printable {",
+						"\t\tprototype() -> String {",
+						'\t\t\t<- "p{@.value}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction show<infer Thing is Shown>(_ thing: Thing) -> String {",
+						"\t\t<- thing::prototype()",
+						"\t}",
+						"",
+						"\tconstant box: Box<Integer> = { value = 1 }",
+						"\tTerminal.inspect(show(box))",
+						"\tTerminal.inspect(box::prototype())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"p1"', '"p1"'])
+		})
+
+		it("should read a static `constructor` and `prototype` off a bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Make {",
+						"\t\tstatic constructor() -> String",
+						"\t\tstatic prototype() -> String",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Make {",
+						"\t\tstatic constructor() -> String {",
+						'\t\t\t<- "made"',
+						"\t\t}",
+						"",
+						"\t\tstatic prototype() -> String {",
+						'\t\t\t<- "proto"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction build<infer Item is Make>(_ item: Item) -> String {",
+						"\t\t<- Item.constructor()::append(Item.prototype())",
+						"\t}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						"\tTerminal.inspect(build(box))",
+						"\tTerminal.inspect(Boxes.constructor())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"madeproto"', '"made"'])
+		})
+
+		it("should read a static `constructor` off `Self` in a provided body", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Made {",
+						"\t\tstatic constructor() -> String",
+						"\t}",
+						"",
+						"\tprotocol Echo is Made {",
+						"\t\ttwice() -> String {",
+						"\t\t\t<- Self.constructor()::append(Self.constructor())",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Echo {",
+						"\t\tstatic constructor() -> String {",
+						'\t\t\t<- "made"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction build<infer Item is Made>(_ item: Item) -> String {",
+						"\t\t<- Item.constructor()",
+						"\t}",
+						"",
+						"\tfunction echo<infer Item is Echo>(_ item: Item) -> String {",
+						"\t\t<- item::twice()",
+						"\t}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						"\tTerminal.inspect(build(box))",
+						"\tTerminal.inspect(echo(box))",
+						"\tTerminal.inspect(box::twice())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"made"', '"mademade"', '"mademade"'])
 		})
 	})
 })

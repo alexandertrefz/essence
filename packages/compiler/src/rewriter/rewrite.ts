@@ -3667,6 +3667,13 @@ function isStructurallyEquatable(
 	return fulfilled.size === 2 && fulfilled.has("is") && fulfilled.has("isNot")
 }
 
+// NOTE: Every read of a witness entry spells the name by `namespaceMemberName`:
+// a call through `namespaceMember`, and a static read in `rewriteLookup`. The
+// key a witness is built with is spelled the same way.
+function witnessKey(methodName: string): estree.Identifier | estree.Literal {
+	return memberKey(namespaceMemberName(methodName))
+}
+
 // NOTE: A conformance value is an object literal that maps each Protocol
 // Method's emitted name onto the conforming Namespace's fulfilling Method —
 // `{ compare: Integer.compare, … }`. This works uniformly for user
@@ -3707,7 +3714,7 @@ function rewriteConformanceValue(
 				properties: provided.map(
 					([memberName, protocolName]): estree.Property => ({
 						type: "Property",
-						key: memberKey(memberName),
+						key: witnessKey(memberName),
 						value: {
 							type: "Identifier",
 							name: providedMemberIdentifier(
@@ -3761,7 +3768,7 @@ function rewriteWitnessGroup(
 						).map(
 							([memberName, protocolName]): estree.Property => ({
 								type: "Property",
-								key: memberKey(memberName),
+								key: witnessKey(memberName),
 								value: {
 									type: "ArrayExpression",
 									elements: [
@@ -3901,7 +3908,7 @@ function witnessMethodMap(
 		properties: Object.entries(node.methodMap).map(
 			([protocolMethodName, namespaceMethodName]): estree.Property => ({
 				type: "Property",
-				key: memberKey(protocolMethodName),
+				key: witnessKey(protocolMethodName),
 				value: namespaceMember(
 					node.namespaceName,
 					namespaceMethodName,
@@ -4950,7 +4957,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 	if (node.conformanceName !== undefined) {
 		return memberRead(
 			{ type: "Identifier", name: node.conformanceName },
-			node.member.name,
+			namespaceMemberName(node.member.name),
 		)
 	}
 
