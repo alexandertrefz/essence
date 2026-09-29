@@ -13778,6 +13778,20 @@ function undeclaredProtocolHelps(
 					? ""
 					: ` from ${specifierTo(importerPath, importing.modulePath)}`
 
+			if (importing !== null && importing.exportedAs === null) {
+				let { modulePath } = importing
+				let fileName = modulePath.slice(modulePath.lastIndexOf("/") + 1)
+
+				missing.set(
+					name,
+					taken === null
+						? `'${name}' is declared in ${fileName}, which does not export it — export it there and import it here, since this value conforms to it and a Protocol's provided Methods are only reachable where the Protocol is.`
+						: `'${name}' is declared in ${fileName}, which does not export it — export it there and import it under a name of its own, '${name} as …', since this value conforms to it and ${holder}.`,
+				)
+
+				continue
+			}
+
 			missing.set(
 				name,
 				taken === null

@@ -7493,4 +7493,98 @@ implementation {${declared}
 			},
 		)
 	})
+
+	// NOTE: No import names a Protocol its Module keeps private, so the Help
+	// asks for the export first.
+	it("asks for the export of a provided Method's Protocol its Module keeps private", async () => {
+		let main = (entries: string, declared: string) => `import {
+	from "./Sized.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	Terminal.inspect(3::isBig())
+}
+`
+		let hidden = providingModule.replace("\tSized\n", "")
+
+		withProject(
+			{ "Main.es": main("IntegerSized", ""), "Sized.es": hidden },
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-method",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here, since this value conforms to it and a Protocol's provided Methods are only reachable where the Protocol is.",
+				])
+			},
+		)
+
+		// NOTE: The Protocol `Sized.es` forwards is declared at the Position of
+		// its own, and is a different one.
+		withProject(
+			{
+				"Main.es": main("IntegerSized", ""),
+				"Other.es": `implementation {
+	protocol Other {
+		weight() -> Integer
+	}
+}
+
+export {
+	Other
+}
+`,
+				"Sized.es": providingModule.replace(
+					"\tSized\n",
+					'\tfrom "./Other.es" { Other }\n',
+				),
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-method",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it here, since this value conforms to it and a Protocol's provided Methods are only reachable where the Protocol is.",
+				])
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main(
+					"IntegerSized",
+					"\n\ttype Sized = { count: Integer }\n",
+				),
+				"Sized.es": hidden,
+			},
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unknown-method",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"'Sized' is declared in Sized.es, which does not export it — export it there and import it under a name of its own, 'Sized as …', since this value conforms to it and this file binds 'Sized' already.",
+				])
+			},
+		)
+
+		await withBuiltProject(
+			{
+				"Main.es": main("IntegerSized\n\t\tSized", ""),
+				"Sized.es": providingModule,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["true"])
+			},
+		)
+	})
 })
