@@ -2534,6 +2534,99 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
+	// NOTE: The bound is read where the Type Parameter is declared, so a
+	// Protocol declared in the enclosing body shadows the top-level one of its
+	// name, which is another Protocol.
+	it("should offer the members of a bound declared in a body", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tstatic minimum() -> Integer",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"",
+			"\tfunction inner() -> Integer {",
+			"\t\tprotocol Sized {",
+			"\t\t\tstatic smallest() -> Integer",
+			"\t\t\tcount() -> Integer",
+			"\t\t}",
+			"",
+			"\t\tfunction gauge <infer Item is Sized>(_ item: Item) -> Integer {",
+			"\t\t\t<- Item.",
+			"\t\t}",
+			"",
+			"\t\t<- 1",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 14, column: 12 })).toEqual([
+			"smallest",
+			"count",
+		])
+	})
+
+	// NOTE: A Protocol the other arm of an `if` or a `match` declares is out of
+	// reach in this one, so the bound names the top-level Protocol.
+	it("should read a bound past a Protocol the other arm of an 'if' declares", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tstatic minimum() -> Integer",
+			"\t}",
+			"",
+			"\tfunction pick(_ flag: Boolean) -> Integer {",
+			"\t\tif flag {",
+			"\t\t\tfunction gauge <infer Item is Sized>(_ item: Item) -> Integer {",
+			"\t\t\t\t<- Item.",
+			"\t\t\t}",
+			"",
+			"\t\t\t<- 1",
+			"\t\t} else {",
+			"\t\t\tprotocol Sized {",
+			"\t\t\t\tstatic smallest() -> Integer",
+			"\t\t\t}",
+			"",
+			"\t\t\t<- 2",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 9, column: 13 })).toEqual(["minimum"])
+	})
+
+	it("should read a bound past a Protocol another Handler declares", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tstatic minimum() -> Integer",
+			"\t}",
+			"",
+			"\tfunction pick(_ value: Integer) -> Integer {",
+			"\t\t<- match value -> Integer {",
+			"\t\t\tcase 0 {",
+			"\t\t\t\tfunction gauge <infer Item is Sized>(_ item: Item) -> Integer {",
+			"\t\t\t\t\t<- Item.",
+			"\t\t\t\t}",
+			"",
+			"\t\t\t\t<- 1",
+			"\t\t\t}",
+			"\t\t\tcase Integer {",
+			"\t\t\t\tprotocol Sized {",
+			"\t\t\t\t\tstatic smallest() -> Integer",
+			"\t\t\t\t}",
+			"",
+			"\t\t\t\t<- 2",
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 10, column: 14 })).toEqual(["minimum"])
+	})
+
 	// NOTE: The two readings this must not turn into. A name that holds a
 	// VALUE is answered by the value, and a name nothing declares is answered
 	// by nothing — the Type space is only read where the base named no value
@@ -2554,6 +2647,60 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		let source = ["implementation {", "\tNotAThing.", "}"].join("\n")
 
 		expect(labelsOf(source, { line: 2, column: 12 })).toEqual([])
+	})
+})
+
+// NOTE: An `if` arm and a `match` Handler are Scopes of their own, so a name
+// one of them declares is out of reach in its sibling, and the name in front of
+// the `.` means the one declared further out.
+describe("Completion of a name a sibling arm declares", () => {
+	it("should read the name past the other arm of an 'if'", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t}",
+			"",
+			"\tfunction pick(_ flag: Boolean) -> Integer {",
+			"\t\tif flag {",
+			"\t\t\tconstant listed = Colour.",
+			"\t\t\t<- 1",
+			"\t\t} else {",
+			"\t\t\ttype Colour = { hue: Integer }",
+			"",
+			"\t\t\t<- 2",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 29 })).toEqual(["cases"])
+	})
+
+	it("should read the name past another Handler of a 'match'", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t}",
+			"",
+			"\tfunction pick(_ value: Integer) -> Integer {",
+			"\t\t<- match value -> Integer {",
+			"\t\t\tcase 0 {",
+			"\t\t\t\tconstant listed = Colour.",
+			"\t\t\t\t<- 1",
+			"\t\t\t}",
+			"\t\t\tcase Integer {",
+			"\t\t\t\ttype Colour = { hue: Integer }",
+			"",
+			"\t\t\t\t<- 2",
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 9, column: 30 })).toEqual(["cases"])
 	})
 })
 

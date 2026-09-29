@@ -6,8 +6,8 @@ import type { ImportedNames } from "@essence-lang/compiler/modules"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
-import { contains } from "./positions"
-import { typedProgramNodes, typedProgramSections } from "./sections"
+import { contains, isAtOrBefore } from "./positions"
+import { typedProgramSections } from "./sections"
 
 // NOTE: What a bare NAME names in the TYPE space where the cursor stands — the
 // Language Server's mirror of the Enricher's `findTypeInScope`, which is the
@@ -37,24 +37,71 @@ export function typeNamedAt(
 	// that name for the length of the body it is declared on. Depth is what
 	// says which of two answers stands further in, since the walk meets a
 	// sibling Statement of an outer body AFTER the body it descended into.
-	let found: { type: common.Type | null; depth: number } = {
+	let found: {
+		type: common.Type | null
+		depth: number
+		bound: string | null
+	} = {
 		type: null,
 		depth: -1,
+		bound: null,
 	}
 	let visited = new WeakSet<object>()
-	let boundIdentity = boundIdentities(program, imported)
+	// NOTE: Where the Enricher typed a Declaration, its Type holds each bound's
+	// identity and that answer is taken. A bound it left untyped is resolved to
+	// the innermost Protocol of its name declared around it, once the walk has
+	// met every Protocol on the way in.
+	let protocols: Array<{ type: common.ProtocolType; depth: number }> = []
 
-	function record(type: common.Type, depth: number) {
+	function record(type: common.Type, depth: number, bound: string | null) {
 		if (depth > found.depth) {
 			found.type = type
 			found.depth = depth
+			found.bound = bound
 		}
+	}
+
+	// NOTE: A typed Generic Declaration holds its bound as written, and a
+	// GenericUse holds the Protocol's identity, which is what the listings
+	// read. A Type Parameter stands in a Scope of its own, so only a Protocol
+	// declared further out than it reaches its bound.
+	function boundIdentity(bound: string, depth: number): string {
+		let innermost: { type: common.ProtocolType; depth: number } | null =
+			null
+
+		for (let declared of protocols) {
+			if (
+				declared.type.name === bound &&
+				declared.depth < depth &&
+				(innermost === null || declared.depth > innermost.depth)
+			) {
+				innermost = declared
+			}
+		}
+
+		if (innermost !== null) {
+			return innermost.type.identity
+		}
+
+		for (let outer of [imported?.protocols ?? {}, builtinProtocols()]) {
+			if (Object.hasOwn(outer, bound)) {
+				return outer[bound]!.identity
+			}
+		}
+
+		return bound
 	}
 
 	function readGenerics(
 		generics: Array<common.typed.GenericDeclarationNode>,
+		typed: common.Type,
 		depth: number,
 	) {
+		let resolved =
+			typed.type === "Function" || typed.type === "Namespace"
+				? typed.generics
+				: []
+
 		for (let generic of generics) {
 			if (generic.name !== name) {
 				continue
@@ -65,16 +112,23 @@ export function typeNamedAt(
 			// still shadows an outer Choice of the same name, and answering
 			// with that Choice's Cases would offer what the name does not
 			// reach.
-			record(
-				generic.constraint === null
-					? { type: "GenericUse", name }
-					: {
-							type: "GenericUse",
-							name,
-							constraint: boundIdentity(generic.constraint),
-						},
-				depth,
-			)
+			let answer = resolved.find((entry) => entry.name === name)
+
+			if (answer === undefined) {
+				record({ type: "GenericUse", name }, depth, generic.constraint)
+			} else {
+				record(
+					answer.constraint == null
+						? { type: "GenericUse", name }
+						: {
+								type: "GenericUse",
+								name,
+								constraint: answer.constraint,
+							},
+					depth,
+					null,
+				)
+			}
 		}
 	}
 
@@ -95,8 +149,13 @@ export function typeNamedAt(
 			case "ChoiceDeclarationStatement":
 			case "TypeAliasStatement":
 				if (node.name.content === name) {
-					record(node.type, depth)
+					record(node.type, depth, null)
 				}
+
+				return
+			case "ProtocolDeclarationStatement":
+				protocols.push({ type: node.protocolType, depth })
+				visitChildren(node, depth)
 
 				return
 			case "FunctionStatement":
@@ -108,7 +167,7 @@ export function typeNamedAt(
 				// between the one the Function is declared in and its body —
 				// which is what lets a Choice declared IN the body shadow a
 				// Type Parameter of the same name.
-				readGenerics(node.value.generics, depth + 1)
+				readGenerics(node.value.generics, node.type, depth + 1)
 				visitBody(node.value.body, depth + 2)
 
 				return
@@ -117,7 +176,7 @@ export function typeNamedAt(
 					return
 				}
 
-				readGenerics(node.generics, depth + 1)
+				readGenerics(node.generics, node.type, depth + 1)
 
 				for (let member of Object.values(node.methods)) {
 					let methods =
@@ -131,7 +190,11 @@ export function typeNamedAt(
 							continue
 						}
 
-						readGenerics(method.value.generics, depth + 2)
+						readGenerics(
+							method.value.generics,
+							method.type,
+							depth + 2,
+						)
 						visitBody(method.value.body, depth + 3)
 					}
 				}
@@ -145,30 +208,51 @@ export function typeNamedAt(
 				}
 
 				return
-			case "IfElseStatement":
-				if (contains(node.position, cursor)) {
-					visitNode(node.condition, depth)
-					visitBody(node.trueBody, depth + 1)
-					visitBody(node.falseBody, depth + 1)
+			// NOTE: Only the arm the cursor stands in, since what a sibling arm
+			// declares is out of reach there. A typed body holds no braces, so
+			// the `else` arm is the one from its first Statement on.
+			case "IfElseStatement": {
+				if (!contains(node.position, cursor)) {
+					return
 				}
 
+				let first = node.falseBody[0]
+
+				visitNode(node.condition, depth)
+				visitBody(
+					first !== undefined &&
+						isAtOrBefore(first.position.start, cursor)
+						? node.falseBody
+						: node.trueBody,
+					depth + 1,
+				)
+
 				return
-			case "Match":
-				if (contains(node.position, cursor)) {
-					visitNode(node.value, depth)
-
-					for (let handler of node.handlers) {
-						for (let expression of typedHandlerExpressions(
-							handler,
-						)) {
-							visitNode(expression, depth + 1)
-						}
-
-						visitBody(handler.body, depth + 1)
-					}
+			}
+			// NOTE: A Handler reaches from its Matcher to the next one's.
+			case "Match": {
+				if (!contains(node.position, cursor)) {
+					return
 				}
 
+				visitNode(node.value, depth)
+
+				let handler = node.handlers.findLast((candidate) =>
+					isAtOrBefore(candidate.matcherPosition.start, cursor),
+				)
+
+				if (handler === undefined) {
+					return
+				}
+
+				for (let expression of typedHandlerExpressions(handler)) {
+					visitNode(expression, depth + 1)
+				}
+
+				visitBody(handler.body, depth + 1)
+
 				return
+			}
 			// NOTE: A Function LITERAL is a Scope like a declared one, and the
 			// only one an Expression opens: its own Type Parameters, and
 			// everything its body declares, are in reach inside it and nowhere
@@ -180,7 +264,7 @@ export function typeNamedAt(
 					return
 				}
 
-				readGenerics(node.value.generics, depth + 1)
+				readGenerics(node.value.generics, node.type, depth + 1)
 				visitInside(node.value.parameters, depth + 1)
 				visitBody(node.value.body, depth + 2)
 
@@ -269,6 +353,14 @@ export function typeNamedAt(
 		depth += 1
 	}
 
+	if (found.bound !== null) {
+		return {
+			type: "GenericUse",
+			name,
+			constraint: boundIdentity(found.bound, found.depth),
+		}
+	}
+
 	// NOTE: The import block stands between what the file declares and the
 	// builtins, exactly as it does in the Scope linking seeds: a Choice this
 	// file declares shadows one it imports, and an imported `Side` is the one
@@ -278,26 +370,4 @@ export function typeNamedAt(
 	// for a name the document declares nothing under — a Program writing its
 	// own `choice Side` means that one.
 	return found.type ?? imported?.types[name] ?? builtinTypes()[name] ?? null
-}
-
-// NOTE: A typed Generic Declaration holds its bound as written, and a
-// GenericUse holds the Protocol's identity, which is what the listings read.
-// A bound woven onto a Namespace Generic already holds one.
-function boundIdentities(
-	program: common.typed.Program,
-	imported: ImportedNames | null,
-): (bound: string) => string {
-	let protocols: Record<string, common.ProtocolType> = {
-		...builtinProtocols(),
-		...imported?.protocols,
-	}
-
-	for (let node of typedProgramNodes(program)) {
-		if (node.nodeType === "ProtocolDeclarationStatement") {
-			protocols[node.name.content] = node.protocolType
-		}
-	}
-
-	return (bound) =>
-		Object.hasOwn(protocols, bound) ? protocols[bound]!.identity : bound
 }
