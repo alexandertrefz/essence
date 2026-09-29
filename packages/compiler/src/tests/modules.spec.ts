@@ -4434,6 +4434,55 @@ export {
 		)
 	})
 
+	it("prints through a `toString` a Protocol of another Module provides", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Named.es" { Named }
+}
+
+implementation {
+	type Box = { size: Integer }
+
+	namespace Boxes for Box is Printable, is Named {}
+
+	constant box: Box = { size = 3 }
+
+	Terminal.print("a {box}")
+	Terminal.print(box)
+}
+`,
+				"Named.es": `implementation {
+	protocol Named {
+		toString() -> String {
+			<- "named"
+		}
+	}
+}
+
+export {
+	Named
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"a named",
+					"named",
+				])
+			},
+		)
+	})
+
 	// NOTE: A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it

@@ -235,7 +235,12 @@ export function printingNamespaceOf(
 		return null
 	}
 
-	let memberName = witness.methodMap["toString"]
+	// NOTE: `Object.hasOwn`, never a plain index: a witness whose `toString` a
+	// Protocol provides has no own entry, and the map would answer
+	// `Object.prototype.toString`.
+	let memberName = Object.hasOwn(witness.methodMap, "toString")
+		? witness.methodMap["toString"]
+		: undefined
 
 	if (memberName === undefined) {
 		return null

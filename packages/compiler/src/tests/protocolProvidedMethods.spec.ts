@@ -6075,6 +6075,68 @@ describe("Protocol-provided Methods", () => {
 			expect(declarationsOf(javaScript, "$es_Sized__hasItems")).toBe(1)
 		})
 	})
+
+	// NOTE: Every JavaScript object answers `toString`, so a witness that maps
+	// no Method of the name must not be read as though it did.
+	describe("a Method named like an Object.prototype member", () => {
+		it("should print a Record through a `toString` another Protocol provides", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\ttoString() -> String {",
+						'\t\t\t<- "named"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { size: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Printable, is Named {}",
+						"",
+						"\tconstant box: Box = { size = 3 }",
+						'\tTerminal.inspect("a {box}")',
+						"\tTerminal.inspect(box::toString())",
+						"\tTerminal.inspect([box]::toString())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"a named"', '"named"', '"[named]"'])
+		})
+
+		it("should print a Choice through a `toString` another Protocol provides", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Named {",
+						"\t\tname() -> String",
+						"",
+						"\t\ttoString() -> String {",
+						'\t\t\t<- "N:{@::name()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tchoice Colour {",
+						"\t\tRed,",
+						"\t\tGreen,",
+						"\t}",
+						"",
+						"\tnamespace Colours for Colour is Printable, is Named {",
+						"\t\tname() -> String {",
+						'\t\t\t<- "c"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant chosen: Colour = #Red",
+						'\tTerminal.inspect("{chosen}")',
+						"\tTerminal.inspect([chosen, Colour#Green]::toString())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"N:c"', '"[N:c, N:c]"'])
+		})
+	})
 })
 
 // NOTE: One const per Protocol and Method. Two Protocols of one name are two

@@ -95,7 +95,11 @@ function directMethodOf(
 		return null
 	}
 
-	let memberName = witness.methodMap[protocolMethodName]
+	// NOTE: `Object.hasOwn`, never a plain index, so a name such as `toString`
+	// that only `Object.prototype` answers is not taken for the Namespace's.
+	let memberName = Object.hasOwn(witness.methodMap, protocolMethodName)
+		? witness.methodMap[protocolMethodName]
+		: undefined
 
 	if (memberName === undefined) {
 		return null

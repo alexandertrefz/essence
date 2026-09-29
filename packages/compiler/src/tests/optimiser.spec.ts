@@ -658,6 +658,24 @@ const witnesses = `implementation {
 	Terminal.inspect([2, 1]::sort()::toString())
 }`
 
+// NOTE: A hole whose witness writes no `toString`: another Protocol the
+// Namespace conforms to provides the body `Printable` requires.
+const providedToString = `implementation {
+	protocol Named {
+		toString() -> String {
+			<- "named"
+		}
+	}
+
+	type Box = { size: Integer }
+
+	namespace Boxes for Box is Printable, is Named {}
+
+	constant box: Box = { size = 3 }
+
+	Terminal.print("a {box}")
+}`
+
 // NOTE: Records, Lists, Cases with a payload and without, a payload that is a
 // Record the Program is holding elsewhere, a member name JavaScript can not
 // spell, and a Match reading it all back — the shapes `collapse-construction`
@@ -3572,6 +3590,20 @@ describe("Optimiser", () => {
 			)
 		})
 
+		// NOTE: The map names no `toString` of its own where a Protocol provides
+		// it, and a plain index would answer `Object.prototype.toString`.
+		// `fold-constants` is off so that this pass is the one asked.
+		it("leaves a witness whose `toString` a Protocol provides", async () => {
+			expect(
+				await outputOf(
+					generate(providedToString, {
+						enabled: true,
+						disabledPasses: new Set(["fold-constants"]),
+					}),
+				),
+			).toEqual(["a named"])
+		})
+
 		it("builds the witness again when it is turned off", () => {
 			expect(
 				generate(witnesses, {
@@ -5325,6 +5357,17 @@ describe("Optimiser", () => {
 					disabledPasses: new Set(["devirtualise-witnesses"]),
 				}),
 			).toContain('String.createString("a count: 7, 1/2, true, x")')
+		})
+
+		it("leaves a hole whose `toString` a Protocol provides", async () => {
+			expect(
+				await outputOf(
+					generate(providedToString, {
+						enabled: true,
+						disabledPasses: new Set(["devirtualise-witnesses"]),
+					}),
+				),
+			).toEqual(["a named"])
 		})
 	})
 
