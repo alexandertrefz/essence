@@ -21,8 +21,8 @@ private, and the VS Code extension ships to the Marketplace instead, via
    of truth, there is no version anywhere else. The one consumer to carry
    along: the VS Code extension pins each `@essence-lang/*` package in its
    `devDependencies` by exact version.
-2. `bun install`, `bun run test`, `bun run typecheck` — the tree the release
-   is cut from is green.
+2. `bun install`, `bun run format:check`, `bun run lint`, `bun run typecheck`,
+   `bun run test` — the tree the release is cut from is green.
 3. `bun run publish:smoke` — stages everything and proves the *artifacts*:
    the staged packages are copied into a scratch npm workspace in the system
    tmpdir, installed with real npm, and driven with plain Node — every export

@@ -54,14 +54,15 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # NOTE: The suite and the type check gate the package step rather than
-      # follow it. The `.vsix` is built out of this checkout — the Language
-      # Server is bundled into it — so whatever the checkout gets wrong is
-      # what would be attached to the release. A red run here costs a minute;
-      # a red one after `gh release create` costs a published version.
-      - run: bun test
+      # NOTE: The test workflow's gate, in its order, before the package step:
+      # the `.vsix` bundles this checkout's Language Server.
+      - run: bun run format:check
+
+      - run: bun run lint
 
       - run: bun run typecheck
+
+      - run: bun run test
 
       - run: bun run --cwd packages/vscode-extension package
 
