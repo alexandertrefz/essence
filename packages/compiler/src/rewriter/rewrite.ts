@@ -5323,8 +5323,11 @@ function protocolPreludeNamespaces(
 		}
 	}
 
+	// NOTE: A `tests` block may declare a Protocol too, and its conformers
+	// name the provided consts exactly as the implementation's do.
 	for (let program of programs) {
 		visit(program.implementation.nodes)
+		visit(program.tests?.nodes ?? [])
 	}
 
 	return found

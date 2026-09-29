@@ -507,6 +507,37 @@ describe("Test codegen — running what was emitted", () => {
 		expect(summary).toMatchObject({ passed: 1, deselected: 1 })
 	})
 
+	it("runs a provided Method of a Protocol the tests block declares", async () => {
+		let { summary } = await run(`implementation {
+			constant shipped = 1
+		}
+
+		tests {
+			protocol Tagged {
+				tag() -> String
+
+				shout() -> String {
+					<- @::tag()::append("!")
+				}
+			}
+
+			type Box = { n: Integer }
+
+			namespace Boxes for Box is Tagged {
+				tag() -> String {
+					<- "b{@.n}"
+				}
+			}
+
+			test "shouts" {
+				constant box: Box = { n = shipped }
+				expect box::shout()::is("b1!")
+			}
+		}`)
+
+		expect(summary).toMatchObject({ passed: 1, failed: 0 })
+	})
+
 	it("explains a failure out of the values it was built from", async () => {
 		let { events } = await run(`implementation {
 			type Standing = { team: String, points: Integer }
@@ -1162,6 +1193,99 @@ describe("Test codegen — a graph of Modules", () => {
 			})
 		} finally {
 			dispose()
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// NOTE: Both Modules' tests blocks declare a `Tagged`, so the two provided
+	// consts are told apart as any two Protocols of one name are.
+	it("runs a provided Method each Module's tests block declares", async () => {
+		let directory = mkdtempSync(join(tmpdir(), "essence-graph-"))
+		let tagged = (suffix: string) => `protocol Tagged {
+					tag() -> String
+
+					shout() -> String {
+						<- @::tag()::append("${suffix}")
+					}
+				}`
+
+		writeFileSync(
+			join(directory, "Doubling.es"),
+			`implementation {
+				function double(_ n: Integer) -> Integer {
+					<- n::multiply(with 2)
+				}
+			}
+
+			export {
+				double
+			}
+
+			tests {
+				${tagged("!")}
+
+				type Box = { n: Integer }
+
+				namespace Boxes for Box is Tagged {
+					tag() -> String {
+						<- "b{@.n}"
+					}
+				}
+
+				test "shouts" {
+					constant box: Box = { n = double(1) }
+					expect box::shout()::is("b2!")
+				}
+			}`,
+		)
+		writeFileSync(
+			join(directory, "Main.es"),
+			`import {
+				from "./Doubling.es" { double }
+			}
+
+			implementation {
+				constant doubled = double(2)
+			}
+
+			tests {
+				${tagged("?")}
+
+				namespace Integers for Integer is Tagged {
+					tag() -> String {
+						<- "i{@}"
+					}
+				}
+
+				test "asks" {
+					expect doubled::shout()::is("i4?")
+				}
+			}`,
+		)
+
+		try {
+			let compiled = await compileToMemory(join(directory, "Main.es"), {
+				tests: true,
+			})
+
+			expect(compiled.diagnostics).toEqual([])
+
+			let { loaded, dispose } = await load(compiled.code, ".mjs")
+
+			try {
+				let summary = await loaded.$tests.run(
+					loaded.$tests.registry(),
+					{
+						sink: () => {},
+						now: () => 0,
+					},
+				)
+
+				expect(summary).toMatchObject({ passed: 2, failed: 0 })
+			} finally {
+				dispose()
+			}
+		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
 	})
