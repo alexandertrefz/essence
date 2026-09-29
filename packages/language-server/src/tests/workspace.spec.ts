@@ -2792,6 +2792,64 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
+		// NOTE: The file's `type Sized` takes the name an entry would bind, so
+		// the import is refused as a duplicate, and the alias the Help asks for
+		// is a name no edit can choose.
+		it("should offer no import of a name the file binds already", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Sized.es": [
+					"implementation {",
+					"\tprotocol Sized {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"",
+					"\tfunction measure <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- item::size()",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSized",
+					"\tmeasure",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Sized.es" { measure }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Sized = { count: Integer }",
+					"",
+					"\tfunction relay <infer Item is Sized>(_ item: Item) -> Integer {",
+					"\t\t<- 1",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\trelay",
+					"\tSized",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let reported = analyseDocument(
+				workspace.sourceOf(mainPath) ?? "",
+				mainPath,
+				{ host: workspace.host },
+			).diagnostics.find(
+				(diagnostic) => diagnostic.code === "unknown-protocol",
+			)
+
+			expect(reported?.helps).toEqual([
+				"'Sized' is declared in Sized.es — import it under a name of its own, 'Sized as …', and write that name here, since this file binds 'Sized' already.",
+			])
+			expect(fixesFor(workspace, mainPath, 8, "Sized")).toEqual([])
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

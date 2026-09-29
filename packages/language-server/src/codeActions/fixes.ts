@@ -7,7 +7,7 @@ import {
 	relativeSpecifier,
 } from "../autoImport"
 import { isSamePosition } from "../positions"
-import type { Workspace } from "../workspace"
+import { namesBoundBy, type Workspace } from "../workspace"
 import {
 	closingBraceAfter,
 	closingBraceOf,
@@ -287,6 +287,10 @@ export type ImportContext = {
 // NOTE: One action per exporting Module rather than a guess between them. Two
 // Modules exporting one name is a real shape — a facade and the Module behind
 // it — and which of them a reader means is not something a Diagnostic can say.
+//
+// None where the file binds the name already: the entry would be refused as a
+// duplicate, and an import under a name of its own needs a name no edit can
+// choose.
 export function importActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -297,6 +301,11 @@ export function importActions(
 	}
 
 	let name = sliceOf(lines, diagnostic.position)
+
+	if (namesBoundBy(imports.program).has(name)) {
+		return []
+	}
+
 	let exporters = imports.workspace
 		.exportersOf(name)
 		.filter((exported) => exported.filePath !== imports.filePath)

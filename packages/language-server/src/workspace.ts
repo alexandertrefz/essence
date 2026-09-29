@@ -1358,12 +1358,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			return []
 		}
 
-		let taken = new Set<string>([
-			...topLevelDeclarations(program).keys(),
-			...(program.imports?.entries ?? []).map(
-				(entry) => (entry.alias ?? entry.name).content,
-			),
-		])
+		let taken = namesBoundBy(program)
 
 		return [...knownFiles()].flatMap((candidate) => {
 			if (candidate === filePath) {
@@ -2402,6 +2397,17 @@ function topLevelDeclarations(
 	}
 
 	return declarations
+}
+
+// NOTE: The names a file's top level binds, what it declares and what its import
+// block binds, which the Compiler refuses an import entry of as a duplicate.
+export function namesBoundBy(program: parser.Program): Set<string> {
+	return new Set<string>([
+		...topLevelDeclarations(program).keys(),
+		...(program.imports?.entries ?? []).map(
+			(entry) => (entry.alias ?? entry.name).content,
+		),
+	])
 }
 
 // NOTE: A discovery walk, not a watcher — the watcher is the client's, and it
