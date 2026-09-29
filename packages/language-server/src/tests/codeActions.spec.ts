@@ -5586,6 +5586,38 @@ describe("Code Actions", () => {
 			).not.toContain("Implement 'Sized'")
 		})
 
+		// NOTE: The tests block's `Sized` is another Protocol, in reach only
+		// inside the tests, so the Namespace owes the implementation's `size`.
+		it("should stub the Protocol the clause resolved to, not one of its name", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\tnamespace IntegerSized for Integer is Sized {",
+				"\t}",
+				"}",
+				"",
+				"tests {",
+				"\tprotocol Sized {",
+				"\t\tweight() -> String",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let [refactor] = actionsOf(lines, {
+				start: { line: 6, column: 2 },
+				end: { line: 6, column: 11 },
+			})
+
+			expect(fix.title).toBe("Implement 'Sized'")
+			expect(applied(lines, fix)[6]).toBe("\t\tsize() -> Integer {}")
+			expect(refactor.title).toBe("Implement 'Sized'")
+			expect(applied(lines, refactor)[6]).toBe("\t\tsize() -> Integer {}")
+		})
+
 		// NOTE: A Function Type prints as no annotation the Parser reads back,
 		// so a stub written with one would not compile.
 		it("should offer no stub for a requirement it can not spell", () => {

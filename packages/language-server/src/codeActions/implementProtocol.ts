@@ -89,7 +89,11 @@ export function implementProtocolAction(
 		return []
 	}
 
-	let protocol = protocolsOf(enrichedProgram, imported)[protocolName]
+	let protocol = protocolNamed(
+		protocolsOf(enrichedProgram, imported),
+		protocolName,
+		conformer.typed.type.conformsTo ?? [],
+	)
 
 	if (protocol === undefined) {
 		return []
@@ -129,7 +133,7 @@ export function implementProtocolActions(
 		let granted = conformer.typed.type.conformsTo ?? []
 
 		for (let clause of conformer.typed.conformsTo) {
-			let protocol = protocols[clause.name]
+			let protocol = protocolNamed(protocols, clause.name, granted)
 
 			// NOTE: The Quick Fix answers on the clause's own Identifier, and
 			// this is the same edit under the same title — so it stands down
@@ -447,16 +451,13 @@ function isChoice(type: common.Type): boolean {
 // counts only where it fulfils the requirement `solving` has of its name, and
 // one whose Protocol is out of reach here is taken to fulfil it.
 function providerIn(
-	protocols: Record<string, common.ProtocolType>,
+	protocols: Array<ProtocolInReach>,
 	granted: ReadonlyArray<string>,
 	solving: common.ProtocolType,
 	target: common.Type | null,
 ): (methodName: string) => string | null {
 	let byIdentity = new Map(
-		Object.values(protocols).map((protocol) => [
-			protocol.identity,
-			protocol,
-		]),
+		protocols.map(({ protocol }) => [protocol.identity, protocol]),
 	)
 	let fulfils = (provider: string, methodName: string): boolean => {
 		let body = byIdentity.get(provider)?.methods[methodName]
@@ -494,15 +495,15 @@ function providerIn(
 // conformance whose body of the name it replaces, as the Enricher judges it.
 // The Enricher offers no stub there either.
 function refusedElsewhere(
-	protocols: Record<string, common.ProtocolType>,
+	protocols: Array<ProtocolInReach>,
 	granted: ReadonlyArray<string>,
 	solving: common.ProtocolType,
 	owed: Array<string>,
 	target: common.Type | null,
 ): boolean {
-	let reached = Object.values(protocols).filter((protocol) =>
-		granted.includes(protocol.identity),
-	)
+	let reached = protocols
+		.map(({ protocol }) => protocol)
+		.filter((protocol) => granted.includes(protocol.identity))
 
 	return (
 		target !== null &&
@@ -521,18 +522,19 @@ function refusedElsewhere(
 	)
 }
 
-// NOTE: The document's own Protocols over the ones it inherits — a standard
-// library source declares the very Protocols the builtin tables hold, and the
-// document's is the one whose requirements belong to it. Each is keyed by the
-// name the document binds it under, which for an import is its alias.
+// NOTE: Every Protocol the document can name, under the name it binds it by:
+// the builtins, what its import block bound, which is an alias where it wrote
+// one, and what it declares, a tests block's own among them.
+type ProtocolInReach = { spelling: string; protocol: common.ProtocolType }
+
 function protocolsOf(
 	enrichedProgram: common.typed.Program | null,
 	imported: ImportedNames | null,
-): Record<string, common.ProtocolType> {
-	let protocols: Record<string, common.ProtocolType> = {
-		...builtinProtocols(),
-		...imported?.protocols,
-	}
+): Array<ProtocolInReach> {
+	let protocols = [
+		...Object.entries(builtinProtocols()),
+		...Object.entries(imported?.protocols ?? {}),
+	].map(([spelling, protocol]) => ({ spelling, protocol }))
 
 	if (enrichedProgram === null) {
 		return protocols
@@ -540,11 +542,30 @@ function protocolsOf(
 
 	for (let node of typedProgramNodes(enrichedProgram)) {
 		if (node.nodeType === "ProtocolDeclarationStatement") {
-			protocols[node.name.content] = node.protocolType
+			protocols.push({
+				spelling: node.name.content,
+				protocol: node.protocolType,
+			})
 		}
 	}
 
 	return protocols
+}
+
+// NOTE: The Protocol a clause names, told apart from another of its spelling
+// by the identity the Enricher resolved the clause to. A standard library
+// source declares the builtin Protocols over again, and its own declaration
+// is the one read.
+function protocolNamed(
+	protocols: Array<ProtocolInReach>,
+	spelling: string,
+	granted: ReadonlyArray<string>,
+): common.ProtocolType | undefined {
+	return protocols.findLast(
+		(candidate) =>
+			candidate.spelling === spelling &&
+			granted.includes(candidate.protocol.identity),
+	)?.protocol
 }
 
 function conformersOf(
