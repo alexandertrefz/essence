@@ -6,7 +6,7 @@ import { visibleLength } from "./theme"
 
 const MINIMUM_WIDTH = 20
 const HIDE_CURSOR = "\x1b[?25l"
-const SHOW_CURSOR = "\x1b[?25h"
+export const SHOW_CURSOR = "\x1b[?25h"
 const CLEAR_LINE = "\x1b[2K"
 const CURSOR_UP = "\x1b[1A"
 const CURSOR_START = "\x1b[G"

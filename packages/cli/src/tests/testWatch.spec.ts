@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -365,15 +371,22 @@ describe("The source watcher", () => {
 // the machine takes, and a test that sleeps for it is a test that fails on a
 // busy one.
 type Session = {
+	pid: number
 	runs: () => Array<Array<TestEvent>>
 	waitForRuns: (count: number) => Promise<Array<Array<TestEvent>>>
+	waitForEvent: (kind: TestEvent["kind"]) => Promise<boolean>
 	// NOTE: Awaited rather than fired and forgotten. A watch session that
 	// outlives its test goes on compiling in the background, and the suites
-	// running after it are the ones that pay for it.
-	stop: () => Promise<void>
+	// running after it are the ones that pay for it. One the signal does not
+	// end in time is killed, and answers null.
+	stop: (signal?: NodeJS.Signals) => Promise<number | null>
 }
 
-function startSession(directory: string, extra: Array<string> = []): Session {
+function startSession(
+	directory: string,
+	extra: Array<string> = [],
+	environment: Record<string, string> = {},
+): Session {
 	let child = Bun.spawn(
 		[
 			process.execPath,
@@ -387,7 +400,12 @@ function startSession(directory: string, extra: Array<string> = []): Session {
 			"--no-color",
 			...extra,
 		],
-		{ cwd: directory, stdout: "pipe", stderr: "pipe" },
+		{
+			cwd: directory,
+			env: { ...process.env, ...environment },
+			stdout: "pipe",
+			stderr: "pipe",
+		},
 	)
 	let complete: Array<Array<TestEvent>> = []
 	let current: Array<TestEvent> = []
@@ -425,7 +443,11 @@ function startSession(directory: string, extra: Array<string> = []): Session {
 		}
 	})()
 
+	let seen = (kind: TestEvent["kind"]) =>
+		[...complete.flat(), ...current].some((event) => event.kind === kind)
+
 	return {
+		pid: child.pid,
 		runs: () => complete,
 		async waitForRuns(count: number): Promise<Array<Array<TestEvent>>> {
 			let deadline = Date.now() + 30_000
@@ -436,10 +458,33 @@ function startSession(directory: string, extra: Array<string> = []): Session {
 
 			return complete
 		},
-		async stop(): Promise<void> {
-			child.kill()
+		async waitForEvent(kind: TestEvent["kind"]): Promise<boolean> {
+			let deadline = Date.now() + 30_000
 
-			await child.exited
+			while (!seen(kind) && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			return seen(kind)
+		},
+		async stop(signal: NodeJS.Signals = "SIGTERM"): Promise<number | null> {
+			child.kill(signal)
+
+			// NOTE: What `exited` answers rather than `exitCode`, which is null
+			// for a process the signal's default action ended.
+			let code = await Promise.race([
+				child.exited,
+				new Promise<null>((resolve) =>
+					setTimeout(() => resolve(null), 10_000),
+				),
+			])
+
+			if (code === null) {
+				child.kill("SIGKILL")
+				await child.exited
+			}
+
+			return code
 		},
 	}
 }
@@ -481,6 +526,25 @@ describe("essence test --watch", () => {
 		"tests {",
 		'\ttest "adds" {',
 		"\t\texpect 2::add(2)::is(4)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const spinning = [
+		"implementation {",
+		"\tfunction spin(_ value: Integer) -> Integer {",
+		"\t\tif value::isNegative() {",
+		"\t\t\t<- value",
+		"\t\t}",
+		"",
+		"\t\t<- spin(value::add(1))",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "spins" {',
+		"\t\texpect spin(1)::is(4)",
 		"\t}",
 		"}",
 		"",
@@ -704,5 +768,99 @@ describe("essence test --watch", () => {
 				await session.stop()
 			}
 		})
+	}, 60_000)
+
+	// NOTE: A session ends by a signal as often as by a keypress: a closing
+	// terminal sends SIGHUP and a supervisor sends SIGTERM. The session stages
+	// into a temporary directory of the test's own, so what is there is its.
+	for (let [signal, status] of [
+		["SIGTERM", 143],
+		["SIGHUP", 129],
+		["SIGINT", 130],
+	] as const) {
+		it(`removes its staging and exits ${status} when ${signal} ends it`, async () => {
+			let temporary = mkdtempSync(
+				path.join(tmpdir(), "essence-watch-temporary-"),
+			)
+			let staged = () =>
+				readdirSync(temporary).filter((name) =>
+					name.startsWith("essence-test-watch-"),
+				)
+
+			try {
+				await withProject(
+					{ "Other.tests.es": other },
+					async (directory) => {
+						let session = startSession(directory, [], {
+							TMPDIR: temporary,
+						})
+						let runs = await session.waitForRuns(1)
+						let during = staged()
+						let code = await session.stop(signal)
+
+						expect(runs).toHaveLength(1)
+						expect(during).toHaveLength(1)
+						expect(code).toBe(status)
+						expect(staged()).toEqual([])
+					},
+				)
+			} finally {
+				rmSync(temporary, { recursive: true, force: true })
+			}
+		}, 60_000)
+	}
+
+	// NOTE: The tests run on the session's own thread, and a handler waits for
+	// the thread, so a test that never yields leaves a signal its default
+	// action. What that leaves behind, the next session sweeps.
+	it("stops on SIGTERM while a test spins, and the next session sweeps its staging", async () => {
+		let temporary = mkdtempSync(
+			path.join(tmpdir(), "essence-watch-temporary-"),
+		)
+		let staged = () =>
+			readdirSync(temporary).filter((name) =>
+				name.startsWith("essence-test-watch-"),
+			)
+
+		try {
+			await withProject(
+				{ "Spin.tests.es": spinning },
+				async (directory) => {
+					let session = startSession(directory, [], {
+						TMPDIR: temporary,
+					})
+					let started = await session.waitForEvent("test-start")
+					let code = await session.stop("SIGTERM")
+
+					expect(started).toBe(true)
+					expect(code).toBe(143)
+					expect(staged()).toHaveLength(1)
+				},
+			)
+
+			await withProject(
+				{ "Other.tests.es": other },
+				async (directory) => {
+					let session = startSession(directory, [], {
+						TMPDIR: temporary,
+					})
+
+					try {
+						expect(await session.waitForRuns(1)).toHaveLength(1)
+						expect(staged()).toEqual([
+							expect.stringMatching(
+								new RegExp(
+									`^essence-test-watch-${session.pid}-`,
+								),
+							),
+						])
+					} finally {
+						await session.stop()
+					}
+				},
+			)
+		} finally {
+			rmSync(temporary, { recursive: true, force: true })
+		}
 	}, 60_000)
 })

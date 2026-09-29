@@ -9,7 +9,10 @@ import {
 	type CoverageSummary,
 	emptyCoverage,
 	mergeCoverage,
+	removeStagingDirectory,
 	type SourceRewrite,
+	stagingDirectoryIn,
+	sweepStagingDirectories,
 	type TestRecord,
 	testFailureDiagnostic,
 } from "@essence-lang/compiler/testing"
@@ -29,11 +32,6 @@ import {
 	type TestWorkerRequest,
 	type TestWorkerResponse,
 } from "./testProtocol"
-import {
-	removeStagingDirectory,
-	stagingDirectoryIn,
-	sweepStagingDirectories,
-} from "./testStaging"
 
 // NOTE: One test session per workspace. It watches what the analysis already
 // watches — the files an Editor opens and the ones that change on disk — works
@@ -58,6 +56,9 @@ const debounceInMilliseconds = 450
 // for a hang, and short enough that a reader who wrote a loop by accident gets
 // their session back within a cup of coffee's inattention.
 const deadlineInMilliseconds = 60_000
+
+// NOTE: One staging directory per Worker, named for the Server's process.
+const stagingPrefix = "essence-lsp-tests-"
 
 type TestSessionOptions = {
 	// NOTE: The workspace's test files, and every file a change to one file
@@ -188,7 +189,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let debounce = options.debounce ?? debounceInMilliseconds
 	let deadline = options.deadline ?? deadlineInMilliseconds
 	let stagingRoot = options.stagingRoot ?? tmpdir()
-	let sweeping = sweepStagingDirectories(stagingRoot)
+	let sweeping = sweepStagingDirectories(stagingRoot, stagingPrefix)
 	let enabled = true
 	let coverageEnabled = false
 	// NOTE: Laid over cycle by cycle. A cycle covers what a change reached and
@@ -289,7 +290,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			return worker
 		}
 
-		let staging = stagingDirectoryIn(stagingRoot)
+		let staging = stagingDirectoryIn(stagingRoot, stagingPrefix)
 		let started = new Worker(workerPath, {
 			// NOTE: The Worker's own stdout, kept out of the Server's. The
 			// Server speaks LSP over stdio, and one `Terminal.print` from a

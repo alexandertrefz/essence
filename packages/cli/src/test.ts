@@ -1,4 +1,4 @@
-import { copyFile, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { copyFile, link, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -20,6 +20,8 @@ import {
 	readSnapshots,
 	type SnapshotStore,
 	type SnapshotWrites,
+	stagingDirectoryIn,
+	sweepStagingDirectories,
 	writeBenchmarks,
 	writeCorpus,
 	writeSnapshots,
@@ -255,6 +257,19 @@ export function focusedTests(suites: Array<LoadedSuite>): Array<FocusedTest> {
 				keywordPosition: test.entry.keywordPosition,
 			})),
 	)
+}
+
+// NOTE: A run's staging directory, named for its process. A run a signal ended
+// may not reach the code that removes its directory, so every run first sweeps
+// the ones whose process has stopped.
+export async function createStagingDirectory(prefix: string): Promise<string> {
+	await sweepStagingDirectories(tmpdir(), prefix)
+
+	let staging = stagingDirectoryIn(tmpdir(), prefix)
+
+	await mkdir(staging)
+
+	return staging
 }
 
 // NOTE: Bun's module resolver remembers what a directory held the first time it
@@ -1135,7 +1150,7 @@ export async function runTest(
 		}
 	}
 
-	let staging = await mkdtemp(path.join(tmpdir(), "essence-test-"))
+	let staging = await createStagingDirectory("essence-test-")
 	let restore = redirectStdout()
 	let suites: Array<LoadedSuite>
 	let run: TestRun = emptyRun

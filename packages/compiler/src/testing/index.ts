@@ -858,3 +858,10 @@ export {
 	type SourceRewrite,
 	writeSnapshots,
 } from "./snapshots"
+// NOTE: Staging is shared by the command line and the Language Server, and
+// lives next door so that neither has to import the other to reach it.
+export {
+	removeStagingDirectory,
+	stagingDirectoryIn,
+	sweepStagingDirectories,
+} from "./staging"

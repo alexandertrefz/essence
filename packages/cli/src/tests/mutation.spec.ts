@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
@@ -718,6 +721,30 @@ describe("essence test --mutate", () => {
 
 			expect(plain?.status).toBe("uncovered")
 		})
+	})
+
+	// NOTE: A run a signal ends never reaches the code that removes its
+	// staging, so the next run sweeps the directory of every run whose process
+	// has stopped. Its name is what says whose it was, and no process can have
+	// the one written here.
+	it("sweeps the staging a stopped run left behind", async () => {
+		let left = path.join(
+			tmpdir(),
+			`essence-mutate-${2 ** 31 - 2}-left-by-${process.pid}`,
+		)
+
+		mkdirSync(path.join(left, "baseline"), { recursive: true })
+
+		try {
+			await withFiles({ "Grading.es": SHARP }, async (directory) => {
+				let { code } = await mutate(directory)
+
+				expect(code).toBe(EXIT_SUCCESS)
+				expect(existsSync(left)).toBe(false)
+			})
+		} finally {
+			rmSync(left, { recursive: true, force: true })
+		}
 	})
 })
 

@@ -2221,6 +2221,81 @@ describe("essence test — a test that waits", () => {
 	})
 })
 
+// NOTE: A run a signal ends never reaches the code that removes its staging, so
+// the next run sweeps it. Both runs are children pointed at a temporary
+// directory of this spec's own, so everything staged there is theirs.
+describe("essence test — staging", () => {
+	const sleeping = [
+		"tests {",
+		'\ttest "waits for longer than the run lasts" {',
+		"\t\tconstant waited = complete Async.sleep(milliseconds 600000)",
+		"",
+		"\t\texpect 1::is(1)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const quick = [
+		"tests {",
+		'\ttest "adds" {',
+		"\t\texpect 2::add(2)::is(4)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("sweeps the staging a run ended by a signal left behind", async () => {
+		await withFiles(
+			{
+				"slow/Sleeping.tests.es": sleeping,
+				"quick/Adding.tests.es": quick,
+			},
+			async (directory) => {
+				let temporary = path.join(directory, "temporary")
+				let binary = fileURLToPath(
+					import.meta.resolve("../../bin/essence"),
+				)
+				let environment = { ...process.env, TMPDIR: temporary }
+				let staged = () =>
+					readdirSync(temporary).filter((name) =>
+						name.startsWith("essence-test-"),
+					)
+
+				mkdirSync(temporary)
+
+				let first = Bun.spawn(
+					[process.execPath, binary, "test", "slow", "--jobs", "1"],
+					{
+						cwd: directory,
+						env: environment,
+						stdout: "ignore",
+						stderr: "ignore",
+					},
+				)
+				let deadline = Date.now() + 30_000
+
+				while (staged().length === 0 && Date.now() < deadline) {
+					await new Promise((resolve) => setTimeout(resolve, 25))
+				}
+
+				first.kill("SIGTERM")
+
+				expect(await first.exited).toBe(143)
+				expect(staged()).toHaveLength(1)
+
+				let second = await spawnAndWait(
+					[process.execPath, binary, "test", "quick", "--jobs", "1"],
+					{ cwd: directory, env: environment },
+				)
+
+				expect(second.code).toBe(EXIT_SUCCESS)
+				expect(staged()).toEqual([])
+			},
+		)
+	}, 60_000)
+})
+
 // NOTE: Piped, because what is asserted is that the run's own input never
 // reaches a test: not in the pass that renders names, not in a test, and not
 // after a test's wait.

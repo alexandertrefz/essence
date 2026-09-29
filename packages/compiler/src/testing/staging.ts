@@ -3,28 +3,28 @@ import { rmSync } from "node:fs"
 import { readdir, rm } from "node:fs/promises"
 import * as path from "node:path"
 
-// NOTE: Where the test Workers stage the bundles they import: one directory per
-// Worker, named for the Server's process so that a later Server can tell the
-// directory of one that has stopped from one still in use.
-
-const STAGING_PREFIX = "essence-lsp-tests-"
-const STAGING_NAME = new RegExp(`^${STAGING_PREFIX}(\\d+)-`)
-
-export function stagingDirectoryIn(root: string): string {
-	return path.join(root, `${STAGING_PREFIX}${process.pid}-${randomUUID()}`)
+// NOTE: Where a test run stages the bundles it imports: a directory named for
+// the process that made it, under a prefix of the tool's own, so that a later
+// run can tell the directory of one that has stopped from one still in use.
+export function stagingDirectoryIn(root: string, prefix: string): string {
+	return path.join(root, `${prefix}${process.pid}-${randomUUID()}`)
 }
 
-// NOTE: Never throws. It runs in a Worker's `exit` listener, where a throw
-// would take the Server down with it.
+// NOTE: Never throws. It runs in a Worker's `exit` listener and in a signal
+// handler, where a throw would take the process down with it.
 export function removeStagingDirectory(directory: string): void {
 	try {
 		rmSync(directory, { recursive: true, force: true })
 	} catch {}
 }
 
-// NOTE: The directories a Server that was killed or crashed left behind. A
+// NOTE: The directories a process that was killed or crashed left behind. A
 // directory without a process in its name, or whose process is running, stays.
-export async function sweepStagingDirectories(root: string): Promise<void> {
+export async function sweepStagingDirectories(
+	root: string,
+	prefix: string,
+): Promise<void> {
+	let owned = new RegExp(`^${prefix}(\\d+)-`)
 	let names: Array<string>
 
 	try {
@@ -34,7 +34,7 @@ export async function sweepStagingDirectories(root: string): Promise<void> {
 	}
 
 	for (let name of names) {
-		let owner = STAGING_NAME.exec(name)?.[1]
+		let owner = owned.exec(name)?.[1]
 
 		if (owner === undefined || isRunning(Number(owner))) {
 			continue

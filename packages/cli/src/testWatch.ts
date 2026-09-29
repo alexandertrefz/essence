@@ -1,7 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { rm } from "node:fs/promises"
+import { constants } from "node:os"
 import * as path from "node:path"
 
+import { removeStagingDirectory } from "@essence-lang/compiler/testing"
 import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_SUCCESS } from "./actions"
@@ -15,8 +16,10 @@ import {
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import { redirectStdout } from "./running"
+import { SHOW_CURSOR } from "./terminal"
 import {
 	claimRegistries,
+	createStagingDirectory,
 	holdsFocus,
 	type LoadedBundle,
 	type LoadedSuite,
@@ -111,7 +114,45 @@ export async function runTestWatch(
 	// inside it. Bun's resolver remembers what a directory held the first time
 	// it read anything out of it, so a re-run whose bundle changed has to be
 	// staged somewhere nothing has ever looked — see `stageBundle`.
-	let staging = await mkdtemp(path.join(tmpdir(), "essence-test-watch-"))
+	let staging = await createStagingDirectory("essence-test-watch-")
+
+	// NOTE: A signal ends the session at once, with the status a shell reports
+	// for it. While the session waits, a handler removes the staging first; while
+	// it compiles or runs tests, the next session's sweep does.
+	let stopOnSignal = new Map(
+		(["SIGINT", "SIGTERM", "SIGHUP"] as const).map((signal) => [
+			signal,
+			() => {
+				if (process.stdin.isTTY) {
+					process.stdin.setRawMode(false)
+				}
+
+				if (process.stderr.isTTY) {
+					process.stderr.write(SHOW_CURSOR)
+				}
+
+				removeStagingDirectory(staging)
+				process.exit(128 + constants.signals[signal])
+			},
+		]),
+	)
+	let handling = false
+	let handleSignals = (handled: boolean): void => {
+		if (handled === handling) {
+			return
+		}
+
+		handling = handled
+
+		for (let [signal, stop] of stopOnSignal) {
+			if (handled) {
+				process.on(signal, stop)
+			} else {
+				process.off(signal, stop)
+			}
+		}
+	}
+
 	let dependents = createDependentsIndex()
 	let bundles = new Map<string, LoadedBundle>()
 	let eventsByEntry = new Map<string, Array<TestEvent>>()
@@ -262,6 +303,12 @@ export async function runTestWatch(
 		}
 
 		running = true
+
+		// NOTE: A handler only runs once the thread is free, and a cycle compiles
+		// and runs tests on it, so until its report a cycle leaves each signal its
+		// default action. The turn first lets a signal already caught run.
+		await new Promise((resolve) => setImmediate(resolve))
+		handleSignals(false)
 		cycles += 1
 
 		let started = performance.now()
@@ -510,6 +557,10 @@ export async function runTestWatch(
 				)
 			}
 
+			// NOTE: Before the cycle says it has ended, so that a signal sent
+			// on seeing that finds the handler there.
+			handleSignals(true)
+
 			if (context.options.json) {
 				writeEvent(
 					`${JSON.stringify({
@@ -568,6 +619,7 @@ export async function runTestWatch(
 				restore()
 			}
 
+			handleSignals(true)
 			running = false
 		}
 
@@ -647,9 +699,5 @@ export async function runTestWatch(
 			process.stdin.resume()
 			process.stdin.on("data", onKey)
 		}
-
-		process.on("SIGINT", () => {
-			void shutdown()
-		})
 	})
 }

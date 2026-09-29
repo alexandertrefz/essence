@@ -9,6 +9,7 @@ import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
 import {
 	collectSnapshots,
 	readSnapshots,
+	removeStagingDirectory,
 	type SourceRewrite,
 	writeSnapshots,
 } from "@essence-lang/compiler/testing"
@@ -27,7 +28,6 @@ import type {
 	TestWorkerRequest,
 	TestWorkerResponse,
 } from "./testProtocol"
-import { removeStagingDirectory } from "./testStaging"
 
 // NOTE: The other end of the session — see `testProtocol.ts` for why a Worker
 // exists at all. It compiles each entry with the tests enriched, writes the

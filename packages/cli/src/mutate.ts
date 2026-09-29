@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { mkdir, rm } from "node:fs/promises"
 import * as path from "node:path"
 import { Worker } from "node:worker_threads"
 
@@ -42,6 +41,7 @@ import { workerFileName } from "./pool"
 import { redirectStdout, rendered } from "./running"
 import {
 	claimRegistries,
+	createStagingDirectory,
 	focusedTests,
 	loadBundles,
 	type LoadedSuite,
@@ -562,7 +562,7 @@ export async function runMutation(
 		contracts,
 		enumerateMutations: true,
 	})
-	let staging = await mkdtemp(path.join(tmpdir(), "essence-mutate-"))
+	let staging = await createStagingDirectory("essence-mutate-")
 	// NOTE: Built once the stores it hands its Workers are known, which is after
 	// the baseline compiled — so it is a name declared here and assigned there,
 	// because the `finally` below is what disposes of it however the run ends.
