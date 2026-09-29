@@ -1,8 +1,5 @@
-# NOTE: The suite is this repository's only gate — there is nothing to build, so
-# a green run means exactly what a contributor's own two commands mean: the
-# checkout type-checks, and every spec passes. Both are run, in that order,
-# because a type error is the cheaper failure to read and there is no reason to
-# wait for the specs to hear about it.
+# NOTE: The gate runs the root scripts a contributor runs, cheapest first, so
+# the quickest failure to read is the first one reported.
 name: Test
 
 on:
@@ -35,6 +32,12 @@ jobs:
       # have to change the lockfile fails here instead of quietly resolving
       # something newer than what the versions were pinned to.
       - run: bun install --frozen-lockfile
+
+      # NOTE: `.es` sources are held to `esfmt` by the formatter's own spec, so
+      # `bun run test` is their format check.
+      - run: bun run format:check
+
+      - run: bun run lint
 
       - run: bun run typecheck
 

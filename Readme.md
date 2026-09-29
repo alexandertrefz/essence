@@ -276,9 +276,10 @@ bun run typecheck # type-check every package, as one program
 own. A plain `bun test <pattern>` still runs a file or a few in one process, which is what to reach for while
 working on one.
 
-Every push and every pull request runs `bun run typecheck` and `bun run test` on GitHub Actions, against the
-Bun named in `.bun-version` — the one this repository is developed against, so a failure there is a failure
-that reproduces here. `bun run check` is not run there, so lint and format stay a local habit.
+Every push and every pull request runs `bun run format:check`, `bun run lint`, `bun run typecheck` and
+`bun run test` on GitHub Actions, against the Bun named in `.bun-version` — the one this repository is developed
+against, so a failure there is a failure that reproduces here. `bun run check` fixes what the first two report
+where it can.
 
 `essence lsp` starts the Language Server on stdio, as does the `esls` executable in
 [packages/language-server/bin](packages/language-server/bin). To develop the VS Code extension against a live
