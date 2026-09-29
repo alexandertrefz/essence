@@ -279,7 +279,7 @@ working on one.
 Every push and every pull request runs `bun run format:check`, `bun run lint`, `bun run typecheck` and
 `bun run test` on GitHub Actions, against the Bun named in `.bun-version` — the one this repository is developed
 against, so a failure there is a failure that reproduces here. `bun run check` fixes what the first two report
-where it can.
+where it can. A second job builds the website and checks its links, as the Netlify deploy does.
 
 `essence lsp` starts the Language Server on stdio, as does the `esls` executable in
 [packages/language-server/bin](packages/language-server/bin). To develop the VS Code extension against a live
