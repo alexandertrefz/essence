@@ -217,14 +217,15 @@ type WalkContext = {
 	// NOTE: Property and Method Declarations per Namespace name — the typed
 	// AST identifies resolved Namespaces by name.
 	namespaceMembers: Map<string, Map<string, Declaration>>
-	// NOTE: The same, per Protocol name, apart because a Protocol and a
-	// Namespace may be spelled alike. Calls a Protocol answers bind here: a
-	// provided Method, and any Method called on a bounded Type.
+	// NOTE: The same, per Protocol, apart because a Protocol and a Namespace
+	// may be spelled alike. Calls a Protocol answers bind here: a provided
+	// Method, and any Method called on a bounded Type. Keyed as
+	// `protocolKeyOf` keys a Protocol, since two may share a name.
 	protocolMembers: Map<string, Map<string, Declaration>>
 	// NOTE: The Protocols each Protocol declared here extends, as its `is` list
-	// writes them. A requirement is looked for through them as well.
+	// names them. A requirement is looked for through them as well.
 	protocolExtensions: Map<string, Array<string>>
-	// NOTE: The name of each Protocol declared here, by the identity the typed
+	// NOTE: The key of each Protocol declared here, by the identity the typed
 	// tree names it by, filled as the typed pass reaches each declaration.
 	ownProtocols: Map<string, string>
 	// NOTE: The references a Protocol answers, bound once the typed pass has
@@ -269,7 +270,9 @@ type ExternalMemberReference = {
 // it does, the two are one name: renaming either alone breaks the conformance.
 export type ConformanceLink = {
 	declaration: Declaration
-	// NOTE: As the `is` clause writes it, which may be an import's local name.
+	// NOTE: The Protocol the `is` clause names, keyed by `protocolKeyOf`: as
+	// the clause writes it, which may be an import's local name, or with its
+	// Position for one this file declares in a body.
 	protocolName: string
 	memberName: string
 }
@@ -1823,22 +1826,25 @@ function walkProtocolDeclaration(
 	scope: Scope,
 	context: WalkContext,
 ) {
-	declareInScope(scope, "types", node.name, "protocol", context)
+	let key = protocolKeyOf(
+		node.name.content,
+		declareInScope(scope, "types", node.name, "protocol", context),
+		context,
+	)
 
 	// NOTE: An extension names a Protocol declared elsewhere, so renaming that
 	// Protocol has to move this spelling of it too.
-	for (let clause of node.conformsTo) {
-		reference(scope, "types", clause.protocol, context)
-	}
-
-	let extensions = context.protocolExtensions.get(node.name.content)
+	let extended = node.conformsTo.map((clause) =>
+		protocolReference(clause.protocol, scope, context),
+	)
+	let extensions = context.protocolExtensions.get(key)
 
 	if (extensions === undefined) {
 		extensions = []
-		context.protocolExtensions.set(node.name.content, extensions)
+		context.protocolExtensions.set(key, extensions)
 	}
 
-	extensions.push(...node.conformsTo.map((clause) => clause.protocol.content))
+	extensions.push(...extended)
 
 	// NOTE: `Self` is visible inside the signatures — builtin, so it colours
 	// like a Type Parameter but can not be renamed.
@@ -1856,11 +1862,11 @@ function walkProtocolDeclaration(
 	// call a Protocol resolved: a provided Method, or any Method called on a
 	// bounded Type. A call on a conformer binds to the conformer's own Method,
 	// which joins this one through `conformances`.
-	let memberDeclarations = context.protocolMembers.get(node.name.content)
+	let memberDeclarations = context.protocolMembers.get(key)
 
 	if (memberDeclarations === undefined) {
 		memberDeclarations = new Map()
-		context.protocolMembers.set(node.name.content, memberDeclarations)
+		context.protocolMembers.set(key, memberDeclarations)
 	}
 
 	for (let member of Object.values(node.methods)) {
@@ -1889,7 +1895,7 @@ function walkProtocolDeclaration(
 			"write",
 		)
 
-		linkConformances(declaration, member.name.content, node, context)
+		linkConformances(declaration, member.name.content, extended, context)
 
 		let signatures =
 			member.nodeType === "OverloadedProtocolMethod" ||
@@ -1943,8 +1949,10 @@ function walkNamespaceDefinition(
 	// NOTE: A clause's Protocol resolves in the outer Scope, its `where`
 	// conditions' LHS Generic through the Namespace's own Type Parameters, and
 	// each condition's RHS Protocol in the outer Scope again.
+	let conformed: Array<string> = []
+
 	for (let clause of node.conformsTo) {
-		reference(scope, "types", clause.protocol, context)
+		conformed.push(protocolReference(clause.protocol, scope, context))
 
 		for (let condition of clause.conditions) {
 			reference(genericScope, "types", condition.generic, context)
@@ -2011,7 +2019,7 @@ function walkNamespaceDefinition(
 			"write",
 		)
 
-		linkConformances(declaration, member.name.content, node, context)
+		linkConformances(declaration, member.name.content, conformed, context)
 	}
 
 	if (node.targetType !== null) {
@@ -2619,18 +2627,48 @@ function resolveRecordMembers(context: WalkContext) {
 function linkConformances(
 	declaration: Declaration,
 	memberName: string,
-	node:
-		| parser.NamespaceDefinitionStatementNode
-		| parser.ProtocolDeclarationStatementNode,
+	protocolNames: Array<string>,
 	context: WalkContext,
 ) {
-	for (let clause of node.conformsTo) {
-		context.conformances.push({
-			declaration,
-			protocolName: clause.protocol.content,
-			memberName,
-		})
+	for (let protocolName of protocolNames) {
+		context.conformances.push({ declaration, protocolName, memberName })
 	}
+}
+
+// NOTE: A Protocol named in an `is` list, resolved where the list is written
+// and keyed by `protocolKeyOf`.
+function protocolReference(
+	identifier: parser.IdentifierNode,
+	scope: Scope,
+	context: WalkContext,
+): string {
+	return protocolKeyOf(
+		identifier.content,
+		reference(scope, "types", identifier, context),
+		context,
+	)
+}
+
+// NOTE: A Protocol declared at the top level is keyed by its name, which is
+// how another file and the builtins name it too. One declared anywhere else
+// carries the Position of its name as well, as its identity does, because it
+// may share that name with another.
+function protocolKeyOf(
+	name: string,
+	declaration: Declaration | null,
+	context: WalkContext,
+): string {
+	let definition = declaration?.definition ?? null
+	let topLevel = context.scopes.find((entry) => entry.range === null)
+
+	if (
+		definition === null ||
+		topLevel?.scope.types.get(name) === declaration
+	) {
+		return name
+	}
+
+	return `${name}@${definition.start.line}:${definition.start.column}`
 }
 
 // NOTE: Undefined where the Protocol, or the one it extends that holds the
@@ -2839,6 +2877,13 @@ function bindProtocolMembers(context: WalkContext) {
 	}
 }
 
+// NOTE: The key `protocolKeyOf` gives a Protocol, read off its identity: what
+// follows the Module path, which is the name and, for one declared in a body,
+// the Position of its name.
+export function protocolIdentityKey(identity: string): string {
+	return identity.slice(identity.lastIndexOf("#") + 1)
+}
+
 function boundProtocol(type: common.Type | null): string | undefined {
 	return type?.type === "GenericUse" ? type.constraint : undefined
 }
@@ -2931,7 +2976,7 @@ function walkTypedNode(
 		case "ProtocolDeclarationStatement":
 			context.ownProtocols.set(
 				node.protocolType.identity,
-				node.name.content,
+				protocolIdentityKey(node.protocolType.identity),
 			)
 			walkTypedMethods(node.methods, context)
 			return

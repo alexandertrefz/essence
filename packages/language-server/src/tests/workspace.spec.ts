@@ -1187,6 +1187,110 @@ describe("Workspace", () => {
 			})
 		})
 
+		// NOTE: A Protocol declared in a body is named by no top level entry, and
+		// may share its name with the one declared at the top level.
+		describe("a Protocol declared in a body", () => {
+			const tagged = [
+				"\tfunction inner() -> Integer {",
+				"\t\tprotocol Tagged {",
+				"\t\t\ttag() -> Integer",
+				"",
+				"\t\t\tdoubled() -> Integer {",
+				"\t\t\t\t<- @::tag()::multiply(with 2)",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tnamespace IntegerTagged for Integer is Tagged {",
+				"\t\t\ttag() -> Integer {",
+				"\t\t\t\t<- @",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tfunction read <infer Item is Tagged>(_ item: Item) -> Integer {",
+				"\t\t\t<- item::tag()",
+				"\t\t}",
+				"",
+				"\t\t<- read(3)",
+				"\t}",
+			]
+
+			let renamedLines = (
+				source: string,
+				renamed: Record<string, string> | null,
+			): Array<number> =>
+				(renamed?.["Main.es"] ?? "")
+					.split("\n")
+					.flatMap((line, index) =>
+						line !== source.split("\n")[index] ? [index + 1] : [],
+					)
+
+			it("should rename a conformer's Method with its requirement and calls", () => {
+				let main = [
+					"implementation {",
+					...tagged,
+					"",
+					"\tTerminal.inspect(inner())",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({ "Main.es": main })
+
+				for (let line of [4, 7, 12, 18]) {
+					expect(
+						renamedLines(
+							main,
+							renameAcross(
+								workspace,
+								pathOf("Main.es"),
+								cursorAt(main, line, "tag"),
+								"label",
+							),
+						),
+					).toEqual([4, 7, 12, 18])
+				}
+			})
+
+			it("should keep it apart from the top level Protocol of its name", () => {
+				let main = [
+					"implementation {",
+					"\tprotocol Tagged {",
+					"\t\ttag() -> Integer",
+					"\t}",
+					"",
+					"\tnamespace StringTagged for String is Tagged {",
+					"\t\ttag() -> Integer {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction outer <infer Item is Tagged>(_ item: Item) -> Integer {",
+					"\t\t<- item::tag()",
+					"\t}",
+					"",
+					...tagged,
+					"",
+					'\tTerminal.inspect(outer("a"))',
+					"\tTerminal.inspect(inner())",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({ "Main.es": main })
+				let renamedFrom = (line: number) =>
+					renamedLines(
+						main,
+						renameAcross(
+							workspace,
+							pathOf("Main.es"),
+							cursorAt(main, line, "tag"),
+							"label",
+						),
+					)
+
+				expect(renamedFrom(3)).toEqual([3, 7, 13])
+				expect(renamedFrom(18)).toEqual([18, 21, 26, 32])
+			})
+		})
+
 		// NOTE: The alias is a name of the importing file alone, so the members
 		// are read off the Module that declares the Protocol under its own name.
 		describe("a Protocol imported under an alias", () => {

@@ -1852,6 +1852,66 @@ describe("identifierPattern", () => {
 				renamedAt([15, 20]),
 			)
 		})
+
+		// NOTE: The `Sized` declared in `inner` shadows the top-level one and is
+		// another Protocol, so each requirement renames with its own conformer
+		// and bounded call alone.
+		it("should keep a Protocol declared in a body apart from one of its name", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\tnamespace IntegerSized for Integer is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction inner() -> Integer {",
+				"\t\tprotocol Sized {",
+				"\t\t\tsize() -> Integer",
+				"\t\t}",
+				"",
+				"\t\tnamespace StringSized for String is Sized {",
+				"\t\t\tsize() -> Integer {",
+				"\t\t\t\t<- 1",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tfunction gauge <infer Item is Sized>(_ item: Item) -> Integer {",
+				"\t\t\t<- item::size()",
+				"\t\t}",
+				"",
+				'\t\t<- gauge("a")',
+				"\t}",
+				"",
+				"\tfunction outer <infer Item is Sized>(_ item: Item) -> Integer {",
+				"\t\t<- item::size()",
+				"\t}",
+				"",
+				"\tTerminal.inspect(outer(3)::add(inner()))",
+				"}",
+			].join("\n")
+
+			let lines = source.split("\n")
+			let renamedAt = (renamed: Array<number>) =>
+				lines
+					.map((line, index) =>
+						renamed.includes(index + 1)
+							? line.replace("size", "extent")
+							: line,
+					)
+					.join("\n")
+
+			expect(rename(source, { line: 3, column: 3 }, "extent")).toBe(
+				renamedAt([3, 7, 31]),
+			)
+			expect(rename(source, { line: 14, column: 4 }, "extent")).toBe(
+				renamedAt([14, 18, 24]),
+			)
+		})
 	})
 })
 

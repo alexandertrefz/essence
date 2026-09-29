@@ -13,10 +13,7 @@ import {
 	canonicalPath,
 	isStdlibDocument,
 } from "@essence-lang/compiler/documents"
-import {
-	displayProtocolName,
-	patternBindings,
-} from "@essence-lang/compiler/helpers"
+import { patternBindings } from "@essence-lang/compiler/helpers"
 import {
 	type LinkedGraph,
 	type ModuleHost,
@@ -49,6 +46,7 @@ import {
 	occurrenceAt,
 	type OccurrenceAccess,
 	type ProgramIndex,
+	protocolIdentityKey,
 	type RenameEdit,
 } from "./rename"
 
@@ -1977,7 +1975,13 @@ function joinComponent(
 				: undefined
 		}
 
-		let declaring = declaringSiteOf(filePath, protocolName, "types")
+		// NOTE: A Protocol the file declares in a body is keyed by its
+		// Position as well as its name, and no top level name binds it.
+		let declaring =
+			declaringSiteOf(filePath, protocolName, "types") ??
+			(indices.get(filePath)?.protocolMembers.has(protocolName) === true
+				? { filePath, name: protocolName }
+				: null)
 
 		if (declaring === null) {
 			return undefined
@@ -2032,7 +2036,7 @@ function joinComponent(
 		}
 
 		let modulePath = identity.slice(0, separator)
-		let name = displayProtocolName(identity)
+		let name = protocolIdentityKey(identity)
 		let declaringIndex = indices.get(modulePath)
 		let member = declaringIndex?.protocolMembers.get(name)?.get(memberName)
 
