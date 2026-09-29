@@ -16,7 +16,7 @@
 		"generate:schema": "bun scripts/generateProjectSchema.ts",
 		"generate:snippets": "bun scripts/generateSnippets.ts",
 		"test": "bun test --parallel",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p packages/vscode-extension && bun scripts/typecheckExamples.ts",
 		"format:essence": "bun packages/formatter/bin/esfmt 'packages/standard-library/sources/*.es' 'packages/fixtures/files/*.es' packages/fixtures/files/modules examples",
 		"publish:stage": "bun scripts/publishing/stage.ts",
 		"publish:pack": "bun scripts/publishing/stage.ts --pack",
@@ -33,6 +33,7 @@
 		"bun": ">=1.0.x"
 	},
 	"devDependencies": {
+		"@essence-lang/client": "workspace:*",
 		"@essence-lang/compiler": "workspace:*",
 		"@essence-lang/fixtures": "workspace:*",
 		"@essence-lang/language-server": "workspace:*",

@@ -30,6 +30,10 @@ export function isBundle(filePath) {
 // NOTE: What a path setting may say. `${workspaceFolder}` and a relative path
 // are what let a checkout commit a working `.vscode/settings.json` instead of
 // one author's absolute path, and `~` is how a path is written in a shell.
+/**
+ * @param raw
+ * @param {{ workspaceRoot?: string, home?: string }} [where]
+ */
 export function expandPath(raw, { workspaceRoot, home } = {}) {
 	let value = raw.trim()
 

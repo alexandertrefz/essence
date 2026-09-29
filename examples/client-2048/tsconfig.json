@@ -10,5 +10,5 @@
 		// plugin writes beside the source while the dev server runs.
 		"allowArbitraryExtensions": true
 	},
-	"include": ["src/**/*", "vite.config.ts"]
+	"include": ["src/**/*", "vite.config.ts", "client-2048.spec.ts"]
 }

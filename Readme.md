@@ -269,7 +269,7 @@ Bun runs the sources.
 bun install
 bun run test      # run the test suite, a worker per core
 bun run check     # lint and format
-bun run typecheck # type-check every package, as one program
+bun run typecheck # type-check every package, the VS Code extension and the examples
 ```
 
 `bun run test` is `bun test --parallel`: a worker process per core, and every spec file in a global of its

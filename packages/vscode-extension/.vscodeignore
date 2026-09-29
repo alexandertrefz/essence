@@ -5,6 +5,7 @@
 bun.lock
 DEVELOPMENT.md
 buildServer.js
+tsconfig.json
 
 # Bundled into dist/extension.js by `bun run build`.
 node_modules/**

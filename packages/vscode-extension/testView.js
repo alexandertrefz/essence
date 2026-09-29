@@ -489,6 +489,7 @@ export function createTestView(options) {
 			return []
 		}
 
+		/** @type {Array<vscode.FileCoverageDetail>} */
 		let details = coverageLinesOf(coverage).map(
 			(line) =>
 				new vscode.StatementCoverage(
@@ -772,6 +773,7 @@ export function createTestView(options) {
 	// beside this.
 	function sessionEnding(name) {
 		let subscription = null
+		/** @type {Promise<void>} */
 		let ended = new Promise((resolve) => {
 			subscription = vscode.debug.onDidTerminateDebugSession(
 				(session) => {

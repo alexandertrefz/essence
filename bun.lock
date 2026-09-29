@@ -5,6 +5,7 @@
     "": {
       "name": "essence",
       "devDependencies": {
+        "@essence-lang/client": "workspace:*",
         "@essence-lang/compiler": "workspace:*",
         "@essence-lang/fixtures": "workspace:*",
         "@essence-lang/language-server": "workspace:*",
@@ -202,6 +203,7 @@
         "@essence-lang/language-server": "0.5.0",
         "@essence-lang/runtime": "0.5.0",
         "@essence-lang/standard-library": "0.5.0",
+        "@types/vscode": "1.100.0",
         "@vscode/vsce": "3.9.2",
         "minimatch": "10.2.5",
         "vscode-languageclient": "9.0.1",
@@ -671,6 +673,8 @@
     "@types/sarif": ["@types/sarif@2.1.7", "", {}, "sha512-kRz0VEkJqWLf1LLVN4pT1cg1Z9wAuvI6L97V3m2f5B76Tg8d413ddvLBPTEHAZJlnn4XSvu0FkZtViCQGVyrXQ=="],
 
     "@types/unist": ["@types/unist@3.0.3", "", {}, "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q=="],
+
+    "@types/vscode": ["@types/vscode@1.100.0", "", {}, "sha512-4uNyvzHoraXEeCamR3+fzcBlh7Afs4Ifjs4epINyUX/jvdk0uzLnwiDY35UKDKnkCHP5Nu3dljl2H8lR6s+rQw=="],
 
     "@typescript/typescript-aix-ppc64": ["@typescript/typescript-aix-ppc64@7.0.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ=="],
 
