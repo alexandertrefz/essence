@@ -284,9 +284,6 @@ export function findCodeActions(
 		entries.push(...makeGeneratableActions(program, lines, range))
 		entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 		entries.push(...shorthandActions(program, lines, range))
-	}
-
-	if (wanted("quickfix")) {
 		entries.push(
 			...implementProtocolActions(
 				program,

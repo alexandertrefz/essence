@@ -8853,6 +8853,37 @@ describe("the kinds a request narrowed itself to", () => {
 		expect(kinds(["refactor.extract"])).toEqual(new Set())
 		expect(kinds(["refactor"])).toEqual(kinds())
 	})
+
+	// NOTE: Writing a conformance's stubs from the Namespace head is a
+	// refactoring, so the Refactor menu is where it is asked for.
+	it("offers the stubs on a Namespace head under the kind they have", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer }",
+			"",
+			"\tnamespace Point for Point is Printable {",
+			"\t}",
+			"}",
+		].join("\n")
+		let offered = (only: Array<string>) =>
+			findCodeActions(
+				source,
+				{ start: { line: 4, column: 2 }, end: { line: 4, column: 11 } },
+				undefined,
+				undefined,
+				null,
+				[],
+				only,
+			).map((entry) => [entry.kind, entry.title])
+
+		expect(offered(["refactor"])).toEqual([
+			["refactor.rewrite", "Implement 'Printable'"],
+		])
+		expect(offered(["refactor.rewrite"])).toEqual([
+			["refactor.rewrite", "Implement 'Printable'"],
+		])
+		expect(offered(["quickfix"])).toEqual([])
+	})
 })
 
 // NOTE: The Quick Fixes for the Diagnostics asynchrony reports. Each is checked
