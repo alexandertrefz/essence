@@ -214,13 +214,27 @@ type WalkContext = {
 		identifier: parser.IdentifierNode
 		callee: Declaration
 	}>
-	// NOTE: Property and Method Declarations per Namespace name — the typed
-	// AST identifies resolved Namespaces by name.
+	// NOTE: Property and Method Declarations per Namespace, keyed as
+	// `siteKeyOf` keys a Namespace, since two declared in bodies may share a
+	// name.
 	namespaceMembers: Map<string, Map<string, Declaration>>
+	// NOTE: The keys each Namespace name is declared under.
+	namespaceKeys: Map<string, Array<string>>
+	// NOTE: The key of each typed Namespace by its Type, which is the object a
+	// call on it resolves to. Filled as the typed pass reaches each declaration.
+	namespaceTypeKeys: Map<common.Type, string>
+	// NOTE: The calls on a name more than one Namespace is declared under whose
+	// Namespace the typed pass had not reached, bound once it has.
+	namespaceMemberReferences: Array<{
+		namespaceName: string
+		namespaceType: common.Type
+		memberName: string
+		position: common.Position
+	}>
 	// NOTE: The same, per Protocol, apart because a Protocol and a Namespace
 	// may be spelled alike. Calls a Protocol answers bind here: a provided
 	// Method, and any Method called on a bounded Type. Keyed as
-	// `protocolKeyOf` keys a Protocol, since two may share a name.
+	// `siteKeyOf` keys a Protocol, since two may share a name.
 	protocolMembers: Map<string, Map<string, Declaration>>
 	// NOTE: The Protocols each Protocol declared here extends, as its `is` list
 	// names them. A requirement is looked for through them as well.
@@ -270,7 +284,7 @@ type ExternalMemberReference = {
 // it does, the two are one name: renaming either alone breaks the conformance.
 export type ConformanceLink = {
 	declaration: Declaration
-	// NOTE: The Protocol the `is` clause names, keyed by `protocolKeyOf`: as
+	// NOTE: The Protocol the `is` clause names, keyed by `siteKeyOf`: as
 	// the clause writes it, which may be an import's local name, or with its
 	// Position for one this file declares in a body.
 	protocolName: string
@@ -502,9 +516,9 @@ export type ProgramIndex = {
 	scopes: Array<ScopeRange>
 	// NOTE: Handed out so the workspace index can reach the Method and Property
 	// Declarations of a Namespace an importer only ever names through an entry.
-	// Keyed by the Namespace's own name, which is unique within one file — two
-	// Namespaces sharing a name is a duplicate the Enricher rejects, and an
-	// import may not shadow a declaration either.
+	// A top level Namespace, the only kind an entry names, is keyed by its own
+	// name, which is unique there — two sharing a name is a duplicate the
+	// Enricher rejects, and an import may not shadow a declaration either.
 	namespaceMembers: Map<string, Map<string, Declaration>>
 	// NOTE: The same, for the Methods a Protocol declares, reached through the
 	// entry that imports the Protocol or by its identity.
@@ -527,6 +541,9 @@ export function indexProgram(
 		labels: new Map(),
 		pendingLabelReferences: [],
 		namespaceMembers: new Map(),
+		namespaceKeys: new Map(),
+		namespaceTypeKeys: new Map(),
+		namespaceMemberReferences: [],
 		protocolMembers: new Map(),
 		protocolExtensions: new Map(),
 		ownProtocols: new Map(),
@@ -612,6 +629,8 @@ export function indexProgram(
 			walkTypedBody(section.nodes, context)
 		}
 	}
+
+	bindNamespaceMembers(context)
 
 	bindProtocolMembers(context)
 
@@ -1826,9 +1845,10 @@ function walkProtocolDeclaration(
 	scope: Scope,
 	context: WalkContext,
 ) {
-	let key = protocolKeyOf(
+	let key = siteKeyOf(
 		node.name.content,
 		declareInScope(scope, "types", node.name, "protocol", context),
+		"types",
 		context,
 	)
 
@@ -1935,7 +1955,17 @@ function walkNamespaceDefinition(
 	scope: Scope,
 	context: WalkContext,
 ) {
-	declareInScope(scope, "values", node.name, "namespace", context)
+	let key = siteKeyOf(
+		node.name.content,
+		declareInScope(scope, "values", node.name, "namespace", context),
+		"values",
+		context,
+	)
+	let keys = context.namespaceKeys.get(node.name.content) ?? []
+
+	if (!keys.includes(key)) {
+		context.namespaceKeys.set(node.name.content, [...keys, key])
+	}
 
 	// NOTE: The Namespace's own Type Parameters are in scope for the `where`
 	// conditions (and for the target Type and Methods below), so the Generic
@@ -1962,12 +1992,13 @@ function walkNamespaceDefinition(
 
 	// NOTE: Property and Method names are declared as Namespace member
 	// symbols — the typed pass binds their use sites, which resolve through
-	// the Namespace's Type. Same-named Namespaces share one member map.
-	let memberDeclarations = context.namespaceMembers.get(node.name.content)
+	// the Namespace's Type. Same-named Namespaces of one Scope share one
+	// member map.
+	let memberDeclarations = context.namespaceMembers.get(key)
 
 	if (memberDeclarations === undefined) {
 		memberDeclarations = new Map()
-		context.namespaceMembers.set(node.name.content, memberDeclarations)
+		context.namespaceMembers.set(key, memberDeclarations)
 	}
 
 	for (let member of Object.values(node.properties)) {
@@ -2636,26 +2667,28 @@ function linkConformances(
 }
 
 // NOTE: A Protocol named in an `is` list, resolved where the list is written
-// and keyed by `protocolKeyOf`.
+// and keyed by `siteKeyOf`.
 function protocolReference(
 	identifier: parser.IdentifierNode,
 	scope: Scope,
 	context: WalkContext,
 ): string {
-	return protocolKeyOf(
+	return siteKeyOf(
 		identifier.content,
 		reference(scope, "types", identifier, context),
+		"types",
 		context,
 	)
 }
 
-// NOTE: A Protocol declared at the top level is keyed by its name, which is
-// how another file and the builtins name it too. One declared anywhere else
-// carries the Position of its name as well, as its identity does, because it
-// may share that name with another.
-function protocolKeyOf(
+// NOTE: A Protocol or a Namespace declared at the top level is keyed by its
+// name, which is how another file and the builtins name it too. One declared
+// anywhere else carries the Position of its name as well, as a Protocol's
+// identity does, because it may share that name with another.
+function siteKeyOf(
 	name: string,
 	declaration: Declaration | null,
+	space: SymbolSpace,
 	context: WalkContext,
 ): string {
 	let definition = declaration?.definition ?? null
@@ -2663,11 +2696,15 @@ function protocolKeyOf(
 
 	if (
 		definition === null ||
-		topLevel?.scope.types.get(name) === declaration
+		topLevel?.scope[space].get(name) === declaration
 	) {
 		return name
 	}
 
+	return nestedKey(name, definition)
+}
+
+function nestedKey(name: string, definition: common.Position): string {
 	return `${name}@${definition.start.line}:${definition.start.column}`
 }
 
@@ -2812,6 +2849,7 @@ function shareConformanceSites(context: WalkContext) {
 
 function bindNamespaceMember(
 	namespaceName: string,
+	namespaceType: common.Type,
 	memberName: string,
 	position: common.Position,
 	context: WalkContext,
@@ -2830,11 +2868,56 @@ function bindNamespaceMember(
 		return
 	}
 
+	let keys = context.namespaceKeys.get(namespaceName) ?? [namespaceName]
+	let key =
+		keys.length === 1
+			? keys[0]!
+			: context.namespaceTypeKeys.get(namespaceType)
+
+	if (key === undefined) {
+		context.namespaceMemberReferences.push({
+			namespaceName,
+			namespaceType,
+			memberName,
+			position,
+		})
+
+		return
+	}
+
+	bindKeyedMember(key, namespaceName, memberName, position, context)
+}
+
+// NOTE: The calls whose Namespace the typed pass reached after them. One whose
+// Type no declaration here holds is taken to name the top level Namespace of
+// its name.
+function bindNamespaceMembers(context: WalkContext) {
+	for (let {
+		namespaceName,
+		namespaceType,
+		memberName,
+		position,
+	} of context.namespaceMemberReferences) {
+		bindKeyedMember(
+			context.namespaceTypeKeys.get(namespaceType) ?? namespaceName,
+			namespaceName,
+			memberName,
+			position,
+			context,
+		)
+	}
+}
+
+function bindKeyedMember(
+	key: string,
+	namespaceName: string,
+	memberName: string,
+	position: common.Position,
+	context: WalkContext,
+) {
 	// NOTE: Builtin Namespaces have no source declaration, so their members stay
 	// unbound and are not renameable.
-	let declaration = context.namespaceMembers
-		.get(namespaceName)
-		?.get(memberName)
+	let declaration = context.namespaceMembers.get(key)?.get(memberName)
 
 	if (declaration !== undefined) {
 		record(declaration, memberName, position, context.index)
@@ -2877,7 +2960,7 @@ function bindProtocolMembers(context: WalkContext) {
 	}
 }
 
-// NOTE: The key `protocolKeyOf` gives a Protocol, read off its identity: what
+// NOTE: The key `siteKeyOf` gives a Protocol, read off its identity: what
 // follows the Module path, which is the name and, for one declared in a body,
 // the Position of its name.
 export function protocolIdentityKey(identity: string): string {
@@ -2957,7 +3040,15 @@ function walkTypedNode(
 			walkTypedParameterDefaults(node.value.parameters, context)
 			walkTypedBody(node.value.body, context)
 			return
-		case "NamespaceDefinitionStatement":
+		case "NamespaceDefinitionStatement": {
+			let keys = context.namespaceKeys.get(node.name.content) ?? []
+			let nested = nestedKey(node.name.content, node.name.position)
+
+			context.namespaceTypeKeys.set(
+				node.type,
+				keys.includes(nested) ? nested : node.name.content,
+			)
+
 			for (let property of Object.values(node.properties)) {
 				walkTypedNode(property.value, context)
 			}
@@ -2973,6 +3064,7 @@ function walkTypedNode(
 			}
 
 			return
+		}
 		case "ProtocolDeclarationStatement":
 			context.ownProtocols.set(
 				node.protocolType.identity,
@@ -3004,6 +3096,7 @@ function walkTypedNode(
 		case "MethodInvocation":
 			bindNamespaceMember(
 				node.namespace.name,
+				node.namespace.type,
 				node.member.name,
 				node.member.position,
 				context,
@@ -3030,6 +3123,7 @@ function walkTypedNode(
 			if (baseType.type === "Namespace") {
 				bindNamespaceMember(
 					baseType.name,
+					baseType,
 					node.member.content,
 					node.member.position,
 					context,
@@ -3050,6 +3144,7 @@ function walkTypedNode(
 				if (bound !== undefined) {
 					bindNamespaceMember(
 						bound,
+						baseType,
 						node.member.content,
 						node.member.position,
 						context,

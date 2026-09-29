@@ -1912,6 +1912,98 @@ describe("identifierPattern", () => {
 				renamedAt([14, 18, 24]),
 			)
 		})
+
+		// NOTE: Each Function declares its own `Tagged` and its own
+		// `IntegerTagged`, and a Method of one is no Method of the other.
+		it("should keep same-named Namespaces two bodies declare apart", () => {
+			let declaring = (name: string, value: string) => [
+				`\tfunction ${name}() -> Integer {`,
+				"\t\tprotocol Tagged {",
+				"\t\t\ttag() -> Integer",
+				"\t\t}",
+				"",
+				"\t\tnamespace IntegerTagged for Integer is Tagged {",
+				"\t\t\ttag() -> Integer {",
+				`\t\t\t\t<- ${value}`,
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tfunction read <infer Item is Tagged>(_ item: Item) -> Integer {",
+				"\t\t\t<- item::tag()",
+				"\t\t}",
+				"",
+				"\t\t<- read(3)::add(IntegerTagged.tag(4))",
+				"\t}",
+				"",
+			]
+			let source = [
+				"implementation {",
+				...declaring("one", "@"),
+				...declaring("two", "1"),
+				"\tTerminal.inspect(one()::add(two()))",
+				"}",
+			].join("\n")
+
+			let lines = source.split("\n")
+			let renamedAt = (renamed: Array<number>) =>
+				lines
+					.map((line, index) =>
+						renamed.includes(index + 1)
+							? line.replaceAll("tag(", "label(")
+							: line,
+					)
+					.join("\n")
+
+			expect(rename(source, { line: 8, column: 4 }, "label")).toBe(
+				renamedAt([4, 8, 14, 17]),
+			)
+			expect(rename(source, { line: 35, column: 33 }, "label")).toBe(
+				renamedAt([22, 26, 32, 35]),
+			)
+		})
+
+		// NOTE: The top level call stands above the Namespace it reaches, and a
+		// body declares another of that name.
+		it("should bind a call above its Namespace past a body's same-named one", () => {
+			let source = [
+				"implementation {",
+				"\tTerminal.inspect(3::tag()::add(Tags.tag(4)))",
+				"",
+				"\tfunction inner() -> Integer {",
+				"\t\tnamespace Tags for String {",
+				"\t\t\ttag() -> Integer {",
+				"\t\t\t\t<- 1",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				'\t\t<- "a"::tag()::add(Tags.tag("b"))',
+				"\t}",
+				"",
+				"\tnamespace Tags for Integer {",
+				"\t\ttag() -> Integer {",
+				"\t\t\t<- @",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			let lines = source.split("\n")
+			let renamedAt = (renamed: Array<number>) =>
+				lines
+					.map((line, index) =>
+						renamed.includes(index + 1)
+							? line.replaceAll("tag(", "label(")
+							: line,
+					)
+					.join("\n")
+
+			expect(rename(source, { line: 2, column: 22 }, "label")).toBe(
+				renamedAt([2, 15]),
+			)
+			expect(rename(source, { line: 6, column: 4 }, "label")).toBe(
+				renamedAt([6, 11]),
+			)
+		})
 	})
 })
 
