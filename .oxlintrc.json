@@ -2,13 +2,308 @@
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 	"rules": {
 		"typescript/array-type": ["warn", { "default": "generic" }],
-		"no-unused-vars": "warn"
+		"no-unused-vars": "warn",
+		"max-lines-per-function": [
+			"error",
+			{ "max": 300, "skipComments": true, "skipBlankLines": true }
+		],
+		"max-lines": [
+			"error",
+			{ "max": 3000, "skipComments": true, "skipBlankLines": true }
+		],
+		"complexity": ["error", { "max": 50 }],
+		"max-params": ["error", { "max": 7 }]
 	},
 	"overrides": [
 		{
 			"files": ["packages/ariadne/src/**"],
 			"rules": {
 				"no-control-regex": "off"
+			}
+		},
+		{
+			"files": ["**/tests/**", "**/*.spec.ts"],
+			"rules": {
+				"max-lines-per-function": "off",
+				"max-lines": "off"
+			}
+		},
+		// NOTE: Each file below is over a size limit and is held to its worst
+		// offence, so nothing in it may grow.
+		{
+			"files": ["packages/ariadne/src/write.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 760, "skipComments": true, "skipBlankLines": true }
+				],
+				"complexity": ["error", { "max": 99 }]
+			}
+		},
+		{
+			"files": ["packages/cli/src/test.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 372, "skipComments": true, "skipBlankLines": true }
+				],
+				"max-params": ["error", { "max": 9 }]
+			}
+		},
+		{
+			"files": ["packages/cli/src/testWatch.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 433, "skipComments": true, "skipBlankLines": true }
+				]
+			}
+		},
+		{
+			"files": ["packages/client/src/dts.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 326, "skipComments": true, "skipBlankLines": true }
+				]
+			}
+		},
+		{
+			"files": ["packages/client/src/marshal-runtime.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{
+						"max": 1331,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/configuration.ts"],
+			"rules": { "max-params": ["error", { "max": 8 }] }
+		},
+		{
+			"files": ["packages/compiler/src/enricher/contracts.ts"],
+			"rules": { "max-params": ["error", { "max": 9 }] }
+		},
+		{
+			"files": ["packages/compiler/src/enricher/enrich.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 339, "skipComments": true, "skipBlankLines": true }
+				],
+				"complexity": ["error", { "max": 51 }]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/enricher/enrichers.ts"],
+			"rules": {
+				"max-lines": [
+					"error",
+					{
+						"max": 13478,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/enricher/resolvers.ts"],
+			"rules": {
+				"max-lines": [
+					"error",
+					{
+						"max": 8320,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/helpers/providedReads.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 381, "skipComments": true, "skipBlankLines": true }
+				]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/helpers/types.ts"],
+			"rules": { "complexity": ["error", { "max": 107 }] }
+		},
+		{
+			"files": ["packages/compiler/src/optimiser/walk.ts"],
+			"rules": { "complexity": ["error", { "max": 57 }] }
+		},
+		{
+			"files": ["packages/compiler/src/parser/descent/parse.ts"],
+			"rules": {
+				"max-lines": [
+					"error",
+					{
+						"max": 5976,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				],
+				"complexity": ["error", { "max": 51 }]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/parser/nodeGenerators.ts"],
+			"rules": { "max-params": ["error", { "max": 8 }] }
+		},
+		{
+			"files": ["packages/compiler/src/rewriter/rewrite.ts"],
+			"rules": {
+				"max-lines": [
+					"error",
+					{
+						"max": 6364,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				],
+				"complexity": ["error", { "max": 71 }]
+			}
+		},
+		{
+			"files": ["packages/compiler/src/validator/validate.ts"],
+			"rules": {
+				"max-lines": [
+					"error",
+					{
+						"max": 3153,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				]
+			}
+		},
+		{
+			"files": ["packages/debug-adapter/src/render.ts"],
+			"rules": { "complexity": ["error", { "max": 52 }] }
+		},
+		{
+			"files": ["packages/language-server/src/argumentContext.ts"],
+			"rules": { "complexity": ["error", { "max": 71 }] }
+		},
+		{
+			"files": ["packages/language-server/src/callHierarchy.ts"],
+			"rules": { "complexity": ["error", { "max": 60 }] }
+		},
+		{
+			"files": [
+				"packages/language-server/src/codeActions/implementProtocol.ts"
+			],
+			"rules": { "max-params": ["error", { "max": 8 }] }
+		},
+		{
+			"files": ["packages/language-server/src/codeActions/lookups.ts"],
+			"rules": { "complexity": ["error", { "max": 76 }] }
+		},
+		{
+			"files": [
+				"packages/language-server/src/codeActions/matchOnValue.ts"
+			],
+			"rules": { "complexity": ["error", { "max": 56 }] }
+		},
+		{
+			"files": ["packages/language-server/src/codeActions/payloads.ts"],
+			"rules": { "complexity": ["error", { "max": 55 }] }
+		},
+		{
+			"files": ["packages/language-server/src/completion.ts"],
+			"rules": {
+				"complexity": ["error", { "max": 94 }],
+				"max-params": ["error", { "max": 8 }]
+			}
+		},
+		{
+			"files": ["packages/language-server/src/foldingRanges.ts"],
+			"rules": { "complexity": ["error", { "max": 65 }] }
+		},
+		{
+			"files": ["packages/language-server/src/hover.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 407, "skipComments": true, "skipBlankLines": true }
+				],
+				"complexity": ["error", { "max": 96 }]
+			}
+		},
+		{
+			"files": ["packages/language-server/src/inlayHints.ts"],
+			"rules": { "complexity": ["error", { "max": 59 }] }
+		},
+		{
+			"files": ["packages/language-server/src/rename.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 366, "skipComments": true, "skipBlankLines": true }
+				],
+				"complexity": ["error", { "max": 88 }]
+			}
+		},
+		{
+			"files": ["packages/language-server/src/selectionRanges.ts"],
+			"rules": { "complexity": ["error", { "max": 74 }] }
+		},
+		{
+			"files": ["packages/language-server/src/semanticTokens.ts"],
+			"rules": { "complexity": ["error", { "max": 62 }] }
+		},
+		{
+			"files": ["packages/language-server/src/server.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{
+						"max": 1501,
+						"skipComments": true,
+						"skipBlankLines": true
+					}
+				]
+			}
+		},
+		{
+			"files": ["packages/language-server/src/signatureHelp.ts"],
+			"rules": { "complexity": ["error", { "max": 57 }] }
+		},
+		{
+			"files": ["packages/language-server/src/testSession.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 550, "skipComments": true, "skipBlankLines": true }
+				]
+			}
+		},
+		{
+			"files": ["packages/language-server/src/workspace.ts"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 845, "skipComments": true, "skipBlankLines": true }
+				]
+			}
+		},
+		{
+			"files": ["packages/vscode-extension/testView.js"],
+			"rules": {
+				"max-lines-per-function": [
+					"error",
+					{ "max": 646, "skipComments": true, "skipBlankLines": true }
+				]
 			}
 		}
 	],
