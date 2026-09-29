@@ -869,7 +869,7 @@ export function createInterpreter(
 				let build = makeDictionary
 
 				if (build === undefined) {
-					return (value, at, step) => {
+					return (_value, at, step) => {
 						throw noDictionaryDoor(at, step)
 					}
 				}
@@ -1052,7 +1052,7 @@ export function createInterpreter(
 				// about the SHAPE rather than about any value of it, so a shape
 				// that has it compiles to the refusal itself.
 				if (admitsAbsence(expected.of)) {
-					return (value, at, step) => {
+					return (_value, at, step) => {
 						throw nestedOptional(at, step)
 					}
 				}
@@ -1103,7 +1103,7 @@ export function createInterpreter(
 				let item = optionalItemOf(expected)
 
 				if (item !== null && admitsAbsence(item)) {
-					return (value, at, step) => {
+					return (_value, at, step) => {
 						throw nestedOptional(at, step)
 					}
 				}
@@ -1125,7 +1125,7 @@ export function createInterpreter(
 				let collision = bareCaseCollision(expected)
 
 				if (collision !== null) {
-					return (value, at, step) => {
+					return (_value, at, step) => {
 						throw ambiguousBareCase(shown, collision, at, step)
 					}
 				}
@@ -1244,7 +1244,7 @@ export function createInterpreter(
 			// is read.
 			case "future":
 			case "started":
-				return (value, at, step) => {
+				return (_value, at, step) => {
 					throw asynchronyFromHost(shown, at, step)
 				}
 			// NOTE: Everything the boundary has no mapping for, refused in the
@@ -1252,7 +1252,7 @@ export function createInterpreter(
 			case "refused": {
 				let why = expected.why
 
-				return (value, at, step) => {
+				return (_value, at, step) => {
 					let where = spell(at, step)
 
 					throw new EssenceMarshalError(`${where}: ${why}`, where)
@@ -1293,7 +1293,7 @@ export function createInterpreter(
 			}
 
 			if (admitsAbsence(item.of)) {
-				return (value, at, step) => {
+				return (_value, at, step) => {
 					throw nestedOptional(at, step)
 				}
 			}
@@ -1775,7 +1775,7 @@ export function createInterpreter(
 				let collision = bareCaseCollision(expected)
 
 				if (collision !== null) {
-					return (value, at, step) => {
+					return (_value, at, step) => {
 						throw ambiguousBareCase(
 							expected.shown,
 							collision,
@@ -1833,7 +1833,7 @@ export function createInterpreter(
 			// to the refusal itself.
 			case "future":
 			case "started":
-				return (value, at, step) => {
+				return (_value, at, step) => {
 					throw asynchronyInsideValue(expected.shown, at, step)
 				}
 			// NOTE: A Type the way IN has no mapping for is still a value on the
@@ -1876,7 +1876,7 @@ export function createInterpreter(
 		let makeContext = makeFutureContext
 
 		if (answer === undefined || makeContext === undefined) {
-			return (value, at, step) => {
+			return (_value, at, step) => {
 				throw noFutureDoor(at, step)
 			}
 		}

@@ -830,7 +830,7 @@ describe("The statistics a List of Numbers answers", () => {
 		let lines = cases.flatMap((items) => [
 			`constant case${cases.indexOf(items)}: NonEmptyList<Integer> = ${items}`,
 		])
-		let checks = cases.map((items, index) => {
+		let checks = cases.map((_items, index) => {
 			let name = `case${index}`
 
 			return show(

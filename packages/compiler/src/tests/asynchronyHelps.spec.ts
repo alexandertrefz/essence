@@ -211,7 +211,6 @@ let isDefaultPosition = (position: Position) =>
 	position.verdict === "parameter-default"
 
 function helpsAt(
-	site: Site,
 	position: Position,
 	statement: string,
 ): {
@@ -239,7 +238,7 @@ describe("Every report that could offer 'complete'", () => {
 					let statement = isDefaultPosition(position)
 						? (site.asDefault as string)
 						: site.written
-					let { codes, helps } = helpsAt(site, position, statement)
+					let { codes, helps } = helpsAt(position, statement)
 
 					// NOTE: The Parameter default position raises the
 					// Declaration's own refusal for some of these — a default is

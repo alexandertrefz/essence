@@ -31,7 +31,6 @@ type ProgressOptions = {
 }
 
 export class Progress {
-	private terminal: Terminal
 	private theme: Theme
 	private palette: Palette
 	private region: LiveRegion
@@ -45,7 +44,6 @@ export class Progress {
 	private visible = false
 
 	constructor(options: ProgressOptions) {
-		this.terminal = options.terminal
 		this.theme = options.theme
 		this.palette = options.palette
 		this.region = new LiveRegion(options.terminal)
