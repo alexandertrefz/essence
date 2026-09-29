@@ -2535,6 +2535,54 @@ export {
 		)
 	})
 
+	// NOTE: Every JavaScript object answers `valueOf`, and a Namespace that
+	// declares no such Method must not be offered as the one that does.
+	it("names no unimported Namespace for a Method none of them declares", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Geometry.es" { Rectangle }
+}
+
+implementation {
+	constant shape: Rectangle = { width = 2, height = 3 }
+
+	Terminal.inspect(shape::valueOf())
+}
+`,
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	namespace Measurable for Rectangle {
+		area() -> Integer {
+			<- @.width::multiply(with @.height)
+		}
+	}
+}
+
+export {
+	Measurable
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(codesOf(main.diagnostics)).toEqual(["unknown-method"])
+				expect(
+					main.diagnostics[0]?.helps.filter((help) =>
+						help.endsWith("— import it."),
+					),
+				).toEqual([])
+			},
+		)
+	})
+
 	// NOTE: A single file compile has no graph at all, and its Diagnostics must be
 	// the ones it always had — no help about a Namespace nobody could import.
 	it("says nothing about unimported Namespaces where there is no graph", () => {

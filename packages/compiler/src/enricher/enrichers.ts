@@ -13140,8 +13140,10 @@ function unimportedNamespaceHelps(
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): Array<string> {
-	let candidates = unimportedNamespacesOf(scope).filter(
-		(candidate) => candidate.namespace.methods[memberName] !== undefined,
+	// NOTE: `Object.hasOwn`, since every Namespace's table would otherwise
+	// answer `valueOf` and `toString` off `Object.prototype`.
+	let candidates = unimportedNamespacesOf(scope).filter((candidate) =>
+		Object.hasOwn(candidate.namespace.methods, memberName),
 	)
 
 	if (candidates.length === 0) {
