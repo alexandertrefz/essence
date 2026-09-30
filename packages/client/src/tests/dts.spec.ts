@@ -508,7 +508,7 @@ describe("The bundle view", () => {
 // Rewriter emitted them as. Build one with \`@essence-lang/runtime\`,
 // which the build resolves to the same copy these were built by.
 
-// NOTE: An Essence value as JavaScript holds it — deliberately opaque. It
+// An Essence value as JavaScript holds it — deliberately opaque. It
 // carries its Type on a Symbol the runtime mints, and reading one apart
 // or building one is \`@essence-lang/runtime\`'s to do.
 type EssenceValue = object

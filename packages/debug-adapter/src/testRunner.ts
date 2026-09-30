@@ -26,7 +26,7 @@ export function testRunnerSource(
 const ids = ${JSON.stringify(ids)}
 const registry = $tests.registry()
 
-// NOTE: Awaited at the top level of the emitted Module, which is ESM and may
+// Awaited at the top level of the emitted Module, which is ESM and may
 // await at its top level: a test that completes something is a test the runner
 // waits for, and the summary is only true once every one of them is over.
 const summary = await $tests.run(registry, {
@@ -70,7 +70,7 @@ console.log(
 	} deselected\`,
 )
 
-// NOTE: The same code \`essence test\` answers with, so that a debug session
+// The same code \`essence test\` answers with, so that a debug session
 // that ran a failing test is a session that failed.
 if (summary.failed > 0) {
 	process.exitCode = 1

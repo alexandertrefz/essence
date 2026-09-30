@@ -197,7 +197,7 @@ function javascriptBlocks(
 		if (declared.of === null) {
 			blocks.push(
 				[
-					`// NOTE: '${declared.name}' is a Protocol. A Namespace conforms to one, and no value`,
+					`// '${declared.name}' is a Protocol. A Namespace conforms to one, and no value`,
 					"// is ever of one — there is nothing on this side to hold.",
 					`export type ${declared.name} = unknown`,
 				].join("\n"),
@@ -264,7 +264,7 @@ function bundleBlocks(
 		// make a generated file depend on a package a build that only ever used
 		// the plugin need not have installed.
 		[
-			"// NOTE: An Essence value as JavaScript holds it — deliberately opaque. It",
+			"// An Essence value as JavaScript holds it — deliberately opaque. It",
 			"// carries its Type on a Symbol the runtime mints, and reading one apart",
 			"// or building one is `@essence-lang/runtime`'s to do.",
 			"type EssenceValue = object",
@@ -1064,7 +1064,7 @@ function createWalker(
 }
 
 const OVERLOADED_NOTICE =
-	"// NOTE: Overloaded. Which Overload a call means is decided by the Argument\n" +
+	"// Overloaded. Which Overload a call means is decided by the Argument\n" +
 	"// Types, which a JavaScript value does not carry — calling this throws.\n"
 
 // #endregion
@@ -1103,7 +1103,7 @@ function unioned(head: string, entries: Array<string>): string {
 }
 
 // One declaration per line, with a blank line around any that needed more
-// than one — a `// NOTE:` above a declaration reads as belonging to the one below
+// than one — a comment above a declaration reads as belonging to the one below
 // it, and packed against its neighbour it reads as belonging to that one too.
 function grouped(declarations: Array<string>): string {
 	let text = ""

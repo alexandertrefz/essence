@@ -261,7 +261,7 @@ Bun runs the sources.
 | [`debug-adapter`](packages/debug-adapter) | the Debug Adapter behind `essence dap` |
 | [`vscode-extension`](packages/vscode-extension) | the VS Code extension, which bundles the language server |
 | [`website`](packages/website) | the documentation |
-| [`fixtures`](packages/fixtures) | Essence sources the test suite compiles |
+| [`fixtures`](packages/fixtures) | Essence sources the test suite compiles, the paths to reach them, the way it runs a process, and what its prose rules call a sentence |
 
 # Development
 

@@ -84,7 +84,7 @@
 
 /*
  * Inline code. Plain mono in body prose; the accent pill belongs to the lede
- * alone. NOTE: the pill is deliberately not the default. Docs prose names a
+ * alone. The pill is deliberately not the default. Docs prose names a
  * type or a method in nearly every sentence, and pilling all of them turns a
  * reference into a field of red instead of emphasising anything.
  */
