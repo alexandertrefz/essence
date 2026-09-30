@@ -21,45 +21,32 @@ import {
 const TokenType = lexer.TokenType
 type Token = lexer.Token
 
-// Deliberately not an `Error` subclass. Speculative parsing throws and
-// catches this on every backtrack, and capturing a stack trace per throw is
-// the single most expensive thing the parser does. Nothing outside the parser
-// ever sees a ParseError — it is caught by `backtrack` or by the Statement
-// loops, which turn it into the one Diagnostic its fields describe.
+// Not an `Error` subclass: speculation throws and catches one on every
+// backtrack, and capturing a stack trace per throw is costly. The parser
+// always catches it and reports the Diagnostic its fields describe.
 export class ParseError {
 	name = "ParseError"
 	message: string
 	position: common.Position | null
-	// What belongs under the arrow at `position` — "expected ':'" —
-	// as opposed to `message`, which is the whole sentence. The renderer puts
-	// them in different places, so they are kept apart here.
+	// What belongs under the arrow at `position`, such as "expected ':'".
+	// `message` is the whole sentence, which the renderer places elsewhere.
 	label: string | null
-	// The Labels BESIDE the primary one, in the order they render. Empty
-	// for almost every ParseError — a failed expectation is about one Token and
-	// has nothing to point at twice — and set by the few refusals that are about
-	// a relationship between two spans, where the second is what turns the claim
-	// into an explanation.
+	// The Labels beside the primary one, in the order they render. Only a
+	// refusal about a relationship between two spans sets them.
 	labels: Array<common.DiagnosticLabel>
-	// Almost every ParseError is the generic "expected X, found Y" and
-	// reports as `syntax-error` with nothing to add. The few that are their
-	// own kind of problem carry their code and context here, so the Statement
-	// loop that finally reports them needs no knowledge of which failure it
-	// caught.
+	// A generic "expected X, found Y" reports as `syntax-error`. A refusal
+	// with a kind of its own carries its code and context here for the loop
+	// that reports it.
 	code: common.DiagnosticCode
 	notes: Array<string>
 	helps: Array<string>
-	// What a Quick Fix would need of the refusal, for the few that have
-	// one. A refused Statement is DROPPED, so whatever the Parser saw of it —
-	// the names a Matcher introduced, the span of a block — survives nowhere
-	// else, and a fix that re-derived it would be re-reading text this Parser
-	// has already read.
+	// What a Quick Fix needs of the refusal. A refused Statement is dropped,
+	// so what the Parser saw of it, such as the names a Matcher introduced,
+	// survives only here.
 	data: common.DiagnosticData | undefined
-	// Whether what went wrong here has already been said. A recovery loop
-	// reports the failure it recovered FROM and then discovers that what it
-	// recovered INTO can not be built — the loop's own Diagnostic is the whole
-	// account of that, so the throw which drops the Statement carries this and
-	// `reportParseError` stays quiet rather than saying the same thing twice in
-	// different words.
+	// Whether a recovery loop has already reported this failure. Such a loop
+	// reports what it recovered from, then finds that what it recovered into
+	// can not be built. `reportParseError` then stays quiet.
 	reported: boolean
 
 	constructor(
@@ -87,27 +74,17 @@ export class ParseError {
 	}
 }
 
-// The codes a speculation gives back when it rewinds, rather than
-// letting them through to the Statement loop. `syntax-error` is the generic
-// failure — "this reading was not the one written" — which is the whole point
-// of speculating, and `nesting-too-deep` is about the READING rather than
-// about the text: a speculation recurs a level deeper than the reading it
-// stands in for, so an attempt can exhaust the depth budget where the reading
-// that is kept fits inside it, and re-raising it would refuse a Program this
-// Parser accepts. Every other code is a refusal of text that WAS written, and
-// no other reading of that text is going to accept it.
+// The codes a speculation gives back when it rewinds, since they are about
+// the reading rather than the text. See "Refusals of the text" in
+// DEVELOPMENT.md.
 const rewoundCodes: Set<common.DiagnosticCode> = new Set([
 	"syntax-error",
 	"nesting-too-deep",
 ])
 
-// Whether a ParseError is a verdict about the text — a refusal that
-// stands whichever reading of the surrounding construct is taken — as opposed
-// to one reading saying it was not the one written.
-//
-// An already REPORTED failure is one by definition: a recovery loop read the
-// text, judged it, and said so. Handing that back for a second reading would
-// answer for text this Parser has already spoken about.
+// Whether a ParseError is a verdict about the text, standing whichever
+// reading is taken, rather than one reading saying it was not the one written.
+// A failure already reported is always one.
 export function refusesTheText(error: ParseError): boolean {
 	return error.reported || !rewoundCodes.has(error.code)
 }
@@ -124,8 +101,8 @@ export function fail(
 	throw new ParseError(message, position ?? null, label ?? null)
 }
 
-// The written form of every fixed-content Token type, used to phrase
-// Diagnostics like `Expected ')' but found 'if'.`.
+// The written form of every fixed-content Token type, for Diagnostics like
+// `Expected ')' but found 'if'.`.
 const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.SymbolAt]: "@",
 	[TokenType.SymbolEqual]: "=",
@@ -228,10 +205,8 @@ export function describeToken(token: Token): string {
 }
 
 // Reported here rather than by `parseDocumentation`, which stays a pure
-// function of the lines it is handed. This is the point where a Diagnostic
-// collection exists to report into, and where `backtrack` will rewind anything
-// a speculative parse reported — a Declaration that turned out to be something
-// else takes its Documentation's Diagnostics with it.
+// function of its lines. Here `backtrack` rewinds the report along with a
+// Declaration that turned out to be something else.
 function reportMissingSeparator(problem: DocumentationProblem): void {
 	let head = problem.name === null ? "@returns" : `@param ${problem.name}`
 
@@ -250,9 +225,8 @@ function reportMissingSeparator(problem: DocumentationProblem): void {
 	)
 }
 
-// The span of the one character a quote Cursor stands on. Every Label in
-// the unclosed-String report points at a `"`, and a zero-width span renders as
-// an arrow at nothing.
+// The span of the one character a quote Cursor stands on, since a
+// zero-width span renders as an arrow at nothing.
 function quoteAt(cursor: common.Cursor): common.Position {
 	return {
 		start: cursor,
@@ -260,11 +234,8 @@ function quoteAt(cursor: common.Cursor): common.Position {
 	}
 }
 
-// What was written from a cursor to the end of its line — the text of a
-// String that never closed, as far as the line it opened on carries it. One line
-// is the whole of what is read, because that is the line the Quick Fix would
-// write its quote at the end of, and the two have to be asked the same question
-// about the same text.
+// What was written from a cursor to the end of its line. The Quick Fix for
+// an unclosed String asks `holeHoldsAnEscape` about the same line.
 function lineFrom(source: string, cursor: common.Cursor): string {
 	return (source.split("\n")[cursor.line - 1] ?? "").slice(cursor.column - 1)
 }
@@ -279,22 +250,14 @@ export class TokenStream {
 	protected index: number
 	protected braceDepth: number
 	public hadLexerError: boolean
-	// Where the next `~` is, from every position. `Type ~> { … }` is the
-	// one construction in the grammar that a `~` can be part of, and it is the
-	// one the parser speculates on for every Identifier it reads in Expression
-	// position — a full Type parse, thrown away on the `~` that is not there.
-	// A speculation can only consume Tokens FORWARD from where it starts, so a
-	// position with no `~` after it is a position where that parse can not
-	// succeed, whatever else stands there. That is the whole test, and it is
-	// deliberately no sharper: neither the `>` following the `~` nor the two
-	// being written flush is required by `parseTypedRecordLiteral`, so a guard
-	// that asked for either would refuse a Program this parser accepts.
+	// The index of the next `~` from every position. Only `Type ~> { … }`
+	// holds a `~`, and the parser speculates on it for every Identifier in
+	// Expression position. Where no `~` follows, `parseTypedRecordLiteral` can
+	// not succeed.
 	protected nextTilde: Int32Array
-	// Documentation Comments are kept out of the Token array entirely
-	// and indexed by the line they sit on. The parser has many fixed offset
-	// lookaheads and backtracks by Token index, all of which would have to
-	// learn to step over them; keying by line costs none of that, and a
-	// Comment always ends at its line break, so one line holds at most one.
+	// Documentation Comments stay out of the Token array, so lookaheads and
+	// backtracks by Token index need not step over them. A Comment ends at its
+	// line break, so keying by line holds at most one per line.
 	protected documentationLines: Map<number, Token>
 
 	constructor(source: string) {
@@ -310,12 +273,9 @@ export class TokenStream {
 		this.hadLexerError = false
 		this.documentationLines = new Map()
 
-		// An unterminated String Literal is the one mistake the Lexer
-		// throws on. That is reported as a positioned Diagnostic here and
-		// lexing stops; the parser continues on the Tokens read so far and
-		// suppresses the end-of-input errors the truncation necessarily
-		// causes. Every other mistake it collects in `errors`, and those are
-		// reported without stopping.
+		// An unterminated String Literal is the one mistake the Lexer throws
+		// on. Lexing stops there, and the parser reads the Tokens so far with
+		// end-of-input errors suppressed. The Lexer collects other mistakes.
 		try {
 			let token = sourceLexer.next()
 			while (token !== undefined) {
@@ -340,10 +300,9 @@ export class TokenStream {
 			this.hadLexerError = true
 		}
 
-		// A malformed Number Literal or a bad escape does not truncate the
-		// stream — the Token is there, it just can not hold the text that was
-		// written — so both are reported without setting `hadLexerError`: every
-		// Diagnostic after them is about a Statement that was read in full.
+		// A collected mistake does not truncate the stream, so it leaves
+		// `hadLexerError` unset: every later Diagnostic is about a Statement that
+		// was read in full.
 		for (let error of sourceLexer.errors) {
 			if (error.code === "comment-in-hole") {
 				reportError(error.message, error.position, {
@@ -382,11 +341,8 @@ export class TokenStream {
 				continue
 			}
 
-			// The `\u{…}` family, whose label, Note and Helps are built
-			// where the escape was read — see `LexingError.report`. The shape of
-			// the mistake and the reader's own digits are known only there, and
-			// the four codes it reports under are the only ones that arrive with
-			// their report already written.
+			// The `\u{…}` escapes arrive with their Label, Notes and Helps
+			// written where the escape was read. See `LexingError.report`.
 			if (error.report !== undefined) {
 				reportError(error.message, error.position, {
 					code: error.code,
@@ -410,8 +366,8 @@ export class TokenStream {
 			})
 		}
 
-		// One backward pass, and one entry past the end so that a query at
-		// the end of the stream is answered without a bounds test.
+		// One entry past the end answers a query at the end of the stream
+		// without a bounds test.
 		this.nextTilde = new Int32Array(this.tokens.length + 1)
 		this.nextTilde[this.tokens.length] = this.tokens.length
 
@@ -423,20 +379,15 @@ export class TokenStream {
 		}
 	}
 
-	// The one fatal Lexer error, which stops the Token stream where it
-	// stands — and the one Diagnostic the Parser reports before it has read a
-	// Token.
+	// The one fatal Lexer error, which stops the Token stream. See "Which
+	// quote is missing" in packages/compiler/src/lexer/DEVELOPMENT.md.
 	protected reportUnterminatedString(
 		error: UnterminatedStringError,
 		source: string,
 	): void {
-		// `endOfInput` is where the Lexer STOPPED — one line past the
-		// last one when the file ends in a newline, where a label has no text
-		// to point at and renders dangling. Clamped to just after the last
-		// visible character, the way `endPosition()` keeps the parser's own
-		// end-of-input Diagnostics on real content. Counted character by
-		// character as the Lexer counts, so the two spellings of one column can
-		// not drift.
+		// The Lexer stops one line past the last when the file ends in a
+		// newline, where a Label renders dangling. So the report stands just
+		// after the last visible character, counted as the Lexer counts columns.
 		let endOfContent = { line: 1, column: 1 }
 
 		for (let character of source.trimEnd()) {
@@ -453,12 +404,8 @@ export class TokenStream {
 		let swallower = error.swallower
 
 		if (swallower === null) {
-			// `"{\"a\": 1}"` — JSON, written with the quotes escaped the
-			// way another language wants them and the braces left alone. The
-			// `{` opened a hole, and the quote this asks for is not what is
-			// missing: writing one leaves the same refusal standing, which is
-			// why the Quick Fix withholds itself here too. See
-			// `holeHoldsAnEscape`.
+			// `"{\"a\": 1}"`: the `{` opened a hole, so a missing quote is
+			// not the problem. See `holeHoldsAnEscape`.
 			if (holeHoldsAnEscape(lineFrom(source, error.openedAt))) {
 				reportError("This String Literal is never closed", position, {
 					code: "unclosed-string",
@@ -492,24 +439,9 @@ export class TokenStream {
 			return
 		}
 
-		// The likelier reading of two — see `swallowedTheLinesBelow` in
-		// the Lexer, which decides between them and says why. The String NAMED
-		// here is the one that SPANS LINES, because that is the '"' a reader has
-		// to write; the quote it closed on and the end of the input are both
-		// still pointed at, so the reading this one was chosen over stands on
-		// the page rather than only in the Lexer.
-		//
-		// The Position is the opening quote rather than the end of the
-		// input, which is the one place this parts company with
-		// `unclosed-block`: what an Editor jumps to, and what `essence check`
-		// prints as `file:line:column`, is then the line the missing '"' belongs
-		// on. The plain case keeps the end of the input, where the String really
-		// does run out.
-		//
-		// The opening quote is the FIRST Label standing on a `"`, which is
-		// the shape the `unclosed-string` Quick Fix reads the String's start off
-		// — see `closeStringAction`. It writes the quote at the end of that
-		// Label's line, so the swapped report moves the fix with it.
+		// The report names the String that spans lines and stands on its
+		// opening quote, the first Label on a `"`, which `closeStringAction`
+		// reads.
 		reportError(
 			"This String Literal is never closed",
 			quoteAt(swallower.openedAt),
@@ -525,14 +457,9 @@ export class TokenStream {
 				],
 				notes: [
 					`A String Literal may span lines, and the line breaks are part of it — so the quote on line ${swallower.closedAt.line} closed the one opened on line ${swallower.openedAt.line}, and the String that quote was written to open is the one that ran to the end of the input.`,
-					// The other reading is said here rather than offered
-					// as a Help, which is what it used to be: "add it at the end
-					// of the input instead" is an edit that reaches no Program.
-					// The quote written there closes a String holding every line
-					// below it, and the quotes standing in those lines close it
-					// early all over again — so a reader who followed it was
-					// answered `unclosed-string` a second time, about the same
-					// two lines, with no spelling of that reading anywhere.
+					// The other reading is a Note rather than a Help. A quote at
+					// the end of the input reaches no Program, since the quotes in
+					// the swallowed lines close that String early again.
 					`One '"' is missing either way, and where it goes decides which String is which: at the end of line ${swallower.openedAt.line} the lines below are Statements, and at the end of the input they are text. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.`,
 				],
 				helps: [
@@ -542,7 +469,7 @@ export class TokenStream {
 		)
 	}
 
-	// Whether a `Type ~> { … }` can begin here at all — see `nextTilde`.
+	// Whether a `Type ~> { … }` can begin here at all. See `nextTilde`.
 	hasTildeAhead(): boolean {
 		return this.nextTilde[this.index]! < this.tokens.length
 	}
@@ -551,11 +478,9 @@ export class TokenStream {
 		return this.braceDepth
 	}
 
-	// Whether the next Token opens a line of its own. A Declaration may
-	// share its line with the signature it owns — `function greet (…)` is one
-	// line and one Declaration — but a Parameter sitting on that same line is
-	// a smaller thing than what the block above it documents, and must not
-	// claim it.
+	// Whether the next Token opens a line of its own. A Parameter on its
+	// Declaration's line must not claim the Documentation written for the
+	// Declaration.
 	startsLine(): boolean {
 		let token = this.peek()
 
@@ -571,9 +496,9 @@ export class TokenStream {
 		)
 	}
 
-	// The run of `§§` Comments directly above `line`. Any gap ends the
-	// run — a blank line or an ordinary `§` Comment in between means the block
-	// was written about something else, so it documents nothing.
+	// The run of `§§` Comments on the lines just before `line`. A blank line
+	// or an ordinary `§` Comment ends the run, since the block beyond it
+	// documents something else.
 	documentationAbove(line: number): common.Documentation | null {
 		let lines: Array<DocumentationLine> = []
 		let start: common.Cursor | null = null
@@ -651,27 +576,9 @@ export class TokenStream {
 		return this.next()
 	}
 
-	// The Token that CLOSES a bracketed construction, expected where the
-	// construction has stopped growing. It differs from a plain `expect` in one
-	// thing: the Label beside the primary one, which says where the bracket it
-	// would close was opened. A bracket left open is noticed at the first Token
-	// that can not carry its contents on, and that Token is usually nowhere
-	// near the mistake — the reader is told "expected ')'" about a line that
-	// holds no parenthesis at all, and has to find the opening one by counting.
-	//
-	// "opened here" rather than "this '(' is never closed", which is what
-	// it looks like from the inside and is not what this knows. The `)` may
-	// stand two Tokens further on, with a stray `+` in front of it: the bracket
-	// is open AT THIS TOKEN, which is the whole of the claim, and it is the same
-	// claim `parseClosingBrace` and the unclosed-String report make in the same
-	// words.
-	//
-	// And only where the two stand on different LINES. A bracket and the
-	// Token that would not close it written on one line are both under the
-	// reader's eye already, and a second arrow at a character they can see is
-	// noise: `print(1 + 2)` is answered with "expected ')'" at the `+` and
-	// nothing else, exactly as it always was. What nobody finds by looking is
-	// the bracket opened four lines up.
+	// The Token that closes a bracketed construction. Unlike `expect`, a
+	// failure also points at the opening bracket, since the Token that fails is
+	// often far from the mistake. See "Closing brackets" in DEVELOPMENT.md.
 	expectClosing(tokenType: lexer.TokenType, opening: Token): Token {
 		let token = this.tokens[this.index]
 
@@ -682,11 +589,9 @@ export class TokenStream {
 		this.failClosing(tokenType, opening)
 	}
 
-	// The failure `expectClosing` raises, thrown by hand where a reading
-	// has already decided that the closing Token is not there — an Argument
-	// whose Expression stopped short of the bracket is the case in point, and
-	// it must fail in the SAME words the Argument list's own close would, or
-	// which of the two readings is reported becomes visible to the reader.
+	// The failure `expectClosing` raises, thrown by a reading that has
+	// already decided the closing Token is missing. It uses the same words, so
+	// the reader can not tell which reading reported it.
 	failClosing(tokenType: lexer.TokenType, opening: Token): never {
 		let token = this.tokens[this.index]
 		let position = token?.position ?? this.endPosition()
@@ -705,10 +610,9 @@ export class TokenStream {
 		)
 	}
 
-	// How far into the Token array the reading has got — the measure
-	// furthest-failure tracking compares two readings by. A number rather than
-	// `save()`, which allocates a state object, because this is asked on the
-	// failure path of every speculation.
+	// How far into the Token array the reading has got, which is how the
+	// furthest failure compares readings. A number, since `save()` allocates and
+	// this is asked on every failed speculation.
 	get offset(): number {
 		return this.index
 	}
@@ -717,10 +621,9 @@ export class TokenStream {
 		return { index: this.index, braceDepth: this.braceDepth }
 	}
 
-	// The Tokens between two saved offsets, which is what a recovery reads
-	// to learn what it just walked past — see `Recovery`. Absolute indices
-	// rather than a `peek` offset, because the reading has already moved on by
-	// the time the question is asked.
+	// The Tokens between two saved offsets, which a recovery reads to learn
+	// what it walked past. Absolute indices, because the reading has already
+	// moved on when it asks.
 	between(from: number, to: number): Array<Token> {
 		return this.tokens.slice(
 			Math.max(from, 0),
@@ -737,21 +640,9 @@ export class TokenStream {
 		return this.index >= this.tokens.length
 	}
 
-	// The block a file that runs out of braces most likely left open, and
-	// the `}` that closed it instead. Which block a `}` closes is decided by
-	// COUNTING, so a file one brace short hands every `}` below the mistake to
-	// the block above the one it was written for — and the report then comes out
-	// at the end of the input, about the outermost block, which is the one place
-	// the mistake is not.
-	//
-	// Indentation is what a reader meant and what the counting ignores. A `}`
-	// written further OUT than the line that opened the block it just closed is
-	// a `}` meant for a block further out, so the block it took the brace from
-	// is the one that never got its own. The FIRST such pair is the answer: a
-	// file short of two braces is short of the innermost one first.
-	//
-	// Asked only where a block really is unclosed, so a file that merely writes
-	// a `}` where an author would not is never measured by this at all.
+	// The block a file short of a brace most likely left open, and the `}`
+	// that closed it instead. That is the first `}` written further out than
+	// the line that opened its block. See "Unclosed blocks" in DEVELOPMENT.md.
 	outdentedClose(): { opened: Token; closed: Token } | null {
 		let stack: Array<{ brace: Token; indent: number }> = []
 		let lineStart = new Map<number, number>()
@@ -789,8 +680,8 @@ export class TokenStream {
 		return null
 	}
 
-	// Used to position end-of-input Diagnostics — the end of the last
-	// Token of the input, or the very start of the file when it has none.
+	// Where end-of-input Diagnostics stand: the end of the last Token, or
+	// the start of a file that has none.
 	endPosition(): common.Position {
 		let lastToken = this.tokens[this.tokens.length - 1]
 
