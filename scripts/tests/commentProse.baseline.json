@@ -497,7 +497,6 @@
 	"packages/runtime/src/tests/testing.spec.ts": {"sentence-length": 39, "em-dash": 35, "all-caps": 19, "position": 2, "block-length": 1, "counts": 1},
 	"packages/runtime/src/tests/unicodeEdges.spec.ts": {"sentence-length": 17, "em-dash": 13, "all-caps": 18, "history": 1},
 	"packages/runtime/src/tests/writing.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 2},
-	"packages/runtime/src/type.ts": {"sentence-length": 48, "em-dash": 38, "all-caps": 29, "history": 3, "position": 13, "block-length": 15},
 	"packages/standard-library/src/index.ts": {"sentence-length": 6, "em-dash": 5, "all-caps": 2, "block-length": 2},
 	"packages/standard-library/src/tests/examples.spec.ts": {"sentence-length": 3, "em-dash": 2, "all-caps": 3},
 	"packages/vscode-extension/buildServer.js": {"sentence-length": 4, "em-dash": 4, "all-caps": 2, "block-length": 1},

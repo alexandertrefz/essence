@@ -93,3 +93,79 @@ Modules' `Shape` apart at run time. The path is where the file sat on the machin
 rendering drops it. `caseText` keeps the last two segments, `Shape#Circle`, found from the end since neither a
 Choice name nor a Case name can hold a `#`. A standard library tag such as `Ordering#Less` carries no Module and
 comes back whole. Two Modules that both declare a `Shape` then print alike, while their values stay distinct.
+
+## Union Method dispatch
+
+A Method called on a Union-typed receiver resolves once for each member Type. The Enricher accepts the call only when
+every member resolves. It orders the cases most specific first, since an open Record member would otherwise take
+values meant for a narrower member. At run time `dispatchMethod` in `type.ts` calls the first case whose Type the
+receiver matches. The Optimiser can instead write the cases out as a chain of tests.
+
+Both forms end in `noDispatchCaseMatched`, so a Program says the same thing whichever form it was built with. A
+Program that compiled clean never reaches it: reaching it means a case's runtime check disagrees with the Type the
+Enricher gave it.
+
+The Arguments are built once at the call site, before any case is tried, so an Argument's side effect happens once.
+An Argument whose Type came from the branch means something different in each one. The Function literal
+`(item) { <- item::label() }` calls a different `label` for a `List<Alpha>` receiver than for a `List<Beta>` one. So
+the Enricher compiles one copy per branch, and a case lists its copies by position. They are written into a copy of
+the Argument list, so one case's Arguments never leak into another's.
+
+Branches resolve to different Methods, and those need not agree on which Parameters may be left out. So each case
+lists the Parameters its Method takes a default for. `dispatchMethod` opens an `undefined` hole at each, which is
+what a JavaScript default parameter fires on. The indices count the receiver as 0, which is passed apart from the
+list, so index `i` lands at `i - 1`. They arrive in Parameter order, so one cursor walks them.
+
+## Conformance witnesses
+
+A witness is the map of Methods a conformance hands to a bounded Function as a hidden trailing Argument.
+`boundConformance` builds one for a conditional conformance: each Method is curried with the witnesses that solve
+the `where` conditions. An unconditional conformance never reaches it, since the Rewriter emits its map as a plain
+object literal.
+
+One entry of a witness is not a Method: the `structural` brand. A Dictionary reads it to decide that its key encoding
+may stand in for the witness's equality. On a conditional conformance the brand holds only when every condition's
+witness carries it too. `List<ItemType> is Equatable where ItemType is Equatable` compares items through its
+condition's witness, so a List key is structural exactly when its items are. A nested List asks the same of its own
+condition. `boundConformance` lifts the brand out rather than currying it, since a Dictionary reads it with `===
+true`.
+
+`providedConformance` builds a witness for a Protocol that provides Method bodies. Each provided body is curried
+with the finished witness, so the map is built first and every body closes over it. The brand passes through,
+since a Protocol never provides a Method by that name.
+
+`providedConformances` builds one conformer's witnesses for several Protocols at once, the first being the answer.
+Every map is built before any body closes over one, so bodies may call across witnesses. It records the group under
+its first witness, so that a later group can take a condition from it by position.
+
+## Runtime type tests
+
+`isValueOfType` in `type.ts` answers a Match's Matchers and a dispatch's cases. Types erase,
+so it looks at what a value holds.
+
+- A Record Matcher is open. The value has to carry each member the Matcher names, and may carry more. The test uses
+  `Object.hasOwn`, so that a member named `toString` is not found on `Object.prototype`.
+- A List or Dictionary fits when every item or entry does, so an empty one fits any Matcher. A Dictionary's key and
+  value are each checked only where the Matcher names a Type for it, and a bare `Dictionary` checks the tag alone.
+- A Case is nominal first: the tag has to match. Every instantiation of a generic Case carries the same tag, so the
+  payload is checked too. A payload is closed, so every member is asked about. Inside generic code the members are
+  still Type Parameters, which match anything, so the test degrades to the tag.
+- A Future or a Started checks its kind alone. What it will answer does not exist until it runs, and running it
+  would give a type test an effect.
+- A Function has no Type key and its Signature is erased, so the test is `typeof`. Two Matchers for
+  Function-typed members therefore ask the same question.
+- A Type Parameter and the wildcard's `Unknown` match anything. Matchers are tried in order, so the concrete ones
+  come first.
+- Any other descriptor is a Compiler bug, and the test throws rather than take a wrong branch.
+
+A Match that no Handler accepts ends in `noCaseMatched`. The Validator refuses a Match that does not cover its Union,
+so reaching it also means a runtime check disagrees with an inferred Type. The error names the value's Type key
+only, since `type.ts` is in every Program's bundle and does not import the printer.
+
+### Why `type.ts` reads containers itself
+
+Every Program carries `type.ts`. It walks a List's runs and a Dictionary's live entries itself, because importing
+`List.ts` or `Dictionary.ts` would close a cycle. A List is read as its front run walked backwards, then its back
+run, with both counts fixed first. A Dictionary's live view is its `store.slots` in insertion order, each at the
+newest version the box's generation can see. A removal's tombstone is a symbol, and every Essence value is an
+object or a Function, so `everyLiveEntry` recognises a tombstone by `typeof`.
