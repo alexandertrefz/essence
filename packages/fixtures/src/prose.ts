@@ -17,14 +17,19 @@ export function maskCode(text: string): string {
 	return text.replace(/`[^`]*`/g, "code")
 }
 
+// Stands in for a code span while the text is split, so that a sentence can
+// open with one. It becomes the word `maskCode` writes afterwards.
+const codeMark = "\u{E000}"
+
 // A sentence ends at a period, a question mark or an exclamation mark that is
-// followed by a space and the start of another one. A colon introduces an
-// example that belongs to its sentence. `1.5` has no space after its period.
-// A split after an abbreviation is joined again.
+// followed by a space and the start of another one. That may be a code span. A
+// colon introduces an example that belongs to its sentence. `1.5` has no space
+// after its period. A split after an abbreviation is joined again.
 export function sentencesOf(text: string): Array<string> {
 	let sentences: Array<string> = []
+	let marked = text.replace(/`[^`]*`/g, codeMark)
 
-	for (let piece of maskCode(text).split(/(?<=[.!?])\s+(?=[A-Z`"'(])/)) {
+	for (let piece of marked.split(/(?<=[.!?])\s+(?=[A-Z`"'(\u{E000}])/u)) {
 		let previous = sentences[sentences.length - 1]
 
 		if (previous !== undefined && abbreviationPattern.test(previous)) {
@@ -37,7 +42,7 @@ export function sentencesOf(text: string): Array<string> {
 	}
 
 	return sentences
-		.map((sentence) => sentence.trim())
+		.map((sentence) => maskCode(sentence.replaceAll(codeMark, "``").trim()))
 		.filter((sentence) => sentence !== "")
 }
 

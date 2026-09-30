@@ -385,6 +385,23 @@ describe("Standard Library Prose", () => {
 			])
 		})
 
+		it("should split before a sentence that opens with a code span", () => {
+			expect(
+				sentencesOf(
+					"Answers the first item. `last` answers the other end.",
+				),
+			).toEqual([
+				"Answers the first item.",
+				"code answers the other end.",
+			])
+			expect(
+				sentencesOf("Counts from zero. `List.of(n)`. Then it stops."),
+			).toEqual(["Counts from zero.", "code.", "Then it stops."])
+			expect(sentencesOf("Two ways: `first` and `second`.")).toEqual([
+				"Two ways: code and code.",
+			])
+		})
+
 		it("should keep a code span whole, periods and all", () => {
 			// One term, one word, and no sentence end inside it.
 			expect(
@@ -401,6 +418,9 @@ describe("Standard Library Prose", () => {
 					"A mode, e.g. `#Start`. The default is `#BothEnds`.",
 				),
 			).toEqual(["A mode, e.g. code.", "The default is code."])
+			expect(sentencesOf("A name, i.e. `count`, is enough.")).toEqual([
+				"A name, i.e. code, is enough.",
+			])
 		})
 
 		it("should not split inside a number", () => {

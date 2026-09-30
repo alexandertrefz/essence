@@ -114,6 +114,19 @@ describe("Comment Prose", () => {
 			).toEqual([3])
 		})
 
+		it("should end a sentence before one that opens with a code span", () => {
+			expect(
+				rulesIn(
+					`let a = 1\n// ${sentenceOf(20)} \`name\` ${sentenceOf(20)}\n`,
+				),
+			).toEqual([])
+			expect(
+				rulesIn(
+					`let a = 1\n// ${sentenceOf(20)} \`name\` ${sentenceOf(25)}\n`,
+				),
+			).toEqual(["sentence-length"])
+		})
+
 		it("should find an em-dash in prose but not in a code span", () => {
 			expect(rulesIn("let a = 1\n// One thing — and another.\n")).toEqual(
 				["em-dash"],
