@@ -1,10 +1,8 @@
 import type { common } from "@essence-lang/interfaces"
 
-// Some things are safest reprinted exactly as they were written rather
-// than rebuilt from the AST — a grouped Number (`1_000` reaches the AST as
-// `"1000"`), a Rational whose parts must stay flush, a String whose quotes the
-// Lexer stripped. Positions are 1-based line/column pairs with no byte offset
-// anywhere in the compiler, so slicing needs the source split into lines.
+// The source, for what is safest reprinted as written, such as the grouping in
+// `1_000` or a String's quotes. Positions are 1-based lines and columns, so it
+// is kept as lines.
 export class SourceText {
 	private lines: Array<string>
 
@@ -20,9 +18,8 @@ export class SourceText {
 		return this.lines[line - 1] ?? ""
 	}
 
-	// Whether every line strictly between the two given ones is blank.
-	// This is what tells a written blank line apart from two things that merely
-	// sit on non-adjacent lines because the first one spans several.
+	// Whether a blank line stands strictly between the two. A Statement over
+	// several lines leaves a gap in line numbers without one.
 	hasBlankLineBetween(endLine: number, startLine: number): boolean {
 		for (let line = endLine + 1; line < startLine; line++) {
 			if (this.lineAt(line).trim() === "") {
@@ -33,15 +30,9 @@ export class SourceText {
 		return false
 	}
 
-	// The line a block's own `}` is written on, looked for between the end
-	// of its last Statement and the start of whatever follows the block.
-	//
-	// An `if … else` gives no Position for the true body's brace — the
-	// Statement's Position runs to the end of the false body — and guessing
-	// "the line above the false body's first Statement" lands above any
-	// Comments written at the top of the `else`, which then get flushed into
-	// the `if` and end up above the `} else {` that used to be below them.
-	// Nothing but the source says where that brace is.
+	// The line a block's own `}` is on. An `if … else` has no Position for the
+	// `}` of its true body. Guessing it would pull the Comments at the top of
+	// the `else` into the `if`.
 	closingBraceLine(from: number, to: number): number | null {
 		for (let line = from; line <= to; line++) {
 			if (this.lineAt(line).trim().startsWith("}")) {
@@ -52,14 +43,9 @@ export class SourceText {
 		return null
 	}
 
-	// The line a block's own `{` is written on: the LAST line in the
-	// range whose code — a trailing Comment stripped — ends with the brace. A
-	// block's opening line is what a trailing Comment is claimed on and what
-	// the Statement inside it are laid out against, and it is NOT the line the
-	// Declaration starts on: a Parameter list, a conformance clause or a
-	// broken chain in an `if` condition can put the brace several lines below
-	// the keyword. The last such line, because a default value or a `match`
-	// value written before the brace can end a line with a `{` of its own.
+	// The last line in the range whose code ends with `{`. A Parameter list or
+	// a broken `if` condition can put the brace lines after the keyword. A
+	// default value or a `match` can end an earlier line with a `{` of its own.
 	openingBraceLine(from: number, to: number): number | null {
 		for (let line = to; line >= from; line--) {
 			let code = codeOf(this.lineAt(line)).trimEnd()
@@ -72,9 +58,8 @@ export class SourceText {
 		return null
 	}
 
-	// `end` is exclusive of the character at `end.column`, matching the
-	// Lexer's cursor, which stops on the first character that is not part of
-	// the Token.
+	// `end` is exclusive, as the Lexer's cursor stops on the first character
+	// after the Token.
 	slice(position: common.Position): string {
 		let { start, end } = position
 
@@ -99,10 +84,8 @@ export class SourceText {
 	}
 }
 
-// A line with its trailing Comment cut off. A `§` inside a String is
-// not a Comment, and the one way to tell without lexing is that an odd number
-// of quotes stands before it — good enough for a line whose only job is to say
-// whether it ends in a brace.
+// A line with its trailing Comment cut off. A `§` after an odd number of
+// quotes is inside a String, which is close enough to see a line end in `{`.
 function codeOf(line: string): string {
 	let quotes = 0
 

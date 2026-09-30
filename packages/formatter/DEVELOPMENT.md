@@ -91,3 +91,29 @@ re-export names another file.
 `canonicalSections` rebuilds each section's flat `entries` list from the sorted groups, so that the safety gate
 compares both trees in one order. `sectionSpans` reads the Program as written, never a sorted copy. The anchor
 comparison pairs each entry with its Comments in the order the Lexer reads them.
+
+## Writing snapshots into the source
+
+`writeInlineSnapshots` in `src/snapshots.ts` writes a recorded value back into a test file. The first run of an inline
+`matches snapshot` calls it, and so does `essence test --update` for a value that differs. It lives in the formatter
+because a machine writes the value into a file a person reads. The result should look the way `esfmt` writes it.
+
+The literal is spliced over its slot rather than printed from a changed tree. The Printer prints a String Literal
+verbatim from the span it occupies, and a literal that is not in the source yet has no span. A snapshot that nothing
+has recorded has no slot of its own: its update names the `snapshot` keyword, and the value is written after it.
+
+Splices run back to front, so each one leaves the slots before it where the parse found them. An update whose
+Position does not start a slot is dropped, since the file changed under the run, and `applied` counts the rest.
+Then the rewritten source has to parse, and each slot written to has to hold exactly the recorded text. Slots are
+matched by their place among the file's inline slots rather than by Position, since a splice moves Positions but
+never reorders slots.
+
+That check covers the slots only, and `format` checks the rest of the file through its own safety gate. The
+formatted text is used only when the source was already formatted before the splice. A test run that reformatted
+lines nobody touched would be a build formatting code without saying so. In a formatted file only the spliced lines
+can differ, so the recorded value still arrives laid out the way `esfmt` writes it. When `format` refuses, the splice
+is handed back unformatted with the refusal.
+
+`literalOf` spells the value with `quotedText`, the runtime's own quoted printer, whose literal the Lexer reads back
+as the same value. `roundTrip.spec.ts` in the compiler holds it to that. It spells a newline as `\n`, so a recorded
+value stays on one line. A value long enough for that to read badly belongs in a stored snapshot.

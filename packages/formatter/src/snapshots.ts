@@ -4,33 +4,19 @@ import { quotedText } from "@essence-lang/runtime/String"
 
 import { format, type FormatResult, guarded } from "./index"
 
-// Writing a recorded value back into the source, which is what the first
-// run of an inline `matches snapshot` does and what `essence test --update`
-// does to one that differs.
-//
-// It lives in the FORMATTER because a recorded value is written by a machine
-// into a file a person reads: the literal is spelled here, and the result is
-// formatted here, so what a run leaves behind is source in the shape the
-// project's own tools would have written.
-//
-// The literal is SPLICED over the slot rather than printed out of a changed
-// tree, for one reason: a String Literal is printed verbatim from the span it
-// occupies, so a Literal that is not in the source yet has nothing to print.
-// What holds the splice honest is the check below — the rewritten source is
-// parsed again, and every slot has to hold exactly the text it was given.
+// Writes recorded values of inline snapshots back into a test file's source.
+// See "Writing snapshots into the source" in DEVELOPMENT.md.
 
 type SnapshotUpdate = {
-	// Where the recorded value stands, or would stand — the `snapshot`
-	// Keyword's own span where the source has never held one. It comes off the
-	// run's own event, which the Compiler filled from the span table.
+	// Where the recorded value stands, or the `snapshot` keyword where no
+	// value has been recorded yet.
 	position: common.Position
 	text: string
 }
 
 type SnapshotWrite = FormatResult & {
-	// How many of the updates found the slot they name. Fewer than were
-	// handed over means the file moved under the run — nothing is written at a
-	// Position that now means something else.
+	// How many updates found their slot. The rest are dropped, since the file
+	// changed under the run.
 	applied: number
 }
 
@@ -75,8 +61,8 @@ function writeUnguarded(
 	}
 
 	let slots = slotsOf(program)
-	// Back to front, so that splicing one slot leaves every slot before
-	// it standing where the parse said it was.
+	// Back to front, so that splicing one slot leaves every slot before it
+	// where the parse found it.
 	let wanted = updates
 		.map((update) => ({
 			update,
@@ -102,9 +88,8 @@ function writeUnguarded(
 		let end = offsetOf(rewritten, update.position.end)
 		let literal = literalOf(update.text)
 
-		// A snapshot nothing has recorded has no slot of its own — what
-		// it names is the `snapshot` Keyword, and the value is written AFTER
-		// it. One that holds a value is replaced where it stands.
+		// An empty snapshot's update names the `snapshot` keyword, and the
+		// value goes after it. A recorded value is replaced where it stands.
 		rewritten =
 			rewritten.slice(0, start) +
 			(slot?.empty === true
@@ -121,11 +106,8 @@ function writeUnguarded(
 		return refused("The rewritten source no longer parses.", "unsafe")
 	}
 
-	// The whole of the safety story for a splice: the slot that was
-	// written into holds exactly the text the run recorded, and it is found by
-	// its PLACE among the file's slots rather than by its Position, which the
-	// splice moved. It says nothing about the rest of the file, which is why
-	// the formatting below runs through `format`, whose own gate does.
+	// Each slot written to holds exactly the recorded text. Slots are found by
+	// index, since the splice moved Positions, and `format` checks the rest.
 	if (!holds(slotsOf(after.program), wanted)) {
 		return refused(
 			"The rewritten source does not hold what was recorded.",
@@ -144,14 +126,9 @@ function writeUnguarded(
 		}
 	}
 
-	// The formatter's answer is taken for a file that was ALREADY
-	// formatted, and only then. Recording a snapshot is something a test run
-	// does to a source, and a run that reformatted forty lines nobody touched
-	// would be a build formatting your code — which this project does not do,
-	// and which no report would mention. Where the file was already in the
-	// shape `esfmt` writes, the only lines that can differ are the ones the
-	// splice touched, so the recorded literal still arrives formatted: broken
-	// across lines if it is long, indented where it stands.
+	// Formatted only when the source already was, so that a test run never
+	// reformats lines nobody touched. See "Writing snapshots into the source"
+	// in DEVELOPMENT.md.
 	if (format(source, { documentPath }).text !== source) {
 		return {
 			text: rewritten,
@@ -169,28 +146,17 @@ function writeUnguarded(
 	}
 }
 
-// A String Literal spelling the text, which is the runtime's own quoted
-// printer and not a second spelling of it: a recorded value is written back
-// into the reader's SOURCE, so what it has to be is exactly what the Lexer
-// reads back as the value — which is the promise `quotedText` makes and
-// `roundTrip.spec.ts` holds it to. This retold the escape set by hand until
-// `\u{…}` existed, and was two rules apart from the printer by then: a control
-// character went into the source RAW, and a lone surrogate went in as a
-// character no UTF-8 file can hold, so writing the file replaced it and the
-// recorded value silently stopped being the one that was recorded.
-//
-// A newline is `\n` rather than a line of its own: Essence has no multi-line
-// String Literal, so a recorded value that spans lines is spelled on one — and
-// a value long enough for that to read badly is what a STORED snapshot is for.
+// The runtime's quoted printer, whose literal the Lexer reads back as the same
+// value. It spells a newline as `\n`, so a recorded value stays on one line.
 function literalOf(text: string): string {
 	return quotedText(text)
 }
 
-// Every slot an INLINE recorded value stands in. A stored snapshot names
-// a file instead, and nothing here writes into a source for one.
+// A slot an inline recorded value stands in. A stored snapshot names a file
+// instead, and nothing here writes one.
 type Slot = {
-	// Which inline slot of the file this is. A splice moves Positions and
-	// never reorders slots, so the place is what a rewritten file is checked by.
+	// The slot's place among the file's inline slots, which a splice moves but
+	// never reorders.
 	index: number
 	position: common.Position
 	empty: boolean
@@ -270,9 +236,8 @@ function assertionsOf(
 	return found
 }
 
-// Essence Cursors are 1-based on both axes, and a column stands one past
-// the character before it — so the offset of a Cursor is the length of every
-// line above it, the newlines included, plus the column minus one.
+// Cursors are 1-based on both axes. The offset is the length of the lines
+// before the Cursor's, newlines included, plus the column minus one.
 function offsetOf(source: string, cursor: common.Cursor): number {
 	let offset = 0
 	let line = 1

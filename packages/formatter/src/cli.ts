@@ -16,10 +16,8 @@ export const EXIT_USAGE = 2
 
 const DEFAULT_PROGRAM_NAME = "esfmt"
 
-// The width the argument lists are given, gap included: every
-// description starts three spaces past the longest one that carries its
-// description on the same line. Written as that line rather than as a number
-// so that the column follows the text it is measured from.
+// The argument lists' width, gap included. Descriptions start three spaces past
+// the longest list that shares their line.
 const ARGUMENTS_WIDTH = "--check <files…>   ".length
 
 function usage(programName: string): string {
@@ -52,12 +50,10 @@ function usage(programName: string): string {
 		},
 	]
 
-	// A program name longer than `esfmt` — `essence format` under the
-	// unified binary — moves the description column right, but only until the
-	// longest description would end past the width this very screen says the
-	// formatter lays out to. Past that the column stops, and an argument list
-	// that no longer fits in front of it carries its description on the next
-	// line instead, the way `--stdin-filepath <path>` already does.
+	// A longer program name, such as `essence format`, moves the description
+	// column right until the longest description would pass `WIDTH`. An
+	// argument list that does not fit before the column puts its description on
+	// the next line.
 	let widest = Math.max(
 		...entries.flatMap((entry) =>
 			entry.description.map((line) => line.length),
@@ -133,17 +129,14 @@ function parseArguments(argv: Array<string>): Options | string {
 		} else if (argument === "--version") {
 			options.version = true
 		} else if (argument === "--help" || argument === "-h") {
-			// Asking for help ends the parse, so that it answers rather
-			// than an argument written after it being rejected.
+			// Ends the parse, so an argument after it cannot get it rejected.
 			options.help = true
 
 			return options
 		} else if (argument === "--") {
-			// Everything past an end-of-options marker is a file name, so
-			// that a path beginning with `-` is expressible at all. Reachable
-			// only through the unified binary: `esfmt -- <file>` works because
-			// bun drops a `--` sitting immediately after the script path, while
-			// `essence format -- <file>` forwards the token verbatim, by design.
+			// Everything after `--` is a file name, so a path starting with `-`
+			// can be named. Only `essence format` passes a `--` through, since Bun
+			// drops one right after the script path.
 			options.patterns.push(...argv.slice(index + 1))
 
 			return options
@@ -186,16 +179,13 @@ function walkLeavesOut(
 
 async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 	let found = new Set<string>()
-	// The project file is found from the working directory, as every
-	// command finds it.
+	// Found from the working directory, as every command finds it.
 	let { exclude } = readProjectConfiguration()
 
 	for (let pattern of patterns) {
-		// A plain path is its own match: `glob` would treat characters
-		// like `[` in a file name as a pattern rather than as the name. A named
-		// file is taken as it is, whatever its extension and even when the
-		// project excludes it; only a directory filters, because there the
-		// author named a place rather than a file.
+		// A plain path is its own match, since `glob` would read a `[` in it as
+		// a pattern. A named file is taken whatever its extension, even when the
+		// project excludes it. Only a directory filters.
 		if (!GLOB_CHARACTERS.test(pattern)) {
 			let resolved = path.resolve(pattern)
 			let isDirectory = await stat(resolved).then(
@@ -236,9 +226,8 @@ function displayPath(file: string): string {
 	return relative.startsWith("..") ? file : relative
 }
 
-// A syntax error is the file's own problem and is reported with the
-// position the parser gave; anything else that stops a file being formatted is
-// the formatter's, and says so plainly rather than blaming the source.
+// A syntax error is reported where the parser found it. Any other refusal is a
+// formatter bug, and says so.
 function reportRefusal(
 	file: string,
 	refusal: NonNullable<ReturnType<typeof format>["refusal"]>,
@@ -419,9 +408,8 @@ export async function run(
 		return failed || unformatted.length > 0 ? EXIT_FAILURE : EXIT_SUCCESS
 	}
 
-	// Silent when something was refused — the refusal has already been
-	// written to stderr, and a count of what did get formatted underneath it
-	// reads like the run succeeded.
+	// Silent after a refusal, since a count of formatted files under it would
+	// read as success.
 	if (failed) {
 		return EXIT_FAILURE
 	}
