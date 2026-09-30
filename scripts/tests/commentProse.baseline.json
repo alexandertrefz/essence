@@ -311,7 +311,6 @@
 	"packages/debug-adapter/src/variables.ts": {"sentence-length": 3, "em-dash": 4, "position": 1, "stacked": 1},
 	"packages/fixtures/src/index.ts": {"sentence-length": 2, "em-dash": 1},
 	"packages/fixtures/src/spawn.ts": {"sentence-length": 1},
-	"packages/formatter/src/printer.ts": {"sentence-length": 180, "em-dash": 145, "all-caps": 38, "history": 3, "position": 14, "block-length": 41},
 	"packages/formatter/src/tests/asynchrony.spec.ts": {"sentence-length": 5, "em-dash": 1, "all-caps": 3},
 	"packages/formatter/src/tests/cli.spec.ts": {"sentence-length": 2, "em-dash": 1},
 	"packages/formatter/src/tests/dictionaryLiterals.spec.ts": {"sentence-length": 9, "em-dash": 9, "all-caps": 11, "block-length": 1},
