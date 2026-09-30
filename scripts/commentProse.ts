@@ -879,11 +879,13 @@ export function findingsIn(source: Source): Array<Finding> {
 		}
 	}
 
+	// The file's header may stand above the comment on its first declaration.
 	for (let index = 1; index < blocks.length; index++) {
 		let above = blocks[index - 1]!
 		let next = blocks[index]!
 
 		if (
+			above !== header &&
 			above.ownLine &&
 			next.ownLine &&
 			above.lines.some(isProse) &&

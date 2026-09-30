@@ -297,7 +297,7 @@ server's TypeScript directly, so there is no bundle to rebuild.
 - No history. Say what the code does, not what it did before.
 - No pointer by position, such as "the loop above". Name the thing instead.
 - No block over six lines, apart from a file's opening block. An indented or fenced code example does not count.
-- No two blocks with nothing but blank lines between them.
+- No two blocks with nothing but blank lines between them, apart from a file's opening block and the comment after it.
 - No count of other code, such as "the three callers".
 - No `NOTE:` prefix. `WARNING:` and `INVARIANT:` are the only markers, for the rare comment that is one.
 - No mention of a `DEVELOPMENT.md` but a citation, `See "<Heading>" in DEVELOPMENT.md.`, naming a heading of the

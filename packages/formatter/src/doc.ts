@@ -2,6 +2,8 @@
 // as a `Doc`, and `printDoc` picks the layout that fits the width.
 // See "The document algebra" in DEVELOPMENT.md.
 
+// Indentation is written as tabs but measured in columns, a tab counting as
+// this many.
 export const TAB_WIDTH = 4
 
 // The columns a line is laid out to, which `printDoc` takes as an argument. The

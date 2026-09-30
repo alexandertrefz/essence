@@ -208,6 +208,13 @@ describe("Comment Prose", () => {
 			)
 		})
 
+		it("should let a file's header stand above the first comment", () => {
+			expect(rulesIn("// Header.\n\n// First.\nlet a = 1\n")).toEqual([])
+			expect(
+				rulesIn("// Header.\n\n// One.\n\n// Two.\nlet a = 1\n"),
+			).toEqual(["stacked"])
+		})
+
 		it("should find a count of other code", () => {
 			expect(
 				rulesIn("let a = 1\n// Shared by the three callers.\n"),
