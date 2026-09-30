@@ -287,6 +287,24 @@ server, point its `essence.server.path` setting at that file: the setting spawns
 nothing else, so it wants the server's own entry point rather than the `essence lsp` command. It runs the
 server's TypeScript directly, so there is no bundle to rebuild.
 
+## Comments
+
+`scripts/tests/commentProse.spec.ts` holds every comment in the TypeScript and JavaScript sources to these rules:
+
+- No sentence over 25 words.
+- No em-dash.
+- No capitals for emphasis. Acronyms, and names the file spells in code, are fine.
+- No history. Say what the code does, not what it did before.
+- No pointer by position, such as "the loop above". Name the thing instead.
+- No block over six lines, apart from a file's opening block.
+- No two blocks with nothing but blank lines between them.
+- No count of other code, such as "the three callers".
+- No `NOTE:` prefix. `WARNING:` and `INVARIANT:` are the only markers, for the rare comment that is one.
+
+`scripts/tests/commentProse.baseline.json` records how often each file breaks each rule today, and a file can
+break a rule less often but never more. After fixing a comment, run `bun run comments:baseline` to lower the
+counts. It never raises one: a higher count is a hand edit that shows in the diff.
+
 # Disclaimer
 This language is still a work in progress. It is not ready for use yet and most things are in flux; the documentation at
 [essencelang.org](https://essencelang.org) describes the current release. Generally: Here be dragons!
