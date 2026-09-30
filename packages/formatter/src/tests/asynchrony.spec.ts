@@ -2,13 +2,12 @@ import { describe, expect, it } from "bun:test"
 
 import { format } from "../index"
 
-// The two prefix Keywords. Each is written as one word, one space and its
-// operand — there is nothing else to decide, because the operand is the whole
-// postfix chain and Essence has no grouping parentheses to put around one.
+// The prefix keywords `start` and `complete`, each written as one word, one
+// space and its operand, which is the whole postfix chain.
 //
-// Every test here is a ROUND TRIP over canonically formatted source: the safety
-// gate refuses output whose re-parse differs, so a form printed back as
-// something else shows up as a refusal rather than as a diff.
+// Every test here is a round trip over formatted source. The safety gate
+// refuses output whose re-parse differs, so a form printed back as something
+// else shows as a refusal rather than a diff.
 
 function block(...lines: Array<string>): string {
 	return ["implementation {", ...lines, "}", ""].join("\n")
@@ -60,8 +59,7 @@ describe("start and complete", () => {
 		)
 	})
 
-	// And both are ordinary names wherever no Expression follows them on
-	// their own line, which the printer has nothing to decide about.
+	// Both are ordinary names where no Expression follows them on their line.
 	it("writes either word where it is a name", () => {
 		roundTrips(
 			block(
@@ -72,12 +70,8 @@ describe("start and complete", () => {
 		)
 	})
 
-	// A word that ends its line is a name and the Statement below it is a
-	// Statement of its own, so there are two here for the printer to print and
-	// it leaves both where they are. The Parser's line rule is what makes that
-	// true: while the operand could begin on a later line, these two came in as
-	// ONE Statement and were printed back as one, which is a formatter baking a
-	// misparse into the source it was asked to leave alone.
+	// A word that ends its line is a name, and the next line is a Statement of
+	// its own. The Parser reads the operand only from the keyword's line.
 	it("leaves a word that ends its line where it was written", () => {
 		roundTrips(
 			block(
@@ -89,8 +83,8 @@ describe("start and complete", () => {
 		)
 	})
 
-	// A chain the Keyword holds breaks the way any chain does, with each
-	// link on a line of its own and the Keyword staying with the head.
+	// A chain the keyword holds breaks as any chain does, each link on its own
+	// line and the keyword staying with the head.
 	it("breaks a chain that does not fit under the Keyword", () => {
 		roundTrips(
 			block(

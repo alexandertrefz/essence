@@ -10,8 +10,8 @@ const MESSY = "implementation {\n    constant a = 1\n}\n"
 const FORMATTED = "implementation {\n\tconstant a = 1\n}\n"
 const BROKEN = "implementation {\n\tconstant = = =\n}\n"
 
-// `run` writes straight to the process's streams, so each invocation is
-// wrapped to keep the test output clean and to let a test read what was said.
+// `run` writes to the process's streams. Each call is wrapped to keep the test
+// output clean and to let a test read what was written.
 async function runCaptured(
 	argv: Array<string>,
 	options?: { programName?: string },
@@ -204,9 +204,8 @@ describe("cli", () => {
 			])
 		})
 
-		// The screen's own last line promises that Essence is laid out to
-		// fit WIDTH columns, so the screen has to fit it too — under every name
-		// it can be invoked as, since the name is what moves the column.
+		// The screen says Essence is laid out to `WIDTH` columns, so the screen
+		// fits them too, under every name, since the name moves the column.
 		for (let programName of [undefined, "essence format"]) {
 			it(`keeps the usage screen inside ${WIDTH} columns as ${programName ?? "esfmt"}`, async () => {
 				let { stdout } = await runCaptured(
@@ -329,8 +328,8 @@ describe("cli", () => {
 	describe("skipped and excluded paths", () => {
 		let previous = process.cwd()
 
-		// The project file is found from the working directory, so these
-		// run from inside the project.
+		// The project file is found from the working directory, so these run
+		// inside the project.
 		beforeEach(async () => {
 			await file("essence.json", '{ "exclude": ["broken"] }\n')
 			await file(path.join(".git", "Object.es"), MESSY)

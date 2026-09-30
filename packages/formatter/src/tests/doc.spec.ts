@@ -22,12 +22,9 @@ import {
 	verbatim,
 } from "../doc"
 
-// A run of lines, each of them a head, the padding that carries it to
-// the run's column, and a tail. `fit` is what the whole line must fit for its
-// padding to be worth writing — a `define` arm reports one, because an arm
-// that breaks writes the very word the column runs through on a line of its
-// own; an assignment reports none, because its `=` never leaves its head's
-// line however far the value runs on.
+// A run of lines, each a head, its padding and a tail. The `fit` is the width
+// the whole line must fit for its padding to count. A `define` arm reports one,
+// and an assignment none, since its `=` never leaves its head's line.
 function alignedLines(
 	maxSpan: number,
 	lines: Array<[head: string, tail: string, fit: number | null]>,
@@ -50,9 +47,8 @@ function alignedLines(
 	)
 }
 
-// The shape every list-like construct in the printer uses — an opening
-// bracket, comma separated entries that break one per line, and a trailing
-// comma that appears only when broken.
+// The shape of every list in the Printer: a bracket, entries that break one per
+// line, and a trailing comma only when broken.
 function bracketed(entries: Array<string>): Doc {
 	return group(
 		concat([
@@ -155,8 +151,8 @@ describe("doc", () => {
 		expect(printDoc(doc, 80)).toBe("a\n\n\tb")
 	})
 
-	// A multi-line String Literal's trailing spaces are characters of the
-	// value, not layout — trimming them changes what the file says.
+	// A multi-line String Literal's trailing spaces belong to the value, so
+	// trimming them would change what the file says.
 	it("keeps trailing whitespace inside verbatim text", () => {
 		let doc = concat([verbatim('"hello   \nworld"'), hardline, text("b")])
 
@@ -169,8 +165,8 @@ describe("doc", () => {
 		expect(printDoc(doc, 80)).toBe("a  \nb")
 	})
 
-	// What a Comment claimed onto a Statement rides on — the group can
-	// never render flat, but no line break is written where the marker stands.
+	// What a trailing Comment carries: the group never prints flat, but no line
+	// break is written for the marker itself.
 	it("renders breakParent as nothing and breaks the enclosing group", () => {
 		let doc = group(concat([text("a"), line, text("b"), breakParent]))
 
@@ -309,11 +305,9 @@ describe("doc", () => {
 			).toBe("a  = 1\nbb = 2\ncccccccccccccccccccc = 3")
 		})
 
-		// The column a run stands at is the renderer's to know, and the
-		// same run resolves differently at two of them: with the whole page to
-		// itself the first line takes its padding, and two indents in the
-		// padding would carry it past the width — so it is out of the run, and
-		// what is left is a block of one and unpadded.
+		// One run resolves differently at two columns. With the whole page the
+		// first line takes its padding. Two indents in, that padding would pass
+		// the width, so the line leaves the run and the rest is a block of one.
 		it("resolves one run against the room it is reached with", () => {
 			let atRoot = alignedLines(12, [
 				["ab", " if " + "x".repeat(64), 70],
@@ -332,9 +326,8 @@ describe("doc", () => {
 			)
 		})
 
-		// Taking one line out is not the end of it — the two lines either
-		// side of it become one block, which can widen the padding of a line
-		// that fit before. The pass runs again until nothing more comes out.
+		// Taking a line out joins the lines around it into one block, which can
+		// widen another line's padding. The pass repeats until no line comes out.
 		it("takes a line out that the padding alone would break", () => {
 			expect(
 				printDoc(
@@ -354,10 +347,8 @@ describe("doc", () => {
 			)
 		})
 
-		// The lines either side of one taken out line up with each other
-		// across it — unless the run is parted by its breaks, where each side
-		// is a run of its own: a `match` Handler that breaks opens a block,
-		// and a column carried across a block would run through two tables.
+		// The lines around one taken out line up with each other, unless the run
+		// is parted by its breaks. Then each side is a run of its own.
 		it("parts a run at a line taken out, where asked to", () => {
 			let lines: Array<[string, string, number | null]> = [
 				["a", " { 1 }", 7],
@@ -387,9 +378,7 @@ describe("doc", () => {
 			)
 		})
 
-		// A line that reports no width holds its column however long it
-		// runs — nothing about the room it stands in can move the thing the
-		// column is drawn through.
+		// A line that reports no width holds its column however long it runs.
 		it("keeps a line with no width of its own in the run", () => {
 			expect(
 				printDoc(

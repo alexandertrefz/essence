@@ -2,17 +2,13 @@ import { describe, expect, it } from "bun:test"
 
 import { format } from "../index"
 
-// The three written forms of a Dictionary — the Literal, the empty one,
-// and the update in either of its halves. Every test here is a ROUND TRIP over
-// canonically formatted source: what the Printer writes for a form it has never
-// seen before is what a reader will have to type, and the safety gate refuses
-// output whose re-parse differs, so a form printed back as something else shows
-// up as a refusal rather than as a diff.
+// The written forms of a Dictionary: the literal, the empty one, and the update
+// in either of its forms. Every test is a round trip over formatted source. The
+// safety gate refuses output whose re-parse differs, so a form printed back as
+// something else shows as a refusal rather than a diff.
 //
-// The comment cases matter more here than anywhere: a Dictionary entry is two
-// Expressions and a `=`, so there are twice as many places a `§` can sit as
-// there are in a List, and every one of them has to come back where it was
-// written.
+// An entry is two Expressions and a `=`, so a Dictionary has twice as many
+// places for a `§` as a List. Each has to come back where it was written.
 
 function block(...lines: Array<string>): string {
 	return ["implementation {", ...lines, "}", ""].join("\n")
@@ -61,10 +57,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// The brackets are read off the Node rather than guessed at, and
-		// this is what says so: `{ record with other }` and `[dictionary with
-		// other]` are the same Node shape, and the pair that was written is the
-		// only thing that tells them apart.
+		// `{ record with other }` and `[dictionary with other]` are one node
+		// shape, so the brackets come from the node.
 		it("keeps a Record's update in braces", () => {
 			roundTrips(
 				block(
@@ -90,9 +84,8 @@ describe("Dictionary literals", () => {
 			roundTrips(source)
 		})
 
-		// A List of nothing but Numbers FILLS — as many to a line as fit
-		// — and a Dictionary never does, whatever its values are: an entry is
-		// two values and a `=`, which nobody reads four to a line.
+		// A List of Numbers fills, but a Dictionary never does, since an entry
+		// is two values and a `=`.
 		it("never fills a Dictionary of Numbers", () => {
 			let source = block(
 				"\tconstant scores = [",
@@ -198,8 +191,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// A Comment anywhere in the entries forces the break, exactly as
-		// it does for a List — a one-line Dictionary has nowhere to put one.
+		// A Comment anywhere in the entries forces the break, as in a List.
 		it("breaks a Literal a Comment was written into", () => {
 			let result = format(
 				block(
@@ -220,11 +212,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// A Comment TRAILING the opening bracket is refused rather than
-		// moved, and refused for a Dictionary exactly as it is for a List: the
-		// Printer has no place to put one and the anchor gate catches it. The
-		// two are pinned together here so that a Dictionary can not quietly
-		// grow a behaviour a List does not have.
+		// A Comment trailing the opening bracket has no place in the Printer,
+		// so the gate refuses the file. The List case is pinned beside it.
 		it("refuses a Comment trailing the opening bracket, as a List does", () => {
 			let dictionary = format(
 				block("\tconstant ages = [§ the eldest", '\t\t"alex" = 39]'),
@@ -240,9 +229,7 @@ describe("Dictionary literals", () => {
 	})
 
 	describe("what must never be rewritten", () => {
-		// `[=]` is one token to a reader and prints as one. It is the
-		// only Dictionary with nothing inside it to lay out, and the `=` is the
-		// whole of what tells it from the empty List.
+		// `[=]` prints as one token, which the `=` tells from the empty List.
 		it("never opens the empty Dictionary", () => {
 			let result = format(
 				block(
@@ -272,11 +259,9 @@ describe("Dictionary literals", () => {
 			expect(result.text).toContain("[]")
 		})
 
-		// A whole Dictionary merged in brings BRACKETS of its own, and a
-		// key list does not — the two hold the same Node on the right of the
-		// `with` and differ by a Position the safety gate strips, so the
-		// Parser marks which of the two it read and the Printer reads the mark.
-		// See `parser.CombinationNode.bare`.
+		// A whole Dictionary merged in brings its own brackets and a key list
+		// does not. Only the Parser knows which it read, since a bare key
+		// list's Position starts at its first key.
 		it("keeps a whole Dictionary merged in inside its own brackets", () => {
 			roundTrips(
 				block(
@@ -318,15 +303,9 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// A Dictionary's key is a VALUE, so a key may be written in brackets
-	// of its own — a List, a Dictionary, an update. That is the case the two
-	// readings of `[base with …]` can not be told apart by looking at the
-	// source: a bare key list's Position starts at its FIRST KEY, so the key's
-	// own bracket read as "the whole Dictionary brought brackets", and
-	// `[d with [3, 4] = "b"]` printed back as `[d with [[3, 4] = "b"]]` — the
-	// merge form, which is a different Program. Only the comment-anchor gate
-	// caught it, and what it said was that a Comment had moved in a file
-	// holding none.
+	// A key may be written in brackets of its own. The source then cannot tell
+	// `[d with [3, 4] = "b"]` from a merge, since a bare key list's Position
+	// starts at its first key.
 	describe("a key written in brackets", () => {
 		it("keeps a List key in an update out of a second pair of brackets", () => {
 			let source = block(
@@ -356,9 +335,7 @@ describe("Dictionary literals", () => {
 			expect(format(source).refusal).toBeNull()
 		})
 
-		// The same key in a LITERAL was always fine — the Literal's own
-		// Position starts at its bracket. Pinned so the fix is not made by
-		// breaking this.
+		// In a literal the Position starts at the bracket, so the key is plain.
 		it("round-trips a List key in a Literal", () => {
 			roundTrips(
 				block(
@@ -368,10 +345,8 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// The forms a Dictionary shares with the two containers beside it.
-	// Each is written as a PAIR with a List or a Record where one exists, so a
-	// Dictionary can not quietly grow — or quietly miss — a behaviour its
-	// siblings have.
+	// The forms a Dictionary shares with a List or a Record, each tested beside
+	// its sibling so that the behaviours cannot drift apart.
 	describe("beside a List and a Record", () => {
 		it("hugs a Dictionary written as the only Argument", () => {
 			let result = format(
@@ -441,9 +416,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// Both refused, and refused for a Record in exactly the same
-		// place — a Comment inside an entry has nowhere to go. Pinned as a PAIR
-		// so a Dictionary can not grow a behaviour a Record does not have.
+		// A Comment inside an entry has nowhere to go, in a Dictionary as in a
+		// Record, so both are refused.
 		it("refuses a Comment inside an entry, as a Record does inside a member", () => {
 			let dictionary = format(
 				block('\tconstant d = ["a" § k', "\t\t= 1]"),
