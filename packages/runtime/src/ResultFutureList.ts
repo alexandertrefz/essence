@@ -1,4 +1,3 @@
-// The runtime module of the `ResultFutureList` Namespace — a List of
-// Futures each answering a Result. Its one Method is in `Future.ts` with the
-// combinators it is written beside.
+// The `ResultFutureList` Namespace. Its one Method lives in `Future.ts` beside
+// the combinators it is written with.
 export { firstValue } from "./Future"

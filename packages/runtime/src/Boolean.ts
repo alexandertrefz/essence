@@ -3,16 +3,10 @@ import { typeKeySymbol } from "./type"
 
 export type BooleanType = { [typeKeySymbol]: "Boolean"; value: boolean }
 
-// There are exactly two Boolean values, so there are exactly two Boolean
-// objects — built once, at Module load, and handed out ever after. Nothing in
-// the language can tell that apart from a fresh one per answer: every runtime
-// value is immutable, and Essence has no operator asking whether two values are
-// the SAME value, only whether they are EQUAL. What it buys is that every
-// comparison, every `and`, every predicate a loop asks stops allocating.
-//
-// Not `Object.freeze`d, for the same reason nothing else in the runtime
-// is — immutability here is a convention the whole Module family keeps, and
-// freezing would put a check on every read of a value that is read constantly.
+// Two shared Boolean values, so a comparison or a predicate allocates nothing.
+// Essence can ask only whether two values are equal, never whether they are
+// the same object. They are not frozen: no runtime value is, since freezing
+// would slow every read.
 export const trueInstance: BooleanType = {
 	[typeKeySymbol]: "Boolean",
 	value: true,
@@ -38,9 +32,7 @@ export function is(
 	return createBoolean(originalBoolean.value === other.value)
 }
 
-// `false` before `true` — the order Swift, Rust, Haskell and SQL all sort
-// a Boolean key in, and the one `false < true` reads as. The three `Ordering`
-// values are shared instances, so this allocates nothing.
+// `false` sorts before `true`.
 export function compare(
 	originalBoolean: BooleanType,
 	other: BooleanType,
@@ -66,8 +58,5 @@ export function or(
 	return createBoolean(originalBoolean.value || other.value)
 }
 
-// `isNot`, `exclusiveOr` and `toString` are implemented in Essence — see
-// `packages/standard-library/sources/Boolean.es`. `negate`, `is`, `and`, `or`
-// and `compare` stay native: they are
-// the anchors the Essence half is built from, and `or` in particular would cost
-// four Method calls through De Morgan where this does one `||`.
+// `exclusiveOr` and `toString` are written in Essence in `Boolean.es`, and
+// `isNot` comes from `Equatable`. The natives here are what those bodies call.

@@ -1,28 +1,9 @@
-// The runtime module of the `NonEmptyDictionary` Namespace — the
-// Dictionaries a Program has proven hold something. The Simplifier emits
-// `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
-// this is it.
+// The `NonEmptyDictionary` Namespace: `Dictionary`'s natives under the proven
+// receiver's names, and `firstEntry`. See "Refined Namespaces" in
+// DEVELOPMENT.md.
 //
-// Every export here but one is `Dictionary`'s own native, re-exported
-// straight through, so the two entries are one Function under two names and can
-// not come apart. A refinement erases before anything runs: what arrives is an
-// ordinary `DictionaryType` and the evidence the Type carried was spent while
-// compiling, so there is nothing left for those bodies to do differently. What
-// the proof buys is said in the Types alone — a count that is never zero, three
-// halves that are never the empty List, and a sort and a map that answer
-// something with an entry in it. The one exception is `firstEntry`, written
-// below: it UNWRAPS what `Dictionary`'s own entry answers, which is a different
-// operation rather than the same one under another name.
-//
-// The module exists at all because an Essence body could not write these.
-// `<- @::length()` on a proven receiver is this very Method rather than
-// `Dictionary`'s, and the Validator refuses it as `infinite-recursion`; see
-// `packages/standard-library/DEVELOPMENT.md`, A receiver narrowed by EVIDENCE.
-//
-// `set` is not here. It answers a `NonEmptyDictionary` on `Dictionary`
-// itself, whatever it was handed, exactly as `List::append(_:)` answers a
-// `NonEmptyList` — so a proven receiver reaches that entry and there is nothing
-// for this Namespace to declare.
+// `set` answers a `NonEmptyDictionary` on `Dictionary` itself, as
+// `List::append(_:)` answers a `NonEmptyList`, so it is not declared here.
 import type { DictionaryType, EntryRecord } from "./Dictionary"
 import { firstLiveEntry } from "./Dictionary"
 import type { AnyType } from "./type"
@@ -37,13 +18,8 @@ export {
 	values,
 } from "./Dictionary"
 
-// The one export here that is not `Dictionary`'s own Function under
-// another name. `Dictionary.firstEntry` answers an Optional and this answers
-// the entry, which is a different operation rather than the same one written
-// twice — the same relation `NonEmptyList.firstItem` has to `List`'s. The
-// proof is spent HERE: a refinement erases before anything runs, so what
-// arrives is an ordinary box, and that the walk below always finds a live slot
-// is exactly what the Namespace's target bought.
+// `Dictionary.firstEntry` answers an Optional and this answers the entry. The
+// proven receiver always has a live slot for `firstLiveEntry` to find.
 export function firstEntry<Key extends AnyType, Value extends AnyType>(
 	dictionary: DictionaryType<Key, Value>,
 ): EntryRecord<Key, Value> {

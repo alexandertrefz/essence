@@ -1,13 +1,7 @@
 import { typeKeySymbol } from "./type"
 
-// `NormalizationForm` is a builtin Choice, like `Side` — its values carry
-// Case tags (`"NormalizationForm#ComposedCanonical"`) exactly as user-declared
-// Cases do. `is`, `isNot` and `toString` are all derived from the Choice
-// (`packages/standard-library/sources/String.es` declares the conformances beside `normalize`,
-// the Method that reads a form). The native `normalize(as:)` reads the tag to pick the
-// JavaScript `String.prototype.normalize` argument; a user's
-// `NormalizationForm#…` value is built by `$type.createCase`, so these
-// singletons exist for symmetry with the other builtin Choices.
+// A builtin Choice. `normalize(as:)` in `String.ts` reads its tag, and these
+// instances go unread. See "Builtin Choices" in DEVELOPMENT.md.
 export type ComposedCanonicalType = {
 	[typeKeySymbol]: "NormalizationForm#ComposedCanonical"
 }

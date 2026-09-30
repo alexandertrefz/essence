@@ -1,17 +1,9 @@
 import { createString, itemText, type StringType } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// `Result` is a builtin generic Choice, like `Optional` — its values carry
-// Case tags (`"Result#Value"`, `"Result#Failure"`) exactly as user-declared
-// Cases do. Every Method of the covering Namespace but one is written in
-// Essence (`packages/standard-library/sources/Result.es`); what else lives here
-// is the Type the generated native contract renders that one signature against.
-//
-// Two constructors, where there used to be none. Almost every Case of
-// this Choice is built by an Essence body, which the Rewriter emits as a
-// `$type.createCase` call; `Http.send` is the one native that ANSWERS a Result,
-// and these are the door it builds one through. They are `Optional.ts`'s two
-// under the names this Choice's Cases carry.
+// A builtin generic Choice, mostly written in Essence in `Result.es`. An
+// Essence body builds a Case through `createCase`; the constructors here are
+// for `Http.send`, the native that answers a Result.
 export type ValueType<Value extends AnyType> = {
 	[typeKeySymbol]: "Result#Value"
 	item: Value
@@ -38,16 +30,8 @@ export function createFailure<Failure extends AnyType>(
 	return { [typeKeySymbol]: "Result#Failure", reason }
 }
 
-// The one Method here, and native for the reason `Optional.toString` is:
-// an Essence body renders a payload through a hole, and a hole renders a String
-// BARE. So the entry could not say the rule `itemText` holds — a String is
-// quoted inside a structure — and `#Failure("gone")` printed as `Failure(gone)`,
-// which `#Failure("")` then read as a word and a pair of parentheses.
-//
-// The `#` sigil is left out, as `Optional` prints `Value` and `Ordering`
-// prints `Less`. A rendering names the Case; it does not quote the Expression
-// that builds it. Both Cases carry a payload, so both are written with the
-// parentheses `Optional#Empty` has no use for.
+// Native so that a String payload is quoted. See "Builtin Choices" in
+// DEVELOPMENT.md.
 export function toString<Value extends AnyType, Failure extends AnyType>(
 	result: ResultType<Value, Failure>,
 	valueConformance: {

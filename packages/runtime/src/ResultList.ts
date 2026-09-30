@@ -1,7 +1,3 @@
-// The runtime module of the `ResultList` Namespace — a List whose items
-// are Results. All four of its Methods — `values`, `reasons`, `partition` and
-// `allValues` — are written in Essence
-// (`packages/standard-library/sources/List.es`), so there is nothing native
-// here; the module stays because the Rewriter imports one per builtin Namespace
-// by name, exactly as `OptionalList.ts` does.
+// The `ResultList` Namespace, written in Essence in `List.es`.
+// See "Namespace modules" in DEVELOPMENT.md.
 export {}

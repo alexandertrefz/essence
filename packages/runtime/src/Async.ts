@@ -3,52 +3,28 @@ import type { IntegerType } from "./Integer"
 import type { RecordType } from "./Record"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// The two natives that build a Future out of nothing — a computation to
-// carry out later, and a length of time to wait. `Future.ts` is where a future
-// IS — what it holds, how a run is started and how one is waited for — and this
-// module is the Namespace a Program reaches those doors through. Kept apart from
-// `Future.ts` for the reason the sources keep the two Namespaces apart: `Async`
-// is where a Program says "run this later", and `Future` is what it has once it
-// has said so.
+// The natives that build a Future out of nothing: a computation to carry out
+// later, and a length of time to wait. `Future.ts` holds what a Future is.
 
-// The Function is called at every START rather than here, which is what
-// makes the answer a DESCRIPTION: building one runs nothing, and two starts run
-// it twice. The context is ignored — a synchronous computation has nothing to
-// stop partway, so there is no signal for it to read.
+// `compute` runs at every start rather than here, so building the Future runs
+// nothing and two starts run it twice. A synchronous computation can not stop
+// partway, so the context goes unread.
 export function deferred<Value extends AnyType>(
 	compute: () => Value,
 ): FutureType<Value> {
 	return of(() => compute())
 }
 
-// The unit value a finished wait answers with. `{}` is the language's unit
-// Type and an empty Record is what one is at run time, built here rather than
-// through `Record.createRecord` for the reason `Terminal.ts` builds its own: a
-// runtime cycle between two modules is a cost every Program pays for one object
-// literal.
+// The unit value a finished wait answers with. Built here rather than through
+// `createRecord`, so this module needs no runtime import of `Record.ts`.
 const unit: RecordType = { [typeKeySymbol]: "Record" }
 
-// `Async.sleep(milliseconds duration)` — the wait itself, as a value. It
-// is a DESCRIPTION like every other Future, so nothing is scheduled until it is
-// started, and starting it twice waits twice.
+// `Async.sleep(milliseconds duration)`. Nothing is scheduled until the Future
+// starts, and starting it twice waits twice.
 //
-// A stopped wait never answers. The timer is cleared and the promise is
-// left unsettled, which is what cancellation is throughout this runtime: the
-// work is signalled and its answer is dropped, never observed. Rejecting instead
-// would put a failure in front of a Program that has no Case for one — a Future
-// can not fail — and would surface out of whatever raced it away.
-//
-// The timer is NOT unreferenced. A host with an event loop stays open for
-// as long as a pending sleep has left to run, which is exactly what
-// `complete Async.sleep(…)` means: unreferencing it would let the host exit out
-// from under the wait. A sleep nobody is waiting for is stopped by whatever
-// raced it, and the timer goes with it.
-//
-// Which is also why `Started::within` delays an exit. Giving up on an
-// answer is not giving up on the run — a Started belongs to whoever started it —
-// so the wait it was written over is still there, holding the host open until
-// it is spent. `Future::within` stops the run it was written over, and with it
-// the timer, because that run belongs to the deadline.
+// A stopped wait clears its timer and never settles, which is what cancellation
+// is in this runtime. Rejecting would hand a Program a failure no Case can hold.
+// The timer stays referenced, so a host stays open while a sleep is pending.
 export function sleep(duration: IntegerType): FutureType<RecordType> {
 	return of(
 		(context: Context) =>

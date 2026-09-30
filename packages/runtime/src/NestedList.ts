@@ -1,6 +1,3 @@
-// The runtime module of the `NestedList` Namespace — a List of Lists.
-// The Simplifier emits `<Namespace>.<method>(…)`, so a Namespace needs a module
-// of its own name; the implementation stays in `List.ts` beside every other
-// operation on a List, and is re-exported here rather than moved, so that
-// `flatten` keeps the List internals it is written against within reach.
+// The `NestedList` Namespace. Its natives live in `List.ts` beside the List
+// internals they use. See "Namespace modules" in DEVELOPMENT.md.
 export { flatten, transpose } from "./List"
