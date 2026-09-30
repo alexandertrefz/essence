@@ -214,6 +214,12 @@ describe("Development Citations", () => {
 
 	describe("repository", () => {
 		it("should resolve every citation", () => {
+			// Passes on no citations at all, so the reader has to find some.
+			expect(
+				citations.some((entry) =>
+					entry.file.startsWith("packages/formatter/"),
+				),
+			).toBe(true)
 			expect(
 				citations
 					.map((entry) => problemOf(entry, readDevelopment))
