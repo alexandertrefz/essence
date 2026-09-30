@@ -1,44 +1,24 @@
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
-// What the Compiler needs of this package is mostly its LOCATION, and
-// that is what this file exports. The other modules here are the language's
-// runtime, the native halves of the standard library, and they reach a Program
-// the other way round: in a bundle the Rewriter writes absolute paths to them
-// into the JavaScript it emits and the Bundler inlines and tree-shakes what the
-// Program touched, and in a host's build every emitted Module imports them by
-// package specifier. The values the Compiler does import are for work it does
-// itself: `bigRational`'s arithmetic for constant folding, and `DEFAULT_CASES`
-// from `Testing` for the test runner.
+// The runtime's location, which is what the Compiler needs of this package.
+// Programs reach the other modules by absolute path in a bundle, or by package
+// specifier in a host's build. The path is resolved from this module's own
+// location, so it holds from any working directory. This package owns it, so
+// the Rewriter and the Bundler need not count `../`s towards it.
 //
-// Resolved off this module's own location rather than the working
-// directory, so `esc` finds the runtime from any cwd. Computed here, in the
-// package that holds the files, rather than by the Rewriter and the Bundler
-// each counting `../`s towards them — they used to, and the two counts had to
-// stay agreeing with each other and with the directory layout.
-//
-// Two layouts. In the workspace this module IS a runtime module, and
-// the directory is its own. The published package is compiled, and this
-// module runs as `dist/index.js` — but what the Bundler inlines must stay the
-// TypeScript sources, which ship as `src/` beside `dist/` exactly so that a
-// published compiler emits the same bundle bytes the workspace one does.
-// Exported for the spec: where the runtime is is a pure question.
+// The published package runs this module as `dist/index.js`, but the Bundler
+// inlines the TypeScript sources shipped in `src/` beside it. That keeps a
+// published compiler's bundles identical to a workspace one's.
 export function runtimeDirectoryFor(moduleDirname: string): string {
 	return path.basename(moduleDirname) === "dist"
 		? path.resolve(moduleDirname, "../src")
 		: moduleDirname
 }
 
-// A THIRD layout, and the only one this module can not answer from its
-// own path: a bundle. The Language Server inside the VS Code extension is one
-// file, `import.meta.dirname` is wherever that file was written, and the runtime
-// sources have to have been copied next to it — the Bundler writes their
-// absolute paths into the JavaScript it emits and then reads them off disk, and
-// no bundler can see through that. The extension's `buildServer.js` copies
-// them, exactly as it copies the standard library's `.es` sources; this finds
-// them there. Without it a Server that compiles — which is what the test
-// session does — reports "Could not resolve .../Integer.ts" for every Program
-// it is asked about.
+// The VS Code extension bundles the Language Server into one file. Its
+// `buildServer.js` copies the runtime sources into a `runtime` directory beside
+// that file, since the Bundler reads them off disk by path.
 const OWN_RUNTIME = runtimeDirectoryFor(import.meta.dirname)
 const BUNDLED_RUNTIME = path.resolve(import.meta.dirname, "runtime")
 
@@ -46,7 +26,6 @@ export const RUNTIME_DIRECTORY = existsSync(path.join(OWN_RUNTIME, "type.ts"))
 	? OWN_RUNTIME
 	: BUNDLED_RUNTIME
 
-// The tsconfig esbuild transpiles the runtime modules with while
-// inlining them. It is deliberately not this repository's — the runtime is
-// emitted into a user's bundle and compiles under its own settings.
+// The tsconfig esbuild transpiles the runtime modules with while inlining them.
+// It is the runtime's own, since the modules compile inside a user's bundle.
 export const RUNTIME_TSCONFIG = path.join(RUNTIME_DIRECTORY, "tsconfig.json")
