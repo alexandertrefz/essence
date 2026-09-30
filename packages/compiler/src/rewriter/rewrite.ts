@@ -48,12 +48,12 @@ import {
 	withOptimiserOptions,
 } from "./stdlibPrelude"
 
-// NOTE: The builtin Namespaces with a runtime module, re-exported from the file
+// The builtin Namespaces with a runtime module, re-exported from the file
 // that holds the list — every emission site here reads it, and so does
 // `pool-constants`, which may not reach this Module without closing a cycle.
 export { runtimeNamespaceNames }
 
-// NOTE: The emit target, re-exported from the file that holds it, because this
+// The emit target, re-exported from the file that holds it, because this
 // is where a caller with a graph to rewrite already is. `esc` keys its cache by
 // one before it has decided to emit anything at all, and reaches it through
 // `rewriter/emitTarget` instead — a name is not worth loading a Rewriter for.
@@ -64,21 +64,21 @@ export {
 	RUNTIME_PACKAGE,
 } from "./emitTarget"
 
-// NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
+// The Rewriter is a typed simple Program in, JavaScript source text out —
 // no bundling, no minifying, nothing written to disk; that is the Bundler's job.
 // It is synchronous and deterministic: the same Program always produces the same
 // text. It does read the file system once, indirectly — the standard library
 // prelude is built from the sources the loader reads at startup — so "pure" here
 // means same input, same output, not "touches nothing".
 //
-// NOTE: This is the single-file form and stays the DEFAULT: one Program, its
+// This is the single-file form and stays the DEFAULT: one Program, its
 // whole prelude inline, no ESM list either way — a Program's Module sections are
 // ignored here, because a lone Program is a bundle of one and has nobody to
 // import from or publish to. `rewriteModules` is the other form, and the two
 // emit through the same helpers rather than through two copies of them.
 export function rewrite(
 	program: common.typedSimple.Program,
-	// NOTE: The Options the Program was optimised under, so the prelude built
+	// The Options the Program was optimised under, so the prelude built
 	// below is built under them too — the standard library's bodies are
 	// optimised where they are collected, and a Program compiled with a pass
 	// turned off must not import a prelude that kept it on.
@@ -88,7 +88,7 @@ export function rewrite(
 }
 
 function rewriteProgram(program: common.typedSimple.Program): string {
-	// NOTE: The Program's own Protocol-provided Methods join the standard
+	// The Program's own Protocol-provided Methods join the standard
 	// library's prelude rather than being emitted where they were written. That
 	// is what makes ONE const answer for every conformer: the reachability fixed
 	// point below already emits each candidate at most once, and the band it
@@ -110,7 +110,7 @@ function rewriteLoneProgram(
 	program: common.typedSimple.Program,
 	prelude: Array<PreludeNamespace>,
 ): string {
-	// NOTE: The user Program is rewritten FIRST, so that which merged Namespaces
+	// The user Program is rewritten FIRST, so that which merged Namespaces
 	// it needs can be answered from the finished tree rather than guessed at from
 	// the source. Every reference to a Namespace — a plain `Boolean.isNot(…)`
 	// call, a conformance witness's `isNot: Boolean.isNot`, a `dispatchMethod`
@@ -119,14 +119,14 @@ function rewriteLoneProgram(
 	// would have to know about each of those shapes and would silently drop a
 	// Namespace the moment a new one was added.
 	const freeFunctions = stdlibFreeFunctions()
-	// NOTE: One pool for the whole file, because a lone Program is one emitted
+	// One pool for the whole file, because a lone Program is one emitted
 	// Module: the standard library's pooled constants and the Program's own are
 	// declared side by side and a constant both of them want is declared once.
 	const { value: rewritten, pool } = collectingConstantPool(() => {
 		let implementation = rewriteImplementationSection(
 			program.implementation,
 		)
-		// NOTE: Inside the pool's collection, and reaching the fixed point
+		// Inside the pool's collection, and reaching the fixed point
 		// below with the implementation: a test body calls the same standard
 		// library Methods a Program does, and a pooled constant a test names
 		// has to be declared in the band above it.
@@ -161,24 +161,24 @@ function rewriteLoneProgram(
 		type: "Program",
 		sourceType: "module",
 		body: [
-			// NOTE: Every runtime module, whether this Program names it or not:
+			// Every runtime module, whether this Program names it or not:
 			// esbuild shakes an unused `import * as <Name>` away, so the head of
 			// a lone Program costs nothing and stays what it always was. A
 			// Module of a bundle asks for what it names instead — there are
 			// twenty heads to read through there rather than one.
 			...runtimeImports(lonelyRuntimeNames(program)),
-			// NOTE: And the coverage counter directly under them, ahead of
+			// And the coverage counter directly under them, ahead of
 			// everything a counter could stand in.
 			...(program.coverage === null
 				? []
 				: coverageHead(program.coverage, null)),
-			// NOTE: Imports first — an Essence Method's const reads the runtime
+			// Imports first — an Essence Method's const reads the runtime
 			// modules those imports bind. Then the Essence-implemented members,
 			// in the two bands `essenceMemberBands` puts them in: the
 			// Function-valued ones in any order, and the static Properties, whose
 			// values are computed HERE, after them.
 			...bands.functions,
-			// NOTE: The pooled constants sit BETWEEN the two, and that is the
+			// The pooled constants sit BETWEEN the two, and that is the
 			// only place they can sit. A pooled conformance witness reads the
 			// Function-valued consts above it, and a static Property's value —
 			// which runs where its const is emitted — may read a pooled
@@ -187,7 +187,7 @@ function rewriteLoneProgram(
 			...constantPool,
 			...bands.values,
 			...rewritten.implementation,
-			// NOTE: The tests come last, after everything the Program declares
+			// The tests come last, after everything the Program declares
 			// — a test reads the implementation and nothing reads a test.
 			...rewritten.tests,
 			...(program.tests === null ? [] : [testEntryPointsExport()]),
@@ -213,7 +213,7 @@ const generateFormat = {
 	quotes: "double",
 }
 
-// NOTE: What `generateProgram` needs to emit a real source map — the Essence
+// What `generateProgram` needs to emit a real source map — the Essence
 // text of every Module a `loc.source` can name, keyed by canonical path, so
 // the map carries the sources verbatim as `sourcesContent` and a debugger
 // needs nothing of the machine that compiled.
@@ -221,7 +221,7 @@ export type SourceMapOptions = {
 	sourceTexts: ReadonlyMap<string, string>
 }
 
-// NOTE: The shape `sourceMapWithCode` answers with. The fork's own
+// The shape `sourceMapWithCode` answers with. The fork's own
 // declarations keep to upstream's documented surface, which predates both the
 // `sourceMap: true` mode — each emitted node reads its source off its own
 // `loc.source`, which is what lets one Module's map name several real files —
@@ -263,7 +263,7 @@ function generateProgram(
 	return `${code}\n${sourceMapComment(json)}`
 }
 
-// NOTE: The map rides INSIDE the module's text, as an inline data URL —
+// The map rides INSIDE the module's text, as an inline data URL —
 // esbuild reads a `sourceMappingURL` comment off the contents a plugin serves
 // and composes it into the bundle's map, which is the one seam the in-memory
 // `essence:` scheme offers; a file next to something that never touches disk
@@ -274,24 +274,24 @@ function sourceMapComment(map: object): string {
 	return `//# sourceMappingURL=data:application/json;base64,${encoded}`
 }
 
-// NOTE: The prelude gets no map — not even an empty one, which esbuild
+// The prelude gets no map — not even an empty one, which esbuild
 // ignores outright and self-maps anyway. Its lines arrive in the bundle's map
 // labelled with the synthetic specifier, and the Bundler's final pass strips
 // every source that is not an on-disk `.es` file, prelude and inlined runtime
 // alike, so a debugger sees the glue as unmapped code to step over.
 
-// NOTE: One Module of a bundle: the canonical path it is keyed by — which is
+// One Module of a bundle: the canonical path it is keyed by — which is
 // also what the Choices it declares take their identity from — and the Program
 // that path parsed into.
 export type ModuleInput = {
 	filePath: string
 	program: common.typedSimple.Program
-	// NOTE: The Module's Essence source, verbatim — read only when source maps
+	// The Module's Essence source, verbatim — read only when source maps
 	// are emitted, where it becomes the map's `sourcesContent` entry.
 	sourceText?: string
 }
 
-// NOTE: A whole graph of Modules, emitted as one bundle's worth of JavaScript.
+// A whole graph of Modules, emitted as one bundle's worth of JavaScript.
 //
 // The prelude is what makes this more than N calls to `rewrite`. A Program's
 // Essence-implemented standard library Methods are emitted as top-level
@@ -302,7 +302,7 @@ export type ModuleInput = {
 // consts are emitted into one synthetic Module every other one imports what it
 // names from.
 //
-// NOTE: The runtime Namespace imports are per Module and per name here, where a
+// The runtime Namespace imports are per Module and per name here, where a
 // single-file Program emits all of them unconditionally. Both answers are
 // correct — esbuild shakes an unused `import * as <Name>` away — and this one
 // keeps a Module's emitted head to what its body actually reads, which is worth
@@ -346,7 +346,7 @@ function rewriteModuleGraph(
 				)
 			: null
 
-	// NOTE: One table for the whole graph — a Protocol declared in one Module
+	// One table for the whole graph — a Protocol declared in one Module
 	// and reached from another names ONE const, which the shared prelude Module
 	// below holds and every Module that names it imports.
 	let protocolMembers = protocolPreludeNamespaces(
@@ -357,7 +357,7 @@ function rewriteModuleGraph(
 
 	return withEmission({ spellings, target, providedMembers }, () => {
 		let freeFunctions = stdlibFreeFunctions()
-		// NOTE: A pool per Module, because a Module's constants are declared in
+		// A pool per Module, because a Module's constants are declared in
 		// it and a name declared in one Module is not in scope in another. The
 		// band is built here, before anything is asked of the Module's names:
 		// what a Module READS includes what its pooled constants read, and the
@@ -368,7 +368,7 @@ function rewriteModuleGraph(
 					...rewriteImplementationSection(
 						module.program.implementation,
 					),
-					// NOTE: In the Module's own pool collection: a test reads
+					// In the Module's own pool collection: a test reads
 					// the standard library exactly as the implementation beside
 					// it does, and a constant pooled for a test is declared in
 					// this Module's band.
@@ -388,7 +388,7 @@ function rewriteModuleGraph(
 					bodies.flatMap((rewritten) => rewritten.body),
 					freeFunctions,
 					bodies.map((rewritten) => rewritten.pool),
-					// NOTE: A host's prelude holds the WHOLE standard library,
+					// A host's prelude holds the WHOLE standard library,
 					// because what a graph reaches is a property of the graph
 					// and the prelude is served to the host under one name for
 					// every graph the build compiles. Two entries would
@@ -409,7 +409,7 @@ function rewriteModuleGraph(
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
-		// NOTE: A bundle publishes ONE way in to the tests of every Module in
+		// A bundle publishes ONE way in to the tests of every Module in
 		// it, and what a bundle exports is what its entry exports — so the
 		// entry carries it whether or not the entry itself wrote a `tests`
 		// block. A `Foo.tests.es` importing the Module it tests is exactly
@@ -425,7 +425,7 @@ function rewriteModuleGraph(
 					? [testEntryPointsExport()]
 					: []),
 			]
-			// NOTE: Ahead of `referencedNames`, because the head NAMES the
+			// Ahead of `referencedNames`, because the head NAMES the
 			// test runtime: a Module instrumented for coverage imports
 			// `$testing` for the counters alone, whether or not it wrote a
 			// `tests` block of its own.
@@ -452,7 +452,7 @@ function rewriteModuleGraph(
 								),
 							]),
 					...moduleImports(module.program, spellings),
-					// NOTE: Under the imports and above everything else, so
+					// Under the imports and above everything else, so
 					// that a top-level Statement's own counter finds the name
 					// bound.
 					...head,
@@ -482,7 +482,7 @@ function rewriteModuleGraph(
 	})
 }
 
-// NOTE: The shared prelude, as its own Module: the runtime imports its consts
+// The shared prelude, as its own Module: the runtime imports its consts
 // read, the consts themselves in the two bands `essenceMemberBands` puts them
 // in, and one export list naming every one of them. Every const is exported
 // whether or not anything imports it — esbuild shakes the unimported ones away,
@@ -513,17 +513,17 @@ function preludeModule(
 	}
 }
 
-// NOTE: The runtime modules every emission site reads under an alias of the
+// The runtime modules every emission site reads under an alias of the
 // Compiler's own rather than as a builtin Namespace.
 const runtimeModuleAliases = [
 	["$_", "functions"],
 	["$type", "type"],
 	["$helpers", "internalHelpers"],
-	// NOTE: The test runtime, which only a test compile ever names — a Program
+	// The test runtime, which only a test compile ever names — a Program
 	// that wrote no `tests` block never mentions it, and esbuild shakes the
 	// import away with the module behind it.
 	["$testing", "Testing"],
-	// NOTE: Asynchrony's own module, which is ALSO the `Future` Namespace's
+	// Asynchrony's own module, which is ALSO the `Future` Namespace's
 	// runtime module — one file in two roles, because the Namespace's name and
 	// the module's are the same name and splitting them would put the
 	// description of a future and the machinery that runs one in two places. The
@@ -533,7 +533,7 @@ const runtimeModuleAliases = [
 	["$future", "Future"],
 ] as const
 
-// NOTE: What a lone Program's head imports — every runtime module, and the test
+// What a lone Program's head imports — every runtime module, and the test
 // runtime beside them exactly when the Program has tests to register.
 function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
 	let names = allRuntimeNames()
@@ -545,7 +545,7 @@ function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
 	return names
 }
 
-// NOTE: A lone Program's head is every runtime module whether the Program names
+// A lone Program's head is every runtime module whether the Program names
 // one or not — esbuild shakes an unused `import * as <Name>` away, so it costs
 // nothing and the head stays what it always was. The TEST runtime is the one
 // exception: only a test compile can name it, and a build that carried the
@@ -559,7 +559,7 @@ function allRuntimeNames(): Set<string> {
 	])
 }
 
-// NOTE: The `import * as <Name>` head of one emitted module, restricted to the
+// The `import * as <Name>` head of one emitted module, restricted to the
 // runtime modules the given names mention — the whole set for a lone Program,
 // what its body reads for a Module of a bundle. `referencedNames` over-collects,
 // which is the safe direction: an import nothing reads costs a line esbuild
@@ -587,7 +587,7 @@ function runtimeImports(
 	return imports
 }
 
-// NOTE: What one Module imports from the others, grouped per Module so the
+// What one Module imports from the others, grouped per Module so the
 // emitted head reads like the source's own block. An entry whose name erases —
 // a Type Alias, a Choice, a Protocol — contributes nothing to bind, but the
 // Module it names still has to RUN before this one, and in the order the source
@@ -628,7 +628,7 @@ function moduleImports(
 		}
 	}
 
-	// NOTE: A re-export names a Module this one never binds anything from, and
+	// A re-export names a Module this one never binds anything from, and
 	// it is a dependency all the same — a facade whose only mention of a Module
 	// is one of these still has to run it.
 	for (let entry of program.exports?.entries ?? []) {
@@ -644,7 +644,7 @@ function moduleImports(
 	)
 }
 
-// NOTE: What one Module publishes, under the name its export block gave it. A
+// What one Module publishes, under the name its export block gave it. A
 // re-export forwards straight from the Module it names — it was never bound
 // here, so there is nothing local to forward — and an entry whose name erases
 // publishes nothing at all: `moduleImports` above is what keeps that Module's
@@ -738,7 +738,7 @@ function namedExport(
 	}
 }
 
-// NOTE: What is being emitted, for the emission sites that can not be handed it
+// What is being emitted, for the emission sites that can not be handed it
 // — the spellings of every Module of the graph, and the target they were
 // spelled for. Empty and `bundle` outside `rewriteModules`: a single-file
 // Program's Case tags and Type descriptors come out byte for byte as they did
@@ -756,7 +756,7 @@ let emission: Emission = {
 	providedMembers: new Map(),
 }
 
-// NOTE: `finally`, for the same reason the Namespace scope stack has one: a
+// `finally`, for the same reason the Namespace scope stack has one: a
 // throw out of the emission of one bundle must not leave the next Program in
 // this process rendering its tags against a graph it is not part of.
 function withEmission<Value>(next: Emission, emit: () => Value): Value {
@@ -771,7 +771,7 @@ function withEmission<Value>(next: Emission, emit: () => Value): Value {
 	}
 }
 
-// NOTE: The canonical path of the Module currently being emitted — what a
+// The canonical path of the Module currently being emitted — what a
 // node's `loc` names as its source. Null everywhere outside `rewriteModules`'
 // per-Module pass: the prelude and the single-file form then attach no `loc`
 // and emit no mapping.
@@ -791,7 +791,7 @@ function withSourcePath<Value>(
 	}
 }
 
-// NOTE: What the Compiler emits of its OWN accord, which no source names and
+// What the Compiler emits of its OWN accord, which no source names and
 // nothing should map to. It is the same answer `locOf` gives outside a Module —
 // no source path, no `loc`, no mapping — asked for deliberately rather than by
 // standing where no Module is being emitted.
@@ -799,7 +799,7 @@ function unmapped<Value>(emit: () => Value): Value {
 	return withSourcePath(null, emit)
 }
 
-// NOTE: An Essence Position is 1-based on both axes, while escodegen reads
+// An Essence Position is 1-based on both axes, while escodegen reads
 // estree's convention — 1-based lines, 0-based columns. Undefined whenever the
 // node carries no position (the Simplifier synthesized it) or no Module is
 // being emitted; escodegen then emits the segment unmapped, which is exactly
@@ -824,7 +824,7 @@ function locOf(
 	}
 }
 
-// NOTE: One nominal identity as the emitted Modules spell it. A Case tag is
+// One nominal identity as the emitted Modules spell it. A Case tag is
 // `<Choice identity>#<Case>` and a Choice identity is `<Module path>#<Choice>`,
 // so what arrives here carries the canonical path of the Module that declared
 // it — which is a place on the machine that compiled and must not be emitted.
@@ -832,7 +832,7 @@ function locOf(
 // changes, so the tag a value is stamped with and the tag a Type descriptor
 // compares it against are rendered by this one answer and can not disagree.
 //
-// NOTE: Every string of an emitted Type descriptor comes through here, not just
+// Every string of an emitted Type descriptor comes through here, not just
 // the ones known to be tags. Over-rendering is impossible rather than merely
 // unlikely: a Module path is absolute, and no other string a descriptor can
 // hold — a Type's `type`, a Namespace's name, a Record member — is.
@@ -846,14 +846,14 @@ function renderIdentity(text: string): string {
 	return text
 }
 
-// NOTE: The same answer for a caller that holds one identity and the compile it
+// The same answer for a caller that holds one identity and the compile it
 // belongs to, and no graph — a host building a Case value has to stamp it with
 // the tag the emitted values carry, and that tag is spelled relative to
 // something. The rule is stated once, above; this reaches it from outside, and
 // takes the target so that a descriptor written beside a host's Modules agrees
 // with the Modules rather than with a bundle nobody emitted.
 //
-// NOTE: Where a Module path ENDS is decided by the last `#` rather than by the
+// Where a Module path ENDS is decided by the last `#` rather than by the
 // spellings map, because a Choice name can hold no `#` — the same split
 // `displayChoiceName` reads a Choice's name by. An identity with no `#` at all
 // is a builtin Choice's bare name (`Optional`, `Ordering`), which is emitted
@@ -880,7 +880,7 @@ export function emittedIdentity(
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	// NOTE: The outermost block a user Namespace can be declared in, and a Scope
+	// The outermost block a user Namespace can be declared in, and a Scope
 	// of its own for the same reason every inner block is one — the Enricher
 	// refuses a top-level `namespace List` today, but nothing here rests on that.
 	return withNamespaceScope(() =>
@@ -890,7 +890,7 @@ function rewriteImplementationSection(
 
 // #region Statements
 
-// NOTE: One Statement in, the Statements it emits out — plural, because two
+// One Statement in, the Statements it emits out — plural, because two
 // shapes emit more than one. A Variable Declaration whose value a lowered
 // Statement computes declares its name BEFORE the block that computes it, so the
 // name outlives the block; the other is a turn of a looped Function. Every other
@@ -902,7 +902,7 @@ function rewriteStatements(
 	let statements =
 		node.nodeType === "IntrinsicStatement"
 			? rewriteIntrinsicStatement(node)
-			: // NOTE: The other Statement that emits more than one — a turn of a
+			: // The other Statement that emits more than one — a turn of a
 				// looped Function holds what it evaluated, what it assigned and the
 				// `continue` that takes it.
 				node.nodeType === "TailCallStatement"
@@ -975,7 +975,7 @@ function rewriteVariableDeclarationStatement(
 function rewriteNamespaceDefinitionStatement(
 	node: common.typedSimple.NamespaceDefinitionStatementNode,
 ): estree.ClassDeclaration {
-	// NOTE: Declared BEFORE the body is rewritten, because a Namespace is in
+	// Declared BEFORE the body is rewritten, because a Namespace is in
 	// scope inside its own Methods — `quadrupledValue` calling `@::doubledValue()`
 	// is a reference to the class being declared — so the two have to agree on
 	// the escaped name from the first Method onward.
@@ -1021,7 +1021,7 @@ function rewriteNamespaceDefinitionStatement(
 	}
 }
 
-// NOTE: One Essence-implemented standard library Method, emitted as its own
+// One Essence-implemented standard library Method, emitted as its own
 // top-level const:
 //
 //   const $es_Boolean_isNot = function (_self, other) { … }
@@ -1034,7 +1034,7 @@ function rewriteNamespaceDefinitionStatement(
 // and here, so the TypeScript is deleted in the same commit that writes the
 // Essence.
 //
-// NOTE: The member name is taken exactly as the Simplifier produced it, so an
+// The member name is taken exactly as the Simplifier produced it, so an
 // Overload's const is named for its position in the METHOD TYPE's Overloads,
 // not among the bodied ones — a block that binds Overload 1 to the runtime and
 // writes Overload 2 in Essence emits `$es_X_m__overload$2`, and the native's
@@ -1056,7 +1056,7 @@ function rewriteEssenceMember(
 	}
 }
 
-// NOTE: The frame a native Method's default is evaluated in, emitted as its own
+// The frame a native Method's default is evaluated in, emitted as its own
 // top-level const beside the Essence-implemented Methods:
 //
 //   const $es_String_trim = (_self, side = $type.createCase("Side#BothEnds")) =>
@@ -1102,7 +1102,7 @@ function rewriteNativeShim(
 				},
 				init: {
 					type: "ArrowFunctionExpression",
-					// NOTE: A block only where a Record default has to be merged
+					// A block only where a Record default has to be merged
 					// in before the native is called; every other shim is the
 					// one-expression arrow it has always been, and emits
 					// byte-identically.
@@ -1131,7 +1131,7 @@ function rewriteNativeShim(
 	}
 }
 
-// NOTE: One Essence-implemented standard library Property, emitted as its own
+// One Essence-implemented standard library Property, emitted as its own
 // top-level const — the value band's counterpart of `rewriteEssenceMember`. A
 // `static EMPTY: String = ""` becomes:
 //
@@ -1141,7 +1141,7 @@ function rewriteNativeShim(
 // and a call of a Method are indistinguishable to everything downstream — which
 // is why a Namespace may not spell a Property and a Method alike.
 //
-// NOTE: What makes this a band of its own rather than another const beside the
+// What makes this a band of its own rather than another const beside the
 // Methods: the initialiser runs where the const is emitted. A value-LESS static
 // Property is a native and never reaches here, so a Namespace's constants keep
 // binding to the runtime until someone gives one a body.
@@ -1166,7 +1166,7 @@ function rewriteEssenceProperty(
 	}
 }
 
-// NOTE: The two edge sets one body draws. `references` is every `$es_…` const it
+// The two edge sets one body draws. `references` is every `$es_…` const it
 // names at all, which is what reachability follows — a const named anywhere in an
 // emitted body has to be emitted. `evaluatedReferences` is the subset whose value
 // the body needs THE MOMENT IT RUNS: a static Property, read for its value, and a
@@ -1180,7 +1180,7 @@ export type EssenceMemberReferences = {
 	evaluatedReferences: Set<string>
 }
 
-// NOTE: One member the emitted Program needs, and the KIND that decides which
+// One member the emitted Program needs, and the KIND that decides which
 // band it is emitted in. The kind can NOT be read back off the declaration or
 // the name: a Method's const and a Property's const are both a
 // `VariableDeclaration` named `$es_<Namespace>_<member>`, and the Map they arrive
@@ -1192,7 +1192,7 @@ export type EssenceMember = {
 	declaration: estree.VariableDeclaration | estree.FunctionDeclaration
 } & EssenceMemberReferences
 
-// NOTE: The two bands of `essenceMemberBands` as one list, the Function-valued
+// The two bands of `essenceMemberBands` as one list, the Function-valued
 // members first. Only the tests ask for it: the emitter needs the seam.
 export function orderEssenceMembers(
 	members: Map<string, EssenceMember>,
@@ -1202,7 +1202,7 @@ export function orderEssenceMembers(
 	return [...bands.functions, ...bands.values]
 }
 
-// NOTE: The reachable members in the order they are emitted, in two bands.
+// The reachable members in the order they are emitted, in two bands.
 //
 // A Function-valued member — an Essence Method's const, a bodied free Function's
 // declaration — may sit anywhere: its body runs only when something CALLS it,
@@ -1221,7 +1221,7 @@ export function orderEssenceMembers(
 // because only their consts hold a value; the route a Property took to reach one
 // is carried along for the refusal below to name.
 //
-// NOTE: A cycle is refused rather than emitted in some arbitrary order, and a
+// A cycle is refused rather than emitted in some arbitrary order, and a
 // SELF-edge is a cycle like any other: a Property that reads itself — directly,
 // or through a Method that reads it back — is a temporal dead zone,
 // `ReferenceError` at import out of a Program that compiled green, where a
@@ -1232,7 +1232,7 @@ export function orderEssenceMembers(
 // refuses to let past — so every edge points backwards. This answers for the day
 // that changes, rather than for a mistake anyone has made yet.
 //
-// NOTE: The two bands are handed back apart, because one thing is emitted
+// The two bands are handed back apart, because one thing is emitted
 // BETWEEN them: the pooled constants. A pooled conformance witness reads the
 // Function-valued consts, and a static Property's value — which runs where its
 // const is emitted — may read a pooled constant, so the pool has to stand
@@ -1257,7 +1257,7 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 		}
 	}
 
-	// NOTE: Which Properties a Function-valued member reads once it is called, and
+	// Which Properties a Function-valued member reads once it is called, and
 	// the chain of Functions the read sits at the end of. Breadth first, so the
 	// chain a refusal names is the shortest one, and memoised per Function because
 	// several Properties reach the same Method. Two Methods calling each other is
@@ -1303,7 +1303,7 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 		return reads
 	}
 
-	// NOTE: The Properties one Property's value reads before its own const is
+	// The Properties one Property's value reads before its own const is
 	// bound, each with the Functions it was reached through — a direct read is
 	// reached through none. A reference the value only HANDS ON rather than
 	// evaluates is not here, which is what keeps a `static F = Boolean.isNot`
@@ -1375,7 +1375,7 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 
 // #region The constant pool
 
-// NOTE: One constant the emitted Module builds once and reads by name ever
+// One constant the emitted Module builds once and reads by name ever
 // after. `marker` is a placeholder name, not the emitted one: which constants
 // are DECLARED is only known when the Module is finished — the search above
 // rewrites every candidate standard library body and keeps a fraction of them,
@@ -1384,12 +1384,12 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 // that survived, and those are numbered `$pool_0` upward and renamed in place.
 type PooledConstant = { marker: string; value: estree.Expression }
 
-// NOTE: Ambient, like the source path and the Namespace scopes, and for the
+// Ambient, like the source path and the Namespace scopes, and for the
 // same reason: a pooled reference is emitted deep inside expression rewriting,
 // several layers below anything that knows which Module is being emitted.
 let pooledConstants = new Map<string, PooledConstant>()
 
-// NOTE: One pool per emitted Module, because a name declared in one Module is
+// One pool per emitted Module, because a name declared in one Module is
 // not in scope in another. The single-Program form above is one Module, so its
 // standard library prelude and its own code share a pool and a constant both
 // want is declared once. A BUILD is the other form whatever it is given: one
@@ -1410,7 +1410,7 @@ function collectingConstantPool<Value>(emit: () => Value): {
 	}
 }
 
-// NOTE: `_` in both, so neither can collide with anything a user writes — the
+// `_` in both, so neither can collide with anything a user writes — the
 // Lexer reads `_` as a Symbol, so no Essence identifier holds one, which is the
 // same guarantee `$es_` rests on. The marker carries `at` so that a marker and
 // a finished name can never be confused for one another either.
@@ -1423,7 +1423,7 @@ function pooledReference(
 	let known = pooledConstants.get(node.key)
 
 	if (known === undefined) {
-		// NOTE: The value is emitted at MODULE scope, which is where its const
+		// The value is emitted at MODULE scope, which is where its const
 		// stands — even a deferred one, which stands below a Statement of the
 		// Module and not inside a block. A user Namespace shadowing a builtin
 		// does so for its own block, and a constant hoisted out of that block
@@ -1431,12 +1431,12 @@ function pooledReference(
 		// could read such a name in the first place; this is the other half of
 		// the same answer, so that the two can not disagree.
 		//
-		// NOTE: Rewritten BEFORE it is recorded, because the value may itself
+		// Rewritten BEFORE it is recorded, because the value may itself
 		// hold a pooled reference — a conditional conformance's witnesses are
 		// conformances — and recording the inner one first is what puts it
 		// above this one in the band.
 		//
-		// NOTE: And rewritten UNMAPPED. The value still carries the Position of
+		// And rewritten UNMAPPED. The value still carries the Position of
 		// a site it was hoisted out of — whichever site was rewritten first,
 		// which is an arbitrary one of however many wrote the same constant —
 		// and a debugger stepping the band would be sent to a line the constant
@@ -1470,20 +1470,20 @@ function atModuleScope<Value>(emit: () => Value): Value {
 	}
 }
 
-// NOTE: The band, and the renaming that finishes it. `roots` is everything the
+// The band, and the renaming that finishes it. `roots` is everything the
 // emitted Module will hold apart from the band itself, read for the markers
 // that survived — a constant collected while rewriting a standard library
 // Method the Program turned out not to reach is not declared, because its
 // marker is nowhere. The survivors pull in what THEY read, so a witness kept
 // for one site keeps the witnesses curried onto it.
 //
-// NOTE: The order is the order the constants were recorded, which is the order
+// The order is the order the constants were recorded, which is the order
 // they must be declared in: a value is recorded after everything inside it, so
 // a constant reading another always stands below it.
 function constantPoolBand(
 	pool: Map<string, PooledConstant>,
 	roots: unknown,
-	// NOTE: The Module's own Statements, where a constant that can not stand in
+	// The Module's own Statements, where a constant that can not stand in
 	// the band goes instead — see `deferredPoolPositions`. Spliced IN PLACE, so
 	// that `roots` (which holds this same array) still reaches every reference
 	// when the markers are renamed below. Null where there is no such body to
@@ -1563,7 +1563,7 @@ function constantPoolBand(
 		standing.push(declaration)
 	}
 
-	// NOTE: Back to front, so that an index computed over the original body is
+	// Back to front, so that an index computed over the original body is
 	// still the index of the same Statement when the splice happens.
 	if (body !== null) {
 		for (let index of [...deferredBands.keys()].sort((a, b) => b - a)) {
@@ -1577,7 +1577,7 @@ function constantPoolBand(
 	return band
 }
 
-// NOTE: Which constants can NOT stand in the band, and which Statement each has
+// Which constants can NOT stand in the band, and which Statement each has
 // to stand below instead. A witness naming a top-level Namespace the Program
 // declares is the one shape this is about: the Namespace is emitted as
 // `var X = class …`, which is not hoisted, so a const above it reads
@@ -1629,7 +1629,7 @@ function deferredPoolPositions(
 	return deferred
 }
 
-// NOTE: What each top-level Statement of the emitted Module BINDS, by index.
+// What each top-level Statement of the emitted Module BINDS, by index.
 // Read structurally rather than from the Program the Module came from: what a
 // constant can read is a name in the emitted JavaScript, and this is the one
 // place that says where such a name comes into being.
@@ -1657,7 +1657,7 @@ function topLevelDeclarationIndices(
 	return declaredAt
 }
 
-// NOTE: The markers replaced by the names the band declares, in place. A marker
+// The markers replaced by the names the band declares, in place. A marker
 // can stand nowhere but where this Module put one — no Essence identifier holds
 // a `_`, and nothing else in emission spells one — so a name match IS the
 // reference, and every position is looked at rather than only the ones a
@@ -1703,7 +1703,7 @@ function renamePooledReferences(
 
 export type PreludeReach = "reached" | "whole"
 
-// NOTE: Which Essence-implemented Methods the emitted Program actually needs,
+// Which Essence-implemented Methods the emitted Program actually needs,
 // and the const for each. A const is emitted only where something names it:
 // unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
 // unused const still names the runtime Methods its body reaches, and once a
@@ -1712,35 +1712,35 @@ export type PreludeReach = "reached" | "whole"
 // charge a Program for a numeric tower it never used. The gate is per-Method,
 // finer than the per-Namespace one it replaced.
 //
-// NOTE: A Method left out costs nothing — nothing references its const and no
+// A Method left out costs nothing — nothing references its const and no
 // spread was ever emitted, so the text is exactly what a wholly native standard
 // library would have produced.
 //
-// NOTE: The search runs to a FIXED POINT over the consts themselves, not just
+// The search runs to a FIXED POINT over the consts themselves, not just
 // over the user Program: `Boolean.isNot`'s body calls `Boolean.negate` (a
 // native, no const) but could equally call another Essence Method, and a
 // Method's const reached only through another one must still be pulled in.
 // Stopping at the first round would emit a const whose body names one that was
 // never declared.
 //
-// NOTE: A bodied static Property is searched for on exactly the same footing —
+// A bodied static Property is searched for on exactly the same footing —
 // its const is emitted only where something reads it, and its own value may be
 // the only thing that reads another one.
 //
-// NOTE: Exported for the tests. The fixed point is the part of this that can
+// Exported for the tests. The fixed point is the part of this that can
 // silently be wrong — a Method reached only through another one is exactly what
 // the standard library will produce more of as the conversion goes on.
 export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
 	freeFunctions: Array<PreludeFreeFunction> = [],
-	// NOTE: The pooled constants already collected, which are part of what the
+	// The pooled constants already collected, which are part of what the
 	// emitted Module names even though they are not in its body yet: a pooled
 	// conformance witness holds the `$es_…` reference that used to stand at the
 	// site the witness was hoisted out of, and a search seeded only by the body
 	// would lose that edge and emit a Module naming a const nobody declared.
 	poolRoots: unknown = null,
-	// NOTE: How much of the prelude to keep. `reached` is the search this
+	// How much of the prelude to keep. `reached` is the search this
 	// Function is named for and what every bundle is emitted under; `whole`
 	// answers with every candidate and runs no search at all — see the seed
 	// below, and `rewriteModuleGraph` for why a host's build asks for it.
@@ -1752,7 +1752,7 @@ export function reachableEssenceMethods(
 		return reachable
 	}
 
-	// NOTE: The Protocol entries and the Namespace entries are two tables, not
+	// The Protocol entries and the Namespace entries are two tables, not
 	// one. Their consts are named by different schemes and a call reaches them
 	// by different questions — a Namespace member by name, a Protocol's provided
 	// Method by the Invocation's `providedBy` — so a Protocol spelled like a
@@ -1761,7 +1761,7 @@ export function reachableEssenceMethods(
 	let namespaces = prelude.filter((entry) => entry.protocol !== true)
 	let provided = providedMemberIdentifiers(protocols)
 
-	// NOTE: The pairs this prelude implements in Essence — an edge is drawn only
+	// The pairs this prelude implements in Essence — an edge is drawn only
 	// to a Method the prelude actually defines a const for.
 	let implemented = new Set(
 		namespaces.flatMap((namespace) =>
@@ -1771,7 +1771,7 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// NOTE: The Essence-bodied free Functions this run can emit, by the bare
+	// The Essence-bodied free Functions this run can emit, by the bare
 	// `<name>__overload$N` name a call site resolves to — the free-Function
 	// analogue of `implemented`. An edge is drawn to one only when it is in
 	// this set, so a native free Function (reached off `$_`) falls out just as
@@ -1780,7 +1780,7 @@ export function reachableEssenceMethods(
 		freeFunctions.map((freeFunction) => freeFunction.name),
 	)
 
-	// NOTE: The native Methods this prelude carries a shim for — the table that
+	// The native Methods this prelude carries a shim for — the table that
 	// is only consulted where a call OMITS an Argument, exactly as
 	// `namespaceMember` only routes to a shim there. A native called at full
 	// arity is a plain member read and draws no edge at all.
@@ -1792,7 +1792,7 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// NOTE: And the shims a call at FULL arity names too — the ones whose
+	// And the shims a call at FULL arity names too — the ones whose
 	// default is a Record, which is merged into what the call wrote rather than
 	// standing in for what it left out. `namespaceMember` routes every call of
 	// one through the shim, so the edge has to be drawn from every call of one:
@@ -1806,7 +1806,7 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// NOTE: The static Properties this prelude gives a value to, keyed like
+	// The static Properties this prelude gives a value to, keyed like
 	// `implemented` because a Property read is spelled exactly like a static
 	// Method reference and the two are told apart by which table answers. A
 	// native Property is in neither, so it stays a member read.
@@ -1818,7 +1818,7 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// NOTE: Each candidate carries its declaration AND the other Essence Methods
+	// Each candidate carries its declaration AND the other Essence Methods
 	// its body calls, read off the TYPED body rather than the emitted const.
 	// That matters: `namespaceMember` decides an emitted call's spelling from the
 	// process-wide prelude, so a const emitted for a DIFFERENT prelude (only the
@@ -1850,7 +1850,7 @@ export function reachableEssenceMethods(
 			),
 	)
 
-	// NOTE: A bodied static Property is a candidate of its own, carrying the KIND
+	// A bodied static Property is a candidate of its own, carrying the KIND
 	// that puts its const in the value band. Its value draws edges like any body
 	// — it is written in Essence, so it reaches Methods, free Functions and other
 	// Properties — and the ones that reach another Property are what order the
@@ -1881,7 +1881,7 @@ export function reachableEssenceMethods(
 			),
 	)
 
-	// NOTE: A free Function is a candidate exactly as a Method is — its own
+	// A free Function is a candidate exactly as a Method is — its own
 	// top-level `function <name>__overload$N(…) {…}` and the edges its body
 	// draws — so the two share ONE fixed point. That unity is the point: a
 	// Method body that calls a free Function, or a free Function body that calls
@@ -1905,7 +1905,7 @@ export function reachableEssenceMethods(
 			},
 		])
 
-	// NOTE: A native Method that declares a default contributes a candidate of
+	// A native Method that declares a default contributes a candidate of
 	// its own — the frame the default is evaluated in — reached exactly as an
 	// Essence Method's const is, and only from a call site that left an Argument
 	// out. It is Function-valued, so it sits in the same band and needs no
@@ -1919,7 +1919,7 @@ export function reachableEssenceMethods(
 					kind: "function",
 					declaration: rewriteNativeShim(namespace.name, shim),
 					...essenceMethodReferences(
-						// NOTE: Both, because a Record default's Expression
+						// Both, because a Record default's Expression
 						// moved out of the Parameter list and into the prologue
 						// — the edges a default draws are the same either way.
 						[shim.parameters, shim.prologue],
@@ -1934,7 +1934,7 @@ export function reachableEssenceMethods(
 			]),
 	)
 
-	// NOTE: A Protocol's provided Methods are candidates on exactly the same
+	// A Protocol's provided Methods are candidates on exactly the same
 	// footing — one const each, shaken away where nothing names them — under the
 	// name the table of provided members gives them.
 	let protocolCandidates: Array<[string, EssenceMember]> = protocols.flatMap(
@@ -1989,7 +1989,7 @@ export function reachableEssenceMethods(
 		}
 	}
 
-	// NOTE: The seed is what the emitted user Program names — a plain call, a
+	// The seed is what the emitted user Program names — a plain call, a
 	// conformance witness and a `dispatchMethod` target are all bare `$es_…`
 	// Identifiers by now, so `referencedNames` finds them all alike. Seeded with
 	// every candidate instead, the loop below has nothing left to find and the
@@ -2009,7 +2009,7 @@ export function reachableEssenceMethods(
 	return reachable
 }
 
-// NOTE: The Essence Methods a typed Method body reaches, restricted to the ones
+// The Essence Methods a typed Method body reaches, restricted to the ones
 // a given prelude implements. This MUST recognise every shape `namespaceMember`
 // turns into a bare `$es_…` Identifier, because those are the emission sites
 // the seed's `referencedNames` will find in the finished tree — if the two
@@ -2060,7 +2060,7 @@ export function reachableEssenceMethods(
 // away), and one they do only emits a const that is read. Exported for a unit
 // test that feeds it each shape directly.
 //
-// NOTE: Each shape also answers WHETHER this body evaluates what it names, which
+// Each shape also answers WHETHER this body evaluates what it names, which
 // is what `essenceMemberBands` orders the value band by — see
 // `EssenceMemberReferences`. A call evaluates its target, a Property read
 // evaluates the Property, and a Function this body only hands on does not.
@@ -2069,16 +2069,16 @@ export function essenceMethodReferences(
 	implemented: Set<string>,
 	implementedFreeFunctions: Set<string> = new Set(),
 	implementedProperties: Set<string> = new Set(),
-	// NOTE: The native pairs that have a shim. Consulted only where the call
+	// The native pairs that have a shim. Consulted only where the call
 	// says it left an Argument out, because that is the only call
 	// `namespaceMember` routes to a shim — a native called at full arity is a
 	// plain member read and draws no edge.
 	shimmed: Set<string> = new Set(),
-	// NOTE: The consts of the Methods a Protocol provided a body for. Consulted
+	// The consts of the Methods a Protocol provided a body for. Consulted
 	// only where the Invocation says a Protocol answered it, the question
 	// `namespaceMember` routes on, so no const is named without being pulled in.
 	provided: ProvidedMemberIdentifiers = new Map(),
-	// NOTE: The native pairs whose shim MERGES a Record default into what the
+	// The native pairs whose shim MERGES a Record default into what the
 	// call wrote. Consulted where the call left nothing out, because that is
 	// exactly where `namespaceMember` routes one to its shim and the set above
 	// does not — the two have to agree, or a const is named in a body and never
@@ -2124,7 +2124,7 @@ export function essenceMethodReferences(
 		}
 	}
 
-	// NOTE: `isStored` says what a Function-valued reference found HERE would be:
+	// `isStored` says what a Function-valued reference found HERE would be:
 	// a value this body hands on rather than runs. It holds at the root — a
 	// Property whose value IS `Boolean.isNot`, a Method that returns it, both only
 	// pass the Function along — and is cleared for everything under an invocation,
@@ -2160,7 +2160,7 @@ export function essenceMethodReferences(
 			isUpdatingDictionary ||
 			(record["nodeType"] === "Intrinsic" &&
 				record["kind"] === "dispatch-chain") ||
-			// NOTE: An inlined loop RUNS the bodies it holds, which is what the
+			// An inlined loop RUNS the bodies it holds, which is what the
 			// call it replaced did with the closures it was handed — so a
 			// Function-valued reference inside one is evaluated, exactly as it
 			// was when it stood under the call.
@@ -2173,7 +2173,7 @@ export function essenceMethodReferences(
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 
-			// NOTE: A provided Method and a Namespace Method may be spelled
+			// A provided Method and a Namespace Method may be spelled
 			// alike, so which table is asked is decided by the Node rather than
 			// by the name — exactly as `namespaceMember` decides it.
 			if (record["providedBy"] !== undefined) {
@@ -2216,7 +2216,7 @@ export function essenceMethodReferences(
 				)
 			}
 		} else if (record["nodeType"] === "Intrinsic") {
-			// NOTE: The two intrinsics that name a Namespace member — a
+			// The two intrinsics that name a Namespace member — a
 			// compiled dispatch's per-branch call and a devirtualised witness's
 			// Method — both of which the Optimiser writes INTO a prelude body,
 			// where this search is what pulls the const in. They are the same
@@ -2272,7 +2272,7 @@ export function essenceMethodReferences(
 				)
 			}
 		} else if (record["nodeType"] === "Lookup") {
-			// NOTE: `rewriteLookup` reads a member off a Namespace where the
+			// `rewriteLookup` reads a member off a Namespace where the
 			// base's Type is one, or where the Lookup carries the Namespace a
 			// Choice's `cases` is written in. A local named after a Namespace
 			// (`constant Optional = { otherwise = 5 }`) is a Record field read.
@@ -2288,13 +2288,13 @@ export function essenceMethodReferences(
 					: undefined)
 
 			if (namespaceName !== undefined) {
-				// NOTE: A member a Protocol PROVIDED is a const of its own and
+				// A member a Protocol PROVIDED is a const of its own and
 				// no member of the Namespace it is written on, so the edge goes
 				// where the emission goes.
 				if (record["providedBy"] !== undefined) {
 					considerProvided(record["providedBy"], member?.["name"])
 				} else {
-					// NOTE: A static Method is evaluated where it is CALLED, a
+					// A static Method is evaluated where it is CALLED, a
 					// Property wherever it is named at all — reading its const is
 					// what yields the value, so there is no handing it on.
 					consider(
@@ -2309,7 +2309,7 @@ export function essenceMethodReferences(
 						implementedProperties,
 						true,
 					)
-					// NOTE: And the shim of a native whose Record default is
+					// And the shim of a native whose Record default is
 					// merged, for the reason a call of one draws that edge: a
 					// bare reference to it is routed to the shim too, because
 					// the merge is what makes it the whole Method.
@@ -2335,7 +2335,7 @@ export function essenceMethodReferences(
 				| Record<string, unknown>
 				| undefined
 
-			// NOTE: A witness is called at full arity, so a native whose shim
+			// A witness is called at full arity, so a native whose shim
 			// merges a Record default is named by its shim here as well.
 			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
 				consider(
@@ -2352,7 +2352,7 @@ export function essenceMethodReferences(
 				)
 			}
 
-			// NOTE: A witness names the Protocol's provided Methods too, each
+			// A witness names the Protocol's provided Methods too, each
 			// under the Protocol that WROTE it rather than under the conforming
 			// Namespace — so the edge goes to the shared const, exactly as it
 			// does from a call.
@@ -2366,7 +2366,7 @@ export function essenceMethodReferences(
 				considerProvided(protocolName, memberName)
 			}
 		} else if (record["nodeType"] === "FunctionInvocation") {
-			// NOTE: A bare free-Function call — `loop__overload$2(…)` by now,
+			// A bare free-Function call — `loop__overload$2(…)` by now,
 			// the Simplifier having mangled the overloaded callee — is an edge
 			// to that Function's const when this run implements it in Essence.
 			// A native free Function is a read off `$_` and is not in the set,
@@ -2383,7 +2383,7 @@ export function essenceMethodReferences(
 				evaluatedReferences.add(callee["name"])
 			}
 
-			// NOTE: `Namespace.member(…)` that left an Argument out reaches the
+			// `Namespace.member(…)` that left an Argument out reaches the
 			// shim rather than the native — a fact the Lookup branch above can
 			// not see, because only the CALL knows what it wrote.
 			if (
@@ -2399,7 +2399,7 @@ export function essenceMethodReferences(
 			}
 		}
 
-		// NOTE: A Node's `type` and `position` are stepped over. Neither holds
+		// A Node's `type` and `position` are stepped over. Neither holds
 		// a Node this search draws an edge from: a Position is line and column
 		// numbers, and a Type is deliberately written to carry no Expression —
 		// the one exception, a Case payload default, is data the Enricher has
@@ -2424,7 +2424,7 @@ export function essenceMethodReferences(
 	return { references, evaluatedReferences }
 }
 
-// NOTE: Every name the given tree READS. A dotted member and an object
+// Every name the given tree READS. A dotted member and an object
 // literal's key are text rather than references — `{ isNot: Boolean.isNot }`
 // names `Boolean` and nothing else — so an emitted Record member that happens
 // to be spelled like a Namespace does not drag it in. Everything else is
@@ -2474,7 +2474,7 @@ function referencedNames(root: unknown): Set<string> {
 	return names
 }
 
-// NOTE: The last word on the fixed point above, read off the FINISHED tree: a
+// The last word on the fixed point above, read off the FINISHED tree: a
 // `$es_…` name is emitted only where a standard library Method is called, and
 // every one of them must have had its const pulled in. The two answers are
 // arrived at differently on purpose — the fixed point follows the TYPED bodies,
@@ -2482,12 +2482,12 @@ function referencedNames(root: unknown): Set<string> {
 // not know about shows up here as a Diagnostic instead of as a `ReferenceError`
 // out of a Program that compiled green.
 //
-// NOTE: Only `$es_…` names can be answered for. A free Function's const is
+// Only `$es_…` names can be answered for. A free Function's const is
 // emitted under its bare name, which is indistinguishable from a user's own
 // binding, and the prefix is what makes this sweep safe: `_` is a Symbol to the
 // Lexer, so no name a Program can write ever starts with one.
 //
-// NOTE: Exported for a unit test, which is the only way to see it fire — while
+// Exported for a unit test, which is the only way to see it fire — while
 // the Rewriter is right, no Program reaches it.
 export function checkEssenceMethodsAreDeclared(
 	program: estree.Program,
@@ -2543,7 +2543,7 @@ function rewriteConditionalStatement(
 	}
 }
 
-// NOTE: What JavaScript is asked. An Essence Boolean is an object, and every
+// What JavaScript is asked. An Essence Boolean is an object, and every
 // object is true, so the question is the `value` it holds — unless
 // `unbox-conditions` found the question already asked in JavaScript's own
 // terms, in which case the Expression IS the question and reading `.value` off
@@ -2572,18 +2572,18 @@ function rewriteFunctionStatement(
 		type: "FunctionDeclaration",
 		id: rewriteIdentifier(node.name),
 		params: node.value.parameters.map((param) => rewriteParameter(param)),
-		// NOTE: A free Function that completes is wrapped exactly as a Method
+		// A free Function that completes is wrapped exactly as a Method
 		// or a literal is — it declares a Future and answers with one.
 		body: completingBodyOf(node.value),
 	}
 }
 
-// NOTE: An Expression the Program wrote for its effects, and the one shape that
+// An Expression the Program wrote for its effects, and the one shape that
 // may not be emitted as JavaScript writes it. A call and an assignment are what
 // every Statement of this kind actually is, and neither can be taken away by an
 // engine — the call may print and the assignment is the mutation.
 //
-// NOTE: Anything ELSE here is a value the Program computes and drops, and a
+// Anything ELSE here is a value the Program computes and drops, and a
 // value in this language can BE an object literal: `collapse-construction`
 // builds `{ [$type.typeKeySymbol]: "Record", … }`, whose hidden Type key is a
 // computed SYMBOL. An engine that decides such a literal is unused is free to
@@ -2599,7 +2599,7 @@ function rewriteFunctionStatement(
 function discardedExpressionStatement(
 	expression: estree.Expression,
 ): estree.Statement {
-	// NOTE: And an `await`, which is what a `complete` written for its effects
+	// And an `await`, which is what a `complete` written for its effects
 	// is. Nothing about it can be taken away — the wait is the point, and what
 	// it waits for has already been started — and binding it to a name would
 	// only say the same thing with a name nobody reads.
@@ -2631,7 +2631,7 @@ function discardedExpressionStatement(
 
 const discardedValueName = "$discarded_value"
 
-// NOTE: An emitted Function that exists only to hold what JavaScript can not say
+// An emitted Function that exists only to hold what JavaScript can not say
 // in an Expression position — a Match's Handlers, a compiled dispatch's held
 // values, a Combination's two operands, an inlined walk's block, a compiled
 // Matcher's test — called at once with whatever it needs. None of them is a
@@ -2644,7 +2644,7 @@ const discardedValueName = "$discarded_value"
 // an arrow returning one. So the wrapper is made `async` and the call is
 // awaited, which puts the wait back at the Statement the source wrote it in.
 //
-// NOTE: Asked of the emitted JavaScript rather than of the Nodes behind it. That
+// Asked of the emitted JavaScript rather than of the Nodes behind it. That
 // IS the question — an `await` reaches the enclosing Function unless a Function
 // of its own stands in between — and it is one answer for every wrapper here
 // rather than a rule each of them has to remember about the Nodes it was built
@@ -2669,7 +2669,7 @@ function calledWrapper(
 	return { type: "AwaitExpression", argument: call }
 }
 
-// NOTE: Whether an `await` stands anywhere in this emitted JavaScript WITHOUT a
+// Whether an `await` stands anywhere in this emitted JavaScript WITHOUT a
 // Function of its own around it — which is the span an `await` belongs to. The
 // walk reads every field rather than the ones each Node kind declares, so a
 // shape added to the emission later is walked without anybody remembering to
@@ -2787,7 +2787,7 @@ function rewriteExpressionByKind(
 	}
 }
 
-// NOTE: The Nodes the Optimiser rewrites Expressions into, and the one place
+// The Nodes the Optimiser rewrites Expressions into, and the one place
 // they are emitted. Each stands for a shape the runtime's own constructor would
 // have built — so the JavaScript below is what that constructor does, written
 // out at the site instead of called. The switch is exhaustive: an intrinsic kind
@@ -2796,11 +2796,11 @@ function rewriteIntrinsic(
 	node: common.typedSimple.IntrinsicNode,
 ): estree.Expression {
 	switch (node.kind) {
-		// NOTE: The tag as the value carries it — through `renderIdentity`, like
+		// The tag as the value carries it — through `renderIdentity`, like
 		// every other place a tag is written, so a Choice declared in a Module
 		// is asked about under the same spelling it was stamped with.
 		//
-		// NOTE: An OPTIONAL read is `?.[…]`, which answers `undefined` for a
+		// An OPTIONAL read is `?.[…]`, which answers `undefined` for a
 		// member that is not there — and `undefined` is not a tag, so the
 		// comparison answers false without the read throwing. That is the
 		// `Object.hasOwn` the runtime's own check asks first, folded into the
@@ -2812,7 +2812,7 @@ function rewriteIntrinsic(
 				left: typeKeyRead(rewriteExpression(node.value), node.optional),
 				right: { type: "Literal", value: renderIdentity(node.tag) },
 			}
-		// NOTE: The general check, byte for byte what a Match Handler emitted
+		// The general check, byte for byte what a Match Handler emitted
 		// before there was a pass to compile one — the descriptor stands in an
 		// Expression position now, which is what lets it be pooled, and that is
 		// the whole of the difference.
@@ -2849,12 +2849,12 @@ function rewriteIntrinsic(
 					"falseInstance",
 				),
 			}
-		// NOTE: The read back off an Essence Boolean — the same `.value` an
+		// The read back off an Essence Boolean — the same `.value` an
 		// emitted condition performs, standing where a raw operand belongs.
 		case "raw-boolean":
 			return memberRead(rewriteExpression(node.value), "value")
 		case "raw-boolean-op":
-			// NOTE: `&&` and `||` do not evaluate their right-hand side when
+			// `&&` and `||` do not evaluate their right-hand side when
 			// the left decides, which is a difference from the Method call
 			// they replace — `lower-scalar-operations` is what proves the
 			// right-hand side has nothing to say, and only builds one of these
@@ -2872,7 +2872,7 @@ function rewriteIntrinsic(
 						left: rewriteExpression(node.operand),
 						right: rewriteExpression(node.other),
 					}
-		// NOTE: What each Integer holds, compared by JavaScript's own operator.
+		// What each Integer holds, compared by JavaScript's own operator.
 		// `<`, `>`, `<=` and `>=` are defined ACROSS a number and a bigint and
 		// decide the mathematical order without converting either side, so one
 		// comparison answers for all four pairings of the hybrid Integer's two
@@ -2889,7 +2889,7 @@ function rewriteIntrinsic(
 			return rawEquals(node)
 		case "raw-arithmetic":
 			return rawArithmetic(node)
-		// NOTE: Through the one function every reference to a standard library
+		// Through the one function every reference to a standard library
 		// member routes through, so a devirtualised Method is spelled exactly
 		// as the witness spelled it — an Essence-implemented one as its own
 		// const, a native one as a read off the runtime module, and a Choice's
@@ -2911,7 +2911,7 @@ function rewriteIntrinsic(
 		case "direct-case":
 			return {
 				type: "ObjectExpression",
-				// NOTE: The payload is spread FIRST and the tag written over it,
+				// The payload is spread FIRST and the tag written over it,
 				// exactly as `createCase` does — a payload Record carries the
 				// `"Record"` brand of its own, and whichever of the two is
 				// written last is the one the value ends up with.
@@ -2929,7 +2929,7 @@ function rewriteIntrinsic(
 				],
 			}
 		case "spread-combination":
-			// NOTE: No brand of its own — the hidden Type key rides along on the
+			// No brand of its own — the hidden Type key rides along on the
 			// spread of the left-hand side, which is a Record and carries it.
 			return node.rhs === null
 				? {
@@ -2943,7 +2943,7 @@ function rewriteIntrinsic(
 						],
 					}
 				: projectedCombination(node.lhs, node.rhs, node.rhsMembers)
-		// NOTE: `options.retries ?? 3` — one member of the Record a callee
+		// `options.retries ?? 3` — one member of the Record a callee
 		// rebuilds a Record-defaulted Parameter into. `??` and not `||`: `false`
 		// and `0` are values a member may legitimately hold, and only absence
 		// may reach the default.
@@ -2960,20 +2960,20 @@ function rewriteIntrinsic(
 			}
 		case "dispatch-chain":
 			return dispatchChain(node)
-		// NOTE: The one place "no Argument given" is written into emitted code
+		// The one place "no Argument given" is written into emitted code
 		// on purpose — the hole a call leaves where a Parameter took its
 		// default and something after it still has to be passed. It is consumed
 		// by the callee's parameter binding before the first Statement runs, so
 		// it never becomes a value.
 		case "omitted-argument":
 			return omittedArgument()
-		// NOTE: A walk written where it stands, wrapped in an arrow because an
+		// A walk written where it stands, wrapped in an arrow because an
 		// Expression position has nowhere to write a `while`. Where it stands in
 		// a Statement position the Optimiser lifted it to the Statement form
 		// above, and there is no arrow at all.
 		case "inline-loop":
 			return inlineLoopExpression(node)
-		// NOTE: A build is not an Expression that can stand anywhere: it names
+		// A build is not an Expression that can stand anywhere: it names
 		// the Array a walk is filling, and there is no way to answer with one
 		// without saying whether the walk is finished with it. The walks that
 		// build read it where their answer is written and never reach here, so
@@ -3007,7 +3007,7 @@ function rewriteIntrinsic(
 	}
 }
 
-// NOTE: A Union dispatch decided where it stands — a conditional for each case
+// A Union dispatch decided where it stands — a conditional for each case
 // that still has a question, and the call the Compiler resolved for it:
 //
 //   value[$type.typeKeySymbol] === "Shape#Circle"
@@ -3020,7 +3020,7 @@ function rewriteIntrinsic(
 // have gone, and whatever the Optimiser left after it — nothing, since it drops
 // what such a case makes unreachable — goes with it.
 //
-// NOTE: The chain ends in `$type.noDispatchCaseMatched()` only where the LAST
+// The chain ends in `$type.noDispatchCaseMatched()` only where the LAST
 // case still has a test, which is the same throw the runtime's own search ends
 // with. Where the Optimiser could elide that test the last call is simply the
 // alternate, and the throw is gone with the question it answered.
@@ -3050,7 +3050,7 @@ function dispatchChain(
 		return answer
 	}
 
-	// NOTE: The Expressions the branches read more than once, held for the
+	// The Expressions the branches read more than once, held for the
 	// length of the chain — as the Parameters of an arrow the chain is the body
 	// of, called at once with them. JavaScript evaluates a call's Arguments left
 	// to right and before the call, which is the order and the once-ness the
@@ -3073,7 +3073,7 @@ function dispatchChain(
 	)
 }
 
-// NOTE: One branch's call — the Method the Compiler resolved for this member
+// One branch's call — the Method the Compiler resolved for this member
 // Type, spelled through the one function every reference to a Namespace member
 // goes through, and given the receiver, the shared Arguments and this case's
 // own hidden conformance Arguments, in the order the runtime handed them over.
@@ -3091,7 +3091,7 @@ function dispatchCaseCall(
 		values[contextual.index] = contextual.value
 	}
 
-	// NOTE: The shared list is what the call WROTE — the branches need not agree
+	// The shared list is what the call WROTE — the branches need not agree
 	// on which Parameters they leave out — so the holes are opened here, in the
 	// branch that makes the call, and after the overrides above, which stand at
 	// the positions the call wrote.
@@ -3122,7 +3122,7 @@ function dispatchCaseCall(
 	}
 }
 
-// NOTE: `void 0` rather than the Identifier `undefined`, which is a name a
+// `void 0` rather than the Identifier `undefined`, which is a name a
 // Program may bind: `constant undefined = 99` is legal Essence and emits a
 // `const undefined`, and every hole in that Module would then have been passed
 // its value. `void 0` is the same value under a spelling nothing can rebind.
@@ -3135,7 +3135,7 @@ function omittedArgument(): estree.UnaryExpression {
 	}
 }
 
-// NOTE: The emitted counterpart of the Simplifier's `expandOmittedArguments`,
+// The emitted counterpart of the Simplifier's `expandOmittedArguments`,
 // for the one Argument list the Simplifier could not build: a dispatch branch's,
 // which is assembled here because the branches share one written list and each
 // takes its own defaults out of it. Both go through `openArgumentHoles`.
@@ -3166,7 +3166,7 @@ function noDispatchCaseMatched(): estree.CallExpression {
 	}
 }
 
-// NOTE: The value a scalar wrapper holds — the number or bigint under an
+// The value a scalar wrapper holds — the number or bigint under an
 // Integer, the JavaScript boolean under a Boolean. Not a member the language
 // has: it is the runtime's own field, read here exactly as every runtime Method
 // reads it.
@@ -3174,19 +3174,19 @@ function valueRead(object: estree.Expression): estree.MemberExpression {
 	return memberRead(object, "value")
 }
 
-// NOTE: `Number.MAX_SAFE_INTEGER`, written as the literal the guard below
+// `Number.MAX_SAFE_INTEGER`, written as the literal the guard below
 // compares against rather than reached for by name: `Number` is a Namespace of
 // the language, and an emitted Module that opens with `import * as Number` would
 // shadow the global this took it from. `Integer.ts` in the runtime holds the
 // same bound; `src/tests/hybridIntegers.spec.ts` holds the two to each other.
 const SAFE_INTEGER = 9007199254740991
 
-// NOTE: Two Strings are equal when their CHARACTERS are, which is not what
+// Two Strings are equal when their CHARACTERS are, which is not what
 // `===` decides — the same accent written as one code point and as two is one
 // String — so the runtime helper that normalises decides it, and the double
 // normalisation stays in the one place that has always performed it.
 //
-// NOTE: An Integer is `===` on what it holds, and THE CANONICAL INVARIANT is
+// An Integer is `===` on what it holds, and THE CANONICAL INVARIANT is
 // what makes that the whole answer. An Integer holds a number while its value is
 // one a double holds exactly and a bigint beyond that, never the other way
 // round, so one mathematical Integer has exactly one representation. Two equal
@@ -3231,11 +3231,11 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 		: equals
 }
 
-// NOTE: The three exact operations, written INLINE around a guard rather than as
+// The three exact operations, written INLINE around a guard rather than as
 // a call — a call is what `lower-scalar-operations` took this site away from,
 // and putting one back would give the saving away.
 //
-// NOTE: A hybrid Integer holds a number or a bigint, and JavaScript's `+`, `-`
+// A hybrid Integer holds a number or a bigint, and JavaScript's `+`, `-`
 // and `*` THROW on a mix of the two, so the two operands have to be known to be
 // numbers before they meet. That is asked with `typeof` rather than with the
 // range test the canonical invariant would also allow: the two decide the same
@@ -3245,7 +3245,7 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 // cost 21ns a turn against 0.3, and it bought about 1ns a turn on values that had
 // not.
 //
-// NOTE: The ANSWER is then checked against safe range, which is what keeps the
+// The ANSWER is then checked against safe range, which is what keeps the
 // result canonical, and the check is EXACT rather than a conservative
 // approximation. IEEE 754 `+`, `-` and `*` are correctly rounded, so the double
 // answer is the nearest double to the true result. Rounding is monotone and 2⁵³
@@ -3257,11 +3257,11 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 // and the rounded product can not sneak back INSIDE — which is why the operands
 // need no bound of their own beyond being numbers at all.
 //
-// NOTE: The escape arm hands the two RAW values to the runtime, which redoes the
+// The escape arm hands the two RAW values to the runtime, which redoes the
 // guard and falls to bigint. It is reached by an operation that left safe range
 // and by one whose operands had already left it, and both are cold.
 //
-// NOTE: Every operand here is read through `unboxedInteger` rather than through
+// Every operand here is read through `unboxedInteger` rather than through
 // `valueRead` — `unboxed-operand`, which is what keeps a CHAIN from building the
 // Integer its next operation immediately takes apart.
 function rawArithmetic(
@@ -3279,7 +3279,7 @@ function rawArithmetic(
 		arguments: [unboxedInteger(left), unboxedInteger(right)],
 	}
 
-	// NOTE: The guard reads each operand twice and the answer three times, so
+	// The guard reads each operand twice and the answer three times, so
 	// an operand it can not read twice — anything with a call in it — is handed
 	// to the runtime whole instead. What is left is what the hot sites are: a
 	// name, a Record member, a pooled constant.
@@ -3308,7 +3308,7 @@ function rawArithmetic(
 	}
 }
 
-// NOTE: An Integer around a value, written as the object the runtime's own
+// An Integer around a value, written as the object the runtime's own
 // constructor would have built. Reached only where the value is already
 // canonical — the guard above IS what establishes that — so nothing here
 // converts, and `Integer.createInteger` is what a value nothing is known about
@@ -3331,13 +3331,13 @@ function boxedInteger(value: estree.Expression): estree.ObjectExpression {
 	}
 }
 
-// NOTE: The Integer a walk builds where it ANSWERS, remembered by identity so
+// The Integer a walk builds where it ANSWERS, remembered by identity so
 // that a walk nested in another does not build one only for the enclosing walk
 // to take it apart on the same line. Its argument is a value the raw slot's own
 // invariant has already made canonical, which is what makes taking it apart the
 // identity.
 //
-// NOTE: By IDENTITY and not by shape, which is the whole reason this exists.
+// By IDENTITY and not by shape, which is the whole reason this exists.
 // `Integer.createInteger` is also how a counted walk boxes its index, and that
 // index is a bigint spelling of a value a double holds exactly wherever the
 // bounds straddle safe range — a call recognised by its shape would strip the
@@ -3352,19 +3352,19 @@ function exitBox(value: estree.Expression): estree.Expression {
 	return box
 }
 
-// NOTE: One Integer-valued Expression, read as the VALUE it holds. Written as a
+// One Integer-valued Expression, read as the VALUE it holds. Written as a
 // rewrite of the finished JavaScript rather than as a second emission mode,
 // because what decides whether a slot is unboxed at all is a question about the
 // emitted body — see `heldRaw` — and the answer is not known until that body
 // exists. The text is the text either way.
 //
-// NOTE: A guarded arithmetic is read through both of its arms: the box the
+// A guarded arithmetic is read through both of its arms: the box the
 // guarded arm would have built is never written, and the escaped arm reads the
 // value off the Integer the runtime built. Both arms are values of one Integer,
 // so reading both is the same rewrite twice. Anything else — a name, a call, a
 // member — is read through as it stands.
 //
-// NOTE: Every site that reads an Integer for its value reads it through here and
+// Every site that reads an Integer for its value reads it through here and
 // not through `valueRead`: the operands of an operation that escaped, the two
 // sides of a comparison, the two sides of an equality, and the value a raw slot
 // takes. `valueRead` is what is left where the Expression is not an Integer or
@@ -3392,7 +3392,7 @@ function unboxedInteger(value: estree.Expression): estree.Expression {
 	return valueRead(value)
 }
 
-// NOTE: The value an emitted Integer LITERAL holds, and null for everything
+// The value an emitted Integer LITERAL holds, and null for everything
 // else. `boxedInteger` above is the one site that writes this shape, and the
 // test is what it wrote: the hidden Type key answering `"Integer"` and one
 // member named `value`. It can not answer yes for anything that is not an
@@ -3417,13 +3417,13 @@ function boxedValue(node: estree.Expression): estree.Expression | null {
 		return null
 	}
 
-	// NOTE: A Property's value is an Expression or a Pattern, and only a
+	// A Property's value is an Expression or a Pattern, and only a
 	// destructuring writes the latter — this one was written by `boxedInteger`,
 	// out of an Expression.
 	return held.value as estree.Expression
 }
 
-// NOTE: The runtime entry each operator escapes to. Each takes the two raw
+// The runtime entry each operator escapes to. Each takes the two raw
 // values, not the Integers around them — the guard already read them, and
 // neither side wants an Integer built to be taken apart again.
 const escapedArithmetic: Record<"+" | "-" | "*", string> = {
@@ -3432,7 +3432,7 @@ const escapedArithmetic: Record<"+" | "-" | "*", string> = {
 	"*": "product",
 }
 
-// NOTE: Which of its two representations a value an Integer holds is in — the
+// Which of its two representations a value an Integer holds is in — the
 // one question about a hybrid Integer that a comparison can not ask, since `<`
 // and `>` read both alike. Asked here as the tag read it is rather than as the
 // range test the canonical invariant would also answer it with, because that
@@ -3481,7 +3481,7 @@ function withinSafeRange(
 	]
 }
 
-// NOTE: A JavaScript number as a literal expression. JavaScript has no negative
+// A JavaScript number as a literal expression. JavaScript has no negative
 // numeric literal — `-1` is a negation of `1`, and the emitter says so by
 // refusing one — so a negative value is written as the negation it is.
 function numberLiteral(value: number): estree.Expression {
@@ -3504,7 +3504,7 @@ function allOf(tests: Array<estree.Expression>): estree.Expression {
 	}))
 }
 
-// NOTE: Whether an emitted expression may be written into the output more than
+// Whether an emitted expression may be written into the output more than
 // once. A name and a chain of plain member reads over one are: every value the
 // Rewriter emits is a plain object, there are no accessors anywhere in the
 // runtime or in what a Program can build, so reading `state.total.value` twice
@@ -3527,7 +3527,7 @@ function isRepeatable(node: estree.Expression): boolean {
 	}
 }
 
-// NOTE: The hidden Type key every runtime value carries, as emitted code
+// The hidden Type key every runtime value carries, as emitted code
 // reaches it: `$type.typeKeySymbol`, off the module alias every Program already
 // imports. It is a Symbol, so it is invisible to `Object.keys` — which is what
 // Record equality, the printer and the runtime Type checks read with — and a
@@ -3548,16 +3548,16 @@ function typeKeyProperty(tag: string): estree.Property {
 	}
 }
 
-// NOTE: The same key, read off a value — what the runtime's own Type checks ask
+// The same key, read off a value — what the runtime's own Type checks ask
 // and what a `tag-test` is.
 //
-// NOTE: `optional` makes it `?.[…]`, for the one reader that asks about a value
+// `optional` makes it `?.[…]`, for the one reader that asks about a value
 // which may not be there at all: a Record Matcher is open, so a member it names
 // can be missing from a value that reaches the test, and a read of a missing
 // member is `undefined`. Optional chaining answers `undefined` for it instead of
 // throwing, and `undefined` equals no tag.
 //
-// NOTE: And it is WRAPPED, because an optional read is a `ChainExpression` in
+// And it is WRAPPED, because an optional read is a `ChainExpression` in
 // ESTree and a bare `MemberExpression` carrying `optional` is not a tree the
 // grammar has — the chain is the Node that says where the short circuit stops.
 // It prints the same either way, so this is the shape being right rather than
@@ -3577,7 +3577,7 @@ function typeKeyRead(
 	return optional ? { type: "ChainExpression", expression: read } : read
 }
 
-// NOTE: Member names go through the same `memberKey` quoting every other
+// Member names go through the same `memberKey` quoting every other
 // emitted Record member does — an Essence name JavaScript can not spell becomes
 // a string key, and the read of it agrees because both positions ask this one
 // question.
@@ -3595,7 +3595,7 @@ function memberProperties(
 	}))
 }
 
-// NOTE: A Case is its payload Record with a nominal tag riding along on the
+// A Case is its payload Record with a nominal tag riding along on the
 // hidden Type key — `$type.createCase` copies the payload and stamps the tag,
 // which is what lets `@.left`-style member access work on the Case value
 // directly.
@@ -3624,7 +3624,7 @@ function rewriteCaseValue(
 	}
 }
 
-// NOTE: Whether this witness names a Namespace whose `is` is the STRUCTURAL
+// Whether this witness names a Namespace whose `is` is the STRUCTURAL
 // one, and is the EQUATABLE one — a Namespace conforms to several Protocols and
 // only the Equatable witness is ever handed to a Dictionary. `Equatable`
 // declares exactly `is` and `isNot`, so the two names it fulfils, wherever they
@@ -3667,14 +3667,14 @@ function isStructurallyEquatable(
 	return fulfilled.size === 2 && fulfilled.has("is") && fulfilled.has("isNot")
 }
 
-// NOTE: Every read of a witness entry spells the name by `namespaceMemberName`:
+// Every read of a witness entry spells the name by `namespaceMemberName`:
 // a call through `namespaceMember`, and a static read in `rewriteLookup`. The
 // key a witness is built with is spelled the same way.
 function witnessKey(methodName: string): estree.Identifier | estree.Literal {
 	return memberKey(namespaceMemberName(methodName))
 }
 
-// NOTE: A conformance value is an object literal that maps each Protocol
+// A conformance value is an object literal that maps each Protocol
 // Method's emitted name onto the conforming Namespace's fulfilling Method —
 // `{ compare: Integer.compare, … }`. This works uniformly for user
 // Namespaces (classes with static Methods) and builtin runtime modules, and
@@ -3693,7 +3693,7 @@ function rewriteConformanceValue(
 		return witness
 	}
 
-	// NOTE: OUTSIDE `boundConformance`, never inside it: a provided const takes
+	// OUTSIDE `boundConformance`, never inside it: a provided const takes
 	// the witness of `Self` alone, and the conditions belong to the Methods the
 	// Namespace WROTE. Wrapping the other way round would curry a `where`
 	// condition's witness onto a body that never declared one.
@@ -3733,7 +3733,7 @@ function rewriteConformanceValue(
 	}
 }
 
-// NOTE: A conformer's witnesses, built in one call so each provided body can
+// A conformer's witnesses, built in one call so each provided body can
 // name the one it is curried with, and each condition is built once:
 // `$type.providedConformances(methods, provided, conditions, curried, shared)`.
 function rewriteWitnessGroup(
@@ -3849,7 +3849,7 @@ function rewriteWitnessGroup(
 	}
 }
 
-// NOTE: The witness a provided body is curried with, by its index in the group.
+// The witness a provided body is curried with, by its index in the group.
 // `Object.hasOwn`, since a body named `toString` would read the prototype's.
 function curriedIndexOf(
 	member: common.typedSimple.ConformanceValueNode,
@@ -3862,14 +3862,14 @@ function curriedIndexOf(
 		: own
 }
 
-// NOTE: The witness's own Methods, with the conditions curried on: everything
+// The witness's own Methods, with the conditions curried on: everything
 // but its provided bodies.
 function rewriteWitnessMethods(
 	node: common.typedSimple.ConformanceValueNode,
 ): estree.ObjectExpression | estree.CallExpression {
 	let methodMap = witnessMethodMap(node)
 
-	// NOTE: An unconditional witness is the plain method-map literal, so its
+	// An unconditional witness is the plain method-map literal, so its
 	// emission stays byte-identical. A conditional one is
 	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each on.
 	if (node.conditions.length === 0) {
@@ -3898,7 +3898,7 @@ function rewriteWitnessMethods(
 	}
 }
 
-// NOTE: The witness's own Methods as the object literal that maps them, before
+// The witness's own Methods as the object literal that maps them, before
 // any condition is curried on.
 function witnessMethodMap(
 	node: common.typedSimple.ConformanceValueNode,
@@ -3926,7 +3926,7 @@ function witnessMethodMap(
 		),
 	}
 
-	// NOTE: The brand a Dictionary reads. Its runtime encodes a key of an
+	// The brand a Dictionary reads. Its runtime encodes a key of an
 	// encodable kind into one Map lookup, and that shortcut is only sound while
 	// the key Type's `is` is the structural one this witness fulfils — so the
 	// witness says so, rather than the runtime guessing from a tag it can not
@@ -3964,7 +3964,7 @@ function rewriteVariableAssignmentStatement(
 	}
 }
 
-// NOTE: A read off the runtime `functions` module (`$_.<name>`) — the one place
+// A read off the runtime `functions` module (`$_.<name>`) — the one place
 // a free Function bound to the runtime is reached. The `$_` import is emitted
 // unconditionally at the top of every Program.
 function functionsModuleMember(name: string): estree.MemberExpression {
@@ -3986,7 +3986,7 @@ function functionsModuleMember(name: string): estree.MemberExpression {
 function rewriteFunctionInvocation(
 	node: common.typedSimple.FunctionInvocationNode,
 ): estree.CallExpression {
-	// NOTE: A native free Function is a read off the runtime `functions` module,
+	// A native free Function is a read off the runtime `functions` module,
 	// exactly as a native Method is a read off its Namespace import. Its callee is
 	// a bare Identifier — already `__overload$N`-mangled by the Simplifier when it
 	// was overloaded — so the native set is consulted by that emitted name. Every
@@ -4006,7 +4006,7 @@ function rewriteFunctionInvocation(
 	}
 }
 
-// NOTE: `Namespace.member(…)` — a static Method, or an instance one reached
+// `Namespace.member(…)` — a static Method, or an instance one reached
 // through its Namespace — is a Lookup, and a Lookup on its own has no call to
 // read. So the one thing a call knows and a Lookup does not is handed over
 // here: whether this call left an Argument out, which is what decides between
@@ -4026,7 +4026,7 @@ function calleeExpression(
 			undefined,
 			true,
 		)
-		// NOTE: The Position `rewriteExpression` would have attached, put back
+		// The Position `rewriteExpression` would have attached, put back
 		// by hand — this is the one callee built without going through it, and
 		// the source map's segment for the head of the call is what it carries.
 		// Without it a `Namespace.member(…)` that omits an Argument emits a
@@ -4044,7 +4044,7 @@ function calleeExpression(
 	return rewriteExpression(node.name)
 }
 
-// NOTE: The runtime helper each routed Record Method answers to. Two names
+// The runtime helper each routed Record Method answers to. Two names
 // rather than three: `Record.es` writes `is` and `toString` and no `isNot`, so
 // the negation is `Equatable`'s own PROVIDED body, which reads `is` off the
 // very witness it is curried with — a routed one included. That is why nothing
@@ -4054,7 +4054,7 @@ const recordRoutingHelperNames: Record<string, string> = {
 	toString: "boundRecordToString",
 }
 
-// NOTE: One reference to a member of a standard library Namespace, in the one
+// One reference to a member of a standard library Namespace, in the one
 // place every emission site routes through. A native member — Method or static
 // Property — stays a read off the plain `import * as <Namespace>`, which esbuild
 // rewrites to a direct symbol reference and can therefore tree-shake, while an
@@ -4068,7 +4068,7 @@ function namespaceMember(
 	namespaceName: string,
 	memberName: string,
 	derivedDescriptor?: common.DerivedEquatableDescriptor,
-	// NOTE: Set only where the CALL left an Argument out. A native Method that
+	// Set only where the CALL left an Argument out. A native Method that
 	// declares a default has a shim beside the prelude holding that default, and
 	// this is the one question that routes to it — so a call writing every
 	// Argument still emits the plain member read it always did, tree-shakeable
@@ -4076,20 +4076,20 @@ function namespaceMember(
 	// A conformance witness passes nothing here on purpose: a witness is called
 	// at the requirement's full arity, always.
 	omitsArguments: boolean = false,
-	// NOTE: The Protocol that PROVIDED this Method, when one did. It is the
+	// The Protocol that PROVIDED this Method, when one did. It is the
 	// same string as `namespaceName` — and that is exactly why it is passed:
 	// a Namespace may be spelled like a Protocol, and only the caller knows
 	// which of the two answered.
 	providedBy?: string,
-	// NOTE: The Case tags a derived `Enumerable::cases` is curried with. Set by
+	// The Case tags a derived `Enumerable::cases` is curried with. Set by
 	// the two sites that reach that derive — a Lookup and a conformance witness
 	// — and by nothing else.
 	derivedCases?: Array<string>,
-	// NOTE: The DECLARED member names a Record routes, in declaration order. Set
+	// The DECLARED member names a Record routes, in declaration order. Set
 	// by the same two kinds of site the descriptor is, and by nothing else.
 	derivedMembers?: Array<string>,
 ): estree.Expression {
-	// NOTE: A Protocol's provided Method, whose const is named out of the
+	// A Protocol's provided Method, whose const is named out of the
 	// Namespace scheme's way. Asked first, because a Namespace of the same name
 	// may well be in the prelude and every question below is asked by name.
 	if (providedBy !== undefined) {
@@ -4099,14 +4099,14 @@ function namespaceMember(
 		}
 	}
 
-	// NOTE: A Record that routes a declared member through that member's own
+	// A Record that routes a declared member through that member's own
 	// conformance. The Namespace is still the builtin `Record` — a Record
 	// conforms conditionally on its members exactly as a List conforms
 	// conditionally on its items — so the routing is named by the member list
 	// rather than by a Namespace nobody declared, and a Record that routes
 	// NOTHING never arrives here at all and emits the native it always did.
 	//
-	// NOTE: Curried with the member names, so the member witnesses arrive as the
+	// Curried with the member names, so the member witnesses arrive as the
 	// helper's trailing Parameters — appended directly at a plain call, or
 	// curried on by `boundConformance` at a bounded one. That is the same shape
 	// the widened `boundChoiceIs` takes its descriptor in.
@@ -4132,13 +4132,13 @@ function namespaceMember(
 		}
 	}
 
-	// NOTE: A Choice's derived equality names a Namespace that exists nowhere —
+	// A Choice's derived equality names a Namespace that exists nowhere —
 	// the Enricher fabricates it per receiver and nothing is ever emitted for
 	// it — so the one reference to it becomes the runtime helper directly.
 	// Every emission site (a plain call, a dispatch branch, a conformance
 	// witness) routes through here, so this one redirect covers all three.
 	if (namespaceName === derivedEquatableNamespaceName) {
-		// NOTE: A *generic* Choice widens to the descriptor-driven helper, curried
+		// A *generic* Choice widens to the descriptor-driven helper, curried
 		// with the plan its payloads follow — the hidden conformance Arguments
 		// then arrive as its trailing Parameters. A non-generic Choice carries no
 		// descriptor and stays the byte-identical flat helper, so its emission
@@ -4176,7 +4176,7 @@ function namespaceMember(
 		}
 	}
 
-	// NOTE: And the Case-listing derive, which is the redirect the equality one
+	// And the Case-listing derive, which is the redirect the equality one
 	// is when it widens: the helper is curried with the tags, because a static
 	// Method has no receiver for the Choice to be read off at run time.
 	if (namespaceName === derivedEnumerableNamespaceName) {
@@ -4194,7 +4194,7 @@ function namespaceMember(
 		}
 	}
 
-	// NOTE: And the printing derive, which is the same redirect with nothing to
+	// And the printing derive, which is the same redirect with nothing to
 	// widen: every Case of the Choice carries no payload, so one helper reading
 	// the tag answers for all of them and no descriptor is ever curried on.
 	if (namespaceName === derivedPrintableNamespaceName) {
@@ -4207,7 +4207,7 @@ function namespaceMember(
 		}
 	}
 
-	// NOTE: The `$es_<Namespace>_<member>` const belongs to the STANDARD LIBRARY's
+	// The `$es_<Namespace>_<member>` const belongs to the STANDARD LIBRARY's
 	// Namespace of that name, so a user Namespace shadowing it must not be routed
 	// to one: `namespace List for Integer { contains(…) }` emitted
 	// `$es_List_contains(5, 5)` — the library's List.contains, run against an
@@ -4222,7 +4222,7 @@ function namespaceMember(
 		return { type: "Identifier", name: essenceName }
 	}
 
-	// NOTE: A call that LEAVES an Argument out needs the frame the default is
+	// A call that LEAVES an Argument out needs the frame the default is
 	// evaluated in, and a call that wrote every Argument does not — unless the
 	// default is a RECORD, which is merged into what the call wrote rather than
 	// standing in for it. `Http.send({ url = "…" })` writes its Argument and
@@ -4265,14 +4265,14 @@ function rewriteMethodInvocation(
 	}
 }
 
-// NOTE: A Method Invocation on a Union-typed receiver — emitted as
+// A Method Invocation on a Union-typed receiver — emitted as
 // `$type.dispatchMethod(receiver, [args…], [[descriptor, Namespace.method,
 // [conformances…], [[index, argument], …]], …])`. The helper evaluates receiver
 // and Arguments once and runs the first case whose member Type descriptor
 // accepts the receiver; the Enricher ordered the cases most specific first and
 // guarantees one matches.
 //
-// NOTE: The fourth element is omitted where a branch has no Argument of its own
+// The fourth element is omitted where a branch has no Argument of its own
 // — which is every dispatch that passes no contextually typed Function literal
 // — so what such a call emits is unchanged, byte for byte.
 function rewriteUnionMethodInvocation(
@@ -4327,7 +4327,7 @@ function rewriteUnionMethodInvocation(
 											dispatchCase.contextualArguments,
 										),
 									]),
-							// NOTE: The Parameters THIS branch leaves out, as
+							// The Parameters THIS branch leaves out, as
 							// the runtime takes them — a fifth case element,
 							// emitted only where there are any, so a dispatch
 							// that omits nothing emits exactly what it always
@@ -4360,7 +4360,7 @@ function rewriteUnionMethodInvocation(
 	}
 }
 
-// NOTE: The Arguments one dispatch branch is given in place of the shared ones,
+// The Arguments one dispatch branch is given in place of the shared ones,
 // as the runtime takes them: a pair per Argument, naming the position it stands
 // in for. The position is the Argument's own index in the Invocation, which the
 // receiver — passed separately — is not part of.
@@ -4381,7 +4381,7 @@ function contextualArgumentOverrides(
 	}
 }
 
-// NOTE: The un-optimised emission of `{ base with … }` — what a Program built
+// The un-optimised emission of `{ base with … }` — what a Program built
 // with `collapse-combinations` off, or with the whole Optimiser off, runs.
 //
 // A right-hand side written as a Record literal is exactly the members its Type
@@ -4394,7 +4394,7 @@ function contextualArgumentOverrides(
 function rewriteCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
-	// NOTE: The BASE is what says which of the two updates this is, read through
+	// The BASE is what says which of the two updates this is, read through
 	// the same erasure `enrichCombination` reads it through — that is where the
 	// two were told apart in the first place, and asking the same question the
 	// same way here is what keeps the two answers from ever disagreeing.
@@ -4443,7 +4443,7 @@ function rewriteCombination(
 	}
 }
 
-// NOTE: Whether a Combination with a base of this Type is a Dictionary update.
+// Whether a Combination with a base of this Type is a Dictionary update.
 // `essenceMethodReferences` asks it too, so the edges it draws follow the calls
 // emitted here.
 function isDictionaryUpdate(lhsType: common.Type | undefined): boolean {
@@ -4452,12 +4452,12 @@ function isDictionaryUpdate(lhsType: common.Type | undefined): boolean {
 	return baseType?.type === "Dictionary"
 }
 
-// NOTE: The Dictionary Methods an update is emitted as calls of. `merge`'s first
+// The Dictionary Methods an update is emitted as calls of. `merge`'s first
 // entry is the one taking only `with`.
 const dictionaryMergeName = "merge__overload$1"
 const dictionarySetName = "set"
 
-// NOTE: A Dictionary update, emitted as the calls an author could have written
+// A Dictionary update, emitted as the calls an author could have written
 // by hand: `[ages with "kim" = 7, "sam" = 9]` is `set` over `set`, and
 // `[ages with other]` is `merge(with other)`. Neither is a merge of two objects
 // the way a Record's is — a Dictionary is a store with an order and a
@@ -4469,12 +4469,12 @@ const dictionarySetName = "set"
 function rewriteDictionaryCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
-	// NOTE: A witness is written on every Dictionary update whose key Type is
+	// A witness is written on every Dictionary update whose key Type is
 	// decided, which is every update a valid Program writes. `null` stands for
 	// the one that is not — an update over a Dictionary nothing has yet said
 	// the key Type of, which holds no key for a comparison to reach.
 	//
-	// NOTE: Rewritten once per call rather than once and shared, so no two
+	// Rewritten once per call rather than once and shared, so no two
 	// positions of the emitted tree hold the same Node. `pool-constants` is
 	// what keeps that from being a method map written out per entry: the
 	// witness it reaches is a reference to the one const by then.
@@ -4515,7 +4515,7 @@ function rewriteDictionaryCombination(
 	return built
 }
 
-// NOTE: A Record literal, in either of the two spellings a Combination's
+// A Record literal, in either of the two spellings a Combination's
 // right-hand side can reach emission in — the Simplifier's own `RecordValue`
 // and the `direct-record` `collapse-construction` leaves. The same pair
 // `collapse-combinations` recognises, asked here for the opposite reason: there
@@ -4527,18 +4527,18 @@ function isRecordLiteral(node: common.typedSimple.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: `{ base with update }`, where `update` is not a literal — one member
+// `{ base with update }`, where `update` is not a literal — one member
 // read per member the right-hand side's TYPE declares, over a spread of the
 // left-hand side, which is where the answer's hidden Type key comes from.
 //
-// NOTE: Projected rather than spread whole because Record assignability is
+// Projected rather than spread whole because Record assignability is
 // width subtyping: `constant partial: { port: Integer } = { port = 8080, tls =
 // "nope" }` is a legal Declaration, and `{ server with partial }` spread whole
 // copied that `tls` over the Boolean the answer's Type declares — a String in a
 // Boolean member, out of a Program that compiled clean. The Type says which
 // members an update carries; nothing says it carries no others.
 //
-// NOTE: A bare name — a Constant, a Parameter, or `_self`, which is what `@`
+// A bare name — a Constant, a Parameter, or `_self`, which is what `@`
 // lowers to — is read once per member and no temporary is needed. Anything else
 // is a value that has to be COMPUTED, and computing it once per member would
 // call a call as many times as the update has members, so it is bound by an
@@ -4579,7 +4579,7 @@ function projectedCombination(
 	)
 }
 
-// NOTE: `{ ...lhs, member: rhs.member, … }` — the spread and one read per
+// `{ ...lhs, member: rhs.member, … }` — the spread and one read per
 // member, both operands already reduced to something that can be named twice.
 // The keys go through `memberKey` and the reads through `memberRead`, which is
 // what carries an Essence name JavaScript can not spell as an identifier
@@ -4676,7 +4676,7 @@ function rewriteStringValue(
 	}
 }
 
-// NOTE: What renders one hole — `<witness>.toString` read off the method map,
+// What renders one hole — `<witness>.toString` read off the method map,
 // and the Method ITSELF where `devirtualise-witnesses` has already said which
 // one it is. This is the one emission site that consumes a witness rather than
 // passing it on, which is why it is the one site that pass has anything to do.
@@ -4690,7 +4690,7 @@ function holeRenderer(
 	return memberRead(rewriteExpression(witness), "toString")
 }
 
-// NOTE: An interpolated String folds into one `String.createString(<concat>)`,
+// An interpolated String folds into one `String.createString(<concat>)`,
 // where the concatenation `+`-joins the text runs (plain JS string Literals)
 // with each hole rendered by its witness — `<witness>.toString(<hole>).value`,
 // the JS string the Printable conformance produces. The whole thing is string
@@ -4737,7 +4737,7 @@ function rewriteInterpolatedStringValue(
 	}
 }
 
-// NOTE: A Number Literal is decimal digits and nothing else — Essence has no
+// A Number Literal is decimal digits and nothing else — Essence has no
 // hexadecimal, binary or exponent form — and the Lexer is what refuses the rest,
 // with a positioned Diagnostic naming the text the author wrote. This is the
 // belt to that braces: `BigInt` is not a decimal parser, it reads `"0xFF"` as
@@ -4752,7 +4752,7 @@ function decimalDigits(value: string): string {
 	return digits === undefined ? "0" : digits
 }
 
-// NOTE: The literal is written in the representation the value CANONICALLY has
+// The literal is written in the representation the value CANONICALLY has
 // — a JavaScript number where a double holds it exactly, a bigint beyond that —
 // so that `createInteger` has nothing to convert and a pooled literal is already
 // the shape every comparison against it expects.
@@ -4899,14 +4899,14 @@ function rewriteListValue(
 	}
 }
 
-// NOTE: The written Dictionary, handed to the runtime as the pairs it was
+// The written Dictionary, handed to the runtime as the pairs it was
 // written as and the witness its keys are compared through. `createDictionary`
 // is a literal constructor and names its Namespace directly, exactly as
 // `List.createList` does above and for the same reason: it is no Method any
 // standard library file declares, so it can never be Essence-implemented and
 // never goes through `namespaceMember`.
 //
-// NOTE: The empty Dictionary hands over `null` where a witness would be. It is
+// The empty Dictionary hands over `null` where a witness would be. It is
 // the one construction that compares nothing — there is no key in the store for
 // a written key to be measured against — and `createDictionary` reads the
 // witness only inside the loop over the pairs, which does not run.
@@ -4938,7 +4938,7 @@ function rewriteDictionaryValue(
 	}
 }
 
-// NOTE: A Lookup reaches here for a static Method call (`Number.sum(…)`), a
+// A Lookup reaches here for a static Method call (`Number.sum(…)`), a
 // static Property read (`Number.Pi`) and a plain Record member access
 // (`record.field`). Only the first two name a Namespace, and WHICH of the three
 // this is has to be read off the base's resolved Type, not off its spelling: a
@@ -4950,7 +4950,7 @@ function rewriteDictionaryValue(
 // value is simply the wrong one. Every other base — a shadowing local, a
 // chained access, a call result — keeps the plain member read.
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
-	// NOTE: A member read off a bounded Type Parameter's conformance rather
+	// A member read off a bounded Type Parameter's conformance rather
 	// than off the Namespace the base spells — `T.cases()` is
 	// `T__conformance.cases()`. The base Node holds the author's name, which is
 	// what Hover reads, so the emitted one comes from the Lookup instead.
@@ -4961,7 +4961,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
-	// NOTE: A derived `cases`, which is a member of no Namespace at all — the
+	// A derived `cases`, which is a member of no Namespace at all — the
 	// base may name the Choice itself, or a Namespace written over it that
 	// simply does not hold the Method, and neither is what the emission reads.
 	if (node.derivedCases !== undefined) {
@@ -4975,7 +4975,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
-	// NOTE: And a member the base does not spell either: a `cases` written in a
+	// And a member the base does not spell either: a `cases` written in a
 	// Namespace of another name, reached through the Choice's own. The base
 	// names the Type, as the author wrote it, so the Namespace comes from here.
 	if (node.namespaceName !== undefined) {
@@ -4998,7 +4998,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 	return memberRead(rewriteExpression(node.base), node.member.name)
 }
 
-// NOTE: The JavaScript words that can not be a binding or a bare reference —
+// The JavaScript words that can not be a binding or a bare reference —
 // `case`, `default`, `new`, `class` — but ARE legal Essence identifiers, so a
 // Parameter or Constant can be named one and reach here. `with`, `for`, `if`,
 // `case`, `static` are Essence keywords too, yet the Parser still lets them name
@@ -5057,7 +5057,7 @@ const reservedJavaScriptWords = new Set([
 	"eval",
 ])
 
-// NOTE: The names the emitted Program binds — or reads off the host — for its
+// The names the emitted Program binds — or reads off the host — for its
 // OWN purposes: the runtime Namespace imports (`List`, `String`, …), the module
 // aliases beside them, and the globals the emission reaches for, such as the
 // `Object` of a Combination's `Object.assign`. None of them is an Essence
@@ -5076,18 +5076,18 @@ const compilerOwnedNames = new Set([
 	"$_",
 	"$type",
 	"$helpers",
-	// NOTE: The test runtime and the name a test's context is bound to inside
+	// The test runtime and the name a test's context is bound to inside
 	// the Function a `tests` section becomes. A Program is free to write either
 	// — `$` is a legal Essence identifier character — and would otherwise take
 	// the context away from every assertion below it.
 	"$testing",
 	"$context",
 	"$tests",
-	// NOTE: The Module's coverage counter, bound at the head of a Module a
+	// The Module's coverage counter, bound at the head of a Module a
 	// coverage compile instrumented. Every counter in the body calls it by
 	// this name.
 	"$cover",
-	// NOTE: Asynchrony's module alias, and the name the CONTEXT a completing
+	// Asynchrony's module alias, and the name the CONTEXT a completing
 	// body runs under is bound to — the one Parameter of the async closure such
 	// a body answers with. Every `start` and every `complete` written in that
 	// body, and in every sync closure written inside it, reads the context by
@@ -5096,18 +5096,18 @@ const compilerOwnedNames = new Set([
 	"$future",
 	"$ctx",
 	"Object",
-	// NOTE: A counted walk whose bounds escaped safe range converts its start
+	// A counted walk whose bounds escaped safe range converts its start
 	// with it, so a Program declaring its own `BigInt` would take the
 	// conversion away from the loop it sits above.
 	"BigInt",
 ])
 
-// NOTE: The builtin Namespaces as a set, for the one question emission asks of
+// The builtin Namespaces as a set, for the one question emission asks of
 // a Namespace name: is this the `import * as <Name>` the Program opens with, or
 // a user's `class`?
 const runtimeNamespaceNameSet = new Set(runtimeNamespaceNames)
 
-// NOTE: A JavaScript IdentifierName, spelled as the specification does — an
+// A JavaScript IdentifierName, spelled as the specification does — an
 // ID_Start (or `$`/`_`) followed by ID_Continue — so an Essence name that is
 // already a legal JavaScript one is emitted untouched, accents and all. The
 // Lexer ends an Identifier only at one of ITS symbols, and `?`, `+`, `!`, `%`,
@@ -5123,7 +5123,7 @@ function isJavaScriptIdentifierName(name: string): boolean {
 	return javaScriptIdentifierName.test(name)
 }
 
-// NOTE: The escape hatch for a name JavaScript can not spell, or one the
+// The escape hatch for a name JavaScript can not spell, or one the
 // compiler has already spoken for. Every character JavaScript accepts unchanged
 // is kept, and every other becomes `_<code point in hex>_` — an encoding that is
 // injective, because `_` can appear NOWHERE else in the result: the Lexer reads
@@ -5147,7 +5147,7 @@ function mangleName(name: string): string {
 	return mangled
 }
 
-// NOTE: One Essence name as the emitted Program binds and reads it. Three things
+// One Essence name as the emitted Program binds and reads it. Three things
 // can be wrong with it, and a name is left ALONE unless one of them is — which
 // is what keeps every ordinary Program's emission byte-identical:
 //
@@ -5163,7 +5163,7 @@ function mangleName(name: string): string {
 // would part it from the key the Record literal wrote. `memberKey` answers for
 // those.
 //
-// NOTE: Exported because a host binding names off an Export Surface has to ask
+// Exported because a host binding names off an Export Surface has to ask
 // the same question — an Essence Module exports `square` and `ok?`, and the
 // bundle binds `square` and `$user_ok_3f_`. Answering it a second time
 // somewhere else is how the two spellings drift apart.
@@ -5184,7 +5184,7 @@ function rewriteIdentifier(
 	}
 }
 
-// NOTE: A Namespace's emitted binding. A builtin's name IS the `import * as
+// A Namespace's emitted binding. A builtin's name IS the `import * as
 // <Name>` the Program opens with, so it is emitted verbatim — escaping it would
 // part every reference from the import. Every other Namespace is a user's,
 // emitted as a `class <Name>`, and its name is an ordinary Essence identifier:
@@ -5194,7 +5194,7 @@ function rewriteIdentifier(
 // agreeing. They did not: the declaration was escaped and the references were
 // not, so `constant this = { x = 1 }` bound `_this` and read `this.x`.
 //
-// NOTE: A user Namespace named after a builtin — `namespace List for Integer` —
+// A user Namespace named after a builtin — `namespace List for Integer` —
 // is refused where the Enricher can see it: at the top level `List` is already
 // declared, and the answer is 'Variable 'List' is already declared'. A NESTED
 // one is accepted, because it declares `List` in an inner Scope where nothing is
@@ -5222,13 +5222,13 @@ function namespaceIdentifierName(namespaceName: string): string {
 		: escapeName(namespaceName)
 }
 
-// NOTE: The user Namespaces in lexical scope right now whose name the compiler
+// The user Namespaces in lexical scope right now whose name the compiler
 // has already spoken for — one Set per emitted block, innermost last. Only a
 // name in `compilerOwnedNames` is ever recorded: every other Namespace name
 // means the same thing wherever it is written, and `escapeName` already answers
 // for it without any scope to consult.
 //
-// NOTE: The stack mirrors the Enricher's own Scope chain, and that is what makes
+// The stack mirrors the Enricher's own Scope chain, and that is what makes
 // it exact rather than a guess. A nested Namespace does not merely add a name —
 // it REPLACES the builtin of that name for the rest of its block, in Method
 // resolution ('No Method named 'firstItem'' for a List beside a
@@ -5239,7 +5239,7 @@ function namespaceIdentifierName(namespaceName: string): string {
 // a `UnionMethodInvocation`'s dispatch case and a `ConformanceValue`'s witness.
 let shadowingNamespaceScopes: Array<Set<string>> = [new Set()]
 
-// NOTE: `finally`, so a throw out of the Rewriter — the one for a Lookup on a
+// `finally`, so a throw out of the Rewriter — the one for a Lookup on a
 // native invocation, say — can not leave the stack deeper than it found it and
 // mangle a Namespace name in the NEXT Program this process compiles.
 function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
@@ -5252,7 +5252,7 @@ function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
 	}
 }
 
-// NOTE: A Protocol's PROVIDED Methods are emitted exactly as the standard
+// A Protocol's PROVIDED Methods are emitted exactly as the standard
 // library's Essence-implemented Methods are — one const each, reached by a bare
 // Identifier, tree-shaken by the same fixed point — which is what makes ONE
 // const answer for every conformer. They are named by
@@ -5312,7 +5312,7 @@ function protocolPreludeNamespaces(
 			}
 		}
 
-		// NOTE: A `type` or `returnType` holds a Type, and a Type holds no
+		// A `type` or `returnType` holds a Type, and a Type holds no
 		// Statements — so the whole of the Type graph, which is most of what a
 		// simplified Program weighs, is stepped over rather than walked. This
 		// runs once per emission, and the walk is what it costs.
@@ -5323,7 +5323,7 @@ function protocolPreludeNamespaces(
 		}
 	}
 
-	// NOTE: A `tests` block may declare a Protocol too, and its conformers
+	// A `tests` block may declare a Protocol too, and its conformers
 	// name the provided consts exactly as the implementation's do.
 	for (let program of programs) {
 		visit(program.implementation.nodes)
@@ -5333,7 +5333,7 @@ function protocolPreludeNamespaces(
 	return found
 }
 
-// NOTE: Each provided Method's const, by Protocol identity and Method name:
+// Each provided Method's const, by Protocol identity and Method name:
 // `$es_<Name>__<member>` for the first Protocol of a name to claim it, and
 // `$es_<Name>_<n>__<member>` for the n-th, which no Name can spell.
 export type ProvidedMemberIdentifiers = ReadonlyMap<
@@ -5341,7 +5341,7 @@ export type ProvidedMemberIdentifiers = ReadonlyMap<
 	ReadonlyMap<string, string>
 >
 
-// NOTE: Bare identities claim first, so the standard library's consts never
+// Bare identities claim first, so the standard library's consts never
 // depend on the graph. The rest claim by declaring Module path and Position, so
 // every entry of a graph names them alike.
 function providedMemberIdentifiers(
@@ -5368,7 +5368,7 @@ function providedMemberIdentifiers(
 		table.set(identity, members)
 
 		for (let memberName of Object.keys(entry.node.methods)) {
-			// NOTE: One identity is one declaration, so this never holds.
+			// One identity is one declaration, so this never holds.
 			if (members.has(memberName)) {
 				throw new Error(
 					`Two Protocols named '${entry.name}' of one identity provide a Method named '${memberName}'`,
@@ -5419,7 +5419,7 @@ function compareKeys(
 	return left[1] - right[1] || left[2] - right[2]
 }
 
-// NOTE: Outside an emission the table is empty, and the first claimant's name
+// Outside an emission the table is empty, and the first claimant's name
 // is the only one there is.
 function providedMemberIdentifier(
 	identity: string,
@@ -5441,7 +5441,7 @@ function isShadowingUserNamespace(namespaceName: string): boolean {
 	return shadowingNamespaceScopes.some((scope) => scope.has(namespaceName))
 }
 
-// NOTE: A name in KEY or PROPERTY position — a Record field, a Namespace's
+// A name in KEY or PROPERTY position — a Record field, a Namespace's
 // static Method, a Protocol Method in a conformance witness. It is never
 // escaped: a reserved word is a legal property key, and the read has to match
 // the key the literal wrote. It does still have to be spellable, though, and an
@@ -5455,7 +5455,7 @@ function memberKey(name: string): estree.Identifier | estree.Literal {
 		: { type: "Literal", value: name }
 }
 
-// NOTE: A user Namespace is a `class`, and a class refuses two member names an
+// A user Namespace is a `class`, and a class refuses two member names an
 // object literal accepts: no static member may be named `prototype` and no
 // field may be named `constructor` — computed keys only move the refusal from
 // the parser to a `TypeError` at definition. `namespace Shape for Shape {
@@ -5465,7 +5465,7 @@ function memberKey(name: string): estree.Identifier | estree.Literal {
 // builtin's members are module exports, not class members, so they keep their
 // names.
 //
-// NOTE: Exported for the same reason `escapeName` is — a host binding reads a
+// Exported for the same reason `escapeName` is — a host binding reads a
 // Namespace's members off the emitted class, so it has to ask the same
 // question.
 const forbiddenClassMemberNames = new Set(["prototype", "constructor"])
@@ -5474,7 +5474,7 @@ export function namespaceMemberName(name: string): string {
 	return forbiddenClassMemberNames.has(name) ? mangleName(name) : name
 }
 
-// NOTE: A spine before the spines it is a prefix of, so a requirement about
+// A spine before the spines it is a prefix of, so a requirement about
 // `payload` is tested before one about `payload.origin` — the second reads
 // through what the first established. Sorted by depth rather than by text,
 // because that is the property being relied on.
@@ -5484,7 +5484,7 @@ function shallowestFirst(spines: Array<string>): Array<string> {
 	)
 }
 
-// NOTE: One member read, `computed` iff the key had to become a Literal — the
+// One member read, `computed` iff the key had to become a Literal — the
 // dotted form for every ordinary name, the bracketed one for the rest.
 function memberRead(
 	object: estree.Expression,
@@ -5499,7 +5499,7 @@ function memberRead(
 	}
 }
 
-// NOTE: `options?.server?.port` — the chain a callee reads one member of a
+// `options?.server?.port` — the chain a callee reads one member of a
 // Record-defaulted Parameter through, and the only member read in an emitted
 // Program that short circuits: every other one is of a value that exists.
 //
@@ -5507,7 +5507,7 @@ function memberRead(
 // left out; every step after it always does, because a level the Argument left
 // out is a level that is not there.
 //
-// NOTE: ONE `ChainExpression` wraps the whole read, for the reason `typeKeyRead`
+// ONE `ChainExpression` wraps the whole read, for the reason `typeKeyRead`
 // gives — a bare `MemberExpression` carrying `optional` is not a tree the ESTree
 // grammar has — and because `?.` short circuits the rest of the chain it stands
 // in: a chain per link would answer `(a?.b)?.c`, which reads `c` off `undefined`.
@@ -5565,11 +5565,11 @@ function callAnyIs(
 	}
 }
 
-// NOTE: A literal Matcher needs no Type check in front of it — `anyIs`
+// A literal Matcher needs no Type check in front of it — `anyIs`
 // already answers false across differing Types. A Guard is ANDed on after
 // whichever check the Matcher produced, so it only ever narrows.
 //
-// NOTE: A Handler carrying a residual test was given one by
+// A Handler carrying a residual test was given one by
 // `compile-type-tests`, which found something cheaper that answers what the
 // Matcher's check answers — a tag comparison in place of a descriptor, or a
 // raw comparison in place of `anyIs` over a scalar literal. It reads the value
@@ -5605,7 +5605,7 @@ function handlerTest(
 		test = callIsValueOfType(value, handler.matcher)
 	}
 
-	// NOTE: What a Case Matcher's payload Pattern requires of a member, tested
+	// What a Case Matcher's payload Pattern requires of a member, tested
 	// behind the Matcher's own check and BEFORE any member comparison. The
 	// order is load-bearing rather than tidy: a value comparison may read down
 	// a spine — `@.payload.origin.x` — and only these requirements establish
@@ -5632,7 +5632,7 @@ function handlerTest(
 		}
 	}
 
-	// NOTE: The member comparisons come after the Matcher's own check and the
+	// The member comparisons come after the Matcher's own check and the
 	// member requirements, and rely on `&&` short-circuiting: those are what
 	// guarantee the value carries every member named here, so reading them is
 	// only safe once they have passed.
@@ -5656,7 +5656,7 @@ function handlerTest(
 	return and(test, valueRead(rewriteExpression(handler.guard)))
 }
 
-// NOTE: The `else` no Handler owns — the one branch taken when every
+// The `else` no Handler owns — the one branch taken when every
 // Matcher declined. The Validator has already refused a Match that leaves
 // a member of its Union unhandled, so this is dead code in a Program that
 // compiled clean; it exists because it did NOT used to, and the chain
@@ -5683,7 +5683,7 @@ function noCaseMatched(value: estree.Identifier): estree.ExpressionStatement {
 	}
 }
 
-// NOTE: `_self` is the name a Match binds the matched value to, and the name
+// `_self` is the name a Match binds the matched value to, and the name
 // `@` lowers to inside a Handler body — one value under one name, so a test
 // written against it reads what the body reads. A fresh Node each time, because
 // a Position may be written onto one of them.
@@ -5691,7 +5691,7 @@ function selfIdentifier(): estree.Identifier {
 	return { type: "Identifier", name: "_self" }
 }
 
-// NOTE: The matched value's tag, read ONCE for a chain that asks about it more
+// The matched value's tag, read ONCE for a chain that asks about it more
 // than once. `_self[$type.typeKeySymbol] === "…"` per Handler is N reads of one
 // key off one object, and where the Cases carry different fields — which is what
 // a Choice with payloads is — every value has a hidden class of its own and the
@@ -5699,7 +5699,7 @@ function selfIdentifier(): estree.Identifier {
 // bound tag is a third off the chain, and over uniformly shaped values (a Choice
 // of unit Cases) it is exactly as fast as the reads it replaces.
 //
-// NOTE: This is EMISSION, not a pass, and the difference is what decides where
+// This is EMISSION, not a pass, and the difference is what decides where
 // it belongs. Nothing about the Program changes: the same key is read off the
 // same immutable value, before the same tests, in the same order, and no Node is
 // added, removed or reordered. There is no Node to add one with either — a tag
@@ -5707,21 +5707,21 @@ function selfIdentifier(): estree.Identifier {
 // and no Statement that binds one, so a pass would have to grow both and every
 // pass after it would have to learn a shape that exists only to be emitted.
 //
-// NOTE: And it depends on no pass having run, which is what the registry's
+// And it depends on no pass having run, which is what the registry's
 // "any subset must be correct" rule asks of everything around it. The binding is
 // made off the `tag-test` Nodes `compile-type-tests` leaves; turn that pass off
 // — or the whole phase, with `--no-optimise` — and there are none, so no name is
 // bound and the chain is emitted exactly as it was before. It can not make a
 // subset of the registry wrong because it reads whatever reached it.
 //
-// NOTE: One name, not a numbered series. A Match nested inside a Handler binds
+// One name, not a numbered series. A Match nested inside a Handler binds
 // its own inside its own block and SHADOWS this one, which is harmless for the
 // reason a nested dispatch's `$dispatch_0` is: a chain reads the tag it bound
 // and nothing else's. The `_` is what keeps the name unspellable in Essence —
 // the Lexer reads one as a Symbol — exactly as it does for `_self`.
 const selfTagName = "$self_tag"
 
-// NOTE: The Handler's own check where it is a tag comparison on the MATCHED
+// The Handler's own check where it is a tag comparison on the MATCHED
 // VALUE, and null for everything else. A literal Matcher is checked by `anyIs`
 // and reads no tag; a member test reads its way down a spine, which is a
 // different object every time and is left where it stands.
@@ -5744,7 +5744,7 @@ function selfTagTestOf(
 		: null
 }
 
-// NOTE: Two, because one read is not worth a name — and a chain of one tag test
+// Two, because one read is not worth a name — and a chain of one tag test
 // is what a two-member Union compiles to, which is most of them.
 function hoistedTagName(
 	handlers: ReadonlyArray<common.typedSimple.MatchHandler>,
@@ -5785,24 +5785,24 @@ function boundTagTest(
 	}
 }
 
-// NOTE: The chain a Match's Handlers become, and the one place it is built. The
+// The chain a Match's Handlers become, and the one place it is built. The
 // Handlers are folded BACK TO FRONT, so that each `if` becomes the `else` of
 // the one before it — the first Handler ends up at the head of the chain and is
 // therefore tested first.
 //
-// NOTE: What the chain ends in, and the Handlers that are tested to reach it.
+// What the chain ends in, and the Handlers that are tested to reach it.
 // `elide-final-match-test` proved the last Handler is the one taken when every
 // other declined, so its body IS the `else` and the fall-through above is gone
 // with its test — see that pass for what the proof rests on and what it gives
 // up.
 //
-// NOTE: `bodyOf` is what tells the two forms of a Match apart. In an Expression
+// `bodyOf` is what tells the two forms of a Match apart. In an Expression
 // position a Handler's Return Statement is the wrapper Function's Return and the
 // body is emitted as written; in a Statement position it is whatever the
 // Statement's own answer is, and the caller hands in a body that writes it
 // there.
 //
-// NOTE: A run of Statements rather than one, because a chain that asks about the
+// A run of Statements rather than one, because a chain that asks about the
 // matched value's tag more than once binds it first — see `selfTagName`. The
 // callers splice them into the block they are already building, so the binding
 // costs no block of its own wherever one is there.
@@ -5823,7 +5823,7 @@ function matchChain(
 		tail = bodyOf(handlers.at(-1)!)
 	}
 
-	// NOTE: Asked of the TESTED Handlers alone. The last one is the `else` where
+	// Asked of the TESTED Handlers alone. The last one is the `else` where
 	// `elide-final-match-test` proved it is, and an `else` reads no tag.
 	let tagName = hoistedTagName(tested)
 	let ifChain: estree.IfStatement | undefined
@@ -5844,14 +5844,14 @@ function matchChain(
 	return tagName === null ? [chain] : [bindTag(tagName, value), chain]
 }
 
-// NOTE: A Match standing in an Expression position, which is the only place
+// A Match standing in an Expression position, which is the only place
 // JavaScript has no way of saying what a Match says: the chain is Statements,
 // and the one Expression that may hold Statements is a Function call. So the
 // Handlers become the body of a Function of `_self` and the matched value is its
 // Argument — which is also what binds `_self` for the Handlers, shadowing an
 // enclosing one for exactly the length of the chain.
 //
-// NOTE: `lower-matches-to-statements` is what takes the wrapper away wherever
+// `lower-matches-to-statements` is what takes the wrapper away wherever
 // the Match stands somewhere a Statement may be written instead.
 function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 	let value = selfIdentifier()
@@ -5874,7 +5874,7 @@ function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 	)
 }
 
-// NOTE: A chain of JavaScript conditionals and nothing else:
+// A chain of JavaScript conditionals and nothing else:
 //
 //   score.value >= 90 ? "A" : score.value >= 80 ? "B" : "F"
 //
@@ -5888,7 +5888,7 @@ function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 // The `otherwise` value is the tail, which is what makes the chain total: there
 // is no fall-through here and no throw to end it with.
 //
-// NOTE: An Essence Boolean is an object and every object is true, so what
+// An Essence Boolean is an object and every object is true, so what
 // JavaScript is asked is the `value` the Condition holds — unless
 // `unbox-conditions` has already left the question asked in JavaScript's own
 // terms, which is what `conditionIsRaw` says. Reading `.value` off a raw
@@ -5916,17 +5916,17 @@ function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
 
 // #region Lowered Statements
 
-// NOTE: The Statement half of the intrinsic family: a Match, a compiled Union
+// The Statement half of the intrinsic family: a Match, a compiled Union
 // dispatch and an inlined loop written where they stand, with no Function
 // around their Statements. `lower-matches-to-statements` writes a Match's and a
 // dispatch's, and `inline-loops` a loop's.
 //
-// NOTE: Two Statements come out of exactly one shape: a Variable Declaration.
+// Two Statements come out of exactly one shape: a Variable Declaration.
 // Its name has to outlive the block that computes its value, so the declaration
 // stands before the block and is a `let` — assigned once, by the block, and
 // never again.
 //
-// NOTE: And the answer is written from INSIDE that block, which is a Scope the
+// And the answer is written from INSIDE that block, which is a Scope the
 // Program writes Statements into: a Handler that binds the very name being
 // written to stands in front of it, and the assignment then lands on the
 // Handler's own binding rather than on the declaration. Where that is so, the
@@ -5973,7 +5973,7 @@ function rewriteIntrinsicStatement(
 			body: [
 				loopDeclaration("let", heldAnswerName, null),
 				intrinsicStatementBody(node, null, held),
-				// NOTE: After the chain and after the label a Handler leaves
+				// After the chain and after the label a Handler leaves
 				// through, which both end here — so every way out of the chain
 				// passes through this one assignment.
 				resultStatement(result, loopIdentifier(heldAnswerName)),
@@ -5982,14 +5982,14 @@ function rewriteIntrinsicStatement(
 	]
 }
 
-// NOTE: Unspellable in Essence for the reason every Compiler-bound name is: the
+// Unspellable in Essence for the reason every Compiler-bound name is: the
 // Lexer reads `_` as a Symbol, so no user identifier holds one. It needs no
 // number — the block it is declared in holds exactly one of them, and the only
 // blocks nested inside it that declare it again are lowered Statements of their
 // own, which write their own answers and never this one's.
 const heldAnswerName = "$held_answer"
 
-// NOTE: Whether the name a lowered Statement writes its answer to is a name the
+// Whether the name a lowered Statement writes its answer to is a name the
 // Statements it holds BIND. Only the Scopes an answer can actually be written
 // into are asked, which is the same descent `redirectedStatements` makes: a
 // Handler body, a Conditional branch inside one, and a lowered Statement in
@@ -6014,7 +6014,7 @@ function bodyBindsName(
 ): boolean {
 	return nodes.some((node) => {
 		switch (node.nodeType) {
-			// NOTE: The four Statements that bind a name in the block they stand
+			// The four Statements that bind a name in the block they stand
 			// in — a `let`, a `function`, a `class`, and the `let` a lowered
 			// Statement in declaration position is emitted as. A Type Alias and a
 			// Protocol bind nothing at all: they are emitted as nothing.
@@ -6038,7 +6038,7 @@ function bodyBindsName(
 	})
 }
 
-// NOTE: Where a lowered Expression's answer goes, written as the Statement that
+// Where a lowered Expression's answer goes, written as the Statement that
 // puts it there.
 function resultStatement(
 	result: PlacedTarget,
@@ -6058,13 +6058,13 @@ function resultStatement(
 					right: answer,
 				},
 			}
-		// NOTE: A name the Compiler binds for itself — an inlined loop's State,
+		// A name the Compiler binds for itself — an inlined loop's State,
 		// its answer, the Boolean a predicate settled on. It is emitted verbatim
 		// rather than through `rewriteIdentifier`, because it is not a name any
 		// Essence Program could have written.
 		case "temporary":
 			return loopAssignment(result.name, answer)
-		// NOTE: Evaluated and dropped — through the same rule every discarded
+		// Evaluated and dropped — through the same rule every discarded
 		// Expression is emitted by, because a Handler may answer with a value as
 		// well as with a call. Where evaluating it observes nothing the pass has
 		// already taken the Return Statement away.
@@ -6073,13 +6073,13 @@ function resultStatement(
 	}
 }
 
-// NOTE: Where an answer GOES, for the answers that go somewhere: a Statement
+// Where an answer GOES, for the answers that go somewhere: a Statement
 // position's own result, or a name the Rewriter itself binds.
 type PlacedTarget =
 	| common.typedSimple.StatementResult
 	| { kind: "temporary"; name: string }
 
-// NOTE: And the whole of what an answer may be written as, which is wider by one
+// And the whole of what an answer may be written as, which is wider by one
 // — an inlined loop's callback does not merely PUT its answer somewhere: a
 // predicate's answer decides whether the walk goes round again, and a `Step`
 // decides both where the answer goes and whether the walk is over. So the target
@@ -6094,7 +6094,7 @@ type RedirectTarget =
 			) => Array<estree.Statement>
 	  }
 
-// NOTE: One answer, as the two things a writer can need of it: the Node it was
+// One answer, as the two things a writer can need of it: the Node it was
 // written as — which is what lets `#Done(…)` be recognised where it is BUILT,
 // and the Case never built at all — and the JavaScript it emits, asked for only
 // where the Node was not enough. `node` is null where no Node stands behind the
@@ -6105,7 +6105,7 @@ type LoopAnswer = {
 	value: () => estree.Expression
 }
 
-// NOTE: One answer, written where its target says — and the way OUT of the body
+// One answer, written where its target says — and the way OUT of the body
 // it was written in, where the answer was not the last thing in it.
 function answerStatements(
 	result: RedirectTarget,
@@ -6119,7 +6119,7 @@ function answerStatements(
 	return [resultStatement(result, answer.value()), ...breakOut(redirect)]
 }
 
-// NOTE: What a lowered Statement standing inside a Handler body or an inlined
+// What a lowered Statement standing inside a Handler body or an inlined
 // callback's is emitted against, when that body's Return Statements are being
 // written somewhere other than a JavaScript Return. A Match in Statement
 // position holds a Match in Return position holds another, and each of them
@@ -6128,7 +6128,7 @@ function answerStatements(
 type ReturnRedirect = {
 	result: RedirectTarget
 	label: string
-	// NOTE: True only for the last Statement of the body being redirected, a
+	// True only for the last Statement of the body being redirected, a
 	// Handler's or an inlined callback's, where nothing follows the answer and
 	// there is nothing to break out of.
 	isTail: boolean
@@ -6150,7 +6150,7 @@ function intrinsicStatementBody(
 	}
 }
 
-// NOTE: Where a lowered Statement's answer goes: the name the Statement
+// Where a lowered Statement's answer goes: the name the Statement
 // position it stood in decides, the outer question it is answering where it
 // stands inside one, or a name of the Compiler's own where the Program binds
 // the first of those itself.
@@ -6166,7 +6166,7 @@ function placedResult(
 	return redirect === null ? node.result : redirect.result
 }
 
-// NOTE: `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
+// `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
 // dispatch holds, as the `const`s of a block. The block is what keeps one
 // chain's names its own: they are numbered from zero per chain, so two chains
 // lifted into one Scope would otherwise declare one name twice.
@@ -6205,7 +6205,7 @@ function heldExpression(
 	}
 }
 
-// NOTE: A Match written as the Statements it always was. What the three
+// A Match written as the Statements it always was. What the three
 // bindings mean is stated where they are declared; what is common to them is
 // that `_self` names the matched value for the length of the chain and for
 // nothing else.
@@ -6217,7 +6217,7 @@ function statementMatch(
 	let result = placedResult(node, redirect, held)
 	let label = redirect === null ? node.label : redirect.label
 	let broke = false
-	// NOTE: A redirected Match breaks out of the label its redirect names, which
+	// A redirected Match breaks out of the label its redirect names, which
 	// is the OUTER Match's — so it is the outer Match that has to hear about it,
 	// and the flag below stays false.
 	let markBroke =
@@ -6238,7 +6238,7 @@ function statementMatch(
 						redirectedStatements(handler.body, {
 							result,
 							label,
-							// NOTE: A Handler's last Statement is the end of its
+							// A Handler's last Statement is the end of its
 							// branch, and the `if` chain is the end of the block
 							// — so its answer needs nothing after it. Unless this
 							// Match is itself inside a Handler being redirected
@@ -6258,7 +6258,7 @@ function statementMatch(
 	)
 	let body = boundChain(node, chain, value)
 
-	// NOTE: The label is emitted only where something breaks out of it, which is
+	// The label is emitted only where something breaks out of it, which is
 	// where a Handler answered somewhere other than its last Statement. A
 	// redirected Match breaks out of the label its redirect names, and that one
 	// is the outer Match's to declare.
@@ -6273,7 +6273,7 @@ function statementMatch(
 	}
 }
 
-// NOTE: The chain with the matched value bound in front of it, in as few blocks
+// The chain with the matched value bound in front of it, in as few blocks
 // as the binding needs. `chain` is a run of Statements because a chain may bind
 // the matched value's tag ahead of itself, and where a block is being built for
 // the value anyway the two bindings stand side by side in it. Where none is —
@@ -6338,7 +6338,7 @@ function breakOut(redirect: ReturnRedirect | null): Array<estree.Statement> {
 	]
 }
 
-// NOTE: A Handler's body or an inlined callback's, with every Return Statement
+// A Handler's body or an inlined callback's, with every Return Statement
 // in it written where the redirect's target says instead. Only three kinds of
 // Statement can hold one: a Return itself, a Conditional's bodies, and a
 // lowered Statement that answers with a Return of its own. Everything else is
@@ -6380,7 +6380,7 @@ function redirectedStatement(
 				node.position,
 			)
 		case "IntrinsicStatement":
-			// NOTE: A lowered Statement answering with a Return of its own is
+			// A lowered Statement answering with a Return of its own is
 			// answering THIS Match — it stood in the Return position of a Handler
 			// body. One that answers a name of its own is answering that name,
 			// and is emitted as it stands.
@@ -6399,7 +6399,7 @@ function redirectedStatement(
 	return rewriteStatements(node)
 }
 
-// NOTE: A branch of a Conditional is in tail position exactly where the
+// A branch of a Conditional is in tail position exactly where the
 // Conditional is: an answer written at the end of a branch of a Conditional that
 // ends the Handler body has nothing after it either, in the branch or after the
 // `if`.
@@ -6444,7 +6444,7 @@ function redirectedConditional(
 
 // #region Inlined loops
 
-// NOTE: A walk written out — the Statements that run it, and the Expression that
+// A walk written out — the Statements that run it, and the Expression that
 // reads what it settled on. Which of the two a caller needs is what the position
 // the loop stood in decides: a Statement position holds both as they are, and an
 // Expression position has to wrap them in something callable.
@@ -6453,7 +6453,7 @@ type InlinedWalk = {
 	answer: estree.Expression
 }
 
-// NOTE: An arrow called at once, which is what an Expression position leaves: a
+// An arrow called at once, which is what an Expression position leaves: a
 // `while` is a Statement and there is nowhere in an Expression to write one. It
 // is ONE closure for the whole walk where the driver called two or three per
 // turn of it — and where the loop stands in a Statement position instead, there
@@ -6477,7 +6477,7 @@ function inlineLoopExpression(
 	)
 }
 
-// NOTE: The same walk with nothing around it, and its answer written where the
+// The same walk with nothing around it, and its answer written where the
 // Statement position says. The block is what keeps the names one walk binds its
 // own — every one of them is spelled from this loop's prefix, so two walks in
 // one Scope can not collide, and the block is there for the reader as much as
@@ -6492,7 +6492,7 @@ function inlineLoopStatement(
 
 	return loopBlock([
 		...walk.statements,
-		// NOTE: No Node stands behind this answer — it is the name the walk
+		// No Node stands behind this answer — it is the name the walk
 		// settled in — so a writer expecting one reads the value instead. That
 		// is the one place a `Step` reaches the tag read rather than being
 		// recognised where it was built: a loop answering with a `Step` that
@@ -6515,7 +6515,7 @@ function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
 			return generalWalk(loop, loop.driver)
 		case "fold":
 			return foldWalk(loop, loop.driver)
-		// NOTE: The two walks that build an Array already — which is the
+		// The two walks that build an Array already — which is the
 		// emission `build-lists-in-place` extends to the four above, and there
 		// is nothing of theirs left to extend it to.
 		case "map":
@@ -6525,7 +6525,7 @@ function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
 	}
 }
 
-// NOTE: `loop(startingWith:while:_)` — the predicate checked BEFORE each
+// `loop(startingWith:while:_)` — the predicate checked BEFORE each
 // step, exactly as the driver checks it, so a predicate false on the seed
 // answers the seed and the body never runs. `until` is the same walk with the
 // answer read the other way round, which is what its own Essence body does by
@@ -6538,13 +6538,13 @@ function conditionWalk(
 	let state = `${prefix}_state`
 	let built = builtArray(loop)
 	let accumulator = loop.build?.parameter ?? null
-	// NOTE: ONE State and two bodies — the predicate is handed it as well — so
+	// ONE State and two bodies — the predicate is handed it as well — so
 	// both are asked and the swap is taken for both or for neither.
 	let carried =
 		built === null
 			? carriedInteger(state, null, 0, [driver.predicate, driver.step])
 			: null
-	// NOTE: What the call was given is written out before the bodies are, so
+	// What the call was given is written out before the bodies are, so
 	// that everything the emission collects on the way — a pooled constant above
 	// all — is collected in the order the Program says it.
 	let seed =
@@ -6560,7 +6560,7 @@ function conditionWalk(
 			write: (answer, redirect) => [
 				{
 					type: "IfStatement",
-					// NOTE: The walk is left where a `while` predicate answers
+					// The walk is left where a `while` predicate answers
 					// false and where an `until` predicate answers true, which
 					// is the whole of the difference between the two entries.
 					test: driver.until
@@ -6605,7 +6605,7 @@ function conditionWalk(
 	}
 }
 
-// NOTE: `loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)`,
+// `loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)`,
 // the two entries that do not go through their driver at all. Each Essence body
 // threads `{ index, carried }` through the `while` driver — a Record and an
 // Integer built per turn, a closure asking whether the index has passed the end
@@ -6616,13 +6616,13 @@ function conditionWalk(
 // per walk: a Program of one ten-turn count measures 5,020 bytes against the
 // 5,130 it measured then.
 //
-// NOTE: The down-counting entry always takes its first turn, which is the promise
+// The down-counting entry always takes its first turn, which is the promise
 // `List.of(integersFrom:downTo:)` carries into its Type and which its Essence
 // body keeps by advancing once before the count is asked anything. Here the same
 // thing is one clamp: the walk runs down to whichever of the end and the start is
 // lower, so an end above the start stops after the first turn.
 //
-// NOTE: The counter counts in NUMBERS wherever both bounds are held as ones,
+// The counter counts in NUMBERS wherever both bounds are held as ones,
 // which is every loop written over ordinary quantities: a counter between two
 // safe bounds never leaves safe range, so counting it as a double is exact, and
 // a double `+ 1` is a fraction of the cost of a heap bigint per turn. A bound
@@ -6630,7 +6630,7 @@ function conditionWalk(
 // run — falls back to the bigint counter this always was, and the kind is
 // decided ONCE, before the first turn, so no turn asks.
 //
-// NOTE: The bounds and the seed are evaluated in the order the call passed them,
+// The bounds and the seed are evaluated in the order the call passed them,
 // which is the order the driver would have evaluated them in. What follows —
 // which way the count runs, and in which representation — reads the two bounds
 // and observes nothing.
@@ -6647,7 +6647,7 @@ function countedWalk(
 	let index = `${prefix}_index`
 	let held = `${prefix}_held`
 	let state = `${prefix}_state`
-	// NOTE: Two bounds written as Integers a double holds exactly decide the
+	// Two bounds written as Integers a double holds exactly decide the
 	// whole of the bigint half below while compiling, and that is the shape all
 	// but a handful of counted walks have. A counter between two safe bounds
 	// never leaves safe range, so it counts in numbers, every value it takes is
@@ -6656,7 +6656,7 @@ function countedWalk(
 	// view — is written at all.
 	let mayEscape = !(safeBound(driver.from) && safeBound(driver.through))
 	let built = builtArray(loop)
-	// NOTE: The State is the SECOND Argument here — the counter is the first —
+	// The State is the SECOND Argument here — the counter is the first —
 	// and the two elisions are independent: a body that counts into a Record
 	// still reads its counter raw, and one that hands its counter on still
 	// carries an Integer State raw. A List State is the third such decision, and
@@ -6664,7 +6664,7 @@ function countedWalk(
 	// taken for the same slot.
 	let carried =
 		built === null ? carriedInteger(state, null, 1, [driver.step]) : null
-	// NOTE: The bounds and the seed, in the order the call passed them and
+	// The bounds and the seed, in the order the call passed them and
 	// before the body is written, so that what the emission collects on the way
 	// is collected in the order the Program says it.
 	let bounds = [
@@ -6684,7 +6684,7 @@ function countedWalk(
 	]
 	let body = inlinedCallback(
 		driver.step,
-		// NOTE: The body is handed the counter as the Integer it was always
+		// The body is handed the counter as the Integer it was always
 		// handed — where it used to cost that Integer, the Record around it and
 		// two calls — and `inlinedCallback` drops even that where the body only
 		// ever reads what the Integer holds.
@@ -6702,7 +6702,7 @@ function countedWalk(
 
 	let statements: Array<estree.Statement> = [
 		...bounds,
-		// NOTE: Only the down-counting entry declares anything here, and what
+		// Only the down-counting entry declares anything here, and what
 		// it declares is the clamp its first turn rests on. The up-counting
 		// entry tests against its end directly, because an end behind the start
 		// is a walk of no turns there.
@@ -6721,7 +6721,7 @@ function countedWalk(
 					}),
 				]
 			: []),
-		// NOTE: Either bound being a bigint is what sends the counter to
+		// Either bound being a bigint is what sends the counter to
 		// bigint, and by the canonical invariant that is the same question
 		// as either bound being outside safe range.
 		...(mayEscape
@@ -6748,7 +6748,7 @@ function countedWalk(
 		),
 		{
 			type: "ForStatement",
-			// NOTE: The start has to match the step's kind — a number
+			// The start has to match the step's kind — a number
 			// counter stepped by a bigint throws — so a bigint walk whose
 			// lower bound happens to be a number converts it once here.
 			init: loopDeclaration(
@@ -6768,7 +6768,7 @@ function countedWalk(
 						}
 					: loopIdentifier(from),
 			),
-			// NOTE: Counting up runs while the index has not passed the end
+			// Counting up runs while the index has not passed the end
 			// from below, and counting down while it has not passed the
 			// clamp from above — the predicate each Essence body writes,
 			// asked of the counter rather than through a closure and an
@@ -6806,7 +6806,7 @@ function countedWalk(
 	}
 }
 
-// NOTE: `loop(startingWith:step:)` — the walk whose body decides when it is
+// `loop(startingWith:step:)` — the walk whose body decides when it is
 // over. Each turn answers with a `Step`: `#Done` stops with its value and
 // `#Continue` carries the next State, which is what `steppedTarget` writes where
 // the answer is written.
@@ -6847,13 +6847,13 @@ function generalWalk(
 	let statements: Array<estree.Statement> = [
 		seed,
 		loopDeclaration("let", answer, null),
-		// NOTE: The label is emitted only where something leaves through it.
+		// The label is emitted only where something leaves through it.
 		// A body that never answers `#Done` is a walk that never ends, which
 		// is exactly what the driver does with one.
 		stops ? labelled(prefix, walk) : walk,
 	]
 
-	// NOTE: Nothing to box at the exit: this walk answers with what a `#Done`
+	// Nothing to box at the exit: this walk answers with what a `#Done`
 	// carried, never with the State. A `#Done` handed the State ITSELF writes it
 	// into the answer slot, and the swap boxes that one write where it stands,
 	// which is why the answer this returns is the slot and never the State. What
@@ -6868,7 +6868,7 @@ function generalWalk(
 	}
 }
 
-// NOTE: `List.reduce`, both entries. The plain fold always runs to the end and
+// `List.reduce`, both entries. The plain fold always runs to the end and
 // answers the accumulator; the early-stopping one may leave on a `#Done`, so its
 // walk stands in a labelled block with the accumulator written after it — which
 // is what "the accumulated value, or the value the first `#Done` carries" means
@@ -6884,7 +6884,7 @@ function foldWalk(
 	let state = `${prefix}_state`
 	let answer = `${prefix}_answer`
 	let stops = false
-	// NOTE: A name of its own, and not the `items` above — the Array a fold
+	// A name of its own, and not the `items` above — the Array a fold
 	// WALKS and the Array it BUILDS stand in the same Scope, and a fold seeded
 	// with its own receiver holds both at once.
 	let built = builtArray(loop)
@@ -6905,7 +6905,7 @@ function foldWalk(
 			: driver.stepped
 				? steppedBuiltTarget(prefix, built, answer, stop)
 				: builtTarget(built)
-	// NOTE: The receiver before the seed, which is the order the call evaluated
+	// The receiver before the seed, which is the order the call evaluated
 	// them in — a Method's receiver is its first Argument — and both before the
 	// body, so that what the emission collects on the way is collected in the
 	// order the Program says it. The count goes with the receiver rather than
@@ -6941,7 +6941,7 @@ function foldWalk(
 		}
 	}
 
-	// NOTE: Asked of the seed and the walk, which is everywhere the State is
+	// Asked of the seed and the walk, which is everywhere the State is
 	// WRITTEN — the tail below only reads it, and how it reads it is what the
 	// answer decides.
 	let raw = built === null ? heldRaw(carried, [...held, walk]) : false
@@ -6965,7 +6965,7 @@ function foldWalk(
 	}
 }
 
-// NOTE: `List.map` — the Array built beside the walk and wrapped once at the
+// `List.map` — the Array built beside the walk and wrapped once at the
 // end, which is what the native does with the Array `Array.prototype.map`
 // returns.
 function mapWalk(
@@ -7003,7 +7003,7 @@ function mapWalk(
 	}
 }
 
-// NOTE: `List.everyItem` — the same walk, keeping the ITEM where the check
+// `List.everyItem` — the same walk, keeping the ITEM where the check
 // accepts it. The item is bound first because two places read it: the check is
 // handed it, and the Array it is kept in is given the same value.
 function keepWalk(
@@ -7052,7 +7052,7 @@ function keepWalk(
 
 // #region Lists built in place
 
-// NOTE: The Array a walk that builds its List in place pushes into, and null for
+// The Array a walk that builds its List in place pushes into, and null for
 // every walk that threads its State the way it always did. The name is spelled
 // from the loop's own prefix like every other name a walk binds, and it is not
 // `<prefix>_items`: a fold walks one Array and builds another, and the two stand
@@ -7061,7 +7061,7 @@ function builtArray(loop: common.typedSimple.InlineLoop): string | null {
 	return loop.build === undefined ? null : `${loop.name}_built`
 }
 
-// NOTE: The Array the walk enters with, and the one entry cost the seed decides.
+// The Array the walk enters with, and the one entry cost the seed decides.
 // A seed written as a List LITERAL hands its Array over outright — the literal
 // is built where it stands and nobody else has ever held it, which is the same
 // licence `collapse-construction` inlines a Case payload under. Every other seed
@@ -7089,10 +7089,10 @@ function ownedItems(
 	}
 }
 
-// NOTE: The items a List LITERAL wrote, for the seed above and for a whole List
+// The items a List LITERAL wrote, for the seed above and for a whole List
 // added to a build — both of them Arrays the walk may take rather than box.
 //
-// NOTE: Read in BOTH of the literal's shapes, because `collapse-construction`
+// Read in BOTH of the literal's shapes, because `collapse-construction`
 // runs after the pass that asked for this and may be turned off — reading one
 // and not the other would make an emission depend on a pass being enabled.
 function listLiteral(
@@ -7107,7 +7107,7 @@ function listLiteral(
 		: null
 }
 
-// NOTE: A whole List's logical items pushed onto an Array the caller owns — the
+// A whole List's logical items pushed onto an Array the caller owns — the
 // runtime's own two-run walk, which is what `append(contentsOf:)` performed.
 function pushedItemsOf(
 	list: estree.Expression,
@@ -7121,7 +7121,7 @@ function pushedItemsOf(
 	}
 }
 
-// NOTE: Where a walk that builds its List writes an answer that rebuilt the
+// Where a walk that builds its List writes an answer that rebuilt the
 // State: as the pushes the rebuilding performs, and nothing else. There is no
 // slot to assign — the Array IS the State — so a branch that changes nothing
 // writes no Statement at all beyond the way out of the body it stood in.
@@ -7135,7 +7135,7 @@ function builtTarget(built: string): RedirectTarget {
 	}
 }
 
-// NOTE: And the same for a walk whose body answers with a `Step`. `#Continue`
+// And the same for a walk whose body answers with a `Step`. `#Continue`
 // adds its items and goes round again, exactly as the plain target does;
 // `#Done` may finish with the List the walk built — which is where the Array is
 // boxed, once, at that exit edge — or with a value of its own, and then the
@@ -7151,7 +7151,7 @@ function steppedBuiltTarget(
 		write: (written, redirect) => {
 			let step = stepConstruction(written.node)
 
-			// NOTE: A `Step` this can not see being BUILT would be one read
+			// A `Step` this can not see being BUILT would be one read
 			// through its tag, and reading one writes the State whole — which a
 			// walk holding an Array has no way to do. `build-lists-in-place`
 			// declines every such body, so nothing reaches here.
@@ -7186,11 +7186,11 @@ function steppedBuiltTarget(
 	}
 }
 
-// NOTE: One turn's additions, in the order the chain performed them — the same
+// One turn's additions, in the order the chain performed them — the same
 // `push` the Compiler's own `map` walk writes, and the runtime's two-run walk
 // where a whole List was added.
 //
-// NOTE: A whole List written as a LITERAL is added as its items directly, for
+// A whole List written as a LITERAL is added as its items directly, for
 // the reason the seed reads one: the literal is built where it stands, so the
 // walk can push what it holds rather than box it and walk the box back out
 // again. `push` takes as many as the literal wrote, and an empty one adds
@@ -7241,13 +7241,13 @@ function isListBuild(
 	return node.nodeType === "Intrinsic" && node.kind === "list-build"
 }
 
-// NOTE: A turn whose whole body is the one push a build performs pushes the
+// A turn whose whole body is the one push a build performs pushes the
 // Argument itself, where the `const` binding it stood. It is the shape a walk
 // that only collects has — `<- accumulated::append(item)` and nothing else — and
 // with the accumulator's Parameter already elided the binding is the last thing
 // the turn writes before the push reads it back.
 //
-// NOTE: Nothing at all stands between the two, which is what makes this an
+// Nothing at all stands between the two, which is what makes this an
 // ordering the substitution can not change: the only reads it moves ahead of the
 // Argument are the Array the walk owns and `push` on it, and a plain Array the
 // Compiler declared has no member a Program could have written. Anything else in
@@ -7255,7 +7255,7 @@ function isListBuild(
 // a second addition — keeps its binding, because then there IS something in
 // between and this does not try to say what.
 //
-// NOTE: It is worth a turn's allocation on V8, which stops keeping the loop in
+// It is worth a turn's allocation on V8, which stops keeping the loop in
 // optimised code once the item is bound before it is stored. A million-turn
 // build of the counter measures 76 ms bound and 30 ms pushed where it stands on
 // Node, against 33 ms for the copying shape this pass replaces; JavaScriptCore
@@ -7275,7 +7275,7 @@ function pushedWhereBound(
 		push.type !== "ExpressionStatement" ||
 		push.expression.type !== "CallExpression" ||
 		push.expression.arguments.length !== 1 ||
-		// NOTE: The Array under its own name, which is the only thing the
+		// The Array under its own name, which is the only thing the
 		// substitution moves ahead of the Argument: a name read and `push` read
 		// off it, neither of which can run a Program's code.
 		push.expression.callee.type !== "MemberExpression" ||
@@ -7305,13 +7305,13 @@ function pushedWhereBound(
 	]
 }
 
-// NOTE: Whether a name is mentioned anywhere in the emitted body at all, which
+// Whether a name is mentioned anywhere in the emitted body at all, which
 // is what an elided Parameter's `const` is held to. It is `mentionsBeyondValue`
 // with nothing admitted: a List accumulator has no read of its own the emission
 // understands, so any mention is one too many.
 function mentionsIdentifier(root: unknown, name: string): boolean {
 	let found = false
-	// NOTE: The emitted tree is a tree today, and this is what says so has to
+	// The emitted tree is a tree today, and this is what says so has to
 	// stay true of it: a Node the emission shared would otherwise be walked once
 	// per path that reaches it.
 	let seen = new Set<unknown>()
@@ -7348,7 +7348,7 @@ function mentionsIdentifier(root: unknown, name: string): boolean {
 
 // #endregion
 
-// NOTE: What a `Step`-answering body's answer is written as, and the whole of
+// What a `Step`-answering body's answer is written as, and the whole of
 // what makes the `Step` disappear. Where the Compiler can SEE the Case being
 // built at the answering position — `<- #Done(x)`, which is what such a body is
 // made of — the walk assigns and leaves, and the Case is never built. Where it
@@ -7356,7 +7356,7 @@ function mentionsIdentifier(root: unknown, name: string): boolean {
 // `Step` held under a name, one a Method answers with, one a nested walk
 // settled on.
 //
-// NOTE: `#Continue` is written like any other answer — the State takes the
+// `#Continue` is written like any other answer — the State takes the
 // value and the body is left through its own label, which is the way out the
 // redirect already knows about. `#Done` is not: it leaves the WALK, so it breaks
 // the label the walk carries, wherever in the body it stands.
@@ -7389,7 +7389,7 @@ function steppedTarget(
 
 			stop()
 
-			// NOTE: A block of its own, so that two answers falling back to the
+			// A block of its own, so that two answers falling back to the
 			// tag read in one body each hold their `Step` under a name of their
 			// own.
 			let held = `${prefix}_step`
@@ -7428,14 +7428,14 @@ function steppedTarget(
 	}
 }
 
-// NOTE: The two Cases of the builtin `Step`, and the single member each carries
+// The two Cases of the builtin `Step`, and the single member each carries
 // — `#Done(x)` is `Step#Done { value: x }` and `#Continue(x)` is
 // `Step#Continue { state: x }`. Nothing else may be read this way: a `Step` is
 // the Type the two drivers take, and the Enricher admits no other value there.
 const doneTag = "Step#Done"
 const continueTag = "Step#Continue"
 
-// NOTE: A `Step` the Compiler can see being BUILT, and null for every other
+// A `Step` the Compiler can see being BUILT, and null for every other
 // answer. Both shapes of a construction are read, because both can arrive:
 // `collapse-construction` runs AFTER the pass that inlines loops and turns a
 // Case with a Record payload into the literal it emits, so a body holds a
@@ -7466,7 +7466,7 @@ function stepConstruction(
 	return null
 }
 
-// NOTE: The payload of a `Step`, and the one member each Case declares. A
+// The payload of a `Step`, and the one member each Case declares. A
 // payload holding anything MORE than that member is refused rather than read:
 // taking the Case away takes the construction of every member with it, and a
 // member the walk does not read is one that would stop being evaluated. `Step`
@@ -7496,7 +7496,7 @@ function stepPayload(
 	return null
 }
 
-// NOTE: What a body may be handed in place of the first Argument's Integer: the
+// What a body may be handed in place of the first Argument's Integer: the
 // name it reads where it read `<name>.value`, and whatever has to be bound for
 // the turn to establish that name. The binding is emitted ONLY where the swap is
 // taken, so a body that keeps its box does not also pay for a view of it, and it
@@ -7506,14 +7506,14 @@ type UnboxedArgument = {
 	binding: Array<estree.Statement>
 }
 
-// NOTE: One callback's body, where the call to it was. The Parameters are bound
+// One callback's body, where the call to it was. The Parameters are bound
 // as the `const`s of a block around it, which is the Scope the closure gave them
 // and nothing more: the body reads its Parameters and everything enclosing the
 // call under the same names it always did, and a Parameter standing in front of
 // an outer binding stands in front of it for exactly the length of the block. No
 // name is rewritten, so no name can be rewritten wrongly.
 //
-// NOTE: The body's Return Statements are what the walk reads, and the redirect
+// The body's Return Statements are what the walk reads, and the redirect
 // is what writes them where they go — the same machinery a lowered Match's
 // Handlers are written through, so a Match, a Conditional or another lowered
 // loop inside a callback answers the walk exactly as a bare Return does. A
@@ -7551,7 +7551,7 @@ function inlinedCallback(
 		...redirectedStatements(callback.body, {
 			result,
 			label,
-			// NOTE: The body IS the block, so its last Statement has nothing
+			// The body IS the block, so its last Statement has nothing
 			// after it to skip — an answer written there needs no way out.
 			isTail: true,
 			broke: () => {
@@ -7560,15 +7560,15 @@ function inlinedCallback(
 		}),
 	])
 	let first = callback.parameters[0]
-	// NOTE: One `const` short where the accumulator's was elided, which is what
+	// One `const` short where the accumulator's was elided, which is what
 	// the two slices below count in.
 	let bound = callback.parameters.length - (dropped === null ? 0 : 1)
-	// NOTE: Taken ONCE, before the swap below reshapes `body` — both questions
+	// Taken ONCE, before the swap below reshapes `body` — both questions
 	// are about the Statements the callback's own body emitted, and the Array
 	// holds the very Statements either swap rewrites in place.
 	let statements = body.slice(bound)
 
-	// NOTE: The List the walk builds in place, whose Parameter is not bound at
+	// The List the walk builds in place, whose Parameter is not bound at
 	// all: `build-lists-in-place` proved that every mention of it is a
 	// rebuilding chain, and the target above consumed every one of them as
 	// pushes. So a mention that survives is a mention the proof missed, and the
@@ -7588,7 +7588,7 @@ function inlinedCallback(
 		}
 	}
 
-	// NOTE: The State, handed to the walk that threads it rather than swapped
+	// The State, handed to the walk that threads it rather than swapped
 	// here: a `while` driver hands one State to TWO bodies, and it is held raw
 	// for both of them or for neither. What this body contributes is the name it
 	// reads the State under and the Statements the fence is asked of.
@@ -7603,23 +7603,23 @@ function inlinedCallback(
 		}
 	}
 
-	// NOTE: The Integer the first Argument boxes, NEVER BUILT where the body
+	// The Integer the first Argument boxes, NEVER BUILT where the body
 	// only ever reads what it holds — which is what a counting body does, since
 	// every arithmetic and every comparison reads through to the value. It is
 	// one allocation a turn, and the walk's own measured cost roughly halves
 	// without it.
 	//
-	// NOTE: What makes the swap safe is that it is refused on ANY other mention
+	// What makes the swap safe is that it is refused on ANY other mention
 	// of the name. A body that hands the Integer on, stores it, or shadows the
 	// name keeps its box, and so does one that merely reads a member called
 	// `index` off something else — the test does not try to tell those apart,
 	// because being wrong once is worse than optimising every time.
 	//
-	// NOTE: The counter is a `for` head's `let`, so each turn binds a fresh one
+	// The counter is a `for` head's `let`, so each turn binds a fresh one
 	// and a closure the body builds captures the turn it was built in — which is
 	// exactly what capturing the Integer gave it.
 	//
-	// NOTE: The two elisions are on DIFFERENT Parameters of the one callback
+	// The two elisions are on DIFFERENT Parameters of the one callback
 	// that can have both — the counted walk hands the counter first and the
 	// State second — so the counter's `const` is still `body[0]` where the
 	// State's was dropped, and neither elision has to know about the other.
@@ -7636,7 +7636,7 @@ function inlinedCallback(
 		}
 	}
 
-	// NOTE: Asked LAST, of whatever the two elisions above left — a build whose
+	// Asked LAST, of whatever the two elisions above left — a build whose
 	// turn is one push has neither of them to take, so the three never argue over
 	// the same `const`, and asking here means this reads the Statements as they
 	// will be emitted rather than as they were written.
@@ -7647,20 +7647,20 @@ function inlinedCallback(
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
 }
 
-// NOTE: A walk's loop-carried State, held as the number or bigint its Integer
+// A walk's loop-carried State, held as the number or bigint its Integer
 // boxes rather than as the Integer. The Integer is the walk's own — nobody
 // outside it can hold one — so a walk whose bodies only ever read what it holds
 // can carry the value itself and build the Integer once, where the walk answers.
 // It is one allocation a TURN against one a walk, and on the two-million turn
 // sum the walk's cost falls by roughly half again on top of the counter's.
 //
-// NOTE: It pays only together with the other half — a body whose arithmetic
+// It pays only together with the other half — a body whose arithmetic
 // still answers a boxed Integer that the slot then reads back through `.value`
 // is SLOWER than leaving the State alone, measured 23.65 ms against 22.06 on
 // that sum. So `unboxedInteger` reads the guarded arithmetic through both arms
 // and the box is never written at all.
 //
-// NOTE: `bodies` is what the fence is asked of: one entry per callback the State
+// `bodies` is what the fence is asked of: one entry per callback the State
 // is handed to, holding the name that callback reads it under and the Statements
 // it emitted. `answer` is the slot a `Step`-answering walk settles on, and null
 // for a walk that answers with the State itself — it is the second place the
@@ -7672,14 +7672,14 @@ type CarriedState = {
 	bodies: Array<{ parameter: string; statements: Array<estree.Statement> }>
 }
 
-// NOTE: The State of a walk that may be held raw, and null for one that may not.
+// The State of a walk that may be held raw, and null for one that may not.
 // The Type has to be EXACTLY Integer in every body — not a Union it is a member
 // of, not a Type Parameter that could be one — because the whole swap is that the
 // slot holds what an Integer holds, and only an Integer is known to hold that. It
 // is the same exactness `lower-scalar-operations` rests on, and it is what leaves
 // a Record, a String or a Rational State untouched.
 //
-// NOTE: A Refinement over Integer IS carried, and there is nothing here that
+// A Refinement over Integer IS carried, and there is nothing here that
 // says so because there is nothing here that could see one: `eraseRefinements`
 // runs at the head of every pipeline, before any pass, so a `NonZeroInteger`
 // State reaches this as the Integer it is. That is right — a refinement is a
@@ -7697,10 +7697,10 @@ function carriedInteger(
 		: null
 }
 
-// NOTE: The swap, asked and taken in one — it answers whether the State is held
+// The swap, asked and taken in one — it answers whether the State is held
 // raw, which is what decides how the walk answers with it.
 //
-// NOTE: The fence is `mentionsBeyondValue`, asked of every body: a body that
+// The fence is `mentionsBeyondValue`, asked of every body: a body that
 // hands the State on, stores it, matches it, asks any Method of it, shadows the
 // name or reads a member of that name off something else keeps the box, and so
 // does every OTHER body of the same walk, because one State can not be two
@@ -7711,7 +7711,7 @@ function carriedInteger(
 // The first stands in a write that is unboxed with every other; the second stands
 // in a write that is BOXED, once, where the walk is leaving anyway.
 //
-// NOTE: What is rewritten is every WRITE of the State: the `let` its seed
+// What is rewritten is every WRITE of the State: the `let` its seed
 // declares and every assignment to it. They are found by NAME rather than
 // recorded as they are emitted, because the name is the Compiler's own and holds
 // a `_`, so no Essence Program can write it — and `mentionsBeyondWrites` is what
@@ -7720,7 +7720,7 @@ function carriedInteger(
 // there when it runs: the two halves fail closed together rather than the fence
 // refusing and the rewriter shrugging.
 //
-// NOTE: And the reads are redirected LAST, so that a write unboxed into
+// And the reads are redirected LAST, so that a write unboxed into
 // `<parameter>.value` is redirected along with the reads the body already had.
 function heldRaw(
 	state: CarriedState | null,
@@ -7762,14 +7762,14 @@ function heldRaw(
 	return true
 }
 
-// NOTE: How a walk answers with its State: the Integer built once where the walk
+// How a walk answers with its State: the Integer built once where the walk
 // is over, or the State itself where it was one all along. `createInteger` and
 // not the literal `boxedInteger` writes, even though every value the raw slot can
 // hold is canonical by the invariant below — it is one call at the END of a walk
 // rather than one a turn, and an exit that canonicalises does not have to be read
 // together with everything that writes the slot to be believed.
 //
-// NOTE: The invariant the slot holds to is the Integer's own: a value in safe
+// The invariant the slot holds to is the Integer's own: a value in safe
 // range is a number and a value outside it is a bigint. The seed enters as the
 // value of an Integer, which is canonical; a guarded arithmetic answers a number
 // it has just range-checked; an escaped one answers the value of an Integer the
@@ -7778,7 +7778,7 @@ function carriedAnswer(state: string, raw: boolean): estree.Expression {
 	return raw ? exitBox(loopIdentifier(state)) : loopIdentifier(state)
 }
 
-// NOTE: Every write of a name, read as the value the Integer it was given holds.
+// Every write of a name, read as the value the Integer it was given holds.
 // Two shapes are written and no others: the `let` a seed is declared as, and the
 // plain assignments a walk threads the State with. Anything else standing under
 // that name is left alone — there is nothing else today, and a shape this does
@@ -7806,7 +7806,7 @@ function unboxWrites(root: unknown, name: string): void {
 	visit(root)
 }
 
-// NOTE: Which key of a Node holds the value written to a name — `init` of the
+// Which key of a Node holds the value written to a name — `init` of the
 // declarator that binds it, `right` of the plain assignment that sets it — and
 // null for a Node that writes it some other way or not at all. A compound
 // assignment answers null and is therefore never unboxed: the walk emits none,
@@ -7841,13 +7841,13 @@ function isNamed(node: unknown, name: string): boolean {
 	return record["type"] === "Identifier" && record["name"] === name
 }
 
-// NOTE: Whether a name is mentioned anywhere in the emitted body OTHER than as
+// Whether a name is mentioned anywhere in the emitted body OTHER than as
 // `<name>.value`. Every position is read — a property key and a member name
 // included, which no reference can be — so the answer is conservative in the one
 // direction that matters: a name this says nothing about is a name nothing may
 // be assumed of.
 //
-// NOTE: `slots` widens that by exactly one position per slot, and only for a
+// `slots` widens that by exactly one position per slot, and only for a
 // State: the name written WHOLE into a slot the walk owns. `<- carried` answers
 // the State unchanged and `<- #Done(carried)` finishes with it, and the writes
 // those two stand in are the two the caller rewrites — so each mention becomes a
@@ -7895,7 +7895,7 @@ function mentionsBeyondValue(
 	return found
 }
 
-// NOTE: Whether the SLOT is mentioned anywhere the swap does not understand.
+// Whether the SLOT is mentioned anywhere the swap does not understand.
 // `mentionsBeyondValue` asks this of the Parameter a body reads the State under;
 // this asks it of the name the State is threaded through, and it is what holds
 // `unboxWrites` to the same standard the fence holds a body to. Three positions
@@ -7904,7 +7904,7 @@ function mentionsBeyondValue(
 // `const` a turn binds a body's Parameter through, which is the one read of the
 // slot the swap is FOR.
 //
-// NOTE: It is what makes recognising the two admitted writes by their shape
+// It is what makes recognising the two admitted writes by their shape
 // enough. Every assignment to the slot is one this admitted and one
 // `unboxWrites` rewrites, so an assignment standing somewhere the walk did not
 // put it — inside a Function a later pass emitted, say — refuses the swap
@@ -7954,7 +7954,7 @@ function mentionsBeyondWrites(
 	return found
 }
 
-// NOTE: The State written straight into the slot a walk ANSWERS with —
+// The State written straight into the slot a walk ANSWERS with —
 // `<- #Done(carried)`, which is how a `Step`-answering body ordinarily finishes
 // — boxed where it is written. That slot holds Integers, because every other
 // `#Done` writes one into it, and this is the one write that would otherwise put
@@ -7987,7 +7987,7 @@ function boxedAnswers(root: unknown, answer: string, name: string): void {
 	visit(root)
 }
 
-// NOTE: The other half, run only once the question above has been answered:
+// The other half, run only once the question above has been answered:
 // every `<name>.value` becomes a read of the name holding that value, in place —
 // the counter itself for a counted walk's index, and the Parameter itself for a
 // State, which is bound to the raw slot and reads it. Written as a walk over the
@@ -8033,13 +8033,13 @@ function isValueRead(node: unknown, name: string): boolean {
 	)
 }
 
-// NOTE: What an inlined List walk begins with: the items under a name, and how
+// What an inlined List walk begins with: the items under a name, and how
 // many of them there are under another. `List.materialise` answers the Array a
 // List's logical items live in — a List that has been prepended to holds two
 // runs, and reading `.value` would walk one of them — and caches the work on
 // the box, so the second walk over the same List pays nothing.
 //
-// NOTE: The count is read HERE and never again. A List's backing Array grows
+// The count is read HERE and never again. A List's backing Array grows
 // under an append that finds its receiver at the Array's tip, so a body that
 // appends to the very List it walks pushes onto the Array the walk is reading:
 // `list::reduce(startingWith list, (acc, item) { <- acc::append(item) })` seeds
@@ -8061,7 +8061,7 @@ function heldItems(
 	]
 }
 
-// NOTE: The walk every List Method performs — over the positions of the Array
+// The walk every List Method performs — over the positions of the Array
 // the List holds, which is the walk the natives perform and the one shape a
 // `for` says better than an iterator does. Its bound is the count `heldItems`
 // froze, not the Array's own live length.
@@ -8099,7 +8099,7 @@ function itemAt(items: string, position: string): estree.MemberExpression {
 	}
 }
 
-// NOTE: The raw JavaScript boolean a predicate's answer decides by — and, where
+// The raw JavaScript boolean a predicate's answer decides by — and, where
 // the answer is a Boolean an earlier pass BUILT out of a JavaScript test, the
 // test it was built from. It is the same collapse `unbox-conditions` performs
 // on a condition, in the one other place a Boolean is built only to be read
@@ -8123,7 +8123,7 @@ function negatedAnswer(test: estree.Expression): estree.Expression {
 	}
 }
 
-// NOTE: The literal constructors, spelled exactly as every other emission site
+// The literal constructors, spelled exactly as every other emission site
 // spells them — a read off the `import * as <Namespace>` the Program opens with.
 function createdInteger(value: estree.Expression): estree.Expression {
 	return {
@@ -8134,7 +8134,7 @@ function createdInteger(value: estree.Expression): estree.Expression {
 	}
 }
 
-// NOTE: Whether a bound is written as an Integer the canonical invariant holds
+// Whether a bound is written as an Integer the canonical invariant holds
 // as a NUMBER, which is what a counted walk asks of both of its bounds before it
 // writes any of the bigint half. Only a Literal answers yes — a folded operation
 // is one by the time this reads it, and `pool-constants` has already put every
@@ -8154,20 +8154,20 @@ function safeBound(node: common.typedSimple.ExpressionNode): boolean {
 	return held >= -BigInt(SAFE_INTEGER) && held <= BigInt(SAFE_INTEGER)
 }
 
-// NOTE: One step of the counter, in numbers: up or down by one, which is the
+// One step of the counter, in numbers: up or down by one, which is the
 // step of every walk whose bounds a double holds. Which way is the entry that
 // was called, so the step is a literal rather than a read.
 function steppedBy(descending: boolean): estree.Expression {
 	return numberLiteral(descending ? -1 : 1)
 }
 
-// NOTE: One step of a counter that had to escape to bigint, as the literal an
+// One step of a counter that had to escape to bigint, as the literal an
 // Integer past safe range holds.
 function countLiteral(value: bigint): estree.BigIntLiteral {
 	return { type: "Literal", bigint: value.toString(), value }
 }
 
-// NOTE: The turn's counter, in the representation the canonical invariant gives
+// The turn's counter, in the representation the canonical invariant gives
 // it. The KIND is decided once, from the bounds, because a `for` counter can not
 // change kind mid-walk — its `+=` would throw — but canonicality is a property
 // of each VALUE, and a walk with one bound inside safe range and one outside
@@ -8178,7 +8178,7 @@ function countLiteral(value: bigint): estree.BigIntLiteral {
 // its Integer is handed a `createInteger` that settles this; the body the box
 // was elided out of is handed this.
 //
-// NOTE: The escaped `const` is asked FIRST, so the walk that counts in numbers —
+// The escaped `const` is asked FIRST, so the walk that counts in numbers —
 // every walk over ordinary quantities — reads one loop-invariant `false` and
 // then the counter it already had. The call is on the arm no walk a Program can
 // finish takes more than a few turns of.
@@ -8209,12 +8209,12 @@ function createdList(value: estree.Expression): estree.Expression {
 	}
 }
 
-// NOTE: The Array a List's logical items live in, read off the `import * as
+// The Array a List's logical items live in, read off the `import * as
 // List` the same way `createdList` reads its constructor. Not a member the
 // language has: it is the runtime's own choke point, the one place a List that
 // carries its items in two runs is made to carry them in one.
 //
-// NOTE: It is what the natives WRITTEN AGAINST ONE ARRAY reach for — `slice`,
+// It is what the natives WRITTEN AGAINST ONE ARRAY reach for — `slice`,
 // `reverse`, `insert`, `sort`, `split`, `pair` — and what an inlined walk
 // reaches for because the `for` below indexes one Array rather than two. The
 // natives that WALK a List do the opposite deliberately: `map`, `everyItem`,
@@ -8245,7 +8245,7 @@ function pushed(
 	}
 }
 
-// NOTE: The names an inlined loop binds are the Compiler's own and are emitted
+// The names an inlined loop binds are the Compiler's own and are emitted
 // verbatim — every one of them is spelled from the loop's prefix, which holds a
 // `_` and is therefore a name no Essence Program can write.
 function loopIdentifier(name: string): estree.Identifier {
@@ -8306,7 +8306,7 @@ function rewriteBlockStatement(
 ): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		// NOTE: One emitted block is one Namespace Scope, so a `namespace List`
+		// One emitted block is one Namespace Scope, so a `namespace List`
 		// declared inside a Function is the user's for the rest of that Function
 		// and the import again the moment the block closes — which is what lets a
 		// sibling Function beside it keep calling the runtime's List.
@@ -8318,7 +8318,7 @@ function rewriteBlockStatement(
 	}
 }
 
-// NOTE: A Parameter carrying a default becomes an `AssignmentPattern` — the
+// A Parameter carrying a default becomes an `AssignmentPattern` — the
 // JavaScript default parameter, whose semantics are the ones the language
 // declares. `@` is `_self`, which is Parameter 0, so a default reading `@`
 // reads a BINDING rather than re-computing the receiver expression: that
@@ -8340,7 +8340,7 @@ function rewriteParameter(
 	}
 }
 
-// NOTE: The one choke point every emitted Function goes through, and so the one
+// The one choke point every emitted Function goes through, and so the one
 // place a COMPLETING body is turned into what it means:
 //
 //   function headline(url) {
@@ -8354,7 +8354,7 @@ function rewriteParameter(
 // future is built rather than when it is run — which is also why nothing here
 // may suspend outside the closure.
 //
-// NOTE: The context Parameter is always spelled `$ctx`, in every completing body
+// The context Parameter is always spelled `$ctx`, in every completing body
 // at every depth, and it is lexical scoping that makes that right rather than a
 // problem: a sync closure written inside such a body closes over the body's
 // `$ctx`, so the work it starts belongs to the run that built it, while a
@@ -8371,7 +8371,7 @@ function rewriteFunctionExpression(
 	}
 }
 
-// NOTE: The BODY half of the emission above, shared with the free-Function
+// The BODY half of the emission above, shared with the free-Function
 // Declaration, which builds its own Node around the same block.
 function completingBodyOf(
 	node: common.typedSimple.FunctionDefinitionNode,
@@ -8414,19 +8414,19 @@ function completingBodyOf(
 	}
 }
 
-// NOTE: `$tail_0: while (true) { … }` around the whole body of a Function
+// `$tail_0: while (true) { … }` around the whole body of a Function
 // `loop-self-tail-calls` looped, and the body untouched where it did not. Every
 // `TailCallStatement` inside ends its turn with `continue $tail_0`, so the loop
 // is left exactly where the Program answers — by a Return, or by a throw. There
 // is no way out at the bottom: a body whose last Statement is not an answer is
 // one the Simplifier gave a Return to, so control never reaches the brace.
 //
-// NOTE: `while (true)` rather than `for (;;)` for one reason: it is what a
+// `while (true)` rather than `for (;;)` for one reason: it is what a
 // reader of the emitted file sees and recognises, and the two are the same
 // program. The label is what makes the `continue` unambiguous where a lowered
 // Match has put labelled blocks between the two.
 //
-// NOTE: It goes around the WHOLE body, prologue included — a Pattern in a
+// It goes around the WHOLE body, prologue included — a Pattern in a
 // Parameter binds at the head of the body and a turn is a call, so a turn binds
 // it again. The per-turn `const`s the pass writes for a slotted Parameter stand
 // at the very top of that body for the same reason.
@@ -8454,7 +8454,7 @@ function tailLoopBody(
 	}
 }
 
-// NOTE: One turn — the Arguments that have to be held, the Parameters the call
+// One turn — the Arguments that have to be held, the Parameters the call
 // changes, and back to the top:
 //
 //   const $tail_0_t0 = removeFirst(rest);
@@ -8462,7 +8462,7 @@ function tailLoopBody(
 //   rest = $tail_0_t0;
 //   continue $tail_0;
 //
-// NOTE: The held Arguments come first and ALL of them are held where any is,
+// The held Arguments come first and ALL of them are held where any is,
 // which is what makes the rebinding simultaneous: `<- swap(b, a)` reads both
 // names before either is written. Where nothing a turn assigns can be read by an
 // Argument of that turn, the pass holds none and the assignments are written
@@ -8507,17 +8507,17 @@ function futureModule(): estree.Identifier {
 	return { type: "Identifier", name: "$future" }
 }
 
-// NOTE: The context a completing body's work runs under — the Parameter of the
+// The context a completing body's work runs under — the Parameter of the
 // closure above, and what every `start` and `complete` inside it is handed. A
 // Program can not bind this name: `compilerOwnedNames` holds it.
 function contextIdentifier(): estree.Identifier {
 	return { type: "Identifier", name: "$ctx" }
 }
 
-// NOTE: `start x` — the future put in flight, answering the one run of it. It
+// `start x` — the future put in flight, answering the one run of it. It
 // never waits, so it is emitted as the plain call it is, wherever it stands.
 //
-// NOTE: The context is `$ctx` where one is lexically in scope and a fresh root
+// The context is `$ctx` where one is lexically in scope and a fresh root
 // where none is — and which of those it is, is a question about the emitted
 // JavaScript rather than about the Program, which is why this Node reaches the
 // Rewriter whole. `$future.root()` is the top level's own context: work started
@@ -8533,7 +8533,7 @@ function rewriteStart(
 	}
 }
 
-// NOTE: `complete x` — the `await` the language has no word for. A Future is
+// `complete x` — the `await` the language has no word for. A Future is
 // started under a context of its own and waited for; a Started is waited for
 // again, which answers the same value it always did.
 function rewriteComplete(
@@ -8550,7 +8550,7 @@ function rewriteComplete(
 	}
 }
 
-// NOTE: Which context the run belongs to. `$ctx` is in scope exactly where a
+// Which context the run belongs to. `$ctx` is in scope exactly where a
 // completing body encloses this one lexically — including through sync closures
 // written inside it, which close over it like any other binding — and the
 // Rewriter knows that because it is emitting the closure it is inside of. A
@@ -8558,7 +8558,7 @@ function rewriteComplete(
 // there is one, since every one of them binds the same name.
 let completingDepth = 0
 
-// NOTE: Whether the body being rewritten has reached for `$ctx` — read by
+// Whether the body being rewritten has reached for `$ctx` — read by
 // `testBody`, which binds a context only where one is asked for. Every other
 // caller of `contextArgument` is inside a body that binds the name already.
 let contextTaken = false
@@ -8592,12 +8592,12 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	// NOTE: An absolute path rather than `@essence-lang/runtime/<Name>`, because
+	// An absolute path rather than `@essence-lang/runtime/<Name>`, because
 	// the emitted module is written to the user's directory and handed to esbuild
 	// from there — a package specifier would have to resolve against wherever
 	// that is. The Bundler inlines these and they never reach the output.
 	//
-	// NOTE: A HOST's build is the other way around. Nothing is inlined there —
+	// A HOST's build is the other way around. Nothing is inlined there —
 	// the Modules are handed over one at a time and the host resolves what they
 	// import — and an absolute path into this Compiler's own installation is not
 	// something a host bundler will read, let alone transpile. The package
@@ -8633,7 +8633,7 @@ function importNamespaceSpecifier(
 	}
 }
 
-// NOTE: Arrays have to be checked before the general object case — they are
+// Arrays have to be checked before the general object case — they are
 // `typeof "object"` too, and emitting one as an ObjectExpression would turn a
 // Union's member list into `{ 0: …, 1: … }`, which no longer has the Array
 // Methods the runtime Type check calls on it.
@@ -8655,7 +8655,7 @@ function convertValueToExpression(value: unknown): estree.Expression {
 	} as estree.Literal
 }
 
-// NOTE: A derived-equality descriptor emitted as a plain JSON-shaped literal.
+// A derived-equality descriptor emitted as a plain JSON-shaped literal.
 // Its keys are Case tags like `"Choice#Case"` and the payload member names
 // underneath them, neither of which a JavaScript IdentifierName is guaranteed
 // to spell, so every key here is a string Literal — one rule for the whole
@@ -8692,7 +8692,7 @@ function jsonExpression(value: unknown): estree.Expression {
 	} as estree.Literal
 }
 
-// NOTE: A Type descriptor emitted as the object literal the runtime's Type
+// A Type descriptor emitted as the object literal the runtime's Type
 // check reads. Most of its keys are the descriptor's own fields — `type`,
 // `members`, `itemType` — but a Record descriptor's `members` map is keyed by
 // Essence member names, and an Essence identifier may hold characters no
@@ -8722,7 +8722,7 @@ function convertObjectToObjectExpression(
 	}
 }
 
-// NOTE: A Type SERIALIZED for the runtime, which is every place a Type stops
+// A Type SERIALIZED for the runtime, which is every place a Type stops
 // being something the Compiler reasons about and becomes data a Program carries.
 // A checked refinement may not reach one: its predicate is not a check the
 // runtime can make, so an emitted descriptor naming it would ask
@@ -8735,7 +8735,7 @@ function convertObjectToObjectExpression(
 // worth having: it is the assertion that the erasure was complete, and it names
 // the Compiler, not the reader, when it is not.
 //
-// NOTE: And it strips a Record's display spelling on the way, because the walk
+// And it strips a Record's display spelling on the way, because the walk
 // above writes out whatever fields a Type is holding: `Standing` is what a
 // reader calls a shape and says nothing to `isValueOfType`, so a Program
 // matching on an Alias would ship the name as dead bytes and pool two spellings
@@ -8762,7 +8762,7 @@ function typeDescriptorExpression(
 
 // #region Tests
 
-// NOTE: The name the test runtime is imported under, and the name a test's
+// The name the test runtime is imported under, and the name a test's
 // context is bound to inside the Function the section becomes. Both are in
 // `compilerOwnedNames`, so a Program writing either binds a mangled name
 // instead — `$` is a legal Essence identifier character, and neither of these
@@ -8770,7 +8770,7 @@ function typeDescriptorExpression(
 const TESTING_MODULE = "$testing"
 const TEST_CONTEXT = "$context"
 
-// NOTE: What a bundle publishes so a runner can reach the tests of EVERY Module
+// What a bundle publishes so a runner can reach the tests of EVERY Module
 // in it: the registry, and the runner that drives it. Both come from INSIDE the
 // bundle — see `entryPoints` in the runtime's `Testing` module — because every
 // Essence value carries a hidden Type key belonging to the runtime instance
@@ -8797,7 +8797,7 @@ function testingCall(
 	}
 }
 
-// NOTE: The whole `tests { … }` block as ONE Statement: a call registering the
+// The whole `tests { … }` block as ONE Statement: a call registering the
 // Module's manifest, whose `run` is the section itself as a Function of the
 // per-test context. Running it evaluates the setup the selected test can see,
 // afresh, and then that test — which is the literal reading of "a tests-section
@@ -8823,7 +8823,7 @@ function rewriteTestsSection(
 	]
 }
 
-// NOTE: The section itself, as the Function of the per-test context the
+// The section itself, as the Function of the per-test context the
 // manifest carries. It is `async` exactly where something inside it waits — a
 // setup Constant that completes, or a test that does — and the runner awaits
 // what it answers with either way.
@@ -8847,7 +8847,7 @@ function sectionRun(
 	return run
 }
 
-// NOTE: One Scope's run of Nodes. A suite is a BLOCK, which is what JavaScript's
+// One Scope's run of Nodes. A suite is a BLOCK, which is what JavaScript's
 // own scoping needs to keep a suite's Constants inside it and let one shadow the
 // section's — the Enricher gave each its own Scope, and an emission that flattened
 // them would declare one name twice in one block.
@@ -8856,7 +8856,7 @@ function rewriteTestsNodes(
 ): Array<estree.Statement> {
 	return nodes.flatMap((node) => {
 		if (node.nodeType === "TestEntry") {
-			// NOTE: In the order the Arguments stand, because rewriting is not
+			// In the order the Arguments stand, because rewriting is not
 			// free of order: a Constant the name pools is pooled before one the
 			// body pools, and the pool's names are what a reader of the emitted
 			// Module sees.
@@ -8867,7 +8867,7 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// NOTE: A benchmark is the same call through the sibling
+						// A benchmark is the same call through the sibling
 						// entry point — one entry, one body, and a runtime that
 						// times the body rather than running it once. Which of
 						// the two is emitted is the whole of the difference: the
@@ -8919,7 +8919,7 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// NOTE: A benchmark's rows go through the sibling entry
+						// A benchmark's rows go through the sibling entry
 						// point the way a plain benchmark goes through
 						// `benchmark`; each row's baseline key is its own
 						// manifest entry's, the row spelled as its last step.
@@ -8986,7 +8986,7 @@ function rewriteTestsNodes(
 		}
 
 		if (node.nodeType === "TestScope") {
-			// NOTE: A call rather than a bare block, so that the runtime can
+			// A call rather than a bare block, so that the runtime can
 			// decline to evaluate a suite the running test is not in. The
 			// closure is the Scope JavaScript needs either way.
 			let held: estree.ArrowFunctionExpression = {
@@ -9021,7 +9021,7 @@ function rewriteTestsNodes(
 	})
 }
 
-// NOTE: A generator as the test runtime reads it: plain data, apart from the
+// A generator as the test runtime reads it: plain data, apart from the
 // two leaves that carry an Expression. Both of those are emitted as a closure
 // of the ONE name they bind — a refinement's check takes the candidate, a
 // `Generatable` call takes the source — which is the same shape a table's rows
@@ -9045,7 +9045,7 @@ function testGenerator(
 				property("value", testGenerator(generator.value)),
 			)
 
-			// NOTE: The key Type's Equatable witness, where one was resolved —
+			// The key Type's Equatable witness, where one was resolved —
 			// what every drawn Dictionary is built through, so that two keys the
 			// Program calls one key are one key here too. Absent for a bare
 			// `Dictionary`, and the runtime falls back to its universal
@@ -9068,7 +9068,7 @@ function testGenerator(
 			break
 		case "case":
 			properties.push(
-				// NOTE: The tag every value of the Case carries, spelled the
+				// The tag every value of the Case carries, spelled the
 				// way `createCase` stamps it — through `renderIdentity`, so a
 				// Choice declared in another Module is named as this bundle
 				// spells it.
@@ -9112,7 +9112,7 @@ function testGenerator(
 					"generate",
 					generatorClosure(generator.binding, generator.call),
 				),
-				// NOTE: The other half of the conformance: what a value it drew
+				// The other half of the conformance: what a value it drew
 				// is reported as instead, where the Namespace wrote a `shrink`.
 				// It is emitted even where the Namespace wrote none, because
 				// the Protocol's provided body is a call like any other — one
@@ -9183,7 +9183,7 @@ function generatorClosure(
 	}
 }
 
-// NOTE: What a table test's rows share: one Function of the row, for the name
+// What a table test's rows share: one Function of the row, for the name
 // and one for the body. Both are Functions rather than values because a row
 // that is not the one running must cost nothing — a table of a hundred rows
 // interpolates one name and runs one body, not a hundred of each.
@@ -9199,7 +9199,7 @@ function rowClosure(
 	}
 }
 
-// NOTE: The name an item is handed, and only where it INTERPOLATES — a plain
+// The name an item is handed, and only where it INTERPOLATES — a plain
 // one is in the manifest already. Written once because the two calls a test may
 // be emitted as, and the two a benchmark may be, all take it in the same place.
 function testName(
@@ -9210,13 +9210,13 @@ function testName(
 		: rewriteExpression(name)
 }
 
-// NOTE: A test body is a completing body in everything but its Type: it may
+// A test body is a completing body in everything but its Type: it may
 // wait, the runner drives one at a time and awaits each, and what it starts is
 // its own. So it is emitted with a context of ITS OWN, bound here rather than
 // taken from an enclosing body — there is none — and STOPPED when the body
 // settles, however it settles.
 //
-// NOTE: The stop is the point. Without it a `start` a test leaves behind goes on
+// The stop is the point. Without it a `start` a test leaves behind goes on
 // running into the next test: what it prints is captured under that test's sink,
 // which is a report naming the wrong test, and `essence test` stays open for as
 // long as the abandoned work has left to run. Stopping it is the language's own
@@ -9225,7 +9225,7 @@ function testName(
 // something: the run is fire-and-forget for the length of the test and no
 // longer.
 //
-// NOTE: Only where the body reaches for the context at all. A test that waits
+// Only where the body reaches for the context at all. A test that waits
 // for nothing and starts nothing is emitted exactly as it was before any of this
 // existed, so a Module of such tests neither binds a context nor imports the
 // module it would come from.
@@ -9310,14 +9310,14 @@ function testBody(
 	}
 }
 
-// NOTE: A registration call the runner has to WAIT for. Every Function here is
+// A registration call the runner has to WAIT for. Every Function here is
 // handed over and called by the runtime, so an `await` written inside one
 // belongs to that Function: it is made `async`, which makes what the runtime
 // hands back a promise, and the call is awaited so that the wait stays where
 // the source put it. The runtime's own entry points pass that promise straight
 // on, one Scope at a time, up to the `run` the runner awaits.
 //
-// NOTE: And nowhere else. A test that completes nothing is emitted, called and
+// And nowhere else. A test that completes nothing is emitted, called and
 // reported exactly as it was before any of this existed — no `async`, no
 // promise, and a body that throws still throws where the runner catches it.
 function awaitedRegistration(
@@ -9333,7 +9333,7 @@ function awaitedRegistration(
 	return { type: "AwaitExpression", argument: call }
 }
 
-// NOTE: The span table, indexed by point id. Emitted whole rather than per
+// The span table, indexed by point id. Emitted whole rather than per
 // point so that a reader with an event in hand can resolve it without the
 // Compiler — see `TestsSectionNode.spans`.
 function testSpans(
@@ -9435,7 +9435,7 @@ function property(name: string, value: estree.Expression): estree.Property {
 	}
 }
 
-// NOTE: What a bundle publishes when anything in it declared a test. It is on
+// What a bundle publishes when anything in it declared a test. It is on
 // the ENTRY Module, because what a bundle exports is what its entry exports,
 // and it is emitted whether or not the entry itself wrote a `tests` block: a
 // graph whose tests all live in its dependencies is the ordinary shape of a
@@ -9459,7 +9459,7 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 	}
 }
 
-// NOTE: The name a Module's coverage counter is bound to, and the head that
+// The name a Module's coverage counter is bound to, and the head that
 // binds it: one call registering this Module's table with the test runtime,
 // answering with the Function every counter in the body calls. It is a closure
 // over the Module's own counts rather than a lookup by Module name, so a
@@ -9470,7 +9470,7 @@ function coverageCounter(): estree.Identifier {
 	return { type: "Identifier", name: COVERAGE_COUNTER }
 }
 
-// NOTE: The head is emitted BEFORE anything else the Module says, because a
+// The head is emitted BEFORE anything else the Module says, because a
 // top-level Statement is instrumented too and would otherwise call a name that
 // is not bound yet. The table goes with it: what a counter MEANT — where it
 // stands, what kind of thing it counts, what to call it — can not be read back
@@ -9553,7 +9553,7 @@ function coverageChoices(
 	}
 }
 
-// NOTE: One counter, in the three shapes a point can need. Standing on its own
+// One counter, in the three shapes a point can need. Standing on its own
 // it counts and answers with nothing; around a Case construction it counts and
 // answers with the very value; in front of a `define` arm's answer it is a
 // sequence, which counts and then answers with the value beside it. The last two
@@ -9583,11 +9583,11 @@ function rewriteCoverageCounter(
 		: count([point, value])
 }
 
-// NOTE: An instrumented point, which answers with the very value it recorded —
+// An instrumented point, which answers with the very value it recorded —
 // so wrapping an Expression in one changes nothing about what that Expression
 // evaluates to, and the Position it carries is the Position of what it wraps.
 //
-// NOTE: A `probe` is the same recording into a different buffer: what a `§?`
+// A `probe` is the same recording into a different buffer: what a `§?`
 // line asks about belongs to the test rather than to the next assertion, which
 // drains what it was built from.
 function rewriteTestTrace(
@@ -9600,7 +9600,7 @@ function rewriteTestTrace(
 	])
 }
 
-// NOTE: Both forms are one call. `expect` records and the test carries on;
+// Both forms are one call. `expect` records and the test carries on;
 // `required` records and, where it did not hold, unwinds the test from where it
 // stands — so the Constants a Matcher binds below it are simply never reached.
 // The unwinding is the runtime's rather than an early `return` emitted here
@@ -9610,7 +9610,7 @@ function rewriteTestTrace(
 function rewriteTestAssertion(
 	node: common.typedSimple.TestAssertionStatementNode,
 ): estree.Statement {
-	// NOTE: A snapshot is recorded rather than tested: what it hands over is
+	// A snapshot is recorded rather than tested: what it hands over is
 	// the rendered text, which slot of the source a recorded value stands in,
 	// and what stands there now. Whether that holds is the runtime's question,
 	// because only the run knows what a stored snapshot says.
@@ -9651,7 +9651,7 @@ function rewriteTestAssertion(
 	}
 }
 
-// NOTE: What has to hold, as a RAW JavaScript boolean. A Matcher's test already
+// What has to hold, as a RAW JavaScript boolean. A Matcher's test already
 // is one — it is the same chain of `&&`s a `match` Handler is tested by, read
 // off the Constant the Statement in front of this one holds the value under —
 // and a Boolean Expression is unwrapped, exactly as an `if`'s condition is.
@@ -9664,14 +9664,14 @@ function assertionTest(
 		return valueRead(value)
 	}
 
-	// NOTE: A Matcher's test reads the value as many times as the Matcher has
+	// A Matcher's test reads the value as many times as the Matcher has
 	// parts, so it has to be a name. The Enricher's desugar guarantees one — a
 	// `require MATCHER = EXPR` is always preceded by the Constant holding what
 	// it asserts
 	// — and the arrow below is the answer for a Program that somehow arrives
 	// without it, rather than a wrong test emitted quietly.
 	//
-	// NOTE: It is also the answer for a Matcher `compile-type-tests` reached.
+	// It is also the answer for a Matcher `compile-type-tests` reached.
 	// That pass writes a compiled test against `_self` — the name a Match binds
 	// its value to — because it runs first and can not know what the value will
 	// be spelled as by the time it is emitted. So a compiled Matcher binds the
@@ -9691,7 +9691,7 @@ function assertionTest(
 	)
 }
 
-// NOTE: Whether `compile-type-tests` decided this Handler's checks. Both fields
+// Whether `compile-type-tests` decided this Handler's checks. Both fields
 // are the Optimiser's own — the Simplifier leaves them null — and either one of
 // them is written against `_self`.
 function isCompiledHandler(handler: common.typedSimple.MatchHandler): boolean {

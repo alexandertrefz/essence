@@ -18,7 +18,7 @@ import {
 	wrapperFor,
 } from "./plugin-core"
 
-// NOTE: Typed structurally rather than against Vite. A plugin object is the
+// Typed structurally rather than against Vite. A plugin object is the
 // whole of the contract, Vite is not a dependency of anything here, and adding
 // one so a hook can be spelled would put a bundler in the dependency tree of
 // every host that only ever wanted `loadModule`.
@@ -54,31 +54,31 @@ export type VitePlugin = {
 }
 
 export function essence(options: PluginOptions = {}): VitePlugin {
-	// NOTE: A build writes its output where it was asked to; a server is somebody
+	// A build writes its output where it was asked to; a server is somebody
 	// sitting in an editor. Which one this is is not known until Vite says.
 	let serving = false
-	// NOTE: The project root Vite resolved. Two things rest on it: a dev server
+	// The project root Vite resolved. Two things rest on it: a dev server
 	// spells its ids relative to it — `/src/Main.es` names a file under the
 	// root, not one at the root of the filesystem — and it is what every
 	// emitted Module of this build is spelled against, so that a file two
 	// entries share is one module rather than two.
 	let root = process.cwd()
-	// NOTE: Replaced when Vite resolves a configuration, which is once per build
+	// Replaced when Vite resolves a configuration, which is once per build
 	// — so what a previous build compiled is not held against this one, and the
 	// root it was compiled under is this build's.
 	let compiler: EssenceCompiler = createCompiler(options, root)
-	// NOTE: The files the HOST asked for through `?raw`, which is the only way
+	// The files the HOST asked for through `?raw`, which is the only way
 	// to tell one of those from the wrapper's own import of the same Module —
 	// they resolve to one id on purpose, so that a build holds one copy. It is
 	// what decides whether a `bundle` view is written: a sibling served through
 	// the same door was reached by the graph rather than imported by anybody,
 	// and declaring it would leave a file beside every source of the project.
 	let rawDoors = new Set<string>()
-	// NOTE: The sources each served id was compiled from, as `load` last saw
+	// The sources each served id was compiled from, as `load` last saw
 	// them — what `transform` says again. See `served` for why it has to.
 	let sourcesOf = new Map<string, Array<string>>()
 
-	// NOTE: Named at `load` AND again at `transform`, and the second is not a
+	// Named at `load` AND again at `transform`, and the second is not a
 	// courtesy. A dev server turns a watch file into an edge of its module
 	// graph, which is what carries an edit from the file to the modules
 	// compiled from it — but Vite records the files `load` names against the
@@ -116,7 +116,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 
 	return {
 		name: "essence",
-		// NOTE: Ahead of Vite's own resolution, so that a `.es` id is claimed
+		// Ahead of Vite's own resolution, so that a `.es` id is claimed
 		// before anything tries to read it as JavaScript.
 		enforce: "pre",
 		configResolved(config) {
@@ -124,7 +124,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			root = canonicalPath(config.root ?? process.cwd())
 			compiler = createCompiler(options, root)
 		},
-		// NOTE: The two moments what was emitted may no longer be what these
+		// The two moments what was emitted may no longer be what these
 		// sources emit — a rebuild in watch mode starts, a file changes under a
 		// dev server. Nothing else here has state to lose: what the compiler
 		// remembers is emitted TEXT, which outlives an edit to the source it
@@ -132,7 +132,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		// and only what was compiled out of a graph reaching it is forgotten;
 		// a rebuild names nothing and forgets everything.
 		//
-		// NOTE: And that is the whole of what hot reloading asks of this
+		// And that is the whole of what hot reloading asks of this
 		// plugin. Every source a served module was compiled from is a watch
 		// file of it, and Vite turns a watch file into an edge of its module
 		// graph — so an edit propagates from the changed file through the
@@ -146,7 +146,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			compiler.invalidate(id)
 		},
 		resolveId(source, importer) {
-			// NOTE: An id this plugin already answered comes back through
+			// An id this plugin already answered comes back through
 			// resolution whenever Vite resolves a URL it does not hold a
 			// module for — a request for a raw Module right after an edit
 			// invalidated it, say. It is answered as itself. Marking it again
@@ -159,7 +159,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 					: null
 			}
 
-			// NOTE: The wrapper's own import, coming back through resolution
+			// The wrapper's own import, coming back through resolution
 			// with the entry already spelled out. `\0` is Rollup's mark for a
 			// module no filesystem holds, which is exactly what an emitted
 			// Module is — without it Vite would go looking for a file.
@@ -167,7 +167,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 				return `\0${source}`
 			}
 
-			// NOTE: What one served Module imports another by. The Rewriter
+			// What one served Module imports another by. The Rewriter
 			// spelled it against the ROOT, so it resolves to the same id
 			// whichever entry emitted the importer — which is what leaves the
 			// build holding one module per file.
@@ -189,7 +189,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 
 			let resolved: string | null = null
 
-			// NOTE: An absolute id is two things on a dev server: the
+			// An absolute id is two things on a dev server: the
 			// root-relative URL an HTML entry writes — `/src/Main.es` — and a
 			// filesystem path. The root answers first, because root-relative is
 			// what Vite itself would have read the id as; a path that resolves
@@ -199,7 +199,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 
 				resolved = canonicalPath(existsSync(rooted) ? rooted : file)
 			} else if (importer !== undefined) {
-				// NOTE: A relative id is resolved against the file that WROTE
+				// A relative id is resolved against the file that WROTE
 				// it, exactly as an Essence specifier is, rather than against
 				// the working directory.
 				resolved = canonicalPath(
@@ -211,7 +211,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 				return null
 			}
 
-			// NOTE: `./Math.es?raw` is the raw door as a HOST writes it, and it
+			// `./Math.es?raw` is the raw door as a HOST writes it, and it
 			// resolves to the same id the wrapper's own import does — one
 			// module either way, rather than two copies of one Module.
 			if (!rawRequested(source)) {
@@ -259,7 +259,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 				options,
 			)
 		},
-		// NOTE: Changes nothing about the text — see `served` for what it is
+		// Changes nothing about the text — see `served` for what it is
 		// here for. Only ids this plugin loaded have sources to name; everything
 		// else is answered with nothing, which Vite reads as "not mine".
 		transform(_code, id) {

@@ -6,7 +6,7 @@ import { format } from "../index"
 import { sectionSpans } from "../sections"
 import { commentAnchors } from "../trivia"
 
-// NOTE: A whole Program written as the lines it is made of, because a Module
+// A whole Program written as the lines it is made of, because a Module
 // section is read for how its groups are laid out across lines, and a
 // `\n`-escaped string hides exactly that.
 function source(...lines: Array<string>): string {
@@ -15,7 +15,7 @@ function source(...lines: Array<string>): string {
 
 let formatted = (text: string) => format(text).text
 
-// NOTE: The anchors the safety gate compares, section-aware — the groups and
+// The anchors the safety gate compares, section-aware — the groups and
 // entries of a Module section come out sorted, so they are compared per group
 // and per entry rather than per Token.
 let anchors = (text: string) =>
@@ -23,7 +23,7 @@ let anchors = (text: string) =>
 
 describe("module sections", () => {
 	describe("canonical order", () => {
-		// NOTE: This order is not a preference: dispatch over imported
+		// This order is not a preference: dispatch over imported
 		// Namespaces is defined to follow it, so the sort can never change which
 		// Namespace a Method call resolves to.
 		it("sorts groups by specifier", () => {
@@ -114,7 +114,7 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: Two groups written for one file are left as two — merging them
+		// Two groups written for one file are left as two — merging them
 		// would have to decide which keeps its Comments — and stand next to each
 		// other, ordered by the first name in each, which is where a reader
 		// finds them to fold together.
@@ -144,7 +144,7 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: A blank line survives only where the sort leaves the lines either
+		// A blank line survives only where the sort leaves the lines either
 		// side of it side by side, in the order they were written. Anywhere else
 		// the sort chose the neighbours, and the gap would part two other lines.
 		it("drops a blank line written between two groups the sort parts", () => {
@@ -271,7 +271,7 @@ describe("module sections", () => {
 		})
 	})
 
-	// NOTE: A group of one name stays on one line, the way a `case` with one
+	// A group of one name stays on one line, the way a `case` with one
 	// short Statement does; two or more names stand one to a line. Nothing is
 	// aligned: a column is what made adding one wide name rewrite every line
 	// beside it.
@@ -498,7 +498,7 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: A Comment above the one name of a group rules the flat shape
+		// A Comment above the one name of a group rules the flat shape
 		// out — it runs to the end of its line, and nothing can follow it there.
 		it("writes out a group whose one name carries a comment", () => {
 			let text = source(
@@ -543,7 +543,7 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: The note after a group written flat is the name's rather than
+		// The note after a group written flat is the name's rather than
 		// the group's, so it stays on the name's line if the group is ever
 		// written out — which a Comment above the name is what forces here.
 		it("gives a comment trailing a flat group to its one name", () => {
@@ -695,7 +695,7 @@ describe("module sections", () => {
 	})
 
 	describe("the safety gate", () => {
-		// NOTE: The round trip the whole provision has to survive: both blocks,
+		// The round trip the whole provision has to survive: both blocks,
 		// an implementation between them, and every Comment where it was written.
 		it("round-trips a Module with both sections and refuses nothing", () => {
 			let text = source(
@@ -762,7 +762,7 @@ describe("module sections", () => {
 			expect(anchors(result.text)).toBe(anchors(text))
 		})
 
-		// NOTE: A sorted block is the one place the Token sequence is allowed to
+		// A sorted block is the one place the Token sequence is allowed to
 		// change, so the anchors are grouped per group and per entry there — and
 		// a re-sort with every Comment still on its own owner has to read as no
 		// change at all.
@@ -797,7 +797,7 @@ describe("module sections", () => {
 			expect(anchors(sorted)).toBe(anchors(written))
 		})
 
-		// NOTE: What the grouping buys: a Comment that ends up against another
+		// What the grouping buys: a Comment that ends up against another
 		// owner is still present, still in order, and only which entry or group
 		// it rides with gives it away.
 		it("still notices a comment that changed which group it rides with", () => {
@@ -850,7 +850,7 @@ describe("module sections", () => {
 			expect(anchors(moved)).not.toBe(anchors(riding))
 		})
 
-		// NOTE: The same name written in two groups is two entries, and a
+		// The same name written in two groups is two entries, and a
 		// Comment that crossed from one to the other has moved — which is what
 		// keying an entry by its group's specifier is for.
 		it("still notices a comment that crossed between two groups' same name", () => {
@@ -924,7 +924,7 @@ describe("module sections", () => {
 			expect(anchors(dropped)).not.toBe(anchors(written))
 		})
 
-		// NOTE: Grouping per owner does not make the block a place where a
+		// Grouping per owner does not make the block a place where a
 		// Comment may end up anywhere — one carried out of it, above the Keyword,
 		// leaves its chunk and shows up in the sequence instead.
 		it("still notices a comment carried out of a block", () => {
@@ -948,7 +948,7 @@ describe("module sections", () => {
 			expect(anchors(above)).not.toBe(anchors(inside))
 		})
 
-		// NOTE: A Comment written between a name and its alias belongs to no
+		// A Comment written between a name and its alias belongs to no
 		// owner the printer can name, and the gate is what keeps that from
 		// being formatted anyway.
 		it("leaves a comment written inside an entry's own span alone", () => {
@@ -995,7 +995,7 @@ describe("module sections", () => {
 			)
 		})
 
-		// NOTE: All four Module Keywords stay spellable as names, so an entry may
+		// All four Module Keywords stay spellable as names, so an entry may
 		// be called `as` or `from` — in an export block too, where `from` opens
 		// a group only when a specifier follows it.
 		it("writes an entry whose own name is a Module keyword", () => {

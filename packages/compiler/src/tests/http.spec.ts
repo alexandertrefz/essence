@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The `Http` Namespace end to end, against a server started in this file.
+// The `Http` Namespace end to end, against a server started in this file.
 // It is the one part of the standard library the golden harness can not hold to
 // account — a line there would record what some host answered on the day it was
 // captured — so everything `Http.send` and the six verbs on it promise is
@@ -19,17 +19,17 @@ import { validate } from "../validator/index"
 // redirect modes, what each verb puts on the wire, the three failures, and that
 // a stopped request is stopped at the SERVER rather than only dropped here.
 //
-// NOTE: Deterministic, and no external network. The server listens on an
+// Deterministic, and no external network. The server listens on an
 // ephemeral port and every address a Program here writes is built from it. The
 // one address that is not is the unreachable one, which is port 1 on the
 // loopback interface — a port nothing binds and the kernel refuses in a turn.
 //
-// NOTE: The slow route answers only when it is STOPPED, or after a wait no test
+// The slow route answers only when it is STOPPED, or after a wait no test
 // here sits through. Nothing sleeps for a fixed time: a test that waits waits
 // for the server to say what it saw, up to a deadline, so a loaded machine
 // makes this file slower and never makes it fail.
 
-// NOTE: What the server saw, read back by the tests. It is reset before each
+// What the server saw, read back by the tests. It is reset before each
 // Program runs rather than accumulated, so a test reads its own run.
 type Seen = {
 	requests: number
@@ -43,7 +43,7 @@ let seen: Seen = freshSeen()
 let server: ReturnType<typeof Bun.serve> | null = null
 let base = ""
 
-// NOTE: The waits the slow route is holding, so that the last test of this file
+// The waits the slow route is holding, so that the last test of this file
 // can not leave a timer behind that keeps the runner's event loop open. Each is
 // its own `release`, and `afterAll` calls every one that is left.
 let pendingWaits = new Set<() => void>()
@@ -65,7 +65,7 @@ function headersOf(request: Request): Record<string, string> {
 beforeAll(() => {
 	server = Bun.serve({
 		port: 0,
-		// NOTE: The host's own idle timeout would answer the slow route for us,
+		// The host's own idle timeout would answer the slow route for us,
 		// which would make the stopping test pass without anything being
 		// stopped.
 		idleTimeout: 0,
@@ -102,7 +102,7 @@ beforeAll(() => {
 				return new Response(null, { status: 304 })
 			}
 
-			// NOTE: A name sent twice, in both shapes the Fetch standard
+			// A name sent twice, in both shapes the Fetch standard
 			// distinguishes: `Headers` folds `x-repeated` itself, and exempts
 			// `set-cookie`, which iterates as one pair per cookie.
 			if (url.pathname === "/repeated") {
@@ -152,7 +152,7 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-	// NOTE: The set is taken and replaced before it is walked, because each
+	// The set is taken and replaced before it is walked, because each
 	// `release` takes itself out of the one it was put in — walking the set a
 	// release is removing from would be reading and writing one thing at once.
 	let waiting = pendingWaits
@@ -166,7 +166,7 @@ afterAll(() => {
 	server?.stop(true)
 })
 
-// NOTE: `await import`, and not because this file prefers it: a Program that
+// `await import`, and not because this file prefers it: a Program that
 // completes anything at its top level emits a top-level `await`, which is a
 // Module a `require` can not read at all. The same harness `asynchrony.spec.ts`
 // runs its Programs through.
@@ -190,7 +190,7 @@ async function run(source: string): Promise<Array<string>> {
 
 	writeFileSync(file, javaScript)
 
-	// NOTE: Both doors a Program writes through, for the reason
+	// Both doors a Program writes through, for the reason
 	// `terminal.spec.ts` intercepts both: `Terminal.print` reaches
 	// `process.stdout.write`, and `Terminal.inspect` reaches `console.log`. A
 	// capture of one of them would see half of what these Programs say.
@@ -216,11 +216,11 @@ async function run(source: string): Promise<Array<string>> {
 		rmSync(directory, { recursive: true, force: true })
 	}
 
-	// NOTE: The trailing break is the one `print` wrote, and not a line.
+	// The trailing break is the one `print` wrote, and not a line.
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
-// NOTE: Everything a Program here asks of an answer, written once. A `match`
+// Everything a Program here asks of an answer, written once. A `match`
 // over the Result is what a reader of `Http` writes, and spelling it out in
 // every Program would bury what each test is about.
 function program(body: string): string {
@@ -238,7 +238,7 @@ ${body}
 }`
 }
 
-// NOTE: What the server has said it saw, waited for rather than assumed. A
+// What the server has said it saw, waited for rather than assumed. A
 // request is stopped by the client, and the server learns of it a turn or more
 // later — so a test that asserted straight away would be asserting that this
 // machine was fast enough.
@@ -298,7 +298,7 @@ describe("Http", () => {
 		expect(output[4]).not.toContain("X-Custom")
 	})
 
-	// NOTE: The one name a host may answer twice on the wire. A Dictionary holds
+	// The one name a host may answer twice on the wire. A Dictionary holds
 	// one value per key, so the second cookie would have overwritten the first
 	// and the first would have been gone with nothing said anywhere.
 	it("folds a header a host sent twice, cookies included", async () => {
@@ -355,11 +355,11 @@ describe("Http", () => {
 
 		expect(output[0]).toBe("200 hello")
 		expect(output[1]).toBe("302 ")
-		// NOTE: The `location` header is the whole of what `#Manual` is for —
+		// The `location` header is the whole of what `#Manual` is for —
 		// the redirect is the answer, and where it points is what a Program
 		// reads off it. Pinned on the hosts that hand a redirect over at all.
 		expect(output[2]).toBe('Value("/hello")')
-		// NOTE: This library's own sentence, and none of the host library's. A
+		// This library's own sentence, and none of the host library's. A
 		// refused redirect used to arrive as `fetch`'s rejection, which named
 		// `fetch()` and its options in a value an Essence Program prints.
 		expect(output[3]).toBe(
@@ -367,7 +367,7 @@ describe("Http", () => {
 		)
 	})
 
-	// NOTE: A redirect mode is about redirects, not about a range of numbers:
+	// A redirect mode is about redirects, not about a range of numbers:
 	// 304 is a 3xx that carries no `location` and means "what you have is
 	// current", so it is an answer under every mode.
 	it("hands back a 3xx that is no redirect even where redirects are refused", async () => {
@@ -380,7 +380,7 @@ describe("Http", () => {
 		expect(output[0]).toBe("304 ")
 	})
 
-	// NOTE: What this library refuses to send at all, in its own words. A host
+	// What this library refuses to send at all, in its own words. A host
 	// library refuses both of these too, with a sentence naming `fetch()` and
 	// its options — a Function no Essence Program can reach, in a value a
 	// Program prints.
@@ -418,7 +418,7 @@ describe("Http", () => {
 			"HEAD",
 		])
 		expect(seen.bodies).toEqual(["", "posted", "put", "patched", "", ""])
-		// NOTE: A HEAD answer carries no body, which is what the Method is for
+		// A HEAD answer carries no body, which is what the Method is for
 		// — so its Response body is the empty String and not the `/echo` route's
 		// answer.
 		expect(output).toEqual([
@@ -431,7 +431,7 @@ describe("Http", () => {
 		])
 	})
 
-	// NOTE: The Record default on `send`'s Parameter, which is where a Record's
+	// The Record default on `send`'s Parameter, which is where a Record's
 	// defaults are written in this language. A request that names only its
 	// address is a whole request, and this is what says the other four members
 	// arrive rather than going missing.
@@ -447,7 +447,7 @@ describe("Http", () => {
 		expect(output).toEqual(["200 hello"])
 	})
 
-	// NOTE: The second call is the `content-type` promise the Request's own
+	// The second call is the `content-type` promise the Request's own
 	// documentation makes: a request carrying a body names its own type,
 	// because this library names none for it.
 	it("sends the headers a call writes", async () => {

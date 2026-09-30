@@ -5,7 +5,7 @@ import { createString } from "../String"
 import { write } from "../Terminal"
 import { typeKeySymbol } from "../type"
 
-// NOTE: `write` is the one primitive under everything a Program puts in front
+// `write` is the one primitive under everything a Program puts in front
 // of a person, and the one runtime Function whose behaviour depends on what
 // HOST it runs on: Bun, Node and Deno give it `process.stdout` and
 // `process.stderr`, a browser gives it nothing but a console made of lines.
@@ -16,7 +16,7 @@ import { typeKeySymbol } from "../type"
 const output: StreamType = { [typeKeySymbol]: "Stream#Output" }
 const error: StreamType = { [typeKeySymbol]: "Stream#Error" }
 
-// NOTE: Three hosts. `streams` is Bun, Node and Deno: both streams present and
+// Three hosts. `streams` is Bun, Node and Deno: both streams present and
 // writable. `shim` is a bundler's `process` polyfill: a `process` exists, but
 // its `stdout` is an empty object and its `stderr` is null, so neither can be
 // written to. `none` is a browser: no `process` at all, and a bare `process`
@@ -24,11 +24,11 @@ const error: StreamType = { [typeKeySymbol]: "Stream#Error" }
 type Host = "streams" | "shim" | "none"
 
 type Seen = {
-	// NOTE: Raw text per stream, concatenated: what is asserted is as often
+	// Raw text per stream, concatenated: what is asserted is as often
 	// the ABSENCE of a newline as its presence.
 	stdout: string
 	stderr: string
-	// NOTE: One entry per console call, so a newline inside an entry and a
+	// One entry per console call, so a newline inside an entry and a
 	// newline the console would add between two can not be confused.
 	logged: Array<string>
 	errored: Array<string>
@@ -82,7 +82,7 @@ function observe(host: Host, body: () => void): Seen {
 
 		body()
 	} finally {
-		// NOTE: Undone in the reverse order, and every branch restores exactly
+		// Undone in the reverse order, and every branch restores exactly
 		// what it replaced — the runner's own reporting writes to these
 		// streams the moment the test returns.
 		if (host === "none") {
@@ -132,7 +132,7 @@ describe("writing to a host with streams", () => {
 })
 
 describe("writing to a host without streams", () => {
-	// NOTE: `print` hands `write` the value and a newline; the console ends
+	// `print` hands `write` the value and a newline; the console ends
 	// every line it is handed itself. So the newline `print` appended comes
 	// off, and a printed line is one console line — not a line and a blank.
 	test("a printed line is one console line", () => {
@@ -147,7 +147,7 @@ describe("writing to a host without streams", () => {
 		expect(seen.stderr).toBe("")
 	})
 
-	// NOTE: Exactly one newline, never all of them: `print("")` is a blank
+	// Exactly one newline, never all of them: `print("")` is a blank
 	// line and has to stay one, and a text ending in two is a line and a
 	// blank line after it.
 	test("exactly one trailing newline comes off", () => {
@@ -159,7 +159,7 @@ describe("writing to a host without streams", () => {
 		expect(seen.logged).toEqual(["", "two\n"])
 	})
 
-	// NOTE: The console has no way to continue a line, so a text without a
+	// The console has no way to continue a line, so a text without a
 	// newline becomes a line of its own there — unchanged, rather than
 	// dropped or held back until something ends it.
 	test("text without a newline is a line of its own", () => {
@@ -170,7 +170,7 @@ describe("writing to a host without streams", () => {
 		expect(seen.logged).toEqual(["no newline"])
 	})
 
-	// NOTE: A `process` whose streams can not be written to is the same as no
+	// A `process` whose streams can not be written to is the same as no
 	// `process` — it is the stream's `write` that is looked for, not the
 	// global, since a bundler's shim has the one without the other.
 	test("a process shim without writable streams counts as no streams", () => {

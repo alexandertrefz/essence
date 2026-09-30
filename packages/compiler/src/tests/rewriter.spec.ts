@@ -54,7 +54,7 @@ const listEmpty = () => list.createList([])
 
 const recordEmpty = () => record.createRecord({})
 
-// NOTE: Absence, as the language spells it — `Optional` is a nominal Choice, so
+// Absence, as the language spells it — `Optional` is a nominal Choice, so
 // "no value" is the payload-less Case `Optional#Empty`, a tagged value carrying
 // no members at all. It stands in these tables where the deleted `nothing`
 // literal used to, and it asks more of them than that literal did: a Case is
@@ -62,11 +62,11 @@ const recordEmpty = () => record.createRecord({})
 // itself and to nothing else, and it must NOT be confused with the structurally
 // identical empty Record.
 //
-// NOTE: Cast because `CaseInstanceType` is deliberately kept out of `AnyType`
+// Cast because `CaseInstanceType` is deliberately kept out of `AnyType`
 // — the same cast the emitted code's own call sites need.
 const optionalEmpty = () => optional.createEmpty() as unknown as AnyType
 
-// NOTE: `Integer.is` and `String.is` are written in Essence now — so are the
+// `Integer.is` and `String.is` are written in Essence now — so are the
 // `Equatable` witnesses the bounded List Methods take. These spell out the
 // answer each Essence body gives, which is what the Simplifier passes at a
 // `List<Integer>` or `List<String>` call site.
@@ -76,7 +76,7 @@ const integerIs = (first: integer.IntegerType, second: integer.IntegerType) =>
 const stringIs = (first: string.StringType, second: string.StringType) =>
 	boolean.createBoolean(first.value === second.value)
 
-// NOTE: Two Lists of Integers hold the same items, asked the way the language
+// Two Lists of Integers hold the same items, asked the way the language
 // asks it. The edits below answer with a box over the receiver's own runs
 // wherever the answer is a WINDOW of them, so the box is not shaped like the
 // literal it holds the same items as — which is the runtime's business and not
@@ -165,7 +165,7 @@ describe("Rewriter", () => {
 					).toBeTrue()
 				})
 
-				// NOTE: `Optional#Empty` beside the empty Record is the pair
+				// `Optional#Empty` beside the empty Record is the pair
 				// worth naming: the two are structurally identical — no
 				// members on either side — and only the tag tells them apart,
 				// which is exactly what a nominal Case promises. `#Empty`
@@ -384,7 +384,7 @@ describe("Rewriter", () => {
 					).toBeTrue()
 				})
 
-				// NOTE: The last two pairs are the ones a nominal Case earns:
+				// The last two pairs are the ones a nominal Case earns:
 				// `Optional#Empty` and the empty Record carry the very same
 				// members — none — so a structural check would call each a
 				// value of the other's Type. Only the tag says otherwise, and
@@ -441,7 +441,7 @@ describe("Rewriter", () => {
 				})
 
 				it("narrows Lists by the items they hold", () => {
-					// NOTE: Item Types erase at runtime, so the empty List
+					// Item Types erase at runtime, so the empty List
 					// fits any List matcher — the same way an empty literal
 					// is assignable to any List.
 					expect(
@@ -475,7 +475,7 @@ describe("Rewriter", () => {
 					).toBeFalse()
 				})
 
-				// NOTE: Regression test — a Function descriptor used to reach
+				// Regression test — a Function descriptor used to reach
 				// the "not implemented" branch, which printed a line of
 				// Compiler prose into the Program's output and answered FALSE.
 				// A Record Matcher naming a callback member could therefore
@@ -494,7 +494,7 @@ describe("Rewriter", () => {
 					let double = (value: integer.IntegerType) =>
 						integer.product(value.value, 2)
 
-					// NOTE: A Function value carries no Type key — `typeof` is
+					// A Function value carries no Type key — `typeof` is
 					// the whole check, because the Signature is erased by the
 					// time it runs.
 					expect(
@@ -526,7 +526,7 @@ describe("Rewriter", () => {
 					).toBeFalse()
 				})
 
-				// NOTE: The descriptors that are left are Types no Matcher and
+				// The descriptors that are left are Types no Matcher and
 				// no dispatch case can name — reaching one is a Compiler bug,
 				// and it used to be answered with a `console.log` and a false,
 				// which took a silently wrong branch instead.
@@ -542,7 +542,7 @@ describe("Rewriter", () => {
 			})
 
 			describe("noCaseMatched", () => {
-				// NOTE: The end of an emitted Match's `if` chain. It used to
+				// The end of an emitted Match's `if` chain. It used to
 				// simply not exist: the wrapper fell off its end and answered
 				// `undefined`, which is not an Essence value, so the failure
 				// surfaced somewhere else entirely — as a `TypeError` out of
@@ -552,7 +552,7 @@ describe("Rewriter", () => {
 						"No Case of this Match matched the Integer it was given.",
 					)
 
-					// NOTE: A Case value is named by its whole tag, Choice and
+					// A Case value is named by its whole tag, Choice and
 					// Case both — `Optional#Empty`, not `Optional` — which is
 					// what makes the message say WHICH Case fell through.
 					expect(() => noCaseMatched(optionalEmpty())).toThrow(
@@ -651,14 +651,14 @@ describe("Rewriter", () => {
 		})
 
 		describe("String", () => {
-			// NOTE: Much of this Namespace is written in Essence
+			// Much of this Namespace is written in Essence
 			// (`packages/standard-library/sources/String.es`) and the golden
 			// harness covers it. What is tested here is the native floor those
 			// Essence bodies stand on, and it is where the code-point behaviour
 			// is actually decided.
 
 			describe("append", () => {
-				// NOTE: The TEXT, not the wrapper. A joined String may carry
+				// The TEXT, not the wrapper. A joined String may carry
 				// what `append` worked out about it — that it is ASCII, and
 				// how many characters it therefore has — under Symbol keys,
 				// and `toEqual` sees those where `Object.keys` and everything
@@ -696,7 +696,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: The TEXT of each piece, for the reason `append` gives: a
+			// The TEXT of each piece, for the reason `append` gives: a
 			// piece of an ASCII String carries the ASCII marker and its count,
 			// and a piece of any other String carries the clusters it was cut
 			// into — `asciiFastPath.spec.ts` and `graphemes.spec.ts` hold
@@ -714,7 +714,7 @@ describe("Rewriter", () => {
 				})
 
 				it("splits an empty splitter by code point, keeping astral characters whole", () => {
-					// NOTE: `String.split("")` would tear the emoji into two
+					// `String.split("")` would tear the emoji into two
 					// lone surrogates; splitting by code point keeps it whole.
 					// This is the ONE place the runtime decides what a
 					// character is — `characters()` IS `split("")` in
@@ -757,7 +757,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: The TEXT again: a case mapping or a trim of an ASCII
+			// The TEXT again: a case mapping or a trim of an ASCII
 			// String keeps the ASCII marker, for the reason `String.ts` gives.
 			describe("casing and trimming", () => {
 				it("upper- and lower-cases", () => {
@@ -770,7 +770,7 @@ describe("Rewriter", () => {
 				})
 
 				it("trims from either end", () => {
-					// NOTE: One native reads the `Side` Case; `trim()` with no
+					// One native reads the `Side` Case; `trim()` with no
 					// Argument reaches it through the frame the Compiler
 					// synthesizes for the `at:` Parameter's default.
 					expect(
@@ -792,7 +792,7 @@ describe("Rewriter", () => {
 
 			describe("compare", () => {
 				it("orders lexicographically by code point", () => {
-					// NOTE: This is also the whole of String equality —
+					// This is also the whole of String equality —
 					// `String.is` is `compare(other)::is(Ordering#Equal)` in
 					// Essence.
 					expect(
@@ -813,7 +813,7 @@ describe("Rewriter", () => {
 							string.createString("apple"),
 						),
 					).toBe(ordering.equal)
-					// NOTE: A prefix orders before the longer String.
+					// A prefix orders before the longer String.
 					expect(
 						string.compare__overload$1(
 							string.createString("app"),
@@ -897,14 +897,14 @@ describe("Rewriter", () => {
 		})
 
 		describe("Rational", () => {
-			// NOTE: The FIRST entry of `of` is fallible, and fallibility is
+			// The FIRST entry of `of` is fallible, and fallibility is
 			// `Optional`, a nominal generic Choice — so the answer is a tagged
 			// Case either way: `#Value` carrying the Rational under `item`, or
 			// the payload-less `#Empty`. No Union's SHAPE means "missing" any
 			// more; the tag says it. The Rational itself is still asserted on in
 			// full, one wrapper deeper.
 			//
-			// NOTE: The SECOND entry is the same construction over a denominator
+			// The SECOND entry is the same construction over a denominator
 			// the Compiler proved is not zero, so it answers with the Rational
 			// itself and there is no wrapper at all. It is reachable only through
 			// that proof, which is why there is no zero case to assert here — a
@@ -931,13 +931,13 @@ describe("Rewriter", () => {
 		})
 
 		describe("Number", () => {
-			// NOTE: `lowest`, `highest`, `sum`, `product` and `average` are
+			// `lowest`, `highest`, `sum`, `product` and `average` are
 			// written in Essence (`packages/standard-library/sources/Number.es`),
 			// and the golden harness covers them.
 		})
 
 		describe("List", () => {
-			// NOTE: `is` takes a conformance witness now — equality of a List is
+			// `is` takes a conformance witness now — equality of a List is
 			// its items\' own equality, handed in by the call site — so the mixed
 			// Lists this block used to compare (a String beside an Integer beside
 			// a Rational) have no single witness to be compared through, and are
@@ -1066,7 +1066,7 @@ describe("Rewriter", () => {
 			})
 
 			describe("append", () => {
-				// NOTE: Asked through the runtime's own `is` rather than of the
+				// Asked through the runtime's own `is` rather than of the
 				// boxes themselves. A List answers its ITEMS; how it holds them
 				// is the runtime's business, and `append` may answer a List
 				// sharing the Array its receiver holds, under a view of its own
@@ -1182,7 +1182,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: `item` is fallible, and fallibility is `Optional`, a
+			// `item` is fallible, and fallibility is `Optional`, a
 			// nominal generic Choice — so a hit answers `#Value` carrying the
 			// item under `item`, and a miss answers the payload-less `#Empty`.
 			// Which item was found is still asserted on in full, one wrapper
@@ -1206,7 +1206,7 @@ describe("Rewriter", () => {
 							integerTwo(),
 						),
 					).toEqual(optional.createEmpty())
-					// NOTE: -1 names the last item, so the position that falls
+					// -1 names the last item, so the position that falls
 					// outside a one-item List from below is -2.
 					expect(
 						list.item__overload$1(
@@ -1242,7 +1242,7 @@ describe("Rewriter", () => {
 					])
 
 				it("returns the half-open range", () => {
-					// NOTE: [1, 3) — positions 1 and 2, stopping before 3.
+					// [1, 3) — positions 1 and 2, stopping before 3.
 					expect(
 						sameItems(
 							list.slice(
@@ -1256,7 +1256,7 @@ describe("Rewriter", () => {
 				})
 
 				it("clamps each end to the list", () => {
-					// NOTE: -5 counts back from the end of a four item List,
+					// -5 counts back from the end of a four item List,
 					// which reaches past the start — so it settles on zero
 					// rather than wrapping a second time.
 					expect(
@@ -1315,7 +1315,7 @@ describe("Rewriter", () => {
 							abcd(),
 						),
 					).toEqual(booleanTrue())
-					// NOTE: The same in the other direction — counting back
+					// The same in the other direction — counting back
 					// from the end by more than a 32 bit index leaves the
 					// position far below zero, where it clamps to the start.
 					expect(
@@ -1331,7 +1331,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: `remove(at:)` is a native again — the Essence body that
+			// `remove(at:)` is a native again — the Essence body that
 			// composed two `slice`s and an `append(contentsOf:)` is gone, and
 			// with it the intermediates. These hold the CONTRACT that body set:
 			// which positions name an item and which leave the List alone. The
@@ -1403,7 +1403,7 @@ describe("Rewriter", () => {
 				})
 
 				it("leaves the List alone when the position names no item", () => {
-					// NOTE: At the length, past it, and reaching back past the
+					// At the length, past it, and reaching back past the
 					// first item — the three ways to name nothing.
 					expect(
 						sameItems(
@@ -1701,7 +1701,7 @@ describe("Rewriter", () => {
 		})
 
 		describe("Ordering", () => {
-			// NOTE: `Ordering.is`, `isNot` and `toString` are derived for the
+			// `Ordering.is`, `isNot` and `toString` are derived for the
 			// Choice, and the golden harness covers them. The runtime `anyIs`
 			// keeps its unit test.
 			it("compares Ordering values with anyIs", () => {
@@ -1712,14 +1712,14 @@ describe("Rewriter", () => {
 		})
 
 		describe("Protocol runtime gap fills", () => {
-			// NOTE: `String.toString` is written in Essence
+			// `String.toString` is written in Essence
 			// (`packages/standard-library/sources/String.es`, `<- @`), and
 			// `List.toString`, which has a representation to build, is native.
 			// The golden harness covers both.
 		})
 
 		describe("Number", () => {
-			// NOTE: `Number.is` and `toString` are written in Essence
+			// `Number.is` and `toString` are written in Essence
 			// (`packages/standard-library/sources/Number.es`), `isNot` is
 			// provided by `Equatable` and the inequalities by `Comparable`, and
 			// the golden harness covers them all. `compare`, which `is` and the
@@ -1742,7 +1742,7 @@ describe("Rewriter", () => {
 
 		describe("Union Method dispatch", () => {
 			it("runs the first case whose member Type accepts the receiver", () => {
-				// NOTE: `Boolean.toString` is implemented in Essence now, so the
+				// `Boolean.toString` is implemented in Essence now, so the
 				// Boolean case supplies a stand-in of the same shape — this tests
 				// that `dispatchMethod` picks the case whose member Type accepts
 				// the receiver, not any particular runtime Method.
@@ -1771,7 +1771,7 @@ describe("Rewriter", () => {
 				)
 			})
 
-			// NOTE: A branch names the Parameters ITS callee takes defaults for,
+			// A branch names the Parameters ITS callee takes defaults for,
 			// as a fifth case element, and the shared Argument list holds what
 			// the call WROTE — so the holes are opened per branch, here. The
 			// indices are over the callee's whole signature with the receiver at
@@ -1811,7 +1811,7 @@ describe("Rewriter", () => {
 				])
 			})
 
-			// NOTE: The order the cases are walked in IS the dispatch's meaning
+			// The order the cases are walked in IS the dispatch's meaning
 			// — the Enricher writes them most specific first and the runtime
 			// answers with the first one that accepts, so a receiver two cases
 			// both accept belongs to the earlier of them. Pinned with cases
@@ -1849,7 +1849,7 @@ describe("Rewriter", () => {
 				).toEqual(string.createString("Union"))
 			})
 
-			// NOTE: The end of the emitted dispatch chain, and the counterpart
+			// The end of the emitted dispatch chain, and the counterpart
 			// to a Match's `noCaseMatched`. The Enricher only emits a dispatch
 			// when some case is guaranteed to accept the receiver, so reaching
 			// here means a case's runtime check disagrees with the Type the
@@ -1882,7 +1882,7 @@ describe("Rewriter", () => {
 				)
 			})
 
-			// NOTE: The three spies below are only ever asked what they were
+			// The three spies below are only ever asked what they were
 			// HANDED, so each answers the unit value — the empty Record, which
 			// is what a `-> {}` Method returns. It has to be an Essence value
 			// all the same: `dispatchMethod` hands its answer straight on.
@@ -1906,7 +1906,7 @@ describe("Rewriter", () => {
 				])
 			})
 
-			// NOTE: A Function literal Argument is typed by the branch it is
+			// A Function literal Argument is typed by the branch it is
 			// passed to, so each branch carries its own compiled copy of it and
 			// names the position that copy stands in for. The copies of the
 			// branches that did NOT match must not reach the Method — that was
@@ -1941,7 +1941,7 @@ describe("Rewriter", () => {
 				])
 			})
 
-			// NOTE: The shared Arguments are evaluated once, at the call site,
+			// The shared Arguments are evaluated once, at the call site,
 			// and the same array is handed to whichever case matches — so a case
 			// that overrides a position must leave that array alone. Writing
 			// through it would make one dispatch's substitution the next one's
@@ -1973,12 +1973,12 @@ describe("Rewriter", () => {
 		})
 	})
 
-	// NOTE: The Modules half of emission. Everything here is about what the
+	// The Modules half of emission. Everything here is about what the
 	// Rewriter does that `rewrite` on its own can not: one shared prelude
 	// instead of a copy per Module, and Case tags spelled against the entry's
 	// directory rather than against the machine that compiled.
 	describe("Modules", () => {
-		// NOTE: No graph and no file system: the paths are the Module identity
+		// No graph and no file system: the paths are the Module identity
 		// and nothing reads them, so a Program that imports nothing can be
 		// enriched as a Module of a bundle straight away. What is under test is
 		// emission, and a graph here would only be a second copy of what
@@ -2034,7 +2034,7 @@ describe("Rewriter", () => {
 				"essence:./deep/Third.es",
 			])
 
-			// NOTE: `Boolean.toString` is written in Essence, so each of the
+			// `Boolean.toString` is written in Essence, so each of the
 			// three reaches the same `$es_Boolean_toString` const. Rewritten
 			// one at a time they would carry three copies of its body — which
 			// is the whole reason the reachability fixed point runs once over
@@ -2061,7 +2061,7 @@ describe("Rewriter", () => {
 			expect(bundle.entry).toBe("essence:./Main.es")
 		})
 
-		// NOTE: A Method no Module reaches is not emitted at all, exactly as it
+		// A Method no Module reaches is not emitted at all, exactly as it
 		// is not for a lone Program — the prelude is one shared Module, not a
 		// standard library the bundle carries whole.
 		it("leaves out a Method no Module of the bundle reaches", () => {
@@ -2075,7 +2075,7 @@ describe("Rewriter", () => {
 			)
 		})
 
-		// NOTE: The identity a Choice took from its Module is a canonical path,
+		// The identity a Choice took from its Module is a canonical path,
 		// which names the machine that compiled and must not reach the output.
 		// The emitted tag renders it against the entry's directory instead, and
 		// the Type descriptor a Match compares against renders identically —
@@ -2095,7 +2095,7 @@ describe("Rewriter", () => {
 	})
 }
 `
-			// NOTE: The descriptor is what the second half of this asks about,
+			// The descriptor is what the second half of this asks about,
 			// and a lone Handler is the one `elide-final-match-test` drops the
 			// test of — so the Match is emitted with that pass off. Which
 			// Handler is tested is not this test's business; how an identity
@@ -2118,7 +2118,7 @@ describe("Rewriter", () => {
 			expect(emitted).not.toContain("/project")
 		})
 
-		// NOTE: The single-file form is the default and stays byte for byte
+		// The single-file form is the default and stays byte for byte
 		// what it was: its prelude is inline, it names no Module and it spells
 		// a Case by its bare name, because a Program that is no Module has no
 		// path in its Choices' identity to render.
@@ -2142,7 +2142,7 @@ describe("Rewriter", () => {
 			expect(generated).toContain('$type.createCase("Colour#Red")')
 		})
 
-		// NOTE: The same spelling for somebody holding one identity and no graph
+		// The same spelling for somebody holding one identity and no graph
 		// — a host building a Case value has to stamp it with the tag the
 		// bundle's own values carry, and these two answers being one is what
 		// makes that possible at all.
@@ -2190,7 +2190,7 @@ describe("Rewriter", () => {
 				).toBe("../Shared.es#Shape")
 			})
 
-			// NOTE: A builtin Choice is identified by its bare name — there is no
+			// A builtin Choice is identified by its bare name — there is no
 			// Module path in it to render, and a `#` that is not preceded by one
 			// is not a Module path either.
 			it("leaves an identity with no Module path alone", () => {

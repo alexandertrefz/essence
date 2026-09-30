@@ -184,7 +184,7 @@ describe("Folding the Module sections", () => {
 		expect(ranges).toContainEqual({ startLine: 8, endLine: 9 })
 	})
 
-	// NOTE: A group written out folds on its own; one written flat has no
+	// A group written out folds on its own; one written flat has no
 	// lines to fold.
 	it("should fold a group written out over lines", () => {
 		let ranges = foldingRangesOf(
@@ -216,7 +216,7 @@ describe("Folding the Module sections", () => {
 	})
 })
 
-// NOTE: A payload default may itself be written across lines, and it folds the
+// A payload default may itself be written across lines, and it folds the
 // way the same literal folds inside a body.
 describe("Folding Ranges inside a Case payload default", () => {
 	it("should fold a List literal written as a payload default's member", () => {
@@ -258,7 +258,7 @@ describe("Folding a define", () => {
 		})
 	})
 
-	// NOTE: An arm has a Position of its own and could be handed out, but
+	// An arm has a Position of its own and could be handed out, but
 	// folding is a brace's affair — the block, the Function around it and the
 	// implementation are the three folds this file has.
 	it("should hand out no range for an arm of its own", () => {
@@ -284,7 +284,7 @@ describe("Folding a define", () => {
 	})
 })
 
-// NOTE: Neither Keyword folds — both are written on the line their operand
+// Neither Keyword folds — both are written on the line their operand
 // starts on — but a call written under one folds like any other, which is what
 // the walk's own case for them is for.
 describe("Folding Ranges under start and complete", () => {

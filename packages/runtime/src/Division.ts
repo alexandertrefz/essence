@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `Division` is a builtin Choice, like `Rounding` and `SignStyle` — its
+// `Division` is a builtin Choice, like `Rounding` and `SignStyle` — its
 // values carry Case tags (`"Division#Euclidean"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Integer.es` declares the conformances
@@ -11,7 +11,7 @@ export type EuclideanType = { [typeKeySymbol]: "Division#Euclidean" }
 export type TruncatingType = { [typeKeySymbol]: "Division#Truncating" }
 export type DivisionType = EuclideanType | TruncatingType
 
-// NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
+// Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
 export const euclidean: EuclideanType = {
 	[typeKeySymbol]: "Division#Euclidean",

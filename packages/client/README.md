@@ -417,7 +417,7 @@ let math = await loadModule("./math/Math.es")
 
 generateDeclarations(describeModule(math.surface, math.entryPath), {
 	moduleName: "Math.es",
-	// NOTE: The Types the Module names. A Descriptor does not carry them —
+	// The Types the Module names. A Descriptor does not carry them —
 	// nothing at run time reads a Type Alias — so a declaration file that wants
 	// them by name asks for them.
 	types: describeTypes(math.surface, math.entryPath),

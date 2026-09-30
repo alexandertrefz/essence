@@ -22,26 +22,26 @@ import type { StringType } from "./String"
 import { createString, itemText } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: A List is TWO runs and a VIEW into each — the back run stored forward
+// A List is TWO runs and a VIEW into each — the back run stored forward
 // in `value`, the front run stored REVERSED in `front` — so that adding at
 // either end can push onto an Array the receiver already holds instead of
 // copying the whole of it. The logical items are `front[frontLen - 1]` down to
 // `front[0]`, then `value[0]` up to `value[length)`.
 //
-// NOTE: The two runs are SHARED between the boxes of one chain, and what keeps
+// The two runs are SHARED between the boxes of one chain, and what keeps
 // them apart is that each box says how much of each run is its own. A box that
 // never prepended carries no `front` at all and is then what a List has always
 // been plus a `length`: both fields absent has to mean "flat, and the view is
 // the whole Array", because that is exactly the literal the Optimiser's
 // `collapse-construction` emits.
 //
-// NOTE: None of this is observable. Every Essence value is immutable and the
+// None of this is observable. Every Essence value is immutable and the
 // language has no way to ask whether two values are the SAME value, so a shared
 // Array is indistinguishable from a copied one for as long as every box answers
 // exactly the items its view holds — which is what the stamping discipline
 // below is for.
 //
-// NOTE: `writes` is the back run's UNDO LOG and the version of it this box
+// `writes` is the back run's UNDO LOG and the version of it this box
 // views, and it is how a positional write can change that Array in place
 // instead of copying it — `listWrites.ts` holds the reasoning. It is absent for
 // every box that has never met such a write, which is nearly all of them, and
@@ -56,7 +56,7 @@ export type ListType<ItemType extends AnyType> = {
 	writes?: LoggedRun<ItemType>
 }
 
-// NOTE: TAKES OWNERSHIP of the Array it is handed. The box stores that Array
+// TAKES OWNERSHIP of the Array it is handed. The box stores that Array
 // rather than copying it, and a later `append` may push onto it in place, so no
 // caller may keep the Array it passed or hand the same one to two boxes. Every
 // caller — in this package and in the JavaScript the Rewriter emits — builds a
@@ -68,7 +68,7 @@ export function createList<ItemType extends AnyType>(
 	return { [typeKeySymbol]: "List", value: originalList }
 }
 
-// NOTE: `createList` for callers whose Array is not theirs to give away — the
+// `createList` for callers whose Array is not theirs to give away — the
 // client bridge, and through it every host that builds a List out of a
 // JavaScript Array of its own. The copy is what the ownership contract above
 // costs when it can not be checked: a host keeps its Array, an append onto the
@@ -81,7 +81,7 @@ export function createListFrom<ItemType extends AnyType>(
 	return { [typeKeySymbol]: "List", value: items.slice() }
 }
 
-// NOTE: What a native sees of a List: the two runs, and the counts THIS box
+// What a native sees of a List: the two runs, and the counts THIS box
 // owns of them. A box with no front views zero items of this one shared Array
 // rather than of a `null`, so every walk is the same two loops with nothing to
 // guard — the front loop simply does not run. Nothing writes to THIS Array, and
@@ -97,7 +97,7 @@ export type ListView<ItemType extends AnyType> = {
 	total: number
 }
 
-// NOTE: THE REENTRANCY RULE. Every native that runs user code while it holds a
+// THE REENTRANCY RULE. Every native that runs user code while it holds a
 // run fixes its item counts once, in the view it reads or in `materialise`, and
 // never asks that run for its length again. A run can grow mid-walk, because a
 // callback may append to the very List being walked:
@@ -108,7 +108,7 @@ export type ListView<ItemType extends AnyType> = {
 // also change mid-walk, through a positional write in place, and THE SECOND
 // REENTRANCY RULE at `walkOf` is what holds a walk against that.
 //
-// NOTE: THE READING view: `runsOf`, with the receiver's runs trimmed to what it
+// THE READING view: `runsOf`, with the receiver's runs trimmed to what it
 // views where THE HALF RULE (`trimUnderHalfRule`) says to trim them. It does
 // not seal, so it is for readers that run no user code while they hold a run.
 // The positional readers, `item(at:)` and `NonEmptyList`'s `firstItem` and
@@ -126,7 +126,7 @@ export function viewOf<ItemType extends AnyType>(
 	return view
 }
 
-// NOTE: THE SECOND REENTRANCY RULE, and the walker's view: `viewOf`, sealed, for
+// THE SECOND REENTRANCY RULE, and the walker's view: `viewOf`, sealed, for
 // a native that hands the raw run to code that may call back into Essence, a
 // Function or a conformance witness. A run can change mid-walk, not only grow:
 // `list::reduce(startingWith list, (acc, item) { <- acc::replace(item, at 0) })`
@@ -135,19 +135,19 @@ export function viewOf<ItemType extends AnyType>(
 // run's log. A write refuses a sealed log and copies instead, and the walk
 // answers the items the List held at entry.
 //
-// NOTE: Sealed for good rather than for the walk's length. A walk is linear work
+// Sealed for good rather than for the walk's length. A walk is linear work
 // anyway, so the one copy the next write then makes is paid for, and there is no
 // pinning to unwind on a path that leaves early. `sealedRunsOf` is the same
 // thing for the walks that must not trim, and `materialise` seals for itself,
 // because what it hands back is the box's own Array.
 //
-// NOTE: THE AUDIT this rests on is finite and mechanical, and the rule is about
+// THE AUDIT this rests on is finite and mechanical, and the rule is about
 // the RUN rather than about the receiver: a native that can run user code — a
 // Function or a conformance witness — while it holds ANY List's raw run says
 // `walkOf`, `sealedRunsOf` or `materialise` for THAT run. Every run it holds, on
 // every operand.
 //
-// NOTE: Written that way because the narrower wording — "reads its receiver's
+// Written that way because the narrower wording — "reads its receiver's
 // items" — is what let `is` ship holding its ARGUMENT's run unsealed while the
 // item witness wrote into it, and the generic Choice member walk in
 // `internalHelpers.ts` hold both of its runs that way. A native with two List
@@ -159,12 +159,12 @@ export function viewOf<ItemType extends AnyType>(
 // `append(contentsOf:)`, `pair`, `flatten`, `transpose`, the edits — runs no
 // user code at all while it holds a run, and owes nothing.
 //
-// NOTE: The readers that visit ONE item, `item(at:)` and `NonEmptyList`'s
+// The readers that visit ONE item, `item(at:)` and `NonEmptyList`'s
 // `firstItem` and `lastItem`, read through `viewOf` instead. They hand no Array
 // to anybody, and a reader that sealed would make "read the cell before, write
 // this one" copy the whole table every turn.
 //
-// NOTE: Every call of `walkOf` and `sealedRunsOf` here that hands items to user
+// Every call of `walkOf` and `sealedRunsOf` here that hands items to user
 // code, and the `materialise` in each `sort`, is held against a callback that
 // writes the List being walked, in `positionalWrites.spec.ts`. `sort(in:)` and
 // `sort(by:)` compare a copy of that Array, so only `sort(on:)` needs its seal.
@@ -183,14 +183,14 @@ export function walkOf<ItemType extends AnyType>(
 	return view
 }
 
-// NOTE: THE HALF RULE FOR RUNS, and the whole of the trimming policy. A box
+// THE HALF RULE FOR RUNS, and the whole of the trimming policy. A box
 // whose view is shorter than its run is holding the whole of its chain's
 // high-water Array alive, and trimming that away and storing the trimmed Array
 // back is what releases it. What the rule decides is WHEN: only when the view
 // that will be held is less than HALF of the Array holding it. Above a half the
 // box is told to keep the Array it has.
 //
-// NOTE: The rule is what keeps a SHRINK CHAIN linear, which is the whole reason
+// The rule is what keeps a SHRINK CHAIN linear, which is the whole reason
 // it is a rule rather than "always". `removeFirst()` answers a window one item
 // shorter, and the canonical functional walk — take `firstItem()`, recurse on
 // `removeFirst()` — reads each of those windows once. Trimming every one of
@@ -200,7 +200,7 @@ export function walkOf<ItemType extends AnyType>(
 // amortised O(1) a turn, and what the walk holds never exceeds twice what it
 // views.
 //
-// NOTE: Held to at BOTH ends of a window's life — where one is read, above, and
+// Held to at BOTH ends of a window's life — where one is read, above, and
 // where one is CUT, in `sharedWindowOf` below. That is what makes the walk cost
 // the same whichever way round its two lines are written: a turn that derives
 // the next window before reading this one trims the run at the cut, and a turn
@@ -209,7 +209,7 @@ export function walkOf<ItemType extends AnyType>(
 // derive-first spelling copying from the halfway point on — 220 ms against 35
 // for the same walk with its two lines swapped.
 //
-// NOTE: What the rule is asked ABOUT is always the receiver's own view, at
+// What the rule is asked ABOUT is always the receiver's own view, at
 // either end of a window's life — the question is how much of an Array the box
 // whose Array it is is keeping alive, and the answer a cut hands out is a box of
 // its own that will be asked the same question the first time it is read. Asking
@@ -217,7 +217,7 @@ export function walkOf<ItemType extends AnyType>(
 // of a List the receiver views the whole of, copying the whole of it to hand out
 // two — which is the one shape this rule exists to refuse.
 //
-// NOTE: A front-less box views zero items of the one shared `noItems`, which is
+// A front-less box views zero items of the one shared `noItems`, which is
 // zero items long, so the front rule can not fire for it and no box is ever
 // given a front run it did not have.
 function trimUnderHalfRule<ItemType extends AnyType>(
@@ -229,7 +229,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 
 		originalList.value = trimmed
 		originalList.length = view.backCount
-		// NOTE: The trimmed Array is this box's alone and the log it was
+		// The trimmed Array is this box's alone and the log it was
 		// carrying describes the Array it just let go of, so the log goes with
 		// it. What that costs is one copy at the box's next positional write,
 		// which mints a log for the fresh Array that write makes.
@@ -246,7 +246,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: The same two runs and the same fixed counts, read WITHOUT writing
+// The same two runs and the same fixed counts, read WITHOUT writing
 // anything back — for everything that asks a List a question about itself
 // rather than about its items. `length`, which the stdlib's edits ask before
 // they slice; the EDITS, which decide from the counts alone which window they
@@ -254,7 +254,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 // to it. Counting is not reading, and a count has no business deciding a
 // representation question for whoever reads next.
 //
-// NOTE: The edits reach the trimming that matters for them THROUGH their
+// The edits reach the trimming that matters for them THROUGH their
 // answer, in `sharedWindowOf`, which asks THE HALF RULE about the counts the
 // answer will view. Trimming the receiver here instead would trim it for a
 // window that keeps almost all of it, and a chain of such windows trims at every
@@ -262,7 +262,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 export function runsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
-	// NOTE: WHERE A BOX LEFT BEHIND CATCHES UP. A positional write may have
+	// WHERE A BOX LEFT BEHIND CATCHES UP. A positional write may have
 	// changed the back run under this box since it last looked, and every view
 	// reader asks for its runs here, directly or through `viewOf`, `walkOf` and
 	// `sealedRunsOf`, so a box that is behind repairs itself before a single
@@ -295,12 +295,12 @@ export function runsOf<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: The one place the two runs become one Array. What comes back is an
+// The one place the two runs become one Array. What comes back is an
 // Array whose whole length IS the box's logical view, so every operation that
 // wants a flat List can be written against it exactly as it was written before
 // there were two runs.
 //
-// NOTE: An upgraded box is DEMOTED in place while it is combined — the box
+// An upgraded box is DEMOTED in place while it is combined — the box
 // keeps the combined Array and forgets its front — so a List that is read
 // repeatedly pays for the combining once. Swapping one representation for
 // another under a value is invisible for the same reason the whole scheme is:
@@ -309,7 +309,7 @@ export function runsOf<ItemType extends AnyType>(
 export function materialise<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): Array<ItemType> {
-	// NOTE: What this hands back is the box's OWN Array, and the caller may walk
+	// What this hands back is the box's OWN Array, and the caller may walk
 	// it while calling user code — `sort(on:)` reads its key off every item, and
 	// the Rewriter's inlined walks read their items here. So a box that is behind
 	// catches up first and a box that is current is sealed, for the reason
@@ -334,7 +334,7 @@ export function materialise<ItemType extends AnyType>(
 
 	let frontCount = originalList.frontLen ?? front.length
 	let back = originalList.value
-	// NOTE: Sized once and filled by index, both halves ASCENDING — the front
+	// Sized once and filled by index, both halves ASCENDING — the front
 	// run is stored reversed, so it is READ descending and WRITTEN forwards.
 	// That is what makes this the cheapest of the four shapes measured on
 	// JavaScriptCore at 8, 64, 1,000 and 100,000 items: two `push` loops into an
@@ -362,7 +362,7 @@ export function materialise<ItemType extends AnyType>(
 	return combined
 }
 
-// NOTE: A run handed to code that may call back into Essence can not be written
+// A run handed to code that may call back into Essence can not be written
 // in place any more, for the reason `walkOf` gives. Sealing the log says so, and
 // says it about the ARRAY rather than about this box: every box sharing that
 // Array reads the same log, so one of them being walked closes the Array to all
@@ -376,7 +376,7 @@ function sealWrites(originalList: ListType<AnyType>): void {
 	}
 }
 
-// NOTE: `runsOf`, sealed, for the walks that must not trim the receiver:
+// `runsOf`, sealed, for the walks that must not trim the receiver:
 // `keySetOver`, `meetsAKeyTwice` and the argument of `contains(everyItemOf:)`
 // here, which ask an item's own witness or a key Function about every item,
 // the walks in `GroupedList` and `Dictionary.of(_:)`, and `mode`. Trimming is
@@ -392,7 +392,7 @@ export function sealedRunsOf<ItemType extends AnyType>(
 	return view
 }
 
-// NOTE: The logical item at a position of a FIXED view — one comparison to
+// The logical item at a position of a FIXED view — one comparison to
 // decide which run holds it, and nothing allocated, so the walks that need
 // positions on both sides at once (`is`, `compare`) can have them without
 // building anything.
@@ -405,10 +405,10 @@ export function itemOfView<ItemType extends AnyType>(
 		: view.back[position - view.frontCount]
 }
 
-// NOTE: The two-run walk written once, for the readers that want nothing more
+// The two-run walk written once, for the readers that want nothing more
 // of a List than its items added to an Array they are building.
 //
-// NOTE: Exported for the walks the Rewriter writes out. A walk that builds its
+// Exported for the walks the Rewriter writes out. A walk that builds its
 // List in place owns one Array and pushes onto it, and this is how a whole List
 // added by `append(contentsOf:)` reaches that Array. It can not reach for
 // `materialise`, which answers the receiver's OWN Array.
@@ -427,18 +427,18 @@ export function pushItemsOf<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: A FRESH Array of a List's logical items, which is what a walk that
+// A FRESH Array of a List's logical items, which is what a walk that
 // builds its List in place enters with wherever its seed is not a literal: the
 // walk owns what it pushes onto, so a List the Program was holding is copied
 // rather than grown.
 //
-// NOTE: A flat box is copied by the same `slice` `append` performed where it
+// A flat box is copied by the same `slice` `append` performed where it
 // could not push in place, so entering a walk costs what rebuilding its first
 // turn cost before. Pushing the items one at a time instead costs four times as
 // much on JavaScriptCore and sixteen on V8, which a short walk over a long seed
 // pays in full and nothing else pays back.
 //
-// NOTE: Only a box carrying a front run has two runs to walk, and it is left
+// Only a box carrying a front run has two runs to walk, and it is left
 // exactly as it was found: nothing of the receiver is shared with the answer, so
 // there is no count to stamp and no representation to trim.
 export function ownItemsOf<ItemType extends AnyType>(
@@ -463,7 +463,7 @@ export function ownItemsOf<ItemType extends AnyType>(
 	return items
 }
 
-// NOTE: What a native owes the receiver before it hands one of the receiver's
+// What a native owes the receiver before it hands one of the receiver's
 // run Arrays to a second box: both of the receiver's counts written down. A box
 // whose count is ABSENT means "the whole Array", so a receiver left that way
 // would view whatever the answer later pushes onto the run they now share.
@@ -480,7 +480,7 @@ function stampClosed<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: AND WHAT ELSE A BOX OWES BEFORE IT SHARES A BACK RUN: the run's log and
+// AND WHAT ELSE A BOX OWES BEFORE IT SHARES A BACK RUN: the run's log and
 // the version of it the receiver views, carried across unchanged. A box holding
 // a logged Array without saying which version it views would read whatever the
 // next in-place write leaves there — the one way this scheme can corrupt a value
@@ -489,7 +489,7 @@ function stampClosed<ItemType extends AnyType>(
 // front Array in this file is built fresh and no positional write ever lands in
 // one.
 //
-// NOTE: THE WHOLE OF WHAT IS SHAREABLE. Shrinking `frontLen` by k drops the
+// THE WHOLE OF WHAT IS SHAREABLE. Shrinking `frontLen` by k drops the
 // first k logical items, because the front run is stored reversed; shrinking
 // the back view by k drops the last k. So the sub-lists a box can answer with
 // while COPYING NOTHING are exactly the windows that still contain the seam
@@ -498,7 +498,7 @@ function stampClosed<ItemType extends AnyType>(
 // seam at zero, which leaves it the prefixes and nothing else — until it is
 // asked for a suffix, when `upgradedForSuffix` below moves its seam to the end.
 //
-// NOTE: The answer is a STALE box, and that is the point. It holds both of the
+// The answer is a STALE box, and that is the point. It holds both of the
 // receiver's Arrays and views less of them, so a read trims it — copying
 // exactly the WINDOW's size, never the parent Array's, and releasing the parent
 // then. A shared window is a copy deferred to the read and sized by the answer
@@ -506,7 +506,7 @@ function stampClosed<ItemType extends AnyType>(
 // reads. What it costs in exchange is the only honest debit: a window nothing
 // reads keeps its parent's Arrays alive.
 //
-// NOTE: THE HALF RULE is asked here as well as at the read, and about the same
+// THE HALF RULE is asked here as well as at the read, and about the same
 // thing: cutting a window out of a box is a use of that box, so the run it is
 // cut from is trimmed exactly where reading it would have trimmed it. A chain of
 // shrinking windows then finds a shorter Array to share every time it has
@@ -542,7 +542,7 @@ function sharedWindowOf<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: A box whose seam is at zero — flat, or a front run viewed at zero —
+// A box whose seam is at zero — flat, or a front run viewed at zero —
 // can share no suffix, so a drain from the front of an APPEND-built List copied
 // the whole back run at every turn and was quadratic: `removeFirst()` measured
 // 121 ms against 20 for the prepend-built drain of 20,000 items, 442 at 40,000
@@ -555,14 +555,14 @@ function sharedWindowOf<ItemType extends AnyType>(
 // `materialise`'s demotion is: the same items answer, and nothing can ask
 // whether two values are the same value.
 //
-// NOTE: The callers apply THE HALF RULE — upgrade only when the prefix dropped
+// The callers apply THE HALF RULE — upgrade only when the prefix dropped
 // is no longer than the suffix kept — because the upgrade copies the whole run
 // where the plain path copies the window. Under the rule the upgrade costs at
 // most twice the copy it replaces, and `lastItems(2)` of a flat List a Program
 // holds still copies two items rather than the List: 24 ms for two thousand of
 // them on 200,000 items, with or without this.
 //
-// NOTE: The bulk `slice` and in-place `reverse` are what makes the one copy
+// The bulk `slice` and in-place `reverse` are what makes the one copy
 // cheap; a walk pushing the items one at a time is what `ownItemsOf` measured
 // four to sixteen times slower. The empty back is a FRESH Array rather than
 // `noItems`, since the receiver may later be appended to in place, and pushing
@@ -578,7 +578,7 @@ function upgradedForSuffix<ItemType extends AnyType>(
 	originalList.length = 0
 	originalList.front = front
 	originalList.frontLen = view.backCount
-	// NOTE: Both runs are fresh Arrays of this box's own, so whatever log the
+	// Both runs are fresh Arrays of this box's own, so whatever log the
 	// old back run carried describes an Array this box no longer holds.
 	originalList.writes = undefined
 
@@ -591,7 +591,7 @@ function upgradedForSuffix<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: The same trade for a window that contains NEITHER end. Only the windows
+// The same trade for a window that contains NEITHER end. Only the windows
 // holding a box's seam can be shared, so a box asked for an interior one had to
 // copy it — and a walk that drops an item from BOTH ends per turn, which is what
 // a palindrome check is, copied everything it had left at every turn and was
@@ -600,13 +600,13 @@ function upgradedForSuffix<ItemType extends AnyType>(
 // middle from either side is a shared window afterwards. One copy pays for the
 // whole walk: the same 50,000 measure 31 ms.
 //
-// NOTE: The middle, rather than either end of the window, because a walk that
+// The middle, rather than either end of the window, because a walk that
 // drops from both ends moves the two ends TOWARDS each other and the seam has to
 // outlast both. A seam placed at the middle of what is kept is passed by neither
 // end until the walk is over, which is what turns the one copy into the whole of
 // what the walk moves.
 //
-// NOTE: THE THREE QUARTERS RULE, which the caller applies where
+// THE THREE QUARTERS RULE, which the caller applies where
 // `upgradedForSuffix`'s callers apply the half: the split moves the whole List
 // where the plain copy moves the window, and it is paid whether or not a second
 // window ever follows. Three quarters rather than a half because a drain that
@@ -617,7 +617,7 @@ function upgradedForSuffix<ItemType extends AnyType>(
 // half that one shot measured 6.7 ms for fifty middles of 50,000 items against
 // the plain copy's 3.4; at three quarters it is 3.4 again.
 //
-// NOTE: Both runs are assembled in BULK — `slice`, an in-place `reverse` and at
+// Both runs are assembled in BULK — `slice`, an in-place `reverse` and at
 // most one `concat` — for the reason `upgradedForSuffix` gives, and the
 // commonest receiver is the cheapest: a flat box, which is what a Program's own
 // List is, needs two plain slices and one reverse. Filling `new Array(n)` by
@@ -661,7 +661,7 @@ function upgradedAroundWindow<ItemType extends AnyType>(
 	originalList.length = total - seam
 	originalList.front = front
 	originalList.frontLen = seam
-	// NOTE: Both runs are fresh Arrays of this box's own, so whatever log the
+	// Both runs are fresh Arrays of this box's own, so whatever log the
 	// old back run carried describes an Array this box no longer holds — the
 	// same debt `upgradedForSuffix` settles, and the one a moved seam owes.
 	originalList.writes = undefined
@@ -675,13 +675,13 @@ function upgradedAroundWindow<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: The answer of an edit that rebuilt ONE of the receiver's two runs — the
+// The answer of an edit that rebuilt ONE of the receiver's two runs — the
 // fresh run stands where the old one stood, and the untouched one rides along by
 // reference under the count the receiver viewed of it. The receiver is stamped
 // closed first, for the reason every sharing answer stamps: the two boxes hold
 // that run's Array between them from here on.
 //
-// NOTE: `replace` answers a copying edit with one of these two; they are
+// `replace` answers a copying edit with one of these two; they are
 // exported, and nothing outside this file calls them. Every branded List
 // literal in the runtime is written in THIS file, and deliberately: what a box
 // owes the receiver whose run it is about to share — both counts written down,
@@ -712,7 +712,7 @@ export function listRebuildingBack<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
 ): ListType<ItemType> {
-	// NOTE: A receiver with no front run has nothing to share, so the fresh back
+	// A receiver with no front run has nothing to share, so the fresh back
 	// run IS the whole answer and the receiver is left exactly as it was.
 	if (view.frontCount === 0) {
 		return createList(back)
@@ -729,12 +729,12 @@ export function listRebuildingBack<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: The answer of an operation on the BACK of a List — a new box over the
+// The answer of an operation on the BACK of a List — a new box over the
 // back run it built, carrying the receiver's front run through BY REFERENCE,
 // since appending leaves the front alone. The `frontLen` comes with it, so a
 // later prepend to the receiver may push onto that shared front without the
 // answer's view growing by an item that was never added to it.
-// NOTE: The `writes` is the BACK run's, so it is handed in rather than read off
+// The `writes` is the BACK run's, so it is handed in rather than read off
 // the source: the two callers reach here with the source's own back Array on the
 // path that pushed onto it, and with a fresh copy on the path that could not.
 // A fresh Array is nobody else's, so it arrives with none.
@@ -758,18 +758,18 @@ function listSharingFrontOf<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: Equality item by item — the item `is` arrives as the hidden conformance
+// Equality item by item — the item `is` arrives as the hidden conformance
 // Argument (curried by `boundConformance` for a nested List), so two Lists are
 // equal exactly when their items say so with their OWN equality, rather than
 // with the universal structural comparison this used to reach for. Lengths
 // decide first, so nothing is compared for a pair of Lists that can not match.
 //
-// NOTE: The two sides may be in different representations — one flat, one
+// The two sides may be in different representations — one flat, one
 // upgraded — and two Lists holding the same items are equal whichever way round
 // they are stored, so both are read through a view rather than off their
 // Arrays.
 //
-// NOTE: BOTH sides are walked, and the ARGUMENT's seal is as load-bearing as the
+// BOTH sides are walked, and the ARGUMENT's seal is as load-bearing as the
 // receiver's: the witness is user code running with both raw runs held, so an
 // argument left unsealed could be written in place from inside the very
 // comparison reading it, and every later position would be compared against an
@@ -804,7 +804,7 @@ export function is<ItemType extends AnyType>(
 	return createBoolean(true)
 }
 
-// NOTE: Counting is not reading — `runsOf`, for the reason stated there. The
+// Counting is not reading — `runsOf`, for the reason stated there. The
 // stdlib's `removeFirst()` is `@::slice(from 1)`, whose end defaults to
 // `@::length()`, so a drain from the front asks each shrinking answer for its
 // length before slicing it again, and a `length` that trimmed would copy the
@@ -815,12 +815,12 @@ export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(runsOf(originalList).total)
 }
 
-// NOTE: The single-item half of `prepend`, whose sibling `prepend(contentsOf:)`
+// The single-item half of `prepend`, whose sibling `prepend(contentsOf:)`
 // stays in Essence on `append(contentsOf:)`. Here for the reason
 // `append__overload$1` is: adding an item can not answer empty, its Declaration
 // says so with a `NonEmptyList`, and no Essence expression can carry that.
 //
-// NOTE: A receiver that never prepended is UPGRADED — the answer keeps the
+// A receiver that never prepended is UPGRADED — the answer keeps the
 // receiver's back run by reference and starts a front run of its own. The
 // receiver's back view is stamped closed first, even though nothing is pushed
 // onto it here: the two boxes now share that Array and either of them may later
@@ -828,14 +828,14 @@ export function length(originalList: ListType<AnyType>): IntegerType {
 // the other one added. Stamping is what makes the pair of them honest, and it
 // is the whole of what the answer's explicit `length` rests on.
 //
-// NOTE: A receiver that HAS a front is tip-or-copy on that front, exactly as
+// A receiver that HAS a front is tip-or-copy on that front, exactly as
 // `append` is on the back — with nothing to stamp, because a front run is never
 // carried without the `frontLen` that says how much of it is viewed.
 export function prepend__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 ): ListType<ItemType> {
-	// NOTE: Reads the box's fields rather than a view, so it catches a box that
+	// Reads the box's fields rather than a view, so it catches a box that
 	// is behind up itself — and unlike `append`'s, this catch-up is for COST
 	// rather than for soundness. Every branch below hands the answer the
 	// receiver's `writes` pair along with its Array, so an answer made from a
@@ -892,19 +892,19 @@ export function prepend__overload$1<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: `append` is one Method with two Overloads, so both bind by position.
+// `append` is one Method with two Overloads, so both bind by position.
 // `$1` adds ONE item, `$2` adds a whole List. The single-item entry is a native
 // rather than the one-line `@::append(contentsOf [item])` it used to be in
 // Essence, because its Declaration now promises a `NonEmptyList` — adding an
 // item can not answer empty — and no Essence expression can say that about the
 // `List` the other entry hands back.
 //
-// NOTE: Tip-or-copy. A receiver viewing all of its back run is the TIP of that
+// Tip-or-copy. A receiver viewing all of its back run is the TIP of that
 // run, so the item can be pushed onto the Array in place and the answer can
 // share it; a receiver viewing less than all of it has been appended to already
 // by somebody else, so the answer gets a run of its own.
 //
-// NOTE: The receiver's view is stamped closed BEFORE the push, and the order is
+// The receiver's view is stamped closed BEFORE the push, and the order is
 // load-bearing: between the two lines there must be no moment at which a box
 // whose `length` is absent — and whose view is therefore implied to be the
 // whole Array — has an item in that Array that was pushed for somebody else.
@@ -912,7 +912,7 @@ export function append__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 ): ListType<ItemType> {
-	// NOTE: Reads the box's fields rather than a view, so it catches a box that
+	// Reads the box's fields rather than a view, so it catches a box that
 	// is behind up itself, for the reason `prepend` does — and a box that is
 	// behind must not push onto the Array it is behind ON.
 	caughtUp(originalList)
@@ -938,7 +938,7 @@ export function append__overload$1<ItemType extends AnyType>(
 	return listSharingFrontOf(copied, count + 1, originalList, undefined)
 }
 
-// NOTE: The same tip-or-copy on the receiver's back, and then the other List's
+// The same tip-or-copy on the receiver's back, and then the other List's
 // logical items. The other one's counts are fixed before the first push, which
 // is what makes `a::append(contentsOf a)` answer the entry-time items twice
 // rather than chasing an Array it is itself growing.
@@ -1006,7 +1006,7 @@ export function reduce__overload$1<
 	return accumulator
 }
 
-// NOTE: The early-stopping fold — the sibling Overload of `reduce`. Its combiner
+// The early-stopping fold — the sibling Overload of `reduce`. Its combiner
 // answers with a `Step` rather than the accumulator outright, so it can leave
 // the walk before its end: `#Continue` carries the accumulator to the next item,
 // `#Done` finishes the whole fold at once with its value and no later item is
@@ -1046,7 +1046,7 @@ export function reduce__overload$2<
 	return accumulator
 }
 
-// NOTE: The running fold — `reduce` keeping every value it built instead of the
+// The running fold — `reduce` keeping every value it built instead of the
 // last one. The starting value is pushed before any item is seen, which is what
 // makes the answer one longer than the receiver and never empty, and is the
 // promise `NonEmptyList<Answer>` records. An Essence body could only be a
@@ -1095,7 +1095,7 @@ export function everyItem__overload$1<ItemType extends AnyType>(
 	return createList(keptList)
 }
 
-// NOTE: The filter and its complement in ONE walk, so the check is offered each
+// The filter and its complement in ONE walk, so the check is offered each
 // item once. The Essence body this replaces was `everyItem(where:)` beside
 // `removeEvery(where:)`, two native walks offering every item to the check
 // twice; the one-`reduce` body that fixes that in Essence carries a Record of
@@ -1139,7 +1139,7 @@ export function partition__overload$1<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: A negative position counts back from the end — -1 is the last item, and
+// A negative position counts back from the end — -1 is the last item, and
 // -length the first. The arithmetic is a double's, which is exact for every
 // position a List can have and for every index a caller can pass: an out-of-
 // range answer stays out of range at any size, since a double does not wrap the
@@ -1148,7 +1148,7 @@ export function positionFromEnd(
 	index: number | bigint,
 	length: number,
 ): number {
-	// NOTE: A bigint index is outside safe range by the canonical invariant, so
+	// A bigint index is outside safe range by the canonical invariant, so
 	// it is past either end of any Array JavaScript can hold — which is all a
 	// caller needs of it. Answering with the nearest position that is out of
 	// range says exactly that, and says it without building a bigint length to
@@ -1160,11 +1160,11 @@ export function positionFromEnd(
 	return index < 0 ? index + length : index
 }
 
-// NOTE: Reading a position does NOT combine the runs — an upgraded List has to
+// Reading a position does NOT combine the runs — an upgraded List has to
 // stay O(1) to index — so the view decides which run holds the item and the
 // item is read straight out of it.
 //
-// NOTE: `viewOf` rather than `walkOf`, and that is load-bearing rather than
+// `viewOf` rather than `walkOf`, and that is load-bearing rather than
 // tidy. Reading one position hands no Array to anybody, so there is nothing to
 // seal — and sealing here would cost the language its positional writes: "read
 // the cell before, write this one" is what a DP table and a heap are, and a
@@ -1186,16 +1186,16 @@ export function item__overload$1<ItemType extends AnyType>(
 	}
 }
 
-// NOTE: `firstItem(where:)` is no longer here — it is written in Essence now, on
+// `firstItem(where:)` is no longer here — it is written in Essence now, on
 // `reduce`'s early-stopping entry, which `#Done`s at the first accepted item.
 // The eager `everyItem` beside `reduce` is what it used to be compared against;
 // the `Step` Choice is what let the short-circuiting version leave the native.
 
-// NOTE: `firstIndex` is no longer here — both of its entries are written in
+// `firstIndex` is no longer here — both of its entries are written in
 // Essence, on `reduce`'s early-stopping entry, which `#Done`s at the first
 // match; the item `is` arrives as the bound's hidden conformance Argument.
 
-// NOTE: The one backwards walk. `reduce` runs forwards and nothing in Essence
+// The one backwards walk. `reduce` runs forwards and nothing in Essence
 // walks a List the other way without copying it, so `lastIndex(where:)` is
 // native and `lastIndex(of:)` and `lastItem(where:)` are written on it. The
 // back run is walked from its end and then the front run from its START, since
@@ -1230,7 +1230,7 @@ export function slice<ItemType extends AnyType>(
 	from: IntegerType,
 	to: IntegerType,
 ): ListType<ItemType> {
-	// NOTE: Half-open [from, to). A negative end counts back from the List's
+	// Half-open [from, to). A negative end counts back from the List's
 	// end — `slice(from 0, to -1)` drops the last item — and only THEN is each
 	// end clamped, so a position that reaches back past the start settles on
 	// zero rather than wrapping a second time.
@@ -1246,7 +1246,7 @@ export function slice<ItemType extends AnyType>(
 		return createList([])
 	}
 
-	// NOTE: The window the receiver can answer with by sharing both runs. It is
+	// The window the receiver can answer with by sharing both runs. It is
 	// what makes `removeLast()` and `removeFirst()` — the stdlib's two slices at
 	// the ends — cost nothing but a box, and a middle window of an upgraded List
 	// with it.
@@ -1254,7 +1254,7 @@ export function slice<ItemType extends AnyType>(
 		return sharedWindowOf(originalList, view, first, last)
 	}
 
-	// NOTE: A suffix of a box whose seam is at zero, under the half rule —
+	// A suffix of a box whose seam is at zero, under the half rule —
 	// `removeFirst()` and `removeFirst(count)` are this window, and after the
 	// upgrade the whole drain is windows.
 	if (view.frontCount === 0 && last === length && first <= length - first) {
@@ -1266,7 +1266,7 @@ export function slice<ItemType extends AnyType>(
 		)
 	}
 
-	// NOTE: An interior window of a box whose seam is at neither end of it, under
+	// An interior window of a box whose seam is at neither end of it, under
 	// THE THREE QUARTERS RULE — the box moves its seam into the middle of the
 	// window, and a walk dropping an item from each end per turn is windows from
 	// here on. The bar is higher than the half the two rules above use because
@@ -1281,13 +1281,13 @@ export function slice<ItemType extends AnyType>(
 		)
 	}
 
-	// NOTE: Every other window lies wholly inside ONE run, since containing the
+	// Every other window lies wholly inside ONE run, since containing the
 	// seam and being moved onto it are the only ways not to, so what is left is
 	// a copy out of that run — a bulk one for the back, and a reversed walk for
 	// the front, whose head is stored last.
 	if (last < view.frontCount) {
 		let count = last - first
-		// NOTE: The argument is the answer's LENGTH. The rule below suggests
+		// The argument is the answer's LENGTH. The rule below suggests
 		// `Array.from({ length })` instead, which fills through an iterator —
 		// the very turn-by-turn work these three fills exist to avoid.
 		// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
@@ -1307,20 +1307,20 @@ export function slice<ItemType extends AnyType>(
 	)
 }
 
-// NOTE: The item at a position is ABSENT from the answer, and every position
+// The item at a position is ABSENT from the answer, and every position
 // naming no item leaves the List alone: one reaching back past the first item,
 // and one standing at or past the end. That is the four-branch Essence body this
 // replaces, said once — the position is resolved from the end BEFORE either
 // decision, because `-1` is the last item and the branch that drops it has to
 // know which item that is.
 //
-// NOTE: Native because no Essence composition can avoid the intermediates. The
+// Native because no Essence composition can avoid the intermediates. The
 // body was two `slice`s and an `append(contentsOf:)`, which builds the whole
 // answer twice over and reads the receiver twice; here it is one Array of the
 // answer's own size, filled once — the same reason `split` and `of` stayed
 // native.
 //
-// NOTE: Dropping the FIRST item of a box with a front run, or the LAST of one
+// Dropping the FIRST item of a box with a front run, or the LAST of one
 // with a back run, is a window rather than a fill: it shrinks the run it touches
 // and shares both. Dropping the first item of a box whose seam is at zero
 // upgrades it first, as `slice` does for the same window, so `remove(at 0)`
@@ -1357,7 +1357,7 @@ export function remove<ItemType extends AnyType>(
 		return sharedWindowOf(originalList, view, 0, view.total - 1)
 	}
 
-	// NOTE: Everything before the position and everything after it, with each run
+	// Everything before the position and everything after it, with each run
 	// walked in two halves split there. The position falls in ONE of the runs, so
 	// the pair of loops on the other side runs the whole of it and the split
 	// leaves nothing out: no turn asks whether this is the item being dropped.
@@ -1404,7 +1404,7 @@ export function reverse<ItemType extends AnyType>(
 	return createList(materialise(originalList).slice(0).reverse())
 }
 
-// NOTE: Everything before the position, the item, then everything from the
+// Everything before the position, the item, then everything from the
 // position on — what the Essence body built with `slice`, `append` and
 // `append(contentsOf:)`, kept exactly. The position is resolved from the end
 // and CLAMPED, so one before the start settles on zero and one past the end on
@@ -1412,10 +1412,10 @@ export function reverse<ItemType extends AnyType>(
 // Declaration promise a `NonEmptyList` and is why the body could not stay in
 // Essence — every step of it answered a plain `List`.
 //
-// NOTE: Clamped exactly as `slice` clamps — a position outside the List settles
+// Clamped exactly as `slice` clamps — a position outside the List settles
 // on the nearest end rather than wrapping to the far one.
 //
-// NOTE: Both ENDS are what the two growers already do, so both are handed
+// Both ENDS are what the two growers already do, so both are handed
 // straight to them and inherit their upgrade-or-push. There is no fast path at
 // the seam and there can not be one: an item pushed onto the front run lands at
 // the logical HEAD, not between the runs, so neither push can say what a seam
@@ -1439,7 +1439,7 @@ export function insert<ItemType extends AnyType>(
 		return append__overload$1(originalList, item)
 	}
 
-	// NOTE: Everything before the position, the item, everything from it on —
+	// Everything before the position, the item, everything from it on —
 	// the three parts, with each run walked in two halves split at the position.
 	// The position falls in ONE of the runs, so one of the two splits sits at an
 	// end of its run and the pair of loops on that side runs the whole of it and
@@ -1481,14 +1481,14 @@ export function insert<ItemType extends AnyType>(
 	return createList(items)
 }
 
-// NOTE: ONE ITEM OUT AND ONE ITEM IN, and nothing at all when the position names
+// ONE ITEM OUT AND ONE ITEM IN, and nothing at all when the position names
 // no item — a position reaching back past the first item and one standing at or
 // past the end both leave the List alone, which is what the four-branch Essence
 // body this replaces said at greater length. Every case keeps the length, which
 // is why `NonEmptyList` may answer this with the proof its receiver carried and
 // why the two Namespaces are one Function.
 //
-// NOTE: Native, and the reason is the whole of `listWrites.ts`. `List::replace`
+// Native, and the reason is the whole of `listWrites.ts`. `List::replace`
 // was `@::remove(at index)::insert(item, at index)` in Essence — two whole fills
 // per write — and `NonEmptyList::replace` copied the run the position fell in.
 // Either way one positional write cost the List, so the accumulator a sieve, a
@@ -1508,7 +1508,7 @@ export function replace__overload$1<ItemType extends AnyType>(
 		return originalList
 	}
 
-	// NOTE: The front run is stored reversed, so the logical position counts
+	// The front run is stored reversed, so the logical position counts
 	// back from its end — and a front run is never written in place: every front
 	// Array in this file is built fresh, and a List a Program writes positions
 	// into is one built flat. So this half is what it always was, the touched run
@@ -1524,19 +1524,19 @@ export function replace__overload$1<ItemType extends AnyType>(
 	return writtenInBack(originalList, view, position - view.frontCount, item)
 }
 
-// NOTE: THE IN-PLACE WRITE. A box may write its back run where it is CURRENT for
+// THE IN-PLACE WRITE. A box may write its back run where it is CURRENT for
 // that run's log — the writes it has seen are all the writes there are — and the
 // log is not sealed. It records what stood at the position, writes over it and
 // counts one version up; the answer views the new version and the receiver is
 // left viewing the old one, which is exactly what `listWrites.ts` catches up.
 //
-// NOTE: A box with NO log copies once, and the COPY gets the log. Every box that
+// A box with NO log copies once, and the COPY gets the log. Every box that
 // exists today holds a bare Array — a literal the Optimiser wrote out, a fresh
 // one a native handed to `createList`, the bridge's — and could never learn of a
 // write into it, so there is nothing to attach a log to but an Array this write
 // makes. The sieve pays that one copy and then writes in place for good.
 //
-// NOTE: The log is BOUNDED by the run's length: past that the next write copies
+// The log is BOUNDED by the run's length: past that the next write copies
 // and mints a fresh log, so what a chain holds is at most the Array and about as
 // much again, and the copies amortise to constant work per write. The old Array
 // and its old log are left exactly as they are, since whoever is behind on them
@@ -1568,7 +1568,7 @@ function writtenInBack<ItemType extends AnyType>(
 
 		let seen = { log, seen: log.version }
 
-		// NOTE: The two shapes the rest of this file builds, written out here
+		// The two shapes the rest of this file builds, written out here
 		// rather than one shape with the front fields left undefined: a flat box
 		// is what a Program writes positions into, and every read of one is a
 		// read of the same shape `createList` and the Optimiser's literal make.
@@ -1591,7 +1591,7 @@ function writtenInBack<ItemType extends AnyType>(
 		}
 	}
 
-	// NOTE: The copy is this answer's ALONE, which is the one condition a log
+	// The copy is this answer's ALONE, which is the one condition a log
 	// may be minted under and the reason a log is never attached to a run whose
 	// provenance is unknown. It is minted at EVERY size rather than above one: a
 	// board of nine squares written down every branch of a nine queens search
@@ -1609,7 +1609,7 @@ function writtenInBack<ItemType extends AnyType>(
 	return answer
 }
 
-// NOTE: The ordering asked rather than imposed, and native because every
+// The ordering asked rather than imposed, and native because every
 // Essence body for it builds something. The adjacent pairs
 // `@::pair(with @::removeFirst())` makes allocate a Record per item, and a fold
 // carrying the item before pays a Record spread per item; two thousand checks of
@@ -1617,7 +1617,7 @@ function writtenInBack<ItemType extends AnyType>(
 // This walk holds the item before in a local and leaves at the first pair out of
 // order, where the pairs build their whole List anyway and measured 57 ms.
 //
-// NOTE: A descending check turns the comparison around rather than negating the
+// A descending check turns the comparison around rather than negating the
 // answer, exactly as `sort` does, so items the order calls `#Equal` are in
 // order in either direction.
 export function isSorted<ItemType extends AnyType>(
@@ -1673,14 +1673,14 @@ function outOfOrder<ItemType extends AnyType>(
 	return ordering[typeKeySymbol] === "Ordering#Greater"
 }
 
-// NOTE: `sort` is one Method with three Overloads, all native, binding by
+// `sort` is one Method with three Overloads, all native, binding by
 // position. `$1` reads the direction and orders by the items' own `compare`,
 // whose conformance its `Comparable` bound hands in as the trailing Argument;
 // `$2` takes the comparison outright and needs no direction, since a comparison
 // says which way it runs; `$3` below orders by a key read off each item. The
 // first two land on the same walk.
 //
-// NOTE: A descending sort hands the SAME comparison the pair the other way
+// A descending sort hands the SAME comparison the pair the other way
 // round rather than reversing the answer. `Array.sort` is stable, and two items
 // the comparison calls `#Equal` still call each other `#Equal` swapped — so a
 // tie keeps the order it had in either direction, which reversing the answer
@@ -1705,7 +1705,7 @@ export function sort__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	order: (first: ItemType, second: ItemType) => OrderingType,
 ): ListType<ItemType> {
-	// NOTE: A copy is sorted, since every List operation returns a new value.
+	// A copy is sorted, since every List operation returns a new value.
 	// `Array.sort` is stable, so items the comparison calls equal keep their
 	// original order. The Ordering Case is read by tag, mapped to the sign
 	// `sort` expects.
@@ -1726,7 +1726,7 @@ function signOf(ordering: OrderingType): number {
 	}
 }
 
-// NOTE: `$3` orders by a KEY read off each item, and the key is read ONCE per
+// `$3` orders by a KEY read off each item, and the key is read ONCE per
 // item rather than twice per comparison: every key is read into an Array, the
 // POSITIONS are sorted on those keys through the key Type's `compare` — the
 // hidden conformance Argument, as `$1`'s is — and the items are read back out
@@ -1737,7 +1737,7 @@ function signOf(ordering: OrderingType): number {
 // with the subprocess startup inside both, and the hand-written
 // decorate-sort-undecorate through `map` measured 29.
 //
-// NOTE: SORTING POSITIONS rather than an Array of `{ key, item }` Records, and
+// SORTING POSITIONS rather than an Array of `{ key, item }` Records, and
 // that is what makes a CHEAP key cost nothing: three sorts of 200,000 rows on a
 // member path measured 103 ms through the comparison, 100 ms here, and 131 ms
 // with the Records — one object per item is a heavier debit than the key reads
@@ -1745,11 +1745,11 @@ function signOf(ordering: OrderingType): number {
 // reason `$1` and `$2` read it that way: a flat box hands over the Array it
 // already holds, and a two-run box is combined and demoted once.
 //
-// NOTE: Rows in a strictly descending order are ONE run to `Array.sort`, which
+// Rows in a strictly descending order are ONE run to `Array.sort`, which
 // finishes them in n comparisons and hides the key's cost entirely — a probe
 // has to scramble its keys, or it measures nothing.
 //
-// NOTE: Stable, as the two beside it are, and for the same reason: a
+// Stable, as the two beside it are, and for the same reason: a
 // descending sort hands the pairs of keys the other way round rather than
 // reversing the answer. Two items whose keys compare `#Equal` keep the order
 // they had in either direction, because `Array.sort` is stable and the
@@ -1794,12 +1794,12 @@ export function sort__overload$3<ItemType extends AnyType, Key extends AnyType>(
 	return createList(sorted)
 }
 
-// NOTE: Lexicographic comparison — the item `compare` arrives as the hidden
+// Lexicographic comparison — the item `compare` arrives as the hidden
 // conformance Argument (curried by `boundConformance` for a nested List). The
 // first pair that is not `Equal` decides; on an equal prefix the shorter List
 // is `Less`, and two equal-length Lists compare `Equal`.
 //
-// NOTE: Both sides are read through a view, for the reason `is` is: two Lists
+// Both sides are read through a view, for the reason `is` is: two Lists
 // holding the same items compare `Equal` whichever representation each of them
 // happens to be in.
 export function compare<ItemType extends AnyType>(
@@ -1835,7 +1835,7 @@ export function compare<ItemType extends AnyType>(
 	return equal
 }
 
-// NOTE: Joining asks nothing of the items but that each can say what it is, so
+// Joining asks nothing of the items but that each can say what it is, so
 // the Method is bounded by `Printable` rather than fixed to a List of Strings —
 // the conforming Namespace's method map arrives as the hidden trailing
 // Argument, exactly as `sort`'s does, and its `toString` is the whole of the
@@ -1862,13 +1862,13 @@ export function join<ItemType extends AnyType>(
 	return createString(pieces.join(separator.value))
 }
 
-// NOTE: What a READER sees, which is the form a Program writes the List down
+// What a READER sees, which is the form a Program writes the List down
 // in: `[1, 2, 3]`, and `[]` for the empty one. Here rather than in Essence
 // because the brackets are String concatenation: written there it would call
 // `String::append`, the only edge this Namespace drew into a Namespace that is
 // written on THIS one.
 //
-// NOTE: Not `join` with brackets around it any more, and the difference is the
+// Not `join` with brackets around it any more, and the difference is the
 // one rule `itemText` holds: a String item is QUOTED here where `join` leaves
 // it bare. Joining answers the raw text — `["a", "b"]::join(with ", ")` is
 // `a, b` — and printing answers what was written down, so `["a", "", "b"]`
@@ -1910,7 +1910,7 @@ export function flatten<ItemType extends AnyType>(
 	return createList(flattened)
 }
 
-// NOTE: One walk up, and one Function under both Namespaces' names: there is a
+// One walk up, and one Function under both Namespaces' names: there is a
 // position for every item, so a receiver with something in it answers with
 // something in it and `NonEmptyList` re-exports this rather than counting a
 // second time. Written here because the proven entry could not be written in
@@ -1932,13 +1932,13 @@ export function indices__overload$1(
 	return createList(positions)
 }
 
-// NOTE: One walk and one Record per item — the position beside the item it
+// One walk and one Record per item — the position beside the item it
 // stands at, so a fold that needs both does not have to carry a counter of its
 // own. Written here rather than in Essence because the Essence body would be
 // `@::indices()::map(…)`, and reading each item back by position builds an
 // Optional per item to take apart again.
 //
-// NOTE: `materialise` rather than a view, as `pair` reads its two Lists: the
+// `materialise` rather than a view, as `pair` reads its two Lists: the
 // answer is a fresh Array of the receiver's whole length either way, so there
 // is nothing to gain by walking the two runs apart.
 export function enumerate<ItemType extends AnyType>(
@@ -1978,7 +1978,7 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 	return createList(pairs)
 }
 
-// NOTE: A group size below one names no grouping, and the answer is the whole
+// A group size below one names no grouping, and the answer is the whole
 // List in ONE group — nothing is dropped and nothing is refused. `1` rather
 // than `1n`: an ordering comparison reads both representations, so one spelling
 // asks the question of either. That clamp is what makes the loop below safe to
@@ -1986,7 +1986,7 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 // an item remains to put in it, so every group comes back with at least one
 // item. The declared item Type `NonEmptyList<ItemType>` rests on exactly that.
 //
-// NOTE: The empty List answers with no groups at all, for every size, because
+// The empty List answers with no groups at all, for every size, because
 // there is no item to put in one. That is the same answer a valid size gives
 // it, so the size below one changes nothing there either.
 export function split__overload$1<ItemType extends AnyType>(
@@ -2006,13 +2006,13 @@ export function split__overload$1<ItemType extends AnyType>(
 	return createList(groups)
 }
 
-// NOTE: One walk behind all four range natives. The step is signed and never
+// One walk behind all four range natives. The step is signed and never
 // zero, so the values run from the first and stop where a step passes the last,
 // whichever side of it the step approaches from. `atLeastOne` is the promise the
 // `downTo:` entries carry into their Type: where the first value is already past
 // the end, the walk answers that value rather than nothing.
 //
-// NOTE: Counted in numbers where every bound is held as one, which is every
+// Counted in numbers where every bound is held as one, which is every
 // range a List can actually hold — a range needing bigint ends spans more items
 // than there is memory for, and is only ever reached to be refused by whatever
 // runs out first.
@@ -2069,7 +2069,7 @@ function integerRange(
 	return createList(integers)
 }
 
-// NOTE: The four range natives, each a step and a promise handed to one walk.
+// The four range natives, each a step and a promise handed to one walk.
 // The step is passed as the value it holds rather than as an Integer, because
 // `Integer.ts` and this file import each other and a module level
 // `createInteger(1)` here would run before the safe bound it reads is bound.
@@ -2107,12 +2107,12 @@ export function of__overload$6(
 	return integerRange(firstInteger, lastInteger, stepInteger.value, true)
 }
 
-// NOTE: The count of this entry is a `PositiveInteger` in the source — proven
+// The count of this entry is a `PositiveInteger` in the source — proven
 // while compiling, erased to an Integer here — so the answer certainly holds
 // something and the Namespace may say so. The Essence entry beside it can not:
 // its body is a `map` over `of`, and what that answers is a `List`.
 //
-// NOTE: The count is a JavaScript number, for the reason `of` counts in one. A
+// The count is a JavaScript number, for the reason `of` counts in one. A
 // count needing a bigint asks for more items than there is memory for, and is
 // only ever reached to be refused by whatever runs out first.
 export function repeat__overload$2<ItemType extends AnyType>(
@@ -2128,7 +2128,7 @@ export function repeat__overload$2<ItemType extends AnyType>(
 	return createList(copies)
 }
 
-// NOTE: THE SET-SHAPED NATIVES, and the one structure all five rest on: a
+// THE SET-SHAPED NATIVES, and the one structure all five rest on: a
 // `KeySet` (`keyEncoding.ts`) holding what the walk has met, keyed by the
 // canonical encoding a Dictionary finds a slot by. What a fold on `contains`
 // costs is a scan of everything kept so far per item, which is quadratic; each
@@ -2138,25 +2138,25 @@ export function repeat__overload$2<ItemType extends AnyType>(
 // distinct the fold measured 650 ms and this walk 22 ms. Best of three, with
 // the 21 ms of subprocess startup inside every figure.
 //
-// NOTE: The encoding lives in a module of its own so that this can reach it
+// The encoding lives in a module of its own so that this can reach it
 // without the store, the version stamps, the kind registry and the written
 // form arriving behind it — which is what `@::tally()::keys()` in `Dictionary.es`
 // used to drag into any Program that asked a List for its distinct items.
 // `bundleSize.spec.ts` holds the figure that trade is worth.
 //
-// NOTE: The witness decides, not the encoding. `encodeKey` answers `null` for a
+// The witness decides, not the encoding. `encodeKey` answers `null` for a
 // witness the Compiler has not branded structural, and every lookup then walks
 // the keys and asks that witness — the same scan path a Dictionary takes for the
 // same reason, and invisible from Essence apart from the time it costs.
 
-// NOTE: The whole item standing as its own key, so that the `on:` entries and
+// The whole item standing as its own key, so that the `on:` entries and
 // the bare ones are one walk each rather than two written twice. A monomorphic
 // identity call per item is inside the noise of the `encodeKey` beside it.
 function itself<ItemType extends AnyType>(item: ItemType): ItemType {
 	return item
 }
 
-// NOTE: Every key of a List, in one set. `sealedRunsOf` rather than `viewOf`,
+// Every key of a List, in one set. `sealedRunsOf` rather than `viewOf`,
 // for the reason `GroupedList` gives — this walk visits each item once and has
 // no reason to trim the caller's List for it — and sealing rather than a bare
 // `runsOf`, because the key Function and the item's own witness are user code
@@ -2180,7 +2180,7 @@ function keySetOver<ItemType extends AnyType, Key extends AnyType>(
 	return set
 }
 
-// NOTE: The intersection and the difference in one walk, told apart by which
+// The intersection and the difference in one walk, told apart by which
 // answer of the membership test keeps an item. Both are filters over the
 // receiver rather than set operations over it: an item is kept every time it
 // occurs, which is what `everyItem(where:)` beside them does with a check.
@@ -2213,7 +2213,7 @@ function keptByMembership<ItemType extends AnyType>(
 	return createList(kept)
 }
 
-// NOTE: The first item met at each key, which is what both `removeDuplicates`
+// The first item met at each key, which is what both `removeDuplicates`
 // entries answer. `addKey` says whether the key was new, so the membership test
 // and the insertion are one lookup rather than two.
 function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
@@ -2244,7 +2244,7 @@ function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
 	return createList(kept)
 }
 
-// NOTE: The same walk, stopped at the first key it has already met — which is
+// The same walk, stopped at the first key it has already met — which is
 // the whole of what `hasDuplicates` asks, and the reason it is not
 // `removeDuplicates()::length()` compared against the receiver's. It seals as
 // `keySetOver` does, and for the same reason.
@@ -2271,7 +2271,7 @@ function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
 	return createBoolean(false)
 }
 
-// NOTE: The subset question. The receiver is indexed and the ARGUMENT is
+// The subset question. The receiver is indexed and the ARGUMENT is
 // walked, so the answer is settled at the first item that is not there. Both
 // sides are sealed — the receiver by `keySetOver` and the Argument here. The
 // empty List asks nothing of the receiver, which is what makes the answer
@@ -2356,18 +2356,18 @@ export function hasDuplicates__overload$2<
 	return meetsAKeyTwice(originalList, keyOf, conformance)
 }
 
-// NOTE: Sealed as the set-shaped natives are, though it asks no witness: every
+// Sealed as the set-shaped natives are, though it asks no witness: every
 // item is counted by its canonical encoding alone, so no user code runs while
 // the run Array is held.
 //
-// NOTE: The item counted highest, and the sixth Method resting on
+// The item counted highest, and the sixth Method resting on
 // `keyEncoding.ts` rather than on a container. It is here beside the
 // set-shaped natives because it is one of them with a tally instead of a
 // membership test: one walk, one lookup per item, and the earliest of the keys
 // counted highest — earliest because a later key has to BEAT the count rather
 // than meet it, and the keys are held in the order each was first met.
 //
-// NOTE: The three Namespaces that declare it — `NonEmptyIntegerList`,
+// The three Namespaces that declare it — `NonEmptyIntegerList`,
 // `NonEmptyRationalList` and `NonEmptyNumberList` — are one Function here, and
 // the answer is the key's FIRST occurrence, which is the item a Dictionary
 // would have kept. That matters where two spellings are one key: `[2/4, 1/2,
@@ -2397,7 +2397,7 @@ export function mode<ItemType extends AnyType>(
 	return count.keys[highest]
 }
 
-// NOTE: The pieces a separator leaves, which is `String::split(on:)`'s shape
+// The pieces a separator leaves, which is `String::split(on:)`'s shape
 // over items. A piece is opened before the first item and closed by every
 // accepted one, so a List holding n accepted items answers n+1 pieces and a
 // List holding none answers one — including the empty List, whose one piece is
@@ -2437,13 +2437,13 @@ export function split__overload$3<ItemType extends AnyType>(
 	return createList(pieces)
 }
 
-// NOTE: Every stretch of one size, one position apart. The loop condition is
+// Every stretch of one size, one position apart. The loop condition is
 // what makes a size above the length answer nothing: the first window would
 // have to reach past the last item. The size is a `PositiveInteger` in the
 // source — proven while compiling, erased to an Integer here — so a stretch
 // always holds something and the Namespace may say so.
 //
-// NOTE: `Number` on the size for the reason `repeat` counts in one: a window
+// `Number` on the size for the reason `repeat` counts in one: a window
 // needing a bigint size spans more items than there is memory for, and reaches
 // the comparison below only to fail it.
 export function windows<ItemType extends AnyType>(
@@ -2461,7 +2461,7 @@ export function windows<ItemType extends AnyType>(
 	return createList(stretches)
 }
 
-// NOTE: The maximal stretches of neighbours the check accepts. A stretch is
+// The maximal stretches of neighbours the check accepts. A stretch is
 // opened by the first item accepted after a refusal and closed by the next
 // refusal, so every one that reaches the answer holds an item — which is what
 // the declared `NonEmptyList<ItemType>` item Type rests on, and what no Essence
@@ -2503,12 +2503,12 @@ export function runs<ItemType extends AnyType>(
 	return createList(stretches)
 }
 
-// NOTE: The inner Lists read as columns. The shortest one decides how many
+// The inner Lists read as columns. The shortest one decides how many
 // there are, which is `pair(with:)`'s rule one dimension along, and it is found
 // in the same walk that materialises the rows — so each inner List is combined
 // at most once however many columns are read out of it.
 //
-// NOTE: `NestedList` re-exports this, as it re-exports `flatten`: the operation
+// `NestedList` re-exports this, as it re-exports `flatten`: the operation
 // is written here beside the List internals it reads, and the Namespace is a
 // name for the receivers that can answer it.
 export function transpose<ItemType extends AnyType>(

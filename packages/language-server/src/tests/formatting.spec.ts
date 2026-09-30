@@ -6,7 +6,7 @@ import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 import { findFormattingEdits } from "../formatting"
 
 describe("Document Formatting", () => {
-	// NOTE: The untouched lead and tail are pared off, so fixing one line does
+	// The untouched lead and tail are pared off, so fixing one line does
 	// not replace the whole buffer under the cursor. Here only the four spaces
 	// of indentation become a tab.
 	it("should narrow the edit to the changed span", () => {
@@ -40,7 +40,7 @@ describe("Document Formatting", () => {
 		])
 	})
 
-	// NOTE: An editor that formats on save would otherwise mark an untouched
+	// An editor that formats on save would otherwise mark an untouched
 	// buffer dirty on every save of an already formatted file.
 	it("should offer no edit when the document is already formatted", () => {
 		expect(
@@ -48,7 +48,7 @@ describe("Document Formatting", () => {
 		).toEqual({ edits: null, warning: null })
 	})
 
-	// NOTE: Most keystrokes leave the document unparseable, and a request that
+	// Most keystrokes leave the document unparseable, and a request that
 	// lands then should do nothing rather than report — the Diagnostics already
 	// say what is wrong.
 	it("should offer no edit and no warning while the document does not parse", () => {
@@ -61,7 +61,7 @@ describe("Document Formatting", () => {
 		expect(findFormattingEdits("").edits).toBeNull()
 	})
 
-	// NOTE: An `unsafe` refusal means the formatter distrusted its own output — a
+	// An `unsafe` refusal means the formatter distrusted its own output — a
 	// formatter bug, which the editor must surface rather than swallow. No
 	// real source can produce one on demand (that is what the corpus sweep
 	// proves), so the formatter is stubbed through the seam.
@@ -82,7 +82,7 @@ describe("Document Formatting", () => {
 		expect(result.warning).toContain("not stable")
 	})
 
-	// NOTE: `declarations { … }` only parses for a standard library document,
+	// `declarations { … }` only parses for a standard library document,
 	// and the Language Server identifies one by the URI it was opened with — so
 	// the path has to reach the formatter for the library to be formattable at
 	// all in the editor.

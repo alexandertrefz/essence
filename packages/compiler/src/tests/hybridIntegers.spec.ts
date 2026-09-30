@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The emitted half of the hybrid Integer. `runtime/src/tests/
+// The emitted half of the hybrid Integer. `runtime/src/tests/
 // hybridIntegers.spec.ts` holds the representation itself to its invariant; this
 // file holds the JavaScript the Rewriter writes to the same one — the guard
 // around every inlined operation, the counter a counted walk runs on, the
@@ -33,7 +33,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: The emitted module is written to a throwaway file and imported, so that
+// The emitted module is written to a throwaway file and imported, so that
 // what is asserted is what the Program PRINTS rather than what it looks like.
 async function outputOf(source: string): Promise<Array<string>> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-hybrid-"))
@@ -70,7 +70,7 @@ function program(body: string): string {
 	return `implementation {\n${body}\n}`
 }
 
-// NOTE: Every line mentioning a walk's State slot that is NOT one of the three
+// Every line mentioning a walk's State slot that is NOT one of the three
 // positions a raw slot may stand in: a WRITE of it — the `let` its seed declares
 // or an assignment to it — a WHOLE read of it into a name, which is the `const` a
 // turn binds a Parameter through and the enclosing slot a nested walk answers
@@ -93,12 +93,12 @@ function unknownMentionsOf(generated: string, slot: string): Array<string> {
 }
 
 describe("the bound the emitted guard is written against", () => {
-	// NOTE: The Compiler writes the bound as a literal and the runtime holds one
+	// The Compiler writes the bound as a literal and the runtime holds one
 	// of its own, because neither can read the other's — the runtime is inlined
 	// into a user's bundle and the Compiler must not import it. This is what
 	// keeps the two the same number.
 	it("is the largest integer a double holds exactly", () => {
-		// NOTE: Through Parameters, so that `fold-constants` has nothing to
+		// Through Parameters, so that `fold-constants` has nothing to
 		// answer and the guard survives to be read.
 		let generated = generate(
 			program(`	function total(_ left: Integer, _ right: Integer) -> Integer {
@@ -129,7 +129,7 @@ describe("an emitted operation", () => {
 		expect(generated).toContain("Integer.sum(left.value, right.value)")
 	})
 
-	// NOTE: The guard reads each operand twice, so an operand that may only be
+	// The guard reads each operand twice, so an operand that may only be
 	// evaluated once can not be guarded in place — it goes to the runtime whole,
 	// where the same decision is made after one evaluation.
 	it("hands an operand it may not read twice to the runtime", () => {
@@ -188,7 +188,7 @@ describe("an emitted operation", () => {
 	})
 
 	it("reads a chained operation through both of its arms", async () => {
-		// NOTE: An operand that is ITSELF a guarded operation used to build an
+		// An operand that is ITSELF a guarded operation used to build an
 		// Integer for the operation around it to read straight back — a box
 		// built and taken apart on one line, which is the half swap
 		// `unboxed-loop-state` measured as a LOSS. Every site that reads an
@@ -221,7 +221,7 @@ describe("an emitted operation", () => {
 	Terminal.print(chained::is(9007199254741002))
 	Terminal.print(compared)`)
 
-		// NOTE: Not one Integer is BUILT anywhere in this Program. Every
+		// Not one Integer is BUILT anywhere in this Program. Every
 		// operation here stands where its answer is read for its value — as the
 		// operand of another, as the side of a comparison, or as the value a raw
 		// slot takes — so the object literal has nowhere left to be written. The
@@ -239,7 +239,7 @@ describe("an emitted operation", () => {
 })
 
 describe("an emitted literal", () => {
-	// NOTE: A literal is written in the representation its value canonically
+	// A literal is written in the representation its value canonically
 	// has, so that `createInteger` has nothing to convert and a pooled constant
 	// is already the shape every comparison against it expects.
 	it("is a number inside safe range and a bigint outside it", () => {
@@ -272,7 +272,7 @@ describe("an emitted literal", () => {
 })
 
 describe("a folded operation", () => {
-	// NOTE: `fold-constants` computes in bigint and writes an `IntegerValue`
+	// `fold-constants` computes in bigint and writes an `IntegerValue`
 	// back, which the Rewriter then spells canonically — so a fold that crosses
 	// the boundary must land in the representation the same value written by
 	// hand would.
@@ -304,7 +304,7 @@ describe("a folded operation", () => {
 })
 
 describe("a counted walk", () => {
-	// NOTE: Two Literals a double holds exactly answer the question before the
+	// Two Literals a double holds exactly answer the question before the
 	// Program runs, so the walk is written with no bigint in it anywhere. A
 	// bound the Compiler can not read is what the run-time test below is for.
 	it("counts in numbers where both bounds are written as ones", () => {
@@ -342,7 +342,7 @@ describe("a counted walk", () => {
 		)
 	})
 
-	// NOTE: A bound past safe range is a walk of more turns than a Program can
+	// A bound past safe range is a walk of more turns than a Program can
 	// run, so what matters is only that it counts CORRECTLY — the counter
 	// escapes with its bounds, and a lower bound still held as a number is
 	// converted once rather than every turn.
@@ -365,7 +365,7 @@ describe("a counted walk", () => {
 		).toEqual(["5", "9007199254740994", "9007199254740990"])
 	})
 
-	// NOTE: The counter's Integer is dropped where the body only reads what it
+	// The counter's Integer is dropped where the body only reads what it
 	// holds, so the two shapes that must not be got wrong are a body that hands
 	// the counter ON — which needs the Integer — and a nested walk reading the
 	// outer counter, which reads through a second walk's worth of emitted code
@@ -403,7 +403,7 @@ describe("a counted walk", () => {
 		).toEqual(["9007199254740991 9007199254740992 9007199254740993 "])
 	})
 
-	// NOTE: The counter's KIND is decided once, from the bounds, because a `for`
+	// The counter's KIND is decided once, from the bounds, because a `for`
 	// counter can not change kind mid-walk. Canonicality is a property of each
 	// VALUE, so a walk with one bound inside safe range and one outside counts
 	// in bigint through values a double holds exactly — and the body that had
@@ -411,7 +411,7 @@ describe("a counted walk", () => {
 	// value with two spellings unless the turn canonicalises it, and `is` is
 	// emitted as `===`, which answers `false` across the two.
 	//
-	// NOTE: Asked with `is` and not with `toString`: a mention of the counter
+	// Asked with `is` and not with `toString`: a mention of the counter
 	// that is not a read of its value REFUSES the elision, so a body that prints
 	// the counter never reaches the shape this is about.
 	it("compares a counter of a crossing walk by its value", async () => {
@@ -439,7 +439,7 @@ describe("a counted walk", () => {
 		).toEqual(["1", "2", "1"])
 	})
 
-	// NOTE: Neither bound written as a literal, so nothing about the walk is
+	// Neither bound written as a literal, so nothing about the walk is
 	// decided while compiling, and the two counters that meet are two walks'
 	// worth of emitted code apart.
 	it("compares two crossing counters against each other", async () => {
@@ -524,7 +524,7 @@ describe("what a Program computes across the boundary", () => {
 		).toEqual(["true", "false", "true", "true", "false", "true"])
 	})
 
-	// NOTE: The cross-kind cell — `1 is 1/1` — with the Integer side held as a
+	// The cross-kind cell — `1 is 1/1` — with the Integer side held as a
 	// number, which is what it always is for a value this small.
 	it("still equals the Rational spelling the same value", async () => {
 		expect(
@@ -584,13 +584,13 @@ describe("what a Program computes across the boundary", () => {
 	})
 })
 
-// NOTE: The other half of the same elision, and the one that PAYS: a walk's
+// The other half of the same elision, and the one that PAYS: a walk's
 // loop-carried State, held as the value its Integer boxes rather than as the
 // Integer. It only pays TOGETHER with the arithmetic answering a raw value — a
 // slot that reads a boxed answer back through `.value` measured SLOWER than
 // leaving the State alone — so the two are one change and are tested as one.
 //
-// NOTE: The first eight `it`s are the eight numbered invariants of the fence, in
+// The first eight `it`s are the eight numbered invariants of the fence, in
 // the order `/docs/reference/optimisations` states them under
 // `unboxed-loop-state` and under the same numbers — a reviewer reading the page
 // and a reviewer reading this file should find one list, not two. What follows them is not part of the fence: which
@@ -619,7 +619,7 @@ describe("a walk's carried State", () => {
 		let generated = generate(source)
 
 		expect(generated).toMatch(/let \$loop_0_state = \$pool_\d+\.value;/)
-		// NOTE: A Record and a String hold their seed as it stands. Only an
+		// A Record and a String hold their seed as it stands. Only an
 		// Integer has a value under it to be held instead.
 		expect(generated).not.toMatch(/let \$loop_1_state = .*\.value;/)
 		expect(generated).not.toMatch(/let \$loop_2_state = .*\.value;/)
@@ -627,7 +627,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("2: keeps its box for any mention past a read of the value", async () => {
-		// NOTE: The fourth walk is the one a reader reaches for first. Only the
+		// The fourth walk is the one a reader reaches for first. Only the
 		// operations `lower-scalar-operations` writes out — the arithmetic and
 		// the comparisons — read the value; every other Method of Integer takes
 		// the Integer, so asking the accumulator whether it is even keeps its
@@ -681,7 +681,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("3: decides for a while driver's predicate and its step together", async () => {
-		// NOTE: One State reaches TWO bodies here, and the predicate is the one
+		// One State reaches TWO bodies here, and the predicate is the one
 		// that refuses — it asks the State for its decimal spelling. A swap
 		// taken for the step alone would hand the predicate a raw value under a
 		// name it still reads `.value` off.
@@ -705,7 +705,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("4: binds the Parameter each turn, so a closure holds that turn", async () => {
-		// NOTE: THE reason the Parameter's `const` is kept rather than read out
+		// THE reason the Parameter's `const` is kept rather than read out
 		// of the slot directly. The slot is ONE binding for the whole walk, so a
 		// closure reading it would answer what the walk finished with; the
 		// Parameter is bound per turn, exactly as the Integer it replaced was,
@@ -725,13 +725,13 @@ describe("a walk's carried State", () => {
 	Terminal.print(holder())`)
 
 		expect(generate(source)).toContain("const carried = $loop_0_state;")
-		// NOTE: 103 is what the third turn was handed, not the 106 the walk
+		// 103 is what the third turn was handed, not the 106 the walk
 		// finished with.
 		expect(await outputOf(source)).toEqual(["106", "103"])
 	})
 
 	it("5: unboxes the seed and every write of the State", () => {
-		// NOTE: Three shapes write a State: the `let` its seed declares, the
+		// Three shapes write a State: the `let` its seed declares, the
 		// assignment an answer is written as, and the `state` member of a `Step`
 		// the Compiler could not see being built. The third is the one that
 		// arrives as an Integer from somewhere else entirely.
@@ -759,7 +759,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("5b: mentions the slot nowhere the swap can not see it", () => {
-		// NOTE: What makes finding the writes by NAME enough. The slot may stand
+		// What makes finding the writes by NAME enough. The slot may stand
 		// in four positions and no others — the `let` its seed declares, an
 		// assignment to it, the `const` a turn binds a Parameter through, and
 		// the exit that boxes it — and the swap refuses a walk that mentions it
@@ -823,7 +823,7 @@ describe("a walk's carried State", () => {
 			generated.indexOf("sum = "),
 		)
 
-		// NOTE: No Integer BUILT — the literal the guarded arm used to write
+		// No Integer BUILT — the literal the guarded arm used to write
 		// and the constructor a boxed slot would need. `Integer.sum` still
 		// stands on the escaped arm, which is where an Integer has to be built
 		// because the runtime is what decides the answer there.
@@ -833,7 +833,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("7: holds the canonical spelling at every turn and at the exit", async () => {
-		// NOTE: The invariant the slot answers to is the Integer's own — a value
+		// The invariant the slot answers to is the Integer's own — a value
 		// in safe range is a number and one outside it is a bigint — and `is` is
 		// emitted as `===` on what each Integer holds, so a slot that fell out of
 		// it answers `false` against the value written as a literal. The walks
@@ -882,7 +882,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("8: admits the State handed straight back", async () => {
-		// NOTE: `<- carried` is the one mention past `.value` that is admitted,
+		// `<- carried` is the one mention past `.value` that is admitted,
 		// because the write it stands in is unboxed with every other — which
 		// turns it into a read of the value like any other. It is what an arm
 		// that changes nothing writes, and refusing it would refuse most walks
@@ -915,7 +915,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("8b: boxes the State a `#Done` finishes with, where it is written", async () => {
-		// NOTE: `<- #Done(carried)` is how a `Step`-answering body ordinarily
+		// `<- #Done(carried)` is how a `Step`-answering body ordinarily
 		// finishes, so refusing it left the two drivers that take a `Step`
 		// carrying their box in nearly every Program that writes one. It is
 		// admitted for the reason `<- carried` is — the write it stands in is one
@@ -949,7 +949,7 @@ describe("a walk's carried State", () => {
 		expect(generated).toContain(
 			"$loop_1_answer = Integer.createInteger(carried);",
 		)
-		// NOTE: Both walks leave past 2⁵³, so the boxed answer is where the
+		// Both walks leave past 2⁵³, so the boxed answer is where the
 		// canonical spelling would go wrong if the exit ever stopped
 		// canonicalising — `is` is `===` on what each Integer holds.
 		expect(await outputOf(source)).toEqual([
@@ -961,7 +961,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("takes a nested walk's exit apart and leaves the counter's box alone", async () => {
-		// NOTE: A walk inside a walk answers straight into the enclosing slot,
+		// A walk inside a walk answers straight into the enclosing slot,
 		// and where both are raw the Integer the inner one builds at its exit
 		// would be taken apart on the line that built it. The exit box is
 		// recognised by IDENTITY: `Integer.createInteger` is also how a counted
@@ -1004,7 +1004,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("carries a State the language refined over Integer", async () => {
-		// NOTE: A checked refinement is erased before any of this runs —
+		// A checked refinement is erased before any of this runs —
 		// `eraseRefinements` stands at the head of every pipeline, `--no-optimise`
 		// included — so a `NonZeroInteger` State reaches the Rewriter as the
 		// Integer it is and is carried like one. That is right, and it is what
@@ -1025,7 +1025,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("carries every walk that threads a State", async () => {
-		// NOTE: The five drivers that thread one — the `while` and `until`
+		// The five drivers that thread one — the `while` and `until`
 		// entries, the counted walk, the `Step` walk, and both `reduce` entries.
 		// `map` and `everyItem` thread none, so there is nothing there to hold.
 		let source =
@@ -1083,7 +1083,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("carries a State through a walk inside a walk", async () => {
-		// NOTE: Two walks deep, with the inner one seeded from the outer's State
+		// Two walks deep, with the inner one seeded from the outer's State
 		// and answering it — so the inner walk's Integer is built at its exit and
 		// read straight back into the outer slot.
 		expect(
@@ -1114,7 +1114,7 @@ describe("a walk's carried State", () => {
 	})
 
 	it("refuses a walk whose State seeds a walk that kept its box", async () => {
-		// NOTE: The seam between two walks, and the one shape that could get it
+		// The seam between two walks, and the one shape that could get it
 		// wrong. The inner walk is written FIRST, so by the time the outer's
 		// fence reads its body the inner seed is either `carried.value` — a read
 		// of the value like any other, which lets the outer carry raw too — or
@@ -1141,7 +1141,7 @@ describe("a walk's carried State", () => {
 })
 
 describe("the pooled constants", () => {
-	// NOTE: A pooled literal is built once and read by name everywhere, so a
+	// A pooled literal is built once and read by name everywhere, so a
 	// pool holding a value in the wrong representation would put an uncanonical
 	// Integer in front of every comparison against it.
 	it("are canonical", async () => {

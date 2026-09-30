@@ -358,7 +358,7 @@ function readParameters(
 
 	return (definition.parameters ?? []).map(
 		(parameter: Node, index: number): Parameter => ({
-			// NOTE: `_ text: String` carries no external name and `count: Integer`
+			// `_ text: String` carries no external name and `count: Integer`
 			// reuses one Identifier for both, so a missing external name is the
 			// positional one.
 			label: parameter.externalName?.content ?? "_",

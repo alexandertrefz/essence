@@ -49,19 +49,19 @@ import {
 } from "./testReport"
 import { createDependentsIndex, createSourceWatcher } from "./watcher"
 
-// NOTE: `essence test --watch` stays up and re-runs only what a change reached.
+// `essence test --watch` stays up and re-runs only what a change reached.
 // The unit of a re-run is an ENTRY: a compiled bundle and the tests of the
 // Modules it claimed. What a save reaches is worked out from the module graphs
 // the last compile reported, exactly as `esc watch` works out what to rebuild —
 // so editing a Module re-runs the tests of every file that imports it and not
 // the whole project.
 //
-// NOTE: Each entry's events are kept apart, and a re-run REPLACES that entry's
+// Each entry's events are kept apart, and a re-run REPLACES that entry's
 // stream. The report is the whole picture folded back up out of all of them, so
 // the tree on screen after a save says what every test holds and not only what
 // just ran.
 
-// NOTE: Raw mode delivers Ctrl+C as data rather than as a signal.
+// Raw mode delivers Ctrl+C as data rather than as a signal.
 const CTRL_C = String.fromCharCode(3)
 
 function timestamp(): string {
@@ -73,7 +73,7 @@ function timestamp(): string {
 	)}`
 }
 
-// NOTE: The tests a suite is the one to run, as ids — what a claim CHANGING
+// The tests a suite is the one to run, as ids — what a claim CHANGING
 // looks like. A shared Module moving from one entry to another has to re-run
 // both, or the one that lost it goes on reporting tests it no longer runs.
 function claimedIds(suite: LoadedSuite): string {
@@ -110,13 +110,13 @@ export async function runTestWatch(
 		tests: true,
 		contracts,
 	})
-	// NOTE: One staging root for the whole session, with a directory per cycle
+	// One staging root for the whole session, with a directory per cycle
 	// inside it. Bun's resolver remembers what a directory held the first time
 	// it read anything out of it, so a re-run whose bundle changed has to be
 	// staged somewhere nothing has ever looked — see `stageBundle`.
 	let staging = await createStagingDirectory("essence-test-watch-")
 
-	// NOTE: A signal ends the session at once, with the status a shell reports
+	// A signal ends the session at once, with the status a shell reports
 	// for it. While the session waits, a handler removes the staging first; while
 	// it compiles or runs tests, the next session's sweep does.
 	let stopOnSignal = new Map(
@@ -159,7 +159,7 @@ export async function runTestWatch(
 	let claims = new Map<string, string>()
 	let sources = new Map<string, string>()
 	let cycles = 0
-	// NOTE: Whether the run as a whole held a focused test at the end of the
+	// Whether the run as a whole held a focused test at the end of the
 	// last cycle. A focus silences every other test of the run, so the answer
 	// changing means every suite is reporting the wrong thing and all of them
 	// have to run again.
@@ -179,7 +179,7 @@ export async function runTestWatch(
 		return events
 	}
 
-	// NOTE: What THIS cycle's entries wrote, which is what a snapshot write
+	// What THIS cycle's entries wrote, which is what a snapshot write
 	// acts on — everything else is on disk from an earlier cycle already.
 	let cycleEvents = (entries: Array<string>): Array<TestEvent> => {
 		let events: Array<TestEvent> = []
@@ -221,7 +221,7 @@ export async function runTestWatch(
 				void cycle(targets)
 			}
 		},
-		// NOTE: Something happened in a watched directory that no watched file
+		// Something happened in a watched directory that no watched file
 		// accounts for, which is what a NEW source looks like from here. The
 		// project is searched again, and a file that now writes tests joins the
 		// session where it stands.
@@ -244,7 +244,7 @@ export async function runTestWatch(
 			return
 		}
 
-		// NOTE: Remembered rather than dropped. A file written while a cycle is
+		// Remembered rather than dropped. A file written while a cycle is
 		// in flight would otherwise be noticed by nothing ever again: the
 		// activity that would have found it has already happened.
 		if (running) {
@@ -284,7 +284,7 @@ export async function runTestWatch(
 		await cycle(added)
 	}
 
-	// NOTE: One turn of the session: compile what changed, load what it emitted,
+	// One turn of the session: compile what changed, load what it emitted,
 	// run what has to run, and reprint the whole picture. A change arriving
 	// while one is in flight is remembered and taken as soon as it finishes,
 	// rather than interleaved with it — a run is synchronous and the bundles it
@@ -304,7 +304,7 @@ export async function runTestWatch(
 
 		running = true
 
-		// NOTE: A handler only runs once the thread is free, and a cycle compiles
+		// A handler only runs once the thread is free, and a cycle compiles
 		// and runs tests on it, so until its report a cycle leaves each signal its
 		// default action. The turn first lets a signal already caught run.
 		await new Promise((resolve) => setImmediate(resolve))
@@ -324,7 +324,7 @@ export async function runTestWatch(
 						{ cacheOutput: true, sourcemapMode: "inline" },
 					)
 
-		// NOTE: A cycle that compiled nothing is warm by default: the entries it
+		// A cycle that compiled nothing is warm by default: the entries it
 		// re-ran are the ones a change reached, and where a change reached none
 		// of them the bundles are exactly the ones the last cycle loaded.
 		let cacheWarm = (compilation?.outcomes ?? []).every(
@@ -339,7 +339,7 @@ export async function runTestWatch(
 			])
 		}
 
-		// NOTE: stdout is the event stream's under --json and the report's
+		// stdout is the event stream's under --json and the report's
 		// otherwise, and neither may carry what a Module writes as it is
 		// evaluated — a `Terminal.print` outside any test, before any test is
 		// running. It is pointed at stderr for the length of the load and the
@@ -353,7 +353,7 @@ export async function runTestWatch(
 
 			for (let outcome of compilation?.outcomes ?? []) {
 				if (!outcome.ok || outcome.outputFileName === null) {
-					// NOTE: An entry that would not compile keeps the events of
+					// An entry that would not compile keeps the events of
 					// the last run that did. What it reports is stale and says
 					// so — the Diagnostics are printed above the tree — and
 					// throwing them away would leave the reader with nothing at
@@ -369,7 +369,7 @@ export async function runTestWatch(
 				})
 			}
 
-			// NOTE: One call for the whole cycle, into a directory of this
+			// One call for the whole cycle, into a directory of this
 			// cycle's own. Staging is numbered WITHIN a call, so loading two
 			// bundles through two calls would stage both as `0/tests.mjs` —
 			// and `import()` caches by URL, so the second would answer with
@@ -401,7 +401,7 @@ export async function runTestWatch(
 					return bundle === undefined ? [] : [bundle]
 				}),
 			)
-			// NOTE: Everything the change reached, plus every suite whose claim
+			// Everything the change reached, plus every suite whose claim
 			// moved — and, once the focus of the run has changed, everything:
 			// what `focused` silences is decided across the whole session, so a
 			// suite that was deselected under the old answer is reporting the
@@ -418,7 +418,7 @@ export async function runTestWatch(
 
 			let focusedNow = await holdsFocus(suites, filters.bench)
 
-			// NOTE: Remembered rather than read back off the events. The
+			// Remembered rather than read back off the events. The
 			// streams kept here carry no `run-start`, on purpose — one cycle is
 			// one run and its bookends are written once, around the whole of it
 			// — so the events could not answer this question.
@@ -432,19 +432,19 @@ export async function runTestWatch(
 				eventsByEntry.set(suite.inputFileName, [])
 			}
 
-			// NOTE: Read afresh every cycle. A watching session is exactly the
+			// Read afresh every cycle. A watching session is exactly the
 			// one that sees a `__snapshots__` file change under it — a
 			// `--update` run in another terminal, an editor's "Accept
 			// snapshot" — and the entries it compares against have to be the
 			// ones on disk now.
 			let stored = await readSnapshots(sources.keys())
-			// NOTE: And the baselines, afresh and for the same reason — a
+			// And the baselines, afresh and for the same reason — a
 			// `--bench --update` in another terminal moves them under a
 			// watching session.
 			let baselines = context.options.bench
 				? await readBenchmarks(sources.keys())
 				: {}
-			// NOTE: The corpus too, and it matters more here than it does for
+			// The corpus too, and it matters more here than it does for
 			// a snapshot: a watching session is what WRITES a counterexample
 			// down, and the cycle after a failure has to see the value the
 			// cycle before it recorded.
@@ -473,7 +473,7 @@ export async function runTestWatch(
 				},
 				context.options.coverage,
 				{ stored, update: context.options.update },
-				// NOTE: A seed per CYCLE rather than per session: a watching
+				// A seed per CYCLE rather than per session: a watching
 				// run is a fresh run of everything a save reached, and drawing
 				// the very values the last cycle drew would hide a property
 				// that only fails sometimes. `--seed` pins it where a reader
@@ -488,7 +488,7 @@ export async function runTestWatch(
 
 			reportUnmatchedFilter(context, filters.filter, matched)
 
-			// NOTE: Everything a Module wrote as it was evaluated has been
+			// Everything a Module wrote as it was evaluated has been
 			// written by now, so stdout goes back to being the report's before
 			// the report is written. What a test itself wrote never came
 			// through there: the runtime captured it against the test.
@@ -496,7 +496,7 @@ export async function runTestWatch(
 			restored = true
 
 			let duration = performance.now() - started
-			// NOTE: Over EVERY entry's stream, not just this cycle's. An entry
+			// Over EVERY entry's stream, not just this cycle's. An entry
 			// nothing reached keeps the events it had, coverage among them, so
 			// the picture is of the project rather than of the save — which is
 			// what makes a watching coverage report incremental without
@@ -505,7 +505,7 @@ export async function runTestWatch(
 			let coverage = context.options.coverage
 				? collectCoverage(allEvents())
 				: emptyCoverage
-			// NOTE: This cycle's OWN events, bound once for the three
+			// This cycle's OWN events, bound once for the three
 			// collectors below — what an entry nothing reached recorded two
 			// saves ago is on disk already, and three copies of this filter
 			// would be three module lists that could drift apart.
@@ -539,7 +539,7 @@ export async function runTestWatch(
 				)
 			}
 
-			// NOTE: Compile Diagnostics go to stderr whatever was asked for,
+			// Compile Diagnostics go to stderr whatever was asked for,
 			// including under --json: they are not events, and a file that
 			// stopped compiling has to say so somewhere or the reader is
 			// looking at a report that quietly stopped moving.
@@ -557,7 +557,7 @@ export async function runTestWatch(
 				)
 			}
 
-			// NOTE: Before the cycle says it has ended, so that a signal sent
+			// Before the cycle says it has ended, so that a signal sent
 			// on seeing that finds the handler there.
 			handleSignals(true)
 
@@ -576,7 +576,7 @@ export async function runTestWatch(
 					})}\n`,
 				)
 			} else {
-				// NOTE: Cleared and reprinted rather than appended to. What a
+				// Cleared and reprinted rather than appended to. What a
 				// watching reader wants is the state of the project now, in one
 				// screen, rather than a log they have to scroll back through to
 				// find the run before this one. Only where a terminal is
@@ -609,7 +609,7 @@ export async function runTestWatch(
 				footer()
 			}
 
-			// NOTE: Outside the branch above, because writing a report is not
+			// Outside the branch above, because writing a report is not
 			// something the terminal decides: a job piping `--json` out of a
 			// watching session asked for the file exactly as a job reading the
 			// table did.
@@ -691,7 +691,7 @@ export async function runTestWatch(
 			process.stdin.off("data", onKey)
 		}
 
-		// NOTE: Raw mode is what makes single keypresses arrive without the
+		// Raw mode is what makes single keypresses arrive without the
 		// reader pressing return. It also means Ctrl+C is delivered as data
 		// rather than as a signal, so it is handled by hand above.
 		if (process.stdin.isTTY) {

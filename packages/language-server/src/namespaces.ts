@@ -26,30 +26,30 @@ import type { DocumentAnalysis } from "./analyse"
 import { documentAnalysisOf } from "./moduleLink"
 import { typedProgramBodies } from "./sections"
 
-// NOTE: Shared between Completion's `::` Method listing and Signature
+// Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type
 // matches this receiver", independent of whether a specific invocation's
 // Arguments happen to match an overload (Signature Help in particular is
 // used exactly while the Arguments are still incomplete).
 
-// NOTE: Derived from the Enricher's builtin tables — never listed by hand
+// Derived from the Enricher's builtin tables — never listed by hand
 // here, so a new builtin can not reach resolution without also reaching the
 // Language Server.
 export { builtinNamespaces }
 
-// NOTE: Read on use rather than at import — the tables are assembled on the
+// Read on use rather than at import — the tables are assembled on the
 // first call and cached for the process, so this stays a lookup.
 export function builtinProtocols(): Array<common.ProtocolType> {
 	return Object.values(builtinProtocolTable())
 }
 
-// NOTE: The Case listing a Namespace over a Choice derives — the mirror of the
+// The Case listing a Namespace over a Choice derives — the mirror of the
 // Enricher's own hook, for the one listing that answers a `.` on a Namespace
 // rather than a `::` on a value. `cases` is a static, so it belongs in no
 // receiver listing and is not among the derives `derivedNamespacesFor` below
 // collects.
 //
-// NOTE: The requirement's signature and its `§§` come from the Protocol itself,
+// The requirement's signature and its `§§` come from the Protocol itself,
 // which is what the Enricher builds the derived Method out of — so Completion
 // and Hover describe the very Method a call reaches.
 export function derivedEnumerableNamespace(
@@ -65,13 +65,13 @@ export function derivedEnumerableNamespace(
 		: derivedEnumerableNamespaceForChoice(namespace.targetType, protocol)
 }
 
-// NOTE: The Namespaces a `.` on a base that names a TYPE reads its members off:
+// The Namespaces a `.` on a base that names a TYPE reads its members off:
 // a Choice's derived Case listing, and everything a Protocol-bounded Type
 // Parameter's bound offers. Both are Namespaces nobody declared — the mirror of
 // the Enricher's `namespaceNamedByType`, which is the rail these two spellings
 // compile and hover through.
 //
-// NOTE: A Namespace WRITING `cases` over the Choice is the answer where one
+// A Namespace WRITING `cases` over the Choice is the answer where one
 // does, exactly as it is at the call, and narrowed to that one Method: the base
 // names a Type, so the only member this rail offers is the one the derive would
 // have answered.
@@ -125,7 +125,7 @@ export function namedTypeNamespaces(
 	return listing === null ? [] : [listing]
 }
 
-// NOTE: Through `bindNamespaceTarget`, which is the Enricher's own door, so the
+// Through `bindNamespaceTarget`, which is the Enricher's own door, so the
 // Editor offers a Method exactly where a call to it would resolve. It renames
 // the Namespace's Generics before it matches, and that matters HERE for the
 // answer rather than for the time: a receiver written in a Function Parameter
@@ -142,7 +142,7 @@ function targetTypeMatches(
 	}
 
 	if (namespace.targetType.type === "UnionType") {
-		// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches the
+		// A Union-typed receiver (`Ordering`, `Number`) matches the
 		// Union target as a whole — the per-member check below only covers
 		// receivers of a single member Type. Mirrors the Enricher's
 		// `resolveMethodLookupNamespacesForReceiverType`.
@@ -162,7 +162,7 @@ function targetTypeMatches(
 	return bindNamespaceTarget(namespace, baseType) !== null
 }
 
-// NOTE: `workspaceNamespaces` are Namespaces other Modules publish that this
+// `workspaceNamespaces` are Namespaces other Modules publish that this
 // document has NOT imported. They take part in matching on exactly the same
 // terms as the ones in scope — a Method only resolves through a Namespace whose
 // target Type matches the receiver, and an offer that would not resolve is worse
@@ -177,11 +177,11 @@ export function matchingNamespaces(
 	workspaceNamespaces: Array<common.NamespaceType> = [],
 	document: DocumentAnalysis | null = null,
 ): Array<common.NamespaceType> {
-	// NOTE: Derived for a caller that hands in no analysis, once for every
+	// Derived for a caller that hands in no analysis, once for every
 	// listing below that reads the document.
 	let analysed = document ?? documentAnalysisOf(documentText, documentPath)
 
-	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
+	// A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves only through its Protocol — mirroring the Enricher's Method
 	// resolution, but named after the Protocol for readable listings.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
@@ -196,7 +196,7 @@ export function matchingNamespaces(
 		let methods: Record<string, common.MethodType> = {}
 
 		for (let [methodName, method] of Object.entries(protocol.methods)) {
-			// NOTE: The requirements under the bound's own name; the PROVIDED
+			// The requirements under the bound's own name; the PROVIDED
 			// Methods under the Protocol that wrote each, so a listing says
 			// where a Method a reader never wrote came from — and so a Hover on
 			// one reads "Provided by …" here exactly as it does on a concrete
@@ -229,7 +229,7 @@ export function matchingNamespaces(
 		]
 	}
 
-	// NOTE: A standard library document declares the very Namespaces the
+	// A standard library document declares the very Namespaces the
 	// builtin table already holds — the loader read this file to fill it. The
 	// document's own declaration is the one being edited, so it wins, and the
 	// builtin twin is dropped. Without this every signature is listed TWICE:
@@ -257,7 +257,7 @@ export function matchingNamespaces(
 					targetTypeMatches(namespace, baseType),
 				)
 
-	// NOTE: A Choice's `is`, `isNot` and `toString` can each be derived — no
+	// A Choice's `is`, `isNot` and `toString` can each be derived — no
 	// Namespace declares them, so nothing above finds them, and without this
 	// they would work everywhere but never be OFFERED. Appended on the same
 	// terms the Enricher resolves them on: only where no listed Namespace
@@ -267,7 +267,7 @@ export function matchingNamespaces(
 		...derivedNamespacesFor(baseType, namespaces, allNamespaces),
 	]
 
-	// NOTE: A Protocol's provided Methods are Methods of every conformer, so
+	// A Protocol's provided Methods are Methods of every conformer, so
 	// they belong in the listing beside the written ones — offered on the same
 	// terms the Enricher resolves them on: only where a listed Namespace
 	// declares the conformance, and only for a name nothing written already
@@ -303,7 +303,7 @@ export function matchingNamespaces(
 		: namespaces.filter((namespace) => namespace.name === specifierName)
 }
 
-// NOTE: One Protocol's OWN provided Methods, as the Namespace a listing shows
+// One Protocol's OWN provided Methods, as the Namespace a listing shows
 // them under — named after the Protocol that wrote them, which is what a Hover
 // reads back as "Provided by …". `written` withholds a Method some listed
 // Namespace already answers, so nothing is offered twice and an override is
@@ -351,7 +351,7 @@ function providedNamespaceOf(
 	}
 }
 
-// NOTE: The same, for a bound — the Protocol and every Protocol it extends,
+// The same, for a bound — the Protocol and every Protocol it extends,
 // because extending one is a promise to conform to it.
 function providedNamespacesOf(
 	protocol: common.ProtocolType,
@@ -379,7 +379,7 @@ function providedNamespacesOf(
 	return namespaces
 }
 
-// NOTE: The Language Server's mirror of the Enricher's derives. Equality is
+// The Language Server's mirror of the Enricher's derives. Equality is
 // derived for every Choice; printing only for a Choice whose Cases all carry no
 // payload and whose Namespace declared `is Printable`, which is the rule the
 // Enricher applies. Each is withheld where a listed Namespace writes the Method
@@ -419,7 +419,7 @@ function derivedNamespacesFor(
 	return derived
 }
 
-// NOTE: The whole Choice a receiver belongs to, or null when it belongs to
+// The whole Choice a receiver belongs to, or null when it belongs to
 // none. The Language Server has no Scope to resolve a Case's Choice in, so the
 // Choice is recovered from the Namespaces already gathered — every Choice with
 // a Namespace is reachable that way, and a Choice with none is only ever met as
@@ -428,7 +428,7 @@ function choiceTypeFor(
 	baseType: common.Type,
 	allNamespaces: Array<common.NamespaceType>,
 ): common.Type | null {
-	// NOTE: Recovered by the Cases' identity, which is what the Enricher matches
+	// Recovered by the Cases' identity, which is what the Enricher matches
 	// them by — two Modules declaring the same Choice name declare two Choices,
 	// and a Union of one of them is not the other's.
 	let isChoiceOf = (type: common.Type, identity: string): boolean =>
@@ -464,7 +464,7 @@ function choiceTypeFor(
 	)
 }
 
-// NOTE: A Union-typed receiver reaches a Method either through a Namespace
+// A Union-typed receiver reaches a Method either through a Namespace
 // covering the whole Union or through per-member dispatch — a Method is
 // dispatchable only when every member resolves it. Member Namespaces are
 // therefore listed with their Methods narrowed to the dispatchable names,
@@ -537,7 +537,7 @@ function unionReceiverNamespaces(
 	return namespaces
 }
 
-// NOTE: Read off the whole (unmodified) document: a "probe" built from the
+// Read off the whole (unmodified) document: a "probe" built from the
 // text up to the cursor only sees Namespaces declared before it, so a
 // Namespace declared further down would otherwise be invisible.
 function collectNamespaceTypes(
@@ -550,7 +550,7 @@ function collectNamespaceTypes(
 		return namespaces
 	}
 
-	// NOTE: A Namespace declared in the `tests { … }` block is a Namespace
+	// A Namespace declared in the `tests { … }` block is a Namespace
 	// the tests may reach through `::`, so it is offered there.
 	for (let body of typedProgramBodies(enrichedProgram)) {
 		collectNamespaceTypesInBody(body, namespaces)
@@ -577,7 +577,7 @@ function collectNamespaceTypesInBody(
 	}
 }
 
-// NOTE: The Protocol a stored identity names, for this document: the graph's
+// The Protocol a stored identity names, for this document: the graph's
 // registry where the document is a Module, which holds a Protocol the document
 // never imports, and otherwise what the document and the builtins declare.
 function protocolsByIdentity(
@@ -604,7 +604,7 @@ function collectProtocolTypes(
 		document?.module?.imported.protocols ?? {},
 	)
 
-	// NOTE: A Protocol declared in a body too, which is a Protocol of its own
+	// A Protocol declared in a body too, which is a Protocol of its own
 	// however it is named.
 	for (let body of typedProgramBodies(enrichedProgram)) {
 		collectProtocolTypesInBody(body, protocols)
@@ -631,7 +631,7 @@ function collectProtocolTypesInBody(
 	}
 }
 
-// NOTE: The Namespaces the import block brought in — declared in another
+// The Namespaces the import block brought in — declared in another
 // Module, so no walk of THIS document's Nodes can find them, and a `::` on a
 // value of an imported Type would be answered by the builtins alone. They take
 // part in matching on the same terms every other Namespace does: a Method

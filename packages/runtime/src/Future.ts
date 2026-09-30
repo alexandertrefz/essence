@@ -6,13 +6,13 @@ import { registerKind } from "./registry"
 import type { ResultType } from "./Result"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: ASYNCHRONY'S RUNTIME, and the `Future` Namespace's module in one file —
+// ASYNCHRONY'S RUNTIME, and the `Future` Namespace's module in one file —
 // the Namespace's name and the module's name are the same name, and splitting
 // them would put what a future IS and what runs one in two places. The emission
 // reads this module under the alias `$future` and the Namespace import reads it
 // under `Future`; both are the same module object.
 //
-// NOTE: A FUTURE IS A DESCRIPTION. Building one runs nothing at all: it holds a
+// A FUTURE IS A DESCRIPTION. Building one runs nothing at all: it holds a
 // `run` and nothing else, and `run` is called once per START. That is the whole
 // reason a Future may be started any number of times — each start is a fresh
 // call — and the whole reason `::attempt` is written in Essence, as a body that
@@ -22,12 +22,12 @@ import { type AnyType, typeKeySymbol } from "./type"
 // answered with and the controller that stops it, so completing one twice
 // answers the same value twice and runs nothing the second time.
 //
-// NOTE: Everything here runs on the one JavaScript thread. Concurrency is not
+// Everything here runs on the one JavaScript thread. Concurrency is not
 // parallelism: a future with no suspension inside it runs to its end
 // synchronously the moment it is started, which is why `start` calls `run`
 // rather than scheduling it.
 
-// NOTE: The context a run belongs to — the signal the work reads and the
+// The context a run belongs to — the signal the work reads and the
 // controller that stops it. Every start makes a CHILD of the context it was
 // written in, so stopping a run stops everything it started, and nothing else.
 export type Context = {
@@ -37,7 +37,7 @@ export type Context = {
 
 export type FutureType<Value> = {
 	[typeKeySymbol]: "Future"
-	// NOTE: May answer with the value itself rather than with a promise of one —
+	// May answer with the value itself rather than with a promise of one —
 	// a description of synchronous work is a Future like any other, and
 	// `Promise.resolve` is what levels the two.
 	run: (context: Context) => Value | Promise<Value>
@@ -49,14 +49,14 @@ export type StartedType<Value> = {
 	controller: AbortController
 }
 
-// NOTE: Registered from the two doors a Future and a Started are BUILT through,
+// Registered from the two doors a Future and a Started are BUILT through,
 // rather than at the top of this module, for the reason `Dictionary.ts` gives at
 // its own registration: the head of every emitted Program imports every runtime
 // module and leans on esbuild to shake the unused ones away, and a top-level
 // call is a side effect a bundler has to keep. A Program that waits for nothing
 // pays nothing for this file.
 //
-// NOTE: Both kinds render as their bare name and hold no parts. What a Future
+// Both kinds render as their bare name and hold no parts. What a Future
 // describes is a JavaScript closure and what a Started holds is a promise;
 // neither says anything to a reader, and printing either would be printing the
 // runtime's own bookkeeping. They compare by IDENTITY for the same reason: two
@@ -83,7 +83,7 @@ function registerFutureKinds(): void {
 	}
 }
 
-// NOTE: The door a completing body's emission comes through:
+// The door a completing body's emission comes through:
 // `$future.of(async ($ctx) => …)`. The closure IS the description, and it is
 // handed the context at every start.
 export function of<Value>(
@@ -94,7 +94,7 @@ export function of<Value>(
 	return { [typeKeySymbol]: "Future", run }
 }
 
-// NOTE: The context work started at a Program's top level belongs to — a root
+// The context work started at a Program's top level belongs to — a root
 // with nothing above it, so nothing can stop it but itself. A fresh one per
 // call, which is what makes two top-level starts independent of each other.
 export function root(): Context {
@@ -103,7 +103,7 @@ export function root(): Context {
 	return { signal: controller.signal, controller }
 }
 
-// NOTE: A context that is stopped when its parent is, and separately stoppable
+// A context that is stopped when its parent is, and separately stoppable
 // on its own — which is what `::within` and `::race` stop their losers through.
 // `release` says the run this context was made for is over; see `childOf` for
 // what that is and is not enough to unlink.
@@ -112,7 +112,7 @@ type Child = {
 	release: () => void
 }
 
-// NOTE: The bookkeeping the fallback path below needs and the `AbortSignal.any`
+// The bookkeeping the fallback path below needs and the `AbortSignal.any`
 // path does not: what a linked context still owes its parent. A forwarding
 // listener may come off the parent only once the run it was added for has
 // settled AND every context started UNDER that run has come off in turn —
@@ -163,7 +163,7 @@ function releaseOne(context: Context): void {
 	}
 }
 
-// NOTE: `AbortSignal.any([parent.signal, own.signal])` is exactly this union,
+// `AbortSignal.any([parent.signal, own.signal])` is exactly this union,
 // and it is taken where the host has one: the engine owns the bookkeeping, and a
 // dependent signal nothing holds any more is collected with the run it belonged
 // to. It arrived in Node 20.3, Bun 1.1, Deno 1.39 and Safari 17.4, so a host
@@ -173,7 +173,7 @@ function releaseOne(context: Context): void {
 // is a side effect esbuild has to keep, and a Program that waits for nothing
 // would pay for it.
 //
-// NOTE: The fallback is one listener on the parent, and what takes it off is a
+// The fallback is one listener on the parent, and what takes it off is a
 // count of what still needs it. A run that has settled needs it no longer — a
 // finished run can not be stopped — but a context started under that run can:
 // stopping a Program's root context stops the work a finished body left behind,
@@ -214,7 +214,7 @@ function childOf(parent: Context): Child {
 
 	parent.signal.addEventListener("abort", forward, { once: true })
 
-	// NOTE: One hold for the run this context was made for, and one taken on
+	// One hold for the run this context was made for, and one taken on
 	// the PARENT for this context being open under it — which is what keeps a
 	// grandparent's stop reaching down through a body that has already
 	// answered.
@@ -237,12 +237,12 @@ function childOf(parent: Context): Child {
 	return { context, release: () => releaseOne(context) }
 }
 
-// NOTE: One run of a description, under a context of its own, as the promise it
+// One run of a description, under a context of its own, as the promise it
 // answers with. The release is what the run is over: a run that finished can no
 // longer be stopped, so holding its link to the parent open would be holding it
 // open for nothing.
 //
-// NOTE: A throw out of `run` is kept ON THE PROMISE rather than raised here. A
+// A throw out of `run` is kept ON THE PROMISE rather than raised here. A
 // future can not FAIL — a failure is a value in this language, carried by a
 // Result — so a throw is a bug in the Compiler or in a native, and raising it
 // would surface it at the `start`, which is not where the work is, and would
@@ -275,7 +275,7 @@ function runUnder<Value>(
 	)
 }
 
-// NOTE: The one door every Started is built through. A run nobody completes is
+// The one door every Started is built through. A run nobody completes is
 // what `start` in Statement position MEANS — `unobserved-started` is an
 // Information, not a refusal — so a throw out of such a run has no reader, and
 // left alone it reaches the host's unhandled-rejection hook, which on Node
@@ -286,7 +286,7 @@ function runUnder<Value>(
 // Started awaits the SAME promise and sees the same throw, because a handler
 // attached to a rejected promise is what marks it, not what consumes it.
 //
-// NOTE: Here rather than in `start` alone, because a Started is built at three
+// Here rather than in `start` alone, because a Started is built at three
 // doors — `start`, `Started::map` and `Started::within` — and the derived
 // promises the last two build are separate promises nothing else marks.
 export function started<Value>(
@@ -298,13 +298,13 @@ export function started<Value>(
 	return { [typeKeySymbol]: "Started", promise, controller }
 }
 
-// NOTE: `start x` — the description put in flight under a context of its own,
+// `start x` — the description put in flight under a context of its own,
 // answering the one run of it. `run` is called SYNCHRONOUSLY, so a future with
 // nothing to wait for inside it is finished before `start` answers; what comes
 // back is a promise either way, because the caller can not tell which it was and
 // must not have to.
 //
-// NOTE: A Started handed here is answered with ITSELF. Starting one is
+// A Started handed here is answered with ITSELF. Starting one is
 // `needless-start`, a Warning the Compiler reports, and the Program it reports
 // on still has to mean something: one run stays one run.
 export function start<Value>(
@@ -314,7 +314,7 @@ export function start<Value>(
 	registerFutureKinds()
 
 	if (work[typeKeySymbol] !== "Future") {
-		// NOTE: A Started is answered with itself, and so is anything else.
+		// A Started is answered with itself, and so is anything else.
 		// Starting a Started is `needless-start` and starting a value that
 		// describes no work is the same Warning — both compile, because both
 		// are Warnings, and a Program that compiles has to mean what the
@@ -329,7 +329,7 @@ export function start<Value>(
 	return started(runUnder(work, child), child.context.controller)
 }
 
-// NOTE: `complete x` — what the emission `await`s. A Started is waited for
+// `complete x` — what the emission `await`s. A Started is waited for
 // again, which answers the value it already has; a Future is run under a context
 // of its own and waited for, without a Started object nobody would read.
 export function complete<Value>(
@@ -340,7 +340,7 @@ export function complete<Value>(
 		return work.promise
 	}
 
-	// NOTE: And anything that is not a Future is its own answer, for the reason
+	// And anything that is not a Future is its own answer, for the reason
 	// `start` answers one with itself: `needless-complete` is a Warning, so the
 	// Program runs, and what it runs has to be the no-op the Warning describes.
 	if (work[typeKeySymbol] !== "Future") {
@@ -354,7 +354,7 @@ export function complete<Value>(
 
 // #region Timers
 
-// NOTE: The longest delay a host timer takes. `setTimeout` keeps its delay in a
+// The longest delay a host timer takes. `setTimeout` keeps its delay in a
 // 32-bit signed integer, so anything past this overflows — and what a host does
 // with an overflowed delay is fire at ONE millisecond, with a warning printed
 // into the Program's own output. An Essence Integer is unbounded and no `@param`
@@ -362,7 +362,7 @@ export function complete<Value>(
 // one that would arrive at once.
 const LONGEST_DELAY = 2147483647
 
-// NOTE: The milliseconds a limit asks for, as a number a timer can be armed
+// The milliseconds a limit asks for, as a number a timer can be armed
 // with. An Integer is hybrid — a small one holds a `number` and a large one a
 // `bigint` — and a `bigint` past 2^53 answers `Infinity` through `Number`,
 // which is honest: a wait that long is a wait with no end. A negative length is
@@ -373,7 +373,7 @@ export function delayOf(limit: IntegerType): number {
 	return Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : Infinity
 }
 
-// NOTE: A timer armed in chunks no longer than a host takes, re-armed until the
+// A timer armed in chunks no longer than a host takes, re-armed until the
 // time asked for is spent — which is what keeps a long deadline long. `Infinity`
 // never spends, so a wait with no end re-arms forever and answers never, which
 // is what it says. Answers the way to call it off.
@@ -396,12 +396,12 @@ export function waitFor(delay: number, answer: () => void): () => void {
 
 // #region The combinators
 
-// NOTE: `Future::within(milliseconds limit)` — the receiver, run under a
+// `Future::within(milliseconds limit)` — the receiver, run under a
 // context of its own, with a deadline over it. What it answers is an Optional,
 // so a run that took too long is a value the Program reads rather than a failure
 // it handles: there is no `TimedOut` Case anywhere, and none is needed.
 //
-// NOTE: The loser is STOPPED. The run belongs to this call and to nothing else —
+// The loser is STOPPED. The run belongs to this call and to nothing else —
 // it was started here — so nothing else can be waiting for it, and what it
 // answers after the deadline is a value nobody may observe. That is the whole of
 // what cancellation is here: the work is signalled and its answer is dropped.
@@ -418,7 +418,7 @@ export function within<Value extends AnyType>(
 					resolve(createEmpty())
 				})
 
-				// NOTE: And the deadline goes when the run above it does. A
+				// And the deadline goes when the run above it does. A
 				// timer left behind holds a host with an event loop open for as
 				// long as it has left to run, for an answer nobody is waiting
 				// for any more.
@@ -440,7 +440,7 @@ export function within<Value extends AnyType>(
 	)
 }
 
-// NOTE: `FutureList::inSequence()` — one after another, each started only once
+// `FutureList::inSequence()` — one after another, each started only once
 // the one before it has answered. It is the combinator to reach for where the
 // work is not independent: a host that refuses a second request, a walk whose
 // order is what the answer means.
@@ -458,7 +458,7 @@ export function inSequence<Value extends AnyType>(
 	})
 }
 
-// NOTE: `FutureList::all()` — every one of them started at once, and the values
+// `FutureList::all()` — every one of them started at once, and the values
 // in the receiver's order however they finished. Concurrency is not parallelism:
 // they share the one thread, so what this buys is the waiting rather than the
 // computing.
@@ -468,13 +468,13 @@ export function all__overload$1<Value extends AnyType>(
 	return of(async (context) => {
 		let started = materialise(futures).map((work) => start(work, context))
 
-		// NOTE: `Promise.all` answers a fresh Array, which is what `createList`
+		// `Promise.all` answers a fresh Array, which is what `createList`
 		// demands of every caller — the box takes the Array it is handed.
 		return createList(await Promise.all(started.map((run) => run.promise)))
 	})
 }
 
-// NOTE: `FutureList::all(atMost count)` — the same answer with a ceiling on how
+// `FutureList::all(atMost count)` — the same answer with a ceiling on how
 // many are in flight. A count below one runs them one at a time, which is the
 // library's rule for a count that makes no sense: nothing is dropped and the
 // answer still holds one value per item.
@@ -488,7 +488,7 @@ export function all__overload$2<Value extends AnyType>(
 		let answers: Array<Value> = Array.from({ length: total })
 		let inFlight = Math.max(1, Math.min(Number(count.value), total))
 		let next = 0
-		// NOTE: One walker per slot, each taking the next item until there is
+		// One walker per slot, each taking the next item until there is
 		// none — rather than a walk of fixed batches, which would wait for the
 		// slowest of each batch before starting any of the one after it.
 		let walkers: Array<Promise<void>> = []
@@ -512,11 +512,11 @@ export function all__overload$2<Value extends AnyType>(
 	})
 }
 
-// NOTE: `NonEmptyFutureList::race()` — every one started at once, the first
+// `NonEmptyFutureList::race()` — every one started at once, the first
 // answer taken, and every other run stopped. The receiver is a List proven to
 // hold something, because the first answer of nothing is no answer at all.
 //
-// NOTE: The index rides with the value so that the winner can be told from the
+// The index rides with the value so that the winner can be told from the
 // losers. Racing the promises alone answers the value and leaves nothing to say
 // WHICH run it came from, and stopping them all would signal the run that won.
 export function race<Value extends AnyType>(
@@ -543,7 +543,7 @@ export function race<Value extends AnyType>(
 	})
 }
 
-// NOTE: `ResultFutureList::firstValue()` — every one started at once, and the
+// `ResultFutureList::firstValue()` — every one started at once, and the
 // first VALUE any of them answers with. A run that fails is not an answer here:
 // the wait goes on, and only a List whose every run failed answers empty. The
 // name is `OptionalList::firstValue`'s, for the same question one level along.
@@ -558,7 +558,7 @@ export function firstValue<Value extends AnyType, Failure extends AnyType>(
 		}
 
 		let awaited = started.length
-		// NOTE: SETTLED ONCE, and this flag is what says so. Every run answers,
+		// SETTLED ONCE, and this flag is what says so. Every run answers,
 		// including the ones that answer in the same turn as the winner, and a
 		// second answer arriving after the choice was made must neither stop
 		// anything nor count towards the empty answer: it would abort every

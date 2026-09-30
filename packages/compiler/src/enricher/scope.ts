@@ -1,6 +1,6 @@
 import type { common, enricher } from "@essence-lang/interfaces"
 
-// NOTE: A Scope map with NO prototype — `Object.create(null)` rather than `{}`.
+// A Scope map with NO prototype — `Object.create(null)` rather than `{}`.
 // The maps are keyed by names a Program writes, and `{}` inherits
 // `Object.prototype`, so a plain index read for `toString`, `valueOf` or
 // `constructor` answers with a JavaScript function nobody declared: an
@@ -17,7 +17,7 @@ export function scopeMap<Value>(
 	return entries === undefined ? map : Object.assign(map, entries)
 }
 
-// NOTE: The Module a Scope belongs to, answered by the nearest Scope that names
+// The Module a Scope belongs to, answered by the nearest Scope that names
 // one — a child Scope inherits nothing, so the walk is what makes a Handler
 // body, a Method body and the Program's top level agree on which Module they are
 // in. Null for a Program that is no Module.
@@ -35,7 +35,7 @@ export function modulePathOf(scope: enricher.Scope): string | null {
 	return null
 }
 
-// NOTE: The nearest Scope with an answer about asynchrony, which a Scope
+// The nearest Scope with an answer about asynchrony, which a Scope
 // carrying the barrier `null` is — read outwards exactly as `modulePathOf` is,
 // and for the same reason: an `if` body and a Match Handler suspend wherever the
 // body holding them does.
@@ -55,7 +55,7 @@ export function completionContextIn(
 	return undefined
 }
 
-// NOTE: Whether this body ALREADY waits, which is what the Parser's `complete`
+// Whether this body ALREADY waits, which is what the Parser's `complete`
 // mark says: a completing body answers with its own Future and a Program's top
 // level is awaited by the emitted Module. A Parameter's default, a test name, a
 // benchmark and a property body are barriers, and a body that declared anything
@@ -70,7 +70,7 @@ function bodyWaits(scope: enricher.Scope): boolean {
 	return context === "top-level" || context?.type === "Future"
 }
 
-// NOTE: The nearest Scope that has an answer about what a `<-` is measured
+// The nearest Scope that has an answer about what a `<-` is measured
 // against, which a Scope carrying `null` is — a `<-` inside a Function whose own
 // return Type is still being worked out has no expected Type, and the enclosing
 // Function's is not it.
@@ -90,7 +90,7 @@ export function expectedReturnTypeIn(
 	return null
 }
 
-// NOTE: Whether a `complete` written HERE would STAND — the one question every
+// Whether a `complete` written HERE would STAND — the one question every
 // report about a forgotten one asks, and the reason each of them can offer the
 // word rather than guess. Two ways it stands: the body already waits, or it
 // declares `-> Future<…>` and has simply not written its first `complete` yet,
@@ -106,7 +106,7 @@ export function bodyCanWait(scope: enricher.Scope): boolean {
 	return bodyWaits(scope) || expectedReturnTypeIn(scope)?.type === "Future"
 }
 
-// NOTE: The position a barrier belongs to, for the reports that have to name it
+// The position a barrier belongs to, for the reports that have to name it
 // — read off the same Scope the walk above stops at, so the two can not disagree
 // about WHICH barrier answered. Null where the context is no barrier at all.
 export function completionBarrierIn(
@@ -127,7 +127,7 @@ export function completionBarrierIn(
 	return null
 }
 
-// NOTE: The Namespaces the Module around this Scope could have imported and did
+// The Namespaces the Module around this Scope could have imported and did
 // not, answered by the nearest Scope that knows — the same parent-chain walk
 // `modulePathOf` makes, and for the same reason: a Method Invocation deep inside
 // a body has to reach what the Module's top level was told. Empty for a Program
@@ -148,7 +148,7 @@ export function unimportedNamespacesOf(
 	return []
 }
 
-// NOTE: The registry of every Protocol the compile declared, from the nearest
+// The registry of every Protocol the compile declared, from the nearest
 // Scope that carries one.
 export function protocolRegistryOf(
 	scope: enricher.Scope,
@@ -166,7 +166,7 @@ export function protocolRegistryOf(
 	return null
 }
 
-// NOTE: Records a Protocol just declared in this Scope in the compile's
+// Records a Protocol just declared in this Scope in the compile's
 // registry.
 export function registerProtocol(
 	scope: enricher.Scope,
@@ -175,7 +175,7 @@ export function registerProtocol(
 	protocolRegistryOf(scope)?.set(protocol.identity, protocol)
 }
 
-// NOTE: A registry holding the Protocols a new top level Scope already binds,
+// A registry holding the Protocols a new top level Scope already binds,
 // which are the builtins.
 export function protocolRegistryFor(
 	protocols: Record<string, common.ProtocolType>,
@@ -188,7 +188,7 @@ export function protocolRegistryFor(
 	)
 }
 
-// NOTE: The Modules this one reaches that declare a Protocol of this name, asked
+// The Modules this one reaches that declare a Protocol of this name, asked
 // of the nearest Scope that knows. Empty for a Program that is no Module.
 export function protocolDeclarationsOf(
 	scope: enricher.Scope,
@@ -207,7 +207,7 @@ export function protocolDeclarationsOf(
 	return []
 }
 
-// NOTE: Whether the Module's own Scope, which an import binds into, binds this
+// Whether the Module's own Scope, which an import binds into, binds this
 // name already, so that an import under it would be refused. False for a
 // Program that is no Module.
 export function moduleBindsName(scope: enricher.Scope, name: string): boolean {
@@ -228,7 +228,7 @@ export function moduleBindsName(scope: enricher.Scope, name: string): boolean {
 	return false
 }
 
-// NOTE: What the Parser abandoned on the way to this Program — the same
+// What the Parser abandoned on the way to this Program — the same
 // parent-chain walk `modulePathOf` makes, and for the same reason: a name read
 // deep inside a body has to reach what the Program's top level was told.
 function abandonedDeclarationsIn(
@@ -247,7 +247,7 @@ function abandonedDeclarationsIn(
 	return []
 }
 
-// NOTE: Whether `cursor` stands inside `span`, inclusive of both ends.
+// Whether `cursor` stands inside `span`, inclusive of both ends.
 function spanHolds(span: common.Position, cursor: common.Cursor): boolean {
 	return notBefore(cursor, span.start) && notBefore(span.end, cursor)
 }
@@ -259,7 +259,7 @@ function notBefore(cursor: common.Cursor, than: common.Cursor): boolean {
 	)
 }
 
-// NOTE: Whether the Parser abandoned a Declaration of this name that THIS read
+// Whether the Parser abandoned a Declaration of this name that THIS read
 // could have seen.
 //
 // It is the one question every "no such name" report asks before it reports.
@@ -268,7 +268,7 @@ function notBefore(cursor: common.Cursor, than: common.Cursor): boolean {
 // syntax error, once more, one line further down. Answering the read as an
 // Error and saying nothing is what keeps one mistake to one Diagnostic.
 //
-// NOTE: And the read's POSITION is what keeps it to one mistake in the other
+// And the read's POSITION is what keeps it to one mistake in the other
 // direction. A hoisted Declaration is in scope file-wide, so a dropped one
 // silences every read of its name; anything else is in scope inside the block it
 // was written in and from its own position down, so a dropped one silences
@@ -290,7 +290,7 @@ export function declarationWasAbandoned(
 	)
 }
 
-// NOTE: The same question asked about a MEMBER name — a Method or a static
+// The same question asked about a MEMBER name — a Method or a static
 // Property read off a Namespace, a Protocol or a Union's Cases. It is file-wide
 // and deliberately so: a member name is not lexical. A Method dropped out of a
 // Namespace's body is read from OUTSIDE that body, everywhere in the file the
@@ -303,7 +303,7 @@ export function memberDeclarationWasAbandoned(
 	return abandonedDeclarationsIn(scope).some((record) => record.name === name)
 }
 
-// NOTE: A fresh child Scope nested under `parent`, with every map empty — the
+// A fresh child Scope nested under `parent`, with every map empty — the
 // shape every block, body and Handler needs before it seeds its own bindings.
 // `overrides` pre-populates the few fields a caller wants set (a seeded `types`
 // or `members` map, an `expectedReturnType`) without restating the empty maps.
@@ -324,7 +324,7 @@ export function childScope(
 	}
 }
 
-// NOTE: How many Types have been declared anywhere, ever. "Which refinements can
+// How many Types have been declared anywhere, ever. "Which refinements can
 // this Scope see" is memoised per Scope, and the answer changes only when a Type
 // is declared into one of the Scopes on the chain — during the hoisting rounds,
 // and again while a body that writes its own `type` is enriched. ONE counter

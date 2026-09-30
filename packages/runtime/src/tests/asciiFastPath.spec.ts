@@ -31,7 +31,7 @@ import { typeKeySymbol } from "../type"
 const string = (value: string) => createString(value)
 const int = (value: number) => createInteger(value)
 
-// NOTE: An Optional position read back as a plain number, `-1` for an empty
+// An Optional position read back as a plain number, `-1` for an empty
 // answer — the shape `indexOf` answers, which is what the ASCII route IS and
 // what the grapheme route has to agree with.
 function positionOf(answer: OptionalType<IntegerType>): number {
@@ -40,7 +40,7 @@ function positionOf(answer: OptionalType<IntegerType>): number {
 		: Number(answer.item.value)
 }
 
-// NOTE: The character a position answers, or nothing — unwrapped here so that
+// The character a position answers, or nothing — unwrapped here so that
 // the assertions below read the answer rather than the Optional around it.
 function characterOf(answer: OptionalType<StringType>): StringType | undefined {
 	return answer[typeKeySymbol] === "Optional#Empty" ? undefined : answer.item
@@ -53,14 +53,14 @@ const last = (text: string, part: string) =>
 const occurrences = (text: string, part: string) =>
 	Number(count(string(text), string(part)).value)
 
-// NOTE: The same two questions asked with the case folded, which is the route
+// The same two questions asked with the case folded, which is the route
 // that reads the receiver in chunks.
 const folded = (text: string, part: string) =>
 	positionOf(firstIndexFolded(string(text), string(part), insensitive))
 const foldedLast = (text: string, part: string) =>
 	positionOf(lastIndexFolded(string(text), string(part), insensitive))
 
-// NOTE: The two Symbol keys `String.ts` remembers a String's ASCII-ness and
+// The two Symbol keys `String.ts` remembers a String's ASCII-ness and
 // character count under, found by their descriptions — they are private to
 // the module, and this file is the one reader that has to see them, because
 // whether a marker SURVIVED a Method is not observable any other way than by
@@ -81,14 +81,14 @@ const isUnmarked = (value: StringType) =>
 	remembered(value, "$isAscii") === undefined &&
 	remembered(value, "$graphemeCount") === undefined
 
-// NOTE: The same text twice, composed and decomposed — canonically equivalent,
+// The same text twice, composed and decomposed — canonically equivalent,
 // different code points — so that a search across the two proves it matches by
 // canonical equivalence rather than by unit. See `graphemes.spec.ts`.
 const composed = "café".normalize("NFC")
 const decomposed = "café".normalize("NFD")
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
 
-// NOTE: `split`, `ends`, `slice` and `character(at:)` take the intrinsic on
+// `split`, `ends`, `slice` and `character(at:)` take the intrinsic on
 // the same condition the searches take it on, and each has to answer what the
 // walk over the view answers.
 describe("cutting by either route", () => {
@@ -124,7 +124,7 @@ describe("cutting by either route", () => {
 })
 
 describe("searching by either route", () => {
-	// NOTE: Two ASCII Strings are searched by the JavaScript intrinsics, and
+	// Two ASCII Strings are searched by the JavaScript intrinsics, and
 	// these are the intrinsics' own answers: the first occurrence, the LAST
 	// occurrence even where it overlaps an earlier one, and the occurrences
 	// that do not overlap — the ones `split` cuts at.
@@ -147,7 +147,7 @@ describe("searching by either route", () => {
 		expect(occurrences("", "a")).toBe(0)
 	})
 
-	// NOTE: The one rule for the empty part, stated above `contains` in
+	// The one rule for the empty part, stated above `contains` in
 	// `String.es`: it matches nowhere, except as a position at either end.
 	test("the empty part is a position at either end and no occurrence", () => {
 		expect(first("hello", "")).toBe(0)
@@ -158,12 +158,12 @@ describe("searching by either route", () => {
 		expect(last("", "")).toBe(0)
 		expect(occurrences("", "")).toBe(0)
 
-		// NOTE: The length is counted by grapheme, whichever route the empty
+		// The length is counted by grapheme, whichever route the empty
 		// part would have taken.
 		expect(last(`a${family}b`, "")).toBe(3)
 	})
 
-	// NOTE: A side the scan refuses goes through the grapheme view, and the
+	// A side the scan refuses goes through the grapheme view, and the
 	// positions are then by grapheme: a joined emoji is ONE position, a base
 	// and its combining mark are one, and a composed part is found inside a
 	// decomposed String.
@@ -181,7 +181,7 @@ describe("searching by either route", () => {
 		expect(last("x\u0301yx", "x")).toBe(2)
 	})
 
-	// NOTE: A carriage return declines the ASCII route (see `isSingleUnitAscii`),
+	// A carriage return declines the ASCII route (see `isSingleUnitAscii`),
 	// because CR LF is one cluster — so a line feed inside one is not found,
 	// while the pair is.
 	test("a carriage return is searched as part of its cluster", () => {
@@ -191,7 +191,7 @@ describe("searching by either route", () => {
 		expect(occurrences("a\r\nb\r\n", "\r\n")).toBe(2)
 	})
 
-	// NOTE: The routes have to meet where one side qualifies and the other
+	// The routes have to meet where one side qualifies and the other
 	// does not: U+037E is the Greek question mark, whose NFC form is the ASCII
 	// semicolon, so an ASCII String holds it by canonical equivalence.
 	test("an ASCII receiver and a non-ASCII part still agree on the answer", () => {
@@ -207,14 +207,14 @@ describe("searching by either route", () => {
 		expect(ends(string("añb"), string("b")).value).toBeTrue()
 	})
 
-	// NOTE: THE FOLDED FIRST-MATCH SEARCHES READ THE RECEIVER IN CHUNKS, so
+	// THE FOLDED FIRST-MATCH SEARCHES READ THE RECEIVER IN CHUNKS, so
 	// that one costs the distance to its match rather than the whole receiver
 	// — and a chunk can cut a match in half. Each chunk therefore begins
 	// `part.length - 1` characters back inside the one before it, and ends that
 	// far inside it walking from the back, which is the widest a match can hang
 	// over a boundary by.
 	//
-	// NOTE: THE RECEIVERS HERE ARE LONG ON PURPOSE, and the part is put at
+	// THE RECEIVERS HERE ARE LONG ON PURPOSE, and the part is put at
 	// EVERY position of one rather than at the boundaries a reader worked out.
 	// Neither route chunks a receiver under twice its chunk — 2,048 units on the
 	// ASCII route, 32 characters on the view route — so every other search test
@@ -222,7 +222,7 @@ describe("searching by either route", () => {
 	// and could not see a boundary bug at all. Sweeping every position needs no
 	// arithmetic about where the chunks fall, and keeps holding when they move.
 	//
-	// NOTE: SIX THOUSAND UNITS rather than the least that chunks at all, because
+	// SIX THOUSAND UNITS rather than the least that chunks at all, because
 	// the ASCII receiver has to reach the DOUBLING and not merely the first
 	// boundary. Its chunks are 1,024 then 2,048, so it crosses a boundary at
 	// 1,024 and another at 3,070 and its last chunk swallows the tail; at 3,000
@@ -244,7 +244,7 @@ describe("searching by either route", () => {
 			expect(foldedLast(text, "qrs")).toBe(at)
 		}
 
-		// NOTE: A receiver the ASCII scan refuses, walked the same way — its
+		// A receiver the ASCII scan refuses, walked the same way — its
 		// chunks are counted in CHARACTERS, and each `é` is one character and
 		// one unit, so the position a search answers is the position the sweep
 		// put the part at.
@@ -262,7 +262,7 @@ describe("searching by either route", () => {
 		}
 	})
 
-	// NOTE: The answers a chunked walk has to keep giving when there is nothing
+	// The answers a chunked walk has to keep giving when there is nothing
 	// to find, or nothing long enough to find it in — the three ways out of the
 	// loop that the sweep above never takes. The receiver is over twice the
 	// ASCII floor for the same reason the sweep's is: under that it is read in
@@ -285,7 +285,7 @@ describe("searching by either route", () => {
 		expect(foldedLast(accents, `${accents}z`)).toBe(-1)
 	})
 
-	// NOTE: The LAST match of a receiver holding several, which is what a
+	// The LAST match of a receiver holding several, which is what a
 	// backward walk stopping at the first chunk that holds one has to answer —
 	// and the FIRST where a forward walk would meet the later one too.
 	test("a folded walk answers the end it started from", () => {
@@ -304,14 +304,14 @@ describe("searching by either route", () => {
 })
 
 describe("the ASCII marker", () => {
-	// NOTE: Every Method that maps an ASCII String to an ASCII String marks
+	// Every Method that maps an ASCII String to an ASCII String marks
 	// its answer, so that a loop measuring what it built does not rescan it.
 	test("survives the Methods that map ASCII to ASCII", () => {
 		let text = string("  Hello, World  ")
 
 		expect(isMarkedAscii(uppercase(text))).toBeTrue()
 		expect(isMarkedAscii(lowercase(text))).toBeTrue()
-		// NOTE: `uppercase` above took the receiver's mark, and `trim` hands
+		// `uppercase` above took the receiver's mark, and `trim` hands
 		// down what the receiver carries rather than taking it itself — the
 		// test below this one is about that, and asserts both halves.
 		expect(isMarkedAscii(trim(text, bothEnds))).toBeTrue()
@@ -330,7 +330,7 @@ describe("the ASCII marker", () => {
 		}
 	})
 
-	// NOTE: The one split that does not mark its pieces, and why: the empty
+	// The one split that does not mark its pieces, and why: the empty
 	// separator answers the characters, and a piece there is ONE unit — the
 	// scan that would answer the mark reads it, so the mark saves nothing and
 	// writing two Symbol keys per character of the receiver measured most of
@@ -344,7 +344,7 @@ describe("the ASCII marker", () => {
 		}
 	})
 
-	// NOTE: `trim` PROPAGATES the mark and never takes it. Taking it means
+	// `trim` PROPAGATES the mark and never takes it. Taking it means
 	// scanning the whole String to answer a question about its two ends,
 	// which is what made trimming a fresh String cost its length; a receiver
 	// something has already measured hands the answer down for free. The
@@ -360,7 +360,7 @@ describe("the ASCII marker", () => {
 		expect(isMarkedAscii(trim(measured, end))).toBeTrue()
 	})
 
-	// NOTE: The two ends a PROVEN String answers, whose fast path is the mark
+	// The two ends a PROVEN String answers, whose fast path is the mark
 	// itself: an ASCII receiver is read by unit and the answer is marked, and
 	// every other receiver comes through the view and is not. So the mark on
 	// the answer is what says which branch ran, and it is asserted rather than
@@ -382,7 +382,7 @@ describe("the ASCII marker", () => {
 		expect(lastCharacter(wide).value).toBe("b")
 		expect(isUnmarked(firstCharacter(wide))).toBeTrue()
 
-		// NOTE: The end of a String whose last character is several code
+		// The end of a String whose last character is several code
 		// units, which is the whole reason the other branch reads the view.
 		let emoji = string("ab😀")
 
@@ -390,7 +390,7 @@ describe("the ASCII marker", () => {
 		expect(length(lastCharacter(emoji)).value).toBe(1)
 	})
 
-	// NOTE: The marker is a claim, and a String the scan would refuse must
+	// The marker is a claim, and a String the scan would refuse must
 	// not carry it — `ß` upper-cases to `SS`, which IS ASCII, but the receiver
 	// was not, so the answer is left for the scan to decide.
 	test("is not written where the receiver was not ASCII", () => {
@@ -404,7 +404,7 @@ describe("the ASCII marker", () => {
 		expect(isUnmarked(trim(string(` ${composed} `), bothEnds))).toBeTrue()
 		expect(isUnmarked(lowercase(string("CAFÉ")))).toBeTrue()
 
-		// NOTE: A carriage return is the scan's one ASCII exception, so it is
+		// A carriage return is the scan's one ASCII exception, so it is
 		// unmarked too — and its pieces then count CR LF as one character.
 		let windows = string("a\r\nb\r\n")
 
@@ -412,7 +412,7 @@ describe("the ASCII marker", () => {
 		expect(length(uppercase(windows)).value).toBe(4)
 	})
 
-	// NOTE: What the marker carries is the character count, and it has to be
+	// What the marker carries is the character count, and it has to be
 	// the count the scan would have answered.
 	test("carries the count the scan would answer", () => {
 		let text = string("Hello, World")
@@ -428,7 +428,7 @@ describe("the ASCII marker", () => {
 })
 
 describe("the NFC form", () => {
-	// NOTE: `words` reads the NFC form, as the position Methods do — they
+	// `words` reads the NFC form, as the position Methods do — they
 	// read the character view, and the view is segmented off the normal form
 	// — so the words of a String and the pieces of its `split` are the same
 	// text in the same bytes.
@@ -445,7 +445,7 @@ describe("the NFC form", () => {
 		).toEqual([composed, composed])
 	})
 
-	// NOTE: `trim` is the exception, and deliberately: normalising is about
+	// `trim` is the exception, and deliberately: normalising is about
 	// the WHOLE String and trimming is about its two ends, so reading the
 	// normal form made an O(1) Method cost the receiver's length. It hands
 	// back the receiver's own bytes, which is the same String — no canonical

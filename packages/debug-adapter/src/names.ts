@@ -1,4 +1,4 @@
-// NOTE: The Rewriter's naming, read backwards — what a JavaScript frame or
+// The Rewriter's naming, read backwards — what a JavaScript frame or
 // binding is called in Essence. Every rule here mirrors one in
 // `packages/compiler/src/rewriter/rewrite.ts`, and each is injective there, so
 // reading them back cannot guess wrong: `$user_` mangling keeps `[A-Za-z0-9$]`
@@ -13,7 +13,7 @@ const stdlibMethodPrefix = "$es_"
 const overloadSuffix = /__overload\$\d+$/
 const providedMethod = /^([^_]+)(?:_\d+)?__(.+)$/
 
-// NOTE: The same list the Rewriter escapes — a `_new` in a frame is the
+// The same list the Rewriter escapes — a `_new` in a frame is the
 // user's `new`, while `_self` (not reserved) is the compiler's receiver.
 const reservedJavaScriptWords = new Set([
 	"break",
@@ -76,7 +76,7 @@ function demangleUserName(mangled: string): string {
 
 import { isSynthesizedName } from "@essence-lang/compiler/helpers"
 
-// NOTE: One emitted name, answered as the author spelled it. The overload
+// One emitted name, answered as the author spelled it. The overload
 // suffix goes first — it is appended to an already-escaped name — and what
 // remains is exactly one of the Rewriter's cases, or already the name itself.
 export function demangleName(name: string): string {
@@ -110,7 +110,7 @@ export function demangleName(name: string): string {
 	return base
 }
 
-// NOTE: The forward direction, for `evaluate` — a single identifier the user
+// The forward direction, for `evaluate` — a single identifier the user
 // types is retried under the name the emitted JavaScript actually binds.
 export function escapeNameForEvaluation(name: string): string {
 	if (reservedJavaScriptWords.has(name)) {
@@ -132,14 +132,14 @@ export function escapeNameForEvaluation(name: string): string {
 	return mangled
 }
 
-// NOTE: Whether a binding is the compiler's own rather than the author's —
+// Whether a binding is the compiler's own rather than the author's —
 // what the Variables view leaves out of a scope.
 export function isCompilerBinding(name: string): boolean {
 	return (
 		name === "$type" ||
 		name === "$helpers" ||
 		name === "$_" ||
-		// NOTE: What a Pattern holds its value in while it reads the members
+		// What a Pattern holds its value in while it reads the members
 		// off — `$pattern_6_12`, `$parameter_9_4`. The names the Pattern BINDS
 		// are the author's and stay; this is the one the Compiler made up, and
 		// it is the first Enricher-produced binding a reader could ever have

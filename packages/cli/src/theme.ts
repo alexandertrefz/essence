@@ -2,7 +2,7 @@ import { styleText } from "node:util"
 
 import { stripAnsi } from "@essence-lang/ariadne"
 
-// NOTE: Colour and Unicode support are resolved once at startup and passed
+// Colour and Unicode support are resolved once at startup and passed
 // around as a Theme, so that every renderer draws consistently and tests can
 // construct a plain Theme instead of faking a Terminal.
 
@@ -32,7 +32,7 @@ export type Theme = {
 		warning: string
 		info: string
 		pending: string
-		// NOTE: A test's own three marks, lighter than the compilation's — a
+		// A test's own three marks, lighter than the compilation's — a
 		// report listing forty of them beside each other is read by shape, and
 		// the heavy ✔/✖ that suit one headline per file turn a tree into noise.
 		pass: string
@@ -46,7 +46,7 @@ export type Theme = {
 	}
 }
 
-// NOTE: The environment variable conventions implemented here are the ones
+// The environment variable conventions implemented here are the ones
 // tools are expected to honour: NO_COLOR disables colour regardless of TTY
 // state, FORCE_COLOR enables it regardless — an explicit `--color` flag wins
 // over both.
@@ -78,7 +78,7 @@ export function supportsColor(
 	return stream.isTTY === true
 }
 
-// NOTE: Windows consoles outside of Windows Terminal, and the handful of
+// Windows consoles outside of Windows Terminal, and the handful of
 // terminals that report a non-UTF-8 locale, render the Braille and box drawing
 // characters as replacement boxes — those fall back to ASCII.
 export function supportsUnicode(
@@ -140,7 +140,7 @@ export function createTheme(color: boolean, unicode: boolean): Theme {
 
 type StyleTextFormat = Parameters<typeof styleText>[0]
 
-// NOTE: `gray` is not a styleText format name — it is spelled `blackBright`
+// `gray` is not a styleText format name — it is spelled `blackBright`
 // in the ANSI naming Node uses. Mapping it here keeps call sites readable.
 function resolveStyles(styles: Array<Style>): StyleTextFormat {
 	return styles.map((style) =>
@@ -162,7 +162,7 @@ export function style(
 	return styleText(resolveStyles(list), text, { validateStream: false })
 }
 
-// NOTE: Semantic wrappers, so that the meaning of a colour lives in one place
+// Semantic wrappers, so that the meaning of a colour lives in one place
 // and the palette can be retuned without touching every renderer.
 export function createPalette(theme: Theme) {
 	let apply =
@@ -189,7 +189,7 @@ export function createPalette(theme: Theme) {
 
 export type Palette = ReturnType<typeof createPalette>
 
-// NOTE: Re-exported rather than reimplemented — the Diagnostic renderer needs
+// Re-exported rather than reimplemented — the Diagnostic renderer needs
 // the same operation, and two copies of an escape-sequence pattern is one copy
 // too many.
 export { stripAnsi }

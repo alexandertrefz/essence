@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `List.of`'s six range entries, each compiled AND run. The direction one
+// `List.of`'s six range entries, each compiled AND run. The direction one
 // of them counts is what it is CALLED now rather than what its two bounds
 // happen to say, so every claim here is about a value the walk answered, not
 // about a Type it was given: a range that counts the wrong way is a Program
@@ -63,7 +63,7 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	return enrich(parsed.program).diagnostics
 }
 
-// NOTE: One Program per block rather than one per claim, because each range is
+// One Program per block rather than one per claim, because each range is
 // a line of output and the pipeline runs once for all of them.
 async function ranges(...calls: Array<string>): Promise<Array<string>> {
 	return run(`implementation {
@@ -83,7 +83,7 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"[1, 2, 3, 4]"', '"[1]"', '"[]"', '"[-2, -1, 0, 1]"'])
 	})
 
-	// NOTE: The empty answer is the whole reason `through:` stopped counting
+	// The empty answer is the whole reason `through:` stopped counting
 	// down. A range written from the length of an empty List reaches
 	// `through -1`, which used to answer `[0, -1]` and now answers nothing.
 	it("answers the empty List for a range written from an empty length", async () => {
@@ -106,7 +106,7 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"[0, 1, 2]"', '"[]"', '"[]"'])
 	})
 
-	// NOTE: The first value is always answered, which is what the Type says.
+	// The first value is always answered, which is what the Type says.
 	it("counts down through an included end, and always answers the first value", async () => {
 		expect(
 			await ranges(
@@ -146,7 +146,7 @@ describe("List.of counts the direction its label says", () => {
 		])
 	})
 
-	// NOTE: A step of zero reaches no end, so the walk behind it would never
+	// A step of zero reaches no end, so the walk behind it would never
 	// finish. `NonZeroInteger` is what keeps it out, and a written `0` is its
 	// own proof that it is not one — so this is refused while compiling rather
 	// than hung at run time.
@@ -163,7 +163,7 @@ describe("List.of counts the direction its label says", () => {
 		)
 	})
 
-	// NOTE: A computed step is refused too, because the proof is about the
+	// A computed step is refused too, because the proof is about the
 	// VALUE and a value the Program is handed carries none.
 	it("refuses a step nothing proved is not zero", () => {
 		let diagnostics = diagnosticsOf(`implementation {
@@ -177,7 +177,7 @@ describe("List.of counts the direction its label says", () => {
 		])
 	})
 
-	// NOTE: The proof, read where it is spent rather than where it is made.
+	// The proof, read where it is spent rather than where it is made.
 	// `firstItem` on a `NonEmptyList` answers the item, so adding to it is only
 	// a Program at all when the receiver carried the proof.
 	it("answers a proven List from downTo, and a plain one from through", async () => {
@@ -190,7 +190,7 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"4"', '"1"', '"Value(1)"'])
 	})
 
-	// NOTE: `NonEmptyList::indices` is native and answers a List that is never
+	// `NonEmptyList::indices` is native and answers a List that is never
 	// empty, and `List.repeat` is written on the up-counting entry, which
 	// answers nothing for a count below one.
 	it("keeps the promises the library's own bodies rest on", async () => {
@@ -211,7 +211,7 @@ describe("List.of counts the direction its label says", () => {
 		])
 	})
 
-	// NOTE: The bigint half of the walk, which the counter escapes to when
+	// The bigint half of the walk, which the counter escapes to when
 	// either bound is past safe range. Both bounds and the step are read as
 	// bigints there, and the answer is canonical on the way out.
 	it("counts a range whose bounds are past safe range", async () => {

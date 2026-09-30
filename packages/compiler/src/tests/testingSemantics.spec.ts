@@ -14,7 +14,7 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 import { compiles } from "./followedHelps"
 
-// NOTE: What a tests section MEANS — the Scopes it opens, the vocabulary its
+// What a tests section MEANS — the Scopes it opens, the vocabulary its
 // Modifiers are read against, what an assertion demands of what it asserts, and
 // the identity every test carries. The grammar alone is `testing.spec.ts`.
 //
@@ -64,7 +64,7 @@ function sectionOf(source: string): common.typed.TestsSectionNode {
 	return program.tests as common.typed.TestsSectionNode
 }
 
-// NOTE: Every test of a section, nested suites included, in source order.
+// Every test of a section, nested suites included, in source order.
 function testsOf(
 	nodes: Array<common.typed.TestsNode>,
 ): Array<common.typed.TestNode> {
@@ -433,7 +433,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["malformed-modifier"])
 		})
 
-		// NOTE: The shared template "Write one reason and nothing else here" is
+		// The shared template "Write one reason and nothing else here" is
 		// anchored on the SECOND reason — the reader stands on the thing that
 		// has to go, so writing a reason there writes a third. Only a deletion
 		// answers it, and the Help says so.
@@ -497,7 +497,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["duplicate-modifier"])
 		})
 
-		// NOTE: The Parser reads `tagged slow focused` as three Modifiers —
+		// The Parser reads `tagged slow focused` as three Modifiers —
 		// see `regrouped`. The vocabulary is what puts it back together, and
 		// the test is here because getting it wrong is silent: a swallowed
 		// `focused` is a test nobody notices has stopped running.
@@ -527,7 +527,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["unknown-modifier"])
 		})
 
-		// NOTE: A tag is any bare name, and plenty of ordinary ones sit within a
+		// A tag is any bare name, and plenty of ordinary ones sit within a
 		// typo's distance of a Modifier. Only a name that IS one is read as a
 		// Modifier written in the wrong place.
 		it("should take a tag that merely looks like a Modifier", () => {
@@ -591,7 +591,7 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
-	// NOTE: The escape hatch the Help has always named, and which nothing read
+	// The escape hatch the Help has always named, and which nothing read
 	// until now: `enrichTableRows` never looked at the Modifiers, so a reader who
 	// wrote the `skipped "…"` it asked for had the same report back.
 	describe("a table with no rows", () => {
@@ -628,7 +628,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["expect-not-boolean"])
 		})
 
-		// NOTE: Taking a value apart is an answer only where it HAS parts. The
+		// Taking a value apart is an answer only where it HAS parts. The
 		// clause used to be unconditional and hardcoded, so an Integer was sent
 		// to `require #Value(item) = value` — which answers `unknown-case` about
 		// `#Value` and `unknown-name` about `item`, two reports for a line the
@@ -649,7 +649,7 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// NOTE: And spells a Case the value really holds, binding a payload only
+		// And spells a Case the value really holds, binding a payload only
 		// where that Case carries one — beside the NAME the assertion was
 		// written over, which is the spelling the reader reads straight back.
 		it("should spell a Case the asserted value has", () => {
@@ -680,7 +680,7 @@ describe("Tests Section Semantics", () => {
 				"Or take it apart instead: 'require #Won = result'.",
 			])
 
-			// NOTE: No name was written, so the value is a schematic rather than
+			// No name was written, so the value is a schematic rather than
 			// a plausible one this stage would have had to invent.
 			expect(helps("expect play()")).toEqual([
 				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
@@ -752,7 +752,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: What a `require` binds is typed AT the Matcher, not at what the
+		// What a `require` binds is typed AT the Matcher, not at what the
 		// value was declared as: below the assertion the value IS the Case the
 		// Matcher named, which is the whole reason a test writes one.
 		it("should type what it binds at the Matcher", () => {
@@ -783,7 +783,7 @@ describe("Tests Section Semantics", () => {
 			expect(binding.type).toEqual({ type: "Integer" })
 		})
 
-		// NOTE: A Matcher that names nothing is still a question about the
+		// A Matcher that names nothing is still a question about the
 		// value — and the only question a bare Case asks.
 		it("should take a value apart with a Matcher that binds nothing", () => {
 			expect(
@@ -836,7 +836,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The members a Pattern may hold, all three of them: one bound
+		// The members a Pattern may hold, all three of them: one bound
 		// under its own name, one bound at a Type, and one constrained by a
 		// written value, which binds nothing and is a question about the value
 		// instead.
@@ -952,7 +952,7 @@ describe("Tests Section Semantics", () => {
 			expect(table.type.type).toBe("Record")
 		})
 
-		// NOTE: The whole reason a Parameter is annotated at all — the rows are
+		// The whole reason a Parameter is annotated at all — the rows are
 		// read against what it declared, so a bare Case resolves the way it
 		// does under any other annotation.
 		it("should resolve a bare Case in a row against the annotation", () => {
@@ -1034,7 +1034,7 @@ describe("Tests Section Semantics", () => {
 			expect(table.type).toEqual({ type: "Integer" })
 		})
 
-		// NOTE: A row is a value like any other, so a `require` takes it apart
+		// A row is a value like any other, so a `require` takes it apart
 		// where it stands — and what it binds is read by the rest of that row's
 		// own run of the body.
 		it("should take a row apart with a Matcher", () => {
@@ -1088,7 +1088,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-not-written"])
 		})
 
-		// NOTE: No rows is no tests, and nothing in a report says so: no line,
+		// No rows is no tests, and nothing in a report says so: no line,
 		// no count, no failure.
 		it("should refuse a table test with no rows in it", () => {
 			expect(
@@ -1102,7 +1102,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-without-rows"])
 		})
 
-		// NOTE: Spelled out of the ROWS the reader wrote. `Row` was a Type
+		// Spelled out of the ROWS the reader wrote. `Row` was a Type
 		// nothing declares — a reader who wrote it back was answered with
 		// `unknown-type 'Row'` — and the rows are where the Parameter's Type
 		// comes from in a table that has not declared one.
@@ -1132,7 +1132,7 @@ describe("Tests Section Semantics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: And no clause about taking the row apart where a row is no
+		// And no clause about taking the row apart where a row is no
 		// Record: there is nothing to take apart, and the clause named members
 		// nobody had written.
 		it("should offer no destructuring where a row is one value", () => {
@@ -1147,7 +1147,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["Write one Parameter: '(row: Integer)'."])
 		})
 
-		// NOTE: The rows are what this Help can not read — that IS the report —
+		// The rows are what this Help can not read — that IS the report —
 		// so what it hands back is the Parameter list the reader wrote, and the
 		// rows are the hole.
 		it("should spell the reader's own Parameter where the rows are not written", () => {
@@ -1194,7 +1194,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
-		// NOTE: And says nothing else about it. A table naming two Parameters
+		// And says nothing else about it. A table naming two Parameters
 		// has no row Type — the FIRST of them is not it — so measuring the rows
 		// against that one reported the Parameter list a second time, in words
 		// about a Type the reader never wrote for the row. Reading the Type off
@@ -1215,7 +1215,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
-		// NOTE: The rows are the one thing about a table test that nothing else
+		// The rows are the one thing about a table test that nothing else
 		// would ever check. A row is neither an Argument nor a Declaration, and
 		// the Type the Parameter declares reaches them as the HINT that resolves
 		// a bare Case — which refuses nothing. A row that slipped through
@@ -1234,7 +1234,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// NOTE: A Pattern Parameter declares its Type in the very same place a
+		// A Pattern Parameter declares its Type in the very same place a
 		// named one does, and binds every name off what it declared — so a row
 		// that does not fit is the same mistake, told the same way.
 		it("should refuse a row a Pattern Parameter takes apart", () => {
@@ -1253,7 +1253,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// NOTE: The shape that HUNG rather than crashed. An Integer stands
+		// The shape that HUNG rather than crashed. An Integer stands
 		// where a Rational was declared, and the name interpolates the row — so
 		// `Rational::toString` was handed an Integer before the body had run at
 		// all, and reduced a pair of members it does not carry forever.
@@ -1290,7 +1290,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Held to assignability and not to identity, the way every other
+		// Held to assignability and not to identity, the way every other
 		// value in the language is: an Integer is a value of `Number`, and a
 		// row is admitted by the same rule that admits an Argument.
 		it("should admit a row of a Type the declared one contains", () => {
@@ -1310,7 +1310,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A row is WRITTEN where it stands, and a written value carries
+		// A row is WRITTEN where it stands, and a written value carries
 		// evidence of its own: a refinement's predicate is decided while
 		// compiling, exactly as it is for the identical Argument or
 		// Declaration. Asked as assignability alone, a refined row Parameter
@@ -1337,7 +1337,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Decided and not assumed — the row that answers the predicate is
+		// Decided and not assumed — the row that answers the predicate is
 		// admitted and the one beside it that does not is still refused.
 		it("should refuse a written row that fails a refinement", () => {
 			expect(
@@ -1353,7 +1353,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// NOTE: Nothing to hold a row to where the Parameter declares nothing.
+		// Nothing to hold a row to where the Parameter declares nothing.
 		// The row Type is worked out FROM the rows there, so every one of them
 		// fits it by construction — including a table whose rows disagree,
 		// which is a Union and not a mistake.
@@ -1371,7 +1371,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: One Diagnostic per row rather than one per table — every row is
+		// One Diagnostic per row rather than one per table — every row is
 		// a test of its own, and a table of forty has to say which of them is
 		// wrong.
 		it("should report every row that does not fit, on its own", () => {
@@ -1399,7 +1399,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([5, 6])
 		})
 
-		// NOTE: A benchmark's rows are read by the very same enrichment, so
+		// A benchmark's rows are read by the very same enrichment, so
 		// what refuses a row of a test refuses a row of a measurement.
 		it("should refuse a mistyped row of a benchmark", () => {
 			expect(
@@ -1415,7 +1415,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// NOTE: The rows and the Constants a Pattern Parameter binds off them are
+		// The rows and the Constants a Pattern Parameter binds off them are
 		// Statements of the test like any other, and the Validator has to walk
 		// them: a non-exhaustive `match` in a row would otherwise compile in
 		// silence while the identical one a line below is refused.
@@ -1444,7 +1444,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["missing-case"])
 		})
 
-		// NOTE: Every row runs the same body, so an inline snapshot written in
+		// Every row runs the same body, so an inline snapshot written in
 		// one would hold a value per row and one slot to write them into.
 		it("should refuse an inline snapshot in a table test", () => {
 			expect(
@@ -1527,7 +1527,7 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// NOTE: What a snapshot records is the value RENDERED, which is
+		// What a snapshot records is the value RENDERED, which is
 		// `Printable::toString` — built as the interpolation an author could
 		// have written, so the witness and the lowering are the ones the
 		// language already has.
@@ -1563,7 +1563,7 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
-	// NOTE: A benchmark is a test in every structural respect and differs in
+	// A benchmark is a test in every structural respect and differs in
 	// exactly one: what RUNNING it means. So what is asked here is that the form
 	// reaches the lowering, that the key its baseline is stored under is spelled
 	// where the run can read it, and that the one shape a measurement can not
@@ -1609,7 +1609,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["doubles", "doubling"])
 		})
 
-		// NOTE: The stored key is the identity WITHOUT the Module path — the
+		// The stored key is the identity WITHOUT the Module path — the
 		// file it belongs to is the file its baselines are written beside, so
 		// naming it in the key as well would lose every entry the day the file
 		// moves.
@@ -1641,7 +1641,7 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// NOTE: Each row is a benchmark in its own right, measured and compared
+		// Each row is a benchmark in its own right, measured and compared
 		// against a baseline of its own — so each row's manifest entry carries
 		// its own key, the row spelled as the identity's last step.
 		it("should take rows, each keyed by its own entry", () => {
@@ -1698,7 +1698,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["benchmark-for-any"])
 		})
 
-		// NOTE: The refusal is an Error and has already stopped the run; what
+		// The refusal is an Error and has already stopped the run; what
 		// the Parameters go on being enriched FOR is everything an Editor draws
 		// off the tree beside it.
 		it("should keep enriching a refused benchmark's Parameters", () => {
@@ -1769,7 +1769,7 @@ describe("Tests Section Semantics", () => {
 		it("should leave nothing of the section in the implementation", () => {
 			let simplified = simplify(analyse(source).program)
 
-			// NOTE: The section is carried BESIDE the implementation rather
+			// The section is carried BESIDE the implementation rather
 			// than folded into it — a build's implementation is byte for byte
 			// what it would have been with no `tests` block written at all,
 			// which is what the golden below proves the whole way down.
@@ -1780,7 +1780,7 @@ describe("Tests Section Semantics", () => {
 			).toBeNull()
 		})
 
-		// NOTE: The claim "a test costs a shipped Program nothing", stated as
+		// The claim "a test costs a shipped Program nothing", stated as
 		// the only thing that could prove it: the JavaScript a build writes for
 		// the fixture is byte for byte the JavaScript it writes for the same
 		// file with the whole block deleted.
@@ -1806,7 +1806,7 @@ function build(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: The section as the lowering leaves it — the manifest and the Nodes a
+// The section as the lowering leaves it — the manifest and the Nodes a
 // runner is registered with, which is where a table test's rows become tests.
 function simplifiedSectionOf(
 	source: string,
@@ -1822,7 +1822,7 @@ function simplifiedSectionOf(
 	return simplified.tests as common.typedSimple.TestsSectionNode
 }
 
-// NOTE: The block cut out by its own Position, lines and all, rather than by
+// The block cut out by its own Position, lines and all, rather than by
 // searching the text for it — the Parser is what knows where the block ends.
 function withoutTestsSection(source: string): string {
 	let { program } = parseWithDiagnostics(source)

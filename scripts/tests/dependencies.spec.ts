@@ -11,7 +11,7 @@ import {
 	REPOSITORY_ROOT,
 } from "../publishing/packages"
 
-// NOTE: The workspace resolves every `@essence-lang/*` package from the root
+// The workspace resolves every `@essence-lang/*` package from the root
 // `node_modules`, declared or not, but a package installed on its own finds only
 // what its manifest names: the nearest tracked `package.json` above the file.
 
@@ -21,7 +21,7 @@ type Token = {
 	line: number
 }
 
-// NOTE: After one of these words a `/` opens a regular expression; after any
+// After one of these words a `/` opens a regular expression; after any
 // other word it divides.
 const regexpAfterWords = new Set([
 	"return",
@@ -40,14 +40,14 @@ const regexpAfterWords = new Set([
 	"await",
 ])
 
-// NOTE: The words, Strings and punctuation of a script. Comments are skipped,
+// The words, Strings and punctuation of a script. Comments are skipped,
 // and a template or a regular expression is skipped whole apart from the code in
 // a template's holes, so text inside any of them never reads as an import.
 function tokensOf(source: string): Array<Token> {
 	let tokens: Array<Token> = []
 	let index = 0
 	let line = 1
-	// NOTE: The brace depth each open template hole returns to its template at.
+	// The brace depth each open template hole returns to its template at.
 	let holes: Array<number> = []
 	let depth = 0
 	let afterValue = false
@@ -194,7 +194,7 @@ function tokensOf(source: string): Array<Token> {
 				end++
 			}
 
-			// NOTE: A line that never closes it was a division after all.
+			// A line that never closes it was a division after all.
 			if (source[end] === "/") {
 				index = end + 1
 
@@ -249,7 +249,7 @@ function tokensOf(source: string): Array<Token> {
 
 type Import = { specifier: string; line: number }
 
-// NOTE: Every form that names a module to load: `import … from`,
+// Every form that names a module to load: `import … from`,
 // `export … from`, a bare `import "x"`, `import("x")` in code or in a type,
 // `require("x")` and `import.meta.resolve("x")`.
 function importsOf(source: string): Array<Import> {
@@ -287,7 +287,7 @@ function importsOf(source: string): Array<Import> {
 	return imports
 }
 
-// NOTE: An Astro component's script is its frontmatter and its `<script>`
+// An Astro component's script is its frontmatter and its `<script>`
 // elements. Everything else is blanked, keeping its line breaks so that lines
 // are counted as the file counts them.
 function astroScript(source: string): string {
@@ -309,7 +309,7 @@ function astroScript(source: string): string {
 	return script.join("")
 }
 
-// NOTE: The script a tracked file holds, or `null` for a file that is not one.
+// The script a tracked file holds, or `null` for a file that is not one.
 // A `bin/` command is a script without an extension, known by its shebang.
 function scriptOf(file: string, text: string): string | null {
 	if (/\.[cm]?[jt]sx?$/.test(file)) {
@@ -423,7 +423,7 @@ async function readRepository(): Promise<Repository> {
 	return repository
 }
 
-// NOTE: What `tsconfig.publish.json` compiles and staging copies: a published
+// What `tsconfig.publish.json` compiles and staging copies: a published
 // package's `src/` apart from its tests and tools, and its `bin/` commands.
 function isShipped(file: string): boolean {
 	return PUBLISHED_PACKAGES.some(({ directory, prebuilt }) => {
@@ -505,7 +505,7 @@ describe("the @essence-lang imports", () => {
 		})
 	})
 
-	// NOTE: The checks that follow pass on an empty list, so a scanner that
+	// The checks that follow pass on an empty list, so a scanner that
 	// read no file, or found no import in the files it read, would pass them
 	// all unnoticed.
 	it("finds imports to check", async () => {
@@ -532,7 +532,7 @@ describe("the @essence-lang imports", () => {
 		expect(findings.join("\n")).toBe("")
 	})
 
-	// NOTE: A published package is installed without its `devDependencies`, so
+	// A published package is installed without its `devDependencies`, so
 	// what its shipped code loads has to be one of its `dependencies`.
 	it("depends on each package a published package's shipped code imports", async () => {
 		let { imports } = await readRepository()

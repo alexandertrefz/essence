@@ -6,7 +6,7 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// NOTE: The mirror of the `constant-reassignment` fix, offered where there is
+// The mirror of the `constant-reassignment` fix, offered where there is
 // no Diagnostic to answer: a `variable` nothing ever assigns is a Constant that
 // says it might change. The Compiler has nothing to say about that — both
 // Programs are correct — so this is a rewrite rather than a fix, and it is
@@ -34,7 +34,7 @@ export function constantActions(
 	walk(program, (node) => {
 		if (
 			node.nodeType !== "VariableDeclarationStatement" ||
-			// NOTE: A Pattern binds several names at once and each of them is a
+			// A Pattern binds several names at once and each of them is a
 			// Declaration of its own, so `variable` there is a keyword over a
 			// list rather than over one name — a question this does not ask.
 			node.name.nodeType !== "Identifier" ||
@@ -51,7 +51,7 @@ export function constantActions(
 			},
 		}
 
-		// NOTE: The Statement's Position starts at its keyword, but a `§§`
+		// The Statement's Position starts at its keyword, but a `§§`
 		// block or a Declaration this Parser recovered from could move it —
 		// replacing a span that does not read `variable` would corrupt the
 		// line silently. The same reading `constantToVariableAction` makes.

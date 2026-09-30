@@ -59,7 +59,7 @@ import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
 const integers = (...values: Array<number>): ListType<IntegerType> =>
 	createList(values.map((value) => createInteger(BigInt(value))))
 
-// NOTE: The items a List answers, read WITHOUT collapsing it — `materialise`
+// The items a List answers, read WITHOUT collapsing it — `materialise`
 // would demote an upgraded box to a flat one, and most of what these tests are
 // about is what a box is still holding after it has been read.
 const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
@@ -88,7 +88,7 @@ const itemAt = (
 		: Number(answer.item.value)
 }
 
-// NOTE: A five-item List whose first two items live in the front run and whose
+// A five-item List whose first two items live in the front run and whose
 // last three live in the back — the shape every native below is held against,
 // since a run boundary in the middle is what a walk or a position can get
 // wrong. A fresh one per call, because reading a List may demote it.
@@ -102,11 +102,11 @@ const integerEquality = {
 
 const integerOrder = { compare: compareIntegers }
 
-// NOTE: `sort` reads a direction now, and every call here wants the everyday
+// `sort` reads a direction now, and every call here wants the everyday
 // one — the Case a call that names none is shimmed with.
 const ascending = { [typeKeySymbol]: "SortOrder#Ascending" } as const
 
-// NOTE: The same reading as `itemsOf`, for the Arrays a build is handed rather
+// The same reading as `itemsOf`, for the Arrays a build is handed rather
 // than the boxes a native answers.
 const valuesOf = (items: Array<IntegerType>): Array<number> =>
 	items.map((value) => Number(value.value))
@@ -123,7 +123,7 @@ const integerList: common.Type = {
 const stringList: common.Type = { type: "List", itemType: { type: "String" } }
 
 describe("cross-representation reads", () => {
-	// NOTE: The claim the whole scheme rests on — the representation is not
+	// The claim the whole scheme rests on — the representation is not
 	// part of the value. A List built by prepending and a List written out flat
 	// hold the same items, so every question either can be asked has to give
 	// the same answer for both.
@@ -157,7 +157,7 @@ describe("cross-representation reads", () => {
 		expect(isValueOfType(upgraded(), integerList)).toBeTrue()
 		expect(isValueOfType(upgraded(), stringList)).toBeFalse()
 
-		// NOTE: The item that would be missed by a walk of the back run alone
+		// The item that would be missed by a walk of the back run alone
 		// sits in the FRONT run, so a List whose front holds the odd item out
 		// is what says the type test walks both.
 		let mixed = prepend(
@@ -170,7 +170,7 @@ describe("cross-representation reads", () => {
 })
 
 describe("branching at both ends", () => {
-	// NOTE: Four boxes over two shared runs, each with its own history. Nothing
+	// Four boxes over two shared runs, each with its own history. Nothing
 	// any of them is asked may show an item another one added.
 	test("each box reads its own items and the receiver is unchanged", () => {
 		let x = integers(1, 2)
@@ -183,7 +183,7 @@ describe("branching at both ends", () => {
 		expect(itemsOf(w)).toEqual([0, 1, 2, 3])
 		expect(itemsOf(x)).toEqual([1, 2])
 
-		// NOTE: Asked a second time, because the first ask may trim a stale box
+		// Asked a second time, because the first ask may trim a stale box
 		// — the half rule decides whether it does — and the answer has to
 		// survive that either way.
 		expect(itemsOf(y)).toEqual([0, 1, 2])
@@ -203,7 +203,7 @@ describe("branching at both ends", () => {
 })
 
 describe("divergent appends", () => {
-	// NOTE: A thousand appends share one run; appending to a version from the
+	// A thousand appends share one run; appending to a version from the
 	// middle of that chain has to answer that version's items and one more,
 	// while the held version itself never grows.
 	test("appending to two tips of one chain answers two Lists", () => {
@@ -232,14 +232,14 @@ describe("divergent appends", () => {
 		expect(itemAt(fromTip, -1)).toBe(-2)
 		expect(itemAt(built, -1)).toBe(999)
 
-		// NOTE: The held version's view never grows, however many times it is
+		// The held version's view never grows, however many times it is
 		// read after the two tips diverged.
 		expect(Number(length(held).value)).toBe(500)
 	})
 })
 
 describe("reentrancy", () => {
-	// NOTE: The fold is seeded with the very List it walks, so the first append
+	// The fold is seeded with the very List it walks, so the first append
 	// pushes onto the run the walk is reading. The walk covers the items the
 	// List held when it started, which is what it did when every append copied.
 	test("a fold seeded with the List it walks answers twice its items", () => {
@@ -304,7 +304,7 @@ describe("reentrancy", () => {
 })
 
 describe("stale views", () => {
-	// NOTE: A box left behind by an append holds its chain's high-water Array
+	// A box left behind by an append holds its chain's high-water Array
 	// until something asks it for ONE Array. `materialise` is that ask — what it
 	// answers is the box's logical items and nothing else — so it trims whatever
 	// the half rule left in place, stores the trimmed Array back, and every
@@ -340,7 +340,7 @@ describe("stale views", () => {
 })
 
 describe("every native against an upgraded receiver", () => {
-	// NOTE: `removeFirst` and `removeLast` are written in Essence on `slice`,
+	// `removeFirst` and `removeLast` are written in Essence on `slice`,
 	// `length` and the index searches, so there is no native of their own to
 	// hold here, and the natives they are written on are held instead.
 	// `remove(at:)` has a native again, and it and the three edits beside it
@@ -362,7 +362,7 @@ describe("every native against an upgraded receiver", () => {
 		expect(itemAt(built, 5)).toBeNull()
 		expect(itemAt(built, -6)).toBeNull()
 
-		// NOTE: Reading a position must not collapse the box — indexing an
+		// Reading a position must not collapse the box — indexing an
 		// upgraded List stays one comparison rather than a combining walk.
 		expect(built.front).toBeDefined()
 	})
@@ -409,7 +409,7 @@ describe("every native against an upgraded receiver", () => {
 		).toEqual([1, 2, 3, 4, 9, 5])
 	})
 
-	// NOTE: The key is read ONCE per item, whichever run the item is in, and
+	// The key is read ONCE per item, whichever run the item is in, and
 	// two items whose keys tie keep their order in either direction — which is
 	// what a sort that reversed its answer would break.
 	test("sort on a key reads each key once and keeps ties in order", () => {
@@ -435,7 +435,7 @@ describe("every native against an upgraded receiver", () => {
 		expect(reads).toBe(10)
 	})
 
-	// NOTE: One walk over both runs, and the check is offered each item ONCE —
+	// One walk over both runs, and the check is offered each item ONCE —
 	// which is what the two filters this replaces did not do — with both halves
 	// in the receiver's order.
 	test("partition offers each item to the check once, across the run boundary", () => {
@@ -457,7 +457,7 @@ describe("every native against an upgraded receiver", () => {
 		expect(itemsOf(empty.refused)).toEqual([])
 	})
 
-	// NOTE: The one walk that runs backwards: the last accepted item is found
+	// The one walk that runs backwards: the last accepted item is found
 	// whichever run it is in, and the check is not offered any item after it.
 	test("lastIndex(where:) walks backwards across the run boundary and stops", () => {
 		let offered: Array<number> = []
@@ -526,7 +526,7 @@ describe("every native against an upgraded receiver", () => {
 
 		expect(Number(total.value)).toBe(15)
 
-		// NOTE: Stopping inside the FRONT run is the case the two loops could
+		// Stopping inside the FRONT run is the case the two loops could
 		// get wrong — the back run must not be walked after a `#Done`.
 		let visited: Array<number> = []
 		let stopped = reduceWithStep(
@@ -557,7 +557,7 @@ describe("every native against an upgraded receiver", () => {
 		)
 		expect(getStringRepresentation(upgraded())).toBe("[ 1, 2, 3, 4, 5 ]")
 
-		// NOTE: A box an append left behind with an empty view still holds the
+		// A box an append left behind with an empty view still holds the
 		// item that was pushed for somebody else, so the empty rendering has to
 		// be decided by the VIEW rather than by the Array.
 		let emptied = createList<IntegerType>([])
@@ -604,7 +604,7 @@ describe("NonEmptyList against an upgraded receiver", () => {
 		expect(Number(firstItem(upgraded()).value)).toBe(1)
 		expect(Number(lastItem(upgraded()).value)).toBe(5)
 
-		// NOTE: A List built out of prepends alone has NO back run, so its last
+		// A List built out of prepends alone has NO back run, so its last
 		// item is the front run's — the front is stored reversed, which puts it
 		// at position zero.
 		let onlyPrepended = prepend(
@@ -617,7 +617,7 @@ describe("NonEmptyList against an upgraded receiver", () => {
 		expect(Number(lastItem(onlyPrepended).value)).toBe(2)
 	})
 
-	// NOTE: `removeDuplicates` is `tally`'s keys, in Essence, so what is asked
+	// `removeDuplicates` is `tally`'s keys, in Essence, so what is asked
 	// here is of the pair it is written on: the walk crosses the run boundary
 	// in logical order, and the first of every group of equal items is kept.
 	test("a tally's keys keep the first of every group", () => {
@@ -662,7 +662,7 @@ describe("NonEmptyList against an upgraded receiver", () => {
 	})
 })
 
-// NOTE: The Array a walk that builds its List in place enters with. Everything
+// The Array a walk that builds its List in place enters with. Everything
 // about it is ownership: the walk pushes onto what it is handed, so what it is
 // handed may be shared with nothing — including a seed still under a trimmed
 // view, and one carrying a front run.
@@ -686,7 +686,7 @@ describe("the Array a build enters with", () => {
 	})
 
 	test("answers a trimmed view's items and leaves the seed as it found it", () => {
-		// NOTE: A box whose view is SHORTER than the Array behind it, which is
+		// A box whose view is SHORTER than the Array behind it, which is
 		// what an append beside a second one leaves. The copy must answer the
 		// view and not the Array, and it must not trim the seed on the way —
 		// the edits read a shrinking chain the same way, and trimming at every
@@ -701,7 +701,7 @@ describe("the Array a build enters with", () => {
 	})
 })
 
-// NOTE: A RANDOM CHAIN of operations against a plain Array model, and the only
+// A RANDOM CHAIN of operations against a plain Array model, and the only
 // proof a representation trick of this size can rest on. Every claim in this
 // file is that nothing in the language can tell a shared run from a copied one;
 // the tests above make that claim one shape at a time, and this makes it against
@@ -711,20 +711,20 @@ describe("the Array a build enters with", () => {
 // inside it and at four outside it, its equality with a flat List of the same
 // items, its ordering against one, and the text it prints as.
 //
-// NOTE: PERSISTENCE is what the pool is for. A box is asked again after boxes
+// PERSISTENCE is what the pool is for. A box is asked again after boxes
 // have been derived from it, after boxes it was derived from have been read and
 // possibly trimmed, and after both — which is the order the trimming policy
 // makes interesting, since a trim writes a fresh Array back under a box whose
 // children hold the old one.
 //
-// NOTE: The seeds are PINNED, so a failure here is a failure anybody can run
+// The seeds are PINNED, so a failure here is a failure anybody can run
 // again. They were not chosen for anything: they are the first six of a count.
 const CHAIN_SEEDS = [
 	0x115701, 0x115702, 0x115703, 0x115704, 0x115705, 0x115706, 0x115707,
 	0x115708, 0x115709, 0x11570a, 0x11570b, 0x11570c,
 ]
 
-// NOTE: mulberry32, copied from `dictionaries.spec.ts` for the reason it says —
+// mulberry32, copied from `dictionaries.spec.ts` for the reason it says —
 // four lines, no dependency, and the same sequence on every engine.
 const seededRandom = (seed: number): (() => number) => {
 	let state = seed >>> 0
@@ -740,7 +740,7 @@ const seededRandom = (seed: number): (() => number) => {
 	}
 }
 
-// NOTE: What each operation MEANS, written against a plain JavaScript Array —
+// What each operation MEANS, written against a plain JavaScript Array —
 // the same references `edits.spec.ts` holds the edits against, kept here rather
 // than shared so that a change made for one file's sake can not quietly change
 // what the other one is comparing against.
@@ -809,10 +809,10 @@ const referenceReplace = (
 	return answer
 }
 
-// NOTE: What the model says the box holds, and the whole of what is compared.
+// What the model says the box holds, and the whole of what is compared.
 type Held = { list: ListType<IntegerType>; items: Array<number> }
 
-// NOTE: Everything the language can ask a List, asked of one box against the
+// Everything the language can ask a List, asked of one box against the
 // Array the model says it holds. `item(at:)` is asked at every position inside
 // the List and at four outside it, because a position that names no item is an
 // answer too. `is` and `compare` are asked against a FLAT List built here, so
@@ -851,13 +851,13 @@ const expectAnswers = (held: Held): void => {
 }
 
 describe("a random chain of List operations against an Array model", () => {
-	// NOTE: Eighty turns over a pool that starts with five boxes, which is deep
+	// Eighty turns over a pool that starts with five boxes, which is deep
 	// enough for a box to be a window of a window of a window and for every
 	// operation to have been asked of every shape the chain reaches. The whole
 	// run of twelve seeds is well under a second.
 	const TURNS = 80
 
-	// NOTE: The positions an operation is given — the two ends, their
+	// The positions an operation is given — the two ends, their
 	// neighbours, one past each end, and one drawn anywhere inside, each in the
 	// two spellings a position has. Drawn from a list rather than from the whole
 	// span, because the ends are where an off-by-one lives and a flat draw over
@@ -886,7 +886,7 @@ describe("a random chain of List operations against an Array model", () => {
 	for (let seed of CHAIN_SEEDS) {
 		test(`every box a chain builds keeps answering for itself, at seed ${seed.toString(16)}`, () => {
 			let draw = seededRandom(seed)
-			// NOTE: The last seed is built by TWELVE prepends, so its front run
+			// The last seed is built by TWELVE prepends, so its front run
 			// is long enough for a window of it to view less than half — which
 			// is the only way the FRONT half of the half rule ever fires, and
 			// no shorter shape here reaches it.
@@ -910,7 +910,7 @@ describe("a random chain of List operations against an Array model", () => {
 			const pick = (): Held =>
 				pool[Math.floor(draw() * pool.length)] as Held
 
-			// NOTE: One operation per turn, and the answer joins the pool. Each
+			// One operation per turn, and the answer joins the pool. Each
 			// of them is written twice over — once as the native, once against
 			// the model — and the two are compared at the end of the turn and
 			// at the end of every turn after it.
@@ -933,7 +933,7 @@ describe("a random chain of List operations against an Array model", () => {
 						items: [value, ...held.items],
 					}
 				},
-				// NOTE: A FRESH long front run with a window keeping a few
+				// A FRESH long front run with a window keeping a few
 				// items off its far end — built rather than drawn, because it
 				// is the one shape the FRONT half of the half rule fires for
 				// and a pool that mixes appends and slices reaches it about
@@ -1042,7 +1042,7 @@ describe("a random chain of List operations against an Array model", () => {
 						items: held.items.filter((item) => item % 2 === 0),
 					}
 				},
-				// NOTE: `lastItems(k)` — a window keeping a few items off the
+				// `lastItems(k)` — a window keeping a few items off the
 				// FAR end, which is the one shape that leaves a box viewing
 				// less than half of a long front run and so the only one that
 				// fires the front half of the half rule.
@@ -1083,7 +1083,7 @@ describe("a random chain of List operations against an Array model", () => {
 						),
 					}
 				},
-				// NOTE: The canonical functional walk's two halves, drawn as
+				// The canonical functional walk's two halves, drawn as
 				// operations of their own so that the chain builds the shrinking
 				// windows the trimming policy is about — and reads the head off
 				// the box before cutting the tail out of it, which is the order
@@ -1133,7 +1133,7 @@ describe("a random chain of List operations against an Array model", () => {
 					(turns[Math.floor(draw() * turns.length)] as () => Held)(),
 				)
 
-				// NOTE: Every box, in an order the draw decides — because what
+				// Every box, in an order the draw decides — because what
 				// a read may do to a box is trim it, and a trim under one box is
 				// felt by whichever of its relatives is read next.
 				let order = pool.map((_, index) => index)
@@ -1152,7 +1152,7 @@ describe("a random chain of List operations against an Array model", () => {
 				}
 			}
 
-			// NOTE: And once more from each end, so that no box was only ever
+			// And once more from each end, so that no box was only ever
 			// asked before its children were read, or only ever after.
 			for (let held of pool) {
 				expectAnswers(held)
@@ -1165,7 +1165,7 @@ describe("a random chain of List operations against an Array model", () => {
 	}
 })
 
-// NOTE: THE REENTRANCY RULE, fuzzed. A callback may edit the very List being
+// THE REENTRANCY RULE, fuzzed. A callback may edit the very List being
 // walked — `List.ts` names the fold seeded with its own receiver — and the walk
 // must cover the items the box viewed when it started and no others, whatever
 // the callback pushed onto the Array it is reading. The trimming policy decides

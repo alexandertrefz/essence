@@ -24,7 +24,7 @@ import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
 import { scopeMap } from "./scope"
 
-// NOTE: The last segment of a path, for both spellings a source arrives under —
+// The last segment of a path, for both spellings a source arrives under —
 // an absolute path from the standard library's own package, and a bare file name
 // from a test that wrote its library inline. A specifier names a sibling, so the
 // segment is the whole of the identity a specifier has to match.
@@ -32,12 +32,12 @@ function basenameOf(filePath: string): string {
 	return filePath.slice(filePath.lastIndexOf("/") + 1)
 }
 
-// NOTE: The one file that says what the LANGUAGE offers, as opposed to what a
+// The one file that says what the LANGUAGE offers, as opposed to what a
 // file offers its siblings. It declares nothing itself — it is an export block
 // and the reasoning behind it.
 const PRELUDE_FILE_NAME = "Prelude.es"
 
-// NOTE: The two groups of files allowed to depend on each other in a circle, and
+// The two groups of files allowed to depend on each other in a circle, and
 // the whole of them. Every other file must stand alone in the graph.
 //
 // Neither is an oversight. Cross-kind arithmetic means each numeric kind
@@ -74,7 +74,7 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 			group.map((module) => basenameOf(module.filePath)).sort(),
 		)
 
-	// NOTE: Only checked for the library ON DISK, told apart by where its files
+	// Only checked for the library ON DISK, told apart by where its files
 	// are rather than by what they are called — a test may well write a file
 	// named `Prelude.es`, and does. The frozen set is a fact about
 	// `packages/standard-library/sources`, not about the loader.
@@ -86,7 +86,7 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 		return
 	}
 
-	// NOTE: Compared as SETS of cycles rather than as one string, because the
+	// Compared as SETS of cycles rather than as one string, because the
 	// order the groups come out in is the condensation's, which is a fact
 	// about the graph rather than a decision anybody wrote down.
 	let expected = EXPECTED_CYCLES.map((cycle) =>
@@ -109,7 +109,7 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 	)
 }
 
-// NOTE: A standard library file that writes no `export { … }` block offers
+// A standard library file that writes no `export { … }` block offers
 // everything it declares. The builtin tables are built from the export
 // SURFACES, and a surface forwards only what its block lists — so without this
 // a file with no block would contribute nothing and the name would simply not
@@ -156,12 +156,12 @@ function exportingEverything(program: parser.Program): parser.Program {
 	}
 }
 
-// NOTE: Which entries of a Namespace member are bound to the runtime rather
+// Which entries of a Namespace member are bound to the runtime rather
 // than implemented in Essence. Methods carry ONE FLAG PER OVERLOAD, in written
 // order, because an `overload` block may mix the two — the position in this
 // Array is the `__overload$N` index. A non-overloaded Method has exactly one
 // flag. Properties are a single flag each.
-// NOTE: Methods and Properties are kept in separate maps rather than one flat
+// Methods and Properties are kept in separate maps rather than one flat
 // record — nothing stops a Namespace from having a Property and a Method of
 // the same name, and one flat record would silently lose one of them.
 type NamespaceNativeBindings = {
@@ -171,7 +171,7 @@ type NamespaceNativeBindings = {
 
 export type NativeBindings = Record<string, NamespaceNativeBindings>
 
-// NOTE: Which entries of a free Function — one that belongs to no Namespace —
+// Which entries of a free Function — one that belongs to no Namespace —
 // are bound to the runtime rather than implemented in Essence, keyed by the
 // Function's name. ONE FLAG PER ENTRY in written order, exactly as a Method's:
 // a body-less `function` has a single `true`, an `overload function` block has
@@ -181,7 +181,7 @@ export type NativeBindings = Record<string, NamespaceNativeBindings>
 // one, and `generateNatives` renders the module's contract from it.
 type FunctionBindings = Record<string, Array<boolean>>
 
-// NOTE: Milliseconds spent in each stage of the load. The standard library is
+// Milliseconds spent in each stage of the load. The standard library is
 // read once per process and everything downstream waits on it, so what it
 // costs belongs in the same Timeline the CLI already draws for a compilation
 // — this is the shape that feeds it. Not wired to the CLI yet.
@@ -192,7 +192,7 @@ type StdlibTiming = {
 	total: number
 }
 
-// NOTE: One standard library file, already parsed. The loader's core takes
+// One standard library file, already parsed. The loader's core takes
 // these rather than a directory, so that the failure paths and the shapes it
 // produces can be driven from synthetic sources in a test.
 type StdlibSource = {
@@ -203,7 +203,7 @@ type StdlibSource = {
 }
 
 export type Stdlib = {
-	// NOTE: The three Scope tables the Enricher and the Language Server start
+	// The three Scope tables the Enricher and the Language Server start
 	// from — everything `packages/standard-library/sources/*.es` declared,
 	// listed in `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries
 	// the free Functions, which have no Namespace to be declared in.
@@ -211,7 +211,7 @@ export type Stdlib = {
 	types: Record<string, common.Type>
 	protocols: Record<string, common.ProtocolType>
 	namespaces: Array<common.NamespaceType>
-	// NOTE: The enriched source Programs — empty while the source directory is.
+	// The enriched source Programs — empty while the source directory is.
 	// Only the BODIED members survive into these; a native has no body to emit.
 	typedPrograms: Array<common.typed.Program>
 	nativeBindings: NativeBindings
@@ -219,12 +219,12 @@ export type Stdlib = {
 	timing: StdlibTiming
 }
 
-// NOTE: A Diagnostic anywhere in the standard library is a COMPILER developer's
+// A Diagnostic anywhere in the standard library is a COMPILER developer's
 // error, not a user's — there is no user Program in sight yet, and every
 // downstream stage would otherwise run against a half-built Scope. It is
 // thrown, fully rendered by the same Ariadne renderer the CLI prints with, so
 // the message reads like the compiler's own output instead of a stack trace.
-// NOTE: EVERY failing file is reported, not the first one. The files share one
+// EVERY failing file is reported, not the first one. The files share one
 // declaration Scope, so a mistake in the file that DECLARES something surfaces
 // as a Diagnostic in every file that USES it — stopping at the first failure in
 // sorted order reliably reports the cascade and hides the cause.
@@ -253,9 +253,9 @@ function throwRenderedDiagnostics(
 	)
 }
 
-// NOTE: Runs `check` over every source and throws once if any of them failed,
+// Runs `check` over every source and throws once if any of them failed,
 // so one broken file can not mask another.
-// NOTE: `check` is handed the source and nothing else, deliberately. It used to
+// `check` is handed the source and nothing else, deliberately. It used to
 // take the position too, and every caller used it to index a parallel Array —
 // which stops being the same file the moment the stages answer in an order of
 // their own.
@@ -282,7 +282,7 @@ function throwOnAnyDiagnostics(
 	}
 }
 
-// NOTE: The top level names a set of Essence Programs claims, per Scope table.
+// The top level names a set of Essence Programs claims, per Scope table.
 // Two callers, for two different reasons:
 //
 //   - The loader, to know which of the names now in the bootstrap Scope came
@@ -318,7 +318,7 @@ export function declaredNames(programs: Array<parser.Program>): {
 				case "OverloadedFunctionStatement":
 					members.add(node.name.content)
 					break
-				// NOTE: A Pattern declares as many names as it binds, and this
+				// A Pattern declares as many names as it binds, and this
 				// runs off the parsed tree — before the desugar that turns them
 				// into ordinary Constants everywhere else.
 				case "ConstantDeclarationStatement":
@@ -340,7 +340,7 @@ export function declaredNames(programs: Array<parser.Program>): {
 	return { members, types, protocols }
 }
 
-// NOTE: The finished member table, listed in the ONE canonical order. A source
+// The finished member table, listed in the ONE canonical order. A source
 // declaration is enriched INTO the Scope, so it lands wherever insertion put it
 // — which is the order `readStdlibSources` sorted the FILE NAMES in, and
 // renaming a file would silently reorder the Completion list and the Enricher's
@@ -368,14 +368,14 @@ function inBuiltinOrder<Entry>(
 	return ordered
 }
 
-// NOTE: A Documentation Position read out of a standard library file points
+// A Documentation Position read out of a standard library file points
 // into a file no consumer of these tables has opened — Hover, Signature Help
 // and `go to definition` all treat a builtin as SOURCELESS, and would otherwise
 // offer to jump into `packages/standard-library/sources/List.es` from a user's
 // project. Stripping it here makes it impossible to hand out a Position with no
 // file attached.
 //
-// NOTE: The Language Server DOES open the standard library sources — as
+// The Language Server DOES open the standard library sources — as
 // ordinary documents, enriched in their own right. That path never goes through
 // this loader, so `go to definition` inside `packages/standard-library/sources`
 // keeps working.
@@ -383,7 +383,7 @@ function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
 
-		// NOTE: A `@param` line carries a Position of its own, for the same
+		// A `@param` line carries a Position of its own, for the same
 		// reason and with the same problem — it points into a file no consumer
 		// of these tables has opened. A signature's own Documentation is
 		// rebuilt as it resolves and carries none; an `overload` block's is
@@ -398,7 +398,7 @@ function stripMethodDocumentationPositions(
 	methods: Record<string, common.MethodType>,
 ): void {
 	for (let method of Object.values(methods)) {
-		// NOTE: An `overload` block documents the set as a whole AND each
+		// An `overload` block documents the set as a whole AND each
 		// Overload separately — both are handed out, so both are stripped.
 		stripPosition(method.documentation)
 
@@ -413,7 +413,7 @@ function stripMethodDocumentationPositions(
 	}
 }
 
-// NOTE: Every shape a source declared top level name can take that carries
+// Every shape a source declared top level name can take that carries
 // Documentation: a Namespace (through its Methods), a Function, and a
 // Protocol. Type Aliases and Choices declare Types, and a Type holds no
 // Documentation of its own.
@@ -433,7 +433,7 @@ function stripDeclaredDocumentationPositions(
 		} else if (member.type === "Function") {
 			stripPosition(member.documentation)
 		} else if (member.type === "OverloadedStaticMethod") {
-			// NOTE: An overloaded free Function documents the set as a whole and
+			// An overloaded free Function documents the set as a whole and
 			// each overload separately — both are handed out, so both are
 			// stripped, exactly as an `overload` Method block's are.
 			stripPosition(member.documentation)
@@ -485,7 +485,7 @@ function collectNativeBindings(
 	return bindings
 }
 
-// NOTE: The nativeness of every free Function the sources declare, in written
+// The nativeness of every free Function the sources declare, in written
 // order — the same record `collectNativeBindings` keeps for a Namespace's
 // Methods, but keyed by the Function's own name because it belongs to no
 // Namespace. A body-less `function` is a single `true`; a bodied one a single
@@ -511,7 +511,7 @@ function collectFunctionBindings(
 	return bindings
 }
 
-// NOTE: The loader's core — everything but the file system. Takes already
+// The loader's core — everything but the file system. Takes already
 // parsed sources so that a test can drive a synthetic standard library, and a
 // failure case, without a directory to put it in.
 export function loadStdlibFrom(
@@ -524,7 +524,7 @@ export function loadStdlibFrom(
 	throwOnAnyDiagnostics("parse", sources, (source) => source.diagnostics)
 
 	for (let source of sources) {
-		// NOTE: A standard library file MUST open with `declarations { … }`.
+		// A standard library file MUST open with `declarations { … }`.
 		// An `implementation { … }` one can not declare a native at all, so
 		// accepting it would silently produce a Namespace missing exactly the
 		// Methods the file was written to add.
@@ -538,7 +538,7 @@ export function loadStdlibFrom(
 	let programs = sources.map((source) => source.program)
 	let declared = declaredNames(programs)
 
-	// NOTE: A standard library file starts from the bare Type tags alone — the
+	// A standard library file starts from the bare Type tags alone — the
 	// handful of Types a declaration bottoms out in. Everything else in the
 	// language, `loop` and every other free Function included, is declared by
 	// the sources being loaded here.
@@ -566,7 +566,7 @@ export function loadStdlibFrom(
 		protocols: scopeMap(),
 	}
 
-	// NOTE: Resolved against the sources handed in rather than against the file
+	// Resolved against the sources handed in rather than against the file
 	// system. They are already read and already parsed — the standard library's
 	// own package does that — and a test drives this with sources that have no
 	// directory to be relative to. `resolveSpecifier` is deliberately not used:
@@ -586,7 +586,7 @@ export function loadStdlibFrom(
 			return { kind: "rejected", reason: "missing-extension" }
 		}
 
-		// NOTE: An unknown name resolves to the text as written, so the graph
+		// An unknown name resolves to the text as written, so the graph
 		// answers `module-not-found` against the specifier the author typed
 		// rather than this returning a rejection reason that means something
 		// else.
@@ -598,7 +598,7 @@ export function loadStdlibFrom(
 
 	let enrichStarted = performance.now()
 
-	// NOTE: One Scope per file, seeded by what that file imports — the standard
+	// One Scope per file, seeded by what that file imports — the standard
 	// library is a graph of Modules like any other, and its files say what they
 	// use. Two things differ from a user Program's Scope, and both are why this
 	// hands one in rather than letting `linkGroup` build it. It carries no
@@ -624,7 +624,7 @@ export function loadStdlibFrom(
 			members: scopeMap(),
 			declarations: scopeMap(),
 			constants: new Set(),
-			// NOTE: Present for the same reason `topLevelScope` carries one:
+			// Present for the same reason `topLevelScope` carries one:
 			// this is a Program's top level, and a Case payload default here
 			// may name a Constant of the file it is written in exactly as one
 			// in a user Module may. One map per FILE, which is what keeps the
@@ -640,7 +640,7 @@ export function loadStdlibFrom(
 
 	refuseUnexpectedCycles(graph)
 
-	// NOTE: Keyed by PATH, never by position. Linking answers in dependency-first
+	// Keyed by PATH, never by position. Linking answers in dependency-first
 	// group order while `sources` is in filename order, so pairing the two by
 	// index would render one file's Diagnostic against another file's text,
 	// under that file's name, underlining a line that is fine — and it would not
@@ -665,7 +665,7 @@ export function loadStdlibFrom(
 		(source) => byPath.get(source.fileName)!.diagnostics,
 	)
 
-	// NOTE: The Validator runs over the standard library too. It is the stage
+	// The Validator runs over the standard library too. It is the stage
 	// that catches an unreachable Handler or an unbindable Type Parameter — a
 	// declaration file is exactly as capable of those as a user Program is.
 	let validateStarted = performance.now()
@@ -676,11 +676,11 @@ export function loadStdlibFrom(
 
 	let validateDuration = performance.now() - validateStarted
 
-	// NOTE: In filename order, which is the order the sources arrive in and the
+	// In filename order, which is the order the sources arrive in and the
 	// order the tables were built in before Modules.
 	let ordered = sources.map((source) => byPath.get(source.fileName)!)
 
-	// NOTE: The language's public surface is ONE file's export block. `Prelude.es`
+	// The language's public surface is ONE file's export block. `Prelude.es`
 	// re-exports what a Program may use without asking, and the builtin tables are
 	// built from its surface alone — so a name a file exports and the prelude does
 	// not forward is reachable by the standard library's own files, through an
@@ -733,7 +733,7 @@ export function loadStdlibFrom(
 
 	return {
 		members: orderedMembers,
-		// NOTE: The bare Type tags are handed out as builtins alongside what the
+		// The bare Type tags are handed out as builtins alongside what the
 		// sources declared, and they live on the parent Scope now rather than in
 		// the declaring one — so the table is rebuilt from both halves. A user
 		// Program has to find `Integer` the Type in `builtinTypes()`; only the
@@ -744,7 +744,7 @@ export function loadStdlibFrom(
 		),
 		protocols: inBuiltinOrder(unionScope.protocols, builtinProtocolOrder),
 		namespaces,
-		// NOTE: In the order the sources arrived, not the order they linked, so
+		// In the order the sources arrived, not the order they linked, so
 		// that `typedPrograms[i]` still answers for `sources[i]` — the Rewriter's
 		// free-Function binding order and every test that reaches for the first
 		// Program depend on it. The sections are dropped: they were read, they
@@ -777,7 +777,7 @@ export function parseStdlibSource(
 	return { fileName, sourceText, program, diagnostics }
 }
 
-// NOTE: `@essence-lang/standard-library` finds and reads the files — it owns
+// `@essence-lang/standard-library` finds and reads the files — it owns
 // them, so it is the one that knows where they are, and it hands them over
 // already sorted. Parsing is what stays here, because parsing is the Compiler's
 // half.
@@ -794,7 +794,7 @@ function readStdlibSources(): {
 	return { sources, parseDuration: performance.now() - started }
 }
 
-// NOTE: The shape a snapshot has to have before it is believed. It is a guess
+// The shape a snapshot has to have before it is believed. It is a guess
 // about bytes another process wrote, and `v8.deserialize` answers with whatever
 // they say rather than throwing — so the tables every consumer indexes into are
 // checked to be there and to be the right kind of thing. What this can not
@@ -817,19 +817,19 @@ function isStdlib(value: unknown): boolean {
 	)
 }
 
-// NOTE: Enriched once per process. Every consumer — the Enricher's top level
+// Enriched once per process. Every consumer — the Enricher's top level
 // Scope, the Language Server's builtin listings, the test suite — reads the
 // same object, so the standard library is parsed, hoisted and validated exactly
 // once no matter how many files are compiled.
 //
-// NOTE: And once per MACHINE rather than once per process, through the
+// And once per MACHINE rather than once per process, through the
 // snapshot. Reading, parsing, enriching and validating the files produces a
 // value that depends on nothing a user typed, and would be paid by every `esc`,
 // every worker thread, every Language Server start and every Debug Adapter
 // session; deserialising the finished object costs a small part of that.
 let cachedStdlib: Stdlib | null = null
 
-// NOTE: The library built from the standard library ON DISK, as opposed to
+// The library built from the standard library ON DISK, as opposed to
 // whichever one `useStdlib` has installed. Everything derived from the library
 // and cached BETWEEN processes has to know the difference: a snapshot is keyed
 // by what the real sources hash to, and a test's synthetic library would be
@@ -867,7 +867,7 @@ function loadCanonicalStdlib(): Stdlib {
 		},
 	})
 
-	// NOTE: The timings a snapshot carries are the ones the process that WROTE
+	// The timings a snapshot carries are the ones the process that WROTE
 	// it paid, and reporting those as this process's would be a Timeline
 	// claiming seventy milliseconds nobody spent. What a restore costs is the
 	// read, which belongs to no stage — so the stages are zero and the total is
@@ -884,18 +884,18 @@ function loadCanonicalStdlib(): Stdlib {
 	return stdlib
 }
 
-// NOTE: The one seam through which the process-wide standard library becomes a
+// The one seam through which the process-wide standard library becomes a
 // different one — a test compiling a user Program against sources it wrote
 // itself, which is the only way to reach behaviour that no library ON DISK
 // exercises yet (a static Property with a value is the first). It answers with
 // the library that was installed before, so a caller puts it back by handing
 // that straight back in rather than dropping it and paying for a second load.
 //
-// NOTE: Everything derived from the library downstream — the Rewriter's prelude
+// Everything derived from the library downstream — the Rewriter's prelude
 // and its name tables — is keyed by this OBJECT, so swapping it here is the
 // whole of the swap. There is deliberately no second cache to remember to clear.
 //
-// NOTE: `canonicalStdlib` is deliberately NOT moved. It names the library the
+// `canonicalStdlib` is deliberately NOT moved. It names the library the
 // real sources produced, and it goes on naming it while a synthetic one is
 // installed — which is what `isCanonicalStdlib` reads to refuse a disk snapshot
 // for a library that was never on disk. Putting the real library back restores

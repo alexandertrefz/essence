@@ -13,7 +13,7 @@ import {
 } from "../testing/benchmarks"
 import { type BenchmarkRecord, collectBenchmarks } from "../testing/index"
 
-// NOTE: Where a measurement is kept between two runs, and what survives the
+// Where a measurement is kept between two runs, and what survives the
 // round trip — because a baseline is worth exactly what can be read back out of
 // it. The snapshot companion beside it is `snapshotFiles.spec.ts`, and the two
 // files answer the same questions on purpose.
@@ -73,7 +73,7 @@ describe("The benchmark companion file", () => {
 		expect(parseBenchmarkFile(printBenchmarkFile(entries))).toEqual(entries)
 	})
 
-	// NOTE: The format is line-oriented, so a line break in a key is the one
+	// The format is line-oriented, so a line break in a key is the one
 	// character that could take the file apart — it escapes like a String
 	// Literal's, and the file stays one entry per line whatever the name says.
 	it("escapes a line break in a key and reads it back", () => {
@@ -105,7 +105,7 @@ describe("The benchmark companion file", () => {
 		expect(parseBenchmarkFile("§ just a comment\n")).toEqual({})
 	})
 
-	// NOTE: A file somebody edited into a shape the format does not have is read
+	// A file somebody edited into a shape the format does not have is read
 	// for whatever it still says, rather than refused. What is lost is a
 	// baseline, which the next measuring run records again.
 	it("steps over an entry with no time under it", () => {
@@ -145,7 +145,7 @@ describe("Reading and writing what a run measured", () => {
 		})
 	})
 
-	// NOTE: A run narrowed by a filter has not measured everything, and deleting
+	// A run narrowed by a filter has not measured everything, and deleting
 	// what it did not visit would lose a baseline for the price of a `-f`.
 	it("lays what it recorded over what it read, keeping the rest", async () => {
 		await withDirectory(async (directory) => {
@@ -174,7 +174,7 @@ describe("Reading and writing what a run measured", () => {
 		})
 	})
 
-	// NOTE: Only a measurement that was RECORDED is written. One that matched
+	// Only a measurement that was RECORDED is written. One that matched
 	// changed nothing, one that improved is news the report carries and a
 	// baseline nobody asked to move, and one that regressed is the failure.
 	it("writes nothing for a measurement that was not recorded", async () => {
@@ -196,7 +196,7 @@ describe("Reading and writing what a run measured", () => {
 
 	it("says so where a file could not be written", async () => {
 		await withDirectory(async (directory) => {
-			// NOTE: A FILE where the companion directory has to go, so the
+			// A FILE where the companion directory has to go, so the
 			// directory can not be made — the plainest way to be refused by the
 			// filesystem without asking anything of the permissions.
 			let module = path.join(directory, "Season.es")
@@ -245,7 +245,7 @@ describe("Reading and writing what a run measured", () => {
 	})
 })
 
-// NOTE: What the fold hands the writer. The one rule worth its own spec is the
+// What the fold hands the writer. The one rule worth its own spec is the
 // refusal: a measurement whose test then failed is not a baseline.
 describe("Collecting what a run measured", () => {
 	const measured = {

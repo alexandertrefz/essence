@@ -3,7 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { keywordBefore, lineAt, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// NOTE: The three assertion shapes the Parser turns away, and the one spelling
+// The three assertion shapes the Parser turns away, and the one spelling
 // each of them was reaching for. All three drop the whole Statement, so there is
 // no Node left to measure an edit against — what the fixes below read is the
 // Diagnostic's span, the Labels beside it, and the line the keyword opens.
@@ -17,7 +17,7 @@ type Opening = {
 	position: common.Position
 }
 
-// NOTE: Where the assertion this Diagnostic is about begins. Both shapes are
+// Where the assertion this Diagnostic is about begins. Both shapes are
 // written on one line — `expect { team } = value`, `expect value is Integer` —
 // so the keyword is looked for on the line the span opens on, and a fix that
 // can not find it offers nothing rather than guessing at where the Statement
@@ -55,7 +55,7 @@ function openingOf(
 	return null
 }
 
-// NOTE: `expect MATCHER = EXPR` — the form `require` has, written on the Keyword
+// `expect MATCHER = EXPR` — the form `require` has, written on the Keyword
 // that can not have it. The whole of what is wrong is the Keyword: an `expect`
 // records its result and the test carries on, so a name it introduced would
 // stand below a line that may never have run, and a `require` ends the test
@@ -81,11 +81,11 @@ export function requireKeywordAction(
 	}
 }
 
-// NOTE: The Diagnostic spans `is MATCHER`, and the value it stands behind is
+// The Diagnostic spans `is MATCHER`, and the value it stands behind is
 // whatever was written between the Keyword and it.
 const trailingMatcherPattern = /^is\s+(\S[\s\S]*)$/
 
-// NOTE: `EXPR is MATCHER` — the form a writer reaches for who has met a Matcher
+// `EXPR is MATCHER` — the form a writer reaches for who has met a Matcher
 // behind an `is` somewhere else. A name is introduced left of `=`, so the
 // rewrite is the two sides swapped around a `require`: `expect value is Integer`
 // becomes `require Integer = value`.
@@ -139,11 +139,11 @@ export function matcherBeforeValueAction(
 	}
 }
 
-// NOTE: The `=` and the whitespace around it, which is the whole of what stands
+// The `=` and the whitespace around it, which is the whole of what stands
 // between a Matcher and the value it was written over.
 const assignmentPattern = /^\s*=\s*$/
 
-// NOTE: `require 3 = value` — a written value where a shape belongs. What the
+// `require 3 = value` — a written value where a shape belongs. What the
 // line asks is whether the two are equal, and that is `Equatable::is`, so the
 // two sides swap around the call: `require value::is(3)`. The Keyword stays as
 // it was written, which is what the Diagnostic's own Help spells — a comparison

@@ -124,7 +124,7 @@ function yamlList(items: string[]): string {
 		: `\n${items.map((item) => `  - ${quoted(item)}`).join("\n")}`
 }
 
-// NOTE: Null where a page is taught NOWHERE — a Type the Language pages have
+// Null where a page is taught NOWHERE — a Type the Language pages have
 // not reached yet — so the page says nothing rather than saying "Taught on: ."
 // The line comes back the moment a page teaches it.
 function taughtOnLine(slugs: string[]): string | null {
@@ -270,7 +270,7 @@ export function renderPage(
 	let block = (...lines: string[]) => body.push("", ...lines)
 	let component = (name: string, props: Record<string, unknown>) =>
 		`<${name} ${Object.entries(props)
-			// NOTE: Every prop as an expression, strings included. A quoted MDX
+			// Every prop as an expression, strings included. A quoted MDX
 			// attribute is taken literally, escapes and all, so a declaration that
 			// spans lines rendered its `\n` and `\t` as text.
 			.map(([key, value]) => `${key}={${JSON.stringify(value)}}`)

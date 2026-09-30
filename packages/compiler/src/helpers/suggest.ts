@@ -1,4 +1,4 @@
-// NOTE: The Damerau-Levenshtein distance — Levenshtein plus the swap of two
+// The Damerau-Levenshtein distance — Levenshtein plus the swap of two
 // adjacent characters as ONE edit rather than two, because that is the typo
 // people actually make: `slwo` for `slow`, `retrun` for `return`. Exported
 // because every "did you mean" in the toolchain has to answer the same way
@@ -42,7 +42,7 @@ export function editDistance(left: string, right: string): number {
 	return distances[rows - 1]![columns - 1]!
 }
 
-// NOTE: Whether two names begin with the same letter, which is the one position
+// Whether two names begin with the same letter, which is the one position
 // in a word a slip almost never lands on — and the one a reader reads first. Two
 // names that open alike look alike; two that do not are two words.
 //
@@ -56,7 +56,7 @@ function sharesOpeningLetter(left: string, right: string): boolean {
 	)
 }
 
-// NOTE: A suggestion is only offered when it is close enough to be plausible —
+// A suggestion is only offered when it is close enough to be plausible —
 // proposing an unrelated flag is worse than proposing nothing.
 //
 // Two edits on a short name is not a near miss, it is a coincidence. `add` and
@@ -81,7 +81,7 @@ export function closestMatch(
 		let distance = editDistance(input, candidate)
 		let sharesOpening = sharesOpeningLetter(input, candidate)
 
-		// NOTE: A tie is broken on the FIRST candidate, which several callers
+		// A tie is broken on the FIRST candidate, which several callers
 		// order their candidates for — see `builtins`. The one thing that comes
 		// before that order is the opening letter: between two names the same
 		// distance away, the one that starts as the input does is the one the
@@ -99,7 +99,7 @@ export function closestMatch(
 		return null
 	}
 
-	// NOTE: A candidate must also share more with the input than it differs
+	// A candidate must also share more with the input than it differs
 	// from it. Without that, every short name is within the threshold of
 	// every other short name, and `point.z` gets told it meant `point.x`.
 	if (best.distance >= input.length) {

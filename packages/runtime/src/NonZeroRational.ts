@@ -1,4 +1,4 @@
-// NOTE: The runtime module of the `NonZeroRational` Namespace — the Rationals a
+// The runtime module of the `NonZeroRational` Namespace — the Rationals a
 // Program has proven are not zero. The Simplifier emits
 // `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
 // this is the whole of it.
@@ -11,7 +11,7 @@ import {
 	type RationalType,
 } from "./Rational"
 
-// NOTE: The product is `Rational`'s own rather than a second one, for the
+// The product is `Rational`'s own rather than a second one, for the
 // reason `NonZeroInteger.ts` gives: a refinement erases before anything runs,
 // so both operands ARE `RationalType`s here and the answer is the same product
 // `Rational.ts` computes. `multiply` is not an Overload in this
@@ -27,7 +27,7 @@ export {
 	numerator,
 } from "./Rational"
 
-// NOTE: `Rational.of(@::numerator()::negate(), over @::denominator())`, which
+// `Rational.of(@::numerator()::negate(), over @::denominator())`, which
 // is the Essence body of `Rational::negate`, written a second time for the
 // reason `reciprocal` below is: the entry beside it is an Essence body and
 // exports nothing to import. It is spelled out of the same three natives that
@@ -42,7 +42,7 @@ export function negate(rational: RationalType): RationalType {
 	)
 }
 
-// NOTE: `Rational.of(@::denominator(), over @::numerator())`, which is the
+// `Rational.of(@::denominator(), over @::numerator())`, which is the
 // Essence body of `Rational::reciprocal`, with the zero check taken OUT rather
 // than skipped — the receiver is proven, so the check was already made. The
 // parts are exchanged as they are STORED rather than in lowest terms:

@@ -1,6 +1,6 @@
 import { type common, lexer, type parser } from "@essence-lang/interfaces"
 
-// NOTE: Hand-written recursive descent parser — the compiler's parser,
+// Hand-written recursive descent parser — the compiler's parser,
 // re-exported through src/parser. It builds its ASTs through the shared
 // node generators in ../nodeGenerators.
 import {
@@ -44,14 +44,14 @@ type NamespaceBodyNode = Parameters<
 	typeof generators.namespaceDefinitionStatement
 >[4][number]
 
-// NOTE: These token types form the Identifier rule of the grammar: every
+// These token types form the Identifier rule of the grammar: every
 // Keyword in the Set is a valid Identifier. The Module keywords are on it for
 // the same reason the rest are: `from` and `as` are Argument labels the
 // standard library already writes (`slice(from 1, to 3)`,
 // `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
 // a Module section is being read.
 //
-// NOTE: `otherwise` is here and `define` is not, though the two words arrived
+// `otherwise` is here and `define` is not, though the two words arrived
 // together. An `otherwise` only ever stands where an Expression has already
 // ENDED — none of the three Tokens that carry one on is a word — so the arm
 // loop tells the terminator from a name by the place it stands in, and no text
@@ -62,14 +62,14 @@ type NamespaceBodyNode = Parameters<
 // `Optional::otherwise` was a Method of the standard library's own until it
 // was renamed — which reserving the word outright would forbid forever.
 //
-// NOTE: `start` and `complete` are here for the reason `expect` and `require`
+// `start` and `complete` are here for the reason `expect` and `require`
 // are: each opens its own form only where an Expression follows it and nothing
 // carries the word itself on, and is a name everywhere else. The two are a
 // harder case than the assertions, because their form is an EXPRESSION rather
 // than a Statement — see `opensAsynchrony` for the two narrowings that takes
 // and the name and the reading it still costs.
 //
-// NOTE: A Set rather than an Array, here and for every other Token-type list in
+// A Set rather than an Array, here and for every other Token-type list in
 // this file. Each is asked of a Token, in a loop over every Token, and a
 // membership test written as a scan pays for every entry on every question.
 const identifierTokenTypes = new Set([
@@ -98,7 +98,7 @@ function isIdentifierToken(token: Token | undefined): boolean {
 	return token !== undefined && identifierTokenTypes.has(token.type)
 }
 
-// NOTE: Every Token type an Expression can begin with — exactly the cases
+// Every Token type an Expression can begin with — exactly the cases
 // `parsePrimaryExpression` answers, and nothing else. A Token type added there
 // belongs here too; one that is here and not there would make
 // `parseArgument` read a label where the Expression reading was meant.
@@ -125,7 +125,7 @@ function startsExpression(token: Token | undefined): boolean {
 	return token !== undefined && expressionStartTokenTypes.has(token.type)
 }
 
-// NOTE: Every way an Expression CARRIES ON past a Token that has already been
+// Every way an Expression CARRIES ON past a Token that has already been
 // read — the three postfix forms `parseExpressionLevels` loops over, plus the
 // `#` that makes an Identifier the Choice half of `Choice#Case` when the two
 // are written flush together. A Keyword that is also an Identifier (`expect`,
@@ -155,7 +155,7 @@ function continuesExpression(
 	)
 }
 
-// NOTE: The Token types that begin an Expression of their own and yet only ever
+// The Token types that begin an Expression of their own and yet only ever
 // stand where one has ENDED. They are read by `opensAsynchrony` below, whose
 // NOTE says what each of them closes and why leaving them out of the prefix
 // reading costs nothing written.
@@ -170,7 +170,7 @@ function standsAfterExpression(token: Token): boolean {
 	return afterExpressionTokenTypes.has(token.type)
 }
 
-// NOTE: Whether one of the two asynchrony Keywords stands where it opens its
+// Whether one of the two asynchrony Keywords stands where it opens its
 // prefix Expression rather than naming something — the `expect`/`require` rule,
 // asked in expression position instead of in statement position, with two
 // narrowings of its own. `complete` reads as the Keyword in
@@ -178,7 +178,7 @@ function standsAfterExpression(token: Token): boolean {
 // `complete.first`, `complete(1)`, `complete#Win`, `{ complete = 1 }` and
 // `Terminal.print(complete)`.
 //
-// NOTE: The first narrowing is the LINE. An operand that begins on a later line
+// The first narrowing is the LINE. An operand that begins on a later line
 // than the word is no operand at all, because Essence ends a Statement at the
 // end of its Expression and at no Token of its own — without the line, these
 // two Statements would read as one and nothing would report it:
@@ -191,7 +191,7 @@ function standsAfterExpression(token: Token): boolean {
 // BEGINS on the Keyword's own line, and `esfmt` prints the two words with
 // exactly one space behind them and no other way.
 //
-// NOTE: The second is a short list of Tokens that begin an Expression and yet
+// The second is a short list of Tokens that begin an Expression and yet
 // only ever stand where one has ENDED, so a value named `start` or `complete`
 // can be the Expression they stand behind. `{` opens the block of an `if`, a
 // `match` or a Guard (`if start { … }`), `otherwise` closes a `define` arm
@@ -202,7 +202,7 @@ function standsAfterExpression(token: Token): boolean {
 // neither is a Future or a Started, so the Keyword reading of those was a
 // `needless-start` in every case.
 //
-// NOTE: What the rule still costs is one name and one reading, and both are
+// What the rule still costs is one name and one reading, and both are
 // worth writing down because nothing reports either. The name: an Argument's
 // LABEL may not be spelled with either word. A label stands directly in front
 // of its value, which is exactly where the prefix form opens, so
@@ -211,7 +211,7 @@ function standsAfterExpression(token: Token): boolean {
 // from the other side; the Language Server's rename refuses the two words as
 // label names because of it.
 //
-// NOTE: The reading: a CONTEXTUAL word standing behind a value named `start` or
+// The reading: a CONTEXTUAL word standing behind a value named `start` or
 // `complete` is taken as the operand, because a contextual word is an
 // Identifier and an Identifier begins an Expression. `expect complete matches
 // snapshot` waits for a value called `matches` rather than matching the value
@@ -238,7 +238,7 @@ function opensAsynchrony(token: Token, following: Token | undefined): boolean {
 	)
 }
 
-// NOTE: The words that open a form of their own where they stand and are
+// The words that open a form of their own where they stand and are
 // ordinary names everywhere else — the same rule `where` follows in a Guard.
 // None of them is a Keyword, so `constant across = 1` and `matches::isEmpty()`
 // are still what they say.
@@ -247,7 +247,7 @@ const ANY = "any"
 const MATCHES = "matches"
 const SNAPSHOT = "snapshot"
 
-// NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
+// The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
 // `case "a"`. Everything else in Matcher position is read as a Type.
 // `LiteralStringStart` is here only so an interpolated String reaches
 // `parseLiteralMatcherValue`, which refuses it with a message about why a
@@ -262,7 +262,7 @@ const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralFalse,
 ])
 
-// NOTE: Every Token type a Matcher can begin with where an assertion opens —
+// Every Token type a Matcher can begin with where an assertion opens —
 // a name (a Type, or the Choice half of `Choice#Case`), a `{` Pattern, a `#`
 // Case, a written value, or `_`. It is what `parseAssertionStatement` asks
 // before it reads the Matcher of `require MATCHER = EXPR` speculatively: an
@@ -287,7 +287,7 @@ function startsMatcher(token: Token | undefined): boolean {
 	return token !== undefined && matcherStartTokenTypes.has(token.type)
 }
 
-// NOTE: The Token types that can begin a Statement — these are the
+// The Token types that can begin a Statement — these are the
 // resynchronisation points after a parse error. Every Keyword
 // `parseImplementationNode` dispatches on belongs here: one that is missing
 // is not a Statement start to the recovery, so the whole Declaration it opens
@@ -313,7 +313,7 @@ const statementStartTokenTypes = new Set([
 	TokenType.KeywordRequire,
 ])
 
-// NOTE: The Keywords a Declaration opens with, each followed by the name it
+// The Keywords a Declaration opens with, each followed by the name it
 // declares. `overload function` and `static` reach their name one Token further
 // in, which is why the walk below skips rather than indexes.
 const declarationKeywordTokenTypes = new Set([
@@ -328,7 +328,7 @@ const declarationKeywordTokenTypes = new Set([
 	TokenType.KeywordStatic,
 ])
 
-// NOTE: Whether `cursor` stands inside `span`, inclusive of both ends.
+// Whether `cursor` stands inside `span`, inclusive of both ends.
 function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
 	let afterStart =
 		cursor.line > span.start.line ||
@@ -340,7 +340,7 @@ function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
 	return afterStart && beforeEnd
 }
 
-// NOTE: The openings whose Declaration is HOISTED — the same list `isHoistable`
+// The openings whose Declaration is HOISTED — the same list `isHoistable`
 // in the Enricher is written over, which is where the rule lives. A run opening
 // with one of them may have declared a name that was in scope ABOVE its own
 // line, so the silence it buys can not be bounded from above; a `constant`, a
@@ -354,7 +354,7 @@ const hoistableKeywordTokenTypes = new Set([
 	TokenType.KeywordProtocol,
 ])
 
-// NOTE: A Parameter is declared by the name in front of its `:`, and a
+// A Parameter is declared by the name in front of its `:`, and a
 // Parameter list goes down with the head it is written on — so `text` in
 // `function exclaimed(_ text: NonEmptyString)` is as undeclared as `exclaimed`
 // itself once that head is dropped, and every line of the body reading it would
@@ -391,7 +391,7 @@ function abandonedParameterNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
-// NOTE: Whether an abandoned run could have OPENED A BODY, which is the only
+// Whether an abandoned run could have OPENED A BODY, which is the only
 // way a `<-` ends up standing outside a Function — see
 // `parser.Recovery.headLines`. `function` and `overload` open one directly,
 // `static` opens one for a static Method, and the bare `NAME(` is the shape a
@@ -413,19 +413,19 @@ function abandonedRunOpensBody(tokens: Array<Token>): boolean {
 	)
 }
 
-// NOTE: The names a Statement the Parser abandoned would have declared, read
+// The names a Statement the Parser abandoned would have declared, read
 // off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
 // about a name, which is every Statement that declares none and a few that do:
 // the point is to be RIGHT about the names it answers, never to answer about
 // all of them. A name this misses is a name read exactly as it always was.
 //
-// NOTE: A Method written in a Namespace body opens with its own name and a `(`,
+// A Method written in a Namespace body opens with its own name and a `(`,
 // which no Statement outside a Namespace does — a bare `name(…)` at the top
 // level is a call, and a call declares nothing. So the shape is only read as a
 // Declaration where it can be one: behind a `(`, and with no Keyword in front
 // of it that would have claimed the name itself.
 //
-// NOTE: A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
+// A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
 // with it, and each of those is a name the rest of the file reads. They are
 // collected from the body's own level and no deeper — a `NAME(` one brace
 // further in is a CALL the body makes, and a name a body calls is a name this
@@ -465,7 +465,7 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 		return names
 	}
 
-	// NOTE: One brace in from where the Declaration was written, which is the
+	// One brace in from where the Declaration was written, which is the
 	// body's own level. The `{ … }` of a Type written in a signature, and every
 	// block a Method body opens, are deeper than that and are stepped over
 	// whole.
@@ -515,7 +515,7 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
-// NOTE: The span a key was written across — the whole path where it is one,
+// The span a key was written across — the whole path where it is one,
 // and the name alone where it is not.
 function keyPosition(pair: {
 	name: parser.IdentifierNode
@@ -531,7 +531,7 @@ function keyPosition(pair: {
 	}
 }
 
-// NOTE: Whether two written keys write the same member — the same spelling, or
+// Whether two written keys write the same member — the same spelling, or
 // one a prefix of the other at a step boundary.
 function keysClash(left: string, right: string): boolean {
 	if (left === right) {
@@ -544,7 +544,7 @@ function keysClash(left: string, right: string): boolean {
 	return longer.startsWith(`${shorter}.`)
 }
 
-// NOTE: Whether two Positions are written flush against each other, with
+// Whether two Positions are written flush against each other, with
 // neither whitespace nor a line break between them. Some of the grammar reads
 // several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
 // tells that apart from the same Tokens written as separate things.
@@ -555,11 +555,11 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// NOTE: What a Dictionary entry is, said once for the three sites that say it.
+// What a Dictionary entry is, said once for the three sites that say it.
 const dictionaryEntryNote =
 	"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
 
-// NOTE: A key's separator written the way another language writes one. Spelled
+// A key's separator written the way another language writes one. Spelled
 // here for the two sites that meet one: the Dictionary reader, which gets there
 // with the key already read, and the Expression tail, where a `=>` is refused
 // before the brackets are ever understood to hold entries at all.
@@ -577,7 +577,7 @@ function dictionaryEntryRefusal(
 	}
 }
 
-// NOTE: Whether the Expression a `=>` was written behind can only have been a
+// Whether the Expression a `=>` was written behind can only have been a
 // Dictionary's KEY. No language writes a Parameter list as a String or a Number,
 // so `"kim" => 7` is the hash rocket however much the arrow looks like a
 // Function literal's. A NAME is left out on purpose: `x => x` is a Function in
@@ -590,7 +590,7 @@ function writtenDictionaryKey(node: parser.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: What a reader wrote between a key and its value when they did not write
+// What a reader wrote between a key and its value when they did not write
 // `=`. Only the two spellings other languages use are named — `:` and `->` —
 // because those are the ones somebody reaches for on purpose; every other Token
 // standing there is a Program that went wrong somewhere else, and claiming it
@@ -614,7 +614,7 @@ function writtenSeparatorLexeme(
 	return null
 }
 
-// NOTE: One refusal's worth of account for text that is not Essence — built
+// One refusal's worth of account for text that is not Essence — built
 // where the habit is RECOGNISED and thrown where it stands. Coded, never
 // `syntax-error`, so that it survives speculation: `a == b` is `a == b` under
 // every reading of the text around it, and handing that back for a second
@@ -629,7 +629,7 @@ type ForeignRefusal = {
 	data?: common.DiagnosticData
 }
 
-// NOTE: What a Token contributes to a foreign lexeme, or null where it
+// What a Token contributes to a foreign lexeme, or null where it
 // contributes nothing. Two sources, because the Lexer splits an operator between
 // them: the Symbols it knows (`=`, `<`, `-`) are Tokens of their own, and
 // everything else — `+`, `&`, `!`, `;`, `?` — ends no name and so arrives inside
@@ -655,14 +655,14 @@ function foreignTokenLead(token: Token): string | null {
 	}
 }
 
-// NOTE: The lexemes that are made of the same characters as a habit and are
+// The lexemes that are made of the same characters as a habit and are
 // Essence — the two arrows, and the `->`'s halves written on their own. Asked of
 // the WHOLE joined text rather than of each Token, which is what keeps
 // `match x -> T` and `<- value` out of this entirely while leaving `a - b` and
 // `a < b` in.
 const essenceLexemes: ReadonlySet<string> = new Set(["->", "<-", "=", "|", "~"])
 
-// NOTE: What Essence writes in place of a habit that is not an operator. Each is
+// What Essence writes in place of a habit that is not an operator. Each is
 // its own shape rather than its own code: `foreign-syntax` is the verdict "this
 // is another language's spelling", and which spelling it was is what the message
 // and the `essence-spelling` payload carry.
@@ -690,7 +690,7 @@ function foreignSyntaxRefusal(
 			message: "A Comment is written with '§'",
 			label: "Essence writes '§' here",
 			position,
-			// NOTE: No `essence-spelling`, because a block Comment is two
+			// No `essence-spelling`, because a block Comment is two
 			// spellings and the second of them is nowhere in hand — a `§` written
 			// over the `/*` would leave the `*/` standing at the end of whatever
 			// line it was written on.
@@ -710,13 +710,13 @@ function foreignSyntaxRefusal(
 			notes: [
 				"A Function literal is its Parameter list, its answer Type and a block, and a value leaves one only through '<-'.",
 			],
-			// NOTE: A WHOLE literal, annotations and all. A Help that wrote
+			// A WHOLE literal, annotations and all. A Help that wrote
 			// only the braces around a body — `'(n) { <- n::add(1) }'` — left
 			// `uninferable-parameter-type` and `missing-return-type` standing
 			// behind the edit it offered, which is the same refusal twice more
 			// for a reader who followed it.
 			//
-			// NOTE: And the Parameter is written `_ n` rather than `n`, because
+			// And the Parameter is written `_ n` rather than `n`, because
 			// a Parameter with no `_` in front of it is LABELLED: a reader who
 			// followed `'(n: Integer) -> Integer { <- n }'` and then called what
 			// they had written was answered `This Argument is not labelled 'n'`.
@@ -750,7 +750,7 @@ function foreignSyntaxRefusal(
 	return null
 }
 
-// NOTE: The value in front of the brackets spelled back out, where it is a name
+// The value in front of the brackets spelled back out, where it is a name
 // or a path of names — `primes`, `box.items`, `@.items`. Null for everything
 // else, which is every shape whose spelling the Parser does not hold: a call, a
 // Literal, a Method chain. A Help built on one of those would have to invent the
@@ -772,7 +772,7 @@ function writtenReceiver(node: parser.ExpressionNode): string | null {
 	}
 }
 
-// NOTE: `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
+// `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
 // its position in brackets, which is the one habit here that is a SHAPE rather
 // than a lexeme: every character of it is Essence, and what is foreign is that
 // one value stands flush in front of another.
@@ -784,7 +784,7 @@ function writtenReceiver(node: parser.ExpressionNode): string | null {
 // The Helps put both back in front of the reader, and write a schematic name
 // where there is none to put.
 //
-// NOTE: No `essence-spelling`. Which Method reads an item is decided by the
+// No `essence-spelling`. Which Method reads an item is decided by the
 // receiver's TYPE — `item(at:)` for a List, `value(at:)` for a Dictionary,
 // `character(at:)` for a String — and the Parser knows no Types at all. A fix
 // that guessed one of the three would trade this refusal for an
@@ -795,14 +795,14 @@ function indexRefusal(
 	key: { text: string; keyed: boolean } | null,
 	position: common.Position,
 ): ForeignRefusal {
-	// NOTE: `collection` rather than `value` for the value that has no name of
+	// `collection` rather than `value` for the value that has no name of
 	// its own, because one of the three Methods offered below is itself called
 	// `value` and `'value::value(at 0)'` reads as a rule about a Keyword rather
 	// than as a name to substitute.
 	let written = receiver ?? "collection"
 	let subject =
 		receiver === null ? "the value it stands behind" : `'${receiver}'`
-	// NOTE: A written String key says the collection is a Dictionary and says
+	// A written String key says the collection is a Dictionary and says
 	// it loudly, because a List and a String are read by POSITION and a
 	// position is an Integer and nothing else. So the Helps are ordered by what
 	// was written, and the position Methods are never handed the String key: a
@@ -833,7 +833,7 @@ function indexRefusal(
 	}
 }
 
-// NOTE: `primes[0] = 5` — the same habit with an `=` behind it, which is a
+// `primes[0] = 5` — the same habit with an `=` behind it, which is a
 // different mistake and was answered as two: the refusal about the brackets, and
 // then `Expected an Expression but found '='` from the Statement loop reading
 // what was left. Every Help it printed named a Method that READS.
@@ -879,7 +879,7 @@ function indexWriteRefusal(
 	}
 }
 
-// NOTE: The value the `require` line was written over, spelled back. A name and
+// The value the `require` line was written over, spelled back. A name and
 // a run of members read off one are the two shapes that ARE their own spelling,
 // and between them they are what almost every such line has on its right. This
 // stage holds Nodes rather than the text they were read from, so anything else
@@ -899,7 +899,7 @@ function writtenValueText(value: parser.ExpressionNode): string {
 	return "…"
 }
 
-// NOTE: The text a span was read from, which is what a Help that tells the
+// The text a span was read from, which is what a Help that tells the
 // reader to WRITE something back has to be built out of. A Node is not the text
 // it came from: a String Node holds the value the escapes stand for, so writing
 // one back out escapes what the reader escaped and leaves what they did not —
@@ -922,7 +922,7 @@ function writtenText(lines: Array<string>, position: common.Position): string {
 	return line.slice(position.start.column - 1, position.end.column - 1)
 }
 
-// NOTE: An Expression that can only ever be a VALUE, which is what tells a
+// An Expression that can only ever be a VALUE, which is what tells a
 // Dictionary's key from a Record's member name. Everything else — a name, a
 // member read, a call — may be either the base of an update or, for a name, a
 // member whose value simply did not parse, and neither is a mistake this can
@@ -944,7 +944,7 @@ function writesAValueKey(node: parser.ExpressionNode): boolean {
 	}
 }
 
-// NOTE: The numerator of a decimal — the two written digit runs read as one
+// The numerator of a decimal — the two written digit runs read as one
 // number over a power of ten. Normalised through `BigInt` so what comes out is
 // plain digits: no leading zeros (`0.05` is `5/100`) and no sign on a zero
 // (`-0.0` is `0/10`). Every stage behind the Parser reads these strings as
@@ -957,7 +957,7 @@ function decimalNumerator(whole: string, fraction: string): string {
 	return magnitude === 0n ? "0" : `${negative ? "-" : ""}${magnitude}`
 }
 
-// NOTE: The parser reads nesting by recursion, one call level per written
+// The parser reads nesting by recursion, one call level per written
 // level, so a Program that nests deeply enough would overflow the call stack
 // and crash without a report. The guard refuses it with one instead, well
 // before the stack runs out — 1024 levels is far past anything written by
@@ -970,13 +970,13 @@ function decimalNumerator(whole: string, fraction: string): string {
 const maximumNestingDepth = 1024
 
 export type ParserOptions = {
-	// NOTE: Opt-in that says the Statements about to be read stand in a test's
+	// Opt-in that says the Statements about to be read stand in a test's
 	// body, which is what makes `expect` and `require` legal in them. Only the
 	// `@example` blocks of a `§§` Documentation block set it: what is written
 	// under one is a test body, and it is parsed on its own rather than as part
 	// of the file it was written in.
 	insideTestBody?: boolean
-	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
+	// Opt-in that lets a Program open with `declarations { … }` — the
 	// standard library sets it, every user file leaves it off so that a
 	// `declarations` block there is diagnosed rather than parsed. It is also
 	// what refuses both Module sections: the files that set it are one shared
@@ -985,7 +985,7 @@ export type ParserOptions = {
 	allowDeclarationsHeader?: boolean
 }
 
-// NOTE: One `import { … }` or `export { … }` block as it was read, with the
+// One `import { … }` or `export { … }` block as it was read, with the
 // side of the implementation it stood on and the Keyword's own Position. The
 // node spans the whole block, which is what the Formatter and the Language
 // Server need; a Diagnostic about the side a block was written on wants to
@@ -996,7 +996,7 @@ type ModuleSectionRead = {
 	side: "above" | "below"
 }
 
-// NOTE: The brackets that CLOSE something. A list reader that has just stepped
+// The brackets that CLOSE something. A list reader that has just stepped
 // over a `,` is looking for its next member, and none of these begins one: the
 // list is short of its own closing bracket, and one of these is the bracket that
 // arrived in its place. See `refuseListContinuation`.
@@ -1006,7 +1006,7 @@ const closingBracketTokenTypes = new Set([
 	TokenType.SymbolRightBrace,
 ])
 
-// NOTE: The Tokens a Statement that begins with a bare name goes on with —
+// The Tokens a Statement that begins with a bare name goes on with —
 // a reassignment, a Method call, a member read, a call, an index. See
 // `parseOptionalRefinementPredicate`.
 const STATEMENT_CONTINUATIONS = new Set([
@@ -1021,25 +1021,25 @@ class DescentParser {
 	protected tokens: TokenStream
 	protected suppressDiagnostics: boolean
 	protected allowDeclarationsHeader: boolean
-	// NOTE: Parser state set from the header — `declarations` unlocks the
+	// Parser state set from the header — `declarations` unlocks the
 	// body-less native Method signatures and value-less static Properties that
 	// `parseNamespaceBodyNode` produces. In `implementation` mode those branches
 	// are simply never reached, so the absence of a body stays a parse error
 	// exactly as before.
 	protected mode: parser.Program["kind"] = "implementation"
-	// NOTE: How many levels of Expressions, Types and blocks the parser is
+	// How many levels of Expressions, Types and blocks the parser is
 	// currently inside — `enterNesting` counts them against
 	// `maximumNestingDepth`. One shared budget, because the three recur into
 	// each other and it is the call stack they share that the limit protects.
 	protected nestingDepth = 0
-	// NOTE: Whether the Statement being read stands in a test's own body — set
+	// Whether the Statement being read stands in a test's own body — set
 	// by `parseTest` and cleared again by every Function body written inside
 	// one, which is what makes `expect` a Statement of the test and not of the
 	// closure it was handed to. A `suite` body does NOT set it: the Statements
 	// directly in a suite are its setup, and there is no test there for an
 	// assertion to belong to.
 	protected insideTestBody = false
-	// NOTE: Whether the Expression being read stands in an ARGUMENT list, which
+	// Whether the Expression being read stands in an ARGUMENT list, which
 	// is the one position that hands a Function literal its Types. A literal
 	// passed to a Method reads its Parameter and return Types off the Parameter
 	// it is passed to; the same literal written into a Declaration reads them
@@ -1048,19 +1048,19 @@ class DescentParser {
 	// path written in a literal's BODY is judged by where that body stands
 	// rather than by the call around it.
 	protected insideArgumentList = false
-	// NOTE: The value an update being read is written ON — the `config` of
+	// The value an update being read is written ON — the `config` of
 	// `{ config with … }` — spelled, or null where it is not one a Help can
 	// print back. The key readers are several calls below the `with` and the
 	// Expression in front of it is nowhere in their reach, and a descend that
 	// updates nothing is answered by naming it: dropping the only key drops the
 	// update, and what is left is that value on its own.
 	protected updatedValue: string | null = null
-	// NOTE: How many speculations are on the stack. It is what tells the
+	// How many speculations are on the stack. It is what tells the
 	// readings of ONE piece of text — the alternatives a construction is tried
 	// as — from the readings of the text inside one of them, which is the whole
 	// of what `furthestFailure` below needs to know. See `forgetFailuresFrom`.
 	private speculationDepth = 0
-	// NOTE: The failure that reached FURTHEST into the input among the readings
+	// The failure that reached FURTHEST into the input among the readings
 	// a speculation threw away, and which is reported instead of the failure of
 	// the reading that was kept last.
 	//
@@ -1076,16 +1076,16 @@ class DescentParser {
 	// Token the readings AGREE about, which is as far as the furthest of them
 	// got.
 	//
-	// NOTE: A coded refusal never lands here. It is raised out of the
+	// A coded refusal never lands here. It is raised out of the
 	// speculation by `refusesTheText` rather than given back, so it is never a
 	// reading that was thrown away — and it keeps its precedence over everything
 	// this records, which is what a verdict about written text is owed.
 	private furthestFailure: ParseError | null = null
 	private furthestFailureOffset = 0
-	// NOTE: The `speculationDepth` the speculation that recorded it was ENTERED
+	// The `speculationDepth` the speculation that recorded it was ENTERED
 	// at, which is the level its sibling readings stand on.
 	private furthestFailureDepth = 0
-	// NOTE: What the recovery walked past, which is handed to the Program as its
+	// What the recovery walked past, which is handed to the Program as its
 	// `Recovery` — see `recordAbandoned`. The lines are a Set, because one
 	// Statement is dropped once however many Tokens it was written across; the
 	// Declarations are a list, because the same name dropped in two different
@@ -1102,11 +1102,11 @@ class DescentParser {
 		atSectionLevel: boolean
 	}> = []
 	private abandonedLines = new Set<number>()
-	// NOTE: The lines of the abandoned runs that could have opened a BODY — see
+	// The lines of the abandoned runs that could have opened a BODY — see
 	// `parser.Recovery.headLines`.
 	private abandonedHeadLines = new Set<number>()
 
-	// NOTE: The source, kept as its lines, for the Helps that spell a piece of
+	// The source, kept as its lines, for the Helps that spell a piece of
 	// the reader's own text back at them. A Node is not the text it was read
 	// from — every escape a String holds is already gone by the time it is one —
 	// so a Help built out of Nodes tells the reader to write something they did
@@ -1119,7 +1119,7 @@ class DescentParser {
 		this.allowDeclarationsHeader = options.allowDeclarationsHeader ?? false
 		this.insideTestBody = options.insideTestBody ?? false
 
-		// NOTE: A Lexer error truncates the Token stream, so every
+		// A Lexer error truncates the Token stream, so every
 		// end-of-input error after it would only be a cascade of the already
 		// reported problem.
 		this.suppressDiagnostics = this.tokens.hadLexerError
@@ -1130,7 +1130,7 @@ class DescentParser {
 	parseProgram(): parser.Program {
 		let above = this.parseModuleSections("above")
 
-		// NOTE: A file that is nothing but tests — the `Season.tests.es`
+		// A file that is nothing but tests — the `Season.tests.es`
 		// convention — writes its imports and a `tests { … }` block and no
 		// implementation block at all. It still carries an implementation
 		// section, empty and spanning the tests block, so that every stage
@@ -1139,7 +1139,7 @@ class DescentParser {
 			let keyword = this.peekOrFail()
 			let tests = this.parseTestsSection()
 
-			// NOTE: An implementation block BELOW the tests section, which is a
+			// An implementation block BELOW the tests section, which is a
 			// file written in the wrong order rather than a file that is
 			// nothing but tests. Both blocks are kept where they stand — the
 			// Program the author meant is the one they wrote — and the
@@ -1178,7 +1178,7 @@ class DescentParser {
 		return this.parseProgramBody(above, null)
 	}
 
-	// NOTE: Everything from the implementation block down, with the tests
+	// Everything from the implementation block down, with the tests
 	// section handed in where one was already read above it.
 	protected parseProgramBody(
 		above: Array<ModuleSectionRead>,
@@ -1187,7 +1187,7 @@ class DescentParser {
 		let header = this.parseProgramHeader()
 
 		if (header === null) {
-			// NOTE: Without the `implementation {` header nothing can be
+			// Without the `implementation {` header nothing can be
 			// parsed — an empty Program is returned alongside the Diagnostic.
 			let position = {
 				start: { line: 1, column: 1 },
@@ -1220,7 +1220,7 @@ class DescentParser {
 			end: closingPosition.end,
 		})
 
-		// NOTE: The tests section is read where it belongs, last of all — and
+		// The tests section is read where it belongs, last of all — and
 		// once more directly under the implementation block, so that a
 		// `tests { … }` written above `export { … }` is diagnosed as the block
 		// in the wrong place rather than as a Token where the Program was
@@ -1263,7 +1263,7 @@ class DescentParser {
 				: "the tests block ends here",
 		)
 
-		// NOTE: A Program's Position stays the implementation block's own span,
+		// A Program's Position stays the implementation block's own span,
 		// sections or none — the Formatter reads it as the block it writes
 		// `implementation {` and its closing brace for, and each section carries
 		// its own span for whoever needs the file's full extent.
@@ -1278,7 +1278,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: Whatever is left once every section has been read. `endPosition` is
+	// Whatever is left once every section has been read. `endPosition` is
 	// where the Program was supposed to have ended — the last section's own
 	// span where there was one, and the block's closing brace where there was
 	// not.
@@ -1311,7 +1311,7 @@ class DescentParser {
 				notes: [
 					"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.",
 				],
-				// NOTE: The span the primary Label stands on is what there is
+				// The span the primary Label stands on is what there is
 				// to delete, so the edit is one the report already knows and
 				// said nothing about. The `essence-spelling` payload with an
 				// empty spelling is the same "remove this" a `;` carries, which
@@ -1326,7 +1326,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: Both blocks are read on BOTH sides of the implementation, in either
+	// Both blocks are read on BOTH sides of the implementation, in either
 	// order — a block written on the wrong side is parsed where it stands rather
 	// than left to cascade into "Expected 'implementation'" or "nothing may
 	// follow here", which say nothing about what the author got wrong. A second
@@ -1373,7 +1373,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Which of the blocks read on either side the Program keeps, and which
+	// Which of the blocks read on either side the Program keeps, and which
 	// are refused. A refused block is dropped rather than carried along broken:
 	// every later stage may read the sections a Program has as the sections it
 	// meant. A `declarations { … }` Program carries them on the same terms as
@@ -1425,7 +1425,7 @@ class DescentParser {
 			section.keywordPosition,
 			{
 				code: "misplaced-module-section",
-				// NOTE: The whole block's span, since the Diagnostic underlines
+				// The whole block's span, since the Diagnostic underlines
 				// the KEYWORD and the section is dropped rather than carried
 				// along — so a fix that moves the block has nothing else left
 				// to read where its text ends.
@@ -1454,7 +1454,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: An import block holds nothing but groups — every name comes from
+	// An import block holds nothing but groups — every name comes from
 	// somewhere, so every name is written under its `from`.
 	protected parseImportSection(): parser.ImportSectionNode {
 		let keyword = this.tokens.next()
@@ -1477,7 +1477,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: An export block lists what the Module declares bare, and what it
+	// An export block lists what the Module declares bare, and what it
 	// forwards in groups. `from` is an ordinary Identifier everywhere else —
 	// a Module may well export something called `from` — so what makes it a
 	// group here is the specifier after it: `from "./Module.es" {`.
@@ -1513,7 +1513,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `from "./Module.es" { … }` — the shape both blocks share. The
+	// `from "./Module.es" { … }` — the shape both blocks share. The
 	// specifier is read once and handed to every entry inside, so an entry
 	// carries where it came from without the group having to be asked.
 	protected parseModuleGroup<Entry>(
@@ -1552,7 +1552,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: The group an entry is written in is what makes it a re-export; a
+	// The group an entry is written in is what makes it a re-export; a
 	// bare entry, with no `source`, exports something this Program declares.
 	protected parseExportEntry(
 		source: parser.ModuleSpecifierNode | null,
@@ -1566,7 +1566,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `as` binds the entry under a local name of the author's choosing. It
+	// `as` binds the entry under a local name of the author's choosing. It
 	// is only a Keyword here — everywhere else it is an ordinary Identifier, an
 	// Argument label included — so an entry may itself be named `as`, and
 	// `as as as` renames the imported `as` to `as`.
@@ -1591,7 +1591,7 @@ class DescentParser {
 		leftBrace: Token
 		kind: parser.Program["kind"]
 	} | null {
-		// NOTE: A bare Identifier can never begin a Program today, so
+		// A bare Identifier can never begin a Program today, so
 		// `declarations {` is unambiguous — no Lexer keyword is needed. Only the
 		// standard library is allowed to open one; anywhere else it is a tailored
 		// Diagnostic, after which the block is parsed as an implementation
@@ -1648,7 +1648,7 @@ class DescentParser {
 
 	// #region Tests
 
-	// NOTE: What opens an implementation block, asked without consuming
+	// What opens an implementation block, asked without consuming
 	// anything — `declarations {` included, because a stdlib file written in
 	// the wrong order deserves the same answer.
 	protected startsProgramHeader(): boolean {
@@ -1672,7 +1672,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `tests { … }`. Like the Module sections, the `{` is part of what is
+	// `tests { … }`. Like the Module sections, the `{` is part of what is
 	// recognised, because `tests` is an ordinary Identifier everywhere else —
 	// `constant tests = […]` is still a Declaration of a name.
 	protected parseTestsSection(): parser.TestsSectionNode {
@@ -1688,7 +1688,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A tests section written ABOVE the implementation block, which reads
+	// A tests section written ABOVE the implementation block, which reads
 	// as a tests-only file until the implementation block turns up behind it.
 	protected reportTestsSectionAboveImplementation(
 		keywordPosition: common.Position,
@@ -1718,7 +1718,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A tests section written ABOVE the `export { … }` block. It is read
+	// A tests section written ABOVE the `export { … }` block. It is read
 	// where it stands and kept — the Program it describes is the one the author
 	// meant, and dropping it would turn one Diagnostic about an order into a
 	// cascade of "unknown name" about everything inside it.
@@ -1750,7 +1750,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: What may stand in a tests section, and in a `suite`'s body: a test,
+	// What may stand in a tests section, and in a `suite`'s body: a test,
 	// a nested suite, or any Statement an implementation block takes — a
 	// `constant` written here is setup, a `function` is a helper.
 	protected parseTestsNode(): parser.TestsNode {
@@ -1761,7 +1761,7 @@ class DescentParser {
 		return this.parseImplementationNode()
 	}
 
-	// NOTE: `test`, `suite` and `benchmark` are ordinary Identifiers as well, so
+	// `test`, `suite` and `benchmark` are ordinary Identifiers as well, so
 	// what opens an item is the Keyword AND the name that must follow it —
 	// `test = 5` stays an assignment to a variable called `test`.
 	protected startsTestItem(token: Token): boolean {
@@ -1789,7 +1789,7 @@ class DescentParser {
 		return this.parseTest()
 	}
 
-	// NOTE: One reading for both forms — a benchmark is a test whose body is
+	// One reading for both forms — a benchmark is a test whose body is
 	// timed rather than judged, and it takes the same head: a name, Modifiers,
 	// and the `across` rows that make it several. What a benchmark may NOT take
 	// (`for any`) is the Enricher's refusal, because the Parser failing over a
@@ -1831,7 +1831,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `for any` is the one two-word opener in the grammar. `for` is a
+	// `for any` is the one two-word opener in the grammar. `for` is a
 	// Keyword and `any` is an ordinary name, so the pair is read together: a
 	// `for` with anything else behind it opens nothing here, and `constant any =
 	// 1` is still a Declaration of a name.
@@ -1847,7 +1847,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `for any (a: Integer, b: NonEmptyList<String>)` — what the runner
+	// `for any (a: Integer, b: NonEmptyList<String>)` — what the runner
 	// generates a value of, once per case. The Parameter list is a closure's, so
 	// the shape reads the way a reader already knows it; the Enricher is what
 	// asks every Parameter for the Type that says what to generate.
@@ -1869,7 +1869,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `across` is recognised by content, the way `matches` is in an
+	// `across` is recognised by content, the way `matches` is in an
 	// assertion: it opens the one form that stands between a test's Modifiers
 	// and its body, and everywhere else it is an ordinary name.
 	protected startsTestTable(): boolean {
@@ -1878,7 +1878,7 @@ class DescentParser {
 		return token?.type === TokenType.Identifier && token.value === ACROSS
 	}
 
-	// NOTE: `across [ … ] ({ scored, conceded }: Scoreline)` — the rows a test
+	// `across [ … ] ({ scored, conceded }: Scoreline)` — the rows a test
 	// runs for, and what one row is called inside the body. The parameter list
 	// is a closure's, so a row can be taken apart by a Pattern and annotated
 	// with the Type that lets a bare Case in a row resolve.
@@ -1904,7 +1904,7 @@ class DescentParser {
 		let name = this.parseTestName("suite")
 		let modifiers = this.parseTestModifiers()
 
-		// NOTE: A suite's own body is not a test body — the Statements directly
+		// A suite's own body is not a test body — the Statements directly
 		// in it are the setup its tests share, and an assertion written among
 		// them belongs to no test.
 		let outerInsideTestBody = this.insideTestBody
@@ -1928,7 +1928,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: A name is a String Literal so that it can say what the test proves
+	// A name is a String Literal so that it can say what the test proves
 	// rather than name it like a Function — and an interpolated one, because a
 	// table test names each row out of the row's own values.
 	protected parseTestName(
@@ -1953,13 +1953,13 @@ class DescentParser {
 		return generators.stringValueNode(token.value, token.position)
 	}
 
-	// NOTE: Zero or more Modifiers, written between the name and the body the
+	// Zero or more Modifiers, written between the name and the body the
 	// way trailing labelled Arguments are written after a call's own. The
 	// grammar is a name and the arguments that follow it; what a name MEANS is
 	// left to the stage that knows the vocabulary, so `within 2s` or
 	// `retries 3` land later as vocabulary rather than as parser work.
 	//
-	// NOTE: A literal always belongs to the Modifier in front of it — there is
+	// A literal always belongs to the Modifier in front of it — there is
 	// nothing else it could be. A bare name is the one shape a Modifier and its
 	// own argument share, and it is read as an argument only where a comma or
 	// the body follows it: in `tagged slow { … }` the body settles it, in
@@ -2018,7 +2018,7 @@ class DescentParser {
 
 		let following = this.tokens.peek(1)
 
-		// NOTE: `tagged slow across [ … ]` and `tagged slow for any (…)` — both
+		// `tagged slow across [ … ]` and `tagged slow for any (…)` — both
 		// open where the body would, so a bare name in front of either is that
 		// Modifier's own argument for exactly the reason it is in front of a
 		// `{`.
@@ -2051,7 +2051,7 @@ class DescentParser {
 
 	// #endregion
 
-	// NOTE: The list loop with nothing around it — no block, no braces, no
+	// The list loop with nothing around it — no block, no braces, no
 	// Program. `parseStatementList` stops at a `}` or at the end of the input,
 	// and an example has neither, so what it reads is everything the text
 	// holds.
@@ -2098,7 +2098,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: Which of two accounts of one broken Statement is reported — the
+	// Which of two accounts of one broken Statement is reported — the
 	// failure of the reading that was KEPT, or the furthest failure among the
 	// readings that were thrown away on the way to it. See `furthestFailure`.
 	//
@@ -2136,7 +2136,7 @@ class DescentParser {
 		return recorded
 	}
 
-	// NOTE: Several parts of the AST hold their members in a name-keyed
+	// Several parts of the AST hold their members in a name-keyed
 	// Record — a Namespace's Methods, a Record's members — where a repeated
 	// name can not be represented at all: building the Record drops the
 	// earlier definition, and with it whatever Expression it held. No later
@@ -2175,7 +2175,7 @@ class DescentParser {
 						),
 						secondary(firstPosition, "first defined here"),
 					],
-					// NOTE: The edit the two Labels already spell out between
+					// The edit the two Labels already spell out between
 					// them, said rather than left to be worked out: the second
 					// writing is the one that goes, because the first is the one
 					// the value is read as having. Callers that have something
@@ -2191,7 +2191,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Parses list elements until the closing `}` (or the end of the
+	// Parses list elements until the closing `}` (or the end of the
 	// input), reporting a single Diagnostic per broken element and
 	// resynchronising afterwards. Broken elements are DROPPED from the AST —
 	// the Enricher already tolerates missing declarations through its
@@ -2209,7 +2209,7 @@ class DescentParser {
 				break
 			}
 
-			// NOTE: Asked here rather than by an element reader, because what it
+			// Asked here rather than by an element reader, because what it
 			// answers is a line that is NO element — swallowed, so the list
 			// carries on with the line behind it and nothing is dropped.
 			if (this.swallowForeignComment()) {
@@ -2218,7 +2218,7 @@ class DescentParser {
 
 			let startState = this.tokens.save()
 
-			// NOTE: Each element is read with no record of a reading thrown
+			// Each element is read with no record of a reading thrown
 			// away for the element in front of it — `forgetFailuresFrom` is
 			// about a group of alternatives resolving, and a Statement that
 			// parsed is that too. An abandoned reading of the LARGER
@@ -2226,7 +2226,7 @@ class DescentParser {
 			// still a live alternative, and the depth is what tells the two
 			// apart.
 			//
-			// NOTE: Defensive, and deliberately so. A record only ever wins
+			// Defensive, and deliberately so. A record only ever wins
 			// where it stands FURTHER into the input than the reading that was
 			// kept — see `furthestOf` — and every reading a Statement is given
 			// stops at or before the Statement's own end, so a record left by
@@ -2247,7 +2247,7 @@ class DescentParser {
 		return elements
 	}
 
-	// NOTE: `# count the items` — a Comment written the way Python and the
+	// `# count the items` — a Comment written the way Python and the
 	// shells write one. A `#` opens a CASE here, so the line read as a bare Case
 	// and then a Statement per word behind it, and every one of those words was
 	// answered as a name nothing declares: one habit, four Diagnostics.
@@ -2318,7 +2318,7 @@ class DescentParser {
 		this.reportParseError(error)
 		this.resynchronise(startState.braceDepth)
 
-		// NOTE: Guarantee progress — when the broken element consumed no
+		// Guarantee progress — when the broken element consumed no
 		// Token and resynchronisation stopped immediately, the enclosing loop
 		// would otherwise retry the same Token forever.
 		if (
@@ -2331,12 +2331,12 @@ class DescentParser {
 		this.recordAbandoned(startState.index)
 	}
 
-	// NOTE: What the recovery just walked past, written down for the stages
+	// What the recovery just walked past, written down for the stages
 	// behind the Parser — see `parser.Recovery`. Read off the Tokens rather
 	// than off the Node that was never built, because the Node is exactly what
 	// a dropped Statement does not leave behind.
 	//
-	// NOTE: A speculation that is thrown away must leave nothing behind, and
+	// A speculation that is thrown away must leave nothing behind, and
 	// this is reached only from the Statement loops, which run outside every
 	// speculation: a reading given back for another attempt has not abandoned
 	// anything, and recording it would make a name the Program declares read as
@@ -2367,7 +2367,7 @@ class DescentParser {
 
 		let hoistable = hoistableKeywordTokenTypes.has(opening.type)
 
-		// NOTE: Deduplicated, because one run declares a name once however many
+		// Deduplicated, because one run declares a name once however many
 		// of its Tokens say so — a Choice's Case written with a payload names
 		// itself twice over, and two records for it would be two identical
 		// silences.
@@ -2380,7 +2380,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: One name, pending the block that will claim it. Every record is
+	// One name, pending the block that will claim it. Every record is
 	// written down here so that there is one place the shape is built and one
 	// place the claim can be explained.
 	protected recordAbandonedDeclaration(
@@ -2397,7 +2397,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A block has just closed, so every record still pending inside it
+	// A block has just closed, so every record still pending inside it
 	// stands in THIS block — the innermost one that encloses it, because a
 	// nested block closes before the block around it and the first claim wins.
 	// Claiming as blocks close is what makes the span exact without the Parser
@@ -2424,7 +2424,7 @@ class DescentParser {
 		}
 
 		for (let record of this.abandonedDeclarations) {
-			// NOTE: Pending AND inside this block. A block that closes is not
+			// Pending AND inside this block. A block that closes is not
 			// necessarily a block the pending records stand in — a Statement
 			// dropped at the top level is still pending when the NEXT
 			// Function's body closes below it, and that body never held it.
@@ -2438,12 +2438,12 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The record handed to the Program — see `parser.Recovery`. Undefined
+	// The record handed to the Program — see `parser.Recovery`. Undefined
 	// where nothing was abandoned, which is what keeps a Program that parsed the
 	// shape it has always had. Sorted, so that one source parses to one Program
 	// however the recovery met it and a snapshot of a broken file is stable.
 	protected recovery(): parser.Recovery | undefined {
-		// NOTE: Either set, because a DROPPED BINDER abandons a name without
+		// Either set, because a DROPPED BINDER abandons a name without
 		// abandoning any text — the Matcher around it parsed whole, and what
 		// was refused is the one clause inside it. Keyed off the lines alone,
 		// the name never reached the Enricher and the body's read of it
@@ -2455,7 +2455,7 @@ class DescentParser {
 			return undefined
 		}
 
-		// NOTE: A record no block ever claimed stood outside every block this
+		// A record no block ever claimed stood outside every block this
 		// Parser got to close — a file with no `implementation {` header at all,
 		// or one whose blocks were all torn open. There is nothing tighter to
 		// say than the file, so it is the file, and it counts as section level:
@@ -2493,7 +2493,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Skips ahead to the next Token that can begin a Statement (or to
+	// Skips ahead to the next Token that can begin a Statement (or to
 	// the closing `}`) at the brace depth the broken element started on —
 	// braces opened by the broken element itself are skipped over entirely.
 	protected resynchronise(targetDepth: number): void {
@@ -2501,7 +2501,7 @@ class DescentParser {
 			let token = this.tokens.peek()
 
 			if (token === undefined) {
-				// NOTE: Resynchronisation hit the end of the input — every
+				// Resynchronisation hit the end of the input — every
 				// further error would be a cascade of the one just reported.
 				this.suppressDiagnostics = true
 
@@ -2533,12 +2533,12 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `openingPosition` is where the `{` this closes was written. The
+	// `openingPosition` is where the `{` this closes was written. The
 	// end of the input is where a missing `}` is *noticed*; the `{` is where
 	// the mistake is, and pointing at both is the difference between "there
 	// is a brace missing somewhere" and "this block was never closed".
 	//
-	// NOTE: `section` marks the three blocks whose own Statements are hoisted —
+	// `section` marks the three blocks whose own Statements are hoisted —
 	// `implementation`, `declarations` and `tests`. Every block close funnels
 	// through here, which is what makes this the one place an abandoned
 	// Declaration can be told which block it stood in; see
@@ -2560,7 +2560,7 @@ class DescentParser {
 			return token.position
 		}
 
-		// NOTE: Only the innermost torn-open block reports — a missing `}`
+		// Only the innermost torn-open block reports — a missing `}`
 		// necessarily tears open every enclosing block as well.
 		if (!this.suppressDiagnostics) {
 			this.reportUnclosedBlock(openingPosition)
@@ -2575,7 +2575,7 @@ class DescentParser {
 		return endPosition
 	}
 
-	// NOTE: Where the brace is missing, which is not where its absence is
+	// Where the brace is missing, which is not where its absence is
 	// noticed. The block that ran out of input is the OUTERMOST one — a missing
 	// `}` tears open every block around it, and the counting hands the braces
 	// below the mistake to the blocks above the ones they were written for. So
@@ -2652,7 +2652,7 @@ class DescentParser {
 				return this.parseFunctionStatement()
 		}
 
-		// NOTE: A `test` or a `suite` is an item of the tests section, and
+		// A `test` or a `suite` is an item of the tests section, and
 		// reached here only where one was written outside it. It is read to its
 		// end before it is refused, so the Diagnostic is about the item rather
 		// than about the first Token inside a block nobody expected.
@@ -2675,7 +2675,7 @@ class DescentParser {
 			)
 		}
 
-		// NOTE: `expect` and `require` are Identifiers as well, so an assertion
+		// `expect` and `require` are Identifiers as well, so an assertion
 		// is only read where what follows the Keyword could not be the Keyword
 		// itself, read as a value: `expect = 5` stays an assignment,
 		// `expect::isEmpty()` and `expect.first` stay reads of a value called
@@ -2695,7 +2695,7 @@ class DescentParser {
 			return this.parseAssertionStatement()
 		}
 
-		// NOTE: `choice` is a valid Identifier, so it only opens a Choice
+		// `choice` is a valid Identifier, so it only opens a Choice
 		// Declaration when the Choice's name follows — `choice = 5` stays an
 		// assignment to a variable named `choice`.
 		if (
@@ -2705,7 +2705,7 @@ class DescentParser {
 			return this.parseChoiceDeclarationStatement()
 		}
 
-		// NOTE: `overload function …` is a free-Function Overload block, only
+		// `overload function …` is a free-Function Overload block, only
 		// meaningful in a `declarations { … }` Program — the standard library's
 		// alone. Anywhere else it is a tailored Diagnostic, after which the block
 		// is parsed anyway so its contents still produce Diagnostics; without
@@ -2769,7 +2769,7 @@ class DescentParser {
 		return expression
 	}
 
-	// NOTE: The other half of a forgotten quote. A String that never closes runs
+	// The other half of a forgotten quote. A String that never closes runs
 	// to the end of the input and the Lexer says so — but where the quote it ran
 	// into was ANOTHER String's opening one, the count comes out even and
 	// nothing is unterminated at all. What is left is the name that stood behind
@@ -2839,14 +2839,14 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `const price = 12`, `let count = 3`, `return n` — a whole Statement
+	// `const price = 12`, `let count = 3`, `return n` — a whole Statement
 	// written in another language's words, read as the Statement it was meant to
 	// be and reported once. Reported and RECOVERED rather than refused, which is
 	// the whole point: a dropped `const price = 12` leaves `price` undeclared, so
 	// every line that reads it is told so, and one mistake becomes as many
 	// Diagnostics as the Constant has readers.
 	//
-	// NOTE: Narrow on purpose. The word only opens this where what follows it is
+	// Narrow on purpose. The word only opens this where what follows it is
 	// the Statement it stands for — a name and an `=` for a declaration, an
 	// Expression on the same line for a return — so `constant const = 1` declares
 	// a Constant called `const`, and `Terminal.print(return)` reads a value called
@@ -2871,14 +2871,14 @@ class DescentParser {
 					? "variable"
 					: null
 
-		// NOTE: The table's own Helps, not one written here. `let` and `var`
+		// The table's own Helps, not one written here. `let` and `var`
 		// carry two — a `variable` and, under it, the `constant` a binding
 		// nothing reassigns should be — and this site used to print the first of
 		// them and drop the second. The fix stays the one word: `variable`
 		// compiles either way, and which of the two was meant is the reader's to
 		// say.
 		let word = foreignWord(token.value)
-		// NOTE: `let mut total = 0` — Rust writes TWO words where this language
+		// `let mut total = 0` — Rust writes TWO words where this language
 		// writes one, and the name it declares stands a Token further along than
 		// `declaresAName` looks. Read as one habit over the span both words
 		// cover, so that the fix writes `variable` over the pair rather than
@@ -2911,7 +2911,7 @@ class DescentParser {
 			span: written,
 		})
 
-		// NOTE: The Keyword is stepped over and the rest is read by the Statement
+		// The Keyword is stepped over and the rest is read by the Statement
 		// it was meant to be, so a `: Type` annotation, a Pattern and the value
 		// are all read exactly as they would have been — and whatever else is
 		// wrong with them is reported by the readers that always reported it.
@@ -2926,7 +2926,7 @@ class DescentParser {
 			: this.parseDeclaredVariable(written)
 	}
 
-	// NOTE: `class Money { … }`, `enum Colour { … }`, `interface Point { … }` —
+	// `class Money { … }`, `enum Colour { … }`, `interface Point { … }` —
 	// a word, a name and a block, which is a shape Essence has no reading for at
 	// all: two Identifiers written in a row are two Statements, and the block
 	// behind them a third. Left alone, each of the three is reported separately
@@ -2945,7 +2945,7 @@ class DescentParser {
 		}
 
 		let position = token.position
-		// NOTE: A block whose `}` never arrives is left where it is. Skipping
+		// A block whose `}` never arrives is left where it is. Skipping
 		// it would take the rest of the file with it and answer the whole of
 		// what is broken with one sentence about the word — the missing brace,
 		// which is the mistake that wants reporting, would never be reached.
@@ -2971,7 +2971,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The `{` a block this language has no reading for opens, counted in
+	// The `{` a block this language has no reading for opens, counted in
 	// Tokens from the word — or null where what stands here is not one of the
 	// four shapes. All four are written on ONE line:
 	//
@@ -3006,7 +3006,7 @@ class DescentParser {
 		if (head) {
 			let depth = 0
 
-			// NOTE: A head that does not close on its line is not this shape —
+			// A head that does not close on its line is not this shape —
 			// the loop leaves only through its own `)`, or through here.
 			while (true) {
 				let token = this.tokens.peek(offset)
@@ -3028,7 +3028,7 @@ class DescentParser {
 				}
 			}
 
-			// NOTE: What a head in parentheses is followed by before its block:
+			// What a head in parentheses is followed by before its block:
 			// `fn double(n: i32) -> i32 {` writes its answer Type there, and so
 			// does `func greet(_ who: String) -> String {`. Read past rather than
 			// spelled out, because what is between them is another language's
@@ -3050,7 +3050,7 @@ class DescentParser {
 			: null
 	}
 
-	// NOTE: Whether the block at `braceOffset` has the `}` that closes it
+	// Whether the block at `braceOffset` has the `}` that closes it
 	// anywhere ahead. Asked before anything is read past, because what is done
 	// about a block that never closes is the opposite of what is done about one
 	// that does.
@@ -3076,7 +3076,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Everything up to and including the `}` that closes the block at
+	// Everything up to and including the `}` that closes the block at
 	// `braceOffset`, so that the refusal thrown behind it is resynchronised past
 	// a body rather than into it. The body of a declaration this language does
 	// not have is not a Program's business, and reporting on it would bury the
@@ -3099,7 +3099,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: What a declaration Keyword has to be followed by before the word in
+	// What a declaration Keyword has to be followed by before the word in
 	// front of it is read as one: the name (or the Pattern) it declares, and the
 	// `=` that gives it its value. Without the `=`, `let count` is two names and
 	// this would claim the first of them.
@@ -3159,7 +3159,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: Reported rather than thrown, because the Statement is read on: the
+	// Reported rather than thrown, because the Statement is read on: the
 	// throw is what would drop it, and dropping it is what this exists to avoid.
 	// Suppressed exactly where every other report is — inside a speculation that
 	// is thrown away, and behind a failure that has already been reported.
@@ -3171,7 +3171,7 @@ class DescentParser {
 			label: string
 			notes: Array<string>
 			helps: Array<string>
-			// NOTE: What the one word REPLACES, where that is more than the word
+			// What the one word REPLACES, where that is more than the word
 			// itself — `let mut` is two words and one habit. The word's own span
 			// wherever it is left out.
 			span?: common.Position
@@ -3196,7 +3196,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `user.name = "Ada"` — the one habit that is not a word or a Symbol
+	// `user.name = "Ada"` — the one habit that is not a word or a Symbol
 	// but a whole shape, and the only place a Lookup is ever followed by an `=`.
 	// Refused here rather than where the Expression ended, because a lone `=` is
 	// Essence everywhere else it stands behind one: it separates a Dictionary's
@@ -3230,7 +3230,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A `§§` block above a Declaration documents whatever the Declaration
+	// A `§§` block above a Declaration documents whatever the Declaration
 	// holds, so a Function literal written as the value is handed the block —
 	// the Enricher already reads the block's `@param` lines against that
 	// literal's Parameters. It is handed down rather than picked up, because a
@@ -3252,7 +3252,7 @@ class DescentParser {
 		return this.parseDeclaredConstant(keyword.position)
 	}
 
-	// NOTE: Everything a Constant Declaration is behind its Keyword, with the
+	// Everything a Constant Declaration is behind its Keyword, with the
 	// Keyword's own span handed in. Split out for the one caller that has stepped
 	// over a Keyword this language does not have — see
 	// `parseForeignDeclarationStatement` — so that a `const` recovers into
@@ -3289,7 +3289,7 @@ class DescentParser {
 		return this.parseDeclaredVariable(keyword.position)
 	}
 
-	// NOTE: The Variable half of the split above, for the same one caller.
+	// The Variable half of the split above, for the same one caller.
 	protected parseDeclaredVariable(
 		keywordPosition: common.Position,
 	): parser.VariableDeclarationStatementNode {
@@ -3315,7 +3315,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: What a Declaration declares — one name, or a Pattern naming the
+	// What a Declaration declares — one name, or a Pattern naming the
 	// parts of the value. The Keyword in front is what makes this unambiguous:
 	// a keyword-less `{ a, b } = x` could not be told from the Record Literal
 	// `{ a = 1 }` written as a Statement until its closing brace, which is why
@@ -3358,7 +3358,7 @@ class DescentParser {
 			predicate,
 			{
 				start: keyword.position.start,
-				// NOTE: Out to the predicate, not to the Type — the Statement
+				// Out to the predicate, not to the Type — the Statement
 				// stands for the whole of `Integer where @::isNot(0)`. The
 				// formatter reads a declaration's own span to decide which
 				// Comments sit above it and which trail it, so a clause left
@@ -3370,12 +3370,12 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The `where` clause of a checked refinement. `where` is not a
+	// The `where` clause of a checked refinement. `where` is not a
 	// Keyword — it is an ordinary Identifier used as an Argument label
 	// (`removeEvery(where …)`) and as a Namespace's conformance conditions — so
 	// it is recognised by content, exactly as `parseOptionalGuard` does it.
 	//
-	// NOTE: On the Type's own line, or on the line after it — linebreak Tokens
+	// On the Type's own line, or on the line after it — linebreak Tokens
 	// are discarded, so a `where` opening the NEXT line has to be told apart
 	// from a Statement that begins with the NAME `where`: `type Handler =
 	// Reader` followed by `where = 3` or `where::check()` must not have its
@@ -3453,7 +3453,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A payload shape may be followed by `= { … }`, the Record a
+	// A payload shape may be followed by `= { … }`, the Record a
 	// construction is filled out of. Nothing else may ever follow a Case, so
 	// the `=` is read unconditionally and refused where there is no payload to
 	// default — which says what is wrong instead of leaving the Expression to
@@ -3498,7 +3498,7 @@ class DescentParser {
 		return { name, type, defaultValue }
 	}
 
-	// NOTE: A free `function` always carries a body, in every mode. A native
+	// A free `function` always carries a body, in every mode. A native
 	// free Function exists only as an `overload function` entry — the
 	// body-less non-overloaded form left with `__print`, the last declaration
 	// that used it — so a signature with no block gets the plain "Expected
@@ -3515,7 +3515,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: An `overload function <name> { … }` block — the free-Function
+	// An `overload function <name> { … }` block — the free-Function
 	// counterpart of an `overload` Method block, and, like the body-less
 	// signature form, only meaningful in a `declarations { … }` Program. Each
 	// entry is a Function literal or a native signature, mixed freely; the
@@ -3604,7 +3604,7 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		// NOTE: Properties and Methods are built into two separate name-keyed
+		// Properties and Methods are built into two separate name-keyed
 		// Records, so a Property may share its name with a Method — but not
 		// with another Property, and a Method not with another Method, not
 		// even when one of the two is `static`.
@@ -3636,7 +3636,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `is` is contextual, not a keyword — `::is()` Method calls rely on
+	// `is` is contextual, not a keyword — `::is()` Method calls rely on
 	// it lexing as an ordinary Identifier. Each conformance carries its own
 	// `is` (`is Equatable, is Printable`); the comma separates clauses, so a
 	// bare Protocol name after a comma is a mistake with a tailored Diagnostic.
@@ -3687,7 +3687,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `where Generic is Protocol (, Generic is Protocol)*`, contextual
+	// `where Generic is Protocol (, Generic is Protocol)*`, contextual
 	// `where` (no lexer change — modelled on `parseOptionalGuard`). Written for
 	// reuse: it takes no Namespace-specific input, so a future function-generics
 	// `where` calls it verbatim.
@@ -3707,7 +3707,7 @@ class DescentParser {
 		]
 
 		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-			// NOTE: Comma disambiguation — a comma followed by `is` ends the
+			// Comma disambiguation — a comma followed by `is` ends the
 			// condition list, because that comma separates conformance clauses
 			// (`is A where Item is X, is B`), not conditions. It is left
 			// unconsumed for `parseConformanceClauses` to pick up.
@@ -3730,7 +3730,7 @@ class DescentParser {
 	protected parseWhereCondition(): parser.WhereConditionNode {
 		let generic = this.parseIdentifier()
 
-		// NOTE: `is`/`where` name real Identifiers, but a `where` condition
+		// `is`/`where` name real Identifiers, but a `where` condition
 		// whose LHS is literally one of them is almost certainly a dropped
 		// name rather than a Type Parameter called `is` — diagnosed here.
 		if (generic.content === "is" || generic.content === "where") {
@@ -3766,7 +3766,7 @@ class DescentParser {
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {
 		let token = this.peekOrFail()
 
-		// NOTE: A Method takes its Documentation from its own signature line,
+		// A Method takes its Documentation from its own signature line,
 		// which is the same line — but an `overload` block and a static
 		// Property own no signature, so theirs is read here.
 		let documentation = this.tokens.documentationAbove(
@@ -3790,7 +3790,7 @@ class DescentParser {
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			if (this.mode === "declarations") {
-				// NOTE: An overload block may MIX bodied and body-less entries in
+				// An overload block may MIX bodied and body-less entries in
 				// declarations mode — each is a Function literal or a native
 				// signature, whichever the entry's own body decides.
 				let methods = this.parseStatementList(() =>
@@ -3879,7 +3879,7 @@ class DescentParser {
 
 			let type = this.parseOptionalDeclarationType()
 
-			// NOTE: A native static Property — `static Pi: Transcendental` with
+			// A native static Property — `static Pi: Transcendental` with
 			// no `=` — is legal only in declarations mode. Everywhere else the
 			// missing `=` stays a parse error, produced by the `expect` below.
 			if (
@@ -3935,7 +3935,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The `declarations`-mode Method form — an optional Generic list, a
+	// The `declarations`-mode Method form — an optional Generic list, a
 	// Parameter list and a return Type, then either a block (a bodied Method,
 	// implemented in Essence) or nothing (a body-less native signature bound to
 	// the runtime by name). The bodied branch reproduces exactly what
@@ -3999,7 +3999,7 @@ class DescentParser {
 	protected parseProtocolDeclarationStatement(): parser.ProtocolDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordProtocol)
 		let name = this.parseIdentifier()
-		// NOTE: The extension list reads exactly as a Namespace's conformance
+		// The extension list reads exactly as a Namespace's conformance
 		// list does, through the very same parse — `protocol Orderable is
 		// Comparable` says of the Protocol what a conformance clause says of a
 		// Type. A `where` clause parses here and is refused at the Enricher,
@@ -4012,7 +4012,7 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseProtocolBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		// NOTE: A Protocol's signatures are name-keyed exactly as a
+		// A Protocol's signatures are name-keyed exactly as a
 		// Namespace's Methods are, and lose the first definition the same way.
 		this.reportDuplicateNames(body, "Method", "duplicate-method", [
 			"Write both signatures inside one 'overload' block when both are meant to exist.",
@@ -4033,7 +4033,7 @@ class DescentParser {
 	protected parseProtocolBodyNode(): parser.ProtocolMethods[string] {
 		let token = this.peekOrFail()
 
-		// NOTE: A signature takes its Documentation from its own line — an
+		// A signature takes its Documentation from its own line — an
 		// `overload` block owns no signature line, so its Documentation is
 		// read here.
 		let documentation = this.tokens.documentationAbove(
@@ -4108,7 +4108,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: A Protocol Method is a requirement or a PROVIDED one, and the brace
+	// A Protocol Method is a requirement or a PROVIDED one, and the brace
 	// after the return Type is the whole of the difference. The provided branch
 	// builds the same Function Definition the bodied `declarations` Method form
 	// builds, over the very Parameter and return Type Nodes the signature keeps
@@ -4173,7 +4173,7 @@ class DescentParser {
 		return null
 	}
 
-	// NOTE: `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` — one
+	// `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` — one
 	// method, because the two Keywords differ in what a failure does and in
 	// nothing else the grammar can see. `expect` judges a Boolean; `require`
 	// judges a Boolean or takes a value apart.
@@ -4248,7 +4248,7 @@ class DescentParser {
 		return generators.expectStatement(value, null, snapshot, position)
 	}
 
-	// NOTE: The Matcher of `require MATCHER = EXPR`, read speculatively. A
+	// The Matcher of `require MATCHER = EXPR`, read speculatively. A
 	// Matcher and an Expression begin alike — `{ team, points }` and
 	// `#Value(second)` are both — and a Matcher holds what no Expression can
 	// (`points: Integer`, `} as whole`), so one reading can not stand for both
@@ -4269,7 +4269,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `expect MATCHER = EXPR` — the form `require` has, written on the
+	// `expect MATCHER = EXPR` — the form `require` has, written on the
 	// Keyword that can not have it. Read to the end of the Expression before
 	// it is refused, so what is dropped is the whole Statement rather than a
 	// tail of it read again as one of its own.
@@ -4298,7 +4298,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The two Matchers that can not mean anything left of `=`. Every
+	// The two Matchers that can not mean anything left of `=`. Every
 	// other one may stand there, whether it binds or not: `require #Empty = x`
 	// and `require Integer = x` name a shape and bind nothing, which is what a
 	// test asks when the shape is the whole of what it is proving.
@@ -4330,7 +4330,7 @@ class DescentParser {
 				"this is a value, not a shape",
 				{
 					code: "literal-in-require",
-					// NOTE: The value the line was written OVER, pointed at so
+					// The value the line was written OVER, pointed at so
 					// that both sides of the comparison the Help spells stand on
 					// the report. It is also the only record of where that value
 					// ends: the Statement is dropped whole, so nothing
@@ -4342,7 +4342,7 @@ class DescentParser {
 					notes: [
 						"'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.",
 					],
-					// NOTE: Built from the two things that were WRITTEN, the
+					// Built from the two things that were WRITTEN, the
 					// way the Quick Fix on this very Diagnostic builds its
 					// edit — a hardcoded 'require x::is(3)' asked a reader
 					// looking at `require "Lions" = name` to find themselves in
@@ -4362,7 +4362,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `EXPR is MATCHER` — the form a writer reaches for who has met a
+	// `EXPR is MATCHER` — the form a writer reaches for who has met a
 	// Matcher behind an `is` somewhere else, recognised here only to say that
 	// this language has no such form. `is` is not a Keyword: it is the
 	// Equatable Method every value already has (`a::is(b)`), which is exactly
@@ -4392,7 +4392,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `require MATCHER = EXPR matches snapshot` — a snapshot asked of
+	// `require MATCHER = EXPR matches snapshot` — a snapshot asked of
 	// the one assertion form that has no value to give it. A snapshot records
 	// a value; this line took one apart, and what came of that is the names it
 	// introduced. Recording one of them is a Statement of its own, written
@@ -4410,7 +4410,7 @@ class DescentParser {
 			"there is no value here to record",
 			{
 				code: "snapshot-after-matcher",
-				// NOTE: The names the Matcher introduced, since one of them is
+				// The names the Matcher introduced, since one of them is
 				// what the line below has to record. The Statement is dropped
 				// here, so nothing downstream ever sees the Matcher again.
 				data: {
@@ -4428,7 +4428,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `matches snapshot` and the two shapes a snapshot takes. An INLINE
+	// `matches snapshot` and the two shapes a snapshot takes. An INLINE
 	// one carries its recorded text in the source, written there by the first
 	// run — `matches snapshot` alone is one that has never run. A STORED one
 	// names an entry of `__snapshots__/<File>.es.snap` and says so with `from`,
@@ -4467,7 +4467,7 @@ class DescentParser {
 
 		let token = this.tokens.peek()
 
-		// NOTE: An interpolated String reaches `parseSnapshotText`, which
+		// An interpolated String reaches `parseSnapshotText`, which
 		// refuses it with a message about why — left alone it would read as a
 		// Statement of its own on the line below an empty snapshot, which is
 		// two readings of one line and no Diagnostic about either.
@@ -4495,7 +4495,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A plain String Literal — an interpolated one holds Expressions,
+	// A plain String Literal — an interpolated one holds Expressions,
 	// and neither a recorded value nor the name of a stored snapshot is
 	// something a run works out.
 	protected parseSnapshotText(what: string): parser.StringValueNode {
@@ -4514,7 +4514,7 @@ class DescentParser {
 		return generators.stringValueNode(token.value, token.position)
 	}
 
-	// NOTE: An assertion belongs to a test — to the test's own block and to
+	// An assertion belongs to a test — to the test's own block and to
 	// every block nested inside it, and to nothing else. A Function literal
 	// written in a test body is the boundary: its body runs wherever it is
 	// handed to, which is not something the test can answer for.
@@ -4563,7 +4563,7 @@ class DescentParser {
 
 	// #region Expressions
 
-	// NOTE: `endsBeforeBlockParameters` is set for the one Expression that is
+	// `endsBeforeBlockParameters` is set for the one Expression that is
 	// followed by a parameter list — the rows of a table test, written
 	// `across [ … ] (row: Row) { … }`. A `(` there would otherwise be read as a
 	// call of what stands in front of it, and `[ … ](row: Row)` is a call
@@ -4597,7 +4597,7 @@ class DescentParser {
 				break
 			}
 
-			// NOTE: The two ':' of a Method call are one lexeme — only written
+			// The two ':' of a Method call are one lexeme — only written
 			// flush against each other do they read as '::', the same adjacency
 			// rule every other multi-Token lexeme gets.
 			if (
@@ -4655,7 +4655,7 @@ class DescentParser {
 				token?.type === TokenType.SymbolLeftBracket &&
 				isAdjacent(expression.position, token.position)
 			) {
-				// NOTE: `primes[0]` — the postfix form every other language
+				// `primes[0]` — the postfix form every other language
 				// reads an item with, and the one Token that can stand here
 				// without ending the Expression in this one. ADJACENCY is the
 				// whole rule, and it is the rule a label is already read by:
@@ -4665,7 +4665,7 @@ class DescentParser {
 				// own. Written flush, neither does.
 				let refused = this.refuseIndexBrackets(expression)
 
-				// NOTE: A `[` whose `]` never arrives is left where it is.
+				// A `[` whose `]` never arrives is left where it is.
 				// Reading past it would swallow the rest of the file to answer
 				// a habit, and what wants reporting there is the List Literal
 				// that was never closed.
@@ -4679,13 +4679,13 @@ class DescentParser {
 			}
 		}
 
-		// NOTE: What stands where the Expression ENDED, when it is another
+		// What stands where the Expression ENDED, when it is another
 		// language's way of carrying one on. The Expression reading is complete
 		// and correct — `1` really is the Expression in `1 + 2` — so this is the
 		// one place that can see the `+` at all: the Statement loop would read it
 		// as an Expression of its own and report an undeclared name.
 		//
-		// NOTE: The LINE is the whole of the narrowing, and it is what keeps two
+		// The LINE is the whole of the narrowing, and it is what keeps two
 		// Statements two: nothing carries an Expression on across a line break, so
 		// a `-` opening the next line is a negative Number and not a subtraction
 		// anybody wrote. Every habit answered here is written flush behind its
@@ -4708,7 +4708,7 @@ class DescentParser {
 		return expression
 	}
 
-	// NOTE: The habits that stand BEHIND a whole Statement rather than inside
+	// The habits that stand BEHIND a whole Statement rather than inside
 	// one — a `;` closing it and a `//` or `/* … */` Comment written after it.
 	// The Expression in front of them is complete and correct, so they are read
 	// past and the Statement is kept, which is the recovery
@@ -4717,7 +4717,7 @@ class DescentParser {
 	// nothing declared is reported again at every line that reads it. One
 	// mistake was answered with one Diagnostic per reader.
 	//
-	// NOTE: Only where the habit is the WHOLE of what is left to read of it: a
+	// Only where the habit is the WHOLE of what is left to read of it: a
 	// `;` that is a Token of its own, a `//` and the line behind it, and a
 	// `/* … */` that closes. A `*/` that never arrives is refused as it was —
 	// what a reading past it would swallow is the rest of the file.
@@ -4765,7 +4765,7 @@ class DescentParser {
 		return true
 	}
 
-	// NOTE: How many Tokens the `/* … */` at the cursor was written across,
+	// How many Tokens the `/* … */` at the cursor was written across,
 	// or null where it never closes. The Lexer ends no name on a `*` and the
 	// `/` is a Symbol, so the closing `*/` arrives as a Token ending in `*`
 	// with a `/` written flush behind it — `*/` on its own, and `word*/` where
@@ -4794,7 +4794,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `primes[0]` — reported at the brackets and READ PAST, which is the
+	// `primes[0]` — reported at the brackets and READ PAST, which is the
 	// recovery `parseForeignDeclarationStatement` makes for a `const` and for
 	// the same reason: a thrown refusal takes the Declaration with it, and a
 	// Constant nothing declares is reported again at every line that reads it.
@@ -4817,7 +4817,7 @@ class DescentParser {
 		let key = this.writtenIndexKey(length)
 		let end = expression.position.end
 
-		// NOTE: `matrix[0][1]` is one habit written twice over, so the whole run
+		// `matrix[0][1]` is one habit written twice over, so the whole run
 		// of brackets is read past and answered once. Each of them stands flush
 		// against the one in front of it, which is the rule that made the first
 		// of them an index at all.
@@ -4845,7 +4845,7 @@ class DescentParser {
 
 		let written = { start: opening.position.start, end }
 
-		// NOTE: An `=` behind the brackets is a WRITE, which is a different
+		// An `=` behind the brackets is a WRITE, which is a different
 		// mistake with different Methods behind it — and the one shape here that
 		// is refused rather than read past: what follows the `=` is the value
 		// the reader meant to store, and reading on would answer it as a
@@ -4875,7 +4875,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: How many Tokens the bracket group at the cursor was written across,
+	// How many Tokens the bracket group at the cursor was written across,
 	// counting its own two, or null where its `]` never arrives. Only brackets
 	// are counted: they nest inside each other in every text this is asked
 	// about, and a `]` written inside a String is one Token rather than a
@@ -4902,7 +4902,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: What was written between the brackets, where that is ONE value a
+	// What was written between the brackets, where that is ONE value a
 	// Help can put back in front of the reader — `primes[0]`, `ages["ada"]`,
 	// `items[i]`. Read off the Token rather than parsed, because a parse would
 	// report on what it read and the whole point of the refusal is that the
@@ -4939,7 +4939,7 @@ class DescentParser {
 		return { text: `"${written.value}"`, keyed: true }
 	}
 
-	// NOTE: And what was written to the RIGHT of the `=`, on the same terms: one
+	// And what was written to the RIGHT of the `=`, on the same terms: one
 	// Token, read rather than parsed, and only where it is the whole of what is
 	// left of the Statement — the next Token stands on another line. Anything
 	// longer is an Expression of the reader's own, and a Help that quoted half of
@@ -4977,7 +4977,7 @@ class DescentParser {
 		return `"${written.value}"`
 	}
 
-	// NOTE: The refusal made as a Diagnostic rather than thrown, for the sites
+	// The refusal made as a Diagnostic rather than thrown, for the sites
 	// that read past what they are reporting. Suppressed exactly where every
 	// other report is — inside a speculation that is thrown away.
 	protected reportForeignText(refusal: ForeignRefusal): void {
@@ -4994,7 +4994,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `identity<Integer>(1)` — a `<` behind a name that closes on a `>`
+	// `identity<Integer>(1)` — a `<` behind a name that closes on a `>`
 	// with a `(` flush behind it, which is the one shape a comparison can not
 	// take. Asked before the operator table, which would read the `<` as a
 	// comparison and offer the reader `isLessThan` for a call they wrote.
@@ -5008,7 +5008,7 @@ class DescentParser {
 
 		let depth = 0
 
-		// NOTE: Bounded, and to the LINE: what is being looked for is a spelling
+		// Bounded, and to the LINE: what is being looked for is a spelling
 		// somebody wrote on purpose, and an unbounded scan over a file whose
 		// angles never balance is a scan of the file per `<` in it.
 		for (let offset = 0; offset < 32; offset++) {
@@ -5059,7 +5059,7 @@ class DescentParser {
 					code: "foreign-syntax",
 					notes: [
 						"Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.",
-						// NOTE: A NOTE rather than a second Help, because the
+						// A NOTE rather than a second Help, because the
 						// Parser can not tell whether it is true here: what the
 						// Arguments decide is read out of a signature the
 						// Declaration carries, and nothing at a call has seen
@@ -5091,7 +5091,7 @@ class DescentParser {
 	protected parsePrimaryExpression(): parser.ExpressionNode {
 		let token = this.peekOrFail("an Expression")
 
-		// NOTE: The same question in prefix position, asked of a Token that opens
+		// The same question in prefix position, asked of a Token that opens
 		// no Expression — a `//` at the head of a line, a `/` left over from
 		// something written above it. Asked HERE rather than in the default arm
 		// below, because the arms in between read Tokens this would answer for:
@@ -5105,7 +5105,7 @@ class DescentParser {
 			}
 		}
 
-		// NOTE: `ChoiceName#CaseName` — recognised before the typed-Record
+		// `ChoiceName#CaseName` — recognised before the typed-Record
 		// backtrack, since a `#` can never follow the Type of a typed Record
 		// literal. The `#` must sit directly against the Identifier: a space
 		// between them (`label #Case`) marks a bare Case value passed as a
@@ -5122,7 +5122,7 @@ class DescentParser {
 			return this.parseCaseValue()
 		}
 
-		// NOTE: `Holder<Integer>#Full(…)` — the same construction with its Type
+		// `Holder<Integer>#Full(…)` — the same construction with its Type
 		// Arguments applied. Speculative, because a `<` after an Identifier opens
 		// nothing else in expression position today and there is no adjacency rule
 		// that could tell the two apart on sight: what makes this a construction is
@@ -5140,7 +5140,7 @@ class DescentParser {
 			}
 		}
 
-		// NOTE: `Type ~> { … }` — speculative, because a Type and an Identifier
+		// `Type ~> { … }` — speculative, because a Type and an Identifier
 		// open the same way and only the `~>` behind the Type tells them apart.
 		// The stream is asked first whether a `~` stands anywhere ahead of here:
 		// the parse below can not succeed without consuming one, so a `~`-less
@@ -5193,7 +5193,7 @@ class DescentParser {
 			case TokenType.SymbolLeftBracket:
 				return this.parseListOrDictionaryLiteral()
 			case TokenType.SymbolLeftParen: {
-				// NOTE: The only Function literal whose annotations may be
+				// The only Function literal whose annotations may be
 				// omitted — in expression position there can be an expected
 				// signature to read them off. A Generic literal writes its own
 				// Generics, so it has nothing to infer them from.
@@ -5246,7 +5246,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `start x` and `complete x`. The operand is read by the FULL
+	// `start x` and `complete x`. The operand is read by the FULL
 	// Expression reading rather than by the primary one, so the whole postfix
 	// chain behind the Keyword belongs to it: `complete headline(url)::retried
 	// (times 3)` completes the retried future, and a Method call on what was
@@ -5257,13 +5257,13 @@ class DescentParser {
 	// and the only reading that makes the everyday call — a future built by a
 	// call and completed — need no parentheses at all.
 	//
-	// NOTE: Which means the loop in `parseExpressionLevels` has nothing left to
+	// Which means the loop in `parseExpressionLevels` has nothing left to
 	// attach when this returns: the recursive reading consumed the chain. So a
 	// `start` reached from there behaves as a primary Expression that happens to
 	// be greedy, and `expressionStartTokenTypes` stays exactly what its NOTE
 	// says it is — the cases this switch answers.
 	//
-	// NOTE: Reached only through `opensAsynchrony`, which has already found the
+	// Reached only through `opensAsynchrony`, which has already found the
 	// Expression the operand is read from. A word with nothing behind it is a
 	// name — `constant held = complete` reads the value `complete`, and it is
 	// the Enricher that answers for a name nothing declared.
@@ -5282,14 +5282,14 @@ class DescentParser {
 			return generators.start(expression, position)
 		}
 
-		// NOTE: Counted for the body being parsed — `start` is not, because it
+		// Counted for the body being parsed — `start` is not, because it
 		// never waits and so never asks anything of the body it stands in.
 		this.completesSeen += 1
 
 		return generators.complete(expression, position)
 	}
 
-	// NOTE: `.price`, `.address.city` — the whole chain is consumed here rather
+	// `.price`, `.address.city` — the whole chain is consumed here rather
 	// than left to the postfix loop, which would otherwise read the second step
 	// as a Lookup over the path and build a Node the language has no meaning
 	// for. Nothing but a member name may follow a step's '.', so the loop needs
@@ -5315,7 +5315,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A path stands for a Function that READS members, so a call attached
+	// A path stands for a Function that READS members, so a call attached
 	// to it has nothing to attach to. Refused here rather than left to the
 	// postfix loop: the loop would build an Invocation over the path and every
 	// message from there on would be about the call rather than about the path
@@ -5350,7 +5350,7 @@ class DescentParser {
 				notes: [
 					"A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.",
 				],
-				// NOTE: The untyped literal only where a literal READS its
+				// The untyped literal only where a literal READS its
 				// Types — an Argument list, and nowhere else. Written into a
 				// Declaration or a return, `(_ item) { … }` is refused for
 				// having no Parameter Type, which is a second report rather
@@ -5366,7 +5366,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The path and the call written on it, spelled back as the Function
+	// The path and the call written on it, spelled back as the Function
 	// literal that CAN carry one. Every word of it is the reader's own but
 	// `item`, which names the Parameter — and that Parameter is left UNTYPED on
 	// purpose: a literal handed to a Method reads its Parameter's Type off the
@@ -5377,7 +5377,7 @@ class DescentParser {
 	protected pathFunctionLiteral(
 		steps: Array<parser.IdentifierNode>,
 		spelling: string,
-		// NOTE: With the two Types written as holes, for a position that hands
+		// With the two Types written as holes, for a position that hands
 		// a literal neither of them.
 		typed = false,
 	): string {
@@ -5397,7 +5397,7 @@ class DescentParser {
 			: `(_ item) { <- item.${path}${call} }`
 	}
 
-	// NOTE: The Argument list at `at`, where it is empty or holds ONE Token a
+	// The Argument list at `at`, where it is empty or holds ONE Token a
 	// Help can print back — `()`, `(2)`, `(other)`. Everything longer is an
 	// Expression of the reader's own, and `…` says theirs goes here rather than
 	// printing half of it back at them.
@@ -5424,7 +5424,7 @@ class DescentParser {
 		return "(…)"
 	}
 
-	// NOTE: The payload parens are part of the construction syntax — they are
+	// The payload parens are part of the construction syntax — they are
 	// consumed here rather than left to the invocation postfix loop, because a
 	// Case is a value, not a Function. Empty parens construct a unit Case.
 	// Without a leading Identifier this parses the bare form (`#Add({ … })`).
@@ -5438,7 +5438,7 @@ class DescentParser {
 		} else {
 			choice = this.parseIdentifier()
 
-			// NOTE: `Holder<Integer>#Full(…)` — the Choice's Type Arguments
+			// `Holder<Integer>#Full(…)` — the Choice's Type Arguments
 			// applied at the value, which is the other half of how a construction
 			// is decided. The same list an annotation writes, read by the same
 			// parse, so `Holder<List<Integer>>#Full` needs nothing of its own —
@@ -5454,7 +5454,7 @@ class DescentParser {
 				let argumentList = this.parseTypeArgumentList()
 				let hashToken = this.tokens.peek()
 
-				// NOTE: And the `#` is held to the closing `>`'s line, for the
+				// And the `#` is held to the closing `>`'s line, for the
 				// reason the `<` is held to the Choice's: a construction is
 				// written on one line. Without it the applied form escaped the
 				// adjacency the bare one is held to — `Box#Full` reaches this
@@ -5499,7 +5499,7 @@ class DescentParser {
 				value = this.parseExpression()
 			}
 
-			// NOTE: A coded refusal rather than the generic one, because this
+			// A coded refusal rather than the generic one, because this
 			// reading is SPECULATIVE where the Case carries Type Arguments —
 			// only the `#` past the `>` tells `Optional<Integer>#Value(…)` from
 			// a comparison chain — and `speculate` gives a `syntax-error` back
@@ -5508,7 +5508,7 @@ class DescentParser {
 			// character on the wrong line. A code the rewind does not swallow is
 			// what keeps the refusal where the mistake is.
 			//
-			// NOTE: And it is a refusal rather than an allowance because a Case
+			// And it is a refusal rather than an allowance because a Case
 			// payload is ONE value: every construct that takes a trailing comma
 			// is a LIST, and a separator with nothing to separate would read as
 			// though a second value could follow. Several values are carried as
@@ -5516,7 +5516,7 @@ class DescentParser {
 			let comma = this.tokens.peek()
 
 			if (comma?.type === TokenType.SymbolComma) {
-				// NOTE: Two shapes arrive at this one refusal and they want
+				// Two shapes arrive at this one refusal and they want
 				// different edits. A comma with the `)` behind it is a
 				// separator with nothing to separate, and dropping it is the
 				// whole fix. A comma with another value behind it is a SECOND
@@ -5591,14 +5591,14 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms
+	// `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms
 	// are told apart by their `as` and by nothing else, not by the lines they
 	// stand on, and that is enough because an Expression ends at the first
 	// Token that can not carry it on. Neither `if` nor `otherwise` is one of
 	// the three that can, so `as 0 if x::isZero()` and `as 10 otherwise` each
 	// read to their end without a lookahead.
 	//
-	// NOTE: Which is also what lets `otherwise` be a name — it is on
+	// Which is also what lets `otherwise` be a name — it is on
 	// `identifierTokenTypes` — without the two readings ever meeting. An arm's
 	// value stops at the word whatever the word is, so `as otherwise otherwise`
 	// answers with the value called `otherwise` and ends where the loop reads
@@ -5606,7 +5606,7 @@ class DescentParser {
 	// Condition. The arm loop decides by the Token it finds AFTER the value,
 	// and a name in value position is never that Token.
 	//
-	// NOTE: The arrow is optional, and a `define` that writes none leaves its
+	// The arrow is optional, and a `define` that writes none leaves its
 	// answer Type to its arms.
 	protected parseDefine(): parser.DefineNode {
 		let keyword = this.tokens.expect(TokenType.KeywordDefine)
@@ -5617,7 +5617,7 @@ class DescentParser {
 		try {
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 			let { arms, otherwise, recovered } = this.parseDefineArms()
-			// NOTE: Read BEFORE the brace is taken, because a `define` whose
+			// Read BEFORE the brace is taken, because a `define` whose
 			// block the input ended inside of is one whose arms were not read to
 			// their end either — and that is the difference between "there is no
 			// `otherwise` arm" and "this Parser never got to where one would
@@ -5630,7 +5630,7 @@ class DescentParser {
 				end: closingPosition.end,
 			}
 
-			// NOTE: A totality refusal is only worth making when the arms were
+			// A totality refusal is only worth making when the arms were
 			// read CLEANLY. An arm loop that recovered skipped text on its way to
 			// the next `as`, and an `otherwise` arm standing in what it skipped is
 			// an arm that was written — so its absence proves nothing, and saying
@@ -5654,13 +5654,13 @@ class DescentParser {
 				)
 			}
 
-			// NOTE: Refused here rather than represented as an absent arm: a
+			// Refused here rather than represented as an absent arm: a
 			// `define` answers with a value wherever it stands, and one whose
 			// every value has a Condition on it has nothing to answer with when
 			// they all decline. The Node has no shape for that, which is what
 			// makes every `define` downstream total by construction.
 			//
-			// NOTE: Coded, which is what makes the refusal SURVIVE a
+			// Coded, which is what makes the refusal SURVIVE a
 			// speculation — `refusesTheText` reads the code, and the generic
 			// `syntax-error` this used to carry is one of the two a speculation
 			// gives back. A `define` missing its `otherwise` arm is a verdict
@@ -5670,7 +5670,7 @@ class DescentParser {
 			// '='", which is the Dictionary reading behind the Record one
 			// speaking for text the Record reading had already judged.
 			//
-			// NOTE: An EMPTY block is the same refusal about different text, so
+			// An EMPTY block is the same refusal about different text, so
 			// it is told apart in the label and in the help rather than given a
 			// code of its own. "Every value here has a condition on it" is a
 			// remark about the values that were written, and a `define { }`
@@ -5704,7 +5704,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Its own loop rather than `parseStatementList`, because the
+	// Its own loop rather than `parseStatementList`, because the
 	// resynchronisation that one does scans for a Statement start and an `as`
 	// is not one — a broken arm would swallow every arm below it, and a
 	// `define` that lost its `otherwise` that way would be refused for a
@@ -5717,7 +5717,7 @@ class DescentParser {
 	} {
 		let arms: Array<parser.DefineArmNode> = []
 		let otherwise: parser.DefineOtherwiseNode | null = null
-		// NOTE: Whether any arm was recovered from, which is what says how much
+		// Whether any arm was recovered from, which is what says how much
 		// the arms below it are worth as evidence — see `parseDefine`.
 		let recovered = false
 
@@ -5733,14 +5733,14 @@ class DescentParser {
 
 			let startState = this.tokens.save()
 
-			// NOTE: Per arm, for the reason `parseStatementList` does it per
+			// Per arm, for the reason `parseStatementList` does it per
 			// element — an arm that was read is a group of readings resolving.
 			this.forgetFailuresFrom(this.speculationDepth)
 
 			try {
 				let keyword = this.tokens.expect(TokenType.KeywordAs)
 
-				// NOTE: Whether this arm stands below the `otherwise` one, which
+				// Whether this arm stands below the `otherwise` one, which
 				// is decided before it is read and answered for once it has
 				// been — see `reportUnreachableArm`. Never RECORDING it is what
 				// keeps the Node's "the `otherwise` arm is last" invariant.
@@ -5783,7 +5783,7 @@ class DescentParser {
 					)
 				}
 			} catch (error) {
-				// NOTE: A CODED refusal is a verdict about the text and not a
+				// A CODED refusal is a verdict about the text and not a
 				// reading that failed — see `refusesTheText` — so it is raised
 				// to the Statement loop that reports such things, exactly as a
 				// speculation raises one, rather than being reported here and
@@ -5800,14 +5800,14 @@ class DescentParser {
 		return { arms, otherwise, recovered }
 	}
 
-	// NOTE: Reported and DROPPED rather than thrown, which is the one refusal
+	// Reported and DROPPED rather than thrown, which is the one refusal
 	// the arm loop answers for itself. The arm reads perfectly well — what is
 	// wrong with it is where it stands — so the text below it is still text this
 	// Parser can read, and a thrown refusal would take the whole Statement the
 	// `define` stands in with it: every use of the Constant it declares then
 	// names nothing, which is a great many Diagnostics for one misplaced arm.
 	//
-	// NOTE: Reported once the arm has been READ, so the span is the whole arm
+	// Reported once the arm has been READ, so the span is the whole arm
 	// rather than the `as` that opens it. That is what the reader has to move or
 	// delete, and it is the only record of the arm's extent there is: an
 	// unreachable arm is never put on the Node, so nothing downstream — an
@@ -5839,7 +5839,7 @@ class DescentParser {
 	): void {
 		this.reportParseError(error)
 
-		// NOTE: Only an arm that READ something has leftovers to skip. One that
+		// Only an arm that READ something has leftovers to skip. One that
 		// failed on its very first Token — a `{` where an `as` belongs — read
 		// nothing, so there is nothing between here and the next arm, and
 		// scanning for one would step INTO whatever that Token opens and skip
@@ -5850,7 +5850,7 @@ class DescentParser {
 			this.resynchroniseToArm(startState.braceDepth)
 		}
 
-		// NOTE: Guarantee progress, for the reason `recoverFromError` does —
+		// Guarantee progress, for the reason `recoverFromError` does —
 		// an arm that consumed no Token and resynchronised to where it started
 		// would be read again forever.
 		if (
@@ -5860,14 +5860,14 @@ class DescentParser {
 			this.tokens.next()
 		}
 
-		// NOTE: An arm is text the Parser abandoned exactly as a Statement is,
+		// An arm is text the Parser abandoned exactly as a Statement is,
 		// and it costs the stages behind it the same thing: a `define` that lost
 		// an arm was not written without cases. It declares nothing, so the
 		// lines are the whole of what this leaves behind.
 		this.recordAbandoned(startState.index)
 	}
 
-	// NOTE: Skips to the next arm's `as`, or to the `}` that closes the
+	// Skips to the next arm's `as`, or to the `}` that closes the
 	// `define`, at the brace depth the broken arm started on — braces the
 	// broken arm opened itself are skipped over entirely, as they are for a
 	// Statement.
@@ -5876,7 +5876,7 @@ class DescentParser {
 			let token = this.tokens.peek()
 
 			if (token === undefined) {
-				// NOTE: Every further error would be a cascade of the one just
+				// Every further error would be a cascade of the one just
 				// reported, as it is for a Statement that ran into the end of
 				// the input.
 				this.suppressDiagnostics = true
@@ -5896,7 +5896,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `_` is a wildcard only here — everywhere else it marks a labelless
+	// `_` is a wildcard only here — everywhere else it marks a labelless
 	// Parameter — so it is recognised in Matcher position rather than in
 	// `parseType`, where it would make `_` look like a Type name.
 	//
@@ -5921,7 +5921,7 @@ class DescentParser {
 			return generators.literalMatcher(value, value.position)
 		}
 
-		// NOTE: A Record in Matcher position is always a Pattern rather than a
+		// A Record in Matcher position is always a Pattern rather than a
 		// Record Type, because only the Pattern form admits `name = value`
 		// members alongside `name: Type` ones — and a bare `name`, which binds.
 		//
@@ -5932,7 +5932,7 @@ class DescentParser {
 			return this.parsePattern(allowsWholeValueBinder)
 		}
 
-		// NOTE: `case #Add` — the bare form resolves against the matched
+		// `case #Add` — the bare form resolves against the matched
 		// value's own Union; `case CalculatorOperation#Add` is the prefixed
 		// form for when that is ambiguous. Either may carry a payload binder,
 		// `case #Value(item)`, parsed by `parseCaseMatcherBinding` below.
@@ -5978,7 +5978,7 @@ class DescentParser {
 		return this.parseType()
 	}
 
-	// NOTE: The payload binder of a Case Matcher — `case #Value(item)`. It names
+	// The payload binder of a Case Matcher — `case #Value(item)`. It names
 	// what the CONSTRUCTOR takes, so the parens hold either one name or a
 	// Pattern that takes apart what the constructor was handed:
 	// `case #Rectangle({ width, height })`.
@@ -5990,14 +5990,14 @@ class DescentParser {
 	// written. The parens have no such problem, which is why the payload Pattern
 	// lives in them.
 	//
-	// NOTE: A Case Matcher is the only Matcher that takes a binder. `@` already
+	// A Case Matcher is the only Matcher that takes a binder. `@` already
 	// answers for every Matcher kind — the scrutinee, narrowed — so this adds a
 	// second name rather than redefining the one that exists. That is also why a
 	// Pattern in Matcher position carries no whole-value binder of its own,
 	// while one in a payload does: what the constructor took is not `@`.
 	protected parseCaseMatcherBinding(): {
 		node: parser.IdentifierNode | parser.PatternNode
-		// NOTE: Where the binder ends, which is the closing paren rather than
+		// Where the binder ends, which is the closing paren rather than
 		// the name inside it. A Matcher's span is what a failed assertion draws
 		// its underline from, and one that stopped at the name left the `)`
 		// standing bare beyond it.
@@ -6022,7 +6022,7 @@ class DescentParser {
 		return { node: binding, end: closing.position.end }
 	}
 
-	// NOTE: A Pattern names the parts of a value, in every position that takes
+	// A Pattern names the parts of a value, in every position that takes
 	// one apart: a Matcher, a Case payload, a Parameter and a Declaration.
 	// `allowsBinder` is false only at the top level of a Matcher, where `@`
 	// already names the whole value.
@@ -6069,7 +6069,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `name` binds the member under its own name; `name: Type` binds it
+	// `name` binds the member under its own name; `name: Type` binds it
 	// and constrains the Type as well; `name = value` constrains the value and
 	// binds nothing, because the value is written right there. The bare form is
 	// the annotated one with its Type elided, which is the same relation
@@ -6110,7 +6110,7 @@ class DescentParser {
 		]
 	}
 
-	// NOTE: `as` binds a member under another name, or takes it apart further —
+	// `as` binds a member under another name, or takes it apart further —
 	// a binder is a name or another Pattern, which is the whole of nesting.
 	//
 	// `as` is an ordinary Identifier everywhere it is not a Keyword (the Module
@@ -6133,7 +6133,7 @@ class DescentParser {
 		return this.parseIdentifier()
 	}
 
-	// NOTE: `} as name` — one name for the whole value, alongside the names its
+	// `} as name` — one name for the whole value, alongside the names its
 	// members bind. Never a nested Pattern: the Pattern that would take it apart
 	// is the one this is written on.
 	protected parseWholeValueBinder(
@@ -6153,7 +6153,7 @@ class DescentParser {
 			return name
 		}
 
-		// NOTE: Reported and then dropped, rather than failed on, so that one
+		// Reported and then dropped, rather than failed on, so that one
 		// redundant binder does not cascade into a parse failure for the arm.
 		let position = { start: keyword.position.start, end: name.position.end }
 
@@ -6166,7 +6166,7 @@ class DescentParser {
 				notes: [
 					"Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.",
 				],
-				// NOTE: BOTH edits, because the binder is what is refused and
+				// BOTH edits, because the binder is what is refused and
 				// rewriting the body alone leaves it standing. The Quick Fix has
 				// always made the pair of edits; the Help named only one.
 				helps: [
@@ -6175,7 +6175,7 @@ class DescentParser {
 			},
 		)
 
-		// NOTE: Recorded as ABANDONED, which is what it is: the binder was
+		// Recorded as ABANDONED, which is what it is: the binder was
 		// written, it was refused, and the body below goes on reading the name
 		// it would have bound. Without this the arm reported a second time —
 		// `unknown-name '<name>'`, once per read — for a name the reader DID
@@ -6183,7 +6183,7 @@ class DescentParser {
 		// one. `declarationWasAbandoned` is the question every "no such name"
 		// report already asks.
 		//
-		// NOTE: The binder is written BEFORE the arm's own `{`, so the block
+		// The binder is written BEFORE the arm's own `{`, so the block
 		// that claims it is the MATCH block rather than the arm. That is wider
 		// than the binder ever was: a read of the same name in a SIBLING arm is
 		// silenced too. It is deliberate — the alternative is teaching the claim
@@ -6194,7 +6194,7 @@ class DescentParser {
 		return null
 	}
 
-	// NOTE: Whether the `as` at the cursor opens a binder rather than being a
+	// Whether the `as` at the cursor opens a binder rather than being a
 	// name in its own right. Two Tokens, no backtracking.
 	protected binderFollows(): boolean {
 		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
@@ -6208,7 +6208,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A Matcher compares against a written literal and nothing else —
+	// A Matcher compares against a written literal and nothing else —
 	// `size = expected` does not read the Constant `expected`, because a
 	// Matcher is a pattern rather than an Expression. Anything else after `=`
 	// is a parse error here rather than something quietly stood in for.
@@ -6228,7 +6228,7 @@ class DescentParser {
 			case TokenType.LiteralFalse:
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
-			// NOTE: An interpolated String is not a compile-time literal — its
+			// An interpolated String is not a compile-time literal — its
 			// holes are evaluated — so it can never be the fixed value a `case`
 			// compares against. Refused with its own message rather than the
 			// generic one, since "found an interpolated String" alone does not
@@ -6248,7 +6248,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `where` is not a Keyword — it is an ordinary Identifier used as an
+	// `where` is not a Keyword — it is an ordinary Identifier used as an
 	// Argument label elsewhere (`removeEvery(where …)`), so it is recognised
 	// by content. That is unambiguous here because a Matcher is otherwise
 	// always followed by the Handler's opening brace.
@@ -6351,7 +6351,7 @@ class DescentParser {
 
 		let lhs = this.parseExpression()
 
-		// NOTE: `{ "a" = 1 }` — a Dictionary written in a Record's braces. Only
+		// `{ "a" = 1 }` — a Dictionary written in a Record's braces. Only
 		// a WRITTEN VALUE is refused here, and never a name: `{ x = ] }` also
 		// reaches this line, because a member whose value does not parse throws
 		// the whole Record reading away, and `x` there is a member name whose
@@ -6384,7 +6384,7 @@ class DescentParser {
 
 		let combinationOfKeys = (allowShorthand: boolean) =>
 			this.backtrack(() => {
-				// NOTE: The value being updated, spelled, for the key readers
+				// The value being updated, spelled, for the key readers
 				// below — a descend that updates nothing is answered by naming
 				// it, and the key list is several readers deep from here. Saved
 				// and put back, because an update nests inside an update.
@@ -6425,7 +6425,7 @@ class DescentParser {
 			return keyValuePairCombination
 		}
 
-		// NOTE: The Expression reading is speculated too, so the key list can
+		// The Expression reading is speculated too, so the key list can
 		// be read ONE more time below when it fails. Order is what keeps
 		// `{ base with other }` meaning what it has always meant — a whole
 		// value merged in — because a bare name reads as an Expression here
@@ -6447,7 +6447,7 @@ class DescentParser {
 			return expressionCombination
 		}
 
-		// NOTE: Neither reading spans this. `{ base with port, host }` is the
+		// Neither reading spans this. `{ base with port, host }` is the
 		// shape that lands here, and left alone it reports
 		// `Expected '}' but found ','` — a message about the comma rather than
 		// about the rule the author was tripped by. Reading the key list once
@@ -6464,7 +6464,7 @@ class DescentParser {
 
 		let rhs = this.parseExpression()
 
-		// NOTE: `{ ages with "alex" = 40 }` — a Dictionary update written in a
+		// `{ ages with "alex" = 40 }` — a Dictionary update written in a
 		// Record's braces, which is the same mistake the head of a braced
 		// literal catches one Token earlier and it is caught by the same test:
 		// a key that is a WRITTEN VALUE with an `=` behind it spells a
@@ -6509,7 +6509,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: One Diagnostic per bare name, on a Combination the third reading
+	// One Diagnostic per bare name, on a Combination the third reading
 	// recovered. The recovered key list is kept — it is what the author meant,
 	// and the Language Server goes on offering completions and colour inside a
 	// file the Compiler has already refused.
@@ -6523,7 +6523,7 @@ class DescentParser {
 			return
 		}
 
-		// NOTE: EVERY bare key, gathered before the first report is written.
+		// EVERY bare key, gathered before the first report is written.
 		// One Diagnostic is raised per name, but the Record each of them offers
 		// to merge has to hold them all: `{ config with port, host }` answered
 		// the `port` report with `'{ base with { port } }'`, and a reader who
@@ -6535,7 +6535,7 @@ class DescentParser {
 		let merged = `'{ ${base} with { ${bare.map((member) => member.name.content).join(", ")} } }'`
 
 		for (let member of bare) {
-			// NOTE: A bare PATH key was already refused as it was read, with
+			// A bare PATH key was already refused as it was read, with
 			// the message that explains why no reading rescues it — there is
 			// no `a.b = a.b` for it to have meant.
 			let name = member.name.content
@@ -6563,17 +6563,17 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: `allowShorthand` is a property of the BRACES, not of the member —
+	// `allowShorthand` is a property of the BRACES, not of the member —
 	// a Record literal's member list takes `{ x }` for `{ x = x }`, and a
 	// Combination's key list does not, because a bare name after `with` is
 	// already the whole value being merged in. The one flag is what keeps
 	// `{ base with other }` from silently turning into "set member `other`".
 	//
-	// NOTE: A Dictionary's key list has no shorthand at all, in a literal or in
+	// A Dictionary's key list has no shorthand at all, in a literal or in
 	// an update — `["a" = 1]` writes a key that is a VALUE, and a bare name
 	// there is that value and not short for anything. See
 	// `parseDictionaryUpdate`.
-	// NOTE: `opening` is the `{` this list stands in, carried down so that a
+	// `opening` is the `{` this list stands in, carried down so that a
 	// member the reader never began is answered with the bracket the braces are
 	// short of — see `refuseListContinuation`.
 	protected parseKeyValuePairList(
@@ -6624,14 +6624,14 @@ class DescentParser {
 			return this.parsePathKeyValue(name, path.steps, allowShorthand)
 		}
 
-		// NOTE: `{ x: 0 }` — a member written with the separator every other
+		// `{ x: 0 }` — a member written with the separator every other
 		// language writes an object's with. Refused HERE, where the name and the
 		// `:` are both in hand, rather than left to the readings above: the
 		// shorthand below would claim `x` as a member of its own and the reading
 		// would fall apart one Token later, on a `}` that is nowhere near the
 		// mistake.
 		//
-		// NOTE: A `:` in braces is Essence in two other places, and neither
+		// A `:` in braces is Essence in two other places, and neither
 		// reaches this: a Record TYPE (`{ x: Integer }`) is read by
 		// `parseRecordType`, and a Pattern's Type annotation (`{ x: Integer }` in
 		// `constant { x: Integer } = point`) by `parsePatternMember`. This is the
@@ -6639,7 +6639,7 @@ class DescentParser {
 		let colon = this.tokens.peek()
 
 		if (colon?.type === TokenType.SymbolColon) {
-			// NOTE: The span a fix writes over runs from the name to the value,
+			// The span a fix writes over runs from the name to the value,
 			// and what it writes is ' = ' — a `:` is written flush against its
 			// name and an `=` is written with a blank either side, so rewriting
 			// the Token alone would leave `{ x= 0 }` for the Formatter to tidy.
@@ -6673,7 +6673,7 @@ class DescentParser {
 			)
 		}
 
-		// NOTE: The value is a Node of its own at the name's Position rather
+		// The value is a Node of its own at the name's Position rather
 		// than the name Node itself — two Declarations at one Position is
 		// exactly what the shorthand is, and the rename index is built to
 		// carry both.
@@ -6699,7 +6699,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: The steps after a key's first Identifier, or null where the key is
+	// The steps after a key's first Identifier, or null where the key is
 	// a plain name — which is what tells the two apart everywhere below. Every
 	// key position reads a path, a plain Record Literal's included: this is
 	// the one key list the Parser has, read for a Record Literal, for the
@@ -6735,14 +6735,14 @@ class DescentParser {
 		return { steps, group: null }
 	}
 
-	// NOTE: `server.{ port = 1, host }` — the member list of an update written
+	// `server.{ port = 1, host }` — the member list of an update written
 	// one level down. Shorthand is allowed inside it, where it is refused after
 	// a `with`: a bare name there could be the whole value being merged, and
 	// inside a descend there is no such reading to lose.
 	protected parseKeyGroup(
 		steps: Array<parser.IdentifierNode>,
 	): parser.RecordValueNode {
-		// NOTE: Counted, because a descend holding a descend recurs through
+		// Counted, because a descend holding a descend recurs through
 		// the key list rather than through an Expression — so without this the
 		// only nesting in the language the depth guard did not bound.
 		this.enterNesting()
@@ -6790,7 +6790,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: Reported and recovered rather than failed on: an empty descend is a
+	// Reported and recovered rather than failed on: an empty descend is a
 	// half-written one, and the rest of the list is still worth reading.
 	protected reportEmptyPathGroup(
 		steps: Array<parser.IdentifierNode>,
@@ -6808,7 +6808,7 @@ class DescentParser {
 			notes: [
 				`An update writes the members it names, so a descend with none in it says to leave '${spelling}' exactly as it is.`,
 			],
-			// NOTE: "or drop the key" was one Help and it was a dead end where
+			// "or drop the key" was one Help and it was a dead end where
 			// the key is the ONLY one: `{ config with server.{ } }` dropped down
 			// to `{ config with }`, which is a syntax error. The second clause
 			// says what to do there, and names the value the update was written
@@ -6826,7 +6826,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A path key always spells its value. Where the key ENDED without
+	// A path key always spells its value. Where the key ENDED without
 	// one — a `,` or the closing brace stands where the `=` was — the member is
 	// recovered under the name of its last step so the rest of the list can be
 	// read, and refused with the one message that fits: no reading rescues a
@@ -6894,7 +6894,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: Two keys clash when they are the same, or when one is a PREFIX of
+	// Two keys clash when they are the same, or when one is a PREFIX of
 	// the other at a step boundary: `server = s` sets the whole Record and
 	// `server.port = 1` reaches into it, so writing both says two things about
 	// `server` and only one of them can survive a Record keyed by name.
@@ -6927,7 +6927,7 @@ class DescentParser {
 						primary(position, "defined a second time here"),
 						secondary(clash.position, "first defined here"),
 					],
-					// NOTE: The edit the two Labels spell out between them,
+					// The edit the two Labels spell out between them,
 					// said rather than left to be worked out — and the second
 					// writing is the one that goes, because the Record a reader
 					// gets is the one the first key made.
@@ -6961,7 +6961,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The Lexer has already split the interpolated String into its chunk
+	// The Lexer has already split the interpolated String into its chunk
 	// Tokens (`Start`/`Middle`/`End`) with each hole's own Tokens lexed in
 	// place between them, so this reads as an ordinary alternation: a chunk, a
 	// hole parsed by the full Expression grammar, a chunk, and so on, ending on
@@ -6996,7 +6996,7 @@ class DescentParser {
 				continue
 			}
 
-			// NOTE: Unreachable for a String the Lexer produced — every hole it
+			// Unreachable for a String the Lexer produced — every hole it
 			// opens it closes with a `Middle` or `End` chunk — but the grammar
 			// says so rather than trusting it to.
 			fail(
@@ -7016,7 +7016,7 @@ class DescentParser {
 		| parser.RationalValueNode {
 		let numerator = this.parseInteger()
 
-		// NOTE: `1/2` is one Rational Literal because the three Tokens are
+		// `1/2` is one Rational Literal because the three Tokens are
 		// written flush — a `/` that stands apart from the Integer above it
 		// belongs to whatever was meant on its own line, and joining it here
 		// would silently turn that Integer into a Rational instead.
@@ -7060,14 +7060,14 @@ class DescentParser {
 		return generators.integerValueNode(numerator.value, numerator.position)
 	}
 
-	// NOTE: `0.75` is one Rational Literal for the reason `3/4` is — the
+	// `0.75` is one Rational Literal for the reason `3/4` is — the
 	// Integer, the `.` and the digits behind it are written flush, and a `.`
 	// that stands apart from either side is the member access it has always
 	// been. So `1.foo` still reads a member off an Integer, and `1 . 5` is
 	// still two things with a broken `.` between them. Answers `null` where
 	// what follows is not a decimal at all, so the Integer stands on its own.
 	//
-	// NOTE: There is no scale — `1.50` is `150/100`, which the runtime reduces
+	// There is no scale — `1.50` is `150/100`, which the runtime reduces
 	// on read, so `1.50 is 1.5`. A decimal is a way of WRITING a Rational and
 	// not a Type of its own, and a Rational has no memory of how it was
 	// written.
@@ -7090,7 +7090,7 @@ class DescentParser {
 			isAdjacent(dot.position, following.position)
 
 		if (!flush || following?.type !== TokenType.LiteralNumber) {
-			// NOTE: A flush Identifier behind the point is the Lookup it was
+			// A flush Identifier behind the point is the Lookup it was
 			// before decimals existed — `1.foo` reads a member. Everything
 			// else is half a decimal: `1.` at the end of a line, `1. 5` with
 			// the digits pushed off the point.
@@ -7137,7 +7137,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `1.5/2` and `1/2.5` — a Rational written both ways at once. The
+	// `1.5/2` and `1/2.5` — a Rational written both ways at once. The
 	// tail is READ before it is refused, the way an `expect` Matcher is: what
 	// is dropped is then the whole Literal, rather than a tail of it left
 	// behind to be read again as a Statement of its own.
@@ -7145,7 +7145,7 @@ class DescentParser {
 		literal: common.Position,
 		symbolType: lexer.TokenType,
 		label: string,
-		// NOTE: The two digit runs already read, so that the Help can say what
+		// The two digit runs already read, so that the Help can say what
 		// the Literal MEANS. `'3/4' or '0.75'` was printed whatever was
 		// written, and `2.5/3` — five sixths — was answered with a Help that
 		// changed the number while the Quick Fix beside it offered `5/6`.
@@ -7166,7 +7166,7 @@ class DescentParser {
 		this.tokens.next()
 
 		let tail = this.parseDigitRun()
-		// NOTE: The value the two spellings say between them, the fraction
+		// The value the two spellings say between them, the fraction
 		// first. A value with no terminating decimal — `1.5/7` — has only the
 		// one, and the Help offers only the one: a rounded decimal would be a
 		// different number than the one that was written.
@@ -7195,7 +7195,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `.5` — the half of a decimal that is missing its whole part. It
+	// `.5` — the half of a decimal that is missing its whole part. It
 	// arrives here because a `.` opens a member path, and the message a path
 	// gives ("expected an Identifier") is about the wrong thing entirely: the
 	// digits are not a member name that came out wrong, they are the Literal's
@@ -7226,7 +7226,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The name behind a `-` is offered as the thing to negate only where
+	// The name behind a `-` is offered as the thing to negate only where
 	// it is the WHOLE of what was being negated. `-price` is `price::negate()`,
 	// but `- tree::hasItems()` negates a call, and naming its receiver offers
 	// an edit that negates something else entirely. What tells the two apart is
@@ -7251,7 +7251,7 @@ class DescentParser {
 		if (this.tokens.peek()?.type === TokenType.SymbolDash) {
 			dash = this.tokens.next()
 
-			// NOTE: `-price` — a `-` signs a Number Literal and negates nothing,
+			// `-price` — a `-` signs a Number Literal and negates nothing,
 			// so a name behind one is the prefix operator another language
 			// writes. Answered here because this is where the sign is read: the
 			// Expression parser reaches a `-` only as the head of a Number, and
@@ -7287,7 +7287,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The digits of one Number, `_` groups joined. Split out of
+	// The digits of one Number, `_` groups joined. Split out of
 	// `parseInteger` because a decimal has TWO runs and only the first of them
 	// may carry a sign — `0.-5` is not a Number, and reading the fractional
 	// part with `parseInteger` is what would have made it one.
@@ -7297,7 +7297,7 @@ class DescentParser {
 		let value = firstPart.value
 		let lastPart = firstPart
 
-		// NOTE: `1_000` is one Number only because its Tokens are written
+		// `1_000` is one Number only because its Tokens are written
 		// flush against one another. The same Tokens with anything between
 		// them are separate things — a line that begins `_ 2` is a Statement
 		// of its own (a broken one), not the tail of the Number above it.
@@ -7330,7 +7330,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: One pair of brackets writes three things — a List, a Dictionary and
+	// One pair of brackets writes three things — a List, a Dictionary and
 	// a Dictionary update — and which of them it is, is settled by ONE Token of
 	// lookahead past the first Expression rather than by speculation: an `=`
 	// after it makes the Expression a KEY, a `with` after it makes it a BASE,
@@ -7392,7 +7392,7 @@ class DescentParser {
 			return this.parseDictionaryUpdate(leftBracket, first)
 		}
 
-		// NOTE: The reading is a List from here on, and it stays one — but a
+		// The reading is a List from here on, and it stays one — but a
 		// separator standing where the `]` belongs says the brackets were meant
 		// to hold entries, and `["a": 1]` reported as "expected ']'" sends the
 		// reader after the bracket rather than after the colon.
@@ -7433,7 +7433,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `[1 = 2 = 3]` — a second `=` where the comma between two entries
+	// `[1 = 2 = 3]` — a second `=` where the comma between two entries
 	// belongs. The entry list read exactly what was written and stopped, so
 	// what is left is a bracket that did not close, and that is what a reader
 	// would be told about. The `=` is the Token the mistake is at.
@@ -7458,12 +7458,12 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The rest of a Dictionary Literal, entered with the first key
+	// The rest of a Dictionary Literal, entered with the first key
 	// already read and the `=` still ahead. A trailing comma is allowed exactly
 	// where a List allows one, and for the same reason: a list of things laid
 	// out one to a line grows by a line rather than by a line and an edit above
 	// it.
-	// NOTE: And the `[` these entries stand in, for the same reason.
+	// And the `[` these entries stand in, for the same reason.
 	protected parseDictionaryEntries(
 		firstKey: parser.ExpressionNode,
 		opening: Token,
@@ -7485,7 +7485,7 @@ class DescentParser {
 		return entries
 	}
 
-	// NOTE: The `= value` half, read with the key already in hand — which is
+	// The `= value` half, read with the key already in hand — which is
 	// what lets the `=` be expected here rather than guessed at: every caller
 	// arrives having seen one, or having read a key that has to be followed by
 	// one, and the refusal below reports at the Token the reader is standing on.
@@ -7507,7 +7507,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The near misses of an entry, which are the shapes a reader who
+	// The near misses of an entry, which are the shapes a reader who
 	// knows another language's dictionary writes: `["a": 1]`, `["a" -> 1]` and
 	// `["a" = 1, "b"]`. None of them is a reading this Parser has, so left
 	// alone every one of them is reported as the `]` or the `=` that did not
@@ -7542,12 +7542,12 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `[ages with "kim" = 7]` and `[ages with other]` — the two halves of
+	// `[ages with "kim" = 7]` and `[ages with other]` — the two halves of
 	// the update form, told apart by ONE Token past the Expression after the
 	// `with`, exactly as the literal itself is: an `=` makes it the first key,
 	// and anything else leaves it the whole Dictionary being merged in.
 	//
-	// NOTE: There is no SHORTHAND here and there is not going to be one. A bare
+	// There is no SHORTHAND here and there is not going to be one. A bare
 	// name after a Record's `with` is already the whole value being merged
 	// (`{ config with other }`), and the same name after a Dictionary's `with`
 	// is the same thing — so `[d with a]` merges `a` and never means
@@ -7562,7 +7562,7 @@ class DescentParser {
 		let withKeyword = this.tokens.expect(TokenType.KeywordWith)
 
 		if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
-			// NOTE: The label ends at the `with` and not at the `]` behind it.
+			// The label ends at the `with` and not at the `]` behind it.
 			// What the reader is being told about is the keyword and the
 			// nothing after it, and underlining the bracket too reads as a
 			// claim about the bracket — which is the one Token here that is
@@ -7588,7 +7588,7 @@ class DescentParser {
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			let entries = this.parseDictionaryEntries(first, leftBracket)
-			// NOTE: The key list spans the keys and nothing else — the brackets
+			// The key list spans the keys and nothing else — the brackets
 			// belong to the Combination, which is the Node they open and close.
 			// Exactly what a braced update's key list spans; see
 			// `buildKeyValuePairList`.
@@ -7615,7 +7615,7 @@ class DescentParser {
 			)
 		}
 
-		// NOTE: `[d with a, b]` — a comma-separated list of bare names, which is
+		// `[d with a, b]` — a comma-separated list of bare names, which is
 		// the shorthand this form does not have and is never going to. Reported
 		// here rather than left as "expected ']'" for the reason the braced
 		// half reports `shorthand-in-combination`: the comma says the author
@@ -7656,7 +7656,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: `ownsDocumentation` is false for a literal in EXPRESSION position.
+	// `ownsDocumentation` is false for a literal in EXPRESSION position.
 	// Such a literal is anonymous: it declares nothing, so no `§§` block is
 	// written about it, and the block above it belongs to whatever Declaration
 	// the expression sits inside. `documentationHere` is keyed by line alone,
@@ -7721,7 +7721,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: Named Functions and Methods take an optional Generic list before
+	// Named Functions and Methods take an optional Generic list before
 	// their parameter list — anonymous Function literals in expression
 	// position are dispatched by their first Token instead (see
 	// `parsePrimaryExpression`).
@@ -7741,7 +7741,7 @@ class DescentParser {
 		return this.parseOptionalGenericListWithPosition().generics
 	}
 
-	// NOTE: The same list, with the span of the `<…>` the entries were written
+	// The same list, with the span of the `<…>` the entries were written
 	// in — null where none was. Only a Method keeps it (see
 	// `FunctionDefinitionNode.genericListPosition`); the readers that take the
 	// entries alone go through `parseOptionalGenericList` above.
@@ -7791,7 +7791,7 @@ class DescentParser {
 	}
 
 	protected parseGenericDeclaration(): parser.GenericDeclarationNode {
-		// NOTE: `infer` is a valid Identifier, so it only acts as the modifier
+		// `infer` is a valid Identifier, so it only acts as the modifier
 		// when it is followed by the actual Generic name — `<infer>` declares
 		// a Generic named `infer`.
 		let inferred = false
@@ -7808,7 +7808,7 @@ class DescentParser {
 		let name = this.parseIdentifier()
 		let start = inferKeyword?.position.start ?? name.position.start
 
-		// NOTE: `is` is contextual — `<infer Item is Comparable>` bounds the
+		// `is` is contextual — `<infer Item is Comparable>` bounds the
 		// Type Parameter by a Protocol.
 		let constraint: parser.IdentifierNode | null = null
 		let peeked = this.tokens.peek()
@@ -7891,7 +7891,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The `§§` block above whatever is about to be parsed. Every
+	// The `§§` block above whatever is about to be parsed. Every
 	// Declaration sits on the line of its own first Token, so no Declaration
 	// needs to hand its Documentation down to the signature it owns.
 	protected documentationHere(): common.Documentation | null {
@@ -7904,11 +7904,11 @@ class DescentParser {
 		return this.tokens.documentationAbove(token.position.start.line)
 	}
 
-	// NOTE: `allowsInferredTypes` is set only for a Function literal in
+	// `allowsInferredTypes` is set only for a Function literal in
 	// expression position, where an omitted annotation has an expected
 	// signature to be read off. Every Declaration parses its annotations, so a
 	// null Type can not reach a named Function or a Method.
-	// NOTE: The `= expression` a caller may leave out, read after everything
+	// The `= expression` a caller may leave out, read after everything
 	// else the Parameter writes. There is nothing to disambiguate here:
 	// Essence has no infix operators at all, so nothing continues an
 	// expression past a top-level `,` or `)`, and any comma inside the default
@@ -7932,7 +7932,7 @@ class DescentParser {
 		return parameter
 	}
 
-	// NOTE: `start` and `complete` can not be a Parameter's LABEL. A label
+	// `start` and `complete` can not be a Parameter's LABEL. A label
 	// stands exactly where the two words open their prefix Expression, so
 	// `compute(start 1)` is a `start` of `1` and never an Argument labelled
 	// `start` — a Parameter asking for one could not be written at a call at
@@ -7974,7 +7974,7 @@ class DescentParser {
 	protected parseParameterHead(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
-		// NOTE: Only a Parameter written on a line of its own can carry a
+		// Only a Parameter written on a line of its own can carry a
 		// block — otherwise the first Parameter of `function greet (…)` would
 		// claim the Function's own Documentation.
 		let documentation = this.tokens.startsLine()
@@ -7984,7 +7984,7 @@ class DescentParser {
 		let annotationFollows = () =>
 			this.tokens.peek()?.type === TokenType.SymbolColon
 
-		// NOTE: `(a + b) * c` — the parentheses a reader wrote to GROUP, read
+		// `(a + b) * c` — the parentheses a reader wrote to GROUP, read
 		// here as the Parameter list of a Function literal, `a` as a label and
 		// `+` as the name it labels. What came of that was
 		// `redundant-parameter-label` about a Parameter nobody wrote, and then
@@ -7997,7 +7997,7 @@ class DescentParser {
 			this.refuseForeignText(following)
 		}
 
-		// NOTE: A leading `{` — a Pattern standing where the internal name goes,
+		// A leading `{` — a Pattern standing where the internal name goes,
 		// with no label written. Like a bare `item`, it takes both its Type and
 		// its label from the expected signature.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
@@ -8007,7 +8007,7 @@ class DescentParser {
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
 
-			// NOTE: `_ { … }` — the labelless Pattern Parameter written out,
+			// `_ { … }` — the labelless Pattern Parameter written out,
 			// which is what a named Function needs, since it parses its
 			// annotations rather than reading them off a signature.
 			if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
@@ -8018,7 +8018,7 @@ class DescentParser {
 				)
 			}
 
-			// NOTE: A bare `_` — binds no name and takes its Type from the
+			// A bare `_` — binds no name and takes its Type from the
 			// expected signature, the contextual counterpart of `_: Type`.
 			if (allowsInferredTypes && !isIdentifierToken(this.tokens.peek())) {
 				return generators.parameter(
@@ -8030,7 +8030,7 @@ class DescentParser {
 				)
 			}
 
-			// NOTE: `_: Type` stops at the `_` — it drops the label *and* the
+			// `_: Type` stops at the `_` — it drops the label *and* the
 			// name, leaving a Parameter the body has no way to refer to. `_
 			// name: Type` only drops the label.
 			if (this.tokens.peek()?.type === TokenType.SymbolColon) {
@@ -8052,7 +8052,7 @@ class DescentParser {
 
 			let internalName = this.parseIdentifier()
 
-			// NOTE: `_ name` — the same Parameter `_ name: Type` declares,
+			// `_ name` — the same Parameter `_ name: Type` declares,
 			// with the Type left to the expected signature.
 			if (allowsInferredTypes && !annotationFollows()) {
 				return generators.parameter(
@@ -8082,7 +8082,7 @@ class DescentParser {
 
 		let name = this.parseIdentifier()
 
-		// NOTE: `of { width, height }: Rectangle` — a label, then a Pattern where
+		// `of { width, height }: Rectangle` — a label, then a Pattern where
 		// the internal name goes. The label is what the caller writes, so the
 		// call site is untouched by anything the Pattern says.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
@@ -8096,7 +8096,7 @@ class DescentParser {
 		if (isIdentifierToken(this.tokens.peek())) {
 			let internalName = this.parseIdentifier()
 
-			// NOTE: A written label is only meaningful next to a written Type
+			// A written label is only meaningful next to a written Type
 			// — an unannotated Parameter takes its label from the expected
 			// signature, so there would be nothing for this one to agree with.
 			// The label is dropped and parsing continues, so that one mistaken
@@ -8146,7 +8146,7 @@ class DescentParser {
 			)
 		}
 
-		// NOTE: A bare `item` — both the Type and the label come from the
+		// A bare `item` — both the Type and the label come from the
 		// expected signature, which is why no external name is recorded. This
 		// is the one place a lone Identifier does not mean `name: Type`'s
 		// label-and-name, and it is why the annotated and unannotated forms of
@@ -8174,7 +8174,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The tail of every Pattern Parameter, shared by its three spellings —
+	// The tail of every Pattern Parameter, shared by its three spellings —
 	// `({ … })`, `(_ { … }: Type)` and `(label { … }: Type)`. The annotation is
 	// optional for the same reason a bare `item`'s is: a Function literal in
 	// Argument position has an expected signature to read it off.
@@ -8205,7 +8205,7 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: A signature with no body has nothing for a Pattern's bindings to be
+	// A signature with no body has nothing for a Pattern's bindings to be
 	// read in — a native Method ends at its return Type and a Protocol Method
 	// never had a block. Refused here rather than in the Enricher, because the
 	// Parameter is well-formed and only its POSITION is wrong.
@@ -8231,7 +8231,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The two positions where a Parameter is well-formed but a default on
+	// The two positions where a Parameter is well-formed but a default on
 	// it could never fire, refused here for the same reason
 	// `refusePatternParameters` is: the Parameter parses, only its POSITION is
 	// wrong. The default is dropped once reported, so that one misplaced `=`
@@ -8271,7 +8271,7 @@ class DescentParser {
 						labels: [primary(position, "this default")],
 						notes: [
 							"A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.",
-							// NOTE: A Note rather than the Help it used to be.
+							// A Note rather than the Help it used to be.
 							// "Write the default on the named Function or
 							// Method this value is passed to" is an edit in
 							// somebody else's Declaration, and often in nobody's
@@ -8282,7 +8282,7 @@ class DescentParser {
 							// rule is what this says.
 							"A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.",
 						],
-						// NOTE: The same edit the Quick Fix makes. The two used
+						// The same edit the Quick Fix makes. The two used
 						// to disagree — the fix took the default out and the
 						// Help sent the reader somewhere else entirely.
 						helps: ["Remove the default."],
@@ -8335,7 +8335,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Whether `label value` is what stands here, read off the Token AFTER
+	// Whether `label value` is what stands here, read off the Token AFTER
 	// the leading Identifier instead of by parsing an Expression and finding
 	// that it did not span the argument. Labelled arguments are the norm in
 	// Essence, and the speculation below costs three or four throws for each
@@ -8354,17 +8354,17 @@ class DescentParser {
 	// Token begins an Expression, minus the two that continue the Identifier
 	// instead.
 	//
-	// NOTE: `#` is the parser's adjacency rule, and the standard library leans
+	// `#` is the parser's adjacency rule, and the standard library leans
 	// on it everywhere — `normalize(as #ComposedCanonical)` is a bare Case
 	// passed under the label `as`, and `Ordering#Less` is a Choice prefix. The
 	// space between them is the whole difference.
 	//
-	// NOTE: `<` stays speculative. It continues the Identifier as
+	// `<` stays speculative. It continues the Identifier as
 	// `Holder<Integer>#Full(…)` and it also opens a Generic Function literal
 	// that could be a labelled argument's value, and only a parse can tell
 	// which — `parsePrimaryExpression` says the same thing about the same `<`.
 	//
-	// NOTE: `start` and `complete` are never read as a label, whichever Token
+	// `start` and `complete` are never read as a label, whichever Token
 	// stands behind them. Where the Keyword form opens, the two readings span
 	// the same two Tokens — the label reading takes the word and the value, the
 	// Keyword reading the word and the Expression — and the Keyword wins, so
@@ -8373,7 +8373,7 @@ class DescentParser {
 	// it: `compute(start .price)` is the member path of a value called `start`,
 	// not an Argument labelled with a word no call could write.
 	//
-	// NOTE: The reservation itself is made where the signature is read —
+	// The reservation itself is made where the signature is read —
 	// `parseParameterHead` refuses either word as a Parameter's label — so
 	// there is no Declaration left for a label spelled with one to fit.
 	protected argumentIsLabelled(): boolean {
@@ -8395,7 +8395,7 @@ class DescentParser {
 			return false
 		}
 
-		// NOTE: A label never stands in front of another language's operator.
+		// A label never stands in front of another language's operator.
 		// `Terminal.print(total + tax)` read `total` as one and `+ tax` as its
 		// value, and what came of that was `Expected ')' but found 'tax'` — the
 		// Argument list complaining about text that was never an Argument's.
@@ -8405,7 +8405,7 @@ class DescentParser {
 			return false
 		}
 
-		// NOTE: '#', '.' and '[' all continue the Identifier when they are
+		// '#', '.' and '[' all continue the Identifier when they are
 		// written flush against it — `Choice#Case`, `order.isPaid` and the
 		// `primes[0]` that is refused as an index — and each opens an Expression
 		// of its own when a space stands between: `label #Case` passes a bare
@@ -8413,7 +8413,7 @@ class DescentParser {
 		// space is the whole difference, and it is the same rule the prefixed
 		// Case construction is read by.
 		//
-		// NOTE: The `[` is here so that `Terminal.print(primes[0])` is answered
+		// The `[` is here so that `Terminal.print(primes[0])` is answered
 		// about the index rather than about the Argument it is not: read as a
 		// label, `primes` labelled a List and the report was
 		// `argument-label-mismatch` about a label nobody wrote. Read as an
@@ -8451,12 +8451,12 @@ class DescentParser {
 				return generators.argument(name, value)
 			}
 
-			// NOTE: An Identifier can start both a plain Expression argument
+			// An Identifier can start both a plain Expression argument
 			// and a labelled argument, so we try the Expression reading first
 			// and fall back to the labelled reading — exactly one of the two
 			// can reach the end of the argument.
 			//
-			// NOTE: The failure is phrased as the Argument list's own close
+			// The failure is phrased as the Argument list's own close
 			// would phrase it — "Expected ')' but found 'X'" at the Token the
 			// Expression stopped in front of — rather than as a remark about
 			// the reading ("Expression does not span the whole argument"). It
@@ -8495,7 +8495,7 @@ class DescentParser {
 
 	// #region Types
 
-	// NOTE: `|` binds loosest, so a Union is parsed on top of Generic
+	// `|` binds loosest, so a Union is parsed on top of Generic
 	// application — `List<Item> | String` is a Union of `List<Item>` and
 	// `String`, not a Generic over a Union. A Union is still reachable as a
 	// Generic argument (`List<Item | String>`), where the angle brackets
@@ -8531,7 +8531,7 @@ class DescentParser {
 
 		let leftAngleToken = this.tokens.peek()
 
-		// NOTE: A `<` continues the base Type as a generic application
+		// A `<` continues the base Type as a generic application
 		// (`List<Integer>`) ONLY when it sits on the SAME line as the Type it
 		// applies to. A `<` that opens the NEXT line begins a new declaration —
 		// the next entry of an `overload` block leading with its own `<infer …>`
@@ -8546,7 +8546,7 @@ class DescentParser {
 		) {
 			let { typeArguments, position } = this.parseTypeArgumentList()
 
-			// NOTE: From the base Type, not from the `<` — the Node stands for
+			// From the base Type, not from the `<` — the Node stands for
 			// `List<Item>`, so that is what it spans. Starting at the bracket
 			// would leave `List` inside no Node at all, which is what made the
 			// Editor underline the Arguments alone while naming the whole
@@ -8560,7 +8560,7 @@ class DescentParser {
 		return baseType
 	}
 
-	// NOTE: `<Integer, String>` — the Arguments of an application, wherever one
+	// `<Integer, String>` — the Arguments of an application, wherever one
 	// is written. An annotation's `Holder<Integer>` and a value's
 	// `Holder<Integer>#Full` are the same list, so they are the same parse.
 	protected parseTypeArgumentList(): {
@@ -8657,7 +8657,7 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: Function Type parameters mirror the parameter grammar — the
+	// Function Type parameters mirror the parameter grammar — the
 	// internal name only documents the parameter and may be omitted entirely
 	// (`_: String`), while the external name is part of the call syntax.
 	protected parseFunctionTypeParameter(): parser.FunctionTypeParameterNode {
@@ -8762,7 +8762,7 @@ class DescentParser {
 		return this.parseType()
 	}
 
-	// NOTE: A contextually typed Function literal may go straight from its
+	// A contextually typed Function literal may go straight from its
 	// Parameter list to its block, leaving the return Type to the expected
 	// signature — or, where that leaves it Generic, to its own body.
 	protected parseOptionalReturnType(
@@ -8785,7 +8785,7 @@ class DescentParser {
 	protected parseBlock(): BlockResult {
 		this.enterNesting()
 
-		// NOTE: A block is a position of its own — what a Statement inside one
+		// A block is a position of its own — what a Statement inside one
 		// is written into says nothing about the Argument list the block itself
 		// may stand in.
 		let outerInsideArgumentList = this.insideArgumentList
@@ -8793,7 +8793,7 @@ class DescentParser {
 		this.insideArgumentList = false
 
 		try {
-			// NOTE: `(n: Integer) => n` — the one habit that is written where a
+			// `(n: Integer) => n` — the one habit that is written where a
 			// BLOCK belongs, which is why it is answered here rather than beside
 			// the operators: the Parameter list read cleanly and what follows it
 			// is an arrow no construction of this language has. Every block goes
@@ -8829,7 +8829,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Called on the way into every parsing method that recurs once per
+	// Called on the way into every parsing method that recurs once per
 	// written nesting level — `parseExpression`, `parseType` and `parseBlock`
 	// reach each other through everything between them, and a key list's braced
 	// descend is the one nesting that reaches none of the three. Counting the
@@ -8860,14 +8860,14 @@ class DescentParser {
 		this.nestingDepth++
 	}
 
-	// NOTE: Whether the `(` the reader is standing on opens a parameter list
+	// Whether the `(` the reader is standing on opens a parameter list
 	// rather than a call: it does exactly when the `)` that closes it is
 	// followed by the `{` of a block, or by the `for` of a `for any (…)`.
 	// Parentheses are the only thing counted — they nest inside every other
 	// bracket and every other bracket nests inside them, so a `)` at depth zero
 	// is the one that closes this `(` whatever stands in between.
 	//
-	// NOTE: The `for` is what lets a test writing BOTH `across` and `for any`
+	// The `for` is what lets a test writing BOTH `across` and `for any`
 	// parse at all. It can not mean anything — a body runs written rows or
 	// generated values, never both — and the Enricher says exactly that. Reading
 	// it as a call instead would report a syntax error about a colon, which
@@ -8907,14 +8907,14 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: How many `complete`s have been read inside the body being parsed and
+	// How many `complete`s have been read inside the body being parsed and
 	// not claimed by a body nested in it — which is all a Function needs to know
 	// to say whether it is a COMPLETING body. Every body parse resets the count
 	// and restores the enclosing one behind it, so a `complete` written in a
 	// Function literal is counted by that literal and by nothing around it,
 	// which is exactly where the language draws the line.
 	//
-	// NOTE: A counter rather than a stack of frames, because the only question
+	// A counter rather than a stack of frames, because the only question
 	// asked of it is "was there one?" of the body being closed, and because a
 	// single number is what `speculate` can save and restore — a reading that is
 	// thrown away must leave no mark on the body it was attempted inside.
@@ -8936,7 +8936,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: Reads a Function's body, which is never part of the test whose
+	// Reads a Function's body, which is never part of the test whose
 	// body it was written in — every Function block goes through here so that
 	// the one rule is stated in one place rather than at each of the four
 	// spellings a Function has.
@@ -8981,7 +8981,7 @@ class DescentParser {
 		return token
 	}
 
-	// NOTE: The foreign lexeme standing at the cursor, joined back out of the
+	// The foreign lexeme standing at the cursor, joined back out of the
 	// Tokens it was split into — `=` and `=` written flush are the `==` a reader
 	// wrote, and `!` and `=` are their `!=`. Only ADJACENT Tokens are joined, and
 	// only behind one whose whole value was taken: `+2` contributes its `+` and
@@ -8990,20 +8990,20 @@ class DescentParser {
 	// Null where nothing at the cursor is made of these characters, which is the
 	// answer for every Program that is not written in another language.
 	//
-	// NOTE: `from` is how far ahead of the cursor to read, and everything but
+	// `from` is how far ahead of the cursor to read, and everything but
 	// `argumentIsLabelled` reads at the cursor itself. That one has to ask about
 	// the Token BEHIND the one it is deciding, because what it decides is
 	// whether the name in front of an operator is a label.
 	protected foreignLexeme(from = 0): {
 		text: string
 		position: common.Position
-		// NOTE: Whether the first Token gave the whole of itself to the lexeme.
+		// Whether the first Token gave the whole of itself to the lexeme.
 		// `+` did and `+2` did not, which is the difference between an operator
 		// standing between two values and one written flush against its
 		// operand — and the second is answered by the Enricher, which has the
 		// operand in hand and can name it.
 		whole: boolean
-		// NOTE: How many Tokens the lexeme was glued out of, so that a caller
+		// How many Tokens the lexeme was glued out of, so that a caller
 		// can read what stands BEHIND it — the right operand of a compound
 		// assignment, which `+=` hides two Tokens deep.
 		tokens: number
@@ -9060,13 +9060,13 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The verdict on the lexeme at the cursor: a habit with its own shape,
+	// The verdict on the lexeme at the cursor: a habit with its own shape,
 	// an operator this language deliberately has none of, or nothing at all.
 	// Essence's own lexemes are answered `null` here rather than excluded Token by
 	// Token, which is what keeps `match x -> T` and `<- value` whole while leaving
 	// `a - b` and `a < b` refused.
 	//
-	// NOTE: `left` is the Expression the operator was written BEHIND, where the
+	// `left` is the Expression the operator was written BEHIND, where the
 	// caller has read one. It is what a compound assignment's Help is spelled
 	// out of — `tally += 5` is short for `tally = tally::add(5)`, and a Help
 	// that names neither `tally` nor `5` sends a reader to two undeclared names
@@ -9080,7 +9080,7 @@ class DescentParser {
 			return null
 		}
 
-		// NOTE: `["kim" => 7]` — the one `=>` that is not a Function literal's
+		// `["kim" => 7]` — the one `=>` that is not a Function literal's
 		// arrow. Answered before the table, which would hand a reader writing a
 		// Dictionary a Function literal to write instead.
 		if (
@@ -9120,7 +9120,7 @@ class DescentParser {
 		}
 	}
 
-	// NOTE: The verdict on the Token standing BEHIND the cursor — the same
+	// The verdict on the Token standing BEHIND the cursor — the same
 	// question as `foreignTextAhead`, asked one Token early. Its two callers are
 	// about to read the Token at the cursor as a NAME, and a name is never what
 	// stands in front of one of these: `Terminal.print(total + tax)` read
@@ -9132,7 +9132,7 @@ class DescentParser {
 	// operand, and the Enricher answers it with the operand in hand and names
 	// it.
 	protected foreignTextFollowing(): ForeignRefusal | null {
-		// NOTE: Only an Identifier, and that is the whole of the narrowing. The
+		// Only an Identifier, and that is the whole of the narrowing. The
 		// Symbols an operator is made of — `=`, `<`, `>`, `/`, `|` — begin no
 		// Expression, so neither caller ever reached this question for one. A
 		// `-` DOES begin one, and is left alone on purpose: `compute(offset -1)`
@@ -9165,7 +9165,7 @@ class DescentParser {
 			: { ...account, position: lexeme.position }
 	}
 
-	// NOTE: What stands after a `,` in a list — the next member, this list's own
+	// What stands after a `,` in a list — the next member, this list's own
 	// closing bracket, which is the trailing comma a reader writes on purpose,
 	// or a mistake. The mistake this answers is the third: a bracket that closes
 	// SOMETHING ELSE, which says the list was never closed and that the bracket
@@ -9207,14 +9207,14 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: A reading kept wherever it parsed at all — the same text is often
+	// A reading kept wherever it parsed at all — the same text is often
 	// read twice (a typed Record Literal, then a Record Literal), and the
 	// first reading that holds together is the one that was written.
 	protected backtrack<T>(parseAttempt: () => T): T | null {
 		return this.speculate(parseAttempt, () => true)
 	}
 
-	// NOTE: A speculation that is thrown away must leave nothing behind — not
+	// A speculation that is thrown away must leave nothing behind — not
 	// the Tokens it read, not the Diagnostics it reported, which are about a
 	// shape the Program was never in, and not the suppression latch an attempt
 	// that ran to the end of the input left set: rewinding the Diagnostics
@@ -9226,7 +9226,7 @@ class DescentParser {
 	// is told from an Expression by the `=` behind it and by nothing inside
 	// it, so text that read as a Matcher was not necessarily written as one.
 	//
-	// NOTE: A CODED refusal is not a failed reading — see `refusesTheText`. It
+	// A CODED refusal is not a failed reading — see `refusesTheText`. It
 	// is a verdict about text that was written, and no other reading of that
 	// text is going to ACCEPT it: `.5` is half a decimal wherever it stands.
 	// The readings a speculation would hand it back to either refuse it in the
@@ -9273,7 +9273,7 @@ class DescentParser {
 	): T | null {
 		let saved = this.tokens.save()
 		let savedSuppressDiagnostics = this.suppressDiagnostics
-		// NOTE: And the `complete` count with them, for the reason the
+		// And the `complete` count with them, for the reason the
 		// Diagnostics are rewound: a reading that is thrown away must not leave
 		// the body around it marked as completing on the strength of a word it
 		// read in a shape the Program was never in.
@@ -9287,7 +9287,7 @@ class DescentParser {
 			let result = parseAttempt()
 
 			if (keeps()) {
-				// NOTE: A reading that HELD answers for the readings tried
+				// A reading that HELD answers for the readings tried
 				// beside it — they were about text this one has now spanned —
 				// and for every group speculated inside it, which resolved on
 				// the way.
@@ -9301,7 +9301,7 @@ class DescentParser {
 			}
 
 			if (refusesTheText(error)) {
-				// NOTE: A REPORTED refusal keeps both, which is the one place
+				// A REPORTED refusal keeps both, which is the one place
 				// the two paragraphs above do not hold. Its account travels in
 				// the Diagnostic collection rather than in the ParseError —
 				// the loop that made it recovered and read on, so there was
@@ -9322,7 +9322,7 @@ class DescentParser {
 				throw error
 			}
 
-			// NOTE: Recorded BEFORE the rewind below, which is the only moment
+			// Recorded BEFORE the rewind below, which is the only moment
 			// the stream still stands where this reading stopped. A reading
 			// that `keeps` turned down is not recorded — it read the text to
 			// its end, and what it failed is a test of the text AROUND it.
@@ -9339,13 +9339,13 @@ class DescentParser {
 		return null
 	}
 
-	// NOTE: Kept where it got further than whatever stands here already. Ties go
+	// Kept where it got further than whatever stands here already. Ties go
 	// to the reading tried FIRST, which is the order the alternatives are
 	// written in — a Record Literal before a Record update, an Argument's
 	// Expression before its label — and that order is itself a judgement about
 	// which reading the text is likelier to have been written as.
 	//
-	// NOTE: A `nesting-too-deep` is kept like any other, though `rewoundCodes`
+	// A `nesting-too-deep` is kept like any other, though `rewoundCodes`
 	// gives it back for a reason — an attempt recurs a level deeper than the
 	// reading it stands in for, so it can exhaust the budget where the reading
 	// that is kept fits inside it, and RE-RAISING it would refuse a Program this
@@ -9371,7 +9371,7 @@ class DescentParser {
 		this.furthestFailureDepth = depth
 	}
 
-	// NOTE: Forgets a recorded failure once nothing is left that it could be an
+	// Forgets a recorded failure once nothing is left that it could be an
 	// alternative READING of — either because a sibling reading held, or because
 	// the Statement loop has moved on to the next element. `depth` is the level
 	// that has resolved: a failure recorded AT it was a reading of the text that
@@ -9395,7 +9395,7 @@ export type ParseResult = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: Parse errors are reported as Diagnostics rather than thrown — the
+// Parse errors are reported as Diagnostics rather than thrown — the
 // parser recovers and always produces a Program (broken Statements are
 // dropped). `parseWithDiagnostics` is the full form the compiler driver
 // uses; `parse` is the convenience form for callers that only need the AST.
@@ -9414,7 +9414,7 @@ export function parse(chunk: string, options?: ParserOptions): parser.Program {
 	return parseWithDiagnostics(chunk, options).program
 }
 
-// NOTE: A bare run of Statements rather than a Program — what an `@example`
+// A bare run of Statements rather than a Program — what an `@example`
 // block holds. It is parsed from a text the caller built, in which every line
 // but the example's own is blank and each of the example's stands at the column
 // it stands at in the file: so every Position the parse produces is the

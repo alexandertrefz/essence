@@ -8,7 +8,7 @@ import {
 	loadModuleGraph as loadModuleGraphUncounted,
 } from "@essence-lang/compiler/modules"
 
-// NOTE: Every Compiler entry point this Server runs goes through here, and
+// Every Compiler entry point this Server runs goes through here, and
 // nowhere else imports them directly. The point is the counters: "how many
 // times did answering this request compile something" is the only question
 // that tells a cache that works from a cache that merely exists, and it can
@@ -21,19 +21,19 @@ import {
 // only kept in a test build is a counter the shipped Server can not be
 // measured by.
 export const compilationCounts = {
-	// NOTE: Text to a Parser AST. The graph parses through its own code path
+	// Text to a Parser AST. The graph parses through its own code path
 	// inside the Compiler, so a `loadModuleGraph` covers as many parses as the
 	// graph has Modules and none of them are counted here.
 	parses: 0,
-	// NOTE: A Parser AST to a typed Program, for ONE document — a file that
+	// A Parser AST to a typed Program, for ONE document — a file that
 	// writes neither Module section, or a probe. A probe of a Module is linked
 	// against dependencies that were linked already rather than enriched alone,
 	// and counts here too: what it types is one Program, and the graph behind it
 	// is read back rather than compiled.
 	enrichments: 0,
-	// NOTE: A Module graph read and parsed, entry included.
+	// A Module graph read and parsed, entry included.
 	graphs: 0,
-	// NOTE: One graph-wide enrichment. This is the expensive one: it enriches
+	// One graph-wide enrichment. This is the expensive one: it enriches
 	// and Type-checks every Module the entry reaches.
 	links: 0,
 }

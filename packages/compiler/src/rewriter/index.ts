@@ -1,4 +1,4 @@
-// NOTE: The Rewriter turns a simplified Program into JavaScript. This barrel is
+// The Rewriter turns a simplified Program into JavaScript. This barrel is
 // the phase's name; `./rewrite` is the phase itself.
 export {
 	BUNDLE_TARGET,

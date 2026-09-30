@@ -2,7 +2,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { matcherValueExpressions } from "./matchHandlerChildren"
 
-// NOTE: `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` are
+// `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` are
 // Statements, and every Expression they hold hangs off them directly — there is
 // no body to descend into. So a walker that has no case for them descends into
 // nothing at all, and the whole of a test body is invisible to it. This is the
@@ -19,7 +19,7 @@ type TypedAssertion =
 	| common.typed.ExpectStatementNode
 	| common.typed.RequireStatementNode
 
-// NOTE: A Matcher's own Expressions are the values it constrains members
+// A Matcher's own Expressions are the values it constrains members
 // against, the `3` of `require { points = 3 } = standing`, which is the same
 // question a Match Handler asks, reached from the other side of the grammar.
 export function assertionExpressions(
@@ -31,7 +31,7 @@ export function assertionExpressions(
 	]
 }
 
-// NOTE: The typed side. Where a Matcher was written, `value` is the NAME of the
+// The typed side. Where a Matcher was written, `value` is the NAME of the
 // Constant holding the asserted value rather than the Expression itself — that
 // Expression is the Statement standing in front of this one, which every walker
 // reaches on its own.

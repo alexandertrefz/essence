@@ -6,7 +6,7 @@ import {
 	firstAnalysed,
 } from "./followedHelps"
 
-// NOTE: The Helps about a Match's Cases, each one followed LITERALLY. Every one
+// The Helps about a Match's Cases, each one followed LITERALLY. Every one
 // of them named a second spelling of the same mistake: reorder two Cases that
 // ask the same question and the report moves to the other one; move a Case that
 // names no value to the end of a Match that already ends in one and the Case at
@@ -34,7 +34,7 @@ describe("A Case an earlier one answers for", () => {
 		Terminal.print(name(Colour#Red))
 	}`
 
-	// NOTE: Two Matchers that ask the same question swallow each other in
+	// Two Matchers that ask the same question swallow each other in
 	// whichever order they are written, so "write it above" moved the report to
 	// the other Case and left a reader circling between two spellings of one
 	// duplicate.
@@ -64,7 +64,7 @@ describe("A Case an earlier one answers for", () => {
 		).toBe(true)
 	})
 
-	// NOTE: A Case the one above COVERS rather than repeats is a different
+	// A Case the one above COVERS rather than repeats is a different
 	// mistake, and reordering really is one of its answers — the clause stays
 	// where it still leads somewhere.
 	it("should keep the reorder where the covered Case is narrower", () => {
@@ -99,7 +99,7 @@ describe("A Case an earlier one answers for", () => {
 })
 
 describe("Two Cases a Signature can not tell apart", () => {
-	// NOTE: The Guard clause is GONE, in both positions. On this Case a Guard
+	// The Guard clause is GONE, in both positions. On this Case a Guard
 	// changes nothing — the earlier one decides first and never reaches it. On
 	// the Case above it takes that Case's claim away and leaves no Case to make
 	// it, which is `missing-case`, whose own two answers are both covered by the
@@ -143,7 +143,7 @@ describe("Two Cases a Signature can not tell apart", () => {
 		).toBe(true)
 	})
 
-	// NOTE: The Guard on the Case above was the clause a reader followed into
+	// The Guard on the Case above was the clause a reader followed into
 	// `missing-case`, which sent them back here. Pinned so the round trip can
 	// not be reintroduced by wording.
 	it("should not survive a Guard on the Case that decides first", () => {
@@ -168,7 +168,7 @@ describe("Two Cases a Signature can not tell apart", () => {
 		).toContain("missing-case")
 	})
 
-	// NOTE: A dispatch branch is picked the same way a Case is, so a Match
+	// A dispatch branch is picked the same way a Case is, so a Match
 	// written over the same two member Types reports the very same conflict one
 	// line further down — the reader followed the Help and met it again wearing
 	// the Match's wording.
@@ -205,7 +205,7 @@ describe("Two Cases a Signature can not tell apart", () => {
 })
 
 describe("Two Cases naming Type Parameters", () => {
-	// NOTE: The closed loop this report had. Neither Case is narrower than the
+	// The closed loop this report had. Neither Case is narrower than the
 	// other — Types erase before a Match runs, so each accepts every value that
 	// reaches it — and the clause that said "write this Case above the other
 	// one" moved the report to the other Case, whose own Help moved it back. A
@@ -225,7 +225,7 @@ describe("Two Cases naming Type Parameters", () => {
 		])
 	})
 
-	// NOTE: The same sentence `undispatchable-method` says about the call this
+	// The same sentence `undispatchable-method` says about the call this
 	// Match was written to replace, out of the same builder — the two reports
 	// are one mistake met at two stages, and one answer said two ways is how two
 	// answers start. A signature taking one Type Parameter has nothing left for
@@ -241,7 +241,7 @@ describe("Two Cases naming Type Parameters", () => {
 		).toBe(true)
 	})
 
-	// NOTE: And the reorder clause stands where it is TRUE: a Case naming a
+	// And the reorder clause stands where it is TRUE: a Case naming a
 	// declared Type really is narrower than the Generic Case that swallowed it,
 	// and moving it up is an edit that ends.
 	it("should keep the reorder clause where this Case is narrower", () => {
@@ -271,7 +271,7 @@ describe("Two Cases naming Type Parameters", () => {
 })
 
 describe("A Case an empty container crosses into", () => {
-	// NOTE: A Match narrows nothing here — its Cases are picked by the same
+	// A Match narrows nothing here — its Cases are picked by the same
 	// erased question the dispatch branches were. What decides an empty
 	// container is a GUARD, so the Help spells the whole shape rather than the
 	// half that reads like an answer.
@@ -343,7 +343,7 @@ describe("A Case of a Match on values", () => {
 		Terminal.print(describe(1))
 	}`
 
-	// NOTE: `'case 0'` was an example of a value and a dead end on a Match over
+	// `'case 0'` was an example of a value and a dead end on a Match over
 	// Strings — a Case naming an Integer there is refused two clauses down. The
 	// example is gone rather than translated, because the value this Case is
 	// about is the reader's to know.
@@ -367,7 +367,7 @@ describe("A Case of a Match on values", () => {
 		}
 	})
 
-	// NOTE: "Move it to the end" is only an edit where there is no end yet. A
+	// "Move it to the end" is only an edit where there is no end yet. A
 	// Match that already closes with `case _` has this Case moved BELOW it,
 	// which makes the `case _` the one that names no value — the report, one
 	// Case further down.
@@ -404,7 +404,7 @@ describe("A Case of a Match on values", () => {
 			Terminal.print(describe(1))
 		}`
 
-		// NOTE: Two `literal-match-shape` reports stand here — this Case, and
+		// Two `literal-match-shape` reports stand here — this Case, and
 		// the Match that now has no last Case — so the one under test is picked
 		// by what it is about rather than by being first.
 		expect(
@@ -441,7 +441,7 @@ describe("A Pattern that names the whole value", () => {
 		})
 	}`
 
-	// NOTE: Rewriting the body alone leaves the binder standing, and the binder
+	// Rewriting the body alone leaves the binder standing, and the binder
 	// is what is refused — the Quick Fix has always made both edits.
 	it("should name both halves of the edit", () => {
 		expect(firstAnalysed(source, "redundant-pattern-binder").helps).toEqual(
@@ -449,7 +449,7 @@ describe("A Pattern that names the whole value", () => {
 		)
 	})
 
-	// NOTE: One mistake, one report. The binder is DROPPED rather than bound, so
+	// One mistake, one report. The binder is DROPPED rather than bound, so
 	// every read of the name below reported as a name nobody declared — this
 	// mistake said again in words about a different one.
 	it("should report nothing about the name it dropped", () => {

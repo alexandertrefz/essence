@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { format } from "../index"
 
-// NOTE: The three written forms of a Dictionary — the Literal, the empty one,
+// The three written forms of a Dictionary — the Literal, the empty one,
 // and the update in either of its halves. Every test here is a ROUND TRIP over
 // canonically formatted source: what the Printer writes for a form it has never
 // seen before is what a reader will have to type, and the safety gate refuses
@@ -61,7 +61,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: The brackets are read off the Node rather than guessed at, and
+		// The brackets are read off the Node rather than guessed at, and
 		// this is what says so: `{ record with other }` and `[dictionary with
 		// other]` are the same Node shape, and the pair that was written is the
 		// only thing that tells them apart.
@@ -90,7 +90,7 @@ describe("Dictionary literals", () => {
 			roundTrips(source)
 		})
 
-		// NOTE: A List of nothing but Numbers FILLS — as many to a line as fit
+		// A List of nothing but Numbers FILLS — as many to a line as fit
 		// — and a Dictionary never does, whatever its values are: an entry is
 		// two values and a `=`, which nobody reads four to a line.
 		it("never fills a Dictionary of Numbers", () => {
@@ -198,7 +198,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: A Comment anywhere in the entries forces the break, exactly as
+		// A Comment anywhere in the entries forces the break, exactly as
 		// it does for a List — a one-line Dictionary has nowhere to put one.
 		it("breaks a Literal a Comment was written into", () => {
 			let result = format(
@@ -220,7 +220,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: A Comment TRAILING the opening bracket is refused rather than
+		// A Comment TRAILING the opening bracket is refused rather than
 		// moved, and refused for a Dictionary exactly as it is for a List: the
 		// Printer has no place to put one and the anchor gate catches it. The
 		// two are pinned together here so that a Dictionary can not quietly
@@ -240,7 +240,7 @@ describe("Dictionary literals", () => {
 	})
 
 	describe("what must never be rewritten", () => {
-		// NOTE: `[=]` is one token to a reader and prints as one. It is the
+		// `[=]` is one token to a reader and prints as one. It is the
 		// only Dictionary with nothing inside it to lay out, and the `=` is the
 		// whole of what tells it from the empty List.
 		it("never opens the empty Dictionary", () => {
@@ -272,7 +272,7 @@ describe("Dictionary literals", () => {
 			expect(result.text).toContain("[]")
 		})
 
-		// NOTE: A whole Dictionary merged in brings BRACKETS of its own, and a
+		// A whole Dictionary merged in brings BRACKETS of its own, and a
 		// key list does not — the two hold the same Node on the right of the
 		// `with` and differ by a Position the safety gate strips, so the
 		// Parser marks which of the two it read and the Printer reads the mark.
@@ -318,7 +318,7 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// NOTE: A Dictionary's key is a VALUE, so a key may be written in brackets
+	// A Dictionary's key is a VALUE, so a key may be written in brackets
 	// of its own — a List, a Dictionary, an update. That is the case the two
 	// readings of `[base with …]` can not be told apart by looking at the
 	// source: a bare key list's Position starts at its FIRST KEY, so the key's
@@ -356,7 +356,7 @@ describe("Dictionary literals", () => {
 			expect(format(source).refusal).toBeNull()
 		})
 
-		// NOTE: The same key in a LITERAL was always fine — the Literal's own
+		// The same key in a LITERAL was always fine — the Literal's own
 		// Position starts at its bracket. Pinned so the fix is not made by
 		// breaking this.
 		it("round-trips a List key in a Literal", () => {
@@ -368,7 +368,7 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// NOTE: The forms a Dictionary shares with the two containers beside it.
+	// The forms a Dictionary shares with the two containers beside it.
 	// Each is written as a PAIR with a List or a Record where one exists, so a
 	// Dictionary can not quietly grow — or quietly miss — a behaviour its
 	// siblings have.
@@ -441,7 +441,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: Both refused, and refused for a Record in exactly the same
+		// Both refused, and refused for a Record in exactly the same
 		// place — a Comment inside an entry has nowhere to go. Pinned as a PAIR
 		// so a Dictionary can not grow a behaviour a Record does not have.
 		it("refuses a Comment inside an entry, as a Record does inside a member", () => {

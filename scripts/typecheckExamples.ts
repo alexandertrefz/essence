@@ -3,7 +3,7 @@ import * as path from "node:path"
 
 import { createCompiler } from "@essence-lang/client/plugin-core"
 
-// NOTE: Each example is type-checked against its own `tsconfig.json`, which
+// Each example is type-checked against its own `tsconfig.json`, which
 // reads an imported `.es` file's Types from the `.d.es.ts` its plugin writes
 // beside it. Those are not tracked, so they are written here first, the same
 // way the plugin writes them.

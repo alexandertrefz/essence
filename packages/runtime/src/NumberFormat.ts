@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `NumberFormat` is a builtin Choice, like `Ordering` and `Side` — its
+// `NumberFormat` is a builtin Choice, like `Ordering` and `Side` — its
 // values carry Case tags (`"NumberFormat#Fraction"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method that
@@ -16,7 +16,7 @@ export type NumberFormatType =
 	| PercentType
 	| ScientificType
 
-// NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
+// Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
 export const fraction: FractionType = {
 	[typeKeySymbol]: "NumberFormat#Fraction",

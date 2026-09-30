@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 
-// NOTE: "Every DiagnosticCode is documented" is a completion gate, not an
+// "Every DiagnosticCode is documented" is a completion gate, not an
 // aspiration — the code is printed in every terminal report and handed to
 // every Language Server client, and a code nobody can look up is worse than
 // no code at all. The union in `interfaces/common` is the source of truth,
 // read from source because a union of string literals leaves nothing behind
 // at runtime to iterate.
 
-// NOTE: This spec lives in the documentation's own package, beside the page it
+// This spec lives in the documentation's own package, beside the page it
 // holds to account — the published one, read as a file, so what the gate holds
 // is what a reader who follows a code to `/docs/reference/diagnostics` finds,
 // and moving the site means moving them together.
@@ -19,7 +19,7 @@ const DIAGNOSTICS_PAGE = path.resolve(
 	"../src/content/docs/reference/diagnostics.mdx",
 )
 
-// NOTE: The codes only the experimental test modes report — benchmarks,
+// The codes only the experimental test modes report — benchmarks,
 // synthesized contracts, mutation runs. The site documents none of those modes,
 // so it documents none of their codes either: a code here is neither required
 // on the page nor allowed on it. By family where the family has a prefix, and
@@ -27,7 +27,7 @@ const DIAGNOSTICS_PAGE = path.resolve(
 const EXPERIMENTAL_PREFIXES = ["benchmark-", "contract-", "mutation-"]
 const EXPERIMENTAL_CODES = new Set([
 	"ungeneratable-contract",
-	// NOTE: Not a test mode's, but held back the same way: the one code of the
+	// Not a test mode's, but held back the same way: the one code of the
 	// typed record literal `Type ~> { … }`, which the site leaves out while the
 	// literal goes unchecked. Documenting the code would teach the form.
 	"record-annotation-not-record",
@@ -41,7 +41,7 @@ function isExperimental(code: string): boolean {
 }
 
 function declaredCodes(): Array<string> {
-	// NOTE: Asked of the module resolver rather than counted out in `../`s.
+	// Asked of the module resolver rather than counted out in `../`s.
 	// The union lives in another package now, and the number of directories
 	// between here and there is not something this spec should know.
 	let source = readFileSync(
@@ -69,7 +69,7 @@ function documentedCodes(): Array<string> {
 
 describe("Diagnostic Codes", () => {
 	it("should find every declared code", () => {
-		// NOTE: A guard on the parsing above — a regex that silently stops
+		// A guard on the parsing above — a regex that silently stops
 		// matching would turn this whole gate into a no-op.
 		expect(declaredCodes().length).toBeGreaterThan(50)
 		expect(documentedCodes().length).toBeGreaterThan(50)
@@ -96,7 +96,7 @@ describe("Diagnostic Codes", () => {
 	})
 
 	it("should allow only codes that exist by name", () => {
-		// NOTE: A named exception outlives the code it excused otherwise, and
+		// A named exception outlives the code it excused otherwise, and
 		// then silently excuses whatever is next given that name.
 		let declared = new Set(declaredCodes())
 

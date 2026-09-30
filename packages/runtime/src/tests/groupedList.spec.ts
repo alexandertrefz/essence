@@ -34,7 +34,7 @@ import { getStringRepresentation } from "../Terminal"
 import { createTranscendental } from "../Transcendental"
 import { type AnyType, typeKeySymbol } from "../type"
 
-// NOTE: The same fixtures `dictionaries.spec.ts` builds its walk on, kept to
+// The same fixtures `dictionaries.spec.ts` builds its walk on, kept to
 // the shapes the three GATHERING natives are handed: the standard library's own
 // equality under the Compiler's brand, the same equality without it, a witness
 // a Namespace wrote that is COARSER than the encoding, and one that reads a
@@ -42,13 +42,13 @@ import { type AnyType, typeKeySymbol } from "../type"
 const integer = (value: number): IntegerType => createInteger(BigInt(value))
 const text = createString
 
-// NOTE: The two spellings of one accented String, written as their code points
+// The two spellings of one accented String, written as their code points
 // so this file can not normalise them into each other. They are ONE String to
 // the language, so a gathering has to collapse them into one entry.
 const composedAccent = "caf\u00E9"
 const decomposedAccent = "cafe\u0301"
 
-// NOTE: √n, which is an Algebraic and so has NO encoding — it stands in a
+// √n, which is an Algebraic and so has NO encoding — it stands in a
 // store beside the Integers and Rationals that do, which is the one arrangement
 // a branded witness can make a MIXED store out of.
 const squareRootOf = (radicand: bigint): AnyType =>
@@ -58,7 +58,7 @@ const squareRootOf = (radicand: bigint): AnyType =>
 		radicand,
 	) as AnyType
 
-// NOTE: π, built as the runtime builds it — the one Transcendental a Program
+// π, built as the runtime builds it — the one Transcendental a Program
 // reaches without arithmetic.
 const pi = createTranscendental({ numerator: 0n, denominator: 1n }, [
 	{ base: "\u03C0", coefficient: { numerator: 1n, denominator: 1n } },
@@ -101,7 +101,7 @@ const printing = {
 const writtenForm = (box: DictionaryType<AnyType, AnyType>) =>
 	dictionaryToString(box, printing, printing).value
 
-// NOTE: mulberry32, copied from `dictionaries.spec.ts` — four lines, no
+// mulberry32, copied from `dictionaries.spec.ts` — four lines, no
 // dependency, and the same sequence on every engine.
 const seededRandom = (seed: number): (() => number) => {
 	let state = seed >>> 0
@@ -117,7 +117,7 @@ const seededRandom = (seed: number): (() => number) => {
 	}
 }
 
-// NOTE: A List's logical items WITHOUT touching the box — `materialise` trims
+// A List's logical items WITHOUT touching the box — `materialise` trims
 // and demotes the box it is handed, which is exactly what the aliasing tests
 // below are trying to observe, so they can not go through it.
 const viewedItems = (list: ListType<AnyType>): Array<AnyType> => {
@@ -138,7 +138,7 @@ const viewedItems = (list: ListType<AnyType>): Array<AnyType> => {
 	return items
 }
 
-// NOTE: `dictionaries.spec.ts`'s own store invariants, with the witness a
+// `dictionaries.spec.ts`'s own store invariants, with the witness a
 // parameter rather than the branded one closed over — a gathered Dictionary is
 // built through whatever witness the call was handed, and the encodings its
 // slots wear have to be that witness's, which is the very thing an unbranded
@@ -204,7 +204,7 @@ const expectStoreInvariants = (
 	)
 }
 
-// NOTE: And what a store a GATHERING native answers has to be beyond that: the
+// And what a store a GATHERING native answers has to be beyond that: the
 // shape a repack leaves one in. Generation zero everywhere, one version per
 // slot, nothing dead and nothing tombstoned — which is what makes the answer an
 // ordinary Dictionary a Program may write to.
@@ -221,7 +221,7 @@ const expectGatheredShape = (box: DictionaryType<AnyType, AnyType>) => {
 	}
 }
 
-// NOTE: THE MODEL. A plain Array of groups in first-appearance order, each
+// THE MODEL. A plain Array of groups in first-appearance order, each
 // found by asking the witness about the keys already standing — which is the
 // specification of all three natives read straight off the design, rather than
 // a second implementation of the store. A tally is the groups' sizes, and an
@@ -249,7 +249,7 @@ const modelGroup = (
 	return groups
 }
 
-// NOTE: A List built the way a Program builds one — some items pushed on the
+// A List built the way a Program builds one — some items pushed on the
 // back and some pushed on the front — so that the two runs a box may hold are
 // both filled, and the natives' backwards walk of the reversed front run is
 // what the model's plain order holds them to.
@@ -277,13 +277,13 @@ const listOfBothEnds = (
 		box = prepend(box, front[index]!)
 	}
 
-	// NOTE: The model has to be handed the same order, so the caller reads it
+	// The model has to be handed the same order, so the caller reads it
 	// back off the box rather than off the two halves it built.
 	return box
 }
 
 describe("gathering a Dictionary out of a List, against a plain model", () => {
-	// NOTE: Five pools, one per witness the Compiler may hand a gathering call,
+	// Five pools, one per witness the Compiler may hand a gathering call,
 	// each holding keys that are EQUAL but spelled differently — so the model
 	// collapses exactly where the store has to, and a scan that skipped a slot
 	// or an encoding that split one shows up as a group too many.
@@ -332,7 +332,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				createInteger(9007199254740993n),
 				createRational(9007199254740993n, 1n),
 				createBoolean(true),
-				// NOTE: The two kinds a branded `Number` witness covers that
+				// The two kinds a branded `Number` witness covers that
 				// have NO encoding — an Algebraic and a Transcendental are
 				// provably irrational, so neither can ever equal a Rational,
 				// and they are found by the scan. They make the store MIXED:
@@ -365,7 +365,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				let items: Array<AnyType> = []
 
 				for (let index = 0; index < count; index++) {
-					// NOTE: The item CARRIES its key, so grouping and tallying
+					// The item CARRIES its key, so grouping and tallying
 					// are asked the same question of the same List — the key
 					// read off an item is the key the item is.
 					items.push(
@@ -384,7 +384,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				)
 				let model = modelGroup(logical, (item) => item, pool.witness)
 
-				// NOTE: The KEY BOX the answer keeps is the one that arrived
+				// The KEY BOX the answer keeps is the one that arrived
 				// FIRST, identity and all, which is what says the slot kept its
 				// original key on every later fold. Asked by identity rather
 				// than by value, because two keys that are EQUAL may be spelled
@@ -406,7 +406,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 					)
 				}
 
-				// NOTE: An index keeps the LAST item met under a key, and it is
+				// An index keeps the LAST item met under a key, and it is
 				// that very box — the item that arrived, not a copy and not the
 				// key box the slot kept from the first.
 				let indexedValues = valuesOf(indexed).value
@@ -423,7 +423,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 				expect(groupItems).toEqual(model.map((group) => group.items))
 
-				// NOTE: And the ITEMS are the very boxes that were grouped,
+				// And the ITEMS are the very boxes that were grouped,
 				// which is what says the walk put each item in its own group
 				// rather than rebuilding anything.
 				for (let index = 0; index < model.length; index++) {
@@ -454,7 +454,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 				expectGatheredShape(counted)
 				expectGatheredShape(indexed)
 
-				// NOTE: And every group holds an Array of its OWN. A group that
+				// And every group holds an Array of its OWN. A group that
 				// shared one with a sibling, or with the List that was grouped,
 				// would answer that sibling's items the moment either was
 				// appended to.
@@ -472,7 +472,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		})
 	}
 
-	// NOTE: The arrangement the fresh-store search has no fallthrough for, held
+	// The arrangement the fresh-store search has no fallthrough for, held
 	// here so it can not quietly stop being reachable — or quietly become
 	// UNSOUND. A branded `Number` witness covers four kinds, two of which have
 	// no encoding, so one store carries encoded slots and unencoded ones at
@@ -506,7 +506,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 			),
 		).toEqual([2, 2, 1, 1])
 
-		// NOTE: And the claim the arrangement rests on, asserted rather than
+		// And the claim the arrangement rests on, asserted rather than
 		// assumed: neither unencoded key is equal to any encoded one.
 		for (let unencodedKey of [root2, pi]) {
 			for (let encodedKey of [
@@ -521,7 +521,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectStoreInvariants(counted, equality)
 	})
 
-	// NOTE: The empty List is the one input with no first item to open a group
+	// The empty List is the one input with no first item to open a group
 	// with, and all three natives have to answer the empty Dictionary rather
 	// than something that merely prints like one.
 	test("the empty List gathers into the empty Dictionary", () => {
@@ -553,7 +553,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		}
 	})
 
-	// NOTE: The one-to-one crossing's own rule, spelled out over a key that
+	// The one-to-one crossing's own rule, spelled out over a key that
 	// repeats: the later item is the value, and the key keeps the place — and
 	// the key BOX — it was first met at, which is what `Dictionary.of` and
 	// `set` promise about a repeated key.
@@ -577,7 +577,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectGatheredShape(indexed)
 	})
 
-	// NOTE: The hazard `List.ts` states in its own words — `createList` TAKES
+	// The hazard `List.ts` states in its own words — `createList` TAKES
 	// OWNERSHIP, and `append` pushes onto the Array in place while its box is
 	// the tip of the run. A group handed to a Program is such a tip, so the
 	// Program may append to it; nothing that does may reach a sibling group, the
@@ -612,7 +612,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		).toEqual(["apple", "banana", "avocado", "blueberry", "cherry"])
 	})
 
-	// NOTE: And the same hazard from the other side — a gathered Dictionary is
+	// And the same hazard from the other side — a gathered Dictionary is
 	// an ordinary one, so a write on it is a tip write, and the box that was
 	// written FROM goes on answering what it answered.
 	test("a gathered Dictionary is a Dictionary a Program may write to", () => {
@@ -629,7 +629,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectStoreInvariants(removed, equality)
 	})
 
-	// NOTE: The one place a tally has to count through the ENCODING rather than
+	// The one place a tally has to count through the ENCODING rather than
 	// through the witness's answer alone: `3` and `3/1` are one Number, so they
 	// are one item, and the spelling that arrived first is the one the entry
 	// keeps.
@@ -650,7 +650,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectStoreInvariants(counted, equality)
 	})
 
-	// NOTE: A key that only the SCAN path finds, counted rather than grouped —
+	// A key that only the SCAN path finds, counted rather than grouped —
 	// `tally` hands the item itself over as the key, so a Record item is a
 	// Record key and the witness is the only thing that can tell two of them
 	// apart.
@@ -677,7 +677,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectStoreInvariants(counted, byIdentifier)
 	})
 
-	// NOTE: The blocker shape an earlier review found — a Namespace writing its
+	// The blocker shape an earlier review found — a Namespace writing its
 	// own `is` for a refinement of a kind whose keys encode. The witness is
 	// unbranded, so every native must SCAN, and a grouping that encoded anyway
 	// would put "Ada" and "ada" in two groups the witness says are one.
@@ -710,7 +710,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectStoreInvariants(indexed, looseText)
 	})
 
-	// NOTE: The composition the fixture itself writes — a grouping mapped over —
+	// The composition the fixture itself writes — a grouping mapped over —
 	// and the one thing it can get wrong: `map` copies each slot's encoding
 	// rather than making one, so a Dictionary gathered through a witness a
 	// Namespace wrote has to stay unencoded on the other side of it, or a later
@@ -745,7 +745,7 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 		expectGatheredShape(branded)
 	})
 
-	// NOTE: And the same claim about the door itself: a Dictionary built out of
+	// And the same claim about the door itself: a Dictionary built out of
 	// pairs through `createDictionary` and one gathered through the three doors
 	// a native gathers by are the SAME shape, so nothing downstream can tell
 	// which built it.

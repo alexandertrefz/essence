@@ -14,7 +14,7 @@ import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 import { typedExpressionAt } from "./typedLookups"
 
-// NOTE: A test that says one thing about several values, written as the table
+// A test that says one thing about several values, written as the table
 // it already is. What makes it mechanical is the narrowness: every line has to
 // be `expect CALL::is(VALUE)` over the SAME Function with the same Arguments
 // written the same way, and every value written in one has to be a Literal or a
@@ -45,7 +45,7 @@ export function tableTestActions(
 	lines: Array<string>,
 	range: common.Position,
 ): Array<CodeActionEntry> {
-	// NOTE: The Types of the columns are the Enricher's, printed back as
+	// The Types of the columns are the Enricher's, printed back as
 	// source — so a file that did not enrich has no table to offer.
 	if (program.tests === null || enrichedProgram === null) {
 		return []
@@ -74,7 +74,7 @@ function tableAction(
 	enrichedProgram: common.typed.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: A benchmark is timed rather than judged, a table test already has
+	// A benchmark is timed rather than judged, a table test already has
 	// its rows, and a property test makes its own values up — none of the three
 	// is a test with expectations to collect.
 	if (
@@ -108,7 +108,7 @@ function tableAction(
 	let last = test.body[test.body.length - 1] as parser.ImplementationNode
 	let head = headEnd(test)
 
-	// NOTE: The rows are written as whole lines under the test's own
+	// The rows are written as whole lines under the test's own
 	// indentation, and the body is replaced by one line — so the body has to
 	// own its lines, and the head has to end where the rows can follow it.
 	if (
@@ -148,7 +148,7 @@ function tableAction(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// NOTE: Never preferred. The one test becomes as many tests as there
+		// Never preferred. The one test becomes as many tests as there
 		// are rows, each with an identity of its own — which is a decision
 		// about what the suite REPORTS, not about how a line is spelled.
 		isPreferred: false,
@@ -165,7 +165,7 @@ function tableAction(
 	}
 }
 
-// NOTE: Every test written in the section, nested Suites included. A Suite is
+// Every test written in the section, nested Suites included. A Suite is
 // a group and never an expectation of its own, so nothing about it is read
 // here but the tests inside it.
 function testsOf(nodes: Array<parser.TestsNode>): Array<parser.TestNode> {
@@ -182,7 +182,7 @@ function testsOf(nodes: Array<parser.TestsNode>): Array<parser.TestNode> {
 	return tests
 }
 
-// NOTE: `expect CALL::is(VALUE)` and nothing else. A Matcher, a snapshot, a
+// `expect CALL::is(VALUE)` and nothing else. A Matcher, a snapshot, a
 // Namespace specifier on the `is`, a labelled Argument to it, a callee that is
 // not a plain name — each of those is a shape a row could not carry, and none
 // of them is worth guessing about.
@@ -231,7 +231,7 @@ function readExpectation(
 	}
 }
 
-// NOTE: What a row can hold: a value that reads the same wherever it is
+// What a row can hold: a value that reads the same wherever it is
 // written. A payload-free Case is one of those — the annotation on the row
 // Parameter is what lets a bare `#Win` stand in a row — and an interpolated
 // String is not, since its holes read names the row knows nothing about.
@@ -249,7 +249,7 @@ function isWritable(node: parser.ExpressionNode): boolean {
 	}
 }
 
-// NOTE: One column per Argument, plus `expected` for what the call answers.
+// One column per Argument, plus `expected` for what the call answers.
 // Null wherever the rows do not line up: a different callee, a different
 // Argument count, the same Argument labelled in one row and not in the next, or
 // a column whose values are not all of one Type — each of those is a table with
@@ -274,7 +274,7 @@ function columnsOf(
 				? null
 				: (head.written[at]?.label ?? null)
 
-		// NOTE: A column is named as the CALLEE names the Parameter it fills,
+		// A column is named as the CALLEE names the Parameter it fills,
 		// where the file declares the callee — the rows then read in the words
 		// the code under test is written in, and `{ conceded = 0 }` says what
 		// `{ b = 0 }` could not. The Argument's label is the next best thing,
@@ -329,7 +329,7 @@ function columnsOf(
 	return columns
 }
 
-// NOTE: The Type every value in the column has, or null where they disagree.
+// The Type every value in the column has, or null where they disagree.
 // A Case widens to its CHOICE — `#Win` and `#Loss` are one column of
 // `Outcome`, and a column of `Outcome#Win` is neither writable nor what the
 // author meant.
@@ -346,7 +346,7 @@ function columnType(
 			return null
 		}
 
-		// NOTE: Spelled where the table is going to STAND, which is where the
+		// Spelled where the table is going to STAND, which is where the
 		// test it replaces stands — a column Type naming an Alias this file
 		// can not resolve is a row Parameter nothing compiles.
 		let at = { program: enrichedProgram, cursor: cell.position.start }
@@ -365,14 +365,14 @@ function columnType(
 	return written
 }
 
-// NOTE: The Choice a Case widens to, written as a Type. A GENERIC Choice's name
+// The Choice a Case widens to, written as a Type. A GENERIC Choice's name
 // is not one on its own — `Optional` where `Optional<Integer>` belongs is
 // `wrong-type-argument-count` — so the Type Arguments the value was applied at
 // are written back with it. A Case that bound none, or one whose Arguments have
 // no spelling, has no column Type to write and the table is not offered: what
 // the rows are of is exactly what a row Parameter has to say.
 function caseSpelling(type: common.CaseType, at: SpellingScope): string | null {
-	// NOTE: The name a reader WROTE, never the identity — a Case of a Module's
+	// The name a reader WROTE, never the identity — a Case of a Module's
 	// Choice carries the declaring file's path in front of its name, and that
 	// is no spelling at all. The Choice still has to be the one this position
 	// resolves the word to, which is the rule every written Type follows here.
@@ -394,13 +394,13 @@ function caseSpelling(type: common.CaseType, at: SpellingScope): string | null {
 			: null
 	}
 
-	// NOTE: A Case of a generic Choice that bound nothing — a bare `#Empty` no
+	// A Case of a generic Choice that bound nothing — a bare `#Empty` no
 	// application ever reached — has no spelling at all, since its Choice's
 	// name alone is a Type short of its Arguments.
 	return (type.choiceGenerics ?? []).length === 0 ? name : null
 }
 
-// NOTE: Whether the word names THIS Choice where the table is written. The
+// Whether the word names THIS Choice where the table is written. The
 // question a Case asks is not the equality every other spelling is held to: the
 // cell holds one Case and the column is written as the whole Choice, so what
 // the name has to resolve to is a Type the Case FITS — the Union standing over
@@ -417,7 +417,7 @@ function namesChoiceAt(
 		return false
 	}
 
-	// NOTE: A GENERIC Choice's name resolves to the DECLARATION rather than to
+	// A GENERIC Choice's name resolves to the DECLARATION rather than to
 	// any application of it — `Optional` names a Generic Alias here, and no
 	// Case of it fits one — so the word naming that Declaration is the whole of
 	// what can be asked. The Arguments written after it are spelled on their
@@ -425,7 +425,7 @@ function namesChoiceAt(
 	return found.type === "GenericAlias" || matchesType(found, type)
 }
 
-// NOTE: What the callee calls its own Parameters, one per written Argument and
+// What the callee calls its own Parameters, one per written Argument and
 // null wherever there is no name to read. The internal name is the one asked
 // for rather than the label: a label is what the CALL writes, so naming a
 // column after one makes the call say it twice — `outcomeOf(a, against
@@ -472,7 +472,7 @@ function parameterNamesOf(
 		return nothing
 	}
 
-	// NOTE: A Parameter that takes its value apart — `of { width, height }` —
+	// A Parameter that takes its value apart — `of { width, height }` —
 	// and one that binds nothing at all — `_: Integer` — have no single name
 	// between them, so those columns fall back with the rest.
 	return parameters.map((parameter) =>
@@ -482,14 +482,14 @@ function parameterNamesOf(
 	)
 }
 
-// NOTE: `a`, `b`, `c` — the names a column takes when neither the callee nor
+// `a`, `b`, `c` — the names a column takes when neither the callee nor
 // the Argument carrying it had one to lend. Past the alphabet there is nothing to fall back
 // on, and a call of twenty-seven Arguments is not what this is for.
 function letterAt(at: number): string | null {
 	return at < 26 ? String.fromCharCode("a".charCodeAt(0) + at) : null
 }
 
-// NOTE: Where `across` goes — after the name and after every Modifier, which is
+// Where `across` goes — after the name and after every Modifier, which is
 // the last thing about the test that is not the test.
 function headEnd(test: parser.TestNode): common.Cursor {
 	let last = test.modifiers[test.modifiers.length - 1]

@@ -4,7 +4,7 @@ import { quotedText } from "@essence-lang/runtime/String"
 
 import { format, type FormatResult, guarded } from "./index"
 
-// NOTE: Writing a recorded value back into the source, which is what the first
+// Writing a recorded value back into the source, which is what the first
 // run of an inline `matches snapshot` does and what `essence test --update`
 // does to one that differs.
 //
@@ -20,7 +20,7 @@ import { format, type FormatResult, guarded } from "./index"
 // parsed again, and every slot has to hold exactly the text it was given.
 
 type SnapshotUpdate = {
-	// NOTE: Where the recorded value stands, or would stand — the `snapshot`
+	// Where the recorded value stands, or would stand — the `snapshot`
 	// Keyword's own span where the source has never held one. It comes off the
 	// run's own event, which the Compiler filled from the span table.
 	position: common.Position
@@ -28,7 +28,7 @@ type SnapshotUpdate = {
 }
 
 type SnapshotWrite = FormatResult & {
-	// NOTE: How many of the updates found the slot they name. Fewer than were
+	// How many of the updates found the slot they name. Fewer than were
 	// handed over means the file moved under the run — nothing is written at a
 	// Position that now means something else.
 	applied: number
@@ -75,7 +75,7 @@ function writeUnguarded(
 	}
 
 	let slots = slotsOf(program)
-	// NOTE: Back to front, so that splicing one slot leaves every slot before
+	// Back to front, so that splicing one slot leaves every slot before
 	// it standing where the parse said it was.
 	let wanted = updates
 		.map((update) => ({
@@ -102,7 +102,7 @@ function writeUnguarded(
 		let end = offsetOf(rewritten, update.position.end)
 		let literal = literalOf(update.text)
 
-		// NOTE: A snapshot nothing has recorded has no slot of its own — what
+		// A snapshot nothing has recorded has no slot of its own — what
 		// it names is the `snapshot` Keyword, and the value is written AFTER
 		// it. One that holds a value is replaced where it stands.
 		rewritten =
@@ -121,7 +121,7 @@ function writeUnguarded(
 		return refused("The rewritten source no longer parses.", "unsafe")
 	}
 
-	// NOTE: The whole of the safety story for a splice: the slot that was
+	// The whole of the safety story for a splice: the slot that was
 	// written into holds exactly the text the run recorded, and it is found by
 	// its PLACE among the file's slots rather than by its Position, which the
 	// splice moved. It says nothing about the rest of the file, which is why
@@ -144,7 +144,7 @@ function writeUnguarded(
 		}
 	}
 
-	// NOTE: The formatter's answer is taken for a file that was ALREADY
+	// The formatter's answer is taken for a file that was ALREADY
 	// formatted, and only then. Recording a snapshot is something a test run
 	// does to a source, and a run that reformatted forty lines nobody touched
 	// would be a build formatting your code — which this project does not do,
@@ -169,7 +169,7 @@ function writeUnguarded(
 	}
 }
 
-// NOTE: A String Literal spelling the text, which is the runtime's own quoted
+// A String Literal spelling the text, which is the runtime's own quoted
 // printer and not a second spelling of it: a recorded value is written back
 // into the reader's SOURCE, so what it has to be is exactly what the Lexer
 // reads back as the value — which is the promise `quotedText` makes and
@@ -186,10 +186,10 @@ function literalOf(text: string): string {
 	return quotedText(text)
 }
 
-// NOTE: Every slot an INLINE recorded value stands in. A stored snapshot names
+// Every slot an INLINE recorded value stands in. A stored snapshot names
 // a file instead, and nothing here writes into a source for one.
 type Slot = {
-	// NOTE: Which inline slot of the file this is. A splice moves Positions and
+	// Which inline slot of the file this is. A splice moves Positions and
 	// never reorders slots, so the place is what a rewritten file is checked by.
 	index: number
 	position: common.Position
@@ -270,7 +270,7 @@ function assertionsOf(
 	return found
 }
 
-// NOTE: Essence Cursors are 1-based on both axes, and a column stands one past
+// Essence Cursors are 1-based on both axes, and a column stands one past
 // the character before it — so the offset of a Cursor is the length of every
 // line above it, the newlines included, plus the column minus one.
 function offsetOf(source: string, cursor: common.Cursor): number {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { compiles, firstAnalysed, firstOf } from "./followedHelps"
 
-// NOTE: The Helps about conformance, each one followed LITERALLY — the audit
+// The Helps about conformance, each one followed LITERALLY — the audit
 // that wrote this spec found four of them leading in circles and one leading
 // somewhere worse than nowhere.
 //
@@ -65,7 +65,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		}
 	})
 
-	// NOTE: The Help that always applies, and the only one that needs nothing
+	// The Help that always applies, and the only one that needs nothing
 	// declared: the bound goes on the Method that needs it. Followed literally
 	// — `biggest<Item is Comparable>()` — and the result compiles, which is the
 	// whole of what these specs are for.
@@ -95,7 +95,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// NOTE: No `where` alternative here, and that is the point of the Scope
+	// No `where` alternative here, and that is the point of the Scope
 	// carrying the Method's name. A `where` reaches only the Methods that fulfil
 	// the conformance — `biggest` fulfils nothing, so adding it changes nothing
 	// and the report comes back unchanged. Offered where it WOULD work, which is
@@ -114,7 +114,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(false)
 	})
 
-	// NOTE: The same Namespace shape, the same Parameter, asked from a Method
+	// The same Namespace shape, the same Parameter, asked from a Method
 	// that DOES fulfil the conformance — and now the `where` is the edit that
 	// works, and the only one offered: a fulfilling Method may not carry a bound
 	// of its own, because the conformance promised it without one.
@@ -147,7 +147,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// NOTE: Where the condition is already written, the Note says why it does
+	// Where the condition is already written, the Note says why it does
 	// not reach here — `biggest` fulfils nothing — and the Help is the same edit
 	// as everywhere else. This used to end in no Help at all, on the reading
 	// that a Method fulfilling nothing could not be bounded; it can.
@@ -169,7 +169,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	// NOTE: The other end of what used to be a loop. The refusal of a bound on
+	// The other end of what used to be a loop. The refusal of a bound on
 	// the NAMESPACE now leads with the per-Method edit, which is one that works
 	// whatever the Namespace declares.
 	it("should send a refused Namespace bound to the Methods", () => {
@@ -217,7 +217,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// NOTE: A Function's Parameter is a different mistake and keeps the Help it
+	// A Function's Parameter is a different mistake and keeps the Help it
 	// always had — the edit it names is one that exists.
 	it("should still bound a Function's own Type Parameter", () => {
 		let source = `implementation {
@@ -245,7 +245,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 })
 
 describe("A conformance condition that can not be added", () => {
-	// NOTE: `nonconforming-namespace` asked for a `where` that
+	// `nonconforming-namespace` asked for a `where` that
 	// `conflicting-where-condition` then refused, leaving the original report
 	// standing beside a new one. One bound per Type Parameter per conformance,
 	// so the second bound is a conformance of its own.
@@ -307,7 +307,7 @@ describe("A conformance condition that can not be added", () => {
 		).toBe(true)
 	})
 
-	// NOTE: The code that used to print nothing at all, which left a reader
+	// The code that used to print nothing at all, which left a reader
 	// holding a refusal and no direction.
 	it("should say where a second bound belongs", () => {
 		let source = `implementation {
@@ -330,7 +330,7 @@ describe("A conformance condition that can not be added", () => {
 })
 
 describe("A conformance a Namespace does not fulfil", () => {
-	// NOTE: The Label names the requirement the check stopped at; the Help names
+	// The Label names the requirement the check stopped at; the Help names
 	// every one the conformance owes, which is what a reader in a terminal —
 	// with no Quick Fix to apply — was never told.
 	it("should name every requirement the conformance owes", () => {
@@ -375,7 +375,7 @@ describe("A conformance a Namespace does not fulfil", () => {
 		).toBe(true)
 	})
 
-	// NOTE: A Method to CORRECT rather than one to write, so no stub is named
+	// A Method to CORRECT rather than one to write, so no stub is named
 	// and the Help says where the shape it has to take is written down.
 	it("should send a mismatched signature to the Protocol", () => {
 		let source = `implementation {
@@ -397,7 +397,7 @@ describe("A conformance a Namespace does not fulfil", () => {
 })
 
 describe("A requirement another conformance provides a body for", () => {
-	// NOTE: `Counted` provides a `describe` that does not fulfil the one
+	// `Counted` provides a `describe` that does not fulfil the one
 	// `Described` requires. Where a `describe` written as `Described` declares it
 	// does not fulfil `Counted`'s either, writing it refuses `is Counted`.
 	let conforming = (
@@ -496,7 +496,7 @@ describe("A requirement another conformance provides a body for", () => {
 })
 
 describe("A Type in want of a conformance", () => {
-	// NOTE: The Type to do something about is the LAST link of the chain, not
+	// The Type to do something about is the LAST link of the chain, not
 	// the one the bound was written on: a Namespace `for Result<String, Problem>`
 	// answers this one call and leaves every other Result unprintable.
 	let resultOfAChoice = `implementation {
@@ -515,7 +515,7 @@ describe("A Type in want of a conformance", () => {
 		Terminal.print(parse("3"))
 	}`
 
-	// NOTE: TWO Helps, and the order is the two questions a reader has. The
+	// TWO Helps, and the order is the two questions a reader has. The
 	// escape comes first because it always works at a print and costs no
 	// declaration — `Terminal.inspect` takes any value — and the declaration
 	// comes second because it is what keeps `print`. The escape is offered
@@ -573,7 +573,7 @@ describe("A Type in want of a conformance", () => {
 		).toBe(true)
 	})
 
-	// NOTE: Work is one word short, not a Type in want of a conformance.
+	// Work is one word short, not a Type in want of a conformance.
 	// Declaring `for Future<String> is Printable` COMPILES and prints a
 	// description of the work, which is the one outcome nobody wanted — so this
 	// says what every other report about a forgotten `complete` says.
@@ -601,7 +601,7 @@ describe("A Type in want of a conformance", () => {
 		).toBe(true)
 	})
 
-	// NOTE: And where the body can NOT wait, the word is not offered at all —
+	// And where the body can NOT wait, the word is not offered at all —
 	// the same rule `interpolation-not-printable` follows, said in one voice
 	// because one helper writes both.
 	it("should ask for the declaration where the body can not wait", () => {
@@ -640,7 +640,7 @@ describe("A Type in want of a conformance", () => {
 })
 
 describe("A bounded Function used as a value", () => {
-	// NOTE: "Call it directly" answered by throwing the value away, which is not
+	// "Call it directly" answered by throwing the value away, which is not
 	// an edit anybody who reached for a value can make. The wrap keeps it.
 	let source = `implementation {
 		function largest<infer Item is Comparable>(of items: List<Item>) -> Optional<Item> {
@@ -675,7 +675,7 @@ describe("A bounded Function used as a value", () => {
 	})
 })
 
-// NOTE: A Method that has ALREADY bounded the Namespace's Parameter and wants a
+// A Method that has ALREADY bounded the Namespace's Parameter and wants a
 // second Protocol. The bound reaches its body through a Scope of its own, and
 // that Scope used to answer "no Namespace declares this name" — so the report
 // took the FUNCTION branch and told the reader to write
@@ -708,14 +708,14 @@ describe("A second bound wanted by a Method that carries one", () => {
 		)
 	})
 
-	// NOTE: And no Quick Fix either — `data` is the same decision the text is
+	// And no Quick Fix either — `data` is the same decision the text is
 	// made of, so an Editor can not offer what the report withheld.
 	it("should carry no Quick Fix", () => {
 		expect(firstOf(source, "unsatisfied-bound").data).toBeUndefined()
 	})
 })
 
-// NOTE: The Help that has to say what the language can NOT do. A Type Parameter
+// The Help that has to say what the language can NOT do. A Type Parameter
 // carries one bound, so the two written here are not a Parameter bounded by
 // both — the second silently replaced the first until this was refused, and the
 // body was then refused for wanting what the reader had already asked for.
@@ -753,7 +753,7 @@ describe("Two bounds on one Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// NOTE: Not a Help that fails — a Help that says "the one the body needs",
+	// Not a Help that fails — a Help that says "the one the body needs",
 	// tested by showing the other one is not it, and that the report a reader
 	// meets then is the one that names the Protocol.
 	it("should report the missing bound where the other one is kept", () => {

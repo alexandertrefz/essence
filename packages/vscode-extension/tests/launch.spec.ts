@@ -12,7 +12,7 @@ import {
 	resolveServer,
 } from "../launch.js"
 
-// NOTE: Every function here is a pure function of its arguments, so a machine
+// Every function here is a pure function of its arguments, so a machine
 // is a set of paths that exist, an environment, and what the login shell
 // would say — and the specs build one per case.
 function machine(

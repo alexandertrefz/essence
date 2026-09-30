@@ -57,7 +57,7 @@ type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
 type MatchHandler = common.typed.MatchNode["handlers"][number]
 
-// NOTE: The Protocol-bounded Type Parameters of every enclosing Function
+// The Protocol-bounded Type Parameters of every enclosing Function
 // Definition, innermost last — one Set per Function, because a Function
 // literal written inside a bounded one reaches the enclosing hidden
 // conformance Parameter the way any closure reaches what encloses it, so a
@@ -67,12 +67,12 @@ type MatchHandler = common.typed.MatchNode["handlers"][number]
 // validated at a time.
 let witnessScopes: Array<Set<string>> = []
 
-// NOTE: The bounds of every enclosing Function Definition's Type Parameters as
+// The bounds of every enclosing Function Definition's Type Parameters as
 // its source spells them, innermost last, for a Help that writes one. A
 // provided Method's `Self` holds an identity and shows its name.
 let writtenBounds: Array<Map<string, string>> = []
 
-// NOTE: Whether each enclosing body may write `complete`, innermost last — a
+// Whether each enclosing body may write `complete`, innermost last — a
 // body may where it answers a Future, and the top level may outright. Module
 // state for the same reason `witnessScopes` is: the alternative is threading it
 // through every `validate…` function, and only one Program is validated at a
@@ -98,7 +98,7 @@ function bodyCanWait(): boolean {
 	return (waitingBodies.at(-1) ?? true) === true
 }
 
-// NOTE: Which of the four barriers refused, for the Helps that name the edit it
+// Which of the four barriers refused, for the Helps that name the edit it
 // leaves — null for a body that simply answers something other than a Future,
 // whose edit is to its own Declaration.
 function completionBarrier(): enricher.CompletionBarrier | null {
@@ -109,7 +109,7 @@ function completionBarrier(): enricher.CompletionBarrier | null {
 		: top
 }
 
-// NOTE: Runs `walk` with one more body on the stack, and pops it whatever
+// Runs `walk` with one more body on the stack, and pops it whatever
 // happens — every push in this file goes through here so that a refusal thrown
 // mid-walk can not leave the stack claiming the wrong answer for the rest of
 // the Program.
@@ -126,7 +126,7 @@ function insideBody(
 	}
 }
 
-// NOTE: Where each top-level Namespace is declared — its index in the top-level
+// Where each top-level Namespace is declared — its index in the top-level
 // statement list, and the Position of its name. A Namespace is emitted as a
 // `class`, whose binding does not exist until the Declaration itself runs, so a
 // use that RUNS above it compiles clean and then fails. Read off the typed
@@ -138,14 +138,14 @@ let topLevelNamespaces: Map<
 	{ index: number; position: common.Position }
 > = new Map()
 
-// NOTE: The index of the top-level statement whose execution is being
+// The index of the top-level statement whose execution is being
 // validated, or null where what is being validated does not run yet — a
 // Function body, which is emitted hoisted and runs whenever it is called. A
 // static Property's initialiser is not such a place: it runs when its
 // Namespace's Declaration does, so it keeps the index it is written under.
 let executingTopLevelIndex: number | null = null
 
-// NOTE: The static Property initialiser being validated: its Namespace's name,
+// The static Property initialiser being validated: its Namespace's name,
 // and the Properties of that Namespace which have no value yet where it runs —
 // itself and everything written below it, each with the Position it is declared
 // at. Null anywhere else, including inside a Function literal written in such an
@@ -156,7 +156,7 @@ let initialisingProperty: {
 	unbound: Map<string, common.Position>
 } | null = null
 
-// NOTE: The lines the Parser abandoned text on — see `parser.Recovery`. A
+// The lines the Parser abandoned text on — see `parser.Recovery`. A
 // construct written across one of them was not read whole, so what it LACKS
 // says nothing about what the reader wrote: the `<-` that would have made a
 // Function return was dropped out of it, the arm that would have given a
@@ -165,13 +165,13 @@ let initialisingProperty: {
 // Module state for the reason `witnessScopes` is.
 let abandonedLines: ReadonlySet<number> = new Set()
 
-// NOTE: The lines of the abandoned runs that could have opened a BODY — see
+// The lines of the abandoned runs that could have opened a BODY — see
 // `parser.Recovery.headLines`. Only such a run can leave a `<-` standing
 // outside a Function, so only such a run stands `top-level-return` down.
 // Module state for the reason `witnessScopes` is.
 let abandonedHeadLines: ReadonlySet<number> = new Set()
 
-// NOTE: The line the last top-level Statement that is NOT itself a top-level
+// The line the last top-level Statement that is NOT itself a top-level
 // `<-` ended on, advanced as the Statements are walked. A dropped head can only
 // have orphaned a `<-` that stands BELOW everything the Parser did read there,
 // so a head abandoned at or above this line took no body down that this `<-`
@@ -183,7 +183,7 @@ let abandonedHeadLines: ReadonlySet<number> = new Set()
 // Module state for the reason `witnessScopes` is.
 let topLevelStatementFloor = 0
 
-// NOTE: Whether anything has already been reported about this Program. The
+// Whether anything has already been reported about this Program. The
 // three rails below state invariants the EMITTED JavaScript rests on, and every
 // one of them rests in turn on a Program that parsed and enriched cleanly: a
 // witness that was never built because its Namespace does not conform is a
@@ -195,11 +195,11 @@ let topLevelStatementFloor = 0
 let alreadyReported = false
 
 export type ValidateOptions = {
-	// NOTE: What the Parser abandoned on its way to this Program — see
+	// What the Parser abandoned on its way to this Program — see
 	// `parser.Recovery`. The typed Program does not carry it: it is the PARSER's
 	// record, and the one caller that runs both stages has it in hand.
 	recovery?: parser.Recovery
-	// NOTE: Whether the Parser or the Enricher reported an Error about this
+	// Whether the Parser or the Enricher reported an Error about this
 	// Program — see `alreadyReported`. Left off by a caller that knows there was
 	// none, which is every spec that validates a Program it just asserted clean.
 	reported?: boolean
@@ -209,7 +209,7 @@ export const validate = (
 	program: common.typed.Program,
 	options: ValidateOptions = {},
 ): Array<common.Diagnostic> => {
-	// NOTE: A fresh stack per run. Each frame is popped in a `finally`, so this
+	// A fresh stack per run. Each frame is popped in a `finally`, so this
 	// is the guarantee rather than the mechanism: no Program is ever checked
 	// against a Type Parameter that another Program declared.
 	witnessScopes = []
@@ -226,7 +226,7 @@ export const validate = (
 		for (let [index, node] of program.implementation.nodes.entries()) {
 			executingTopLevelIndex = index
 
-			// NOTE: Expected errors are reported as Diagnostics and recovered
+			// Expected errors are reported as Diagnostics and recovered
 			// from in place — anything thrown past this point is a Compiler
 			// bug. It is reported as a Diagnostic as well, so that a single
 			// broken statement can not take down the validation of the
@@ -240,7 +240,7 @@ export const validate = (
 			raiseTopLevelStatementFloor(node)
 		}
 
-		// NOTE: Only a compile that ASKED for the tests carries a section here
+		// Only a compile that ASKED for the tests carries a section here
 		// — a build leaves the block parsed and never enriches it. A test's
 		// body is checked exactly as the implementation's Statements are: it is
 		// a block standing in no Function, so a `<-` in it is the
@@ -259,7 +259,7 @@ export const validate = (
 	return diagnostics
 }
 
-// NOTE: One top-level Statement has been walked — see `topLevelStatementFloor`.
+// One top-level Statement has been walked — see `topLevelStatementFloor`.
 // A `<-` written at the top level does not move the floor: it is exactly the
 // Statement a dropped head orphans, and a head drops ONE `{` however many
 // Returns end up standing outside it.
@@ -276,7 +276,7 @@ function raiseTopLevelStatementFloor(
 	)
 }
 
-// NOTE: Whether the Parser abandoned text on any line this construct is written
+// Whether the Parser abandoned text on any line this construct is written
 // across — see `abandonedLines`. Lines rather than spans, because a Statement
 // dropped out of a body leaves a hole the body's own span no longer reaches:
 // `<- item:isGreaterThan(2)` keeps the `<- item` and drops the rest of the line,
@@ -315,7 +315,7 @@ function reportInternalError(error: unknown, position: common.Position): void {
 
 function validateTestsNode(node: common.typed.TestsNode): void {
 	if (node.nodeType === "Test") {
-		// NOTE: The rows and what a Pattern Parameter binds off them are
+		// The rows and what a Pattern Parameter binds off them are
 		// Expressions and Statements of the test like any other. Walking only
 		// the body would let a non-exhaustive `match` in a row compile in
 		// silence while the identical one a line below is refused.
@@ -327,7 +327,7 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 			validateImplementationNode(binding, null)
 		}
 
-		// NOTE: And a generator's own Expressions, for the same reason: a
+		// And a generator's own Expressions, for the same reason: a
 		// refinement's check and a `Generatable` call are Expressions the
 		// Compiler wrote, but they are emitted into this Module and run in this
 		// test, so whatever the Validator says about an Expression it says
@@ -336,7 +336,7 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 			validateGenerator(parameter.generator)
 		}
 
-		// NOTE: A `test` body is run once and awaited, so it may wait; a
+		// A `test` body is run once and awaited, so it may wait; a
 		// property body runs once per generated value and a benchmark body is
 		// timed over many runs, and neither can. The same three answers the
 		// Enricher's barriers give, said here so that a report the Validator
@@ -420,7 +420,7 @@ function collectTopLevelNamespaces(
 	>()
 
 	for (let [index, node] of nodes.entries()) {
-		// NOTE: The FIRST Declaration of a name is the one recorded — a name
+		// The FIRST Declaration of a name is the one recorded — a name
 		// declared twice is the Enricher's report to make, and until the second
 		// one is removed it is the first that a use between them reaches.
 		if (
@@ -462,12 +462,12 @@ function validateImplementationNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
-		// NOTE: Never reached — the Validator runs on a Program the Enricher
+		// Never reached — the Validator runs on a Program the Enricher
 		// reported nothing about, and a refused value only ever stands in one
 		// it did. Named all the same, so the switch stays total and nothing has
 		// to guess what a Node kind left out of it would have done.
 		case "RefusedValue":
-			// NOTE: The one position where what an Expression ANSWERS with
+			// The one position where what an Expression ANSWERS with
 			// decides whether it may stand at all — a Statement drops the
 			// value, and for work that is the whole of what went wrong. Asked
 			// here rather than in `validateExpression`, because this is the
@@ -537,7 +537,7 @@ function validateExpression(
 		case "IntegerValue":
 		case "BooleanValue":
 		case "Self":
-		// NOTE: Never reached, for the reason the Statement walk gives — and
+		// Never reached, for the reason the Statement walk gives — and
 		// there would be nothing to validate either way: what stands here was
 		// refused where it was written.
 		case "RefusedValue":
@@ -546,7 +546,7 @@ function validateExpression(
 	}
 }
 
-// NOTE: A Union of work is work. `complete` and `start` unwrap such a Union
+// A Union of work is work. `complete` and `start` unwrap such a Union
 // member by member, because the runtime answers each member on its own, and a
 // Statement holding one drops exactly as much as a Statement holding a single
 // Future does. One level, for the reason `unwrapWork` gives in the Enricher.
@@ -558,7 +558,7 @@ function holdsWork(type: common.Type, kind: "Future" | "Started"): boolean {
 	)
 }
 
-// NOTE: An Expression written in a Statement position — its value goes nowhere
+// An Expression written in a Statement position — its value goes nowhere
 // — and the two answers that makes a mistake of.
 //
 // A `Future` is a DESCRIPTION of work: dropping one runs nothing at all, which
@@ -567,7 +567,7 @@ function holdsWork(type: common.Type, kind: "Future" | "Started"): boolean {
 // write, and a thing to be told about, so it is an Information rather than a
 // complaint.
 //
-// NOTE: Asked of every Expression Statement rather than only of the two
+// Asked of every Expression Statement rather than only of the two
 // Keywords, because the Type is what decides it: a plain call answering a
 // Future — `headline(url)` on its own line — is exactly the mistake this is for,
 // and the call says nothing about asynchrony on its face.
@@ -586,7 +586,7 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 			notes: [
 				"A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.",
 			],
-			// NOTE: And the second help, because a call that merely HANDS a
+			// And the second help, because a call that merely HANDS a
 			// Future on is the same Statement to this rule and a different
 			// mistake to whoever wrote it: `Terminal.inspect(work)` printed
 			// what it was asked to print, and what goes nowhere is the value
@@ -601,7 +601,7 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 
 	if (holdsWork(type, "Started")) {
-		// NOTE: A `start` is a run this Statement put in flight; anything else
+		// A `start` is a run this Statement put in flight; anything else
 		// of this Type is a call that ANSWERED with one, which may have been
 		// written for what it did rather than for the run it handed back. The
 		// label says which, so the reader is told about the Statement they
@@ -628,13 +628,13 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 }
 
-// NOTE: A value whose Type is a Function with Protocol-bounded Type
+// A value whose Type is a Function with Protocol-bounded Type
 // Parameters can not travel — its hidden conformance parameters only exist
 // at direct invocations, where the Enricher resolves them from the concrete
 // bindings. A stored bounded Function would later be invoked without its
 // conformances, so every value position rejects it.
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
-	// NOTE: An overloaded Function is a SET of signatures, not one Function value
+	// An overloaded Function is a SET of signatures, not one Function value
 	// — a bare reference (`constant f = someOverloadedFn`) names every overload
 	// at once, and nothing downstream can pick which one a later invocation
 	// meant. Refused in every value position, exactly like a bounded Function,
@@ -680,7 +680,7 @@ function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 				notes: [
 					"A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.",
 				],
-				// NOTE: The wrap is the clause that keeps the VALUE, and it is
+				// The wrap is the clause that keeps the VALUE, and it is
 				// what a reader who wrote this wanted: `(_ items: List<Integer>)
 				// -> Optional<Integer> { <- largest(of items) }` is a Function
 				// value, and the call inside it is direct, so the hidden
@@ -717,7 +717,7 @@ function isBoundFunctionType(type: common.Type): boolean {
 	return false
 }
 
-// NOTE: The two checks below are about the COMPILER, not about the Program:
+// The two checks below are about the COMPILER, not about the Program:
 // each states an invariant the emitted JavaScript rests on, and each throws
 // where it does not hold, which `validate` turns into the `internal-error`
 // Diagnostic. They are safety nets — every hole they were written for is fixed
@@ -725,14 +725,14 @@ function isBoundFunctionType(type: common.Type): boolean {
 // call it is about, rather than as a `ReferenceError` or a wrong answer out of
 // the emitted Program.
 //
-// NOTE: And every one of them stands down on a Program that has ALREADY been
+// And every one of them stands down on a Program that has ALREADY been
 // reported on — see `alreadyReported`. The invariants are about what the
 // emitter will be handed, and nothing is emitted from such a Program; what they
 // answer there is the recovery rather than a bug. `boxes::sort()` beside a
 // Namespace that failed to conform resolved no witness, and the arity rail
 // called that a Compiler bug in a file whose real mistake was two lines up.
 //
-// NOTE: Which means they are quiet on EXACTLY the Programs this stage newly
+// Which means they are quiet on EXACTLY the Programs this stage newly
 // walks. Before the Validator ran over a Program the stages in front of it had
 // reported on, `alreadyReported` was false for every Program it ever saw and
 // the rails watched all of them; now it is true for every broken one, and the
@@ -745,7 +745,7 @@ function railsStandDown(): boolean {
 	return alreadyReported
 }
 
-// NOTE: The Type Parameters of the Signature an Invocation resolved to — one
+// The Type Parameters of the Signature an Invocation resolved to — one
 // entry per Overload, so a Method that has several is asked about the one the
 // Arguments picked. Null where there is no Signature to count: a callee that is
 // not a Function at all, or an overloaded one no index was settled on, both of
@@ -774,21 +774,21 @@ function invokedSignatureGenerics(
 	return null
 }
 
-// NOTE: A bounded Type Parameter appends one hidden trailing Parameter to the
+// A bounded Type Parameter appends one hidden trailing Parameter to the
 // emitted Function and one hidden trailing Argument to every call of it, so a
 // call site that resolved a different NUMBER of witnesses than its callee
 // declares bounds emits a call whose Arguments are shifted — the witness lands
 // in a Parameter that expected a value, and the Program fails somewhere else
 // entirely.
 //
-// NOTE: The callee Type is read BY REFERENCE at validation time, which is the
+// The callee Type is read BY REFERENCE at validation time, which is the
 // point of the check rather than an implementation detail: a conditional
 // conformance's bounds are woven into a Namespace's Method Types while the
 // Namespace hoists, so a call enriched BEFORE the weave — a use site written
 // above the Namespace — resolved its witnesses against a Signature that had no
 // bounds yet, and only the finally-woven Type says so.
 //
-// NOTE: An Error anywhere in what the Invocation was resolved FROM is why a
+// An Error anywhere in what the Invocation was resolved FROM is why a
 // witness would be missing — a Type Parameter bound to an Error is skipped on
 // purpose, so that the one mistake is reported once, where it was made — and
 // the count says nothing then. A witness can go missing without an Error to
@@ -834,7 +834,7 @@ function checkConformanceArity(
 		(generic) => generic.constraint != null,
 	).length
 
-	// NOTE: A RECORD that routes a declared member is the one call whose hidden
+	// A RECORD that routes a declared member is the one call whose hidden
 	// Arguments the Signature does not count. A Record's members are not Type
 	// Parameters, so the builtin Namespace declares no bound for them — what the
 	// call carries is one witness per ROUTED member, and `derivedMembers` is the
@@ -856,7 +856,7 @@ function checkConformanceArity(
 	)
 }
 
-// NOTE: WHICH Overload a call resolved to is settled once, by the Enricher, and
+// WHICH Overload a call resolved to is settled once, by the Enricher, and
 // the Validator only checks that the Signature it settled on still accepts the
 // Arguments — it is a consumer of `overloadedMethodIndex`, never a second
 // selector. Selecting again here would ask the question without what the
@@ -867,7 +867,7 @@ function checkConformanceArity(
 // Simplifier mangles the callee from this index, so the call would be EMITTED
 // against an Overload the Program was never type-checked against.
 //
-// NOTE: The same Error rails as the checks above, and for the same reason: what
+// The same Error rails as the checks above, and for the same reason: what
 // the Arguments were matched with is what a missing index or an Error-tainted
 // Argument says nothing about.
 function checkCommittedOverload(
@@ -909,14 +909,14 @@ function checkCommittedOverload(
 		)
 	}
 
-	// NOTE: WHICH Parameters were left out is settled by the Enricher exactly as
+	// WHICH Parameters were left out is settled by the Enricher exactly as
 	// which Overload was, and for the same reason: the Simplifier builds the
 	// emitted Argument list from this list, so a re-match answering differently
 	// would emit the Arguments into the wrong positions. Re-matching reads only
 	// labels and `hasDefault`, so agreeing is not a coincidence — it is the
 	// invariant, and the same Error rail says so where it does not hold.
 	//
-	// NOTE: `defaultMembers` does not enter into it. A Parameter carrying one is
+	// `defaultMembers` does not enter into it. A Parameter carrying one is
 	// answered by an Argument that is WRITTEN, whole or partial, so nothing it
 	// says can move a position in this list — which is exactly why a partial
 	// default leaves `hasDefault` unset instead of widening what it means.
@@ -930,7 +930,7 @@ function checkCommittedOverload(
 	}
 }
 
-// NOTE: A `parameter` source forwards the enclosing bounded Function's own
+// A `parameter` source forwards the enclosing bounded Function's own
 // hidden conformance Parameter, which the Simplifier emits from that Function's
 // constrained Generics — so the name has to be one of those, from this Function
 // or from one it is written inside. Where it is not, the emitted call reads a
@@ -939,7 +939,7 @@ function checkCommittedOverload(
 // sides, which is what keeps the check about the JavaScript rather than about
 // the Type Parameter each side happens to call its own.
 //
-// NOTE: Conditions are walked alongside the conformance that carries them — a
+// Conditions are walked alongside the conformance that carries them — a
 // conditional conformance curries one witness per `where` condition, each
 // solved the same way, so each can forward a Parameter just as the outer one
 // can.
@@ -971,7 +971,7 @@ function checkWitnessScope(
 	}
 }
 
-// NOTE: The conditions of a witness and of every witness built together with
+// The conditions of a witness and of every witness built together with
 // it, each spelled into the same Argument list.
 function witnessConditionsOf(
 	source: Extract<common.ConformanceSource, { kind: "namespace" }>,
@@ -979,7 +979,7 @@ function witnessConditionsOf(
 	return [...source.conditions, ...(source.groupConditions ?? [])]
 }
 
-// NOTE: A `namespace` source is spelled into the Argument list of the CALL, not
+// A `namespace` source is spelled into the Argument list of the CALL, not
 // of the Declaration it comes from — `things::sort()` emits `{ compare:
 // Thing.compare }` — so a call that RUNS above the conforming Namespace reads
 // a `class` binding that holds nothing yet. The Namespace's name appears
@@ -987,7 +987,7 @@ function witnessConditionsOf(
 // does spell walk straight past it; it is the same fault they report, one
 // indirection further in.
 //
-// NOTE: Conditions are walked alongside the conformance that carries them, for
+// Conditions are walked alongside the conformance that carries them, for
 // the reason `checkWitnessScope` walks them: a conditional conformance names
 // one more Namespace per `where` condition, and every one of them is spelled
 // into the same Argument list. Each name is reported once, so a Signature that
@@ -1038,7 +1038,7 @@ function validateMethodInvocation(
 	validateExpression(node.base)
 
 	if (node.dispatch !== null) {
-		// NOTE: A dispatch branch's own copy of a contextually typed Argument is
+		// A dispatch branch's own copy of a contextually typed Argument is
 		// a whole Expression that reaches the emitted Program, and the shared
 		// Argument walked above is a DIFFERENT compilation of the same source —
 		// so every check the shared one gets, each copy has to get too, or a
@@ -1055,7 +1055,7 @@ function validateMethodInvocation(
 
 	let describeCallee = () => `'${node.namespace.name}::${node.member.name}'`
 
-	// NOTE: A dispatched Invocation names no Namespace of its own — each branch
+	// A dispatched Invocation names no Namespace of its own — each branch
 	// carries its target by NAME, with no Type to read a Signature off — so the
 	// arity of its witnesses is the one thing here that can not be cross-checked.
 	// Their scopes still can be, and are, for every branch.
@@ -1101,7 +1101,7 @@ function validateMethodInvocation(
 	return node
 }
 
-// NOTE: The dispatch branches are the Cases of a Match nobody wrote — the
+// The dispatch branches are the Cases of a Match nobody wrote — the
 // receiver's runtime Type picks one, the first that fits wins, and the same two
 // things that let a Case swallow the Case below it let a branch swallow the
 // branch below it. The Enricher orders them most specific first, so a branch
@@ -1136,7 +1136,7 @@ function validateDispatchCases(
 							"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
 							"A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.",
 						],
-						// NOTE: The Match clause is gone. A dispatch branch and a
+						// The Match clause is gone. A dispatch branch and a
 						// Match Case are picked the same way, so a Match written
 						// over these two member Types reports the very same
 						// conflict one line further down — the reader followed
@@ -1153,7 +1153,7 @@ function validateDispatchCases(
 			}
 
 			if (overlapsAtRuntime(earlierType, laterType)) {
-				// NOTE: Which container's empty value crosses. The dispatch
+				// Which container's empty value crosses. The dispatch
 				// question is `overlapsAtRuntime` and it is asked of every pair,
 				// so a pair that crosses through neither container keeps the
 				// List's wording it has always had — this only tells the reader
@@ -1187,7 +1187,7 @@ function validateDispatchCases(
 								? "Key and value Types erase before a branch is picked, so a Dictionary is placed by the entries it holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is."
 								: "Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
 						],
-						// NOTE: A Match alone narrows nothing here — its Cases are
+						// A Match alone narrows nothing here — its Cases are
 						// picked by the same erased question the branches were,
 						// so the reader who wrote one met this report again in
 						// the Match's own wording. What decides an empty
@@ -1218,7 +1218,7 @@ function validateFunctionInvocation(
 		validateNoBoundFunctionValue(argumentNode.value)
 	}
 
-	// NOTE: The callee is not walked as an Expression of its own — a static call
+	// The callee is not walked as an Expression of its own — a static call
 	// (`Namespace.method(…)`) is the one shape whose callee names something that
 	// can be too early, so it is asked about here rather than through
 	// `validateIdentifier`, which would never see it. The Property behind the
@@ -1238,7 +1238,7 @@ function validateFunctionInvocation(
 		checkPropertyIsBound(node.name)
 	}
 
-	// NOTE: An Identifier callee names itself; a Lookup and an Expression that
+	// An Identifier callee names itself; a Lookup and an Expression that
 	// answers with a Function have no one name to give, and the Position the
 	// Diagnostic carries says which call is meant either way.
 	let describeCallee = () =>
@@ -1262,7 +1262,7 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedMethod" &&
 		functionType.type !== "OverloadedStaticMethod"
 	) {
-		// NOTE: Silent where the Enricher already refused this call. It reports the
+		// Silent where the Enricher already refused this call. It reports the
 		// same sentence at the callee's own name, which is the narrower span of the
 		// two, and it answers the Invocation with an Error to say so — the ordinary
 		// reading of a hole, and the one every other check here makes. Both stages
@@ -1287,7 +1287,7 @@ function validateFunctionInvocation(
 		return node
 	}
 
-	// NOTE: And a SIGNATURE the Enricher could not establish measures nothing
+	// And a SIGNATURE the Enricher could not establish measures nothing
 	// either. A Method in a Namespace with no target Type is refused where it
 	// is written and left carrying an Error receiver, so every call of it
 	// counted one Parameter more than the reader can see and answered with
@@ -1297,14 +1297,14 @@ function validateFunctionInvocation(
 		return node
 	}
 
-	// NOTE: An Argument the Enricher could not type is an Argument that fits
+	// An Argument the Enricher could not type is an Argument that fits
 	// nothing, so measuring the call against its Signature answers the hole
 	// rather than the call — and a hole in a POSITIONAL Argument moves every
 	// Argument after it, so the whole call stands down rather than the position
 	// that carries it. The mistake has been reported where the Argument was
 	// written.
 	//
-	// NOTE: A LABELLED Argument can not move anything: it is matched by its
+	// A LABELLED Argument can not move anything: it is matched by its
 	// label, so the Arguments around it line up whatever it came to. Where
 	// every hole is labelled, the rest of the call is still measured, and the
 	// second mistake in `f(first undeclared, second 99)` is reported in the same
@@ -1324,7 +1324,7 @@ function validateFunctionInvocation(
 			node.position,
 		)
 	} else {
-		// NOTE: Every other callee: a Method with a receiver called through
+		// Every other callee: a Method with a receiver called through
 		// `.`, as `Namespace.method(…)`, and an Overload set, an `overload
 		// function` called by its name among them. A `::` call is
 		// `validateMethodInvocation`'s.
@@ -1370,7 +1370,7 @@ function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): common.typed.FunctionDefinitionNode {
-	// NOTE: The hidden conformance Parameters this Function is emitted with —
+	// The hidden conformance Parameters this Function is emitted with —
 	// the Simplifier reads them off these same Generic Declarations, so what a
 	// witness inside the body may forward is exactly what is pushed here.
 	witnessScopes.push(
@@ -1396,7 +1396,7 @@ function validateFunctionDefinition(
 		),
 	)
 
-	// NOTE: A body does not run where it is written — it runs when the Function
+	// A body does not run where it is written — it runs when the Function
 	// is called, which is at the earliest the statement that calls it — so
 	// nothing inside it is a top-level use, however far above a Declaration it
 	// stands. A Function literal written INSIDE a static Property's initialiser
@@ -1407,14 +1407,14 @@ function validateFunctionDefinition(
 
 	executingTopLevelIndex = null
 	initialisingProperty = null
-	// NOTE: The declared Type rather than the Parser's `completing` mark, which
+	// The declared Type rather than the Parser's `completing` mark, which
 	// says only that a `complete` is ALREADY written. A `-> Future<…>` body that
 	// has not written its first one is exactly the body a report is most likely
 	// to be offering the word to, and it may have it.
 	waitingBodies.push(node.returnType.type === "Future" ? true : "plain-body")
 
 	try {
-		// NOTE: A default runs when the Function is CALLED, in the frame the
+		// A default runs when the Function is CALLED, in the frame the
 		// body runs in — so it is held to everything the body is held to, under
 		// the same suspended top-level index, and it is checked ahead of the
 		// body because that is where it stands. Nothing inside a `= expression`
@@ -1460,7 +1460,7 @@ function writtenBoundOf(
 	return displayProtocolName(parameter.constraint)
 }
 
-// NOTE: A native Method has no body, and the frame the Compiler synthesizes for
+// A native Method has no body, and the frame the Compiler synthesizes for
 // its defaults is the only Essence it owns — so it is the only thing here to
 // check, and checking it is what keeps a `declarations { … }` Program held to
 // what every other Program is held to.
@@ -1492,7 +1492,7 @@ function validateLookup(
 	return node
 }
 
-// NOTE: A static Property read out of the initialiser of a Property of the SAME
+// A static Property read out of the initialiser of a Property of the SAME
 // Namespace, where the one being read is written at or below the one reading it.
 // The Namespace is emitted as a `class` and its Properties as static fields,
 // which are initialised in the order they are written, so the read answers
@@ -1536,7 +1536,7 @@ function checkPropertyIsBound(node: common.typed.LookupNode): void {
 	)
 }
 
-// NOTE: A name is nothing but a name in every other respect — the one thing it
+// A name is nothing but a name in every other respect — the one thing it
 // can be wrong about on its own is naming a Namespace from above the Declaration
 // of it. A static Method call and a static Property read both reach here through
 // the base of their Lookup, which is where the Namespace is written.
@@ -1550,7 +1550,7 @@ function validateIdentifier(
 	return node
 }
 
-// NOTE: Whether anything this Match is judged BY is a hole — the value it
+// Whether anything this Match is judged BY is a hole — the value it
 // matches, or a Matcher the Enricher could not resolve. Every verdict below is
 // a comparison between the two, and a comparison against an Error answers the
 // mistake that left it rather than the Cases the reader wrote: a Case naming a
@@ -1563,7 +1563,7 @@ function validateIdentifier(
 function matchIsJudgeable(node: common.typed.MatchNode): boolean {
 	return (
 		!typeContainsError(node.value.type) &&
-		// NOTE: The RUNTIME Matcher, which is the Matcher with the Handler's
+		// The RUNTIME Matcher, which is the Matcher with the Handler's
 		// payload requirements grafted onto it — that is the Type every verdict
 		// below is computed from, and a requirement naming a member nothing
 		// declares leaves its hole there rather than in the Matcher itself.
@@ -1580,7 +1580,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
 	if (!matchIsJudgeable(node)) {
-		// NOTE: The Handlers' BODIES are still walked — everything below the
+		// The Handlers' BODIES are still walked — everything below the
 		// early return covers them, and a mistake written inside a Handler is
 		// its own, whatever the Match around it came to.
 		validateMatchHandlers(node)
@@ -1589,7 +1589,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	}
 
 	if (node.value.type.type === "UnionType") {
-		// NOTE: Flattened, so that a Union member that is itself a Union — a
+		// Flattened, so that a Union member that is itself a Union — a
 		// Choice composed as `CalculatorOperation | String`, or `Number |
 		// String` — is discharged by Handlers for its *members* rather than
 		// demanding one Handler for the nested Union as a whole.
@@ -1608,7 +1608,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			}
 		}
 
-		// NOTE: One Diagnostic for the whole Match rather than one per
+		// One Diagnostic for the whole Match rather than one per
 		// unhandled member — they all have the same cause and the same fix,
 		// and a Union of six unhandled members would otherwise bury the rest
 		// of the output.
@@ -1632,14 +1632,14 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					helps: [
 						`Add ${descriptions.map((description) => `'case ${description}'`).join(", ")}, or a 'case _' that covers the rest.`,
 					],
-					// NOTE: The same spellings once more, in declaration
+					// The same spellings once more, in declaration
 					// order, for the Quick Fix that writes the Handlers out.
 					data: { kind: "missing-case", unhandled: descriptions },
 				},
 			)
 		}
 
-		// NOTE: Which Handler already answers for each member of the Union, by
+		// Which Handler already answers for each member of the Union, by
 		// index — a Handler is dead not only when its Matcher names a Type the
 		// Union does not have, but also when every Type it could match was
 		// already taken by an earlier Handler. A Handler takes one when its
@@ -1658,7 +1658,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		) {
 			let handler = node.handlers[handlerIndex]
 			let runtimeMatcher = runtimeMatchers[handlerIndex]
-			// NOTE: The members SOME value of which can take this Handler's
+			// The members SOME value of which can take this Handler's
 			// test — overlap, not acceptance, because a test that narrows (a
 			// Record member, a payload requirement) still runs for the values
 			// that pass it. Acceptance here called such a Handler dead while
@@ -1678,7 +1678,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			}
 
 			if (matchedMemberIndices.length === 0) {
-				// NOTE: Tagged `unnecessary` so that clients grey the case out
+				// Tagged `unnecessary` so that clients grey the case out
 				// instead of underlining it — it is dead, not wrong. The
 				// Position is the Matcher's, so only the dead Handler is
 				// greyed out rather than the whole Match.
@@ -1700,7 +1700,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 								`this is ${withArticle(describeType(node.value.type))}`,
 							),
 						],
-						// NOTE: Removal is safe here and nowhere else in this
+						// Removal is safe here and nowhere else in this
 						// function: this Case overlaps NO member, so taking it
 						// out changes nothing about what the Match answers for
 						// — a Case the exhaustiveness check never counted can
@@ -1732,7 +1732,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				}
 			}
 
-			// NOTE: Every Type this Handler could match is spoken for, and the
+			// Every Type this Handler could match is spoken for, and the
 			// first Handler that fits is the one that runs — so this one never
 			// does, whether it is a duplicated `case Integer` or a Case written
 			// below the `case _` that swallows it. Its own Guard or literal
@@ -1742,7 +1742,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				let claimingHandler = node.handlers[claimingHandlerIndex]
 				let claimingMatcher = runtimeMatchers[claimingHandlerIndex]
 
-				// NOTE: WHY the earlier Case answers for this one decides what
+				// WHY the earlier Case answers for this one decides what
 				// there is to say about it, and two of the three reasons are
 				// nowhere in the source. A Generic Matcher covers its members
 				// because there is nothing left to check by the time it runs,
@@ -1753,7 +1753,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				let notes = [
 					"Cases are tried in order, and the first one that fits wins.",
 				]
-				// NOTE: Reordering is only an answer where the covered Matcher
+				// Reordering is only an answer where the covered Matcher
 				// is NARROWER than the one covering it. Two Matchers that ask
 				// the same question — a `case #Red` written twice — swallow each
 				// other whichever way round they are written, so "write it above"
@@ -1764,7 +1764,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						? "Remove this Case — the Case above answers for every value it would take, in whichever order the two are written."
 						: "Remove this Case, or write it above the one that covers it.",
 				]
-				// NOTE: The two reasons that are ERASURE rather than dead code.
+				// The two reasons that are ERASURE rather than dead code.
 				// A Case shadowed by a Type that covers it is a Case nobody
 				// needed; a Case shadowed by a Type the source says it is
 				// unrelated to is a Program answering with the wrong value —
@@ -1779,7 +1779,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						`Types erase before a Match runs, so the Generic Case '${describeType(claimingHandler.matcher)}' narrows nothing and accepts every value that reaches it.`,
 					)
 
-					// NOTE: Reordering is an answer only where THIS Case is
+					// Reordering is an answer only where THIS Case is
 					// narrower than the one covering it. Where both Cases name
 					// Type Parameters neither is narrower — both accept every
 					// value that reaches them — so "write it above" moved the
@@ -1801,7 +1801,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 									`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
 								]
 				} else if (!matchesType(claimingMatcher, runtimeMatcher)) {
-					// NOTE: The earlier test does not accept this one's Type at
+					// The earlier test does not accept this one's Type at
 					// all, so what it claimed it claimed through erasure.
 					// Reordering can not help here: whichever of the two is
 					// written first swallows the other. WHICH erasure decides
@@ -1820,7 +1820,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 							: "A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 					)
 
-					// NOTE: A Guard is no answer here, in either position, and
+					// A Guard is no answer here, in either position, and
 					// the clause offering one is gone. On THIS Case it changes
 					// nothing — the earlier one decides first and never reaches
 					// it, which is what the Label already says. On the Case
@@ -1862,7 +1862,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						},
 					)
 				} else {
-					// NOTE: Tagged `unnecessary` so that clients grey the Case
+					// Tagged `unnecessary` so that clients grey the Case
 					// out instead of underlining it — it is dead, not wrong,
 					// which is exactly what the erased pair above is not.
 					reportWarning(
@@ -1918,7 +1918,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				notes: [
 					"Matching a Type with only one possible shape has only one outcome.",
 				],
-				// NOTE: The two forms that DO ask about a value with one shape,
+				// The two forms that DO ask about a value with one shape,
 				// which is what a reader reaching for `match` here wanted. Named
 				// in the order they answer: a question with two answers is an
 				// `if`, and one with several is a `define`. An Integer or a
@@ -1936,20 +1936,20 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	return node
 }
 
-// NOTE: What every Handler is made of, judged whatever the Match around it came
+// What every Handler is made of, judged whatever the Match around it came
 // to. Split out because a Match nothing can be said ABOUT still holds Handlers
 // whose bodies are ordinary Statements — the reader's own — and skipping them
 // with the exhaustiveness verdict would take a whole branch of the Program out
 // of the Validator's reach for want of one resolved Case name.
 function validateMatchHandlers(node: common.typed.MatchNode): void {
 	for (let handler of node.handlers) {
-		// NOTE: A Guard decides, per value, whether its Handler runs — it is a
+		// A Guard decides, per value, whether its Handler runs — it is a
 		// Condition, and is held to what every other Condition is held to.
 		if (handler.guard !== null) {
 			validateCondition(handler.guard, "A Case Guard")
 		}
 
-		// NOTE: A Matcher's literals are Expressions of their own — only a
+		// A Matcher's literals are Expressions of their own — only a
 		// Literal can stand there, so in practice this is `case 1/0`'s
 		// denominator, but a Matcher is no more exempt from the walk than any
 		// other place a value is written.
@@ -1963,7 +1963,7 @@ function validateMatchHandlers(node: common.typed.MatchNode): void {
 			}
 		}
 
-		// NOTE: Synthetic — a Match handler is validated as if it were a
+		// Synthetic — a Match handler is validated as if it were a
 		// Function body so that its `<-` Statements are checked against the
 		// Match's Type. It has no Parameter list of its own, so nothing here
 		// is ever inferred or hinted.
@@ -1986,7 +1986,7 @@ function validateMatchHandlers(node: common.typed.MatchNode): void {
 	}
 }
 
-// NOTE: Nothing here walks sub-Expressions on its own — every Validator recurs
+// Nothing here walks sub-Expressions on its own — every Validator recurs
 // by hand — so an arm this does not visit is an arm nothing validates at all.
 // Both halves of every arm are Expressions the Program evaluates, and the
 // `otherwise` arm's value is one as much as the rest.
@@ -1999,7 +1999,7 @@ function validateDefine(
 		checkDefineAnswer(node, arm.value)
 		validateExpression(arm.value)
 
-		// NOTE: An arm's Condition picks the path exactly as an `if` does, and
+		// An arm's Condition picks the path exactly as an `if` does, and
 		// is held to what every other Condition is held to: Essence has no
 		// truthiness, so only a Boolean may decide.
 		validateCondition(arm.condition, "A Define Condition")
@@ -2011,7 +2011,7 @@ function validateDefine(
 	return node
 }
 
-// NOTE: A `define` whose only arm is the `otherwise` one asks nothing. It is
+// A `define` whose only arm is the `otherwise` one asks nothing. It is
 // the value it answers with, written the long way round, and every reader who
 // meets it has to read the braces before they find that out.
 //
@@ -2025,7 +2025,7 @@ function validateDefine(
 // well-formed: it has the one arm every `define` must have, and this is a
 // judgment about what that arm is worth rather than about how it was written.
 function reportCaselessDefine(node: common.typed.DefineNode): void {
-	// NOTE: And silent for a `define` the Parser did not read whole — see
+	// And silent for a `define` the Parser did not read whole — see
 	// `partiallyRead`. A ladder whose arms were dropped has no cases HERE and
 	// every one of them in the file, which is the syntax error above wearing a
 	// Warning's clothes.
@@ -2046,13 +2046,13 @@ function reportCaselessDefine(node: common.typed.DefineNode): void {
 	})
 }
 
-// NOTE: Every arm answers where the `define` stands, so every arm is held to
+// Every arm answers where the `define` stands, so every arm is held to
 // the `define`'s answer Type. Asked of the Type whatever decided it: where the
 // arms decided it themselves it is the Union of exactly these values and each
 // of them fits by construction, so one check covers the arrow and the position
 // around the `define` without the Node having to say which of them spoke.
 //
-// NOTE: Reported at the arm's VALUE, which is the part a reader can change —
+// Reported at the arm's VALUE, which is the part a reader can change —
 // the arrow's Type has no Position of its own, and the position around a
 // `define` is a Declaration's annotation somewhere above it. Same reason a `<-`
 // is reported where it is, and the same code: an arm is what a `define`
@@ -2109,7 +2109,7 @@ function checkDefineAnswer(
 	)
 }
 
-// NOTE: A Case that an earlier one takes the EMPTY VALUES of a container from
+// A Case that an earlier one takes the EMPTY VALUES of a container from
 // without covering it: an empty List fits every List Matcher, so
 // `case List<String>` above `case List<Integer>` answers for an empty
 // `List<Integer>` and this Case never sees one. Nothing said so before, in
@@ -2119,12 +2119,12 @@ function checkDefineAnswer(
 // takes are exactly the ones it names, which is Cases being tried in order and
 // nothing to warn about.
 //
-// NOTE: The empty DICTIONARY crosses in exactly the same way and is reported in
+// The empty DICTIONARY crosses in exactly the same way and is reported in
 // exactly the same place, under a Warning of its own — a Dictionary reader is
 // told about its two slots and helped with `hasEntries()`, where a List reader
 // is told about item Types and helped with `hasItems()`.
 //
-// NOTE: One Diagnostic per Handler, on the first earlier Case that overlaps it.
+// One Diagnostic per Handler, on the first earlier Case that overlaps it.
 // Members the earlier Case takes ENTIRELY are none of this: those are the
 // dead-Case reports above, and this Handler still runs for the rest.
 function reportEmptyContainerOverlap(
@@ -2196,17 +2196,17 @@ function reportEmptyContainerOverlap(
 	}
 }
 
-// NOTE: A Match that takes a VALUE apart rather than a Type — `match n { case 0
+// A Match that takes a VALUE apart rather than a Type — `match n { case 0
 // { … } case _ { … } }`. There is no Union here to be exhaustive over, so what
 // stands in for exhaustiveness is the SHAPE: every Case names a value, and the
 // last one answers for every value the Cases above it did not name.
 //
-// NOTE: That last Case is also where evidence comes from. Reaching it proves the
+// That last Case is also where evidence comes from. Reaching it proves the
 // value is none of the values named above, which is the `isNot` a refinement is
 // declared by — `refinedSelfType` in the Enricher is what reads it — so the
 // shape is a rule about what the Program MEANS rather than a matter of style.
 //
-// NOTE: Integer and String, and no other Type. They are the two whose literal
+// Integer and String, and no other Type. They are the two whose literal
 // Matcher asks exactly what their Namespace's `is` asks: `anyIs` compares
 // Integers as bigints and Strings NFC-normalised, which is what `Integer.is`
 // and `String.is` answer, so a Case that declined really does prove `isNot`.
@@ -2216,7 +2216,7 @@ function reportEmptyContainerOverlap(
 // A Boolean's two values are an `if` written the long way, and everything else,
 // a Rational included, keeps `match-on-non-union`.
 //
-// NOTE: A Match on one of the two that names NO value at all is not one of
+// A Match on one of the two that names NO value at all is not one of
 // these. It asks nothing about the value it was given, which is the one-outcome
 // Match `match-on-non-union` has always been about, and it still reports.
 function isLiteralMatch(node: common.typed.MatchNode): boolean {
@@ -2228,7 +2228,7 @@ function isLiteralMatch(node: common.typed.MatchNode): boolean {
 	)
 }
 
-// NOTE: One Diagnostic per Case that can not stand where it stands, and one more
+// One Diagnostic per Case that can not stand where it stands, and one more
 // for a Match that does not end in a Case for the rest — each is a mistake of
 // its own at a Position of its own, which is why they are not merged the way
 // `missing-case` merges the members of a Union.
@@ -2242,7 +2242,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 	let takesValuesApart = `A Match on ${withArticle(describeType(scrutinee))} takes the VALUE apart: every Case names a value, and the last one answers for every value the Cases above it did not name.`
 	let lastIndex = node.handlers.length - 1
 	let last = node.handlers[lastIndex]
-	// NOTE: Whether the Match ALREADY ends in a Case for the rest, which is what
+	// Whether the Match ALREADY ends in a Case for the rest, which is what
 	// decides the Help below — the same question the final check asks, asked once
 	// and read twice so the two can not disagree.
 	let endsInACaseForTheRest =
@@ -2267,7 +2267,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 						matchedValue(),
 					],
 					notes: [takesValuesApart],
-					// NOTE: `'case 0'` was an example of a value, and it is a
+					// `'case 0'` was an example of a value, and it is a
 					// dead end on a Match over Strings — a Case naming an
 					// Integer there is refused two clauses down. And "move it to
 					// the end" is only an edit where there is no end yet: a
@@ -2314,7 +2314,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 			continue
 		}
 
-		// NOTE: The Case is compared TO the matched value, so a Case naming a
+		// The Case is compared TO the matched value, so a Case naming a
 		// value of another Type is a comparison that is false however it is
 		// written — the same mistake `n::is("zero")` is, in the one place the
 		// Types were never checked against each other.
@@ -2334,7 +2334,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 					notes: [
 						"A Case of such a Match is compared to the matched value, and a comparison across Types can never be true.",
 					],
-					// NOTE: The Type a value written here has to BE, which the
+					// The Type a value written here has to BE, which the
 					// Label has just said this one is not. Removal is the other
 					// answer and is always safe: a Case comparing across Types
 					// is never true, so the Cases below it already answer for
@@ -2347,10 +2347,10 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 		}
 	}
 
-	// NOTE: A Match with no Handlers at all is a Parser error, and this runs on a
+	// A Match with no Handlers at all is a Parser error, and this runs on a
 	// tree the Parser accepted.
 	//
-	// NOTE: `endsInACaseForTheRest` is the answer to "unconditional, and
+	// `endsInACaseForTheRest` is the answer to "unconditional, and
 	// accepting every value that can arrive" — `case _`, or a Case naming the
 	// matched Type itself, which is the same question spelled out. Both are
 	// indistinguishable by the time a Match is typed, and both are total, so
@@ -2376,7 +2376,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 	)
 }
 
-// NOTE: WHY the last Handler is not the end of a Match on values — the three ways
+// WHY the last Handler is not the end of a Match on values — the three ways
 // it can fail to answer for everything the Cases above it left, each underlining
 // the part of the Handler that decides.
 function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
@@ -2407,7 +2407,7 @@ function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
 	)
 }
 
-// NOTE: A Handler with a literal Matcher, a value-constrained Record member or
+// A Handler with a literal Matcher, a value-constrained Record member or
 // a Guard covers only part of its Matcher's Type — `case 0` leaves every other
 // Integer, and a Guard can decline outright. So only an unconditional Handler
 // discharges a member of the Union, and only an unconditional Handler takes a
@@ -2421,7 +2421,7 @@ function isUnconditionalHandler(handler: MatchHandler): boolean {
 	)
 }
 
-// NOTE: Whether the Handler's emitted TEST is its whole question — nothing left
+// Whether the Handler's emitted TEST is its whole question — nothing left
 // that could decline a value the test accepted. Payload requirements stay in:
 // they are part of the test itself, which `runtimeMatcherOf` folds into the
 // Matcher, so a requirement that erases at runtime claims the Cases below it
@@ -2435,7 +2435,7 @@ function claimsWhatItsTestAccepts(handler: MatchHandler): boolean {
 	)
 }
 
-// NOTE: The question a Handler's emitted test asks, as ONE Type — the Matcher
+// The question a Handler's emitted test asks, as ONE Type — the Matcher
 // with the payload requirements grafted onto the members their spines reach.
 // `case #Apply({ fn: IntFn })` and `case { fn: IntFn }` are two spellings of
 // one test, and reachability has to read them as one: a requirement kept
@@ -2481,7 +2481,7 @@ function graftRequirement(
 		),
 	}
 
-	// NOTE: A grafted Record is built fresh rather than spread over, because a
+	// A grafted Record is built fresh rather than spread over, because a
 	// member narrowed by a requirement is a shape no Alias declared: a
 	// `Standing` whose `points` a Pattern requires to be a `NonZeroInteger` is
 	// not what `Standing` says, and this Type is PRINTED — the reachability
@@ -2493,13 +2493,13 @@ function graftRequirement(
 		: { ...type, members }
 }
 
-// NOTE: Whether the check emitted for `matcher` answers TRUE for EVERY value of
+// Whether the check emitted for `matcher` answers TRUE for EVERY value of
 // `memberType` — which decides reachability, and is a WIDER question than
 // assignability. Some of what a Matcher names does not survive to runtime, and
 // what does not survive can not narrow: assignability answers what a Case may
 // assume about the values it accepts, this answers which values reach it at all.
 //
-// NOTE: Two things erase, and each one is a Case that swallowed everything below
+// Two things erase, and each one is a Case that swallowed everything below
 // it with nothing here to say so. A Generic Matcher (and the wildcard's Unknown,
 // which is the same answer spelled differently) has no Type left to check, so
 // `isValueOfType` returns true unconditionally — `case Value` above `case
@@ -2509,14 +2509,14 @@ function graftRequirement(
 // Matcher naming a callback member accepts every Record carrying one, whatever
 // that callback's Parameters and Return Type were declared as.
 //
-// NOTE: Exported so the agreement between this and the runtime can be tested
+// Exported so the agreement between this and the runtime can be tested
 // directly — every value this accepts, `isValueOfType` has to accept too, and
 // `overlapsAtRuntime` below is the other side of the same sandwich.
 export function acceptsAllAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
-	// NOTE: A checked refinement is the third thing that erases, and the most
+	// A checked refinement is the third thing that erases, and the most
 	// completely: its predicate is not a check the runtime declines to make, it
 	// is a check the runtime never hears of. So both sides are unwrapped before
 	// anything else is asked, and a refinement answers exactly as its base does
@@ -2536,7 +2536,7 @@ export function acceptsAllAtRuntime(
 		return true
 	}
 
-	// NOTE: A Union is decided member by member, on whichever side it stands:
+	// A Union is decided member by member, on whichever side it stands:
 	// every value of a matched Union has to pass, and a Matcher that is a Union
 	// passes a value as soon as one of its arms does.
 	if (memberType.type === "UnionType") {
@@ -2555,13 +2555,13 @@ export function acceptsAllAtRuntime(
 		return memberType.type === "Function"
 	}
 
-	// NOTE: Structural and open, exactly as the runtime check is — the value
+	// Structural and open, exactly as the runtime check is — the value
 	// has to carry every member the Matcher names, and may carry more besides.
 	if (matcher.type === "Record" && memberType.type === "Record") {
 		return membersAcceptAllAtRuntime(matcher.members, memberType.members)
 	}
 
-	// NOTE: The Record check with the tag in front of it, which is what the
+	// The Record check with the tag in front of it, which is what the
 	// runtime does for a Case — the tag is shared by every instantiation, so
 	// the payload is what tells `Box<Integer>#Full` from `Box<String>#Full`.
 	if (matcher.type === "Case" && memberType.type === "Case") {
@@ -2572,7 +2572,7 @@ export function acceptsAllAtRuntime(
 		)
 	}
 
-	// NOTE: A List Matcher is answered by the items the value HOLDS, so it takes
+	// A List Matcher is answered by the items the value HOLDS, so it takes
 	// every List whose item Type its own accepts — and one naming no item Type
 	// at all (a bare `List`) takes every List there is. A member Type whose own
 	// items are undecided could hold anything, so it is not all of anything.
@@ -2590,7 +2590,7 @@ export function acceptsAllAtRuntime(
 		)
 	}
 
-	// NOTE: A Dictionary Matcher is answered by the entries the value HOLDS, as
+	// A Dictionary Matcher is answered by the entries the value HOLDS, as
 	// a List Matcher is answered by its items — the tag first, then each slot on
 	// its own terms.
 	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
@@ -2609,7 +2609,7 @@ export function acceptsAllAtRuntime(
 	return false
 }
 
-// NOTE: Whether the check emitted for `matcher` can answer TRUE for SOME value
+// Whether the check emitted for `matcher` can answer TRUE for SOME value
 // of `memberType`. It differs from `acceptsAllAtRuntime` in exactly one place,
 // and that place is the whole reason it exists: an empty List holds no item to
 // disagree about, so it is a value of every List Type there is and every List
@@ -2617,14 +2617,14 @@ export function acceptsAllAtRuntime(
 // runs for an empty `List<Integer>`, which assignability — and so the Validator
 // — used to call impossible while the runtime did it.
 //
-// NOTE: Conservative everywhere else: an answer of false is a promise that no
+// Conservative everywhere else: an answer of false is a promise that no
 // value of `memberType` reaches this Matcher, so anything not known to overlap
 // is answered exactly as `acceptsAllAtRuntime` answers it.
 export function overlapsAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
-	// NOTE: Unwrapped for the reason its sibling above unwraps.
+	// Unwrapped for the reason its sibling above unwraps.
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
 		return overlapsAtRuntime(
 			eraseRefinements(matcher),
@@ -2636,7 +2636,7 @@ export function overlapsAtRuntime(
 		return true
 	}
 
-	// NOTE: A member Type that is still a Type Parameter is NOT counted as an
+	// A member Type that is still a Type Parameter is NOT counted as an
 	// overlap, though its Argument could be anything: every Match over a
 	// `Value | String` would report one, and a Type Parameter's values are
 	// exactly what the Handlers around it are written to sort out. What this
@@ -2670,12 +2670,12 @@ export function overlapsAtRuntime(
 		)
 	}
 
-	// NOTE: The empty List, whatever the two item Types are.
+	// The empty List, whatever the two item Types are.
 	if (isRuntimeList(matcher) && isRuntimeList(memberType)) {
 		return true
 	}
 
-	// NOTE: And the empty Dictionary, which holds no entry to disagree about
+	// And the empty Dictionary, which holds no entry to disagree about
 	// either of its slots over.
 	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
 		return true
@@ -2684,13 +2684,13 @@ export function overlapsAtRuntime(
 	return false
 }
 
-// NOTE: Whether the values that cross from `memberType` into `matcher` are the
+// Whether the values that cross from `memberType` into `matcher` are the
 // EMPTY ones of a container — a Matcher somewhere in the overlap whose own slots
 // do not take the member's. That crossover is the one `overlapsAtRuntime` exists
 // to see, and the one worth a warning: every other partial overlap is a Matcher
 // taking exactly the values it names, in order, as Matchers do.
 //
-// NOTE: The empty DICTIONARY crosses in exactly the same way, and is asked about
+// The empty DICTIONARY crosses in exactly the same way, and is asked about
 // under its own `kind` rather than folded into the List's answer. The two
 // Warnings are not one Warning — a List reader is told about item Types and
 // helped with `hasItems()`, and a Dictionary reader about its two slots and
@@ -2745,7 +2745,7 @@ function overlapsThroughEmptyContainer(
 	return false
 }
 
-// NOTE: Which container's empty value crosses, or null where nothing does. A
+// Which container's empty value crosses, or null where nothing does. A
 // List is asked about FIRST, so a Program that crosses through both — a Record
 // holding one of each — reports the List's Warning it has always reported.
 type EmptyCrossover = "List" | "Dictionary"
@@ -2769,7 +2769,7 @@ function membersAcceptAllAtRuntime(
 	matcherMembers: Record<string, common.Type>,
 	memberTypes: Record<string, common.Type>,
 ): boolean {
-	// NOTE: `Object.hasOwn` before the read — a member named after one of
+	// `Object.hasOwn` before the read — a member named after one of
 	// `Object.prototype`'s would otherwise be checked against a JavaScript
 	// function the value does not carry.
 	return Object.entries(matcherMembers).every(
@@ -2790,7 +2790,7 @@ function membersOverlapAtRuntime(
 	)
 }
 
-// NOTE: The two Types the runtime answers its List check for — a `List<X>` and
+// The two Types the runtime answers its List check for — a `List<X>` and
 // the bare `List` a Generic List annotation resolves to, which names no item
 // Type of its own.
 function isRuntimeList(type: common.Type): boolean {
@@ -2801,7 +2801,7 @@ function runtimeItemType(type: common.Type): common.Type {
 	return type.type === "List" ? type.itemType : { type: "Unknown" }
 }
 
-// NOTE: The same pair for the Dictionary, whose bare spelling names neither of
+// The same pair for the Dictionary, whose bare spelling names neither of
 // its slots — so both read as Unknown, which is what the checks above ask for
 // when they mean "this says nothing about that half".
 function isRuntimeDictionary(type: common.Type): boolean {
@@ -2816,7 +2816,7 @@ function runtimeValueType(type: common.Type): common.Type {
 	return type.type === "Dictionary" ? type.valueType : { type: "Unknown" }
 }
 
-// NOTE: One slot of a Dictionary, asked exactly as `acceptsAllAtRuntime` asks a
+// One slot of a Dictionary, asked exactly as `acceptsAllAtRuntime` asks a
 // List's items — the Matcher naming nothing there takes every value, and a
 // member whose own slot is undecided could hold anything, so it is not all of
 // anything. The two slots are asked SEPARATELY and both have to answer, which is
@@ -2836,7 +2836,7 @@ function slotAcceptsAllAtRuntime(
 	)
 }
 
-// NOTE: Whether the payload is present and matches is checked here rather
+// Whether the payload is present and matches is checked here rather
 // than in the Enricher — the Case's Type resolves either way, so a wrong
 // payload stays a single Diagnostic instead of poisoning the whole
 // Expression.
@@ -2852,7 +2852,7 @@ function validateCaseValue(
 		return node
 	}
 
-	// NOTE: A payload judged against a Case whose own members the Enricher could
+	// A payload judged against a Case whose own members the Enricher could
 	// not establish — or a payload VALUE it could not — is judged against a hole,
 	// and every answer that comes back names Types the reader never wrote. The
 	// two shape checks above it stand down with it: which of them applies is
@@ -2891,13 +2891,13 @@ function validateCaseValue(
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
 				],
-				// NOTE: A bare `#Case` is a UNIT Case's spelling and stays one,
+				// A bare `#Case` is a UNIT Case's spelling and stays one,
 				// however much of a payload is defaulted — which is what keeps
 				// a bare Case name meaning exactly one thing on both sides of
 				// the JavaScript boundary. So a fully defaulted Case has an
 				// empty payload to write, and this is where to say so.
 				//
-				// NOTE: Every other one gets the SHAPE, spelled with the member
+				// Every other one gets the SHAPE, spelled with the member
 				// names the Note has just named the Types of — the two halves of
 				// one answer, and a reader holding both writes the payload
 				// without looking the Case up. The values are the reader's, so
@@ -2920,7 +2920,7 @@ function validateCaseValue(
 	} else if (
 		reportUnmergedPayloadPathKey(payloadType, node.type, node.value)
 	) {
-		// NOTE: Reported already — a path key the payload's default does not
+		// Reported already — a path key the payload's default does not
 		// reach into is what made the payload not fit, and naming the whole Type
 		// under it would name everything but the mistake.
 	} else if (casePayloadIsPartial(node.type, node.value)) {
@@ -2936,7 +2936,7 @@ function validateCaseValue(
 	} else if (
 		!matchesType(payloadType, casePayloadType(node.type, node.value))
 	) {
-		// NOTE: A generic Choice applied to a blank carries one: a `step` body
+		// A generic Choice applied to a blank carries one: a `step` body
 		// over a seed nothing decided constructs `#Continue` out of a
 		// `{ state: List<Unknown> }`, and what refuses the payload is the blank
 		// rather than anything the payload holds.
@@ -2945,7 +2945,7 @@ function validateCaseValue(
 			casePayloadType(node.type, node.value),
 			null,
 		)
-		// NOTE: A payload shape is a Record nobody declared under a name, so
+		// A payload shape is a Record nobody declared under a name, so
 		// the sentences call it what the rest of this report calls it — the
 		// Case whose payload it is.
 		let record = recordMismatchEvidence(
@@ -2975,10 +2975,10 @@ function validateCaseValue(
 				],
 				helps: [
 					...record.helps,
-					// NOTE: A single-member Case would have accepted the value
+					// A single-member Case would have accepted the value
 					// through the shorthand, so the hint only helps where it can
 					// not: a multi-member Case needs the whole Record spelled out.
-					// NOTE: And only where the payload was not ALREADY written
+					// And only where the payload was not ALREADY written
 					// as that Record. `#Rectangle({ width = "wide", height = 2 })`
 					// spells every member the Case declares and got one value
 					// wrong; telling its author that the shorthand does not apply
@@ -3001,7 +3001,7 @@ function validateCaseValue(
 	return node
 }
 
-// NOTE: Whether the payload names the Case's own members — which is what tells a
+// Whether the payload names the Case's own members — which is what tells a
 // payload that tried the one-member shorthand from one that wrote the Record out
 // and got a value wrong. Names only: the Types are exactly what disagreed, and a
 // payload that spells `width` and `height` at a Case declaring `width` and
@@ -3023,7 +3023,7 @@ function payloadSpellsTheCasesMembers(
 	)
 }
 
-// NOTE: A payload written as a Record Literal for a Case that defaults its
+// A payload written as a Record Literal for a Case that defaults its
 // payload is measured as a PARTIAL — every member it writes is one the payload
 // declares, carrying a value that member's Type admits — and what is left is
 // only ever the question of which members it should have written. A payload that
@@ -3045,7 +3045,7 @@ function casePayloadIsPartial(
 	)
 }
 
-// NOTE: What the payload comes to once the default has filled it in — the Type
+// What the payload comes to once the default has filled it in — the Type
 // a path key's member stands for, rather than the partial it wrote. The
 // payload's own Type wherever no path key was written, which is every payload
 // but one.
@@ -3087,7 +3087,7 @@ function reportIncompleteCasePayload(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this payload.`],
-			// NOTE: As for an Argument — a payload is a Record Literal measured
+			// As for an Argument — a payload is a Record Literal measured
 			// against a default, and the same scaffold answers both.
 			data: { kind: "missing-members", names: missing },
 		},
@@ -3119,7 +3119,7 @@ function validateRationalValue(
 	return node
 }
 
-// NOTE: A member is an Expression like any other — a Match, an Invocation, a
+// A member is an Expression like any other — a Match, an Invocation, a
 // Function literal — so it is walked rather than only checked for the values
 // that can not travel. The Record's own shape is the Enricher's business; what
 // is checked here is what the members are made of.
@@ -3145,7 +3145,7 @@ function validateListValue(
 	return node
 }
 
-// NOTE: Both halves of every entry, on the same terms a List's items are held
+// Both halves of every entry, on the same terms a List's items are held
 // to: a value whose Type carries hidden conformance Parameters can not be
 // stored, because storing it is what makes it travel away from the call that
 // filled them.
@@ -3162,7 +3162,7 @@ function validateDictionaryValue(
 	return node
 }
 
-// NOTE: Each hole is an Expression of its own — `"total: {price::add(tax)}"`
+// Each hole is an Expression of its own — `"total: {price::add(tax)}"`
 // holds an Invocation — so each is walked. A hole can not itself be a bound
 // Function value (the Enricher already refused it as not Printable), so unlike
 // a List there is no `validateNoBoundFunctionValue` guard to add.
@@ -3178,7 +3178,7 @@ function validateInterpolatedStringValue(
 	return node
 }
 
-// NOTE: Both sides are Expressions of their own — `{ makeBase(1) with x =
+// Both sides are Expressions of their own — `{ makeBase(1) with x =
 // compute("2") }` holds two Invocations — so both are walked. Whether the two
 // shapes combine at all is the Enricher's business
 // (`partial-type-mismatch`); what is checked here is what they are made of.
@@ -3195,7 +3195,7 @@ function validateCombination(
 
 // #region Statements
 
-// NOTE: The two assertions are NOT among these — nothing about them depends on
+// The two assertions are NOT among these — nothing about them depends on
 // the Function they stand in, so `validateImplementationNode` answers for them
 // before they get here. Excluding them from the parameter Type rather than
 // leaving unreachable cases in the switch is what keeps that routing a fact
@@ -3275,10 +3275,10 @@ function validateVariableDeclarationStatement(
 	return node
 }
 
-// NOTE: A Declaration's Type Annotation carries no Position of its own, so
+// A Declaration's Type Annotation carries no Position of its own, so
 // the Type it demands is stated as a note rather than pointed at. The value
 // is what gets the arrow — it is the part that can be changed.
-// NOTE: `name` is null for the Constant a Pattern Declaration holds its value
+// `name` is null for the Constant a Pattern Declaration holds its value
 // in. That Constant is real and its annotation is the author's, but its NAME is
 // the Compiler's — unspellable on purpose — so the report names the Pattern
 // instead of a `$pattern_2_11` no reader has ever seen.
@@ -3336,7 +3336,7 @@ function validateVariableAssignmentStatement(
 	if (!fitsExpectedType(node.name.type, node.value)) {
 		let declaredType = describeType(node.name.type)
 		let evidence = refinementEvidence(node.name.type, node.value)
-		// NOTE: The one mismatch a reader can meet whose EXPECTED side is the
+		// The one mismatch a reader can meet whose EXPECTED side is the
 		// Enricher's own answer rather than something written down. Every other
 		// Type a value is judged against is an annotation, and `Unknown` is
 		// unspellable — so `List<Unknown>` can only stand here, where the
@@ -3369,7 +3369,7 @@ function validateVariableAssignmentStatement(
 							`this is ${withArticle(describeType(node.value.type))}`,
 						),
 					...record.labels,
-					// NOTE: Null for a builtin, which was declared in
+					// Null for a builtin, which was declared in
 					// TypeScript and has no Essence source to point at.
 					...(node.declarationPosition === null
 						? []
@@ -3417,7 +3417,7 @@ function validateVariableAssignmentStatement(
 	return node
 }
 
-// NOTE: A Method whose every returning path hands back a direct call to
+// A Method whose every returning path hands back a direct call to
 // ITSELF can never produce a value — each call only defers to another call of
 // the same Method, and no branch returns anything else, so the recursion has
 // no base case to stop it. This is the decidable core of infinite recursion:
@@ -3428,14 +3428,14 @@ function validateVariableAssignmentStatement(
 type MethodIdentity = {
 	namespaceName: string
 	methodName: string
-	// NOTE: Null for a non-overloaded Method, matching the `null`
+	// Null for a non-overloaded Method, matching the `null`
 	// `overloadedMethodIndex` its call sites carry; an Overload carries its
 	// index in the Method Type, so a call to a *sibling* Overload (a different
 	// index) is not self-recursion and is left alone.
 	overloadIndex: number | null
 }
 
-// NOTE: The returns reachable at the body's own control-flow level — through
+// The returns reachable at the body's own control-flow level — through
 // `if`/`else`, but NOT into a `match` Case or a nested Function literal, where
 // `@::method()` resolves against a narrowed receiver or a different `@`, and
 // so is a different Method than the one being defined.
@@ -3479,10 +3479,10 @@ function checkInfiniteRecursion(
 ): void {
 	let returns = collectTopLevelReturns(definition.body)
 
-	// NOTE: No return of its own — a native Method, or one that answers only
+	// No return of its own — a native Method, or one that answers only
 	// from inside a `match` — says nothing here.
 	//
-	// NOTE: And neither does a Method the Parser did not read whole — see
+	// And neither does a Method the Parser did not read whole — see
 	// `partiallyRead`. "Every returning path" is a claim about the paths that
 	// were WRITTEN, and the base case may well be the Statement that was
 	// dropped; `position` is the Method's own span, because a path that went
@@ -3523,7 +3523,7 @@ function checkInfiniteRecursion(
 	)
 }
 
-// NOTE: A Choice declaration is Types, with one Expression in it: the `= { … }`
+// A Choice declaration is Types, with one Expression in it: the `= { … }`
 // a payload shape may carry. It is held to what every other Expression is held
 // to — an Argument that does not fit, a bound Method handed on as a value —
 // which is what keeps a default from being the one place those go unchecked.
@@ -3538,7 +3538,7 @@ function validateChoiceDeclarationStatement(
 	return node
 }
 
-// NOTE: A Protocol's requirements are signatures and carry nothing to check.
+// A Protocol's requirements are signatures and carry nothing to check.
 // Its PROVIDED Methods are bodies, held to what a Namespace's Methods are held
 // to — every returning path fits the declared return Type, and a Method whose
 // every path calls itself is the same mistake wherever it is written.
@@ -3574,12 +3574,12 @@ function validateProtocolDeclarationStatement(
 function validateNamespaceDefinitionStatement(
 	node: common.typed.NamespaceDefinitionStatementNode,
 ): common.typed.NamespaceDefinitionStatementNode {
-	// NOTE: A static Property's initialiser is an Expression that runs when the
+	// A static Property's initialiser is an Expression that runs when the
 	// Program loads, so it is held to what a Constant Declaration is held to —
 	// it is the same Declaration, written in a Namespace. A native Property has
 	// no value to check and is not in the typed tree at all.
 	//
-	// NOTE: The Properties are walked in the order they are written, which is
+	// The Properties are walked in the order they are written, which is
 	// the order their initialisers run in, so the ones still without a value
 	// where one of them runs are itself and everything below it — which is what
 	// `unbound` holds, shrinking as each is left behind. A native is not among
@@ -3695,7 +3695,7 @@ function validateIfStatement(
 	return node
 }
 
-// NOTE: Whether a run that could have opened a body was abandoned in the window
+// Whether a run that could have opened a body was abandoned in the window
 // a `<-` on `line` could have been orphaned from: below everything the Parser
 // read at the top level, and at or above the `<-` itself. Both ends matter — a
 // head dropped BELOW the `<-` orphans nothing above it, and a head dropped above
@@ -3716,20 +3716,20 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		// NOTE: Silent where a dropped HEAD above this `<-` could have taken
+		// Silent where a dropped HEAD above this `<-` could have taken
 		// the body it belongs in down with it — see `aHeadWasAbandonedAbove`.
 		// A `<-` stands outside a Function only because the head that opened
 		// one is missing, and the head is dropped a LINE ABOVE the `<-` it
 		// orphans, so asking about the Statement's own span answers no.
 		//
-		// NOTE: And silent where the `<-` itself stands on a line the Parser
+		// And silent where the `<-` itself stands on a line the Parser
 		// did not read whole, which is the question every other check here
 		// asks. That is the OTHER way a `<-` ends up at the top level: a
 		// Function literal written `(n) { <- … }` with its `{` dropped leaves
 		// the Return where the Statement around it was, and the run that was
 		// abandoned opens with whatever that Statement opens with.
 		//
-		// NOTE: It used to be silent wherever the Parser abandoned ANYTHING,
+		// It used to be silent wherever the Parser abandoned ANYTHING,
 		// which stood the check down for the whole file: a `constant limit 10`
 		// dropped two lines above a `<- 42` the reader really did write at the
 		// top level took the report with it, though a dropped Constant can not
@@ -3743,7 +3743,7 @@ function validateReturnStatement(
 				labels: [
 					primary(node.position, "this is outside any Function"),
 				],
-				// NOTE: Both ends, because which one is meant is the reader's
+				// Both ends, because which one is meant is the reader's
 				// to say: a `<-` written at the top level is either a value the
 				// Program wanted to keep — a Declaration — or a body that lost
 				// its head.
@@ -3762,7 +3762,7 @@ function validateReturnStatement(
 			node.expression,
 		)
 	) {
-		// NOTE: A completing body is written as though it answered the VALUE —
+		// A completing body is written as though it answered the VALUE —
 		// the future is what the emission wraps around it — so what a `<-` is
 		// held to is the inner Type of the declared `Future<T>`. Everything
 		// below reads that same Type, so the message names what the reader has
@@ -3772,7 +3772,7 @@ function validateReturnStatement(
 			currentFunctionContext.completing === true,
 		)
 		let evidence = refinementEvidence(expected, node.expression)
-		// NOTE: A Function literal's return Type is inferred rather than
+		// A Function literal's return Type is inferred rather than
 		// written, so this is the second place a blank can be the EXPECTED
 		// side of a refusal: a combiner whose accumulator nothing decided
 		// returns `List<Unknown>`, and every `<-` writing into it is refused
@@ -3791,7 +3791,7 @@ function validateReturnStatement(
 
 		reportError(
 			"This value does not fit the declared return Type",
-			// NOTE: The member that was refused, where the value is a written
+			// The member that was refused, where the value is a written
 			// Record Literal and one member is what refused it — an Editor
 			// underlines the `points = "0"` rather than the two hundred
 			// characters around it. The whole value where there is no such
@@ -3799,7 +3799,7 @@ function validateReturnStatement(
 			record.lead?.position ?? node.expression.position,
 			{
 				code: "return-type-mismatch",
-				// NOTE: The declared return Type has no Position of its own —
+				// The declared return Type has no Position of its own —
 				// only the Parameter list does, which is where an omitted
 				// `-> Type` would have gone — so it is stated as a note
 				// rather than pointed at.
@@ -3828,7 +3828,7 @@ function validateReturnStatement(
 					...evidence.helps,
 					...undecided.helps,
 				],
-				// NOTE: The word is offered here even in a body that can not
+				// The word is offered here even in a body that can not
 				// yet wait, unlike every other position. `<- Async.deferred(…)`
 				// in a `-> Integer` body is a body that has not decided to be
 				// asynchronous at all, and writing the word is the first of
@@ -3861,13 +3861,13 @@ function validateFunctionStatement(
 
 // #region Helpers
 
-// NOTE: One check for every way a Namespace can be named — a Method's home, a
+// One check for every way a Namespace can be named — a Method's home, a
 // dispatch branch's target, a static member's base, a bare reference, a
 // conformance witness a call curries in — because what makes them wrong is the
 // same thing: the Declaration is BELOW the statement that runs the use.
 // `useLabel` is what the arrow at the use says.
 //
-// NOTE: Silent for a Namespace that is not top-level (nothing records where a
+// Silent for a Namespace that is not top-level (nothing records where a
 // nested one is declared) and for every builtin, none of which is in the map at
 // all — so a name the standard library owns is only ever reported where the
 // Program itself declares it, which is exactly where it can be too late.
@@ -3907,7 +3907,7 @@ function checkNamespaceIsDeclared(
 	)
 }
 
-// NOTE: The `require` line that takes THIS value apart, or null where there is
+// The `require` line that takes THIS value apart, or null where there is
 // nothing to take apart. The first Case of the Choice or Union, because any of
 // them is a shape the line could ask for and the first is the one a reader
 // reads first; a payload is bound only where the Case declares members, since
@@ -3935,7 +3935,7 @@ function takingItApart(value: common.typed.ExpressionNode): string | null {
 	return `Or take it apart instead: 'require ${matcher} = ${named}'.`
 }
 
-// NOTE: `expect EXPR` asks the same question an `if` does — is this true — and
+// `expect EXPR` asks the same question an `if` does — is this true — and
 // is refused for the same reason where the answer is not a Boolean: Essence has
 // no truthiness, so there is nothing for an assertion over a Standing to mean.
 //
@@ -3945,7 +3945,7 @@ function takingItApart(value: common.typed.ExpressionNode): string | null {
 function validateAssertion(
 	node: common.typed.ExpectStatementNode | common.typed.RequireStatementNode,
 ): common.typed.ImplementationNode {
-	// NOTE: A snapshot asserts nothing of its own — what it compares is the
+	// A snapshot asserts nothing of its own — what it compares is the
 	// value RENDERED, which the Enricher already demanded be Printable.
 	if (
 		node.matcher === null &&
@@ -3953,7 +3953,7 @@ function validateAssertion(
 		node.value.type.type !== "Boolean" &&
 		node.value.type.type !== "Error"
 	) {
-		// NOTE: Taking a value apart is an answer only where it HAS parts. An
+		// Taking a value apart is an answer only where it HAS parts. An
 		// Integer has no Cases, and the Help sent a reader to
 		// `require #Value(item) = value` — which answers `unknown-case` about
 		// `#Value` and `unknown-name` about `item`, two reports for a line the
@@ -3995,7 +3995,7 @@ function validateAssertion(
 	return node
 }
 
-// NOTE: An `if`, an `else if` and a Match Handler's Guard all pick a path from
+// An `if`, an `else if` and a Match Handler's Guard all pick a path from
 // a value, and Essence has no truthiness — only a Boolean can decide. One
 // check for all of them, so the rule can not hold in one place and lapse in
 // another; `description` is what names the Condition in the message.
@@ -4022,7 +4022,7 @@ function validateCondition(
 	validateExpression(condition)
 }
 
-// NOTE: The Help a Condition that is not a Boolean gets. `booleanQuestionFor`
+// The Help a Condition that is not a Boolean gets. `booleanQuestionFor`
 // lives beside the other Diagnostic vocabulary, because the refinement clause in
 // the Enricher asks the same question of the same Types.
 function booleanQuestionHelp(type: common.Type): string {
@@ -4033,7 +4033,7 @@ function validateDefiniteReturn(
 	definition: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): void {
-	// NOTE: The inner Type for a completing body, for the reason a `<-` is held
+	// The inner Type for a completing body, for the reason a `<-` is held
 	// to it: `-> Future<{}>` is a body that answers nothing, and asking it for a
 	// `<-` would refuse every `complete Async.sleep(…)` written on its own line.
 	let returnType = returnedTypeOf(
@@ -4049,7 +4049,7 @@ function validateDefiniteReturn(
 		return
 	}
 
-	// NOTE: A body the Parser did not read whole is a body whose `<-` may be
+	// A body the Parser did not read whole is a body whose `<-` may be
 	// exactly what went missing — see `partiallyRead`. Falling off the end is a
 	// claim about every path through what was WRITTEN, and this is not that.
 	if (partiallyRead(position)) {
@@ -4060,7 +4060,7 @@ function validateDefiniteReturn(
 		reportError("Not every path through this Function returns", position, {
 			code: "missing-return",
 			labels: [primary(position, "this path falls off the end")],
-			// NOTE: A completing body is not described as DECLARING the Type its
+			// A completing body is not described as DECLARING the Type its
 			// `<-` answers with, because it does not: the signature says
 			// `Future<Integer>` and the body answers `Integer`, and a note about
 			// the declaration would name a Type the reader can not find in it.
@@ -4069,7 +4069,7 @@ function validateDefiniteReturn(
 					? `This body waits, so its '<-' answers with ${describeType(returnType)}; every path must yield one.`
 					: `The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
 			],
-			// NOTE: A path that falls off the end is answered either by giving
+			// A path that falls off the end is answered either by giving
 			// it a value or by giving the branching an `else`, and the two are
 			// different Programs — an `if` with no `else` returns from one path
 			// and walks out of the other, and which of those the reader meant is
@@ -4083,14 +4083,14 @@ function validateDefiniteReturn(
 	}
 }
 
-// NOTE: Whether a value fits where it was written — assignability, plus the one
+// Whether a value fits where it was written — assignability, plus the one
 // thing assignability alone can not see. A refinement demands evidence, and a
 // value written DOWN carries its own: its predicate is decided while compiling,
 // so `constant d: NonZeroInteger = 3` needs no branch in front of it while `= 0`
 // is still refused. The Enricher admits the same literals as it matches
 // Arguments, and this is that question asked again over the finished tree, at
 // every position the Enricher does not resolve one against the other.
-// NOTE: A hole on either side is answered as a FIT, which is the whole of how
+// A hole on either side is answered as a FIT, which is the whole of how
 // this Validator stays quiet about mistakes it has already been told about. The
 // Enricher writes an Error wherever it could not establish a Type and reports
 // why, once, where the reading failed; a value of that Type then fits nothing,
@@ -4103,7 +4103,7 @@ function validateDefiniteReturn(
 // written Type, and none of them has anything to say when one of the two is a
 // hole.
 //
-// NOTE: The two sides are asked DIFFERENT questions, and the difference is what
+// The two sides are asked DIFFERENT questions, and the difference is what
 // keeps this from swallowing mismatches that are real. An Error anywhere in the
 // EXPECTED Type means the annotation did not resolve, so there is nothing left
 // to hold the value to. On the VALUE's side only a Type that IS an Error
@@ -4122,14 +4122,14 @@ function fitsExpectedType(
 	return fitsWritten(expected, value)
 }
 
-// NOTE: What a mismatch against a refinement has to say beyond naming the two
+// What a mismatch against a refinement has to say beyond naming the two
 // Types. A base value arriving where evidence is demanded is not a spelling
 // mistake — the value may well satisfy the predicate, and nothing has asked —
 // so the Diagnostic names the question that went unanswered and the two places
 // an answer comes from. Empty for every other Type, which is what lets the sites
 // below spread it without asking first.
 //
-// NOTE: Named as it was APPLIED, because a generic refined Alias' bare name is not
+// Named as it was APPLIED, because a generic refined Alias' bare name is not
 // a Type anything can be written as — a help offering to pass a value of
 // 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
 // refinement carrying none spells as its name alone, which is every non-generic
@@ -4184,7 +4184,7 @@ function refinementEvidence(
 	}
 }
 
-// NOTE: An Argument is asked the same question the Enricher asked it, and for a
+// An Argument is asked the same question the Enricher asked it, and for a
 // reason beyond the Diagnostic: a committed Overload whose Arguments do not
 // match is an ICE here, so a call the Enricher admitted a literal into would
 // fail the compile outright if this asked only about assignability.
@@ -4200,7 +4200,7 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		mergedValue: () => argumentNode.value,
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
-		// NOTE: An Argument carrying a slot nobody decided binds no Type
+		// An Argument carrying a slot nobody decided binds no Type
 		// Parameter, so it is matched after every Argument that can decide one —
 		// the holding-back a prefixed Case construction gets, for the same reason
 		// and one Argument kind over. A blank is bottom to READ and nothing to
@@ -4217,7 +4217,7 @@ function matchableArgumentsFromTypedNodes(
 	}))
 }
 
-// NOTE: The Arguments matched against the Signature the Enricher committed to —
+// The Arguments matched against the Signature the Enricher committed to —
 // and, where that fails while an Argument still carries an undecided slot,
 // matched a SECOND time with the Type Parameters the Enricher decided read back
 // off the Type it recorded for the call.
@@ -4300,7 +4300,7 @@ function matchCommittedArguments(
 	return seeded.type === "Match" ? seeded : matched
 }
 
-// NOTE: Whether an Argument the Enricher could not type stands where it moves
+// Whether an Argument the Enricher could not type stands where it moves
 // the ones around it — which is every POSITIONAL one. A labelled Argument is
 // matched by its label before its Type is looked at, so a hole under a label
 // leaves every other Argument exactly where it was and the call can still be
@@ -4329,7 +4329,7 @@ function reportArityMismatch(
 	})
 }
 
-// NOTE: A LABEL is what an Argument is matched by before its Type is looked at
+// A LABEL is what an Argument is matched by before its Type is looked at
 // — a free Function's Arguments carry them exactly as a Method's do, `loop(
 // startingWith 1, …)` as much as `things::sort(by …)` — so a label that does
 // not agree leaves `matchArguments` with the same mismatching index a wrong
@@ -4363,7 +4363,7 @@ function reportArgumentLabelMismatch(
 					? "Pass the value with no label."
 					: `Write '${parameter.name}' before the value.`,
 			],
-			// NOTE: Both halves, because which of the three edits the mismatch
+			// Both halves, because which of the three edits the mismatch
 			// asks for is decided by the PAIR — a label written where none is
 			// declared is dropped, one written where another is declared is
 			// changed, and one that was never written is inserted. The Help
@@ -4378,7 +4378,7 @@ function reportArgumentLabelMismatch(
 	)
 }
 
-// NOTE: A Record Argument written against a Parameter whose default fills some
+// A Record Argument written against a Parameter whose default fills some
 // of its members in, missing members the default does NOT fill in — and missing
 // nothing else. Null where the Argument failed for any other reason: a member
 // with the wrong Type, a member the Parameter does not declare, a Parameter
@@ -4386,7 +4386,7 @@ function reportArgumentLabelMismatch(
 // `argument-type-mismatch`, which names the whole Type, and this one names the
 // members instead.
 //
-// NOTE: And null for an Argument that is not WRITTEN as a Record literal, which
+// And null for an Argument that is not WRITTEN as a Record literal, which
 // may not be a partial at all: naming the members it is missing would be advice
 // it can not take, since writing them means writing a literal. That refusal is
 // `argument-type-mismatch` with `partialSpellingEvidence`'s note.
@@ -4415,7 +4415,7 @@ function missingMembersOf(
 	return missing.length === 0 ? null : missing
 }
 
-// NOTE: What the Argument comes to once the default has filled it in — a member
+// What the Argument comes to once the default has filled it in — a member
 // a path key wrote stands for the whole member the merge rebuilds. The
 // Argument's own Type wherever no path key was written, which is every Argument
 // but one.
@@ -4458,7 +4458,7 @@ function reportIncompleteRecordArgument(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this Record.`],
-			// NOTE: In the Parameter's declaration order, which is the order
+			// In the Parameter's declaration order, which is the order
 			// the label and the Help name them in — a scaffold that wrote them
 			// in any other reads as though the Compiler shuffled the Record.
 			data: { kind: "missing-members", names: missing },
@@ -4466,13 +4466,13 @@ function reportIncompleteRecordArgument(
 	)
 }
 
-// NOTE: "'host', 'retries'" — the spelling every Diagnostic that lists names
+// "'host', 'retries'" — the spelling every Diagnostic that lists names
 // uses, so a reader meets one shape wherever a set of members is named.
 function quotedNames(names: ReadonlyArray<string>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
-// NOTE: A path key in a Literal that is merged into a default reaches into a
+// A path key in a Literal that is merged into a default reaches into a
 // member the merge REBUILDS — the callee writes that member out one level down,
 // taking each of ITS members from the Argument or from the default. A member the
 // merge does not rebuild is one the Argument replaces whole, and a path key into
@@ -4502,7 +4502,7 @@ function reportUnmergedPathKey(
 
 		let position = value.memberPositions?.[name] ?? member.position
 
-		// NOTE: A step the position does not declare at all is a member nobody
+		// A step the position does not declare at all is a member nobody
 		// has, which `argument-type-mismatch` and `payload-type-mismatch` name
 		// as they name every other one. This is about a member that IS there.
 		if (!Object.hasOwn(into.members, name)) {
@@ -4569,7 +4569,7 @@ function reportUnmergedPathKey(
 			return true
 		}
 
-		// NOTE: One level down, where every member of the default's Literal is
+		// One level down, where every member of the default's Literal is
 		// written out — so a step is refused there for the same reasons and
 		// under the same names.
 		if (
@@ -4588,7 +4588,7 @@ function reportUnmergedPathKey(
 	return false
 }
 
-// NOTE: The same question about a Case's payload, which is merged into its
+// The same question about a Case's payload, which is merged into its
 // payload default exactly as an Argument is merged into a Parameter's.
 function reportUnmergedPayloadPathKey(
 	payloadType: common.RecordType,
@@ -4625,7 +4625,7 @@ function reportArgumentMismatch(
 	let name = describeParameter(parameter, index)
 
 	if (parameter !== undefined) {
-		// NOTE: Before the missing-member reading and before the Type is named:
+		// Before the missing-member reading and before the Type is named:
 		// a path key the default does not reach into is the ONE thing wrong
 		// with this Argument, and the whole Type is what every other reading
 		// names.
@@ -4657,7 +4657,7 @@ function reportArgumentMismatch(
 
 	let evidence = refinementEvidence(parameter?.type, argumentNode.value)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
-	// NOTE: The members a partial default fills in are not missing from this
+	// The members a partial default fills in are not missing from this
 	// Argument, however little it writes — the merge supplies them. Which is
 	// the same list `missingMembersOf` read a moment ago, asked here of the
 	// Argument that got PAST that reading and is refused for what it wrote.
@@ -4721,7 +4721,7 @@ function reportArgumentMismatch(
 	)
 }
 
-// NOTE: An Argument the default's members WOULD have covered, refused only for
+// An Argument the default's members WOULD have covered, refused only for
 // being written as something other than a Record literal. Its Type reads like a
 // perfectly good partial, so nothing the Diagnostic says about Types can explain
 // the refusal — the rule has to be named.

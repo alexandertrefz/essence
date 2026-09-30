@@ -10,7 +10,7 @@ import {
 	provenConjuncts,
 } from "./types"
 
-// NOTE: Whether a value is admitted into a refinement by DECIDING its predicate
+// Whether a value is admitted into a refinement by DECIDING its predicate
 // here, while compiling. A refinement normally needs a branch in front of it —
 // something has to have asked the question — but a value written DOWN needs
 // nobody to ask: `constant d: NonZeroInteger = 3` is a NonZeroInteger because 3
@@ -22,7 +22,7 @@ import {
 // mismatch belongs to, and that Diagnostic is written where the value stands,
 // with `describePredicate` below naming what went unanswered.
 //
-// NOTE: Only a written LITERAL is admitted. Anything else would have to be
+// Only a written LITERAL is admitted. Anything else would have to be
 // evaluated, and evaluating Essence while compiling means an interpreter, a fuel
 // budget and a second implementation of every native — so what is here instead
 // is an ALLOWLIST: a table of predicates whose meaning is written out over
@@ -31,7 +31,7 @@ import {
 // failure mode: the Program says what it always said, and the value goes through
 // a branch.
 //
-// NOTE: The key can be trusted because the Namespaces it names are the standard
+// The key can be trusted because the Namespaces it names are the standard
 // library's and a Program can not redeclare one — `namespace Integer for
 // Integer` is refused for the name alone, which is already declared. So an
 // `Integer::isNot` conjunct is the standard library's `isNot` and no other, and
@@ -43,7 +43,7 @@ import {
 // Overload, falls out here rather than being compared as though the bound were
 // an Integer.
 //
-// NOTE: The table is over the PRIMITIVES alone, because a conjunct is stored
+// The table is over the PRIMITIVES alone, because a conjunct is stored
 // resolved: `isZero` arrives as `is`, `hasCharacters` as a negated `isEmpty`,
 // `isGreaterThanOrEqualTo` as a negated `isLessThan` over the bound the call
 // wrote. Every Method the standard library writes on another one is gone by the
@@ -61,13 +61,13 @@ function admittedByEvaluation(
 	return admissionOfWrittenValue(value)?.(refinement) ?? false
 }
 
-// NOTE: The Type a written value is admitted AT, given the Type its position
+// The Type a written value is admitted AT, given the Type its position
 // asks for — which is the question every site below really has, since a position
 // naming a refinement wants the refinement back to match its Parameter by.
 // `null` is "nothing here was decided": the position asks for no evidence, or
 // the value did not answer what it asked.
 //
-// NOTE: A written LIST is asked item by item. The two List predicates read the
+// A written LIST is asked item by item. The two List predicates read the
 // count and nothing else, so `[[1], [2, 3]]` is a `List<NonEmptyList<Integer>>`
 // for the same reason `[1]` is a `NonEmptyList<Integer>` — the brackets are
 // right there, one pair per item. What comes back is a List of what the ITEMS
@@ -116,14 +116,14 @@ export function admittedTypeOf(
 		itemTypes.push(decided ?? item.type)
 	}
 
-	// NOTE: The empty written List decides nothing and needs to: its item Type
+	// The empty written List decides nothing and needs to: its item Type
 	// is Unknown, which every List Type already accepts.
 	return itemTypes.length === 0
 		? null
 		: { type: "List", itemType: buildUnion(itemTypes) }
 }
 
-// NOTE: The written Dictionary asked the same question the written List is
+// The written Dictionary asked the same question the written List is
 // asked, once per SLOT: `["a" = [1]]` is a `Dictionary<String,
 // NonEmptyList<Integer>>` because the brackets around the `1` are right there,
 // one pair per entry. Both slots are walked rather than only the values,
@@ -172,7 +172,7 @@ function admittedDictionaryTypeOf(
 	}
 }
 
-// NOTE: Whether a written value fits where it stands — assignability, plus the
+// Whether a written value fits where it stands — assignability, plus the
 // evidence a written value carries of its own. Every position that measures a
 // value against a Type it did not resolve asks this rather than `matchesType`.
 export function fitsWritten(
@@ -185,7 +185,7 @@ export function fitsWritten(
 	)
 }
 
-// NOTE: Whether a position asks a written value for evidence at all — the one
+// Whether a position asks a written value for evidence at all — the one
 // cheap question every Argument is asked before anything is read or memoised.
 // Down the List spine only: an item is a position a written List has a Node
 // for, and a Record's or a Case's member is one this would have to learn to
@@ -200,7 +200,7 @@ export function refinementInside(type: common.Type): boolean {
 	)
 }
 
-// NOTE: What a written part that did not fit is reported as — the part, the
+// What a written part that did not fit is reported as — the part, the
 // question it left unanswered, and WHAT it is inside the value it was written
 // in. `part` is what a Diagnostic calls it: a List holds items, a Dictionary
 // holds keys and values, and calling a key an item is calling it the wrong
@@ -211,7 +211,7 @@ type UnadmittedWrittenPart = {
 	part: "item" | "key" | "value"
 }
 
-// NOTE: The first written part that did not answer the question its position
+// The first written part that did not answer the question its position
 // asks, and that question — what a Diagnostic points at when a written
 // container is refused for something inside it. `null` where the refusal is
 // about the container itself, which is what every site already reports.
@@ -221,7 +221,7 @@ export function unadmittedWrittenItem(
 ): UnadmittedWrittenPart | null {
 	let container = expected.type === "Refinement" ? expected.base : expected
 
-	// NOTE: A Dictionary's entries are walked in written order and each entry
+	// A Dictionary's entries are walked in written order and each entry
 	// KEY before its value, so the report points at the first thing a reader
 	// would have written — the same rule as a List's items, over two slots
 	// instead of one.
@@ -269,7 +269,7 @@ export function unadmittedWrittenItem(
 	return null
 }
 
-// NOTE: The deepest thing inside a part that did not fit, or the part itself
+// The deepest thing inside a part that did not fit, or the part itself
 // where the slot named a refinement. `null` where the slot named none, which is
 // the refusal every site already reports about the whole value.
 //
@@ -289,7 +289,7 @@ function unadmittedWrittenPart(
 	)
 }
 
-// NOTE: The same question asked of MANY refinements at once, with the value read
+// The same question asked of MANY refinements at once, with the value read
 // only once. A Method receiver is the one position nothing hands an expected
 // Type — it is typed bottom-up and Namespace lookup runs from whatever that came
 // to — so it asks every refinement in scope instead of one, and reading a written
@@ -307,12 +307,12 @@ export function admissionOfWrittenValue(
 		return null
 	}
 
-	// NOTE: The base is asked as well as the predicate. `["a"]::hasItems()` is
+	// The base is asked as well as the predicate. `["a"]::hasItems()` is
 	// true of a List of Strings and says nothing whatever about the
 	// `List<Integer>` a refinement of that base demands — the conjuncts alone
 	// would admit it.
 	//
-	// NOTE: Asked as a WRITTEN value, so a base that names a refinement of its
+	// Asked as a WRITTEN value, so a base that names a refinement of its
 	// own reaches the items — `NonEmptyList<NonEmptyList<Integer>>` proves its
 	// own count here and asks the base for each item's. A base naming no
 	// refinement costs the one `matchesType` it always cost.
@@ -323,7 +323,7 @@ export function admissionOfWrittenValue(
 		)
 }
 
-// NOTE: The refinement a written value is asked ABOUT, where the position it
+// The refinement a written value is asked ABOUT, where the position it
 // stands at has not finished saying what it is. A Parameter written
 // `NonEmptyList<Item>` in a signature that infers `Item` is not a Type until
 // something decides that Parameter, and while an Argument is being matched
@@ -348,7 +348,7 @@ export function admissionOfWrittenValue(
 // narrowing demands all of them because there is no call behind it to report
 // anything: the branch either establishes a whole Type or none.
 //
-// NOTE: This is what the value is asked about and NOT what it may answer with.
+// This is what the value is asked about and NOT what it may answer with.
 // The bindings are worked out in a Map of this call's own, so a losing Overload
 // probe leaves nothing behind; and the instantiation is handed back to
 // `matchTypes` against the Parameter as DECLARED, which binds an `infer`
@@ -362,7 +362,7 @@ export function refinementDecidedBy(
 ): common.RefinementType | null {
 	let parameters = genericNamesMentioned(refinement.base)
 
-	// NOTE: Every non-generic refinement, which comes back as ITSELF — the
+	// Every non-generic refinement, which comes back as ITSELF — the
 	// question a `NonZeroInteger` Parameter asks is the one it was written as.
 	if (parameters.size === 0) {
 		return refinement
@@ -385,7 +385,7 @@ export function refinementDecidedBy(
 	return instantiated.type === "Refinement" ? instantiated : null
 }
 
-// NOTE: The predicate spelled back out of the conjuncts, for the Diagnostic that
+// The predicate spelled back out of the conjuncts, for the Diagnostic that
 // has to name the question a value did not answer. The typed predicate
 // Expression lives on the Type Alias Statement it was written on, and nothing
 // reporting about a refinement has that Node in hand, so what is printed is the
@@ -398,13 +398,13 @@ export function refinementDecidedBy(
 // spelled `case Integer where @::isBetween(0, and 9)`, `@` and all, so a Help
 // that dropped the label offered something no Overload answers.
 //
-// NOTE: A leaf is stored RESOLVED — `@::hasCharacters()` is `String::isEmpty`
+// A leaf is stored RESOLVED — `@::hasCharacters()` is `String::isEmpty`
 // negated — and what is printed is the name it was WRITTEN as, which the leaf
 // carries for this one purpose. A reader is told the predicate they wrote and
 // not the Method the standard library wrote it on top of. A leaf nobody wrote
 // carries no spelling, and those are exactly the synthesized ones — a
 // complement, a Matcher's `case 0` — which no Diagnostic ever names.
-// NOTE: Folded from the FIRST conjunct rather than from a seed, because a
+// Folded from the FIRST conjunct rather than from a seed, because a
 // refinement proving nothing does not exist: a predicate spells one leaf or a
 // conjunction of leaves, so the set is never empty, and the unresolved case is
 // refused by `provenConjuncts` before it gets here. A seeded fold would have to
@@ -423,7 +423,7 @@ function spellConjunct(conjunct: common.PredicateConjunct): string {
 		.map(spellArgument)
 		.join(", ")})`
 
-	// NOTE: A spelling is written the way it was asked, so the flag is already
+	// A spelling is written the way it was asked, so the flag is already
 	// in the name and adding anything would be saying it twice. Only a leaf
 	// nobody wrote can reach the negation here, and it prints as the Essence a
 	// reader would have to write for it.
@@ -432,7 +432,7 @@ function spellConjunct(conjunct: common.PredicateConjunct): string {
 		: call
 }
 
-// NOTE: An Argument as it was written — the scalar under the label the call put
+// An Argument as it was written — the scalar under the label the call put
 // in front of it, and the scalar alone where it wrote none. A leaf nobody wrote
 // carries its bare scalars here, which is what a synthesized conjunct has.
 function spellArgument(
@@ -443,7 +443,7 @@ function spellArgument(
 		: spellScalar(argument)
 }
 
-// NOTE: A String Argument arrives already quoted — that is what tells `1` from
+// A String Argument arrives already quoted — that is what tells `1` from
 // `"1"` in the key — and every other scalar is bare digits, a fraction or a
 // Boolean. So the scalar IS its own spelling, and the only one that has to be
 // made into text is the Boolean.
@@ -451,7 +451,7 @@ function spellScalar(scalar: string | boolean): string {
 	return typeof scalar === "boolean" ? String(scalar) : scalar
 }
 
-// NOTE: A written value as the JavaScript the table below compares — a bigint
+// A written value as the JavaScript the table below compares — a bigint
 // for an Integer, because that is what an Integer is at run time and what its
 // digits mean, and a PAIR of them for a Rational, kept in lowest terms with the
 // sign on the numerator, because that is what a Rational is at run time and
@@ -474,13 +474,13 @@ function spellScalar(scalar: string | boolean): string {
 // answers `null` for an opaque one and refuses — exactly as it does for a value
 // of the wrong shape.
 //
-// NOTE: Only an ITEM is ever opaque. `literalValueOf` answers `null` for an
+// Only an ITEM is ever opaque. `literalValueOf` answers `null` for an
 // Expression it can not read, and `admittedByEvaluation` refuses on that before
 // a single conjunct is asked: a value the Compiler can not see at all is not a
 // value it may decide anything about, and a List is the one shape it can see
 // something about without seeing the whole of it.
 //
-// NOTE: `whole` is what tells a written Dictionary from an UPDATE of one. A
+// `whole` is what tells a written Dictionary from an UPDATE of one. A
 // literal names every entry it holds; an update names the entries it sets and
 // stands on a base whose own entries the Compiler can not see. So an update's
 // brackets are a LOWER BOUND — at least these entries, and whatever the base
@@ -500,7 +500,7 @@ type LiteralValue =
 
 type LiteralItem = LiteralValue | { kind: "Opaque" }
 
-// NOTE: One written entry, both halves read as items — a key or a value the
+// One written entry, both halves read as items — a key or a value the
 // Compiler can not see is opaque exactly as a List's item is, and for the same
 // reason: what the brackets say is how many entries there are, whatever stands
 // inside them.
@@ -508,7 +508,7 @@ type LiteralEntry = { key: LiteralItem; value: LiteralItem }
 
 const OPAQUE_ITEM: LiteralItem = { kind: "Opaque" }
 
-// NOTE: `null` is "not a shape this entry can decide" — the wrong kind of value,
+// `null` is "not a shape this entry can decide" — the wrong kind of value,
 // or Arguments it can not read — and is what makes the table refusable entry by
 // entry rather than by a second list of shapes each entry accepts.
 type PredicateEvaluator = (
@@ -516,7 +516,7 @@ type PredicateEvaluator = (
 	args: Array<string | boolean>,
 ) => boolean | null
 
-// NOTE: The comparisons are declared once by `Comparable`, which provides them
+// The comparisons are declared once by `Comparable`, which provides them
 // for every numeric kind, and AGAIN on Integer, where the same-kind entry is
 // written on the same-kind native — a performance stratification the standard
 // library explains at length. Either way the conjunct names the NAMESPACE whose
@@ -529,7 +529,7 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	isLessThan: integerComparison((value, other) => value < other),
 	isGreaterThan: integerComparison((value, other) => value > other),
 
-	// NOTE: Both bounds included, and the two naming the same range in either
+	// Both bounds included, and the two naming the same range in either
 	// order — which is what the standard library's own body says, so a pair
 	// written the other way round is read with the two exchanged rather than as
 	// a range that encloses nothing.
@@ -554,19 +554,19 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	},
 }
 
-// NOTE: Integer's alone — `Number` declares none of these over the tower.
+// Integer's alone — `Number` declares none of these over the tower.
 // `isZero`, `isPositive` and `isNegative` are not here: each is written on a
 // comparison above and arrives as that comparison, so the table would be asked
 // a question nothing can spell any more.
 const INTEGER_QUESTIONS: Record<string, PredicateEvaluator> = {
-	// NOTE: A negative remainder is still a remainder — `-3 % 2` is `-1` in
+	// A negative remainder is still a remainder — `-3 % 2` is `-1` in
 	// JavaScript — so evenness is asked as "the remainder is zero", which is
 	// also how Integer writes it. Oddness is the same leaf negated and is
 	// decided by the flag rather than by a row of its own.
 	isEven: integerQuestion((value) => value % 2n === 0n),
 }
 
-// NOTE: Essence's String equality is canonical equivalence: `String.is` is
+// Essence's String equality is canonical equivalence: `String.is` is
 // `compare(to other)::is(#Equal)` and `compare` orders the NFC-normalised
 // Strings, so a composed accent and a decomposed one are the same String. Both
 // sides are normalised here for that reason, and `isNot` is why it MUST be —
@@ -576,14 +576,14 @@ const INTEGER_QUESTIONS: Record<string, PredicateEvaluator> = {
 const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	is: stringComparison((value, other) => value === other),
 
-	// NOTE: `isEmpty` is `@::length()::is(0)`, and `length` counts grapheme
+	// `isEmpty` is `@::length()::is(0)`, and `length` counts grapheme
 	// clusters — a String has no clusters exactly when it has no code units, so
 	// the JavaScript length answers the emptiness question, and only that one.
 	// It is a leaf of its own for that reason: the body reads a chain rather
 	// than asking one Method of `@`. `hasCharacters` is this one negated.
 	isEmpty: stringQuestion((value) => value.length === 0),
 
-	// NOTE: `isOneCharacter` is `@::length()::is(1)`, and `length` counts
+	// `isOneCharacter` is `@::length()::is(1)`, and `length` counts
 	// grapheme clusters — so this one has to segment where `isEmpty` could
 	// read the code units. It is the same segmentation the runtime performs
 	// (`clustersIn` in `String.ts`): the NFC form, cut by `Intl.Segmenter`.
@@ -593,7 +593,7 @@ const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	isOneCharacter: stringQuestion((value) => isOneGrapheme(value)),
 }
 
-// NOTE: Whether the text is ONE grapheme cluster, counted the way the runtime
+// Whether the text is ONE grapheme cluster, counted the way the runtime
 // counts. The Segmenter is built on first use and remembered, for the reason
 // `String.ts` gives: constructing one costs about a millisecond of table
 // loading, and a compile that never asks this question should not pay it.
@@ -624,11 +624,11 @@ function isOneGrapheme(value: string): boolean {
 }
 
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
-	// NOTE: `hasItems` is this one negated, exactly as on a String.
+	// `hasItems` is this one negated, exactly as on a String.
 	isEmpty: listQuestion((items) => items.length === 0),
 }
 
-// NOTE: And the Dictionary's one question, on the same terms: `hasEntries` is
+// And the Dictionary's one question, on the same terms: `hasEntries` is
 // `@::isEmpty()::negate()`, so it arrives here as this row with the flag turned
 // over and is no row of its own. What the brackets say is how many entries were
 // written, which is the whole of what either predicate reads — and for an
@@ -650,14 +650,14 @@ const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
 
 // #region Rational literals
 
-// NOTE: A Rational as the pair the entries below compare — the lowest-terms
+// A Rational as the pair the entries below compare — the lowest-terms
 // form with the sign on the numerator, which is the one form `1/2` and `2/4`
 // share. The runtime canonicalises the same way (`createRational` moves a
 // negative sign off the denominator, `reduced` divides both parts out), so a
 // written Rational is read here as exactly the value it will be.
 type ExactValue = { numerator: bigint; denominator: bigint }
 
-// NOTE: The Rational rung of the comparisons, and the PRIMITIVES of it alone:
+// The Rational rung of the comparisons, and the PRIMITIVES of it alone:
 // `Rational` declares them on its own `compare` and `Orderable` provides
 // `isBetween` through its conformance, each keyed as `Rational::…` since a
 // conjunct names the Namespace that ANSWERED. `isNot`, `isLessThanOrEqualTo`
@@ -678,7 +678,7 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 		(value, other) => compareExact(value, other) > 0,
 	),
 
-	// NOTE: Both bounds included, and the two naming the same range in either
+	// Both bounds included, and the two naming the same range in either
 	// order — the Integer entry's rule, and for the same reason: this is what
 	// `Orderable::isBetween` says, whichever kind it was provided for.
 	isBetween: (value, args) => {
@@ -706,15 +706,15 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 	},
 }
 
-// NOTE: Rational's alone, and the whole of it — `isWholeNumber` is the one
+// Rational's alone, and the whole of it — `isWholeNumber` is the one
 // question the Namespace asks of a Rational and nothing else.
 const RATIONAL_QUESTIONS: Record<string, PredicateEvaluator> = {
-	// NOTE: `@::denominator()::is(1)`, which is Rational's own body, and the
+	// `@::denominator()::is(1)`, which is Rational's own body, and the
 	// denominator it reads is the lowest-terms one — so `4/2` is whole.
 	isWholeNumber: rationalQuestion((value) => value.denominator === 1n),
 }
 
-// NOTE: The covering Namespace answers for whichever kind stands in front of
+// The covering Namespace answers for whichever kind stands in front of
 // it, so its rung is BOTH tables: an Integer receiver keeps the Integer entry
 // it always reached, and a Rational one is read as a Rational. A conjunct
 // reaches `Number` where the two operands are of different kinds — an Integer
@@ -731,7 +731,7 @@ const NUMBER_COMPARISONS: Record<string, PredicateEvaluator> = eitherTable(
 	RATIONAL_COMPARISONS,
 )
 
-// NOTE: The first entry that can decide the value, which is at most one of
+// The first entry that can decide the value, which is at most one of
 // them: each refuses a value of the kind it does not read, so the two tables
 // never both answer and the order between them decides nothing.
 function eitherTable(
@@ -776,7 +776,7 @@ function rationalQuestion(
 	}
 }
 
-// NOTE: A denominator in lowest terms is positive, so the cross-multiplication
+// A denominator in lowest terms is positive, so the cross-multiplication
 // keeps the order and no division is taken anywhere.
 function compareExact(value: ExactValue, other: ExactValue): number {
 	let left = value.numerator * other.denominator
@@ -789,7 +789,7 @@ function rationalLiteral(value: LiteralItem): ExactValue | null {
 	return value.kind === "Rational" ? value : null
 }
 
-// NOTE: A conjunct keeps a written Rational as its two runs of DIGITS with a
+// A conjunct keeps a written Rational as its two runs of DIGITS with a
 // slash between them — the form `literalPredicateArgument` writes and
 // `spellScalar` prints back. A bare run of digits is read as well, and is an
 // Integer bound standing where a Rational is compared: `Rational::isLessThan`
@@ -816,7 +816,7 @@ function rationalScalar(scalar: string | boolean): ExactValue | null {
 	return denominator === 0n ? null : reducedExact(numerator, denominator)
 }
 
-// NOTE: The lowest-terms form with the sign on the numerator, and zero as
+// The lowest-terms form with the sign on the numerator, and zero as
 // `0/1` — the canonical form `createRational` and `reduced` give a Rational at
 // run time, taken here so that two written spellings of one number are one
 // value.
@@ -837,7 +837,7 @@ function reducedExact(numerator: bigint, denominator: bigint): ExactValue {
 	}
 }
 
-// NOTE: Euclid's, over a magnitude that may be zero and a denominator that is
+// Euclid's, over a magnitude that may be zero and a denominator that is
 // not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
 function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	while (denominator !== 0n) {
@@ -847,7 +847,7 @@ function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	return magnitude
 }
 
-// NOTE: The spelling a conjunct KEEPS for a written Rational, which is the
+// The spelling a conjunct KEEPS for a written Rational, which is the
 // lowest-terms one. Two refinements are compared by their conjunct sets, and
 // `@::isNot(0/1)` and `@::isNot(0/2)` are one question about one number — so
 // the number is what the key holds, rather than the characters that were typed.
@@ -867,7 +867,7 @@ export function reducedRationalSpelling(
 
 // #endregion
 
-// NOTE: One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
+// One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
 // Method. The Lexer reads `:` as a Symbol so no name a Program can write holds
 // one — which is also what keeps every key here away from the property names an
 // Object carries of its own accord.
@@ -894,7 +894,7 @@ function keyedByNamespace(
 	)
 }
 
-// NOTE: The flag is applied to the ANSWER and not to the table, so a question
+// The flag is applied to the ANSWER and not to the table, so a question
 // the table declines to decide stays undecided either way round: `null` is "not
 // a shape this entry can read", and the contrary of something unreadable is not
 // `true`.
@@ -963,7 +963,7 @@ function listQuestion(
 		value.kind !== "List" || args.length !== 0 ? null : ask(value.items)
 }
 
-// NOTE: These two take an ITEM rather than a value, which is the wider of the
+// These two take an ITEM rather than a value, which is the wider of the
 // two and costs a caller holding a value nothing. It is what makes an opaque
 // item refuse by the same route a Boolean does where an Integer was wanted: the
 // kind is not the one asked for, so the answer is `null` and the entry above it
@@ -976,7 +976,7 @@ function stringLiteral(value: LiteralItem): string | null {
 	return value.kind === "String" ? value.value : null
 }
 
-// NOTE: A conjunct keeps a written Integer as its DIGITS, because a value is a
+// A conjunct keeps a written Integer as its DIGITS, because a value is a
 // bigint at run time and JSON has no bigint — so an Argument spelled any other
 // way, a Rational's `1/2`, a quoted String or a Boolean, is refused right here.
 // That is what keeps a Rational bound out of a comparison between integers.
@@ -988,7 +988,7 @@ function integerScalar(scalar: string | boolean): bigint | null {
 		: null
 }
 
-// NOTE: And a written String as the JSON of its characters, quotes and all,
+// And a written String as the JSON of its characters, quotes and all,
 // which is the half of the scalar that says it was a String and not the digits
 // it may happen to spell. Read back through `JSON.parse`, which is what wrote
 // it; anything else is an Argument of another kind and no question this entry
@@ -1003,7 +1003,7 @@ function stringScalar(scalar: string | boolean): string | null {
 	return typeof parsed === "string" ? parsed : null
 }
 
-// NOTE: One bracket list's entries, both halves read as items. The literal and
+// One bracket list's entries, both halves read as items. The literal and
 // the update share it because they share the list — an update's key list is a
 // literal's, on the same terms and with the same opaque halves.
 function entriesOf(
@@ -1024,7 +1024,7 @@ function literalValueOf(
 
 			return integer === null ? null : { kind: "Integer", value: integer }
 		}
-		// NOTE: Read as the number rather than as the two runs of digits that
+		// Read as the number rather than as the two runs of digits that
 		// were typed, so `2/4` is the value `1/2` is. A zero denominator is
 		// refused here and reported by the Validator, which runs after this: it
 		// is no Rational, so it is no value to decide anything about.
@@ -1039,7 +1039,7 @@ function literalValueOf(
 			return { kind: "String", value: value.value }
 		case "BooleanValue":
 			return { kind: "Boolean", value: value.value }
-		// NOTE: Never `null`, whatever stands inside it. What the brackets say
+		// Never `null`, whatever stands inside it. What the brackets say
 		// is how many items there are, and they say it whether or not the
 		// Compiler can read one.
 		case "ListValue":
@@ -1049,7 +1049,7 @@ function literalValueOf(
 					(item) => literalValueOf(item) ?? OPAQUE_ITEM,
 				),
 			}
-		// NOTE: Never `null` either, and for the same reason: `[=]` and
+		// Never `null` either, and for the same reason: `[=]` and
 		// `["a" = 1]` say how many entries they hold in the brackets, whatever
 		// the Compiler can make of the keys and values inside them.
 		case "DictionaryValue":
@@ -1058,7 +1058,7 @@ function literalValueOf(
 				entries: entriesOf(value),
 				whole: true,
 			}
-		// NOTE: `[ages with "kim" = 7]` — the one written shape whose brackets
+		// `[ages with "kim" = 7]` — the one written shape whose brackets
 		// say something about a value they do not hold the whole of. The
 		// entries it sets are there in the source, one pair each, exactly as a
 		// literal's are, and the base stands behind them unread. So it is read

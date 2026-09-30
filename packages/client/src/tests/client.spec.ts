@@ -23,7 +23,7 @@ import { type EssenceModule, loadModule, watchModule } from "../index"
 import { createInterpreter } from "../marshal-runtime"
 import { EssenceRational } from "../rational"
 
-// NOTE: Every load in this file caches into a directory of its own, so that a
+// Every load in this file caches into a directory of its own, so that a
 // run touches neither the developer's real cache nor another test's.
 let cacheDirectory = ""
 
@@ -41,7 +41,7 @@ function clientFixture(name: string): string {
 	return path.join(import.meta.dirname, "files", name)
 }
 
-// NOTE: A project on disk in a directory of its own, removed again — for the
+// A project on disk in a directory of its own, removed again — for the
 // tests that need to EDIT a source and see what changes.
 async function withProject<Result>(
 	files: Record<string, string>,
@@ -63,7 +63,7 @@ async function withProject<Result>(
 	}
 }
 
-// NOTE: The `modules` fixture prints three lines as its body runs, and importing
+// The `modules` fixture prints three lines as its body runs, and importing
 // the bundle is what runs it. Both doors are held: `print` writes to the stream
 // and `inspect` ends its line through `console.log`, so a harness holding one of
 // the two reads half a Program as silent.
@@ -126,7 +126,7 @@ describe("Loading a Module", () => {
 
 		let squared = call(math, "square", math.bridge.integer(12n))
 
-		// NOTE: The BUNDLE's own value, read without marshalling it — so what
+		// The BUNDLE's own value, read without marshalling it — so what
 		// it holds is the hybrid Integer's own representation, a number for
 		// anything a double carries exactly. `toJS` is what makes an Integer a
 		// bigint on the way out, and this call deliberately does not go
@@ -146,7 +146,7 @@ describe("Loading a Module", () => {
 		expect(fieldOf(pi, "denominator")).toBe(100n)
 	})
 
-	// NOTE: And the same constant as JavaScript, which is what a host that never
+	// And the same constant as JavaScript, which is what a host that never
 	// wants to know about a Type key came for. The parts are held UNREDUCED by
 	// the runtime — `314/100` is what the source wrote — and reduced on the way
 	// out, because a Rational on this side has one spelling per value.
@@ -165,7 +165,7 @@ describe("Loading a Module", () => {
 			loadModule(fixturePath("modules", "Main.es"), { cacheDirectory }),
 		)
 
-		// NOTE: The fixture's own body runs as the bundle is imported, which is
+		// The fixture's own body runs as the bundle is imported, which is
 		// what a Module being a Program rather than a header means.
 		expect(written.trimEnd().split("\n")).toEqual(["area: 12", "25", "157"])
 
@@ -182,7 +182,7 @@ describe("Loading a Module", () => {
 		expect(fieldOf(described, "value")).toBe("area: 12")
 	})
 
-	// NOTE: `Rectangle` is a Type Alias AND the Namespace of the same name, so
+	// `Rectangle` is a Type Alias AND the Namespace of the same name, so
 	// its kind reads `type` while it is very much a value in the bundle. Binding
 	// off `kinds` would have left it out.
 	it("binds a Namespace whose kind reads as a Type", async () => {
@@ -211,7 +211,7 @@ describe("Loading a Module", () => {
 })
 
 describe("The Runtime Bridge", () => {
-	// NOTE: THE reason the bridge exists. The Type key is a Symbol minted while
+	// THE reason the bridge exists. The Type key is a Symbol minted while
 	// the bundle is evaluated, so this process's own copy of the runtime holds a
 	// different one — a host that read values with it would find nothing on any
 	// of them.
@@ -225,7 +225,7 @@ describe("The Runtime Bridge", () => {
 		expect(math.bridge.typeKey.description).toBe("$type")
 	})
 
-	// NOTE: The bridge is the bundle's DEFAULT export, which is the one name it
+	// The bridge is the bundle's DEFAULT export, which is the one name it
 	// can not take from the Module: `export * from` never carries a default, and
 	// no Essence export is emitted as one — the Rewriter escapes every reserved
 	// word with a `_`. `Escaped.es` is the fixture that tries hardest to collide,
@@ -240,7 +240,7 @@ describe("The Runtime Bridge", () => {
 		expect(fieldOf(userConstant, "value")).toBe(12)
 	})
 
-	// NOTE: The runtime's `createList` TAKES OWNERSHIP of the Array it is given
+	// The runtime's `createList` TAKES OWNERSHIP of the Array it is given
 	// — a List may push onto it in place rather than copy it — and a host's
 	// Array is not the host's to give away by calling a Function. The bridge
 	// therefore hands out `createListFrom`, which copies, and this is the test
@@ -263,7 +263,7 @@ describe("The Runtime Bridge", () => {
 })
 
 describe("A value from another copy of the runtime", () => {
-	// NOTE: The failure the bridge exists to prevent, named where it can not
+	// The failure the bridge exists to prevent, named where it can not
 	// be prevented: a value built by one bundle handed to another. Nothing on
 	// the value says it is wrong — it IS an Integer, tagged as one, by a Symbol
 	// this Module has never seen — so it would be refused as "an object with
@@ -290,7 +290,7 @@ describe("A value from another copy of the runtime", () => {
 		)
 	})
 
-	// NOTE: This process's own runtime as well — the copy a host reaches by
+	// This process's own runtime as well — the copy a host reaches by
 	// importing `@essence-lang/runtime` itself, which no interpreter was ever
 	// built over. Its key is recognised by its description, so a host that
 	// built a value the direct way is told the same thing.
@@ -329,21 +329,21 @@ describe("A Module that does not compile", () => {
 		expect(compileError.message).toContain(
 			"Error: No overload of 'multiply' accepts these Arguments",
 		)
-		// NOTE: The excerpt, the underline and the tally — the whole report
+		// The excerpt, the underline and the tally — the whole report
 		// rather than the headline of one.
 		expect(compileError.message).toContain("Broken.es:4:6")
 		expect(compileError.message).toContain('<- value::multiply(with "two")')
 		expect(compileError.message).toContain("1 error")
-		// NOTE: Plain. An Error's message is read out of logs and assertions at
+		// Plain. An Error's message is read out of logs and assertions at
 		// least as often as off a terminal.
 		expect(compileError.message).not.toContain("[")
 	})
 
-	// NOTE: One block per file against that file's own source. A dependency's
+	// One block per file against that file's own source. A dependency's
 	// Diagnostic rendered against the entry's text would underline whatever
 	// happens to be written at that line number in the wrong file.
 	//
-	// NOTE: And the ENTRY gets a block of its own, saying that what it imports
+	// And the ENTRY gets a block of its own, saying that what it imports
 	// did not compile. That is what `essence check` and the Editor both answer
 	// for this graph, and the seam a host compiles through now reads the same
 	// analysis they do — so a reader who builds through a plugin and then runs
@@ -396,7 +396,7 @@ export {
 	})
 })
 
-// NOTE: The listeners a watcher is given, with a way to WAIT for the next of
+// The listeners a watcher is given, with a way to WAIT for the next of
 // each — a test that edited a file has nothing else to do until the watcher has
 // seen it, and a watcher that never does should fail the test rather than hang
 // it.
@@ -417,7 +417,7 @@ function listeners(): {
 		waiting: Array<(value: Value) => void>,
 		what: string,
 	): Promise<Value> =>
-		// NOTE: Under the per-test budget `scripts/testBudget.ts` sets, and
+		// Under the per-test budget `scripts/testBudget.ts` sets, and
 		// deliberately so. A deadline that fires after the test has timed
 		// out rejects a Promise nobody is waiting on, which bun reports as an
 		// unattributed "unhandled error between tests": a second failure for
@@ -499,7 +499,7 @@ describe("Watching a Module", () => {
 				)
 
 				try {
-					// NOTE: The first load arrives BEFORE `watchModule` answers,
+					// The first load arrives BEFORE `watchModule` answers,
 					// which is what lets a host read `module` straight away.
 					expect(heard.modules).toHaveLength(1)
 					expect(watcher.module).toBe(heard.modules[0]!)
@@ -511,7 +511,7 @@ describe("Watching a Module", () => {
 						].sort(),
 					)
 
-					// NOTE: An edit to what the entry IMPORTS, not to the entry
+					// An edit to what the entry IMPORTS, not to the entry
 					// — the file that changes is rarely the one that was asked
 					// for, and a watcher on the entry alone would sit still.
 					let next = heard.nextModule()
@@ -529,7 +529,7 @@ describe("Watching a Module", () => {
 					expect(second).not.toBe(heard.modules[0]!)
 					expect(watcher.module).toBe(second)
 					expect(second.exports.answer).toBe(5n)
-					// NOTE: The Module before the edit is untouched — a host
+					// The Module before the edit is untouched — a host
 					// still holding it holds a working Module.
 					expect(heard.modules[0]!.exports.answer).toBe(4n)
 				} finally {
@@ -572,7 +572,7 @@ describe("Watching a Module", () => {
 					expect(watcher.module).toBe(first)
 					expect(heard.modules).toHaveLength(1)
 
-					// NOTE: And the fix is the next thing heard.
+					// And the fix is the next thing heard.
 					let fixed = heard.nextModule()
 
 					writeFileSync(
@@ -588,7 +588,7 @@ describe("Watching a Module", () => {
 		)
 	})
 
-	// NOTE: A save that changes nothing — the same text written again — moves
+	// A save that changes nothing — the same text written again — moves
 	// the file's time and nothing else. It is loaded, because only the load can
 	// tell, and NOT reported, because what it loaded is the bundle already held.
 	it("does not report a save that changes nothing", async () => {
@@ -638,7 +638,7 @@ describe("Watching a Module", () => {
 				try {
 					expect(watcher.module).toBe(null)
 					expect(heard.errors).toHaveLength(1)
-					// NOTE: Watched even though nothing compiled — the graph as
+					// Watched even though nothing compiled — the graph as
 					// far as it was read is what the fix will land in.
 					expect(watcher.files).toContain(
 						path.join(directory, "Math.es"),
@@ -687,7 +687,7 @@ describe("Watching a Module", () => {
 		)
 	})
 
-	// NOTE: The one thing a reload can not carry over, named. A raw value from
+	// The one thing a reload can not carry over, named. A raw value from
 	// the load before the edit is tagged by THAT bundle's key; the load after
 	// has a key of its own, and refuses the value as what it is rather than as a
 	// plain object — see "A value from another copy of the runtime".
@@ -750,12 +750,12 @@ describe("The Bundle Cache", () => {
 			let before = (await stat(file)).mtimeMs
 			let again = await loadModule(entry, { cacheDirectory: directory })
 
-			// NOTE: Not rewritten — the name is the hash of the sources, so the
+			// Not rewritten — the name is the hash of the sources, so the
 			// file that is there is already the answer. Rewriting it would only
 			// invalidate the Module every holder has already imported.
 			expect((await stat(file)).mtimeMs).toBe(before)
 			expect(await readdir(directory)).toEqual(bundles)
-			// NOTE: And the same file was imported: the same URL is the same
+			// And the same file was imported: the same URL is the same
 			// Module, so the Program inside a bundle is evaluated once.
 			expect(again.raw.square).toBe(first.raw.square)
 		})
@@ -807,13 +807,13 @@ export {
 		)
 	})
 
-	// NOTE: The Dictionary door is 15,655 B of runtime — the two Functions a
+	// The Dictionary door is 15,655 B of runtime — the two Functions a
 	// Dictionary crosses through, and behind them the store and the key
 	// encoding — and a bundle carries it only where the boundary names one.
 	// This is the loader's own injector, which is the one every browser host
 	// goes through; the wrapper's is asked the same question in `plugin.spec`.
 	//
-	// NOTE: A cache directory of its own per half is load-bearing rather than
+	// A cache directory of its own per half is load-bearing rather than
 	// tidy: the bundle hash deliberately does NOT name the door, so a shared
 	// cache would answer for both directions and neither assertion would be
 	// about what this load decided.
@@ -873,7 +873,7 @@ export {
 		)
 	})
 
-	// NOTE: The file's NAME is what makes the cache worth having: `loadModule`
+	// The file's NAME is what makes the cache worth having: `loadModule`
 	// asks for it before it emits anything, and only compiles where nothing on
 	// disk answers. That only works while the hash it looks the file up by is the
 	// same hash the compile would have written it under — an option set on one
@@ -895,7 +895,7 @@ export {
 		})
 	})
 
-	// NOTE: The bridge is bytes the sources do not say, so a bundle built with it
+	// The bridge is bytes the sources do not say, so a bundle built with it
 	// and one built without it can not be one file — otherwise whichever was
 	// written first answers for both, and the loser is either a plugin build
 	// handed exports it never asked for or a `loadModule` told the bundle "was
@@ -909,7 +909,7 @@ export {
 	})
 })
 
-// NOTE: A JavaScript call may leave out what an Essence call may — the arity
+// A JavaScript call may leave out what an Essence call may — the arity
 // gate is a range and the label gate asks for the REQUIRED labels, and the
 // emitted default parameter fills the rest.
 describe("Calling with an Argument left out", () => {
@@ -952,7 +952,7 @@ describe("Calling with an Argument left out", () => {
 		expect(greeting("hi", "there")).toBe("hi there")
 	})
 
-	// NOTE: A required Argument is still required, and the refusal names the
+	// A required Argument is still required, and the refusal names the
 	// RANGE the signature accepts rather than one count nobody has to pass.
 	it("still refuses a call that leaves a required Argument out", () => {
 		let cut = defaults.exports.cut as (...args: Array<unknown>) => bigint
@@ -960,7 +960,7 @@ describe("Calling with an Argument left out", () => {
 		expect(() => cut()).toThrow(/takes 1 to 2 Arguments/)
 	})
 
-	// NOTE: WHICH Parameters a positional call stops before is the question,
+	// WHICH Parameters a positional call stops before is the question,
 	// never how many. `cut(7n)` writes as many Arguments as the range allows and
 	// still leaves the REQUIRED `to` out — counted, it was admitted and the hole
 	// was padded onto `to`, which reached the emitted Function as `undefined`
@@ -972,7 +972,7 @@ describe("Calling with an Argument left out", () => {
 		expect(() => cut(7n)).toThrow(/takes 1 to 2 Arguments/)
 	})
 
-	// NOTE: The `.d.ts` types an omittable label as `label?: T` and an interior
+	// The `.d.ts` types an omittable label as `label?: T` and an interior
 	// one as `T | undefined`, and TypeScript's `?` admits an explicit
 	// `undefined` — so a call writing one is a call the declaration says is
 	// legal, and it means the same as leaving the key out.
@@ -991,7 +991,7 @@ describe("Calling with an Argument left out", () => {
 		expect(greeting("hi", undefined)).toBe("hi world")
 	})
 
-	// NOTE: And a required slot is untouched by that — `undefined` there is a
+	// And a required slot is untouched by that — `undefined` there is a
 	// value the host passed, and no Essence Type admits it.
 	it("still refuses an explicit undefined on a required Parameter", () => {
 		let cut = defaults.exports.cut as (labelled: {
@@ -1016,7 +1016,7 @@ describe("Calling with an Argument left out", () => {
 		expect(() => cut({ to: 7n, around: 1n })).toThrow(/'from', 'to'/)
 	})
 
-	// NOTE: `optional` is a WIRE format field, written to `<output>.descriptor
+	// `optional` is a WIRE format field, written to `<output>.descriptor
 	// .json` and inlined as JSON into generated wrappers — so a sidecar written
 	// before defaults existed has to keep loading, and every Parameter in it has
 	// to keep meaning "required". Absence reads as required, which is what makes
@@ -1032,7 +1032,7 @@ describe("Calling with an Argument left out", () => {
 			throw new Error("Expected a function export")
 		}
 
-		// NOTE: The old sidecar, made by taking the field back out.
+		// The old sidecar, made by taking the field back out.
 		let older = {
 			exports: {
 				scaled: {
@@ -1059,7 +1059,7 @@ describe("Calling with an Argument left out", () => {
 	})
 })
 
-// NOTE: A Record Parameter whose default fills SOME of its members in. The
+// A Record Parameter whose default fills SOME of its members in. The
 // Argument is still required and every member the default does not fill in has
 // to be written — what a host gains is the right to leave the rest out, and the
 // callee's own prologue is what puts them back.
@@ -1091,7 +1091,7 @@ describe("Leaving out a member the callee fills in", () => {
 		)
 	})
 
-	// NOTE: A member written `undefined` is a member WRITTEN — the default is
+	// A member written `undefined` is a member WRITTEN — the default is
 	// for a caller that said nothing, and this caller said something no Integer
 	// admits.
 	it("refuses a member written as undefined", () => {
@@ -1112,7 +1112,7 @@ describe("Leaving out a member the callee fills in", () => {
 		expect(() => connect("a", { host: "h" })).toThrow(EssenceMarshalError)
 	})
 
-	// NOTE: The Record is still CLOSED — a member the Type does not name is a
+	// The Record is still CLOSED — a member the Type does not name is a
 	// misspelling in the making, and leaving one out is not permission to add
 	// another.
 	it("still refuses a member the Type does not name", () => {
@@ -1125,7 +1125,7 @@ describe("Leaving out a member the callee fills in", () => {
 		).toThrow(/timeout/)
 	})
 
-	// NOTE: The whole Argument is NOT omittable — a partial default fills in
+	// The whole Argument is NOT omittable — a partial default fills in
 	// members, never a value — so the arity gate is unmoved.
 	it("still requires the Argument itself", () => {
 		let connect = defaults.exports.connect as (
@@ -1135,7 +1135,7 @@ describe("Leaving out a member the callee fills in", () => {
 		expect(() => connect("a")).toThrow(/takes 2 Arguments/)
 	})
 
-	// NOTE: `optional` is a WIRE format field on a member exactly as it is on a
+	// `optional` is a WIRE format field on a member exactly as it is on a
 	// Parameter, and absence reads as required there too — a sidecar written
 	// before Record defaults existed has to keep loading and keep meaning what
 	// it always meant.
@@ -1153,7 +1153,7 @@ describe("Leaving out a member the callee fills in", () => {
 			throw new Error("Expected a Record Parameter")
 		}
 
-		// NOTE: The old sidecar, made by taking the field back out.
+		// The old sidecar, made by taking the field back out.
 		let older = {
 			exports: {
 				connect: {
@@ -1198,7 +1198,7 @@ describe("Leaving out a member the callee fills in", () => {
 	})
 })
 
-// NOTE: The other position a member may be left out at, and the one that has to
+// The other position a member may be left out at, and the one that has to
 // carry its own values across: a Record Parameter's default is written in by the
 // CALLEE, while a Case is BUILT where it is written — a constructor writes the
 // tag onto what it was handed and marshals nothing — so the boundary itself is
@@ -1245,7 +1245,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 		)
 	})
 
-	// NOTE: `headers` is the one member whose default NAMES a Constant rather
+	// `headers` is the one member whose default NAMES a Constant rather
 	// than writing a value. Nothing crosses but data — the declaring Module read
 	// the Constant at the declaration and baked its value into the Case Type —
 	// so this side fills it in exactly as it fills in a written literal, and the
@@ -1262,7 +1262,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 		).toThrow(EssenceMarshalError)
 	})
 
-	// NOTE: A member written `undefined` is a member WRITTEN, exactly as at a
+	// A member written `undefined` is a member WRITTEN, exactly as at a
 	// Record Parameter — the default is for a host that said nothing.
 	it("refuses a member written as undefined", () => {
 		expect(() =>
@@ -1276,7 +1276,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 		)
 	})
 
-	// NOTE: The payload is still CLOSED — leaving a member out is not
+	// The payload is still CLOSED — leaving a member out is not
 	// permission to add another.
 	it("still refuses a member the payload does not name", () => {
 		expect(() =>
@@ -1284,7 +1284,7 @@ describe("Leaving out a member a Case payload's default fills in", () => {
 		).toThrow(/timeout/)
 	})
 
-	// NOTE: The filled members are the Module's own values, so a Case coming
+	// The filled members are the Module's own values, so a Case coming
 	// back OUT carries all of them whether a host wrote them or not.
 	it("hands every member back out", () => {
 		let blank = defaults.exports.blank as () => Record<string, unknown>

@@ -1,4 +1,4 @@
-// NOTE: A `{` inside a String Literal opens a HOLE — `"Hello, {name}"` reads
+// A `{` inside a String Literal opens a HOLE — `"Hello, {name}"` reads
 // the value of `name` — so a brace that stands for itself is written `\{`, and
 // its partner `\}`.
 //
@@ -11,7 +11,7 @@
 // offer at all, and it is asked by the report and by the fix alike so that the
 // two can not answer it differently.
 
-// NOTE: A backslash is the whole of the test. A hole holds an Expression, and
+// A backslash is the whole of the test. A hole holds an Expression, and
 // there is no Expression in this language that a `\` is part of — so a hole with
 // one inside it is a hole nobody meant to open, which is exactly the reading
 // that makes the missing quote the wrong thing to talk about. A hole holding a

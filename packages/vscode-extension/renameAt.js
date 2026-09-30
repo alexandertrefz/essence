@@ -1,6 +1,6 @@
 import * as vscode from "vscode"
 
-// NOTE: The one gesture a Code Action can not make with edits. An extraction
+// The one gesture a Code Action can not make with edits. An extraction
 // has to call the thing it lifted out SOMETHING, and the name it derives —
 // `total`, `extracted` — is a placeholder the reader is meant to replace; the
 // way to say so is to put the cursor on it and open rename. No workspace edit
@@ -23,7 +23,7 @@ export async function revealForRename(uriString, position) {
 
 	let cursor = new vscode.Position(position.line, position.character)
 
-	// NOTE: The selection is handed to `showTextDocument` rather than written
+	// The selection is handed to `showTextDocument` rather than written
 	// onto an editor afterwards, because the document need not be open at all —
 	// an action that edits a second file is a shape this Server already has —
 	// and opening it AT the name is one scroll rather than two. It also focuses

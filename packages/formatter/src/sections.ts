@@ -2,7 +2,7 @@ import type { parser } from "@essence-lang/interfaces"
 
 import type { SectionSpan } from "./trivia"
 
-// NOTE: The canonical order of a Module section is more than a Formatter's
+// The canonical order of a Module section is more than a Formatter's
 // preference: dispatch over imported Namespaces is defined to follow this same
 // order — sorted, never written — so re-sorting a block can never change which
 // Namespace a Method call resolves to.
@@ -32,7 +32,7 @@ function compareKeys(left: Array<string>, right: Array<string>): number {
 	return 0
 }
 
-// NOTE: The local name an entry binds under, which is what tells two entries
+// The local name an entry binds under, which is what tells two entries
 // naming the same thing from the same file apart. Only `as` can produce that
 // pair, and it is a Diagnostic — but the Formatter still has to write it the
 // same way every time.
@@ -40,7 +40,7 @@ function localName(entry: parser.ImportNode | parser.ExportNode): string {
 	return entry.alias === null ? "" : entry.alias.content
 }
 
-// NOTE: The order of the names inside one group, and of the bare names of an
+// The order of the names inside one group, and of the bare names of an
 // export block: by the exported name, then by the local one.
 export function compareEntries(
 	left: parser.ImportNode | parser.ExportNode,
@@ -52,7 +52,7 @@ export function compareEntries(
 	)
 }
 
-// NOTE: What a group is ordered by: its specifier, and the names inside it —
+// What a group is ordered by: its specifier, and the names inside it —
 // the shape of a group node, and of what the printer holds while it lays one
 // out.
 type GroupHead = {
@@ -60,7 +60,7 @@ type GroupHead = {
 	entries: Array<{ name: parser.IdentifierNode }>
 }
 
-// NOTE: Groups are ordered by specifier. Two groups written for one file are
+// Groups are ordered by specifier. Two groups written for one file are
 // left as two — merging them would have to decide which of them keeps its
 // Comments — and stand next to each other, ordered by the first name in each,
 // which is where a reader finds them to fold together.
@@ -74,7 +74,7 @@ export function compareGroups(left: GroupHead, right: GroupHead): number {
 	)
 }
 
-// NOTE: Every group with its names in order, and the groups in order among
+// Every group with its names in order, and the groups in order among
 // themselves.
 export function sortedGroups<
 	Group extends parser.ImportGroupNode | parser.ExportGroupNode,
@@ -89,7 +89,7 @@ export function sortedGroups<
 		.sort(compareGroups)
 }
 
-// NOTE: The same Program with both Module sections in canonical order. Sorting
+// The same Program with both Module sections in canonical order. Sorting
 // a block is the one thing the Formatter is allowed to reorder, and the gate
 // that compares the AST before and after formatting reads the entry lists in
 // order — so both sides are brought into canonical order before they are
@@ -130,7 +130,7 @@ export function canonicalSections(program: parser.Program): parser.Program {
 	return { ...program, imports, exports }
 }
 
-// NOTE: Read off the Program as it was written, never off a canonicalised copy:
+// Read off the Program as it was written, never off a canonicalised copy:
 // the anchor comparison groups each entry with the Comments around it by the
 // same written order the trivia cursor walks.
 //

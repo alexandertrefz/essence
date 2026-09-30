@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs"
 
 import grammar from "../syntaxes/essence.tmLanguage.json"
 
-// NOTE: The grammar and the snippets are data an Editor reads, not code
+// The grammar and the snippets are data an Editor reads, not code
 // anything type-checks — a rule that never matches lights nothing and says so
 // nowhere, which is the same silent failure `contribution.spec.ts` pins the
 // manifest against.
 //
-// NOTE: The rules are read here with JavaScript's own RegExp rather than with
+// The rules are read here with JavaScript's own RegExp rather than with
 // Oniguruma, which is what VS Code runs them through. The two agree on
 // everything these patterns use — a line anchor, `\b`, character classes and a
 // lookahead — and the alternative is a tokenizer dependency for two regexes.
@@ -21,7 +21,7 @@ let repository = grammar.repository as Record<
 
 let controlKeyword = new RegExp(repository.controlKeyword!.match!)
 
-// NOTE: Picked out by what it matches rather than by its index, so that a rule
+// Picked out by what it matches rather than by its index, so that a rule
 // added beside it does not silently move the test onto another one. The needle
 // is a piece of the rule's own pattern, which is the one thing about it that
 // can not be shared with a neighbour.
@@ -33,7 +33,7 @@ function contextualKeyword(needle: string): RegExp {
 	)
 }
 
-// NOTE: `\G` anchors a documentation tag to the head of its line, and it is
+// `\G` anchors a documentation tag to the head of its line, and it is
 // Oniguruma's alone — JavaScript's own RegExp reads it as a literal `G`. So it
 // is dropped here, and what is left is read the way every other rule is.
 function documentationTag(needle: string): RegExp {
@@ -53,7 +53,7 @@ describe("the define grammar", () => {
 		expect(controlKeyword.test('\t\t\tas "F" otherwise')).toBe(true)
 	})
 
-	// NOTE: The existing `as` rule wants an Identifier character immediately in
+	// The existing `as` rule wants an Identifier character immediately in
 	// front of the whitespace, which an arm head — a line break and an indent —
 	// can never offer. This is the rule that reads an arm as an arm.
 	it("lights the as at the head of an arm", () => {
@@ -63,7 +63,7 @@ describe("the define grammar", () => {
 		expect(armAs.test("\t\tas -1 otherwise")).toBe(true)
 	})
 
-	// NOTE: `as` is an ordinary Identifier where no `define` block is open, and
+	// `as` is an ordinary Identifier where no `define` block is open, and
 	// the grammar cannot see blocks — so what keeps a value NAMED `as` unlit is
 	// what follows it.
 	it("leaves a line that assigns to a name called as unlit", () => {
@@ -73,14 +73,14 @@ describe("the define grammar", () => {
 		expect(armAs.test("\tconstant asset = 3")).toBe(false)
 	})
 
-	// NOTE: A binder and a label are still the other rule's business — an arm
+	// A binder and a label are still the other rule's business — an arm
 	// head is the one `as` that stands at the start of its line.
 	it("leaves a Pattern binder to the rule written for it", () => {
 		expect(armAs.test("\tconstant { x as y } = point")).toBe(false)
 		expect(armAs.test("\tnormalize(as #ComposedCanonical)")).toBe(false)
 	})
 
-	// NOTE: An Argument label stands at the head of its line too, whenever the
+	// An Argument label stands at the head of its line too, whenever the
 	// Formatter explodes the Argument list it belongs to — the line below is
 	// this repo's own `StdlibExhaustive.es`, written by `esfmt`. What tells it
 	// from an arm is the trailing comma the Formatter ends every exploded
@@ -93,7 +93,7 @@ describe("the define grammar", () => {
 		expect(armAs.test("\t\tas #Sensitive,")).toBe(false)
 	})
 
-	// NOTE: And the arm shapes the comma test must not turn away with it — a
+	// And the arm shapes the comma test must not turn away with it — a
 	// Condition, an `otherwise`, and a value that carries on past the line.
 	it("still lights an arm whose line ends in anything else", () => {
 		expect(armAs.test("\t\t\tas [1, 2] if flag")).toBe(true)
@@ -102,7 +102,7 @@ describe("the define grammar", () => {
 	})
 })
 
-// NOTE: The vocabulary a tests section writes, none of it reserved: every one
+// The vocabulary a tests section writes, none of it reserved: every one
 // of these words is a valid Identifier, so every rule here is scoped by what
 // stands around it. The subjects are lines out of `Tests.es`.
 describe("the testing grammar", () => {
@@ -132,7 +132,7 @@ describe("the testing grammar", () => {
 		expect(tagged.test("\t\t<- tagged::length()")).toBe(false)
 	})
 
-	// NOTE: A `focused` carries nothing, so the brace of the item's own block is
+	// A `focused` carries nothing, so the brace of the item's own block is
 	// what follows it.
 	it("lights a focused test on the block behind it", () => {
 		expect(
@@ -142,7 +142,7 @@ describe("the testing grammar", () => {
 		expect(focused.test("\t\t<- focused()")).toBe(false)
 	})
 
-	// NOTE: Or nothing at all, where the Formatter stood the Modifier on a line
+	// Or nothing at all, where the Formatter stood the Modifier on a line
 	// of its own — and there NOTHING may stand in front of it, because ending
 	// its line is not on its own a fact about a Modifier. A value read out of a
 	// Constant ends a line the same way.
@@ -162,7 +162,7 @@ describe("the testing grammar", () => {
 		expect(across.test("\t\t<- across(3)")).toBe(false)
 	})
 
-	// NOTE: The pair is the Keyword — neither word means anything alone — and
+	// The pair is the Keyword — neither word means anything alone — and
 	// the `from` of a named snapshot is part of the same form.
 	it("lights matches snapshot as the pair it is", () => {
 		expect(
@@ -191,7 +191,7 @@ describe("the testing grammar", () => {
 	})
 })
 
-// NOTE: The two Keywords asynchrony is written with. Both are ordinary
+// The two Keywords asynchrony is written with. Both are ordinary
 // Identifiers as well — the Parser reads the Keyword only where an Expression
 // follows it ON THE SAME LINE and nothing carries the word itself on — so the
 // rule is scoped by what comes behind the word, exactly as `expect` and
@@ -215,7 +215,7 @@ describe("the asynchrony grammar", () => {
 		expect(asynchrony.test("\tstart upload(file)")).toBe(true)
 	})
 
-	// NOTE: Every shape a value NAMED `start` or `complete` is written in — the
+	// Every shape a value NAMED `start` or `complete` is written in — the
 	// names the standard library and the fixtures used before the two words
 	// became Keywords, which is what the contextual reading exists to keep
 	// writable.
@@ -229,14 +229,14 @@ describe("the asynchrony grammar", () => {
 		expect(asynchrony.test("\t\t{ start }")).toBe(false)
 	})
 
-	// NOTE: `\b` on both ends, so a name that merely opens with one of the words
+	// `\b` on both ends, so a name that merely opens with one of the words
 	// is a name and nothing else.
 	it("leaves a longer name that opens with one of them unlit", () => {
 		expect(asynchrony.test("\t\tstarting(value)")).toBe(false)
 		expect(asynchrony.test("\t\tcompleted::negate()")).toBe(false)
 	})
 
-	// NOTE: The Tokens that carry a name ON rather than opening an Expression
+	// The Tokens that carry a name ON rather than opening an Expression
 	// behind it. Each was run through the Parser: `start (1)` is a call of a
 	// Function called `start`, `1::complete (2)` a Method call, `complete
 	// .price` a member read off a name, and a `§` opens a Comment, which is no
@@ -252,7 +252,7 @@ describe("the asynchrony grammar", () => {
 		).toBe(false)
 	})
 
-	// NOTE: And the Tokens that begin an Expression of their own and yet only
+	// And the Tokens that begin an Expression of their own and yet only
 	// ever stand where one has ENDED, which is the list `opensAsynchrony`
 	// excludes: the value in front of them is the Expression, so the word is a
 	// name.
@@ -265,7 +265,7 @@ describe("the asynchrony grammar", () => {
 		expect(asynchrony.test("\t\t\tas complete otherwise")).toBe(false)
 	})
 
-	// NOTE: The line, which the Parser reads the same way. A word with nothing
+	// The line, which the Parser reads the same way. A word with nothing
 	// behind it on its line is a name, and the Statement below is a Statement
 	// of its own.
 	it("leaves a word that ends its line unlit", () => {
@@ -274,7 +274,7 @@ describe("the asynchrony grammar", () => {
 	})
 })
 
-// NOTE: A Guard is `where` written after the Matcher it guards, and the Match
+// A Guard is `where` written after the Matcher it guards, and the Match
 // grammar could not light one whose Condition begins with a lowercase name —
 // the rule it was left to reads what FOLLOWS the word, to keep the Argument
 // label spelled the same unlit, and a lowercase name says nothing. These two
@@ -308,7 +308,7 @@ describe("the where grammar", () => {
 		).toBe(true)
 	})
 
-	// NOTE: A label opens its Argument, so a `(` or a comma precedes it where a
+	// A label opens its Argument, so a `(` or a comma precedes it where a
 	// Guard has the Matcher it guards.
 	it("leaves an Argument label called where unlit", () => {
 		expect(
@@ -327,7 +327,7 @@ describe("the where grammar", () => {
 		expect(whereGuard.test("\t\t<- where.member")).toBe(false)
 	})
 
-	// NOTE: The other line-initial `where` in the corpus is an exploded
+	// The other line-initial `where` in the corpus is an exploded
 	// Argument's label, and the trailing comma the Formatter writes is what
 	// tells the two apart — the same test the `as` of an arm is told by.
 	it("lights a Guard the Formatter broke onto its own line", () => {
@@ -351,7 +351,7 @@ describe("the where grammar", () => {
 describe("the documentation grammar", () => {
 	let example = documentationTag("@example")
 
-	// NOTE: An `@example` tag stands alone on its line — the assertions under
+	// An `@example` tag stands alone on its line — the assertions under
 	// it are the example — so there is no em-dash separator to light beside it,
 	// which is what the two tags above it carry.
 	it("lights an @example tag", () => {
@@ -361,13 +361,13 @@ describe("the documentation grammar", () => {
 	})
 })
 
-// NOTE: What a tab stop's placeholder stands as before anything is typed —
+// What a tab stop's placeholder stands as before anything is typed —
 // which is the text a column in the body is aligned against.
 function rendered(line: string): string {
 	return line.replace(/\$\{\d+:([^}]*)\}/g, "$1")
 }
 
-// NOTE: Read and parsed rather than imported: `.code-snippets` is strict JSON
+// Read and parsed rather than imported: `.code-snippets` is strict JSON
 // under a name no bundler knows, and an import of it lands as nothing at all.
 let snippets = JSON.parse(
 	readFileSync(
@@ -391,7 +391,7 @@ describe("the define snippet", () => {
 		)
 	})
 
-	// NOTE: The `match` snippet pads its second Matcher so that both case
+	// The `match` snippet pads its second Matcher so that both case
 	// braces stand in one column; an arm's two Keywords are the same question,
 	// asked of `if` and `otherwise`.
 	it("stands if and otherwise in one column", () => {
@@ -401,7 +401,7 @@ describe("the define snippet", () => {
 	})
 })
 
-// NOTE: The String Literal's escapes, which are three rules read in order: the
+// The String Literal's escapes, which are three rules read in order: the
 // Unicode escape, every other shape a `\u` is written in, and the seven short
 // escapes with the catch-all behind them. Order is the whole of the rule — all
 // four begin with a backslash — so each subject below is checked against the
@@ -433,7 +433,7 @@ describe("the string escape grammar", () => {
 		}
 	})
 
-	// NOTE: Every shape the Compiler refuses, each reaching the invalid rule
+	// Every shape the Compiler refuses, each reaching the invalid rule
 	// because the valid one in front of it does not match.
 	it("marks every other shape of Unicode escape illegal", () => {
 		for (let written of [
@@ -454,10 +454,10 @@ describe("the string escape grammar", () => {
 		}
 	})
 
-	// NOTE: An escape that never closes must not run past the quote that closes
+	// An escape that never closes must not run past the quote that closes
 	// the String, or the rest of the line stops being highlighted at all.
 	//
-	// NOTE: And it stops at each of the OTHER four characters the Lexer's own
+	// And it stops at each of the OTHER four characters the Lexer's own
 	// scan stops at, so that what is coloured as one illegal escape is the same
 	// run of text the Compiler refuses as one. The quote alone was excluded at
 	// first, which left `"\u{a\tb"` coloured through a backslash the Lexer had
@@ -476,7 +476,7 @@ describe("the string escape grammar", () => {
 		}
 	})
 
-	// NOTE: `\r` was missing from the short escapes, so a carriage return in a
+	// `\r` was missing from the short escapes, so a carriage return in a
 	// String was drawn as an error in every Editor while the Compiler read it
 	// perfectly well.
 	it("lights all seven short escapes", () => {

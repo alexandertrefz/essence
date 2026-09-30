@@ -1,5 +1,5 @@
 {
-	// NOTE: The extension is JavaScript outside the root program, so it is
+	// The extension is JavaScript outside the root program, so it is
 	// checked here with `checkJs`, against the `@types/vscode` its engine names.
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {

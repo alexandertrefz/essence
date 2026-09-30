@@ -22,7 +22,7 @@ import {
 import { emitBundle, type EmitModule, generateModules } from "./emit"
 import { hashGraph } from "./hash"
 
-// NOTE: The back half of the pipeline is shared with `esc` rather than owned
+// The back half of the pipeline is shared with `esc` rather than owned
 // here, and it is reached through this entry: one stage, one entry in the
 // Compiler's exports map.
 export {
@@ -33,11 +33,11 @@ export {
 	type EmitStage,
 	generateModules,
 } from "./emit"
-// NOTE: Re-exported from the Rewriter, which owns what the modes MEAN, so that
+// Re-exported from the Rewriter, which owns what the modes MEAN, so that
 // a host embedding the Compiler names its target and keys its own cache by it
 // through one entry rather than two.
 export { type EmitTarget, emitTargetKey } from "../rewriter/index"
-// NOTE: What a bundle carries so that a JavaScript host can build values it
+// What a bundle carries so that a JavaScript host can build values it
 // accepts — the runtime's own Type key and constructors, injected as a Module
 // and handed over as the bundle's default export. See `./bridge`.
 export {
@@ -51,7 +51,7 @@ export {
 	runtimeBridgeModules,
 	withRuntimeBridge,
 } from "./bridge"
-// NOTE: The boundary between an emitted Module and the JavaScript that calls
+// The boundary between an emitted Module and the JavaScript that calls
 // it, written down. A host marshalling values across it reads a Descriptor
 // rather than a Type, which is what lets the reading happen where no Compiler
 // is — see `./describe`. Reached through its own entry as well, so that
@@ -74,51 +74,51 @@ export {
 	type NamespaceMethod,
 	type OverloadDescriptor,
 } from "./describe"
-// NOTE: Exported because a host that writes its own bundles somewhere shared
+// Exported because a host that writes its own bundles somewhere shared
 // has the same question this seam answers — what is the toolchain that wrote
 // them — and no way to ask it otherwise.
 export { toolchainKey } from "./hash"
 
-// NOTE: The seam a HOST compiles Essence through — a test harness, a build
+// The seam a HOST compiles Essence through — a test harness, a build
 // tool, the JavaScript client. It is `esc` without the command line: the same
 // stages in the same order, and nothing written anywhere. What it answers with
 // is what a host needs and a file on disk can not carry — the bundle's text,
 // the entry's export surface, and a hash that identifies the sources it was all
 // derived from.
 //
-// NOTE: Diagnostics are RETURNED rather than thrown, including the ones that
+// Diagnostics are RETURNED rather than thrown, including the ones that
 // stopped the compile: what to do about a type error is the host's decision,
 // and rendering one is a choice this seam has no business making. A throw that
 // escapes is a Compiler bug and stays a throw.
 
-// NOTE: The compile MODE is one of these — see `CompileMode`. It changes the
+// The compile MODE is one of these — see `CompileMode`. It changes the
 // emitted bytes out of sources that are byte for byte the same, so it joins
 // `bundleHash` rather than being trusted to the caller.
 export type EmbedOptions = CompileMode & {
-	// NOTE: Where the sources are read from. The default reads disk; a host
+	// Where the sources are read from. The default reads disk; a host
 	// holding unsaved text answers out of memory, exactly as the Language
 	// Server does.
 	host?: ModuleHost
 	optimisation?: OptimiserOptions
 	transformSources?: (sources: ModuleSources) => ModuleSources
-	// NOTE: What the HOST puts into the bundle beyond the sources, named. A
+	// What the HOST puts into the bundle beyond the sources, named. A
 	// `transformSources` changes the bytes and can not be hashed — it is a
 	// Function — so a host that injects a Module says here what it injects, and
 	// `bundleHash` tells the two bundles apart. Leaving it out is the claim
 	// that nothing was injected.
 	emitterKey?: string
-	// NOTE: Who the emitted Modules are for — see `EmitTarget`. It changes the
+	// Who the emitted Modules are for — see `EmitTarget`. It changes the
 	// bytes without changing the sources, so it joins `bundleHash` beside the
 	// `emitterKey` rather than being trusted to the caller.
 	emit?: EmitTarget
-	// NOTE: Nothing is written there — the name only decides what the source map
+	// Nothing is written there — the name only decides what the source map
 	// spells its `.es` sources relative to. A host that goes on to write the
 	// bundle should name the place it is going to write it, or its map points at
 	// files that are not beside it.
 	outputFileName?: string
 }
 
-// NOTE: One file's Diagnostics with the text they are about. A Diagnostic
+// One file's Diagnostics with the text they are about. A Diagnostic
 // carries a Position and no file, so a flat list can not be RENDERED — the
 // pairing has to be made where the sources are still in hand, which is here and
 // nowhere a host can reach.
@@ -135,23 +135,23 @@ export type DiagnosticGroup = {
 }
 
 export type MemoryCompileResult = {
-	// NOTE: Empty exactly when the compile stopped — a bundle is either whole or
+	// Empty exactly when the compile stopped — a bundle is either whole or
 	// not there, and a host that reads `code` without reading `diagnostics`
 	// should get nothing rather than half a Program.
 	code: string
-	// NOTE: The ENTRY Module's, which is what a host imports names out of.
+	// The ENTRY Module's, which is what a host imports names out of.
 	surface: ExportSurface
-	// NOTE: Every source the compile READ, in canonical path order — the whole
+	// Every source the compile READ, in canonical path order — the whole
 	// graph, not the entry alone, and present even where the compile stopped. A
 	// host watching for a reason to compile again has to watch all of them: the
 	// file that changed is rarely the file that was asked for.
 	files: Array<string>
 	diagnostics: Array<common.Diagnostic>
-	// NOTE: The same Diagnostics, paired with the sources they index into —
+	// The same Diagnostics, paired with the sources they index into —
 	// `diagnostics` is exactly this, flattened. A host that only counts errors
 	// reads the flat list; one that renders them reads these.
 	diagnosticGroups: Array<DiagnosticGroup>
-	// NOTE: What this bundle IS, in one name — every source of the graph, the
+	// What this bundle IS, in one name — every source of the graph, the
 	// Optimiser Options, the toolchain that emitted it and whatever the host
 	// injected. Deliberately not a hash of the sources alone: a bundle carries
 	// the standard library and the runtime, and neither is in the graph, so a
@@ -160,14 +160,14 @@ export type MemoryCompileResult = {
 	bundleHash: string
 }
 
-// NOTE: The front half alone — the sources read, hashed and linked, and nothing
+// The front half alone — the sources read, hashed and linked, and nothing
 // emitted. This is what a host holding a CACHE of bundles asks first: the hash
 // says whether it already has the answer, and the Export Surface is the other
 // half of what it needs, which no cached file carries. Running the whole
 // pipeline to find out that its output was already on disk is the one thing a
 // content-addressed cache exists to avoid.
 //
-// NOTE: Validation does NOT run here, so `diagnostics` is what parsing and
+// Validation does NOT run here, so `diagnostics` is what parsing and
 // linking had to say and no more. A cache hit means these exact sources, under
 // this exact toolchain, emitted a bundle once — which they could not have done
 // while the Validator had anything to report. A host using this for anything
@@ -180,7 +180,7 @@ export type MemoryLinkResult = {
 	bundleHash: string
 }
 
-// NOTE: The same answer a compile gives, with the graph as Modules where the
+// The same answer a compile gives, with the graph as Modules where the
 // bundle's text would have been: every Module under the specifier the others
 // import it by, the shared prelude beside them, and which of them is the entry.
 // Empty exactly when the compile stopped, for the reason `code` is.
@@ -246,7 +246,7 @@ export async function compileToMemory(
 		sourceFileName: entryPath,
 		outputFileName:
 			options.outputFileName ?? defaultOutputFileName(prepared.entry),
-		// NOTE: Inside the bundle rather than beside it, because there is no
+		// Inside the bundle rather than beside it, because there is no
 		// "beside": what a host is handed is one string, and a map it can not
 		// reach is a stack trace it can not read.
 		sourcemap: true,
@@ -254,7 +254,7 @@ export async function compileToMemory(
 		transformSources: options.transformSources,
 	})
 
-	// NOTE: A bundling failure is a Compiler bug rather than a file's, so it goes
+	// A bundling failure is a Compiler bug rather than a file's, so it goes
 	// where the graph's own Diagnostics go: under the entry.
 	if (containsErrors(bundled.diagnostics)) {
 		return { code: "", ...prepared.answer(bundled.diagnostics) }
@@ -273,14 +273,14 @@ export async function compileToMemory(
 	}
 }
 
-// NOTE: The same compile, stopped one stage earlier: the graph as JavaScript
+// The same compile, stopped one stage earlier: the graph as JavaScript
 // Modules, each under the specifier the others import it by, and nothing
 // bundled. This is what a HOST BUNDLER embeds — it has a module graph of its
 // own and wants Essence's Modules inside it rather than a finished bundle
 // beside it, so that one runtime, and therefore one hidden Type key, is shared
 // by every Essence file the build reaches.
 //
-// NOTE: Only worth asking for under `emit: { mode: "host", root }`. The default
+// Only worth asking for under `emit: { mode: "host", root }`. The default
 // spells every Module relative to the ENTRY, which makes a shared file's text a
 // function of which entry was compiled — fine inside one bundle, wrong the
 // moment a host holds one module per path.
@@ -297,10 +297,10 @@ export async function emitToMemory(
 	let sources = await generateModules({
 		...prepared.request,
 		sourceFileName: entryPath,
-		// NOTE: Named but never written — nothing here reaches the Bundler, and
+		// Named but never written — nothing here reaches the Bundler, and
 		// the maps are the Modules' own inline ones.
 		outputFileName: defaultOutputFileName(prepared.entry),
-		// NOTE: Always, for the reason `compileToMemory` always asks for one:
+		// Always, for the reason `compileToMemory` always asks for one:
 		// there is no "beside" to write a map to when what a caller is handed is
 		// a string. A host bundler reads the `sourceMappingURL` comment off the
 		// text it is served and composes it into its own map, so a `.es` file
@@ -313,7 +313,7 @@ export async function emitToMemory(
 	return { sources, ...prepared.answer([]) }
 }
 
-// NOTE: Everything both emitting entries do before they part — read, parse,
+// Everything both emitting entries do before they part — read, parse,
 // link, validate — and the answer either of them gives when one of those had
 // something to say. `request` is the front half of an `EmitRequest`: what the
 // GRAPH decides, with what the caller decides left out.
@@ -327,7 +327,7 @@ type PreparedGraph =
 				optimisation: OptimiserOptions
 				emit: EmitTarget | undefined
 			}
-			// NOTE: The graph's own Diagnostics with whatever emitting added to
+			// The graph's own Diagnostics with whatever emitting added to
 			// them — a Bundler's complaint, or nothing at all.
 			answer: (own: Array<common.Diagnostic>) => MemoryLinkResult
 	  }
@@ -353,7 +353,7 @@ function validateGraph(
 		}
 	}
 
-	// NOTE: A specifier that names nothing is the one stop that stands in FRONT
+	// A specifier that names nothing is the one stop that stands in FRONT
 	// of the judgement rather than falling out of it: the graph resolved every
 	// entry while it was reading the files, so a hole in it means there is no
 	// graph to link and nothing behind this stage to ask.
@@ -370,7 +370,7 @@ function validateGraph(
 	let linked = linkModuleGraph(front.graph, modeOf(options))
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
-	// NOTE: Every stage's verdict in ONE pass, through the same entry `esc` and
+	// Every stage's verdict in ONE pass, through the same entry `esc` and
 	// the Language Server go through — see `analyseLinkedModules`. This used to
 	// stop at whichever stage reported first and then call the Validator bare
 	// underneath: a host embedding the Compiler was told about one mistake where
@@ -387,7 +387,7 @@ function validateGraph(
 	}))
 	let validated = answer(surface, perModule, linked.diagnostics)
 
-	// NOTE: And the stop is about EMITTING rather than about judging. Nothing is
+	// And the stop is about EMITTING rather than about judging. Nothing is
 	// emitted from a graph with an Error in it — but by the time that is
 	// decided, every Error in it has been found.
 	if (containsErrors(validated.diagnostics)) {
@@ -415,14 +415,14 @@ function noSources(): ModuleSources {
 	return { entry: "", sources: new Map() }
 }
 
-// NOTE: One Module's Diagnostics on their way to a group, before the source
+// One Module's Diagnostics on their way to a group, before the source
 // text they are rendered against is looked up.
 type ModuleDiagnostics = {
 	filePath: string
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: Everything both entries do before they part: the entry canonicalised,
+// Everything both entries do before they part: the entry canonicalised,
 // the files read and parsed, and the hash that names what they compile to. Both
 // stop at exactly the same place, so neither can drift into hashing something
 // the other does not.
@@ -457,13 +457,13 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 			entryPath: entry,
 			modules: graph.modules,
 			optimisation,
-			// NOTE: The target joins whatever the host named itself by, and
+			// The target joins whatever the host named itself by, and
 			// contributes NOTHING where it is the default — so every hash
 			// spelled before there was a target to name still names the same
 			// bytes, and a host's Modules can never be served out of a cache
 			// under a bundle's name.
 			//
-			// NOTE: And the compile MODE, for the same reason and through the
+			// And the compile MODE, for the same reason and through the
 			// one Function that spells it — `modeKey`, which `esc`'s own key
 			// reads too, so a facet can not join the mode without joining both
 			// names at once. See `CompileMode`.
@@ -481,7 +481,7 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 	}
 }
 
-// NOTE: Empty groups are dropped so that a host can render every group it is
+// Empty groups are dropped so that a host can render every group it is
 // handed without asking whether there is anything in it.
 function groupDiagnostics(
 	entryPath: string,
@@ -503,7 +503,7 @@ function groupDiagnostics(
 
 	if (own.length > 0) {
 		groups.push({
-			// NOTE: An entry that could not be read is not in the graph at all, so
+			// An entry that could not be read is not in the graph at all, so
 			// its text is empty — which is the right excerpt for the placeless
 			// Diagnostic saying exactly that.
 			filePath: entryPath,
@@ -515,7 +515,7 @@ function groupDiagnostics(
 	return groups
 }
 
-// NOTE: `.mjs` rather than `.js`, so that a host writing the bundle out under
+// `.mjs` rather than `.js`, so that a host writing the bundle out under
 // this name gets a file Node reads as a Module whatever the nearest
 // `package.json` says.
 function defaultOutputFileName(entryPath: string): string {

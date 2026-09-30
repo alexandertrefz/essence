@@ -7,14 +7,14 @@ import type { common } from "@essence-lang/interfaces"
 import { endOfLine, lineAt, sliceOf } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 
-// NOTE: The Diagnostics about how a Token was WRITTEN — a String that was never
+// The Diagnostics about how a Token was WRITTEN — a String that was never
 // closed, an escape the Lexer does not know, a tag that ran into its own text.
 // Each of them is a handful of characters on one line, so each fix here reads
 // the span back off the buffer before it writes: what these answer is a mistake
 // in the very text the edit is about to land in, and a Position from an analysis
 // two keystrokes old points at something else entirely.
 
-// NOTE: The String's opening quote is the first Label standing on a `"`, which
+// The String's opening quote is the first Label standing on a `"`, which
 // is the one thing the two shapes of this Diagnostic share. The plain one stands
 // at the END OF THE INPUT — an unclosed String swallows every line below it, so
 // that is where the Lexer ran out — and carries the opening quote as its
@@ -42,7 +42,7 @@ export function closeStringAction(
 
 	let end = endOfLine(lines, opening.start.line)
 
-	// NOTE: A quote written behind an ODD run of backslashes is escaped by the
+	// A quote written behind an ODD run of backslashes is escaped by the
 	// last of them — `"hello\` closed this way reads `"hello\"`, which is a
 	// String still running — so the one edit this offers would leave the very
 	// Diagnostic it answers standing. What the trailing backslash was meant to
@@ -53,7 +53,7 @@ export function closeStringAction(
 		return null
 	}
 
-	// NOTE: And a String whose `{` opened a hole is refused for the same reason
+	// And a String whose `{` opened a hole is refused for the same reason
 	// and withheld for the same reason: `"{\"a\": 1}"` answered this fix with
 	// the very Diagnostic it was applied to, so the fix ran again and wrote a
 	// third quote, and a fourth. The report says what is actually missing there
@@ -76,7 +76,7 @@ export function closeStringAction(
 	}
 }
 
-// NOTE: How many backslashes a line ends in, counted back from `column`.
+// How many backslashes a line ends in, counted back from `column`.
 function trailingBackslashes(text: string, column: number): number {
 	let count = 0
 
@@ -87,11 +87,11 @@ function trailingBackslashes(text: string, column: number): number {
 	return count
 }
 
-// NOTE: The Diagnostic spans exactly the two characters `\c`, whatever `c` came
+// The Diagnostic spans exactly the two characters `\c`, whatever `c` came
 // out as.
 const escapePattern = /^\\(.)$/
 
-// NOTE: The two answers the Help gives, both offered and neither preferred: a
+// The two answers the Help gives, both offered and neither preferred: a
 // backslash that was meant to be one is written `\\`, and a backslash that was
 // never meant at all goes. Which of the two was meant is what the writer knows
 // and the Lexer does not — `"C:\temp"` wants the first and `"a\q"` almost
@@ -133,7 +133,7 @@ export function invalidEscapeActions(
 	]
 }
 
-// NOTE: The rewrite a `\u{…}` Diagnostic already carries. The Lexer worked out
+// The rewrite a `\u{…}` Diagnostic already carries. The Lexer worked out
 // which digits the reader meant and spelled them back at them — four where
 // JavaScript would have read four, a surrogate pair's whole character, the
 // leading zeros off a seventh digit, the `U+` off a named code point — and
@@ -142,7 +142,7 @@ export function invalidEscapeActions(
 // contract between the two, and it is written in exactly one place: the
 // Helps of `readUnicodeEscape`.
 //
-// NOTE: The Help for a code point read as DECIMAL is deliberately NOT offered
+// The Help for a code point read as DECIMAL is deliberately NOT offered
 // as a fix. It offers its spelling on a condition the source can not settle —
 // whether those digits were meant as decimal at all — and a fix applied from a
 // menu settles every condition it is given, so following that one has to stay
@@ -173,13 +173,13 @@ export function unicodeEscapeActions(
 	})
 }
 
-// NOTE: The two halves of a decimal that was written with one side empty. A
+// The two halves of a decimal that was written with one side empty. A
 // digit run may be grouped with `_`, which is part of the spelling and stays in
 // whatever is written back.
 const leadingPointPattern = /^\.([0-9][0-9_]*)$/
 const trailingPointPattern = /^(-?[0-9][0-9_]*)\.$/
 
-// NOTE: `.5` has ONE answer — a decimal missing its whole part is a decimal
+// `.5` has ONE answer — a decimal missing its whole part is a decimal
 // whose whole part is zero, and no other reading of it exists. `1.` has two,
 // which the Diagnostic's own Helps give in order: the digits behind the point
 // were forgotten, or the point was. They differ in the Type the Literal ends up
@@ -215,7 +215,7 @@ export function partialDecimalActions(
 		return []
 	}
 
-	// NOTE: The point is the last character of the span, and the Position runs
+	// The point is the last character of the span, and the Position runs
 	// one past it, as every Position does.
 	let point = {
 		line: diagnostic.position.end.line,
@@ -237,7 +237,7 @@ export function partialDecimalActions(
 	]
 }
 
-// NOTE: The value the two spellings say between them, written back each way.
+// The value the two spellings say between them, written back each way.
 // Both are offered and neither is preferred: `1.5/2` is `3/4` and `0.75` alike,
 // and which of them the file should read is a matter of what it is about — a
 // ratio is a fraction and a price is a decimal.
@@ -258,7 +258,7 @@ export function mixedRationalActions(
 	)
 }
 
-// NOTE: One shape for every Literal rewritten in place: the title names the
+// One shape for every Literal rewritten in place: the title names the
 // spelling the reader will be left with, which is the only thing that tells two
 // of them apart in a list. Preferred only where the offer stands alone — where
 // two spellings are offered, choosing between them is what a Diagnostic can not
@@ -281,7 +281,7 @@ function literalAction(
 
 const emDash = "—"
 
-// NOTE: The Diagnostic underlines the TEXT rather than the tag it ran into —
+// The Diagnostic underlines the TEXT rather than the tag it ran into —
 // the em-dash is missing exactly where the text begins — so the separator is
 // written in front of it and not one character of what was typed is retyped.
 //
@@ -294,7 +294,7 @@ export function documentationSeparatorAction(
 ): CodeActionEntry | null {
 	let written = sliceOf(lines, diagnostic.position)
 
-	// NOTE: The span opens on the first character of the text, so leading
+	// The span opens on the first character of the text, so leading
 	// whitespace or a dash already standing there says the buffer has moved on
 	// since the Diagnostic was made.
 	if (written === "" || /^\s/.test(written) || written.startsWith(emDash)) {
@@ -302,7 +302,7 @@ export function documentationSeparatorAction(
 	}
 
 	let start = diagnostic.position.start
-	// NOTE: JSDoc writes `@param name - text`, and the hyphen is ITS separator
+	// JSDoc writes `@param name - text`, and the hyphen is ITS separator
 	// — so a fix that only inserts the em dash left `@param _ — - the number`,
 	// with both languages' punctuation standing in one line. The run is
 	// REPLACED where one was written: it is the same separator, spelled the way
@@ -324,12 +324,12 @@ export function documentationSeparatorAction(
 	}
 }
 
-// NOTE: A value comment is `§?` written at the end of a Statement, and the
+// A value comment is `§?` written at the end of a Statement, and the
 // Diagnostic spans the whole Comment — the two characters and everything the
 // reader wrote behind them.
 const valueComment = "§?"
 
-// NOTE: The two characters at the front, and nothing else: what a reader wrote
+// The two characters at the front, and nothing else: what a reader wrote
 // behind them is a Comment either way, and is left exactly as it was. Preferred,
 // because the other answer the Help gives — ask it of a Statement inside the
 // `tests { … }` block — is a move rather than an edit, and moving a Statement is

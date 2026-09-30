@@ -12,7 +12,7 @@ import type { AnyType } from "../type"
 import { createCase } from "../type"
 
 describe("rendering a String", () => {
-	// NOTE: The structural rendering is for the Program's AUTHOR — an embedded
+	// The structural rendering is for the Program's AUTHOR — an embedded
 	// quote must not read as the closing one, and a line break must not split
 	// the one value across two lines — so the contents are spelled with the
 	// String Literal's own escapes.
@@ -28,7 +28,7 @@ describe("rendering a String", () => {
 		)
 	})
 
-	// NOTE: The remaining control characters have no spelling of their own, so
+	// The remaining control characters have no spelling of their own, so
 	// they render as their code point — which is a spelling a Program can now
 	// write down as well as read back.
 	test("a control character renders as its code point", () => {
@@ -38,7 +38,7 @@ describe("rendering a String", () => {
 		)
 	})
 
-	// NOTE: A BARE BRACE in quoted output opens an interpolation hole when the
+	// A BARE BRACE in quoted output opens an interpolation hole when the
 	// text is read back, so `"a\{b\}"::quote()` printed `"a{b}"` and pasting
 	// that into a Program was a syntax error rather than the value it came
 	// from. `roundTrip.spec.ts` in the Compiler holds the whole promise, with
@@ -47,7 +47,7 @@ describe("rendering a String", () => {
 		expect(getStringRepresentation(createString("a{b}"))).toBe('"a\\{b\\}"')
 	})
 
-	// NOTE: The invisible characters that change how the text around them is
+	// The invisible characters that change how the text around them is
 	// READ, which is what makes a printed value a trap: a bidi override
 	// reorders the line it is printed on — the source-spoofing trick, pointed
 	// at a report — U+2028 breaks the line in two, and a byte order mark simply
@@ -64,7 +64,7 @@ describe("rendering a String", () => {
 		)
 	})
 
-	// NOTE: And the invisible ones that change how their neighbours DRAW are
+	// And the invisible ones that change how their neighbours DRAW are
 	// left alone. A zero-width joiner holds an emoji sequence together, and
 	// escaping it would take a printed sequence apart into the characters
 	// nobody wrote.
@@ -74,7 +74,7 @@ describe("rendering a String", () => {
 		).toBe('"\u{1F469}\u200D\u{1F4BB}"')
 	})
 
-	// NOTE: A lone surrogate is half of a character and no Literal spells one,
+	// A lone surrogate is half of a character and no Literal spells one,
 	// so there is no escape that reads back to it. It renders as the
 	// replacement character's escape — what encoding the text would turn it
 	// into anyway, named rather than silent.
@@ -103,7 +103,7 @@ describe("rendering a String", () => {
 	})
 })
 
-// NOTE: The witness `createDictionary` asks about the keys it is handed. These
+// The witness `createDictionary` asks about the keys it is handed. These
 // keys are Strings and no two of them are equal, so the only thing this witness
 // ever answers is `false`, and what it answers is what a Dictionary of distinct
 // keys never depends on. `dictionaries.spec.ts` is where equality itself is
@@ -112,7 +112,7 @@ const distinct = {
 	is: () => ({ [Symbol.for("$type")]: "Boolean", value: false }) as never,
 }
 
-// NOTE: `createCase` answers a `CaseInstanceType`, which is deliberately
+// `createCase` answers a `CaseInstanceType`, which is deliberately
 // outside `AnyType` — the same cast every runtime module that builds a Case
 // makes, and for the reason `Generators.ts` gives. These are Cases at run time
 // either way.
@@ -131,7 +131,7 @@ const dictionary = (...pairs: Array<[string, number]>) =>
 		distinct,
 	)
 
-// NOTE: A Dictionary is rendered by the WRITTEN form, which is what
+// A Dictionary is rendered by the WRITTEN form, which is what
 // `Dictionary::toString` answers as well — so a Record holding one says the
 // same about it as printing it on its own does. The two readers of this walk
 // differ only in the padding, exactly as they do for a List.
@@ -142,7 +142,7 @@ describe("rendering a Dictionary", () => {
 		)
 	})
 
-	// NOTE: `[=]` rather than `[]`, which is the whole reason the empty
+	// `[=]` rather than `[]`, which is the whole reason the empty
 	// Dictionary carries the `=` an entry is written with: a reader has to be
 	// able to tell it from the empty List. The padding says nothing about it,
 	// because there is nothing to pad.
@@ -153,7 +153,7 @@ describe("rendering a Dictionary", () => {
 		).toBe("[=]")
 	})
 
-	// NOTE: What `Record::toString` asks for — no padding inside the brackets,
+	// What `Record::toString` asks for — no padding inside the brackets,
 	// which is the form `Dictionary::toString` answers and a Program writes.
 	test("the printable reading pads nothing", () => {
 		expect(
@@ -166,7 +166,7 @@ describe("rendering a Dictionary", () => {
 		).toBe('{ counts = ["a" = 1] }')
 	})
 
-	// NOTE: A single line over sixty characters wraps, the way a List and a
+	// A single line over sixty characters wraps, the way a List and a
 	// Record do, and each entry is then rendered at the deeper indent so that
 	// anything nested inside it lines up under its own key.
 	test("a long Dictionary wraps one entry to a line", () => {
@@ -192,7 +192,7 @@ describe("rendering a Dictionary", () => {
 	})
 })
 
-// NOTE: The TEXT a Case is rendered as, which is not the tag it is stamped
+// The TEXT a Case is rendered as, which is not the tag it is stamped
 // with. A Program's Choice is identified by the Module that declares it, so its
 // Cases are tagged `"./Doors.es#Door#Open"` — and printing that put the
 // compiling machine's path into the Program's own output, so that renaming a
@@ -232,7 +232,7 @@ describe("rendering a Case", () => {
 		).toBe("Shape#Square { side = 1, door = Door#Shut }")
 	})
 
-	// NOTE: A Module path holding a `#` of its own is what the rule has to be
+	// A Module path holding a `#` of its own is what the rule has to be
 	// read from the END for. Neither a Choice name nor a Case name can hold one,
 	// so the two separators nearest the end are always the right pair.
 	test("a Module path holding a # keeps only the last two segments", () => {
@@ -252,7 +252,7 @@ describe("rendering a Case", () => {
 		)
 	})
 
-	// NOTE: The rendering collides and the VALUES do not, which is the whole of
+	// The rendering collides and the VALUES do not, which is the whole of
 	// what a rendering without a Module path gives up: the tag keeps its Module,
 	// so nominal identity is untouched, and only the two lines a reader sees are
 	// the same.
@@ -267,7 +267,7 @@ describe("rendering a Case", () => {
 	})
 })
 
-// NOTE: The renderer table a routed Record hands this walk is indexed by MEMBER
+// The renderer table a routed Record hands this walk is indexed by MEMBER
 // NAME, and a member may be named anything a reader can write — `constructor`,
 // `toString`, `valueOf`. Read off a plain object those names answer
 // `Object.prototype`'s own functions rather than nothing, so the `??` beside the
@@ -275,7 +275,7 @@ describe("rendering a Case", () => {
 // returns: `[object Object]`, or `false`. The table is therefore built with no
 // prototype at all, and these are what say so.
 //
-// NOTE: The one that BITES is the member the table does not name — any other
+// The one that BITES is the member the table does not name — any other
 // member of a Record that routes something, whether the width rule left it
 // structural or its Type simply prints that way: the read invents a renderer
 // where there was none. A member the table DOES name is safe on any object,
@@ -285,14 +285,14 @@ describe("rendering a Case", () => {
 // Only a Record that routes SOMETHING is handed a table at all, which is why
 // both cases below route a member.
 describe("rendering a Record whose member is named like Object.prototype", () => {
-	// NOTE: Every own name on `Object.prototype` that a Program can spell.
+	// Every own name on `Object.prototype` that a Program can spell.
 	// `__proto__` is one of them and is refused by the Lexer, so no source text
 	// can reach here with it.
 	const prototypeNames = Object.getOwnPropertyNames(Object.prototype).filter(
 		(name) => name !== "__proto__",
 	)
 
-	// NOTE: Through `boundRecordToString` rather than by handing the walk a table
+	// Through `boundRecordToString` rather than by handing the walk a table
 	// this file built. The table is built by the runtime, and a test that built
 	// its own — safely, as any new code would — would pass whatever the runtime
 	// does. What is under test is the pair: the builder and the read.
@@ -325,7 +325,7 @@ describe("rendering a Record whose member is named like Object.prototype", () =>
 		}
 	})
 
-	// NOTE: And the same names on a Record that routes NOTHING, which is what
+	// And the same names on a Record that routes NOTHING, which is what
 	// every Program printing a Record did before any of this. It is handed no
 	// table at all, so this is the answer the two above have to match.
 	test("the same members print structurally where nothing routes", () => {
@@ -339,14 +339,14 @@ describe("rendering a Record whose member is named like Object.prototype", () =>
 	})
 })
 
-// NOTE: The walk renders every child ONCE, at indent zero, and re-indents that
+// The walk renders every child ONCE, at indent zero, and re-indents that
 // rendering for the nested layout — so what it costs is the size of the value
 // and not two renderings per level of nesting. Its two tests are the two halves
 // of that: the layout it produces at a deeper indent is the one it produces at
 // zero with the indent written after each newline, and a value nested deeply
 // enough that every level wraps still renders in no time at all.
 describe("rendering a deeply nested value", () => {
-	// NOTE: One member per level and a leaf long enough that every level
+	// One member per level and a leaf long enough that every level
 	// overflows the single-line budget, which is the shape that made the walk
 	// double per level. Depth 22 measured 1,153 ms before and 0.03 ms now.
 	function chain(depth: number): AnyType {

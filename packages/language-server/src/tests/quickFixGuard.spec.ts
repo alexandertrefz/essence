@@ -33,7 +33,7 @@ afterAll(() => {
 	madeFolders = []
 })
 
-// NOTE: The standing guard over every Quick Fix this Server offers, asked of
+// The standing guard over every Quick Fix this Server offers, asked of
 // every deliberately broken file there is. Each fix, applied alone to the
 // original text:
 //   (i)   raises no report the file did not already carry, except the codes
@@ -56,7 +56,7 @@ afterAll(() => {
 // questions are asked by `answerFailures` and `chainFailures`, and the mutants
 // in "The guard itself" check that each of them can fail.
 
-// NOTE: Codes the Parser and the Lexer raise, which is what "does it still
+// Codes the Parser and the Lexer raise, which is what "does it still
 // parse" is asked with — a fix that leaves a buffer the Parser can not read has
 // taken the rest of the file's reports away with it.
 const SYNTAX_CODES: ReadonlySet<string> = new Set([
@@ -67,19 +67,19 @@ const SYNTAX_CODES: ReadonlySet<string> = new Set([
 ])
 
 type Allowance = {
-	// NOTE: Matched on the fix's title by PREFIX, because a title is built from
+	// Matched on the fix's title by PREFIX, because a title is built from
 	// the reader's own names — "Implement 'Printable'" and "Implement 'Shown'"
 	// are one fix.
 	code: common.DiagnosticCode
 	title: string
 	reason: string
-	// NOTE: What the fix is allowed to leave behind. A scaffold leaves a hole
+	// What the fix is allowed to leave behind. A scaffold leaves a hole
 	// BY DESIGN, and the hole has a code: naming it here is what keeps "the
 	// count may rise" from meaning "anything may happen".
 	followUp: Array<common.DiagnosticCode>
 }
 
-// NOTE: The scaffolding fixes, and nothing else. Each of these writes a hole
+// The scaffolding fixes, and nothing else. Each of these writes a hole
 // the reader fills in, so the report that stands in the hole is the fix working
 // rather than the fix failing — and each entry names the code that hole
 // reports, so a fix that starts leaving a DIFFERENT one fails here.
@@ -173,18 +173,18 @@ const ALLOWED: Array<Allowance> = [
 ]
 
 type ReachAllowance = {
-	// NOTE: Keyed the way an Allowance is — the code the fix answers and the
+	// Keyed the way an Allowance is — the code the fix answers and the
 	// title it is offered under, by prefix.
 	code: common.DiagnosticCode
 	title: string
 	reason: string
-	// NOTE: How far the fix may write — "elsewhere in the file" where the
+	// How far the fix may write — "elsewhere in the file" where the
 	// answer lives at a declaration the reader may have put anywhere in it,
 	// "another file" for the one kind of fix that reaches a second Module.
 	reach: "elsewhere in the file" | "another file"
 }
 
-// NOTE: The fixes that legitimately write somewhere OTHER than the lines the
+// The fixes that legitimately write somewhere OTHER than the lines the
 // report stands on, and why each does. Everything else edits what it
 // underlines, give or take the line above and the line below — the rule that
 // tells a fix from a rewrite of the reader's file, and the one the survey's
@@ -241,11 +241,11 @@ function reachAllowanceFor(entry: CodeActionEntry): ReachAllowance | undefined {
 }
 
 type RefactorAllowance = {
-	// NOTE: Matched by PREFIX on the title, and pinned to the fixtures it is
+	// Matched by PREFIX on the title, and pinned to the fixtures it is
 	// allowed on: a rewrite that starts raising the count somewhere else is a
 	// new fact and fails here rather than riding in on an old reason.
 	//
-	// NOTE: A prefix wide enough to catch a rewrite nobody wrote it for is an
+	// A prefix wide enough to catch a rewrite nobody wrote it for is an
 	// allowance that excuses the wrong thing — "Make '" would cover a "Make it
 	// a Constant" nobody has written yet — so `for` narrows it to the shape the
 	// reason is about: the title reads "Make 'X' Generatable", and nothing else
@@ -254,11 +254,11 @@ type RefactorAllowance = {
 	for?: RegExp
 	fixtures: Array<string>
 	reason: string
-	// NOTE: How many errors it may ADD. One scaffold body is one hole.
+	// How many errors it may ADD. One scaffold body is one hole.
 	atMost: number
 }
 
-// NOTE: The two rewrites that leave a file more broken than they found it, and
+// The two rewrites that leave a file more broken than they found it, and
 // why each is allowed to. A refactoring is held to the weaker rule — it is
 // offered on code the Compiler is happy with and it CHANGES what a Program
 // says — but "weaker" is not "anything", so both are written down here with the
@@ -323,7 +323,7 @@ function allowanceFor(entry: CodeActionEntry): Allowance | undefined {
 	return found
 }
 
-// NOTE: A Diagnostic as the identity a loop is measured by: the same code, the
+// A Diagnostic as the identity a loop is measured by: the same code, the
 // same message, in the same place. A fix that answers a report by moving it to
 // a different code has made progress; one that hands back this is a loop.
 function identityOf(diagnostic: common.Diagnostic): string {
@@ -338,7 +338,7 @@ function identityOf(diagnostic: common.Diagnostic): string {
 	].join(" ")
 }
 
-// NOTE: A Diagnostic as "the same report", which is what a report the fix
+// A Diagnostic as "the same report", which is what a report the fix
 // RAISED is told from one the file was already carrying. The code and the
 // message, deliberately without the position: an edit that writes a line moves
 // every report below it down one, and a report that moved is not a new one,
@@ -349,7 +349,7 @@ function reportKey(diagnostic: common.Diagnostic): string {
 	return `${diagnostic.code} ${diagnostic.message}`
 }
 
-// NOTE: What the fix left behind that the file did not already say. Shared by
+// What the fix left behind that the file did not already say. Shared by
 // both paths: a scaffold's holes are read off this list and matched against the
 // codes its allowance names, and a fix with no allowance may leave none at all.
 function freshReports(
@@ -361,7 +361,7 @@ function freshReports(
 	return after.filter((diagnostic) => !standing.has(reportKey(diagnostic)))
 }
 
-// NOTE: The Diagnostic an action answers, as the identity a chain is followed
+// The Diagnostic an action answers, as the identity a chain is followed
 // by — the code and where it was raised. Null where the action answers none,
 // which no quickfix does.
 function keyOf(entry: CodeActionEntry): string | null {
@@ -393,13 +393,13 @@ function parsesIn(diagnostics: Array<common.Diagnostic>): boolean {
 	return !diagnostics.some((diagnostic) => SYNTAX_CODES.has(diagnostic.code))
 }
 
-// NOTE: One line of slack on each side, because an edit that writes a line ABOVE
+// One line of slack on each side, because an edit that writes a line ABOVE
 // the report — a Type a declaration was short of, a conformance, the closing
 // quote of the String that ran on — stands on the neighbouring line and is as
 // local as an edit gets.
 const NEARBY_LINES = 1
 
-// NOTE: Where a fix may write. The reader asked about ONE report, and an edit
+// Where a fix may write. The reader asked about ONE report, and an edit
 // somewhere else in their file is a change they did not ask for and will not
 // read — the Help audit's mutants walked in exactly here, riding along with an
 // honest edit: a binding renamed throughout, every documentation comment
@@ -431,7 +431,7 @@ function reachesTooFar(
 	return inside ? null : "elsewhere in the file"
 }
 
-// NOTE: The guard's own questions, as a function rather than as a wall of
+// The guard's own questions, as a function rather than as a wall of
 // assertions, so that the mutants in "The guard itself" can be asked them too.
 // It answers the questions the fix failed, empty where it passed all of them.
 function answerFailures(
@@ -448,7 +448,7 @@ function answerFailures(
 	// (i) It raised no report the file was not already carrying — and, where
 	// it is no scaffold, neither count rose either.
 	//
-	// NOTE: Counts alone said nothing about WHICH reports were counted: a fix
+	// Counts alone said nothing about WHICH reports were counted: a fix
 	// that answered the report it was offered for and left an unrelated one in
 	// its place went four for four and passed. What a fix may leave is what its
 	// allowance names, and nothing is what everything else may leave.
@@ -507,7 +507,7 @@ function answerFailures(
 	return failures
 }
 
-// NOTE: Split out because the Module group asks this one question on its own:
+// Split out because the Module group asks this one question on its own:
 // there the answer is read off the whole graph, and an edit landing in a second
 // file is the fix working rather than the fix reaching.
 function reachFailures(entry: CodeActionEntry): Array<string> {
@@ -560,7 +560,7 @@ function answers(
 	)
 }
 
-// NOTE: One round of a chain. A scaffold's round is counted without the codes
+// One round of a chain. A scaffold's round is counted without the codes
 // its allowance names, since those reports are the holes it leaves by design.
 function roundFailures(
 	fix: CodeActionEntry,
@@ -592,7 +592,7 @@ function roundFailures(
 	return failures
 }
 
-// NOTE: The fourth question follows a fix the way a reader presses through
+// The fourth question follows a fix the way a reader presses through
 // lightbulbs: apply it, read the Diagnostics again, then apply the quick fix
 // the result offers for a report that round raised, or else the first it offers.
 function chainFailures(source: string, entry: CodeActionEntry): Array<string> {
@@ -647,7 +647,7 @@ function chainFailures(source: string, entry: CodeActionEntry): Array<string> {
 	return failures
 }
 
-// NOTE: A path with no import or export block beside it is analysed on its own,
+// A path with no import or export block beside it is analysed on its own,
 // which is what every single-file fixture here is. The refactorings need one.
 const DOCUMENT = "file:///repo/Showcase.es"
 
@@ -670,7 +670,7 @@ describe("Every Quick Fix on every broken file", () => {
 		expect(showcases.length).toBeGreaterThan(20)
 	})
 
-	// NOTE: Nothing may escape into the other group by accident — a single-file
+	// Nothing may escape into the other group by accident — a single-file
 	// fixture that started offering a fix reaching a second file would be
 	// skipped in silence, and this is what stops that.
 	it("offers only single-file edits on a single-file fixture", () => {
@@ -718,7 +718,7 @@ describe("Every Quick Fix on every broken file", () => {
 	}
 })
 
-// NOTE: The weaker rule for a REFACTORING, which is offered on code the
+// The weaker rule for a REFACTORING, which is offered on code the
 // Compiler is happy with and is a rewrite rather than an answer: it may say
 // something new, and what it may never do is turn a file with N errors into one
 // with more.
@@ -749,7 +749,7 @@ describe("Every refactoring on every broken file", () => {
 	}
 })
 
-// NOTE: The Module showcase, which is the only place a fix reaches a SECOND
+// The Module showcase, which is the only place a fix reaches a SECOND
 // file — a name written into the export block of the Module that kept it
 // private. It runs against a real directory for the reason `workspace.spec.ts`
 // does: which path a specifier resolves to is most of what there is to get
@@ -784,7 +784,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 		return root
 	}
 
-	// NOTE: The whole workspace's Diagnostics, because a Module fix is judged
+	// The whole workspace's Diagnostics, because a Module fix is judged
 	// by what the GRAPH says afterwards — an export written into one file
 	// answers a report raised in another, and reading back only the file the
 	// fix was offered on would call that a success either way.
@@ -807,7 +807,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 			})
 	}
 
-	// NOTE: One fix, applied to the files as they were written, with the edits
+	// One fix, applied to the files as they were written, with the edits
 	// grouped per file — a Workspace Edit reaching two files is one action, and
 	// applying half of it is not what a reader does.
 	function withFix(entry: CodeActionEntry, onto: string): Array<string> {
@@ -828,7 +828,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 		return graphCodes(freshFolder(files))
 	}
 
-	// NOTE: And it has fixes to apply — a group that quietly stopped finding any
+	// And it has fixes to apply — a group that quietly stopped finding any
 	// would pass every assertion below it by never reaching one.
 	it("has a showcase to fix", () => {
 		let root = freshFolder(moduleFiles)
@@ -873,7 +873,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 				let where = `${name} · ${entry.title}`
 				let after = withFix(entry, name)
 
-				// NOTE: The same rule as everywhere else, read over the whole
+				// The same rule as everywhere else, read over the whole
 				// graph: a fix may answer a report and may not add one.
 				expect([where, after.length <= before.length]).toEqual([
 					where,
@@ -884,7 +884,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 					after.filter((code) => code.endsWith("syntax-error")),
 				]).toEqual([where, []])
 
-				// NOTE: And it wrote where the report stands, or where its
+				// And it wrote where the report stands, or where its
 				// allowance says it may. This is the one group where a fix
 				// reaches a SECOND file, which is exactly why the rule is
 				// asked here as well: "it is a Module fix" is not a reason to
@@ -895,7 +895,7 @@ describe("Every Quick Fix on the Module showcase", () => {
 	}
 })
 
-// NOTE: The allowlist's own guard. An entry that stops being needed is a claim
+// The allowlist's own guard. An entry that stops being needed is a claim
 // about the Compiler that nobody is checking any more — so it fails here, and
 // whoever fixed the fix deletes the line that excused it.
 describe("The allowlist", () => {
@@ -924,7 +924,7 @@ describe("The allowlist", () => {
 	})
 })
 
-// NOTE: The guard's own guard: each mutant is a deliberately wrong fix, most of
+// The guard's own guard: each mutant is a deliberately wrong fix, most of
 // them the honest fix carrying something no reader asked for, and each has to
 // be caught.
 //
@@ -932,7 +932,7 @@ describe("The allowlist", () => {
 // file, which only question (v) catches, and one is caught only by following the
 // chain past its first round.
 describe("The guard itself", () => {
-	// NOTE: Written here rather than read out of the corpus: a mutant has to
+	// Written here rather than read out of the corpus: a mutant has to
 	// know what it is corrupting — a comment, a binding, a Case — and a fixture
 	// is free to stop carrying any of the three. One misspelled name, in the
 	// middle of the file so that an edit at either end of it is plainly
@@ -990,7 +990,7 @@ describe("The guard itself", () => {
 		expect(reachAllowanceFor(honest)).toBeUndefined()
 	})
 
-	// NOTE: The control. A guard that failed everything would catch every mutant
+	// The control. A guard that failed everything would catch every mutant
 	// and be worth nothing.
 	it("passes the honest fix", () => {
 		expect(verdict(honest)).toEqual([])
@@ -1052,7 +1052,7 @@ describe("The guard itself", () => {
 		])
 	})
 
-	// NOTE: The three that got past the counting guard, each of which leaves a
+	// The three that got past the counting guard, each of which leaves a
 	// file the Compiler is just as happy with and the reader no longer
 	// recognises. They are caught by where they WRITE, so the verdict is read
 	// for that question by name rather than for any failure at all.
@@ -1092,7 +1092,7 @@ describe("The guard itself", () => {
 		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
 	})
 
-	// NOTE: Caught by no question but the chain: the fix moves the misspelled
+	// Caught by no question but the chain: the fix moves the misspelled
 	// name into a declaration whose uses it masks, and the next fix unmasks them.
 	it("catches a count that rises further down the chain", () => {
 		let trap = mutant([

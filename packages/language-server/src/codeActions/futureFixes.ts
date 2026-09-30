@@ -4,15 +4,15 @@ import { containsRange, keywordAt, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// NOTE: The fixes for the Diagnostics asynchrony reports. Four of the five have
+// The fixes for the Diagnostics asynchrony reports. Four of the five have
 // a mechanical answer and are written below; `unobserved-started` has none and
 // is the reason the NOTE at the bottom of this file exists.
 
-// NOTE: The Keyword each Node is written with, which is what
+// The Keyword each Node is written with, which is what
 // `dropKeywordAction` checks the buffer against before cutting it.
 const keywords = { Start: "start", Complete: "complete" } as const
 
-// NOTE: `complete` in a body that declared something other than a Future. The
+// `complete` in a body that declared something other than a Future. The
 // body is right and the signature is behind it: what it answers with is a
 // Future of what it says today, so the annotation is wrapped rather than
 // replaced — the Type the author wrote is the Value the future carries.
@@ -34,7 +34,7 @@ export function declareFutureReturnAction(
 
 	let written = sliceOf(lines, definition.returnType.position).trim()
 
-	// NOTE: Nothing is offered where the annotation is empty or already reads
+	// Nothing is offered where the annotation is empty or already reads
 	// `Future<…>`, rather than `Future<Future<Integer>>`.
 	if (written === "" || written.startsWith("Future<")) {
 		return null
@@ -55,7 +55,7 @@ export function declareFutureReturnAction(
 	}
 }
 
-// NOTE: The Function definition whose own body holds a Position, innermost
+// The Function definition whose own body holds a Position, innermost
 // first — the body rather than the whole Node, which is what tells a `complete`
 // written in a Statement from one written in a Parameter's default.
 //
@@ -88,7 +88,7 @@ function completingDefinitionAt(
 	return found
 }
 
-// NOTE: A Future written where its value goes nowhere, which is the one
+// A Future written where its value goes nowhere, which is the one
 // Diagnostic of the five with two answers: waiting for it and putting it in
 // flight are both whole things to mean, and nothing in the source says which.
 // Neither is preferred for that reason, and `complete` is offered first because
@@ -103,12 +103,12 @@ export function discardedFutureActions(
 	].map((entry) => ({ ...entry, isPreferred: false }))
 }
 
-// NOTE: A Type mismatch that is one missing word: a Future or a Started
+// A Type mismatch that is one missing word: a Future or a Started
 // standing where the value it answers with is wanted. The Validator has already
 // decided that, by assignability, and says so in its `data` — so what is left
 // here is writing the word.
 //
-// NOTE: Read off the DATA rather than off the Help's sentence. The codes these
+// Read off the DATA rather than off the Help's sentence. The codes these
 // arrive under are reported for every other mismatch in the language as well,
 // so the code alone can not decide it — and the Helps are written per report
 // site, in wording `interfaces/common` explicitly reserves the right to change.
@@ -123,7 +123,7 @@ export function waitForValueAction(
 	return insertKeywordAction(diagnostic, "complete", "Wait for it with")
 }
 
-// NOTE: The same missing word on a call that picked no Overload at all, where
+// The same missing word on a call that picked no Overload at all, where
 // the Diagnostic is reported at the WHOLE call and the Argument that was refused
 // is what its primary Label points at. So the edit is measured off that Label
 // rather than off the Diagnostic's own span — writing the word in front of the
@@ -157,7 +157,7 @@ function insertKeywordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	keyword: string,
 	title: string,
-	// NOTE: Where the word goes, which is the Diagnostic's own span for every
+	// Where the word goes, which is the Diagnostic's own span for every
 	// report that points at the value itself.
 	at: common.Position = diagnostic.position,
 ): CodeActionEntry {
@@ -166,7 +166,7 @@ function insertKeywordAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// NOTE: Preferred where it is the answer rather than one of two —
+		// Preferred where it is the answer rather than one of two —
 		// `discardedFutureActions` overrides this on both of the pair it
 		// offers, since choosing between them is the reader's.
 		isPreferred: true,
@@ -179,7 +179,7 @@ function insertKeywordAction(
 	}
 }
 
-// NOTE: A Keyword in front of a value that is neither a Future nor a Started.
+// A Keyword in front of a value that is neither a Future nor a Started.
 // The word is the whole of what is wrong, so the whole of the fix is to take it
 // out — everything from where it starts to where its operand does, which is the
 // word and the space behind it.
@@ -221,7 +221,7 @@ export function dropKeywordAction(
 	}
 }
 
-// NOTE: The `start` or `complete` the Diagnostic was reported against. Both are
+// The `start` or `complete` the Diagnostic was reported against. Both are
 // reported at the whole Expression's Position, so the Node wanted is the one
 // standing exactly there — and the walk answers with the innermost, which is
 // what tells the inner Keyword of `complete start x` from the outer one.
@@ -243,7 +243,7 @@ function keywordNodeAt(
 	return found
 }
 
-// NOTE: And the one that is offered nothing. `unobserved-started` is an
+// And the one that is offered nothing. `unobserved-started` is an
 // Information about a line that is legal — fire and forget is a real thing to
 // write — and its two answers are "leave it", which is no edit, and "hold it in
 // a Constant", whose whole content is a name only the reader knows. A fix that

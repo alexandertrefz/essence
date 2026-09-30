@@ -6,7 +6,7 @@ import type { parser } from "@essence-lang/interfaces"
 
 import { tagDiagnostics, tagUsages } from "../testTags"
 
-// NOTE: The two questions a workspace can ask about its tags and one Module can
+// The two questions a workspace can ask about its tags and one Module can
 // not. Everything here is over PARSER Programs, because that is what the
 // Workspace holds and because where a tag was written survives only there.
 

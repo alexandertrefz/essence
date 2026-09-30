@@ -15,7 +15,7 @@ import {
 } from "./enrichers"
 import { childScope } from "./scope"
 
-// NOTE: A checked refinement IS a property, and a Namespace Method that writes
+// A checked refinement IS a property, and a Namespace Method that writes
 // one in its return Type has already stated the property its answer holds. This
 // turns that statement into the test it is: generate the receiver and every
 // Argument from the declared Types, call the Method, and expect the answer to
@@ -24,38 +24,38 @@ import { childScope } from "./scope"
 // — a reader who asks for a file's tests is shown the ones they wrote and,
 // beside them, the ones their declarations promise.
 //
-// NOTE: A goal that THROWS fails, and that is the contract even where the
+// A goal that THROWS fails, and that is the contract even where the
 // return Type refines nothing: a Method is declared over a domain, and totality
 // over the domain it declared is the smallest thing a signature says. So every
 // entry gets a goal, and the ones with refinements get expects as well.
 //
-// NOTE: For a Method written in Essence the prover has already guaranteed the
+// For a Method written in Essence the prover has already guaranteed the
 // refinements, so a stdlib contract run is a Compiler soundness harness rather
 // than a check on the library. Where the goals earn their keep is the two seams
 // the prover can not see through: a native binding, and a `Generatable`
 // conformance that hands back a value its own Type refuses.
 
-// NOTE: How many cases one goal runs where the command line says nothing. A
+// How many cases one goal runs where the command line says nothing. A
 // Namespace is dozens of goals and a hundred cases each is a run nobody asked
 // to wait for; twenty-five is enough for a shape-level lie to show, and
 // `--cases` overrides it either way — for the reader who wants one goal
 // hammered, and for the sweep that wants them all brief.
 const CONTRACT_CASES = 25
 
-// NOTE: The name the answer is bound to inside a goal's body. A `$` name no
+// The name the answer is bound to inside a goal's body. A `$` name no
 // Essence source can spell, so a Method taking an Argument labelled `answer`
 // can not collide with it, and one name for every goal because a goal is its
 // own Scope.
 const ANSWER = "$answer"
 
-// NOTE: The suite every goal is reported under. A written suite of the same
+// The suite every goal is reported under. A written suite of the same
 // name is REFUSED where the synthesis happens — see `refuseReservedSuite` in
 // tests.ts — because two suites sharing one identity share the corpus, the
 // seeds and the focus that identity anchors, and a collision the author can
 // not see is a collision nothing can diagnose.
 export const CONTRACT_SUITE = "contracts"
 
-// NOTE: One Namespace's goals, and what was skipped on the way. The skips are
+// One Namespace's goals, and what was skipped on the way. The skips are
 // carried rather than reported as they happen so that a Namespace whose Methods
 // are mostly generic says so ONCE, naming them together, instead of filling a
 // report with one remark per Method.
@@ -64,7 +64,7 @@ type Synthesis = {
 	skipped: Array<{ name: string; reason: string; generation: boolean }>
 }
 
-// NOTE: Why one entry got no goal. `generic` is the deliberate rule the docs
+// Why one entry got no goal. `generic` is the deliberate rule the docs
 // state — one instantiation proves nothing about the rest — and is not worth a
 // remark, let alone the `Generatable` help that could never make it eligible.
 // The others are said out loud, each in its own words.
@@ -76,7 +76,7 @@ function skipOf(answer: common.typed.TestNode | GoalSkip): GoalSkip | null {
 	return "skip" in answer ? answer : null
 }
 
-// NOTE: The `suite "contracts" { … }` a Module's own declarations promise, or
+// The `suite "contracts" { … }` a Module's own declarations promise, or
 // null where they promise nothing this can build. It is TYPED rather than
 // parsed — the `@example` precedent synthesizes Parser Nodes because what it
 // compiles is written down in a Comment, and a goal is written nowhere at all —
@@ -89,7 +89,7 @@ export function contractSuite(
 	modulePath: string | null,
 ): common.typed.SuiteNode | null {
 	let goals: Array<common.typed.TestNode> = []
-	// NOTE: One derivation per Type for the whole Module. A Namespace's entries
+	// One derivation per Type for the whole Module. A Namespace's entries
 	// share their parameter Types by identity — every non-static entry carries
 	// the same receiver Type object — and deriving a refined Type re-enriches a
 	// predicate call per conjunct, so without this a wide Namespace repeats the
@@ -102,7 +102,7 @@ export function contractSuite(
 			continue
 		}
 
-		// NOTE: The Module's OWN declarations, read out of the Scope the
+		// The Module's OWN declarations, read out of the Scope the
 		// implementation filled rather than out of `getAllNamespacesInScope` —
 		// which answers with the whole prelude beside them. The standard
 		// library's Methods get their goals when the standard library's own
@@ -114,7 +114,7 @@ export function contractSuite(
 			continue
 		}
 
-		// NOTE: Only the members THIS statement wrote. The Scope answers with
+		// Only the members THIS statement wrote. The Scope answers with
 		// the MERGED Namespace — a second `namespace X for T`, in this file or
 		// in a Module that imports it, folds into one table — so goal-ing the
 		// table per statement would goal an inherited Method once per
@@ -188,14 +188,14 @@ function namespaceGoals(
 				isStatic,
 				entries.length === 1 ? null : index + 1,
 			)
-			// NOTE: The WHOLE synthesis is speculative. Deriving a generator
+			// The WHOLE synthesis is speculative. Deriving a generator
 			// reports what it can not build, and rebuilding the call reports
 			// what does not typecheck — both about code nobody wrote, and both
 			// answered once, about the Namespace, by whoever asked. So the
 			// collection is opened here and the Diagnostics inside it are read
 			// for their first message and then dropped.
 			//
-			// NOTE: And it is GUARDED — `collectDiagnostics` restores the
+			// And it is GUARDED — `collectDiagnostics` restores the
 			// ambient collection and rethrows, so an enricher invariant
 			// tripping over the call nobody wrote would otherwise take the
 			// whole compile down for a file that compiles fine without the
@@ -230,7 +230,7 @@ function namespaceGoals(
 			let skip = skipOf(attempt.result)
 
 			if (skip !== null || containsErrors(attempt.diagnostics)) {
-				// NOTE: A generic entry is the one skip not worth a word — the
+				// A generic entry is the one skip not worth a word — the
 				// docs state the rule, and no conformance an author could
 				// declare would ever make it eligible.
 				if (skip?.skip === "generic") {
@@ -269,7 +269,7 @@ function namespaceGoals(
 	return synthesis
 }
 
-// NOTE: One entry as the property test it is, or a `GoalSkip` saying why it
+// One entry as the property test it is, or a `GoalSkip` saying why it
 // has none. Everything here happens inside the caller's speculative collection:
 // a skip and a reported Diagnostic mean the same thing to it, and a goal that
 // half-built leaves nothing behind but a Scope nobody keeps.
@@ -284,7 +284,7 @@ function goalOf(
 	modulePath: string | null,
 	derived: WeakMap<common.Type, common.typed.TestGenerator>,
 ): common.typed.TestNode | GoalSkip {
-	// NOTE: A Method whose signature still mentions a Type Parameter is left
+	// A Method whose signature still mentions a Type Parameter is left
 	// alone. What a generic Method's contract says is a claim about every
 	// instantiation of it, and the values this generates are drawn from ONE —
 	// so a goal over it would either not typecheck or quietly prove the
@@ -322,7 +322,7 @@ function goalOf(
 		values.push({ nodeType: "Identifier", content: binding, position })
 	}
 
-	// NOTE: A Scope of the goal's own, holding one Constant per generated
+	// A Scope of the goal's own, holding one Constant per generated
 	// value. Built whole rather than filled Parameter by Parameter, because a
 	// Scope with a name written into it after something has read it is a Scope
 	// whose memoised Namespace table has already answered without it.
@@ -344,7 +344,7 @@ function goalOf(
 		return { skip: "call" }
 	}
 
-	// NOTE: A Method answering a Future or a Started is skipped rather than
+	// A Method answering a Future or a Started is skipped rather than
 	// proved. A goal's body is the call as a bare Expression Statement, which is
 	// exactly what `unused-future` names and `unobserved-started` remarks on —
 	// and the Statement is generated, so it has no source position of its own
@@ -376,7 +376,7 @@ function goalOf(
 		skipped: null,
 		focused: null,
 		table: null,
-		// NOTE: A Method that takes nothing and has no receiver has nothing to
+		// A Method that takes nothing and has no receiver has nothing to
 		// generate, so its goal is a plain test that runs ONCE. A property test
 		// with no Parameters is the shape `for any ()` is refused for.
 		properties:
@@ -390,7 +390,7 @@ function goalOf(
 	}
 }
 
-// NOTE: What a goal RUNS: the call, and one `expect` per conjunct the answer's
+// What a goal RUNS: the call, and one `expect` per conjunct the answer's
 // Type promises.
 //
 // With conjuncts the answer is bound, because every expect reads it and a call
@@ -426,7 +426,7 @@ function bodyOf(
 			position,
 		)
 
-		// NOTE: A conjunct nothing can rebuild takes the whole goal with it. A
+		// A conjunct nothing can rebuild takes the whole goal with it. A
 		// goal reported under the Method's own name claims the Method's whole
 		// contract, and one that checked half of it would be a passing test
 		// about a promise nobody kept.
@@ -458,7 +458,7 @@ function bodyOf(
 			declaredType: null,
 			type: answer.type,
 			documentation: null,
-			// NOTE: A Constant no source wrote, which is what keeps the
+			// A Constant no source wrote, which is what keeps the
 			// Simplifier from handing it a probe point: what an Editor draws
 			// beside a written Constant is the value the author named, and
 			// nobody named this one.
@@ -468,7 +468,7 @@ function bodyOf(
 	]
 }
 
-// NOTE: The call the goal makes, spelled the way an author would have written
+// The call the goal makes, spelled the way an author would have written
 // it — a Method through its own Namespace, so that two Namespaces answering one
 // name for one Type stay told apart, and a static as the Lookup it is.
 function invocation(
@@ -523,7 +523,7 @@ function invocation(
 	}
 }
 
-// NOTE: What one generated value is called inside the goal's body, and what a
+// What one generated value is called inside the goal's body, and what a
 // counterexample is reported beside. The Parameter's own LABEL wherever it has
 // one, because that is the word the author chose for it; `receiver` for the
 // Parameter a non-static signature is prefixed with, and `argument1` upward for
@@ -549,7 +549,7 @@ function bindingName(
 	return name
 }
 
-// NOTE: The Method's full spelling, which is what a reader searching a report
+// The Method's full spelling, which is what a reader searching a report
 // looks for and what makes the identity stable: a stable name is a stable id,
 // and a stable id is what the corpus, the seeds and the shrinking are keyed by.
 // The Arguments are spelled as a call site writes them — `label:` where one is
@@ -576,7 +576,7 @@ function goalName(
 	return overload === null ? name : `${name} overload ${overload}`
 }
 
-// NOTE: Said ONCE per Namespace, and quietly. A Method whose goal could not be
+// Said ONCE per Namespace, and quietly. A Method whose goal could not be
 // built is not a mistake anybody made — a generic Method, a Parameter nothing
 // knows how to draw a value of — and a run that stayed silent about them would
 // leave a reader believing their whole Namespace was under contract.
@@ -589,7 +589,7 @@ function reportSkippedGoals(
 	}
 
 	let first = skipped[0]!
-	// NOTE: The `Generatable` help is real advice only where a generation
+	// The `Generatable` help is real advice only where a generation
 	// refused — offered for a call that does not typecheck it would send the
 	// author declaring a conformance that changes nothing.
 	let generation = skipped.some((entry) => entry.generation)

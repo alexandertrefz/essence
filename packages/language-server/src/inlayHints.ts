@@ -8,7 +8,7 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
 import { spellTypeAt } from "./spellableTypes"
 
-// NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
+// Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters
 // and return Type of a contextually typed Function literal, which take their
 // Types from the signature they are passed to and so show them nowhere in the
@@ -22,7 +22,7 @@ import { spellTypeAt } from "./spellableTypes"
 export type InlayHint = {
 	position: common.Cursor
 	label: string
-	// NOTE: `type` is the annotation the source left out; `value` is what a
+	// `type` is the annotation the source left out; `value` is what a
 	// test RECORDED at that place — the answer of an `expect` that did not
 	// hold, the value of a Constant a test body wrote, the value of a line
 	// ending in `§?`. A value Hint carries no edit: there is nothing to accept,
@@ -32,14 +32,14 @@ export type InlayHint = {
 	textEdit: InlayHintEdit | null
 }
 
-// NOTE: An insertion, so a Cursor rather than a Position — the annotation goes
+// An insertion, so a Cursor rather than a Position — the annotation goes
 // where the Hint is shown and replaces nothing.
 type InlayHintEdit = {
 	position: common.Cursor
 	newText: string
 }
 
-// NOTE: Every Hint's label is the annotation the source left out, spelled
+// Every Hint's label is the annotation the source left out, spelled
 // exactly as it would have been written, and every Hint sits exactly where
 // that annotation belongs — so accepting a Hint is inserting its own label at
 // its own position, and building the two together is what keeps them from
@@ -54,7 +54,7 @@ type InlayHintEdit = {
 // file parsing. The hint still SHOWS what was inferred, which is information;
 // it simply carries no edit, exactly as a recorded value does.
 //
-// NOTE: The label and the edit are built from the same Type and are not always
+// The label and the edit are built from the same Type and are not always
 // the same TEXT, which is the one place the two part company: a label names an
 // Alias wherever the reader is standing, and an edit may only write a name the
 // position can resolve. `: Point` over a file that imports no `Point` is shown
@@ -101,7 +101,7 @@ export function findInlayHints(
 	)
 }
 
-// NOTE: The list being filled and the Program it is read off, carried together
+// The list being filled and the Program it is read off, carried together
 // through the walk — what a Hint's edit may WRITE is a question about the
 // Scopes standing where the Hint sits, and the Program is where those are read.
 type Hints = {
@@ -122,7 +122,7 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// NOTE: `declaredType` is set exactly when the source spelled the
+			// `declaredType` is set exactly when the source spelled the
 			// Type out — annotating an annotated declaration would be noise.
 			// A failed inference is left alone rather than shown as `Error`.
 			//
@@ -244,7 +244,7 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 			}
 
 			return
-		// NOTE: An arm declares nothing to annotate, but a Function literal
+		// An arm declares nothing to annotate, but a Function literal
 		// written as one of its values takes its Types from the position it
 		// fills and shows them nowhere in the source — exactly the case a hint
 		// answers.
@@ -291,7 +291,7 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 
 			return
 		case "ChoiceDeclarationStatement":
-			// NOTE: A Function literal written inside a Case payload's default
+			// A Function literal written inside a Case payload's default
 			// takes its Types from the member it fills in, so it shows them
 			// nowhere in the source — exactly the case a hint answers.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -310,7 +310,7 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 	}
 }
 
-// NOTE: A Function literal that annotates itself in full already shows its
+// A Function literal that annotates itself in full already shows its
 // whole Type at the declaration — repeating that Type beside the name says
 // nothing the line does not already say, and says it at the width of a
 // signature. A literal that left an annotation out is the opposite case: the
@@ -328,7 +328,7 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: `inferredType` and `inferredReturnType` are set exactly when the
+// `inferredType` and `inferredReturnType` are set exactly when the
 // source left the annotation out, mirroring `declaredType` on a Constant.
 // A failed inference is left alone rather than shown as `Error`.
 //
@@ -340,7 +340,7 @@ function visitFunctionDefinition(
 	hints: Hints,
 ) {
 	for (let parameter of definition.parameters) {
-		// NOTE: `parameter.position` stops at the Type and does NOT cover a
+		// `parameter.position` stops at the Type and does NOT cover a
 		// default — deliberately, and this is the reason it does not: the hint
 		// sits at that end, and `codeActions` offers the same span as an
 		// APPLIED edit, so a widened Position would write `: Integer` after

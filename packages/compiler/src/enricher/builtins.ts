@@ -2,13 +2,13 @@ import type { common } from "@essence-lang/interfaces"
 
 import { loadStdlib } from "./stdlib"
 
-// NOTE: The single source of truth for what exists before the first line of a
+// The single source of truth for what exists before the first line of a
 // Program. The Enricher builds its top-level Scope from these accessors, and
 // the Language Server derives its builtin listings from the same ones — a new
 // builtin registered here reaches resolution, completion, rename and
 // semantic tokens in one step, and can not be half-wired again.
 //
-// NOTE: The standard library itself is written in Essence, under
+// The standard library itself is written in Essence, under
 // `packages/standard-library/sources`. Of what a Program starts with, only the
 // bare Type tags are declared in TypeScript, in `primitives.ts`: `loadStdlib`
 // reads the sources once per process and hands those tags out beside what the
@@ -17,7 +17,7 @@ import { loadStdlib } from "./stdlib"
 // the one thing a source file can not say about itself, because each declares
 // only its own name.
 
-// NOTE: The order the builtin members are listed in. A source declaration is
+// The order the builtin members are listed in. A source declaration is
 // enriched INTO the Scope, so it lands where insertion put it — which is the
 // order `readStdlibSources` happened to sort the file names in, and nothing an
 // editor of `packages/standard-library/sources` would think to control. The
@@ -26,7 +26,7 @@ import { loadStdlib } from "./stdlib"
 // builds its `matchingNamespaces` in the same order — so it is stated here,
 // once, rather than left to the file system.
 //
-// NOTE: This is the order BETWEEN Namespaces. The order WITHIN one — its
+// This is the order BETWEEN Namespaces. The order WITHIN one — its
 // Methods and Properties — is a property of the declaration itself, and is
 // simply the order the `.es` file writes them in. Which is not left to
 // whoever wrote it either: `packages/standard-library/DEVELOPMENT.md`, Member
@@ -40,19 +40,19 @@ export const builtinMemberOrder: Array<string> = [
 	"Terminal",
 	"loop",
 	"String",
-	// NOTE: Directly after `String`, for the reason `NonZeroInteger` sits
+	// Directly after `String`, for the reason `NonZeroInteger` sits
 	// directly after `Integer` — the general Namespace has to be met FIRST so
 	// that `NonEmptyString::firstCharacter` reads as the extra a proven String
 	// has.
 	"NonEmptyString",
 	"Boolean",
 	"Integer",
-	// NOTE: Directly after `Integer`, for the reason `NestedList` sits directly
+	// Directly after `Integer`, for the reason `NestedList` sits directly
 	// after `List` — the two Namespaces one Integer value can reach belong
 	// together, and the general one has to be met FIRST so that
 	// `NonZeroInteger::multiply` reads as the extra a proven Integer has.
 	"NonZeroInteger",
-	// NOTE: And the second refinement of `Integer` after the first, for the same
+	// And the second refinement of `Integer` after the first, for the same
 	// reason. The two share one Method name, `multiply`, and neither target is
 	// narrower than the other, so this order decides which of the two
 	// Completion names first for a receiver proving both — a call RESOLVES to
@@ -60,19 +60,19 @@ export const builtinMemberOrder: Array<string> = [
 	// declares the name too. They are listed together so that a reader meets
 	// what an Integer can be proven to be in one place.
 	"NonNegativeInteger",
-	// NOTE: And the third after both, for the reason every proven Namespace
+	// And the third after both, for the reason every proven Namespace
 	// sits after the ones it narrows — `PositiveInteger` is a `NonZeroInteger`
 	// and a `NonNegativeInteger` at once, so a receiver reaching it reaches
 	// those two as well, and has to meet them FIRST so that its own entries
 	// read as the extra holding both proofs adds.
 	"PositiveInteger",
 	"Rational",
-	// NOTE: Directly after `Rational`, for the reason `NonZeroInteger` sits
+	// Directly after `Rational`, for the reason `NonZeroInteger` sits
 	// directly after `Integer` — the two Namespaces one Rational value can
 	// reach belong together, and the general one has to be met FIRST so that
 	// `NonZeroRational::reciprocal` reads as the extra a proven Rational has.
 	"NonZeroRational",
-	// NOTE: The other two refinements of `Rational`, with the first and in the
+	// The other two refinements of `Rational`, with the first and in the
 	// order the Integer three are listed in — the general Namespace has to be
 	// met FIRST, and `PositiveRational` is a `NonZeroRational` and a
 	// `NonNegativeRational` at once, so it comes after both. The three share
@@ -80,7 +80,7 @@ export const builtinMemberOrder: Array<string> = [
 	// narrowest target rather than on this order.
 	"NonNegativeRational",
 	"PositiveRational",
-	// NOTE: After both of the Types it covers, for the reason `NonEmptyList`
+	// After both of the Types it covers, for the reason `NonEmptyList`
 	// sits after `List` — an Integer and a Rational each reach this Namespace
 	// as well as their own, and Completion dedupes members
 	// first-Namespace-wins, so `add` and `multiply` have to be offered from
@@ -94,19 +94,19 @@ export const builtinMemberOrder: Array<string> = [
 	"Transcendental",
 	"Number",
 	"Optional",
-	// NOTE: Directly after `Optional`, for the reason `NestedList` sits
+	// Directly after `Optional`, for the reason `NestedList` sits
 	// directly after `List` — the two Namespaces one Optional value can reach
 	// belong together, and the general one has to be met FIRST so that
 	// `NestedOptional::flatten` reads as the extra a nested Optional has.
 	"NestedOptional",
-	// NOTE: After `Optional` and the Namespace beside it, because a Result is
+	// After `Optional` and the Namespace beside it, because a Result is
 	// the same carrier with a reason attached and a reader meets the plainer
 	// one first. It shares ten Method names with `Optional`, and shares them
 	// harmlessly, because no value reaches both: this target is a Result and
 	// that one is an Optional. So the position decides nothing but where a
 	// reader meets it.
 	"Result",
-	// NOTE: Directly after `Result`, for the reason `NestedOptional` sits
+	// Directly after `Result`, for the reason `NestedOptional` sits
 	// directly after `Optional` — the two Namespaces one Result value can
 	// reach belong together, and the general one has to be met FIRST so that
 	// `NestedResult::flatten` reads as the extra a nested Result has.
@@ -117,26 +117,26 @@ export const builtinMemberOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
-	// NOTE: Directly after `Rounding`, because `Rational.es` declares the two
+	// Directly after `Rounding`, because `Rational.es` declares the two
 	// together and a reader meets them where they are declared. All three of
 	// its Methods are derived, so it shares no Method name with anything here
 	// and its position decides nothing else.
 	"SignStyle",
-	// NOTE: With the two mode Choices the numeric tower already had, and after
+	// With the two mode Choices the numeric tower already had, and after
 	// them because a reader meets `Rounding` first — `Integer.es` declares this
 	// one, and `Integer::quotient` takes a `Rounding` beside the `Division` its
 	// `remainder` takes. All three of its Methods are derived, so it shares no
 	// Method name with anything here and its position decides nothing else.
 	"Division",
-	// NOTE: With the other mode Choices. `SortOrder` is declared beside `sort`
+	// With the other mode Choices. `SortOrder` is declared beside `sort`
 	// in `List.es` rather than with these, and it shares no Method name with
 	// any Namespace here — all three of its Methods are derived — so its
 	// position decides nothing but where a reader of this list meets it.
 	"SortOrder",
-	// NOTE: With the other mode Choices. It shares no Method name with anything
+	// With the other mode Choices. It shares no Method name with anything
 	// here — all three of its Methods are derived.
 	"Stream",
-	// NOTE: And the two a request is written in, with the mode Choices for the
+	// And the two a request is written in, with the mode Choices for the
 	// reason `Stream` is here rather than beside `Terminal`: what puts a
 	// Namespace in this block is that every Method of it is DERIVED, and both
 	// of these declare a Choice of payload-free Cases and write nothing. They
@@ -148,7 +148,7 @@ export const builtinMemberOrder: Array<string> = [
 	"Redirects",
 	"Record",
 	"List",
-	// NOTE: Directly after `List`, because both target a List and the position
+	// Directly after `List`, because both target a List and the position
 	// decides how the two are PRESENTED. The Enricher builds
 	// `matchingNamespaces` in this order and Completion dedupes members
 	// first-Namespace-wins, so a `List<List<…>>` receiver has to meet the
@@ -162,13 +162,13 @@ export const builtinMemberOrder: Array<string> = [
 	// Method name are separated by target specificity, where the nested target
 	// beats the flat one regardless of this order.
 	"NestedList",
-	// NOTE: And beside it, for the same reason and the same distance from
+	// And beside it, for the same reason and the same distance from
 	// `List` — `OptionalList` narrows a List by what its items ARE, exactly as
 	// `NestedList` does, so `List` has to be met first here too. It shares no
 	// Method name with any Namespace above or below it, so its position decides
 	// only where `values` is offered.
 	"OptionalList",
-	// NOTE: And beside it, for the same reason once more — `ResultList` narrows
+	// And beside it, for the same reason once more — `ResultList` narrows
 	// a List by what its items ARE, exactly as `OptionalList` does, so `List`
 	// has to be met first here too. It shares `values` with `OptionalList` and
 	// `partition` with `List`, and a List of Results reaches all three: `List`
@@ -176,21 +176,21 @@ export const builtinMemberOrder: Array<string> = [
 	// takes a check, and `OptionalList` before this one means neither `values`
 	// hides the other on a receiver that can only reach one of them.
 	"ResultList",
-	// NOTE: And after those, for the same reason. `NonEmptyList` targets a
+	// And after those, for the same reason. `NonEmptyList` targets a
 	// refinement of `List`, and its `firstItem`/`lastItem` are named by `List`
 	// as well — so `List` has to be met FIRST, or Completion on any List would
 	// offer the total pair that only a proven List can answer. Which Namespace
 	// a call RESOLVES to is not decided here either: the refined target beats
 	// the base one regardless of this order.
 	"NonEmptyList",
-	// NOTE: And after both of the Namespaces it narrows, for the same reason
+	// And after both of the Namespaces it narrows, for the same reason
 	// again. `NonEmptyNestedList` targets a proven List of proven Lists, which
 	// is a `List<List<…>>` and a `NonEmptyList` as well, so a receiver of that
 	// Type reaches `NestedList::flatten` and `NonEmptyList::firstItem` too.
 	// Both have to be met FIRST, or Completion on a nested List would offer the
 	// total `flatten` that only two proofs can answer.
 	"NonEmptyNestedList",
-	// NOTE: And after all of them, for the same reason once more. Each of
+	// And after all of them, for the same reason once more. Each of
 	// these targets a List of a particular Number Type — `List<Integer>`,
 	// `List<Rational>`, the mixed `List<Integer | Rational>` and the proven
 	// forms of the three — so `List` has to be met FIRST, and each general one
@@ -201,13 +201,13 @@ export const builtinMemberOrder: Array<string> = [
 	"NonEmptyIntegerList",
 	"NonEmptyRationalList",
 	"NonEmptyNumberList",
-	// NOTE: Last of the List Namespaces, though its target is the widest of
+	// Last of the List Namespaces, though its target is the widest of
 	// them all. It narrows nothing and nothing narrows it — what makes a List
 	// reach it is the KEY its two aggregates take, not the items — so the order
 	// is free, and met last it reads as the extra it is: a List's own members
 	// are `List`'s, and these come after them.
 	"KeyedNumberList",
-	// NOTE: And after it, for the reason every proven Namespace sits after the
+	// And after it, for the reason every proven Namespace sits after the
 	// one it narrows — a reader meets a List's own keyed aggregates before the
 	// extra a proof adds. Both declare `average`, and neither what Completion
 	// SHOWS nor what a call RESOLVES to turns on the order: the name is claimed
@@ -216,7 +216,7 @@ export const builtinMemberOrder: Array<string> = [
 	// target for the same reason. All this order decides is where the one
 	// `average` lands in the list.
 	"NonEmptyKeyedNumberList",
-	// NOTE: After the List Namespaces, because a Dictionary is the second
+	// After the List Namespaces, because a Dictionary is the second
 	// container and a reader of this list meets the first one whole before it.
 	// It shares plenty of Method names with them — `of`, `is`, `toString`,
 	// `isEmpty`, `length`, `map`, `remove`, `removeEvery`, `count` and `sort`
@@ -228,7 +228,7 @@ export const builtinMemberOrder: Array<string> = [
 	// `builtins.spec.ts` holds this list to what the standard library
 	// declares.
 	"Dictionary",
-	// NOTE: And after it, for the reason every proven Namespace sits after the
+	// And after it, for the reason every proven Namespace sits after the
 	// one it narrows — a reader meets a Dictionary's own members before the
 	// extra a proof adds. `length`, `keys`, `values`, `entries` and `map` are
 	// named by `Dictionary` too, so `Dictionary` has to be met FIRST, or
@@ -236,7 +236,7 @@ export const builtinMemberOrder: Array<string> = [
 	// proven one can give. What a call RESOLVES to is not decided here: the
 	// refined target beats the base one regardless of this order.
 	"NonEmptyDictionary",
-	// NOTE: The bridge from the first container to the second, and its proven
+	// The bridge from the first container to the second, and its proven
 	// twin after it for the same reason. Both target a LIST — `List<ItemType>`
 	// and the proven form of it — so they sit with the Dictionary Namespaces a
 	// reader finds them beside in `Dictionary.es` rather than with the List
@@ -246,19 +246,19 @@ export const builtinMemberOrder: Array<string> = [
 	// Namespace's own members either way.
 	"GroupedList",
 	"GroupedNonEmptyList",
-	// NOTE: After the containers. `Randomness` targets a Type nothing else
+	// After the containers. `Randomness` targets a Type nothing else
 	// targets and shares not one Method name with the Namespaces above it, so
 	// its position decides nothing at all — and a reader of this list meets the
 	// Namespaces of the values a Program works with before the one only a
 	// property test is handed.
 	"Randomness",
-	// NOTE: After it, and for the same reason twice over: each targets a Type
+	// After it, and for the same reason twice over: each targets a Type
 	// nothing else targets, and a reader of this list meets the Namespaces of
 	// the values a Program HOLDS before the ones that are about work it has not
 	// finished. `Started` follows `Future` because a Started is what starting a
 	// Future answers with, which is the order the two are met in.
 	//
-	// NOTE: The narrower targets follow the one they narrow, which is the rule
+	// The narrower targets follow the one they narrow, which is the rule
 	// `NestedList` and `OptionalList` follow after `List`. Each declares a name
 	// none of the others declares, so nothing here is a tie for Completion to
 	// break: the order is what a reader meets them in.
@@ -268,12 +268,12 @@ export const builtinMemberOrder: Array<string> = [
 	"NonEmptyFutureList",
 	"ResultFutureList",
 	"Started",
-	// NOTE: And last of all among them, because it is the one Namespace there a
+	// And last of all among them, because it is the one Namespace there a
 	// Program reaches without holding anything: `Async.deferred` is where a
 	// future comes FROM, and a reader meets what a future is before meeting how
 	// one is made.
 	"Async",
-	// NOTE: And after every one of them, because what it answers is a future
+	// And after every one of them, because what it answers is a future
 	// and a reader has to have met one. `Http` is the only Namespace in this
 	// list whose Methods reach ANOTHER host, which is the other half of why it
 	// is last: the order here is what a reader meets, and the door to a host is
@@ -281,11 +281,11 @@ export const builtinMemberOrder: Array<string> = [
 	// host — its streams, its descriptors and its entropy — and neither leaves
 	// the machine the Program runs on.
 	"Http",
-	// NOTE: Then what a host answered, because a Response is what `Http` hands
+	// Then what a host answered, because a Response is what `Http` hands
 	// back. Neither of its two Methods is named anywhere above, so the position
 	// decides only where a reader meets them.
 	"Response",
-	// NOTE: And the reason there is no Response, last. It is met after the
+	// And the reason there is no Response, last. It is met after the
 	// answer for the reason `Result` is met after `Optional`: a reader meets
 	// what a call answers with before meeting why it sometimes does not. Its
 	// `toString` is the one Method of the three Choices `Http.es` declares that
@@ -294,7 +294,7 @@ export const builtinMemberOrder: Array<string> = [
 	"HttpFailure",
 ]
 
-// NOTE: The same rule for the Type table, and for the same reason — a Type's
+// The same rule for the Type table, and for the same reason — a Type's
 // position must be a property of its name, not of the file name that happens to
 // declare it. Two surfaces read this order: `closestMatch` breaks a tie on the
 // FIRST candidate, so "did you mean …?" would otherwise name whichever Type
@@ -313,29 +313,29 @@ export const builtinMemberOrder: Array<string> = [
 export const builtinTypeOrder: Array<string> = [
 	"Boolean",
 	"String",
-	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// Directly after the Type it refines, for the reason `NonZeroInteger`
 	// sits directly after `Integer`.
 	"NonEmptyString",
-	// NOTE: The second refinement of `String`, after the one a Program meets
+	// The second refinement of `String`, after the one a Program meets
 	// first — a String with something in it is the everyday proof, and a String
 	// of exactly one character is what reading a character answers.
 	"Character",
 	"Integer",
-	// NOTE: Directly after the Type it refines, for the reason `NestedList` sits
+	// Directly after the Type it refines, for the reason `NestedList` sits
 	// directly after `List` — a reader of this table meets `Integer` and then what
 	// an Integer can be proven to be, and `closestMatch` breaks a tie on the FIRST
 	// candidate, so a typo near both still reads as the base Type.
 	"NonZeroInteger",
-	// NOTE: The other two refinements of `Integer`, with the first and in the
+	// The other two refinements of `Integer`, with the first and in the
 	// order they build on each other — `PositiveInteger` is spelled as the
 	// conjunction of the two above it, so a value of it is both.
 	"NonNegativeInteger",
 	"PositiveInteger",
 	"Rational",
-	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// Directly after the Type it refines, for the reason `NonZeroInteger`
 	// sits directly after `Integer`.
 	"NonZeroRational",
-	// NOTE: The other two refinements of `Rational`, with the first and in the
+	// The other two refinements of `Rational`, with the first and in the
 	// order the Integer three are listed in — `PositiveRational` is spelled as
 	// the conjunction of the two above it, so a value of it is both.
 	"NonNegativeRational",
@@ -344,23 +344,23 @@ export const builtinTypeOrder: Array<string> = [
 	"Transcendental",
 	"Record",
 	"List",
-	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// Directly after the Type it refines, for the reason `NonZeroInteger`
 	// sits directly after `Integer` — a reader of this table meets `List` and
 	// then what a List can be proven to be, and `closestMatch` breaks a tie on
 	// the FIRST candidate, so a typo near both still reads as the base Type.
 	"NonEmptyList",
-	// NOTE: After the List family rather than beside `Record`, though its
+	// After the List family rather than beside `Record`, though its
 	// vocabulary borrows from both — a reader of this table meets the container
 	// Types together, and `Dictionary` is the second of them. It shares not one
 	// name with anything above it, so `closestMatch` has no tie here to break.
 	"Dictionary",
-	// NOTE: Directly after the Type it refines, for the reason `NonEmptyList`
+	// Directly after the Type it refines, for the reason `NonEmptyList`
 	// sits directly after `List` — a reader of this table meets `Dictionary`
 	// and then what a Dictionary can be proven to be, and `closestMatch` breaks
 	// a tie on the FIRST candidate, so a typo near both still reads as the base
 	// Type.
 	"NonEmptyDictionary",
-	// NOTE: The two halves of the tower, and then the whole of it. `Scalar` is
+	// The two halves of the tower, and then the whole of it. `Scalar` is
 	// first because a Program meets the exact kinds first, and `closestMatch`
 	// breaks a tie on the FIRST candidate — which decides nothing between
 	// these three, since no two of them are one edit apart.
@@ -368,7 +368,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Irrational",
 	"Number",
 	"Optional",
-	// NOTE: Directly after the Type it is the sibling of, for the reason
+	// Directly after the Type it is the sibling of, for the reason
 	// `NonZeroInteger` sits directly after `Integer` — a reader of this table
 	// meets the carrier that says there is nothing and then the one that says
 	// why. `closestMatch` breaks a tie on the FIRST candidate, and the two are
@@ -381,23 +381,23 @@ export const builtinTypeOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
-	// NOTE: Beside the mode Choice it is declared with, for the reason it
+	// Beside the mode Choice it is declared with, for the reason it
 	// follows `Rounding` in the member order above.
 	"SignStyle",
-	// NOTE: Beside the two mode Choices a division reads, for the reason it
+	// Beside the two mode Choices a division reads, for the reason it
 	// follows `SignStyle` in the member order above.
 	"Division",
-	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
+	// Beside the mode Choice it is one of, and after `Rounding` for the
 	// reason it follows `Rounding` in the member order above.
 	"SortOrder",
-	// NOTE: With the other mode Choices, for the reason it follows them in the
+	// With the other mode Choices, for the reason it follows them in the
 	// member order above.
 	"Stream",
-	// NOTE: And the two a request is written in, for the reason they follow
+	// And the two a request is written in, for the reason they follow
 	// `Stream` in the member order above.
 	"HttpMethod",
 	"Redirects",
-	// NOTE: Then the rest of what `Http.es` declares, in the order a reader
+	// Then the rest of what `Http.es` declares, in the order a reader
 	// meets it: what is sent, what comes back, and why sometimes nothing does.
 	// `closestMatch` breaks a tie on the FIRST candidate and there is no tie
 	// here to break — no two of these are one edit apart, and none is one edit
@@ -406,12 +406,12 @@ export const builtinTypeOrder: Array<string> = [
 	"Request",
 	"Response",
 	"HttpFailure",
-	// NOTE: After every Type a Program writes down, because it is the one Type
+	// After every Type a Program writes down, because it is the one Type
 	// a Program never writes down: a source arrives as a Parameter of
 	// `Generatable::generate` and goes nowhere else. Listing it earlier would
 	// put it in front of Types in every Completion of an annotation.
 	"Randomness",
-	// NOTE: Last, and the two together in the order a Program meets them: a
+	// Last, and the two together in the order a Program meets them: a
 	// `Future` is what a completing body declares and what every Method that
 	// answers work hands back, and a `Started` is what `start` turns one into.
 	// They share not one name with anything above — `closestMatch` breaks a tie
@@ -422,7 +422,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Started",
 ]
 
-// NOTE: The third table's order, stated for the same reason as the two above.
+// The third table's order, stated for the same reason as the two above.
 // It is read in order wherever the builtin Protocols are LISTED rather than
 // looked up — Hover and Completion both build their list by spreading this, and
 // `rename` walks it — so leaving it to fall out of whatever order the sources
@@ -432,7 +432,7 @@ export const builtinTypeOrder: Array<string> = [
 // `Comparable` is the first whose signature names a Type rather than only bare
 // tags, and `Orderable` extends it.
 //
-// NOTE: It is the order a receiver's PROVIDED Methods are offered in as well —
+// It is the order a receiver's PROVIDED Methods are offered in as well —
 // they belong to no Namespace, so a listing appends them per Protocol, and this
 // is that per-Protocol order.
 export const builtinProtocolOrder: Array<string> = [
@@ -440,19 +440,19 @@ export const builtinProtocolOrder: Array<string> = [
 	"Printable",
 	"Comparable",
 	"Orderable",
-	// NOTE: After the four a VALUE answers, because its one requirement is
+	// After the four a VALUE answers, because its one requirement is
 	// answered by the Type rather than by a value of it — a listing that met it
 	// among the four would offer a static where every neighbour takes a
 	// receiver. It is derived where a Choice carries no payload, as the first
 	// two are.
 	"Enumerable",
-	// NOTE: Last, because it builds on nothing above it and nothing builds on
+	// Last, because it builds on nothing above it and nothing builds on
 	// it — a conformance is what a property test reads instead of deriving a
 	// generator, and no other Protocol asks about one.
 	"Generatable",
 ]
 
-// NOTE: Accessors rather than consts, because what they answer with is read
+// Accessors rather than consts, because what they answer with is read
 // from Essence source at first call. `loadStdlib` parses, enriches and
 // validates `packages/standard-library/sources/*.es`, caches the result for the
 // process, and hands back the SAME object every time — so these stay as cheap

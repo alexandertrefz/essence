@@ -17,7 +17,7 @@ function hintsOf(source: string) {
 	return findInlayHints(enrichedProgram)
 }
 
-// NOTE: `createFreshenedInference` alpha-renames a callee's Generics for the
+// `createFreshenedInference` alpha-renames a callee's Generics for the
 // span of one invocation — `T` is matched as `T`, a zero-width space and a
 // counter — so a caller's same-named Generic can not collide with them. A
 // Generic that never binds is left in the Types stamped onto the Argument
@@ -25,7 +25,7 @@ function hintsOf(source: string) {
 // verbatim the reader gets `T117`, since only the separator is invisible. The
 // counter is per process, so the digits are not even stable between sessions.
 describe("Display names of freshened Generics", () => {
-	// NOTE: The lambda's Parameter and return Type come from the signature it
+	// The lambda's Parameter and return Type come from the signature it
 	// is passed to and appear nowhere in the source, so these hints are the
 	// only place the reader sees them. `T` occurs ONLY inside the callback, so
 	// no Argument can name it: it stays unbound, and the lambda is typed in the
@@ -40,7 +40,7 @@ describe("Display names of freshened Generics", () => {
 	].join("\n")
 
 	it("should hint a contextually typed lambda under the Generic the source wrote", () => {
-		// NOTE: The first hint is `r`'s own Type: `apply` answers nothing
+		// The first hint is `r`'s own Type: `apply` answers nothing
 		// useful, which is the unit Type, the empty Record.
 		expect(hintsOf(source).map((hint) => hint.label)).toEqual([
 			": {}",
@@ -66,7 +66,7 @@ describe("Display names of freshened Generics", () => {
 		).toBe("(_ T) -> T")
 	})
 
-	// NOTE: The Diagnostics-oriented sibling of `printType`. The Validator
+	// The Diagnostics-oriented sibling of `printType`. The Validator
 	// reports against the signature's own Parameter Types, which are never
 	// freshened — this keeps the renderer honest all the same, since a
 	// freshened Type reaching a Diagnostic would name a Generic the reader can
@@ -77,7 +77,7 @@ describe("Display names of freshened Generics", () => {
 		).toBe("ItemType")
 	})
 
-	// NOTE: Only the fresh suffix goes — a source Generic may well end in
+	// Only the fresh suffix goes — a source Generic may well end in
 	// digits, and `T2` is a name somebody wrote.
 	it("should leave a name the source spelled alone", () => {
 		expect(displayGenericName("T")).toBe("T")

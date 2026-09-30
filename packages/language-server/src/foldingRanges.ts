@@ -9,7 +9,7 @@ import { assertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { programSections } from "./sections"
 
-// NOTE: Folding is derived from the Parser AST, so it keeps working while the
+// Folding is derived from the Parser AST, so it keeps working while the
 // Program has Type errors. Only constructs that span more than one line are
 // worth folding, and the last line is excluded so that the closing brace
 // stays visible when the range is collapsed.
@@ -24,7 +24,7 @@ export function findFoldingRanges(
 ): Array<FoldingRange> {
 	let ranges: Array<FoldingRange> = []
 
-	// NOTE: The `implementation { … }` block itself is foldable too, and so are
+	// The `implementation { … }` block itself is foldable too, and so are
 	// the two Module sections framing it — an entry list is the one part of a
 	// file a reader is done with once they know what it says.
 	if (program.imports !== null) {
@@ -32,7 +32,7 @@ export function findFoldingRanges(
 		collectGroups(program.imports.groups, ranges)
 	}
 
-	// NOTE: Every Section folds as the block it is written as — the
+	// Every Section folds as the block it is written as — the
 	// implementation, the `tests { … }` block below it, and each `suite` and
 	// `test` inside that. A reader who is done with what a file PROVES collapses
 	// one line, exactly as they collapse the import list.
@@ -49,7 +49,7 @@ export function findFoldingRanges(
 	return ranges
 }
 
-// NOTE: A group written out over lines folds on its own — one dependency's
+// A group written out over lines folds on its own — one dependency's
 // names are what a reader is done with once they know which file they come
 // from. A group written flat has nothing to fold, and `addRange` says so.
 function collectGroups(
@@ -71,7 +71,7 @@ function addRange(ranges: Array<FoldingRange>, position: common.Position) {
 		endLine: position.end.line - 1,
 	}
 
-	// NOTE: Two ranges over the same lines are one fold, and a file that is
+	// Two ranges over the same lines are one fold, and a file that is
 	// nothing but tests hands out exactly that — its implementation section is
 	// an empty stand-in spanning the `tests { … }` block, so both Sections
 	// cover the same lines. A Statement wrapping a single Expression has always
@@ -98,7 +98,7 @@ function collectFromBody(
 	}
 }
 
-// NOTE: A block-like default — `= match …`, `= { … }`, a Function literal —
+// A block-like default — `= match …`, `= { … }`, a Function literal —
 // lays itself out over lines of its own and folds like anything else that does.
 function collectFromDefaults(
 	parameters: Array<parser.ParameterNode>,
@@ -122,7 +122,7 @@ function collectFromNode(
 		case "OverloadedFunctionStatement":
 			addRange(ranges, node.position)
 
-			// NOTE: An `overload function` block mixes bodied Function literals
+			// An `overload function` block mixes bodied Function literals
 			// with body-less native signatures — only the bodied entries have a
 			// block to fold.
 			for (let method of node.methods) {
@@ -137,14 +137,14 @@ function collectFromNode(
 			addRange(ranges, node.position)
 
 			for (let property of Object.values(node.properties)) {
-				// NOTE: A native static Property has no value to fold.
+				// A native static Property has no value to fold.
 				if (property.value !== null) {
 					collectFromNode(property.value, ranges)
 				}
 			}
 
 			for (let member of Object.values(node.methods)) {
-				// NOTE: Only bodied Methods have a block to fold — the body-less
+				// Only bodied Methods have a block to fold — the body-less
 				// native signatures (declarations mode) have none, so they are
 				// skipped.
 				let methods: Array<parser.FunctionValueNode> = []
@@ -183,7 +183,7 @@ function collectFromNode(
 		case "ChoiceDeclarationStatement":
 			addRange(ranges, node.position)
 
-			// NOTE: A payload default may itself be a Record or a List written
+			// A payload default may itself be a Record or a List written
 			// across lines, which folds the way one written in a body does.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				collectFromNode(defaultValue, ranges)
@@ -193,7 +193,7 @@ function collectFromNode(
 		case "ProtocolDeclarationStatement":
 			addRange(ranges, node.position)
 
-			// NOTE: A PROVIDED Method's block folds on its own, exactly as a
+			// A PROVIDED Method's block folds on its own, exactly as a
 			// Namespace Method's does — it is a body like any other.
 			for (let member of Object.values(node.methods)) {
 				let signatures =
@@ -219,7 +219,7 @@ function collectFromNode(
 			collectFromBody(node.body, ranges)
 			return
 		case "IfElseStatement":
-			// NOTE: One range for the whole Statement — the Parser keeps no
+			// One range for the whole Statement — the Parser keeps no
 			// Position for the `else` keyword, so the branches cannot be
 			// folded separately.
 			addRange(ranges, node.position)
@@ -235,7 +235,7 @@ function collectFromNode(
 		case "ReturnStatement":
 			collectFromNode(node.expression, ranges)
 			return
-		// NOTE: An assertion folds nothing of its own — it is one Statement —
+		// An assertion folds nothing of its own — it is one Statement —
 		// but a Function literal written inside one lays itself out over lines
 		// and folds like any other.
 		case "ExpectStatement":
@@ -250,7 +250,7 @@ function collectFromNode(
 			collectFromNode(node.value, ranges)
 
 			for (let handler of node.handlers) {
-				// NOTE: A Guard is an ordinary Expression and can be spelled
+				// A Guard is an ordinary Expression and can be spelled
 				// across as many lines as any other call.
 				if (handler.guard !== null) {
 					collectFromNode(handler.guard, ranges)
@@ -260,7 +260,7 @@ function collectFromNode(
 			}
 
 			return
-		// NOTE: The block folds, an arm does not. An arm has a Position of its
+		// The block folds, an arm does not. An arm has a Position of its
 		// own and could be handed out as a range, but folding is a brace's
 		// affair — the last line is dropped so the closing brace stays
 		// visible, and an arm has none to leave behind. What is inside one
@@ -337,7 +337,7 @@ function collectFromNode(
 		case "Lookup":
 			collectFromNode(node.base, ranges)
 			return
-		// NOTE: Neither Keyword opens a block of its own, so neither folds — but
+		// Neither Keyword opens a block of its own, so neither folds — but
 		// what stands under one folds like anything else, and a walk with no case
 		// here would leave a call written over five lines under a `complete` with
 		// nothing to fold at all.
@@ -348,7 +348,7 @@ function collectFromNode(
 		case "RefusedValue":
 			collectFromNode(node.base, ranges)
 			return
-		// NOTE: A path is written on one line and folds nothing, but it has to
+		// A path is written on one line and folds nothing, but it has to
 		// be named here all the same — this switch has no `default`, so a
 		// nodeType it does not list is a hole nothing reports.
 		case "MemberPath":

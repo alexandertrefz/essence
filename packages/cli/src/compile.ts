@@ -28,18 +28,18 @@ import {
 } from "./report"
 import { Progress, type Task } from "./spinner"
 
-// NOTE: build, check and watch differ only in what they do with the result, so
+// build, check and watch differ only in what they do with the result, so
 // the work itself — resolving inputs, choosing how to run, driving the
 // progress display, printing Diagnostics and the report — happens once here.
 
-// NOTE: The compile MODE is PLANNED rather than passed per file, because it
+// The compile MODE is PLANNED rather than passed per file, because it
 // decides how the whole run is compiled — the Session every entry is linked
 // through opens in it. See `CompileMode`.
 type CompilationPlan = CompileMode & {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher
-	// NOTE: Whether every entry is also asked what mutations its Modules admit
+	// Whether every entry is also asked what mutations its Modules admit
 	// — see `CompileRequest.enumerateMutations`. Planned like the mode because
 	// it is a fact about the whole run: only a mutation run's baseline asks, and
 	// it asks of every entry of it.
@@ -67,7 +67,7 @@ export async function planCompilation(
 		command,
 		context.programName,
 	)
-	// NOTE: A compile that emits into the bundle cache has no output to
+	// A compile that emits into the bundle cache has no output to
 	// resolve — the name is the hash of what it emits, which is not known
 	// until it has been emitted. Left to the default the source tree would
 	// collect a `.js` beside every file `esc run` was ever pointed at.
@@ -115,7 +115,7 @@ export async function runCompilation(
 		enabled: !context.options.json && !context.options.quiet,
 	})
 
-	// NOTE: The whole run's entries first, and only then the requests. A Module
+	// The whole run's entries first, and only then the requests. A Module
 	// is compiled as a graph, and the graphs of a batch overlap: which files are
 	// going to be asked for decides how many times each of them is read.
 	plan.dispatcher.begin(plan.inputFileNames, plan)
@@ -170,7 +170,7 @@ export async function runCompilation(
 	progress.stop()
 
 	return {
-		// NOTE: A file two entries reach is reported by one of them. Without
+		// A file two entries reach is reported by one of them. Without
 		// this a batch counts a shared dependency's errors once per entry that
 		// imports it, and prints its excerpt as many times.
 		outcomes: attributeDiagnostics(outcomes),
@@ -179,7 +179,7 @@ export async function runCompilation(
 	}
 }
 
-// NOTE: Diagnostics go to stderr and the report goes to stdout — a build whose
+// Diagnostics go to stderr and the report goes to stdout — a build whose
 // output is being read by another process should not have its Diagnostics
 // folded into that stream, and a build being watched by a human should show
 // both. Separate from the report because a command may want one without the

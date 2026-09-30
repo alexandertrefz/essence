@@ -1,15 +1,15 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: Shared Position geometry for the features that search a typed AST
+// Shared Position geometry for the features that search a typed AST
 // for "the smallest node containing the cursor" — Hovers, Completion's
 // Scope lookup and Signature Help's enclosing invocation all need it.
 
-// NOTE: Cursor ordering — true when `a` is at or before `b`.
+// Cursor ordering — true when `a` is at or before `b`.
 export function isAtOrBefore(a: common.Cursor, b: common.Cursor): boolean {
 	return a.line < b.line || (a.line === b.line && a.column <= b.column)
 }
 
-// NOTE: Compared by value — a Declaration's `definition` currently aliases
+// Compared by value — a Declaration's `definition` currently aliases
 // one of its occurrence objects, but nothing enforces that.
 export function isSamePosition(
 	a: common.Position,
@@ -39,7 +39,7 @@ export function contains(
 	return afterStart && beforeEnd
 }
 
-// NOTE: Strictly smaller — ties are left to the caller, since callers differ
+// Strictly smaller — ties are left to the caller, since callers differ
 // on whether a tie should keep the first or the latest candidate.
 export function isSmaller(a: common.Position, b: common.Position): boolean {
 	let aLines = a.end.line - a.start.line

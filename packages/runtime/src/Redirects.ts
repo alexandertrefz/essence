@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `Redirects` is a builtin Choice, like `HttpMethod` beside it — its
+// `Redirects` is a builtin Choice, like `HttpMethod` beside it — its
 // values carry Case tags (`"Redirects#Follow"`) exactly as user-declared Cases
 // do, and `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Http.es` declares the conformances). No

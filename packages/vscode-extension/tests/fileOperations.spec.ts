@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test"
 import { serverCapabilities } from "@essence-lang/language-server/server"
 import { minimatch } from "minimatch"
 
-// NOTE: What the Server ADVERTISES for `workspace/willRenameFiles` is only half
+// What the Server ADVERTISES for `workspace/willRenameFiles` is only half
 // of whether it is ever asked: the client decides, and it decides by matching
 // each filter's glob against the file's absolute path with minimatch — the same
 // library and the same defaults this reads them with. So a glob that looks

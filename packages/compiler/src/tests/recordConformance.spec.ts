@@ -14,14 +14,14 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 import { compiles } from "./followedHelps"
 
-// NOTE: A composite asks its members. A Record's DECLARED members decide its
+// A composite asks its members. A Record's DECLARED members decide its
 // `Equatable` and its `Printable`: each one compares and prints through its own
 // Namespace's conformance, and a member whose Type has none takes the Record's
 // away. Every claim here is about a Program that RUNS — the routing is a witness
 // the Compiler synthesises and hands over as hidden Arguments, so type-checking
 // alone would say nothing about whether the right `is` was called.
 //
-// NOTE: `Tag` is the receiver most of this is written against: a Record whose
+// `Tag` is the receiver most of this is written against: a Record whose
 // Namespace writes a case-INSENSITIVE `is`, so that "News" and "news" are one
 // Tag and two Strings. Nothing structural can answer that, which is what makes
 // every routed answer visibly different from the unrouted one.
@@ -36,7 +36,7 @@ const tag = `type Tag = { text: String }
 	constant news: Tag = { text = "News" }
 	constant lower: Tag = { text = "news" }`
 
-// NOTE: And a non-generic Choice whose payload holds a Tag, the receiver for
+// And a non-generic Choice whose payload holds a Tag, the receiver for
 // the rule that a Case payload asks its members as a Record does.
 const box = `choice Box {
 		Full { tag: Tag },
@@ -45,7 +45,7 @@ const box = `choice Box {
 
 	namespace Boxes for Box is Equatable {}`
 
-// NOTE: And the receiver the PRINTING half is written against: a Choice whose
+// And the receiver the PRINTING half is written against: a Choice whose
 // derived printing answers `Open` where the structural walk writes `Door#Open`,
 // and a Record whose Namespace writes `EUR 1999` where the walk writes
 // `{ cents = 1999 }`. Two members, two different reasons the walk is wrong.
@@ -63,7 +63,7 @@ const money = `choice Door { Open, Shut }
 
 	constant price: Money = { cents = 1999 }`
 
-// NOTE: A member whose conformance can not be CHOSEN is a different mistake
+// A member whose conformance can not be CHOSEN is a different mistake
 // from a member that has none, and it used to be no mistake at all here: the
 // member solve is asked quietly, an ambiguity is a failure it REPORTED
 // rather than described, and a reported failure was read as "leave this
@@ -154,7 +154,7 @@ function notesOf(source: string): Array<string> {
 }
 
 describe("A Record asks its declared members", () => {
-	// NOTE: The whole finding in four lines. Before this, a Tag was equal to
+	// The whole finding in four lines. Before this, a Tag was equal to
 	// another Tag, a List of Tags to a List of Tags, and a Record of Tags to
 	// nothing — every composite in the language routed its members except the
 	// one that is made of them.
@@ -171,7 +171,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "true", "true", "false"])
 	})
 
-	// NOTE: `isNot` is its own emitted helper rather than a `!` put on `is` at
+	// `isNot` is its own emitted helper rather than a `!` put on `is` at
 	// the call, because a witness's Methods are read out one by one — a
 	// requirement fulfilled by an expression is a requirement fulfilled by
 	// nothing. The pair is checked on both answers so a helper that forgot to
@@ -191,7 +191,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "false", "false", "true"])
 	})
 
-	// NOTE: THE WIDTH RULE. Only the members the static Type declares are
+	// THE WIDTH RULE. Only the members the static Type declares are
 	// routed; a member it can not see is compared structurally, as it always
 	// was. So the same two values compare one way at `{ tag: Tag }` and another
 	// at the top `Record`, which is the price of asking a Type rather than a
@@ -216,7 +216,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "false", "true"])
 	})
 
-	// NOTE: The member SETS still have to match, which is the difference
+	// The member SETS still have to match, which is the difference
 	// between routing a Record and routing a Case payload: a Case's members are
 	// fixed by its declaration, a Record's value may carry more than its Type
 	// can see. An extra member on either side makes two Records unequal exactly
@@ -251,7 +251,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["false", "true", "false", "false"])
 	})
 
-	// NOTE: Member ORDER is not a member of the answer. The routing is a list of
+	// Member ORDER is not a member of the answer. The routing is a list of
 	// names and a list of witnesses, lined up by position, and a Record literal
 	// written in another order is the same Record — so the walk has to find the
 	// witness by NAME rather than by where the key happened to land.
@@ -275,7 +275,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true"])
 	})
 
-	// NOTE: And the other half of that: the names are lined up with the
+	// And the other half of that: the names are lined up with the
 	// witnesses BY POSITION, so a Record whose routed members are written out of
 	// alphabetical order is the one shape that can tell the two lists apart. The
 	// two Namespaces here answer DIFFERENTLY on the same pair of Strings — one
@@ -316,7 +316,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "false", "true", "false"])
 	})
 
-	// NOTE: A nested Record routes AS A WHOLE, through its own — itself
+	// A nested Record routes AS A WHOLE, through its own — itself
 	// conditional — witness, rather than being flattened into the outer one's
 	// plan. That is what keeps the plan a flat list of names however deep the
 	// Types go, and it is why the outer Record's own member set is checked by
@@ -336,7 +336,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "false"])
 	})
 
-	// NOTE: Every composite the language has, holding a Record that routes.
+	// Every composite the language has, holding a Record that routes.
 	// Each of these was already routing its own items before this work — a List
 	// through the item witness, a Dictionary through the value witness, a
 	// generic Choice through its Type Argument's — and each was handed the
@@ -364,7 +364,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "true", "true", "1", "true", "true"])
 	})
 
-	// NOTE: A bounded call reaches the routing through `solveConformance` and a
+	// A bounded call reaches the routing through `solveConformance` and a
 	// direct one through the Method it resolved; the two are different rails and
 	// they have to answer alike. Two levels of forwarding, because a witness
 	// that is right at the first hop and dropped at the second is a bug the one
@@ -392,7 +392,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "true", "true"])
 	})
 
-	// NOTE: A Namespace written for the RECORD TYPE ITSELF still wins, exactly
+	// A Namespace written for the RECORD TYPE ITSELF still wins, exactly
 	// as it did: the routing is what the BUILTIN Record Namespace conforms by,
 	// and a Namespace targeting a concrete shape is the more specific candidate.
 	// Routing that beat a written `is` would be the worst outcome of this whole
@@ -413,7 +413,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["false"])
 	})
 
-	// NOTE: A member whose Type is a Choice with a conditional conformance —
+	// A member whose Type is a Choice with a conditional conformance —
 	// an `Optional<Tag>` — routes through that Choice's own witness, which
 	// routes its payload through Tag's. Two levels of routing, and the answer
 	// has to be Tag's `is` at the bottom of them.
@@ -442,7 +442,7 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true", "true"])
 	})
 
-	// NOTE: And a member whose Type is a bare STRUCTURAL Union is refused, for
+	// And a member whose Type is a bare STRUCTURAL Union is refused, for
 	// the reason a `List<Tag | Integer>` is refused today: no Namespace makes
 	// `Tag | Integer` Equatable, so there is no `is` for the member to be routed
 	// through. A member with no conformance refuses the Record as an item with
@@ -468,7 +468,7 @@ describe("A Record asks its declared members", () => {
 		])
 	})
 
-	// NOTE: The all-structural path, which has to stay EXACTLY where it was:
+	// The all-structural path, which has to stay EXACTLY where it was:
 	// nothing routes, the witness is the plain builtin one, and the emitted
 	// JavaScript names `Record.is` rather than a helper. The emission is read
 	// rather than the answer, because the answer is the same either way and
@@ -486,7 +486,7 @@ describe("A Record asks its declared members", () => {
 		expect(js).toContain("Record.is")
 	})
 
-	// NOTE: And the other side of it — a Record that DOES route names the helper
+	// And the other side of it — a Record that DOES route names the helper
 	// and curries it with the member names. A mutant that routed nothing passes
 	// every equality test above by accident where the members happen to agree,
 	// and fails this one outright.
@@ -502,7 +502,7 @@ describe("A Record asks its declared members", () => {
 })
 
 describe("A Record asks its declared members how to print", () => {
-	// NOTE: The structural walk writes a Case as `Door#Open` and a `Money` as
+	// The structural walk writes a Case as `Door#Open` and a `Money` as
 	// `{ cents = 1999 }`; the Namespaces that own them answer `Open` and
 	// `EUR 1999`. A Record printed for a READER asks them, which is what
 	// `[EUR 1999]` and `["k" = EUR 1999]` have always done for a List and a
@@ -517,7 +517,7 @@ describe("A Record asks its declared members how to print", () => {
 		).toEqual(['"\\{ price = EUR 1999, door = Open \\}"'])
 	})
 
-	// NOTE: A String member keeps its quotes, because inside a composite the
+	// A String member keeps its quotes, because inside a composite the
 	// quoted form is what every reader already gets — `[ "a" ]`, `{ name = "a" }`
 	// — and routing a String through its own `toString` would take them away.
 	// A whole Rational member still prints its numerator alone. Both are claims
@@ -534,7 +534,7 @@ describe("A Record asks its declared members how to print", () => {
 		).toEqual(['"\\{ name = \\"a\\", ratio = 1, price = EUR 1999 \\}"'])
 	})
 
-	// NOTE: `Terminal.inspect` is the STRUCTURAL rendering and stays exactly
+	// `Terminal.inspect` is the STRUCTURAL rendering and stays exactly
 	// where it was — it asks for no conformance, so it can not ask a member for
 	// one. The same Record therefore reads two ways on purpose, and this is the
 	// test that holds the two apart.
@@ -548,7 +548,7 @@ describe("A Record asks its declared members how to print", () => {
 		).toEqual(["{ price = { cents = 1999 }, door = Door#Open }"])
 	})
 
-	// NOTE: A String hole renders its value through the very `Printable`
+	// A String hole renders its value through the very `Printable`
 	// conformance a bounded call is handed, so an interpolated Record routes
 	// too — and that is the rail `Terminal.print` itself is written on.
 	it("routes through a String hole", async () => {
@@ -563,7 +563,7 @@ describe("A Record asks its declared members how to print", () => {
 		).toEqual(['"\\{ price = EUR 1999 \\}"'])
 	})
 
-	// NOTE: The layout is not forked — the member renderers go INTO the one
+	// The layout is not forked — the member renderers go INTO the one
 	// walk. So a routed Record past the sixty-character budget still breaks one
 	// member to a line, still indents what it nests, and a routed member's own
 	// multi-line answer is re-indented where it stands.
@@ -586,7 +586,7 @@ describe("A Record asks its declared members how to print", () => {
 		])
 	})
 
-	// NOTE: And the Record that routes NOTHING prints through the native it
+	// And the Record that routes NOTHING prints through the native it
 	// always did. Read off the emission, because the answer is the same either
 	// way and would not notice the cost.
 	it("emits the plain native where every member is structural", () => {
@@ -598,7 +598,7 @@ describe("A Record asks its declared members how to print", () => {
 		expect(js).toContain("Record.toString")
 	})
 
-	// NOTE: THE ESCAPE HELP IS AN EDIT, so it is offered at the one call it is an
+	// THE ESCAPE HELP IS AN EDIT, so it is offered at the one call it is an
 	// edit FOR. `Terminal.print(value)` becomes `Terminal.inspect(value)` and the
 	// Program compiles; `value::toString()` does not become anything, because
 	// what the reader wanted there was a String and `inspect` answers none. The
@@ -616,7 +616,7 @@ describe("A Record asks its declared members how to print", () => {
 		expect(helpsOf(printed)[0]).toBe(
 			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
 		)
-		// NOTE: And the edit itself, compiled — the promise a Help makes.
+		// And the edit itself, compiled — the promise a Help makes.
 		expect(
 			compiles(`implementation {
 				constant run = (_ value: Integer) -> Integer { <- value }
@@ -648,7 +648,7 @@ describe("A Record asks its declared members how to print", () => {
 		expect(helpsOf(held)).toEqual([])
 	})
 
-	// NOTE: A member whose Choice nobody declared Printable takes the Record's
+	// A member whose Choice nobody declared Printable takes the Record's
 	// printing away, as a member with no conformance does, although the
 	// structural walk could print this Record.
 	it("is refused where a member's Choice is not Printable", () => {
@@ -671,7 +671,7 @@ describe("A Record asks its declared members how to print", () => {
 		)
 	})
 
-	// NOTE: A member written as a BARE Case is typed as that Case and not as its
+	// A member written as a BARE Case is typed as that Case and not as its
 	// Choice, and the Help a Case gets is "annotate the value at 'Door'" —
 	// which is the edit that works where the CHOICE conforms and the annotation
 	// is all that stands between the reader and it. Here nothing makes `Door`
@@ -702,7 +702,7 @@ describe("A Record asks its declared members how to print", () => {
 		).toBe(true)
 	})
 
-	// NOTE: And the other half of the rule — where the Choice DOES conform, the
+	// And the other half of the rule — where the Choice DOES conform, the
 	// annotation is the whole edit and is what is offered. `Enumerable` is the
 	// Protocol that reaches it: a payload-free Choice derives the listing, a
 	// bound on ONE of its Cases can not be satisfied by it, and annotating the
@@ -725,7 +725,7 @@ describe("A Record asks its declared members how to print", () => {
 })
 
 describe("A Record whose member can not compare", () => {
-	// NOTE: A member with no conformance refuses the Record, and the refusal
+	// A member with no conformance refuses the Record, and the refusal
 	// reads like `List<Function>`'s on purpose: the same
 	// `unsatisfied-conformance-condition`, the same because-chain shape, with
 	// one sentence more that NAMES the member. A reader who has met the one has
@@ -738,7 +738,7 @@ describe("A Record whose member can not compare", () => {
 		}`
 
 		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
-		// NOTE: The chain's head is dropped where it only repeats the message,
+		// The chain's head is dropped where it only repeats the message,
 		// so what is left says something new on every line: which member, and
 		// what its Type can not do. The last Note is the one that withholds the
 		// Help — no `for` clause can name a Function Type.
@@ -750,7 +750,7 @@ describe("A Record whose member can not compare", () => {
 		expect(helpsOf(source)).toEqual([])
 	})
 
-	// NOTE: The DOTTED PATH, which is the whole reason the refusal carries a
+	// The DOTTED PATH, which is the whole reason the refusal carries a
 	// path rather than a name: a reader given `run` has to open two Types to
 	// find which `run` was meant, and a reader given `inner.run` has to open
 	// none.
@@ -768,7 +768,7 @@ describe("A Record whose member can not compare", () => {
 		])
 	})
 
-	// NOTE: A bounded call is refused by the same rule, through the rail that
+	// A bounded call is refused by the same rule, through the rail that
 	// was already there — the chain becomes the notes of the bound's own
 	// Diagnostic, which is how `List<Function>` has always read.
 	it("is refused at a bounded call too", () => {
@@ -781,7 +781,7 @@ describe("A Record whose member can not compare", () => {
 		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
 	})
 
-	// NOTE: And the one that must NOT be refused: the top `Record` declares no
+	// And the one that must NOT be refused: the top `Record` declares no
 	// members, so it routes nothing and asks nothing. A Program that puts such a
 	// value behind a `Record` Parameter keeps the structural answer it always
 	// had, Function member and all.
@@ -802,7 +802,7 @@ describe("A Record whose member can not compare", () => {
 		).toEqual(["true", "false"])
 	})
 
-	// NOTE: The routing reads a member's conformance by the NAME of the Namespace
+	// The routing reads a member's conformance by the NAME of the Namespace
 	// that answers it — the two lists in `helpers/conformance.ts` — and a Program
 	// may SHADOW one of those names inside a Function, which is what
 	// `dictionaries.spec.ts` keys a Dictionary through. The question that leaves
@@ -845,7 +845,7 @@ describe("A Record whose member can not compare", () => {
 		}`
 
 		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
-		// NOTE: The member's own Diagnostic, unchanged but for the sentence that
+		// The member's own Diagnostic, unchanged but for the sentence that
 		// says which member reaches it — so the reader is told the same thing
 		// about `Tag` that `[news]::contains(lower)` tells them, and where to
 		// look for it.
@@ -859,7 +859,7 @@ describe("A Record whose member can not compare", () => {
 		])
 	})
 
-	// NOTE: Both rails, because they reach the member solve by different roads —
+	// Both rails, because they reach the member solve by different roads —
 	// the direct one through `routedRecordCall`, the bounded one through
 	// `solveConformance` — and a silence fixed on one of them is a silence still.
 	it("says so at a bounded call as well", () => {
@@ -872,7 +872,7 @@ describe("A Record whose member can not compare", () => {
 		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
 	})
 
-	// NOTE: And through a member that HOLDS the ambiguous Type rather than being
+	// And through a member that HOLDS the ambiguous Type rather than being
 	// it. The List's own conformance is the thing that fails, and it fails
 	// silently — so without this the Record would be left structural by a
 	// failure nobody ever saw.
@@ -889,7 +889,7 @@ describe("A Record whose member can not compare", () => {
 		)
 	})
 
-	// NOTE: One sentence per level, innermost first, which is the same path the
+	// One sentence per level, innermost first, which is the same path the
 	// refusal spells with dots — written as a chain here because each level adds
 	// the Type it is about, and a reader following it opens exactly the Types
 	// between the Statement they wrote and the ambiguity.
@@ -909,7 +909,7 @@ describe("A Record whose member can not compare", () => {
 		])
 	})
 
-	// NOTE: `Terminal.inspect` stays TOTAL — it asks for no conformance at all,
+	// `Terminal.inspect` stays TOTAL — it asks for no conformance at all,
 	// which is what makes it the Help the refusal offers first.
 	it("can still be inspected", async () => {
 		expect(
@@ -923,7 +923,7 @@ describe("A Record whose member can not compare", () => {
 })
 
 describe("A Case payload asks its members", () => {
-	// NOTE: One rule for every derived composite: it asks its members. A
+	// One rule for every derived composite: it asks its members. A
 	// non-generic Choice's derived `is` routes each payload member through its
 	// own Type's conformance, so `Box#Full({ tag = news })` equals
 	// `Box#Full({ tag = lower })` as `Optional<Tag>#Value(news)` equals
@@ -948,7 +948,7 @@ describe("A Case payload asks its members", () => {
 		).toEqual(["true", "true", "false", "false"])
 	})
 
-	// NOTE: The tag still decides the Case FIRST and nominally — routing a
+	// The tag still decides the Case FIRST and nominally — routing a
 	// payload must not make two different Cases carrying equal payloads equal.
 	it("still decides the Case by its tag", async () => {
 		expect(
@@ -972,7 +972,7 @@ describe("A Case payload asks its members", () => {
 		).toEqual(["false", "true"])
 	})
 
-	// NOTE: A payload member that is a composite routes AS A WHOLE, through the
+	// A payload member that is a composite routes AS A WHOLE, through the
 	// conformance of the Type it is — a List through List's own `is` carrying
 	// Tag's witness, a Record through the Record routing one level further down.
 	it("routes a composite payload member through that composite's witness", async () => {
@@ -996,7 +996,7 @@ describe("A Case payload asks its members", () => {
 		).toEqual(["true"])
 	})
 
-	// NOTE: Both rails again, and for a Choice they are further apart than for a
+	// Both rails again, and for a Choice they are further apart than for a
 	// Record: a direct call carries the witnesses as the fabricated Method's own
 	// pinned Generics, a bounded one as the derived conformance's conditions.
 	// Same descriptor, same slots, or the Arguments shift.
@@ -1017,7 +1017,7 @@ describe("A Case payload asks its members", () => {
 		).toEqual(["true", "true", "true"])
 	})
 
-	// NOTE: A generic Choice whose Case carries BOTH a Type Parameter and a
+	// A generic Choice whose Case carries BOTH a Type Parameter and a
 	// routed member is the one Program that can tell the slots apart. The
 	// Parameters keep the slots their declaration order gives them and the
 	// routed members take the ones after, so `item` reads witness 0 and `tag`
@@ -1058,11 +1058,11 @@ describe("A Case payload asks its members", () => {
 		).toEqual(["true", "false", "false"])
 	})
 
-	// NOTE: And a Choice whose payload routes NOTHING keeps the flat helper it
+	// And a Choice whose payload routes NOTHING keeps the flat helper it
 	// always had — the whole reason the descriptor is built only where the
 	// router found a slot.
 	it("emits the flat helper where no payload member routes", () => {
-		// NOTE: Through a Parameter rather than two written Cases, so that the
+		// Through a Parameter rather than two written Cases, so that the
 		// Optimiser's `lower-unit-case-equality` has nothing constant to fold
 		// the comparison into and the helper the witness names is still there
 		// to read.
@@ -1085,7 +1085,7 @@ describe("A Case payload asks its members", () => {
 		expect(js).toContain("choiceIs")
 	})
 
-	// NOTE: A payload member with no equality means the Choice derives none,
+	// A payload member with no equality means the Choice derives none,
 	// so `namespace Handlers for Handler is Equatable {}` is refused where it
 	// is WRITTEN — `nonconforming-namespace`, the same Diagnostic a Namespace
 	// that declares a conformance and writes none of it has always had. The
@@ -1117,7 +1117,7 @@ describe("A Case payload asks its members", () => {
 		])
 	})
 
-	// NOTE: And the bounded rail refuses the same Program, through the rail
+	// And the bounded rail refuses the same Program, through the rail
 	// that was already there: the derive is withheld, so nothing makes the
 	// Choice Equatable and the bound has nothing to bind.
 	it("refuses a bounded call over such a Choice too", () => {
@@ -1138,7 +1138,7 @@ describe("A Case payload asks its members", () => {
 		])
 	})
 
-	// NOTE: RECURSION. There is no self slot to build: this language refuses a
+	// RECURSION. There is no self slot to build: this language refuses a
 	// Choice that names itself, and a generic one that does, and two that name
 	// each other — before any conformance is ever asked about. The router
 	// still tells the cycle guard's refusal from a real one, because a Type
@@ -1158,14 +1158,14 @@ describe("A Case payload asks its members", () => {
 		).toContain("recursive-type-declaration")
 	})
 
-	// NOTE: And a payload member whose conformance can not be CHOSEN, which is
+	// And a payload member whose conformance can not be CHOSEN, which is
 	// reported as a Record's member is, but without the sentence naming the
 	// member, which this rail has no name to write — the router is handed a
 	// member's Type and answers a slot, and the walk holding the names describes
 	// the whole Case. What a reader is told about `Tag` is what a direct use of
 	// a `Tag` tells them.
 	//
-	// NOTE: TWICE, and a Record's is reported once, because a Choice's derive is
+	// TWICE, and a Record's is reported once, because a Choice's derive is
 	// DECLARED: the Namespace's `is Equatable` builds the plan and meets the
 	// ambiguity there, and the call that uses it meets the same one again. That
 	// is exactly the shape a payload member with NO conformance already has —
@@ -1198,7 +1198,7 @@ describe("A Case payload asks its members", () => {
 })
 
 describe("A routed key and the comparison agree", () => {
-	// NOTE: A routed key needs no code of its own: `boundConformance` brands a
+	// A routed key needs no code of its own: `boundConformance` brands a
 	// witness structural only where the method map says so AND every curried
 	// condition is branded, and a Record that routes has, by construction, a
 	// condition whose witness is not — that is WHY it routes. So the brand can
@@ -1222,7 +1222,7 @@ describe("A routed key and the comparison agree", () => {
 		).toEqual(["true", "true", "1"])
 	})
 
-	// NOTE: One level of generic forwarding, and two. A witness that is right at
+	// One level of generic forwarding, and two. A witness that is right at
 	// the first hop and dropped at the second is a bug the first hop can not
 	// see — and the Dictionary is where it would show, because an unbranded
 	// witness arriving as a branded one silently opens a second slot for a key
@@ -1250,7 +1250,7 @@ describe("A routed key and the comparison agree", () => {
 		).toEqual(["true", "true", "true"])
 	})
 
-	// NOTE: Caller and callee spelling their Type Parameter THE SAME — the
+	// Caller and callee spelling their Type Parameter THE SAME — the
 	// name-collision witness bug `genericWitnessArity.spec.ts` is the permanent
 	// guard for. A routed Record is a witness with conditions of its own, which
 	// is the shape that bug ate.
@@ -1272,7 +1272,7 @@ describe("A routed key and the comparison agree", () => {
 		).toEqual(["true"])
 	})
 
-	// NOTE: And a routed CASE key, which a Case payload's routing reaches the
+	// And a routed CASE key, which a Case payload's routing reaches the
 	// same way.
 	it("finds a routed Case key the same way", async () => {
 		expect(
@@ -1287,7 +1287,7 @@ describe("A routed key and the comparison agree", () => {
 		).toEqual(["true"])
 	})
 
-	// NOTE: The other half, and the one a mutant that brands everything would
+	// The other half, and the one a mutant that brands everything would
 	// pass: an ALL-STRUCTURAL Record key is still branded and still encoded, so
 	// it is found in one step rather than by a scan. Read off the emission,
 	// because both paths answer the same and only the cost differs.
@@ -1308,7 +1308,7 @@ describe("A routed key and the comparison agree", () => {
 	})
 })
 
-// NOTE: Every test above declares ONE routed Record Type per Program, and a
+// Every test above declares ONE routed Record Type per Program, and a
 // Program with one witness can not show two of them being confused for each
 // other. These declare TWO, routing the same member Type under DIFFERENT names:
 // their witnesses name the same Namespace, carry the same one-entry method map
@@ -1318,7 +1318,7 @@ describe("A routed key and the comparison agree", () => {
 // ONE constant and hand it to both Types, so one of them would be asked about
 // the other's members.
 describe("Two Record Types routing the same member Type", () => {
-	// NOTE: The silent half, and the reason this is a guard rather than a NOTE.
+	// The silent half, and the reason this is a guard rather than a NOTE.
 	// A name the value does not carry is not an error at runtime: the walk finds
 	// no slot for it and falls through to `anyIs`, so the Record is compared
 	// STRUCTURALLY and answers false where its own `is` says true. The direct
@@ -1362,7 +1362,7 @@ describe("Two Record Types routing the same member Type", () => {
 		])
 	})
 
-	// NOTE: And the loud half. Here the name one Type routes is a name the other
+	// And the loud half. Here the name one Type routes is a name the other
 	// carries too, under a different Type — `fig` is a Money in one and an
 	// Integer in the other — so a shared witness does not fall through to
 	// `anyIs`, it calls Money's `is` on an Integer and dies reading `.cents` off
@@ -1399,7 +1399,7 @@ describe("Two Record Types routing the same member Type", () => {
 		).toEqual(["true", "true", "true", "false"])
 	})
 
-	// NOTE: Read off the emission as well, because both tests above would also
+	// Read off the emission as well, because both tests above would also
 	// pass if the pool were switched off altogether — and the pool is what makes
 	// a Program that builds the same witness in twenty places emit it once. The
 	// two Types here DO share everything but their member names, so a pool that

@@ -12,11 +12,11 @@ export type Finished = {
 	stderr: string
 }
 
-// NOTE: Under the suite's 60 s test budget, so that a stuck child fails its test
+// Under the suite's 60 s test budget, so that a stuck child fails its test
 // by name rather than leaving the runner to report only that time ran out.
 export const SPAWN_DEADLINE_MILLISECONDS = 50_000
 
-// NOTE: Awaited, because a synchronous spawn inside `bun test` can go on
+// Awaited, because a synchronous spawn inside `bun test` can go on
 // spinning after the child has exited. Both streams are read while the child
 // runs, so neither pipe can fill and stall it.
 export async function spawnAndWait(
@@ -25,7 +25,7 @@ export async function spawnAndWait(
 ): Promise<Finished> {
 	let child = Bun.spawn(command, {
 		cwd: options.cwd,
-		// NOTE: `process.env` itself rather than Bun's default, which leaves out
+		// `process.env` itself rather than Bun's default, which leaves out
 		// what a spec assigned into it.
 		env: options.env ?? process.env,
 		stdin:
@@ -39,7 +39,7 @@ export async function spawnAndWait(
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let expired = new Promise<never>((_, reject) => {
 		timer = setTimeout(() => {
-			// NOTE: Killed outright, because a child spinning in a loop never
+			// Killed outright, because a child spinning in a loop never
 			// reaches a handler it installed for a gentler signal.
 			child.kill("SIGKILL")
 			reject(

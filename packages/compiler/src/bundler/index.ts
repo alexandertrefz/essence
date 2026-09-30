@@ -8,13 +8,13 @@ import type { RawSourceMap } from "source-map"
 
 import { placelessDiagnostic } from "../diagnostics/index"
 
-// NOTE: The Rewriter emits a module whose imports of the Essence runtime are
+// The Rewriter emits a module whose imports of the Essence runtime are
 // absolute paths into `@essence-lang/runtime`. Bundling resolves and inlines them,
 // tree-shaking away everything the Program does not touch, so that a compiled
 // file is standalone — runnable by Bun or Node, or loadable in a browser, with
 // no dependency on the Compiler being installed.
 
-// NOTE: The scheme every emitted Module specifier wears. A Module of a bundle
+// The scheme every emitted Module specifier wears. A Module of a bundle
 // is never read off disk — the Rewriter has it in hand already — so its
 // specifier is a token this Bundler claims rather than a path anything
 // resolves. It is also what esbuild labels each inlined Module with in the
@@ -22,22 +22,22 @@ import { placelessDiagnostic } from "../diagnostics/index"
 // path there would name the machine that compiled.
 export const MODULE_SCHEME = "essence:"
 
-// NOTE: The esbuild namespace the plugin claims those specifiers into, which is
+// The esbuild namespace the plugin claims those specifiers into, which is
 // also the half of the label the scheme is carried by.
 const MODULE_NAMESPACE = "essence"
 
-// NOTE: The synthetic Module the shared standard library prelude is emitted
+// The synthetic Module the shared standard library prelude is emitted
 // into. It is not a file, and nothing in the graph can be spelled like it: a
 // specifier resolves to a `.es` path, and `$` is not one.
 export const PRELUDE_SPECIFIER = `${MODULE_SCHEME}$prelude`
 
-// NOTE: One Module's specifier, built from the spelling of its path relative
+// One Module's specifier, built from the spelling of its path relative
 // to the entry's directory.
 export function moduleSpecifier(spelling: string): string {
 	return `${MODULE_SCHEME}${spelling}`
 }
 
-// NOTE: A whole bundle's JavaScript, already rewritten, with the specifier the
+// A whole bundle's JavaScript, already rewritten, with the specifier the
 // emitted imports name each Module under. Nothing intermediate is written: the
 // plugin below serves these straight out of memory, so tree-shaking and the
 // single-file output are what they were.
@@ -51,7 +51,7 @@ export type BundleOptions = {
 	outputFileName: string
 	minify?: boolean
 	sourcemap?: boolean
-	// NOTE: `linked` writes the map beside the output; `inline` rides it inside
+	// `linked` writes the map beside the output; `inline` rides it inside
 	// the bundle itself, which is what a bundle with no name of its own needs:
 	// `essence run` without `--out`, and a host handed one string.
 	sourcemapMode?: "linked" | "inline"
@@ -67,20 +67,20 @@ export type BundleResult = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: esbuild is loaded lazily. It is the single most expensive import in
+// esbuild is loaded lazily. It is the single most expensive import in
 // the Compiler, and `esc check` never needs it at all.
 async function loadESBuild() {
 	return import("esbuild")
 }
 
-// NOTE: The one place a Module of a multi-Module bundle is handed to esbuild.
+// The one place a Module of a multi-Module bundle is handed to esbuild.
 // `onResolve` claims every specifier wearing the scheme — the Modules and the
 // synthetic prelude alike — and `onLoad` answers with the JavaScript the
 // Rewriter already produced. `resolveDir` stays the runtime's own directory,
 // so the absolute runtime imports each Module carries resolve exactly as the
 // single-file path's do.
 //
-// NOTE: The scheme is taken off the resolved path and carried by the namespace
+// The scheme is taken off the resolved path and carried by the namespace
 // instead. esbuild labels each inlined module `<namespace>:<path>` in the
 // output, so leaving it on spelled every one of them `essence:essence:./X.es`.
 function moduleSourcePlugin(modules: ModuleSources): Plugin {
@@ -119,11 +119,11 @@ function moduleSourcePlugin(modules: ModuleSources): Plugin {
 	}
 }
 
-// NOTE: Nothing is written here — the caller decides whether the result goes
+// Nothing is written here — the caller decides whether the result goes
 // to disk, to a temporary directory or nowhere at all, and it needs the exact
 // bytes to report the output size either way.
 //
-// NOTE: A whole bundle's Modules go through the plugin as an entry point
+// A whole bundle's Modules go through the plugin as an entry point
 // rather than through `stdin`, and that is not a matter of taste: a cycle that
 // reaches the entry Module back would resolve its specifier through the plugin
 // while the entry itself came in on standard input, and the bundle would carry
@@ -141,7 +141,7 @@ export async function bundle(
 						stdin: {
 							contents: code,
 							loader: "ts" as const,
-							// NOTE: The runtime's own directory, so any specifier a
+							// The runtime's own directory, so any specifier a
 							// runtime module spells resolves from the runtime, not from
 							// wherever the user's Program happens to live.
 							resolveDir: RUNTIME_DIRECTORY,
@@ -153,7 +153,7 @@ export async function bundle(
 						plugins: [moduleSourcePlugin(code)],
 					}),
 			tsconfig: RUNTIME_TSCONFIG,
-			// NOTE: esbuild labels every module it inlines with that module's
+			// esbuild labels every module it inlines with that module's
 			// path relative to its working directory, and those labels are part
 			// of the emitted file. Left at the process's working directory they
 			// spell out wherever the Compiler happens to be installed, as seen
@@ -173,7 +173,7 @@ export async function bundle(
 			treeShaking: true,
 			bundle: true,
 			format: "esm",
-			// NOTE: Absolute, because `absWorkingDir` is what a relative
+			// Absolute, because `absWorkingDir` is what a relative
 			// `outfile` resolves against — which would put the user's output
 			// inside the Compiler's own directory rather than beside their
 			// source. `resolve` anchors it to the working directory, which is
@@ -198,7 +198,7 @@ export async function bundle(
 			),
 		}
 	} catch (error) {
-		// NOTE: The Rewriter only ever produces JavaScript it built itself, so
+		// The Rewriter only ever produces JavaScript it built itself, so
 		// a bundling failure means the Compiler emitted something invalid —
 		// a Compiler bug, reported as such rather than blamed on the source.
 		return {
@@ -208,7 +208,7 @@ export async function bundle(
 	}
 }
 
-// NOTE: esbuild maps every line it cannot attribute through an input map back
+// esbuild maps every line it cannot attribute through an input map back
 // onto the module itself — the synthetic prelude and the inlined runtime
 // arrive in the bundle's map as `essence:$prelude` and `Number.ts`, sources no
 // debugger can resolve to a file. The final map is confined to the on-disk
@@ -216,7 +216,7 @@ export async function bundle(
 // a debugger's "step through code with no map" setting carry a session over
 // the glue rather than into it.
 async function confineMapToEssenceSources(raw: RawSourceMap): Promise<string> {
-	// NOTE: Loaded lazily for the same reason esbuild is — only a compile that
+	// Loaded lazily for the same reason esbuild is — only a compile that
 	// asked for a map pays for it.
 	let { SourceMapConsumer, SourceMapGenerator } = await import("source-map")
 	let consumer = new SourceMapConsumer(raw)
@@ -261,7 +261,7 @@ async function confineMapToEssenceSources(raw: RawSourceMap): Promise<string> {
 
 const inlineMapPrefix = "//# sourceMappingURL=data:application/json;base64,"
 
-// NOTE: Where the map to confine LIVES depends on the mode — `linked` wrote a
+// Where the map to confine LIVES depends on the mode — `linked` wrote a
 // `.map` output beside the bundle, `inline` rode it into the bundle's own last
 // line — so both places are covered by shape rather than by re-deriving the
 // mode here.

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 
-// NOTE: Everything loading a graph needs of the world, which is one question:
+// Everything loading a graph needs of the world, which is one question:
 // what does this file say? Kept an interface because callers answer it
 // differently — `esc` reads disk, while the Language Server has to answer from
 // the documents the Editor holds open, whose unsaved text is the only truthful
@@ -11,7 +11,7 @@ export type ModuleHost = {
 	readFile(filePath: string): string | undefined
 }
 
-// NOTE: The plain answer, for every caller that is not an Editor. A directory,
+// The plain answer, for every caller that is not an Editor. A directory,
 // a missing file and an unreadable one are all one answer here: the graph's
 // business is which Module could not be read, not why the filesystem said no.
 export const diskModuleHost: ModuleHost = {

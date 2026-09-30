@@ -23,7 +23,7 @@ import { uriOf } from "../server"
 import { createWorkspace, type Workspace } from "../workspace"
 import { applyEdits } from "./textEdits"
 
-// NOTE: A workspace is a directory of files, so these run against a real one.
+// A workspace is a directory of files, so these run against a real one.
 // The alternative — an in-memory host — would exercise everything except the
 // two things that actually break: which path a specifier resolves to, and
 // whether the discovery walk finds a file at all.
@@ -69,7 +69,7 @@ afterEach(() => {
 	directories = []
 })
 
-// NOTE: A Cursor by what it points AT rather than by a column counted out by
+// A Cursor by what it points AT rather than by a column counted out by
 // hand — a tab is one column here and the sources below are tab-indented, so a
 // counted column is a fact about the whitespace rather than about the name.
 function cursorAt(source: string, line: number, needle: string): common.Cursor {
@@ -83,7 +83,7 @@ function cursorAt(source: string, line: number, needle: string): common.Cursor {
 	return { line, column: column + 1 }
 }
 
-// NOTE: Where a Completion is asked from: directly BEHIND what has been typed
+// Where a Completion is asked from: directly BEHIND what has been typed
 // so far, which is the only place an Editor ever asks from.
 function cursorPast(
 	source: string,
@@ -95,7 +95,7 @@ function cursorPast(
 	return { line, column: cursor.column + needle.length }
 }
 
-// NOTE: The Range a Code Action request carries — an Editor sends the selection,
+// The Range a Code Action request carries — an Editor sends the selection,
 // which for a cursor sitting in a name is that name.
 function spanOf(source: string, line: number, needle: string): common.Position {
 	let start = cursorAt(source, line, needle)
@@ -103,7 +103,7 @@ function spanOf(source: string, line: number, needle: string): common.Position {
 	return { start, end: { line, column: start.column + needle.length } }
 }
 
-// NOTE: Applies a workspace rename textually, file by file, so the expectations
+// Applies a workspace rename textually, file by file, so the expectations
 // below can state whole Programs instead of position lists — the same shape
 // `rename.spec.ts` uses for one file.
 function renameAcross(
@@ -185,7 +185,7 @@ const other = [
 	"",
 ].join("\n")
 
-// NOTE: A second Module publishing a name `Geometry.es` publishes too, so that
+// A second Module publishing a name `Geometry.es` publishes too, so that
 // one import block can bind a name twice without two of its entries naming one
 // file.
 const shapes = [
@@ -269,7 +269,7 @@ describe("Workspace", () => {
 				),
 			).toEqual(new Set(["Geometry.es", "Main.es"]))
 
-			// NOTE: The Position an unaliased entry writes belongs to ONE
+			// The Position an unaliased entry writes belongs to ONE
 			// occurrence, not two — it is the entry's own binding and the
 			// reference to what the dependency publishes at once, and a rename
 			// that emitted it twice would be two edits of one Range.
@@ -324,7 +324,7 @@ describe("Workspace", () => {
 			).toEqual(new Set(["Left.es"]))
 		})
 
-		// NOTE: What Go to Definition returns — the joined symbol's
+		// What Go to Definition returns — the joined symbol's
 		// `filePath`/`definition` pair must point at the declaration BEHIND an
 		// import entry, not at the entry itself, or a definition request from
 		// the entry answers with the very line it was asked from.
@@ -382,7 +382,7 @@ describe("Workspace", () => {
 			expect(symbol?.definition?.start.line).toBe(3)
 		})
 
-		// NOTE: The mark is what holds a rename of such a Parameter to the label
+		// The mark is what holds a rename of such a Parameter to the label
 		// rules as well, and the Server reads it off the joined symbol.
 		it("should carry the mark of a Parameter whose name doubles as its label", () => {
 			let compute = [
@@ -409,7 +409,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: Hover reads the linked enrichment — its annotations resolved on the
+	// Hover reads the linked enrichment — its annotations resolved on the
 	// file alone answer 'Error' for every imported name, and an entry's own
 	// Identifier has no typed body node to answer for it at all.
 	describe("hover through the graph", () => {
@@ -463,7 +463,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: `Main.es` imports `Sized` as `Measurable`, so that is what a Hover
+	// `Main.es` imports `Sized` as `Measurable`, so that is what a Hover
 	// there calls it, while `Sized.es` goes on calling it by its own name.
 	describe("a Protocol imported under an alias", () => {
 		const sized = [
@@ -611,7 +611,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: `namespace Rectangle for Rectangle` is how the corpus writes a
+		// `namespace Rectangle for Rectangle` is how the corpus writes a
 		// Namespace over a Type, and one entry publishes both of them — so a
 		// rename has to move both, from whichever side it is asked. Moving one
 		// leaves the export entry publishing a name only the other still
@@ -712,7 +712,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: An aliased import's local name is a symbol of this file alone —
+		// An aliased import's local name is a symbol of this file alone —
 		// what the other Module publishes is not renamed by renaming it, and
 		// nothing else in the workspace has ever seen the alias.
 		it("should keep an aliased import's local name to the file that wrote it", () => {
@@ -786,7 +786,7 @@ describe("Workspace", () => {
 			expect(renamed?.["Math.es"]).toContain("\tCIRCLE\n")
 		})
 
-		// NOTE: `squared as square` publishes one name and declares another, and
+		// `squared as square` publishes one name and declares another, and
 		// they are two symbols. Renaming the public one reaches every importer
 		// and stops at the alias; renaming the local one stays inside the Module.
 		it("should tell the two sides of an aliased export apart", () => {
@@ -835,7 +835,7 @@ describe("Workspace", () => {
 			expect(localSide?.["Math.es"]).toContain("\tpowered as square")
 		})
 
-		// NOTE: A Method reference in an importer names no Namespace at all —
+		// A Method reference in an importer names no Namespace at all —
 		// `shape::area()` dispatches through one — so the only trace of it is the
 		// resolved Invocation, and the Namespace it names is joined through the
 		// entry that brought it in rather than by its name.
@@ -874,7 +874,7 @@ describe("Workspace", () => {
 			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
 		})
 
-		// NOTE: A provided Method's call names the PROTOCOL, not a Namespace,
+		// A provided Method's call names the PROTOCOL, not a Namespace,
 		// so the join reads the importing file's Type space and the declaring
 		// file's Protocol members — two tables over from the Namespace case,
 		// and the same join between them.
@@ -1007,7 +1007,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: The requirement, the conformer reaching it through an extension
+		// The requirement, the conformer reaching it through an extension
 		// written in a third Module, and a call through a bounded Type are each
 		// in a file of their own.
 		describe("a Protocol requirement", () => {
@@ -1139,7 +1139,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: `Measurable` is only how `Main.es` spells `Sizable`, and the
+			// `Measurable` is only how `Main.es` spells `Sizable`, and the
 			// bound the call resolves through is the Protocol `Sizable.es`
 			// declares.
 			it("should move the requirement from a call bounded under an alias", () => {
@@ -1168,7 +1168,7 @@ describe("Workspace", () => {
 				})
 			})
 
-			// NOTE: One rename group, but each call still has its own definition.
+			// One rename group, but each call still has its own definition.
 			it("should keep each call's definition where its Method is written", () => {
 				let { workspace, pathOf } = makeWorkspace(files)
 				let conformerCall = workspace.symbolAt(
@@ -1187,7 +1187,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: A Protocol declared in a body is named by no top level entry, and
+		// A Protocol declared in a body is named by no top level entry, and
 		// may share its name with the one declared at the top level.
 		describe("a Protocol declared in a body", () => {
 			const tagged = [
@@ -1291,7 +1291,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: The alias is a name of the importing file alone, so the members
+		// The alias is a name of the importing file alone, so the members
 		// are read off the Module that declares the Protocol under its own name.
 		describe("a Protocol imported under an alias", () => {
 			const sizable = [
@@ -1439,7 +1439,7 @@ describe("Workspace", () => {
 			expect(renamed?.["Main.es"]).toContain("Measures.surface({")
 		})
 
-		// NOTE: The alias is published by a Module that only forwards, so the
+		// The alias is published by a Module that only forwards, so the
 		// members are read off the Module that declares the Protocol.
 		describe("a Protocol forwarded under an alias", () => {
 			const sizable = [
@@ -1619,7 +1619,7 @@ describe("Workspace", () => {
 					.map((entry) => [entry.name, entry.exported]),
 			).toEqual([["squared", true]])
 
-			// NOTE: An empty query is every symbol — the client filters, and the
+			// An empty query is every symbol — the client filters, and the
 			// protocol says so.
 			expect(workspace.symbols("").length).toBeGreaterThan(4)
 		})
@@ -1649,7 +1649,7 @@ describe("Workspace", () => {
 			expect(edit?.range.start).toEqual({ line: 3, column: 1 })
 			expect(edit?.newText).toBe('\tfrom "./Bounds.es" { Box }\n')
 
-			// NOTE: Sorted by specifier, so a group for a later file goes below
+			// Sorted by specifier, so a group for a later file goes below
 			// every group of an earlier one whatever the names are.
 			let last = insertImportEdit(source, program, {
 				name: "PI",
@@ -1661,7 +1661,7 @@ describe("Workspace", () => {
 			expect(last?.newText).toBe('\tfrom "./math/Math.es" { PI as Pi }\n')
 		})
 
-		// NOTE: A group of one name is written flat, and a second name is what
+		// A group of one name is written flat, and a second name is what
 		// writes it out — so the edit replaces the flat group with the two
 		// names one to a line, in order, which is what the Formatter makes of
 		// a group of two.
@@ -1759,7 +1759,7 @@ describe("Workspace", () => {
 			expect(last?.newText).toBe("\t\tperimeter\n")
 		})
 
-		// NOTE: Applied and reparsed rather than matched against a spelling —
+		// Applied and reparsed rather than matched against a spelling —
 		// what an insertion must never do is land outside the braces of a
 		// block written on one line, which only a reparse can attest.
 		function withInsertedEntry(
@@ -1918,7 +1918,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: The Namespace offer is the one that can not be worked out from
+		// The Namespace offer is the one that can not be worked out from
 		// the name at the cursor — `shape::area()` names no Namespace at all, so
 		// the Enricher's own help is what says which one declares the Method for
 		// this receiver.
@@ -1997,7 +1997,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: The last name of a group takes the group with it — an empty
+		// The last name of a group takes the group with it — an empty
 		// `from "./Geometry.es" {}` imports nothing and says so on two lines.
 		it("should remove a whole group with its last unused name", () => {
 			let { workspace, pathOf } = makeWorkspace({
@@ -2039,7 +2039,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: Nothing separates two entries but the space between them, so
+		// Nothing separates two entries but the space between them, so
 		// both may be written on one line — and the entry that is still read
 		// is not the removal's to take. What goes is the name and the blank
 		// that carried it.
@@ -2081,7 +2081,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And two GROUPS may share a line the same way, which is what
+		// And two GROUPS may share a line the same way, which is what
 		// the duplicate fix has to be careful of: the group it drops is the
 		// later one, and the one in front of it stays where it was written.
 		it("should remove a duplicate group written beside another", () => {
@@ -2123,7 +2123,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The Diagnostic points at the entry that was being bound when
+		// The Diagnostic points at the entry that was being bound when
 		// the clash was found, which is the LATER of the two — the earlier one
 		// already holds the name.
 		it("should offer to remove the later of two entries binding one name", () => {
@@ -2158,7 +2158,7 @@ describe("Workspace", () => {
 			expect(removal?.title).toBe(
 				"Remove the duplicate import of 'Rectangle'",
 			)
-			// NOTE: Offered, never preferred. The two entries name two different
+			// Offered, never preferred. The two entries name two different
 			// Modules' `Rectangle`, so dropping the second leaves every use in
 			// the file reading the FIRST — a Program that compiles and answers
 			// something else, which is not an edit an Editor may make without
@@ -2185,7 +2185,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The same code covers a clash with something the file declares
+		// The same code covers a clash with something the file declares
 		// itself. Dropping the entry there would leave every use of the name
 		// reading the local declaration instead, which is a different Program —
 		// so the Help's `as` is the only answer, and no edit can choose a name.
@@ -2274,7 +2274,7 @@ describe("Workspace", () => {
 			).toEqual(["RectangleMeasurable"])
 		})
 
-		// NOTE: A facade forwards someone else's declaration, and the specifier
+		// A facade forwards someone else's declaration, and the specifier
 		// an entry writes has to name the FACADE — importing past it is a
 		// different dependency, and one the author of the facade did not offer.
 		it("should offer a re-exported name under the Module that publishes it", () => {
@@ -2314,7 +2314,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: These four are reported by the graph rather than by a single
+	// These four are reported by the graph rather than by a single
 	// document's pipeline, so they need a workspace to be reported at all —
 	// which is what puts their fixes here rather than in `codeActions.spec.ts`.
 	describe("the Module Diagnostics a Quick Fix answers", () => {
@@ -2344,7 +2344,7 @@ describe("Workspace", () => {
 			}).diagnostics.map((diagnostic) => diagnostic.code)
 		}
 
-		// NOTE: The catch-22 the Help audit found. `Problem` is a Choice another
+		// The catch-22 the Help audit found. `Problem` is a Choice another
 		// Module declares, and the equality a Choice DERIVES is in reach only
 		// where its name is — so `unsatisfied-bound` fired over a call whose own
 		// span holds no mention of it, and asked for a Namespace, which is a
@@ -2413,7 +2413,7 @@ describe("Workspace", () => {
 				"\t}",
 			])
 
-			// NOTE: The bound is satisfied, which is this half of the loop shut.
+			// The bound is satisfied, which is this half of the loop shut.
 			// The OTHER half is the Linker's: `usedNames` now counts a named Type
 			// the tree RESOLVED to, so the entry this fix just wrote is not read
 			// back as unused. The test below is the end-to-end one.
@@ -2422,7 +2422,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: Both halves of the catch-22 in one Program, which is the only
+		// Both halves of the catch-22 in one Program, which is the only
 		// place either half can be proved shut. `unsatisfied-bound` asks for the
 		// import, and `usedNames` in `modules/link.ts` counts the Type that
 		// import brings in — a derived conformance is reached without spelling
@@ -2478,7 +2478,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `measure` is bounded by a Protocol `Main.es` never imported, and
+		// `measure` is bounded by a Protocol `Main.es` never imported, and
 		// the bound is the Protocol `Sized.es` resolved, so there is nothing to
 		// report and nothing to fix.
 		it("should leave a call bounded by a Protocol the file never imports alone", () => {
@@ -2532,7 +2532,7 @@ describe("Workspace", () => {
 			expect(fixesFor(workspace, mainPath, 9, "measure(3)")).toEqual([])
 		})
 
-		// NOTE: `Main.es` bounds its own Function by a `Sized` it never imported.
+		// `Main.es` bounds its own Function by a `Sized` it never imported.
 		// The Compiler names the Module that declares it, and the fix writes the
 		// entry, after which nothing is left to report.
 		it("should answer a bound naming an unimported Protocol with the import", () => {
@@ -2586,7 +2586,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Main.es` names `Sized.es` and has not imported `IntegerSized`,
+		// `Main.es` names `Sized.es` and has not imported `IntegerSized`,
 		// the Namespace the call needs. The fix writes that entry, and nothing is
 		// left to report once it stands.
 		it("should answer a refused bound with the import of the Namespace that conforms", () => {
@@ -2646,7 +2646,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: `Main.es` binds no name for `Sized`, so the bound and its import
+		// `Main.es` binds no name for `Sized`, so the bound and its import
 		// are one edit, and nothing is left to report once both stand.
 		it("should bound a Type Parameter and import its Protocol in one fix", () => {
 			let { workspace, pathOf } = makeWorkspace({
@@ -2776,7 +2776,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: An import of `Sized` beside the file's own Type of that name
+		// An import of `Sized` beside the file's own Type of that name
 		// would be refused, so there is no fix to offer.
 		it("should offer no bound whose import a Type of the file would collide with", () => {
 			let { workspace, pathOf } = makeWorkspace({
@@ -2832,7 +2832,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: `Sized.es` publishes `Sized` as `Measurable`, so the entry and
+		// `Sized.es` publishes `Sized` as `Measurable`, so the entry and
 		// the bound are both written by that name.
 		it("should bound a Type Parameter by the name its Protocol is exported under", () => {
 			let { workspace, pathOf } = makeWorkspace({
@@ -2896,7 +2896,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: The file's `type Sized` takes the name an entry would bind, so
+		// The file's `type Sized` takes the name an entry would bind, so
 		// the import is refused as a duplicate, and the alias the Help asks for
 		// is a name no edit can choose.
 		it("should offer no import of a name the file binds already", () => {
@@ -2979,7 +2979,7 @@ describe("Workspace", () => {
 
 			let result = applyEdits(source, fix.edits)
 
-			// NOTE: The group goes and the section stays, which is what
+			// The group goes and the section stays, which is what
 			// `removeImportAction` does with the last unused name of one too: an
 			// empty `import { }` is a block a reader deletes or fills, and
 			// nothing about it is wrong.
@@ -2999,7 +2999,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: A self-import written beside a group that is not one takes the
+		// A self-import written beside a group that is not one takes the
 		// blanks in front of it and nothing else — the group it shares its line
 		// with is the file's only way of reaching what it names.
 		it("should remove a self-import written beside another group", () => {
@@ -3027,7 +3027,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: A self-EXPORT is the forwarding spelling of something the Module
+		// A self-EXPORT is the forwarding spelling of something the Module
 		// is entitled to publish, so the fix writes the names bare rather than
 		// dropping the group: deleting it would take the Module's whole public
 		// surface with it, which is the one thing the writer did not ask for.
@@ -3072,7 +3072,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: And an `as` survives the edit. A bare entry renames the same way
+		// And an `as` survives the edit. A bare entry renames the same way
 		// a forwarded one does, so the Module goes on publishing the name it
 		// published.
 		it("should keep an 'as' when it writes a self-export bare", () => {
@@ -3123,7 +3123,7 @@ describe("Workspace", () => {
 
 			expect(fix.title).toBe("Write './Other.es'")
 			expect(fix.diagnosticCode).toBe("invalid-module-specifier")
-			// NOTE: A guess at where the file sits, which the Help itself
+			// A guess at where the file sits, which the Help itself
 			// hedges — so the reader applies it rather than the Editor.
 			expect(fix.isPreferred).toBe(false)
 
@@ -3161,7 +3161,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: Two of the four rejections sharing this code spell no concrete
+		// Two of the four rejections sharing this code spell no concrete
 		// specifier at all, and there is nothing to offer for those.
 		it("should stay silent where the Diagnostic spells no specifier", () => {
 			let { workspace, pathOf } = makeWorkspace({
@@ -3201,7 +3201,7 @@ describe("Workspace", () => {
 
 			expect(fix.title).toBe("Declare 'counter' as a Constant")
 			expect(fix.diagnosticCode).toBe("export-of-variable")
-			// NOTE: Every assignment to the Variable becomes a
+			// Every assignment to the Variable becomes a
 			// `constant-reassignment` the moment this lands.
 			expect(fix.isPreferred).toBe(false)
 
@@ -3211,7 +3211,7 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: And withholds it where something assigns to the Variable, which
+		// And withholds it where something assigns to the Variable, which
 		// is the shape that made this fix the only door of a two-code loop: it
 		// answered `constant-reassignment` at every assignment, and that Help
 		// asks for the `variable` back. The Diagnostic withholds the clause and
@@ -3243,7 +3243,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: A Protocol another Module declares reaches this file through its
+	// A Protocol another Module declares reaches this file through its
 	// import block, under the name the entry binds, and so do the Types its
 	// requirements name. The stubs are written in those names or not at all.
 	describe("Implement a Protocol another Module declares", () => {
@@ -3385,7 +3385,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: A Record has a shape to write in place of a name the file does
+		// A Record has a shape to write in place of a name the file does
 		// not bind, and a Choice has none, so a requirement naming one the file
 		// never imported leaves nothing a stub could compile as.
 		it("should write a Record's shape and offer nothing for an unbound Choice", () => {
@@ -3406,7 +3406,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Shown` provides a `describe` answering an Integer, and a stub
+		// `Shown` provides a `describe` answering an Integer, and a stub
 		// written as `Described` declares one answering a String, which the
 		// conformance to `Shown` refuses.
 		it("should offer no stub another conformance would refuse", () => {
@@ -3457,7 +3457,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: A Type the file imports under an alias is written under the alias,
+	// A Type the file imports under an alias is written under the alias,
 	// and a Choice has no shape to fall back on where it is not.
 	describe("an annotation naming an imported Type", () => {
 		it("should write the name the file imports the Type under", () => {
@@ -3532,7 +3532,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: The one SOURCE action this Server offers, and the only bulk rewrite
+	// The one SOURCE action this Server offers, and the only bulk rewrite
 	// it will ever offer: removing an entry nothing reads is unambiguous and
 	// leaves the Program's meaning alone, which is what a bulk action has to be.
 	describe("organizing imports", () => {
@@ -3621,7 +3621,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: One deletion for the group rather than one per entry — the
+		// One deletion for the group rather than one per entry — the
 		// lines the entries stand on are the group's own lines too, and two
 		// deletions over them would overlap.
 		it("should take a group that empties with its last entry", () => {
@@ -3670,7 +3670,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Two unused entries on ONE line, with a third beside them that is
+		// Two unused entries on ONE line, with a third beside them that is
 		// read. Whole-line deletions here would each take all three, and two of
 		// them over the same line would overlap besides.
 		it("should remove two unused entries written on one line", () => {
@@ -3714,7 +3714,7 @@ describe("Workspace", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And two whole GROUPS on one line, where the blanks between them
+		// And two whole GROUPS on one line, where the blanks between them
 		// are what both deletions reach for — they are folded into one edit, so
 		// what goes out is a range an Editor will apply.
 		it("should remove two unused groups written on one line", () => {
@@ -3779,7 +3779,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: The fixes whose edit lands in a file the reader is not looking at.
+	// The fixes whose edit lands in a file the reader is not looking at.
 	// Each of them is checked on the text of BOTH files — the one the action was
 	// asked for and the one it reaches — and then by re-analysing the workspace
 	// with the result written back, which is the only answer to "does this end
@@ -3801,7 +3801,7 @@ describe("Workspace", () => {
 			)
 		}
 
-		// NOTE: What the buffers look like once the action is applied, keyed by
+		// What the buffers look like once the action is applied, keyed by
 		// the file each edit named — an action that reaches a second Module is
 		// two texts, and asserting on one of them says nothing about the other.
 		function appliedAcross(
@@ -3835,7 +3835,7 @@ describe("Workspace", () => {
 			return result
 		}
 
-		// NOTE: The workspace with the action's result written back to disk,
+		// The workspace with the action's result written back to disk,
 		// analysed again — every file it touched, since a Diagnostic that moved
 		// to the other Module is not a Diagnostic that went away.
 		function codesAfter(
@@ -3939,7 +3939,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, mainPath)).toEqual([])
 			})
 
-			// NOTE: A re-export asks another Module for a name exactly as an
+			// A re-export asks another Module for a name exactly as an
 			// import does, and is answered here exactly as one.
 			it("should answer a re-export of a private name too", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -3982,7 +3982,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
 			})
 
-			// NOTE: A Variable is the one declaration an export block may not
+			// A Variable is the one declaration an export block may not
 			// list, so publishing it would answer this Diagnostic with
 			// `export-of-variable` in the other file.
 			it("should offer nothing for a Variable", () => {
@@ -4089,7 +4089,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
 			})
 
-			// NOTE: What the block publishes must not change under a fix that
+			// What the block publishes must not change under a fix that
 			// only answers where the name comes FROM.
 			it("should keep the 'as' the entry was written with", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4115,7 +4115,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
 			})
 
-			// NOTE: Two Modules publishing one name is a real shape — a facade
+			// Two Modules publishing one name is a real shape — a facade
 			// and the Module behind it — and which of them a block meant is not
 			// something the block says.
 			it("should offer one action per Module publishing the name, none preferred", () => {
@@ -4176,7 +4176,7 @@ describe("Workspace", () => {
 			})
 		})
 
-		// NOTE: The three-file case is the whole of what a move has to answer
+		// The three-file case is the whole of what a move has to answer
 		// for: the Module the Declaration leaves, the Module it lands in, and a
 		// Module that named it in an entry. Every assertion below is on the text
 		// of all three, and then on what the Compiler makes of them.
@@ -4253,7 +4253,7 @@ describe("Workspace", () => {
 				let declaringPath = pathOf("A.es")
 				let actions = moves(workspace, declaringPath, 2, "double")
 
-				// NOTE: Every `.es` file beside the document, in path order,
+				// Every `.es` file beside the document, in path order,
 				// and the Module this would write last of all.
 				expect(actions.map((action) => action.title)).toEqual([
 					"Move 'double' to ./B.es",
@@ -4306,7 +4306,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: A file the action WRITES, which no text edit can do on its
+			// A file the action WRITES, which no text edit can do on its
 			// own — the Server turns this one into a resource operation.
 			it("should offer a Module named after the Declaration", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4347,7 +4347,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: Moving a helper into the one Module that reads it is the
+			// Moving a helper into the one Module that reads it is the
 			// ordinary reason to move one, and there the entry is not
 			// retargeted but dropped: a Module does not import what it declares.
 			it("should drop the entry of the Module it lands in", () => {
@@ -4401,7 +4401,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: The Module it leaves has to import it back, and the one it
+			// The Module it leaves has to import it back, and the one it
 			// lands in has to publish it — even though nothing published it
 			// before the move.
 			it("should import the Declaration back where this Module still reads it", () => {
@@ -4458,7 +4458,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
 			})
 
-			// NOTE: A name the Statement reads is in scope where it stands
+			// A name the Statement reads is in scope where it stands
 			// because this Module declares it; where it LANDS it is an import,
 			// and the move is what has to write it. Without that the target is
 			// left at `unknown-name` in a file the reader never opened.
@@ -4513,7 +4513,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
-			// NOTE: A Type is one of those names too, and a Module the file
+			// A Type is one of those names too, and a Module the file
 			// writes from scratch takes the block with the rest of the Program.
 			it("should import a Type into the Module it writes", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4566,7 +4566,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: A Method is reached through a TYPE, so it is not a name the
+			// A Method is reached through a TYPE, so it is not a name the
 			// Statement carries — but the Namespace that declares it is reached
 			// by name, and one this Module keeps to itself is out of scope where
 			// the Statement lands.
@@ -4600,7 +4600,7 @@ describe("Workspace", () => {
 				).toEqual([])
 			})
 
-			// NOTE: And the same Namespace published is one the target can
+			// And the same Namespace published is one the target can
 			// import, so the move is offered and brings it along.
 			it("should carry a published Namespace along with the Declaration", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4642,7 +4642,7 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
-			// NOTE: A member, a property, a Method and an Argument label are
+			// A member, a property, a Method and an Argument label are
 			// reached through a Type rather than through the Module's own
 			// Scope — what has to travel with the Statement is the NAME beside
 			// them, and that one is checked on its own.
@@ -4678,7 +4678,7 @@ describe("Workspace", () => {
 				).toContain("Move 'origin' to ./B.es")
 			})
 
-			// NOTE: THE refusal — the Statement reads a name this Module keeps
+			// THE refusal — the Statement reads a name this Module keeps
 			// to itself, so there is no Module it could be read in.
 			it("should offer nothing for a Declaration reading a private name", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4731,7 +4731,7 @@ describe("Workspace", () => {
 				).toContain("Move 'double' to ./B.es")
 			})
 
-			// NOTE: A Variable can not be exported, so there is nowhere for one
+			// A Variable can not be exported, so there is nowhere for one
 			// to go — and the cursor has to be on the NAME, since a refactoring
 			// offered on a body would be offered on every Statement of it.
 			it("should offer nothing for a Variable, or for a cursor off the name", () => {
@@ -4755,7 +4755,7 @@ describe("Workspace", () => {
 				expect(moves(workspace, pathOf("A.es"), 5, "value")).toEqual([])
 			})
 
-			// NOTE: The `§§` block documents the Declaration and travels with
+			// The `§§` block documents the Declaration and travels with
 			// it, and the Comment that documented the Statement beside it stays
 			// exactly where it was.
 			it("should carry the documentation block with the Declaration", () => {
@@ -4798,7 +4798,7 @@ describe("Workspace", () => {
 				)
 			})
 
-			// NOTE: A Module forwarding the name is naming the Module behind
+			// A Module forwarding the name is naming the Module behind
 			// it, and that Module is about to be a different one.
 			it("should retarget a re-export and an entry sharing its group", () => {
 				let { workspace, pathOf } = makeWorkspace({
@@ -4949,7 +4949,7 @@ describe("Workspace", () => {
 				])
 			})
 
-			// NOTE: A bare name stands in front of every group, whatever it is
+			// A bare name stands in front of every group, whatever it is
 			// called — what a Module declares itself is one list and what it
 			// forwards is another.
 			it("should write a bare name above the groups", () => {
@@ -5008,7 +5008,7 @@ describe("Workspace", () => {
 				])
 			})
 
-			// NOTE: A block is ordered by the name each entry is written under at
+			// A block is ordered by the name each entry is written under at
 			// home rather than by the one it publishes, which is the order the
 			// Formatter puts it in — an `as` renames what the importer writes
 			// and leaves the entry where the reader will look for it.
@@ -5136,7 +5136,7 @@ describe("Workspace", () => {
 			expect(reported?.labels.length).toBeGreaterThan(0)
 			expect(reported?.helps.length).toBeGreaterThan(0)
 
-			// NOTE: One Diagnostic per broken Module, not per entry naming it.
+			// One Diagnostic per broken Module, not per entry naming it.
 			expect(
 				analysis.diagnostics.filter(
 					(diagnostic) => diagnostic.code === "dependency-has-errors",
@@ -5150,7 +5150,7 @@ describe("Workspace", () => {
 			).toContain("unknown-name")
 		})
 
-		// NOTE: `Item` is bounded by the `Sized` that `SizedBox` demands, which
+		// `Item` is bounded by the `Sized` that `SizedBox` demands, which
 		// `Boxes.es` never imports and `Box.es` keeps to itself. The file is
 		// being edited, so the member is read off a relink of the edited text.
 		it("should complete a member of a bound private to another Module", () => {
@@ -5227,7 +5227,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: A Diagnostic published for a file nobody has open is addressed by
+	// A Diagnostic published for a file nobody has open is addressed by
 	// URI, and the client matches it against the URI it handed over — a path
 	// that does not survive the round trip is a squiggle in the wrong file, or
 	// in none.
@@ -5295,7 +5295,7 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: `exclude` in the nearest `essence.json`. Reported on a project
+	// `exclude` in the nearest `essence.json`. Reported on a project
 	// rather than on the open tabs, the discovery walk decides what the Problems
 	// panel speaks for — and a project holds `.es` files that are not its
 	// sources: a corpus kept deliberately broken, a vendored copy, whatever the
@@ -5315,7 +5315,7 @@ describe("Workspace", () => {
 			expect(workspace.isExcluded(pathOf("broken/Bad.es"))).toBe(true)
 		})
 
-		// NOTE: The line between "not discovered" and "not analysed". A file
+		// The line between "not discovered" and "not analysed". A file
 		// this project IMPORTS is this project's, whichever directory it sits
 		// in — excluding a directory says nothing is to be walked INTO, not
 		// that a Module named out loud stops being checked.
@@ -5350,7 +5350,7 @@ describe("Workspace", () => {
 			).not.toEqual([])
 		})
 
-		// NOTE: The walk is answered once and the watcher keeps it current
+		// The walk is answered once and the watcher keeps it current
 		// afterwards, so an exclusion the walk obeyed has to hold on the
 		// watcher's path too — a file appearing under an excluded directory is
 		// how a corpus grows.
@@ -5371,7 +5371,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: What the Server does when the project file changes: sets the
+		// What the Server does when the project file changes: sets the
 		// folders again, which is what forgets the exclusions along with every
 		// answer derived under them.
 		it("should read the exclusions again when the folders are set", () => {
@@ -5396,7 +5396,7 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: Per FILE rather than per workspace. The exclusions used to be
+		// Per FILE rather than per workspace. The exclusions used to be
 		// every folder's laid together, which let one folder of a multi-root
 		// workspace silence a directory of the same name in the other — and
 		// there is no way for a project to say anything about a folder it is
@@ -5425,7 +5425,7 @@ describe("Workspace", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A project inside a project. The nearest file governs, so the
+		// A project inside a project. The nearest file governs, so the
 		// inner one draws its own boundary and the outer one's says nothing
 		// about what is under it.
 		it("should let a nested project file govern its own subtree", () => {
@@ -5449,7 +5449,7 @@ describe("Workspace", () => {
 			expect(workspace.isExcluded(pathOf("broken/Bad.es"))).toBe(false)
 		})
 
-		// NOTE: The `essence` key of a `package.json` is where these settings
+		// The `essence` key of a `package.json` is where these settings
 		// used to live. Nothing is read from one now — the corpus it named is
 		// walked and reported on — and the key is answered with a Diagnostic on
 		// itself rather than with silence, because a setting the author
@@ -5479,7 +5479,7 @@ describe("Workspace", () => {
 			).toEqual([[pathOf("package.json"), ["moved-setting"]]])
 		})
 
-		// NOTE: What a `package.json` changing asks for: the settings are read
+		// What a `package.json` changing asks for: the settings are read
 		// again, and the walk the Server already paid for is not. It is the one
 		// case where forgetting everything would be wrong — a manifest draws no
 		// boundary, so nothing derived from one has moved.

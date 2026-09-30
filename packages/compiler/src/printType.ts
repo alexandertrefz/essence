@@ -7,7 +7,7 @@ import {
 	displayedRefinementArguments,
 } from "./helpers/describe"
 
-// NOTE: How the file a signature is printed for names a Protocol, by the
+// How the file a signature is printed for names a Protocol, by the
 // identity a bound holds. A Language Server request sets it for its document;
 // everything else prints the declared name.
 let protocolSpeller: (identity: string) => string = displayProtocolName
@@ -31,11 +31,11 @@ export function spellProtocol(identity: string): string {
 	return protocolSpeller(identity)
 }
 
-// NOTE: A human-oriented Type printer for Hovers. `describeType` is its
+// A human-oriented Type printer for Hovers. `describeType` is its
 // Diagnostics-oriented sibling. Where that one names an Overload set
 // "Function", this one prints its first signature and counts the rest.
 //
-// NOTE: What this prints is a TYPE, and a Type is something an author can write
+// What this prints is a TYPE, and a Type is something an author can write
 // down: the Inlay Hint that shows a Declaration's inferred Type is offered by
 // `codeActions` as an applied edit, so whatever comes out of here has to parse
 // back as what it says. That is why a Parameter carrying a default prints here
@@ -49,7 +49,7 @@ export function spellProtocol(identity: string): string {
 export function printType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
-			// NOTE: A Choice's Union prints as the Choice's name — spelling
+			// A Choice's Union prints as the Choice's name — spelling
 			// out every Case would drown the Hover. An applied Generic Alias
 			// prints as applied: `Optional<Integer>`.
 			if (type.name !== undefined) {
@@ -65,7 +65,7 @@ export function printType(type: common.Type): string {
 			return type.types.map(printType).join(" | ")
 		case "Case":
 			return caseHeader(type)
-		// NOTE: A checked refinement prints as the alias it was declared under —
+		// A checked refinement prints as the alias it was declared under —
 		// the predicate is what the Declaration says, and a Hover over a value
 		// is about the Type, not about how it was proven. An applied generic one
 		// prints as applied, the way `Optional<Integer>` does.
@@ -80,7 +80,7 @@ export function printType(type: common.Type): string {
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":
 			return "List"
-		// NOTE: The bare spelling falls out of the applied one — an unapplied
+		// The bare spelling falls out of the applied one — an unapplied
 		// `Future` is `Future<Unknown>`, and `Unknown` prints as itself
 		// through the fallthrough below, so a Hover over one reads
 		// `Future<Unknown>` and says exactly what is undecided about it.
@@ -94,7 +94,7 @@ export function printType(type: common.Type): string {
 			)}>`
 		case "GenericDictionary":
 			return "Dictionary"
-		// NOTE: A Record reached through an Alias prints as the Alias — the
+		// A Record reached through an Alias prints as the Alias — the
 		// Union arm's rule one Type over, and for the same reason: a Hover over
 		// a value of `Standing` answers the word its Declaration wrote, and
 		// nine members spelled out drown every place a Type is shown beside
@@ -112,7 +112,7 @@ export function printType(type: common.Type): string {
 			}
 
 			return printRecordWithMembers(type)
-		// NOTE: A Function prints as the signature a DECLARATION writes, which is
+		// A Function prints as the signature a DECLARATION writes, which is
 		// not the spelling a Type Declaration accepts — a Parameter's Type
 		// follows its name here and follows a colon there, so `(_ Integer) ->
 		// Integer` read back into source is refused at the `)`. Kept as it is
@@ -132,7 +132,7 @@ export function printType(type: common.Type): string {
 			})
 		case "Namespace":
 			return type.name
-		// NOTE: Under the name the source wrote, never the one an invocation
+		// Under the name the source wrote, never the one an invocation
 		// freshened it to — see `displayGenericName`.
 		case "GenericUse":
 		case "GenericAlias":
@@ -142,7 +142,7 @@ export function printType(type: common.Type): string {
 	}
 }
 
-// NOTE: A Namespace's conformance list, rendered the way it is declared —
+// A Namespace's conformance list, rendered the way it is declared —
 // ` is Equatable, is Printable, is Comparable where ItemType is Comparable`.
 // The first clause follows the `for Target` half with just a space (as in the
 // declaration itself); the later clauses are comma-separated. An unconditional
@@ -171,14 +171,14 @@ export function printConformanceClauses(
 		.join("")
 }
 
-// NOTE: The `Choice#Case` head a Case prints with. An instantiated Case of a
+// The `Choice#Case` head a Case prints with. An instantiated Case of a
 // generic Choice carries the applied spelling — `Step<Integer, String>#Done` —
 // so a Hover or Completion detail shows the Type Arguments it was constructed
 // with. A DECLARED Case (`choiceGenerics`, no `typeArguments`) and a fully
 // unbound instantiation (every Argument still its own same-named GenericUse)
 // stay terse as `Step#Done`, where a `<…>` would only echo the header.
 //
-// NOTE: The Choice is named as it was declared, never by the identity a Case
+// The Choice is named as it was declared, never by the identity a Case
 // carries — this is the one funnel every Hover, Completion detail and Document
 // Symbol reads a Case's head through, so a Module path can not reach an editor
 // from here.
@@ -199,7 +199,7 @@ export function caseHeader(caseType: common.CaseType): string {
 	return `${choiceName}#${caseType.name}`
 }
 
-// NOTE: A Record with its members spelled out, whatever it is called — the
+// A Record with its members spelled out, whatever it is called — the
 // Record's own twin of `printCaseWithPayload` below, and for the same occasion:
 // a Hover over the Alias's own Declaration, where `Standing: Standing` is what
 // naming it would answer. Everywhere a value of one is shown, `printType`'s
@@ -212,7 +212,7 @@ export function printRecordWithMembers(type: common.RecordType): string {
 	return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
 }
 
-// NOTE: A Case with its payload shape spelled out — for Hovers where the
+// A Case with its payload shape spelled out — for Hovers where the
 // Case itself is the subject rather than a mention. `printType` deliberately
 // stays terse (`CalculatorOperation#Add`); this is the descriptive form.
 export function printCaseWithPayload(caseType: common.CaseType): string {
@@ -225,7 +225,7 @@ export function printCaseWithPayload(caseType: common.CaseType): string {
 		: `${caseHeader(caseType)} { ${members.join(", ")} }`
 }
 
-// NOTE: Non-static Methods carry Self as their first Parameter Type — for
+// Non-static Methods carry Self as their first Parameter Type — for
 // display it is stripped, so the signature matches what a `::` call site
 // actually passes.
 export function withoutSelf(
@@ -237,7 +237,7 @@ export function withoutSelf(
 	}
 }
 
-// NOTE: The signatures a call site can actually invoke: an Overload set
+// The signatures a call site can actually invoke: an Overload set
 // expands to one entry per Overload rather than collapsing into a single
 // combined Type, and Self is stripped where a call site does not pass it.
 // Returns null for everything that is not callable.
@@ -259,7 +259,7 @@ export function signaturesOf(
 	}
 }
 
-// NOTE: Where only one line is available — a Completion's detail, or a
+// Where only one line is available — a Completion's detail, or a
 // Function Type nested inside another Type — the remaining Overloads are
 // counted instead of spelled out.
 export function printSignatureSummary(
@@ -282,7 +282,7 @@ export function printSignatureSummary(
 	})`
 }
 
-// NOTE: Whether a Parameter a call may leave out is MARKED. On for a signature
+// Whether a Parameter a call may leave out is MARKED. On for a signature
 // shown to a reader — a Hover, Signature Help, a Document Symbol — and off for a
 // Type printed where source could be written; see `printType`.
 type SignaturePrinting = { marksOmittable?: boolean }
@@ -295,7 +295,7 @@ export function printSignature(
 	return describeSignature(functionType, name, printing).label
 }
 
-// NOTE: Offsets into a signature's label, in UTF-16 code units. Signature
+// Offsets into a signature's label, in UTF-16 code units. Signature
 // Help highlights the active Parameter by range rather than by matching its
 // printed text, which would otherwise always land on the first of two
 // identically printed Parameters — `(_ Integer, _ Integer)` is common.
@@ -311,7 +311,7 @@ export function describeSignature(
 	name: string = "",
 	printing: SignaturePrinting = {},
 ): SignatureDescription {
-	// NOTE: `Self` is never shown. A Protocol's PROVIDED Method is a bounded
+	// `Self` is never shown. A Protocol's PROVIDED Method is a bounded
 	// generic Function over `Self` — that is how one body answers for every
 	// conformer — but nobody wrote that Parameter and no call site binds it by
 	// hand: it is the receiver's own Type, worked out from the receiver. Shown,
@@ -325,7 +325,7 @@ export function describeSignature(
 			? ""
 			: `<${declaredGenerics
 					.map((generic) =>
-						// NOTE: A Protocol-bounded Type Parameter reads back as it
+						// A Protocol-bounded Type Parameter reads back as it
 						// is written — `ItemType is Comparable` — so a Hover or
 						// Signature Help over `sort` shows the bound its ordering
 						// depends on rather than a bare `ItemType`.
@@ -354,7 +354,7 @@ export function describeSignature(
 	return { label, parameters }
 }
 
-// NOTE: A Parameter a call may leave out reads as `at?: Side` — the FACT of a
+// A Parameter a call may leave out reads as `at?: Side` — the FACT of a
 // default, not its text. `common.Parameter` deliberately carries no Expression:
 // a Type is compared, cached and serialized, and it has no business carrying a
 // Node. Showing `at: Side = #Start` in a Hover would mean carrying the default's

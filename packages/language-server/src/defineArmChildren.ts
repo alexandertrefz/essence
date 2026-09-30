@@ -1,4 +1,4 @@
-// NOTE: `define { as VALUE if CONDITION … as VALUE otherwise }` holds nothing
+// `define { as VALUE if CONDITION … as VALUE otherwise }` holds nothing
 // but Expressions. An arm has no body to descend into — that is what keeps a
 // `define` an Expression — so a walker with no case for it descends into
 // nothing at all, and the whole of `as total if hasRun` is invisible to Hovers,
@@ -12,7 +12,7 @@
 // `otherwise` arm stands below every conditional one — so a walker searching for
 // the first match in a document finds it where it lexically is.
 //
-// NOTE: One set of functions answers for the Parser AST and for the typed one
+// One set of functions answers for the Parser AST and for the typed one
 // alike: an arm is a value and a Condition either side of enrichment, and only
 // the Expression Type differs. Shaped after `parameterDefaults`, which is
 // written generically over the same two ASTs for the same reason.
@@ -27,7 +27,7 @@ type Define<Expression> = {
 	otherwise: { value: Expression }
 }
 
-// NOTE: One arm, for the walkers that have something to say about the arm
+// One arm, for the walkers that have something to say about the arm
 // itself — a Position of its own to put on a selection chain.
 export function defineArmExpressions<Expression>(
 	arm: Arm<Expression>,
@@ -44,7 +44,7 @@ export function defineExpressions<Expression>(
 	]
 }
 
-// NOTE: The same enumeration split by what the two halves are read AGAINST,
+// The same enumeration split by what the two halves are read AGAINST,
 // for the walkers that thread an expected Type down: every value answers the
 // `define` and so is read against the Type the position expects of it, while a
 // Condition is a Boolean that expects nothing of its own. Split here rather

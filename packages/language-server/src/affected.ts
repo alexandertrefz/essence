@@ -2,14 +2,14 @@ import { coveringPoints } from "@essence-lang/compiler/testing"
 import type { common } from "@essence-lang/interfaces"
 import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 
-// NOTE: Which tests a change reached, so the live session can re-run those and
+// Which tests a change reached, so the live session can re-run those and
 // not every test of every file that imports the one that changed. Everything
 // here is a function of its arguments — no session state, no Worker, no clock —
 // which is what lets `tests/affected.spec.ts` pin the reasoning without an
 // Editor. The session in `testSession.ts` holds the index this reads and feeds
 // it the current buffers.
 //
-// NOTE: The whole thing rides on coverage. Per-test attribution — which test
+// The whole thing rides on coverage. Per-test attribution — which test
 // touched which point — is a fact the instrumentation records and the runtime
 // emits as `test-coverage` events, so line-level selection is only ever a
 // refinement AVAILABLE when `essence.tests.coverage` is on. With it off there
@@ -18,7 +18,7 @@ import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 // change reached, then the tests within them a change reached — and every rung
 // answering "run more" is the safe one.
 
-// NOTE: One Module's coverage table as the join reads it, plus WHICH tests
+// One Module's coverage table as the join reads it, plus WHICH tests
 // touched each point. `points[i]` and `tests[i]` are the same index — the index
 // a `test-coverage` event names — so a point and the tests that reached it are
 // read together. `points` keeps the whole `CoveredPoint` rather than only its
@@ -29,14 +29,14 @@ import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 type ModulePoints = {
 	points: Array<CoveredPoint>
 	tests: Array<Set<string>>
-	// NOTE: The point indices this Module ran simply by being LOADED — reached
+	// The point indices this Module ran simply by being LOADED — reached
 	// by no single test's span, so no `tests` entry can name them. An edit to
 	// one can change a test that read the load-time result without re-entering
 	// the point, so a change covering one is a whole run, not a narrowing.
 	loaded: Set<number>
 }
 
-// NOTE: One entry file's own attribution, built from ONE unnarrowed cycle so
+// One entry file's own attribution, built from ONE unnarrowed cycle so
 // that every point index lines up with one compile's table — never a mix of two.
 // `byModule` covers every instrumented Module the entry's bundle reached, not
 // just the entry's own file: a test in `Reader.tests.es` reaches points in
@@ -50,7 +50,7 @@ export type EntryAttribution = {
 	text: Map<string, string>
 }
 
-// NOTE: The attribution of one Module, folded out of a cycle's events. A
+// The attribution of one Module, folded out of a cycle's events. A
 // `coverage` event carries the table and the load-time counts; a `test-coverage`
 // event names, per test, the points it touched by index into that table. This
 // is the same fold `attributionOf` does for `--mutate`, kept apart because the
@@ -93,19 +93,19 @@ export function buildAttribution(
 }
 
 function lineCount(text: string): number {
-	// NOTE: `split` counts the segments between newlines, which is the number of
+	// `split` counts the segments between newlines, which is the number of
 	// lines a Position's 1-based line refers to — a file ending without a
 	// trailing newline still has that last line.
 	return text.split("\n").length
 }
 
-// NOTE: The span of OLD text a change touched, in the coordinates the stored
+// The span of OLD text a change touched, in the coordinates the stored
 // table is in — so it maps onto the Positions that table already holds. Answered
 // as the range from the first line that differs to the last, which over-states a
 // scattered edit into one span rather than under-stating it: a wider range
 // reaches more tests, which is the safe direction.
 //
-// NOTE: `null` for two cases the caller reads apart. Identical text is one — the
+// `null` for two cases the caller reads apart. Identical text is one — the
 // entry's snapshot of this Module never changed, so nothing here concerns it.
 // The other is a change that ADDED or REMOVED lines, and it is refused on
 // purpose: every point below the edit would have moved, so the stored table's
@@ -141,7 +141,7 @@ export function changedRange(
 		suffix += 1
 	}
 
-	// NOTE: 1-based, inclusive. The line counts match and the texts differ, so
+	// 1-based, inclusive. The line counts match and the texts differ, so
 	// at least one line changed and the range is never empty.
 	let firstLine = prefix + 1
 	let lastLine = total - suffix
@@ -155,7 +155,7 @@ export function changedRange(
 	}
 }
 
-// NOTE: The tests to re-run for a change, or `null` for "cannot say — run the
+// The tests to re-run for a change, or `null` for "cannot say — run the
 // reached files whole". Every entry handed in is already known FRESH: its
 // attribution was built from an unnarrowed cycle whose snapshot is the text the
 // change is measured against. What is left to decide is whether the change lands
@@ -187,7 +187,7 @@ export function affectedTests(
 		for (let file of changed) {
 			let held = attribution.byModule.get(file)
 
-			// NOTE: A changed file this entry does not reach is not this entry's
+			// A changed file this entry does not reach is not this entry's
 			// concern — `reached` picked the entry up for some OTHER changed file.
 			if (held === undefined) {
 				if (reaches(attribution.entry, file)) {
@@ -207,7 +207,7 @@ export function affectedTests(
 			let range = changedRange(old, now)
 
 			if (range === null) {
-				// NOTE: Identical is "unchanged for this entry"; a line-count
+				// Identical is "unchanged for this entry"; a line-count
 				// change is one `changedRange` refuses, and refusing here is the
 				// whole-run fallback.
 				if (old === now) {
@@ -228,7 +228,7 @@ export function affectedTests(
 					continue
 				}
 
-				// NOTE: A point reached at LOAD is checked FIRST, before its
+				// A point reached at LOAD is checked FIRST, before its
 				// tests: a helper called both from a top-level Constant and
 				// directly by a test has that test in its set AND ran at load,
 				// and narrowing to the test alone would leave every test that
@@ -242,7 +242,7 @@ export function affectedTests(
 						affected.add(id)
 					}
 				} else if (point.count > 0) {
-					// NOTE: Reached, but by no test's span — belt to the load
+					// Reached, but by no test's span — belt to the load
 					// check's braces, since a count with no test is a load hit.
 					return null
 				}

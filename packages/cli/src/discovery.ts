@@ -15,24 +15,24 @@ import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 import { looksLikeGlob } from "./inputs"
 
-// NOTE: `esc build` is pointed at the files it compiles; `essence test` is
+// `esc build` is pointed at the files it compiles; `essence test` is
 // pointed at a project, and walks it with the Compiler's `essenceFilesUnder`,
 // the walk the Formatter shares.
 
-// NOTE: The `.tests.es` convention: a file that is nothing but imports and a
+// The `.tests.es` convention: a file that is nothing but imports and a
 // `tests { … }` block, named after the Module it tests. It is discovered by
 // its NAME as well as by its content, so a `Season.tests.es` that does not
 // parse is still compiled and still reports its Diagnostic — a file that can
 // not be read can not be shown to hold no tests.
 const TESTS_SUFFIX = ".tests.es"
 
-// NOTE: The one thing a file with no `tests { … }` block may still write that
+// The one thing a file with no `tests { … }` block may still write that
 // makes it a file with tests. Like the substring check on `tests`, it can only
 // rule a file OUT — an `@example` may perfectly well be prose — so what follows
 // it is a parse.
 const EXAMPLE_TAG = "@example"
 
-// NOTE: And the word a file has to write before a contract run can find
+// And the word a file has to write before a contract run can find
 // anything to test in it. Like the two above it can only rule a file OUT — the
 // word may be written in a Comment, or be a Constant's name — so what follows
 // it is a parse.
@@ -53,13 +53,13 @@ async function isDirectory(target: string): Promise<boolean> {
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
-	// NOTE: Whether a standard library source counts. A walk of a PROJECT must
+	// Whether a standard library source counts. A walk of a PROJECT must
 	// never pick one up, wherever the checkout puts it — it declares the
 	// builtins and is nobody's test. A walk that STARTED inside the standard
 	// library is a different question: the library's own `@example` blocks are
 	// tests, and `essence test` run in it is how they are run.
 	allowStdlib: boolean,
-	// NOTE: What the project said not to walk into. Empty for every caller that
+	// What the project said not to walk into. Empty for every caller that
 	// read no configuration, which is every caller but the two commands.
 	exclude: Array<string> = [],
 ): Promise<void> {
@@ -70,7 +70,7 @@ async function collectEssenceFiles(
 	}
 }
 
-// NOTE: Two rules, because the two ways a file arrives here mean different
+// Two rules, because the two ways a file arrives here mean different
 // things. A file the caller NAMED is one they want an answer about, so an
 // unreadable or unparsable one is kept and the compile reports why. A file a
 // WALK turned up is one nobody mentioned, so it is kept only when it plainly
@@ -79,7 +79,7 @@ async function collectEssenceFiles(
 async function keepsFile(
 	filePath: string,
 	named: boolean,
-	// NOTE: Whether the run reads a Namespace declaration as tests too — see
+	// Whether the run reads a Namespace declaration as tests too — see
 	// `--contracts`. It widens what a WALK keeps, because a file whose goals a
 	// run is about to synthesize is a file with tests whether or not anybody
 	// wrote a `tests { … }` block in it. A project's ordinary run is untouched.
@@ -97,7 +97,7 @@ async function keepsFile(
 		return named
 	}
 
-	// NOTE: A file that never writes the word can not open the section, so a
+	// A file that never writes the word can not open the section, so a
 	// walk that turned it up is answered without parsing it — which is what
 	// keeps `essence test` in a project from parsing every source in it twice,
 	// once here and once in the compile. The reverse does NOT hold: `tests` is a
@@ -105,7 +105,7 @@ async function keepsFile(
 	// Constant, and that is why what follows is a parse rather than a second
 	// guess.
 	//
-	// NOTE: Under `--contracts` the text scan is the WHOLE answer: a Namespace
+	// Under `--contracts` the text scan is the WHOLE answer: a Namespace
 	// declaration promises goals, a declaration can not be written without the
 	// word, and nearly every implementation file writes one — so a parse here
 	// would be a parse of most of the project, serially, before the compile
@@ -128,7 +128,7 @@ async function keepsFile(
 
 	return (
 		parsed.program.tests !== null ||
-		// NOTE: A file that writes no section may still promise something: an
+		// A file that writes no section may still promise something: an
 		// `@example` in a `§§` block is a test of the file it was written in,
 		// and a project's documentation is the last place a drifting example
 		// should be allowed to sit unrun.
@@ -137,7 +137,7 @@ async function keepsFile(
 	)
 }
 
-// NOTE: Every file `essence test` will compile, from what was typed. Nothing
+// Every file `essence test` will compile, from what was typed. Nothing
 // typed means the project — see `root` — a directory means every Essence source
 // under it; anything else is a file or a glob, and is a file the caller named.
 export async function discoverTestFiles(
@@ -145,7 +145,7 @@ export async function discoverTestFiles(
 	command: CommandSpec,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	workingDirectory: string = process.cwd(),
-	// NOTE: Where a walk that was given nothing starts: the directory the
+	// Where a walk that was given nothing starts: the directory the
 	// project file sits in, which is what `essence test` typed with no argument
 	// is about. Null where no project file governs the run, and then the
 	// working directory answers as it always did. Handed over rather than read
@@ -153,22 +153,22 @@ export async function discoverTestFiles(
 	// — the commands read the file once, at the head of a run, and hand what it
 	// said to everything that needs it.
 	//
-	// NOTE: It moves the WALK and nothing else. A pattern that WAS typed — a
+	// It moves the WALK and nothing else. A pattern that WAS typed — a
 	// file, a glob, a directory — is still read against the working directory,
 	// because a path typed into a shell means what that shell's directory says
 	// it means.
 	root: string | null = null,
-	// NOTE: The project's own `exclude`. It narrows the WALK and nothing else:
+	// The project's own `exclude`. It narrows the WALK and nothing else:
 	// a file named on the command line was asked about by name, and answering
 	// "there is a setting" to a direct question would be the worse reading of
 	// both.
 	exclude: Array<string> = [],
-	// NOTE: Whether this run reads a declaration as a test — see `keepsFile`.
+	// Whether this run reads a declaration as a test — see `keepsFile`.
 	contracts: boolean = false,
 ): Promise<Array<string>> {
 	let walked = new Set<string>()
 	let named = new Set<string>()
-	// NOTE: Everything typed is read against the working directory rather than
+	// Everything typed is read against the working directory rather than
 	// against `process.cwd()`, so that a caller driving this from somewhere
 	// else — a spec, a run started in a nested directory — says once where the
 	// globs and the named files are read from.
@@ -220,7 +220,7 @@ export async function discoverTestFiles(
 	}
 
 	let candidates = [...new Set([...named, ...walked])].sort()
-	// NOTE: Fanned out — each answer is one independent read (and sometimes a
+	// Fanned out — each answer is one independent read (and sometimes a
 	// parse), and a project of hundreds of files pays this walk at the head of
 	// every run and every watch cycle. The order of the answers is the sorted
 	// candidates', whatever order the disk answered in.

@@ -20,7 +20,7 @@ import {
 } from "./session"
 import type { WorkerRequest, WorkerResponse } from "./worker"
 
-// NOTE: Booting a worker and importing the Compiler into it costs about twenty
+// Booting a worker and importing the Compiler into it costs about twenty
 // milliseconds of wall clock, so workers are only worth it where there is that
 // much divisible work to put in front of them. How much a batch holds depends
 // on what is being asked of it, and these are the crossovers measured on this
@@ -46,7 +46,7 @@ import type { WorkerRequest, WorkerResponse } from "./worker"
 // is very little left to divide: the win only arrives at a quarter of a
 // megabyte of Essence, which is twice everything in this repository.
 //
-// NOTE: An emitting batch whose bundles are all in the cache costs what a check
+// An emitting batch whose bundles are all in the cache costs what a check
 // costs, and would rather have been left here — twenty-three entries take 153 ms
 // on the main thread against 182 in four workers. Which of the two a build is
 // can not be known before it is run: it is the hash of each linked graph that
@@ -56,7 +56,7 @@ import type { WorkerRequest, WorkerResponse } from "./worker"
 const PARALLEL_ENTRIES = 6
 const PARALLEL_BYTES = 256 * 1024
 
-// NOTE: Four, and not one per core. What a worker parallelises ends in esbuild,
+// Four, and not one per core. What a worker parallelises ends in esbuild,
 // which runs threads of its own inside every one of them, so a fifth worker
 // competes with the four already there rather than adding to them: twenty-three
 // entries emit in 496 ms across three workers, 498 across four, 532 across six
@@ -66,11 +66,11 @@ const PARALLEL_BYTES = 256 * 1024
 const MAX_WORKERS = 4
 
 export type CompileDispatcher = {
-	// NOTE: Every entry of one run, before any of them is compiled. A graph is
+	// Every entry of one run, before any of them is compiled. A graph is
 	// what a Module compiles as, and a graph is shared: the dispatcher has to
 	// know the whole invocation to load each file once, and the whole
 	// invocation is only known here.
-	// NOTE: The MODE is the whole run's — see `createCompileSession`. It travels
+	// The MODE is the whole run's — see `createCompileSession`. It travels
 	// with the entries rather than with each request because it is what the
 	// Session is opened in.
 	begin: (inputFileNames: Array<string>, mode?: CompileMode) => void
@@ -82,7 +82,7 @@ export type CompileDispatcher = {
 	readonly size: number
 }
 
-// NOTE: The entry count is a ceiling rather than the number itself: a worker
+// The entry count is a ceiling rather than the number itself: a worker
 // with no entry assigned to it is a thread booted to sit idle. What decides the
 // rest is the cap above, which the measurements put ahead of anything derived
 // from how much source there is.
@@ -92,7 +92,7 @@ export function defaultWorkerCount(fileCount: number): number {
 	return Math.max(1, Math.min(fileCount, cores, MAX_WORKERS))
 }
 
-// NOTE: A watch session is not a case of its own. It used to be — warm workers
+// A watch session is not a case of its own. It used to be — warm workers
 // were worth booting once and reusing — but a rebuild wakes only the entries
 // whose graph the changed file sits in, which is nearly always one, and one
 // entry has no second worker to give work to. Measured over a three-file watch,
@@ -103,7 +103,7 @@ export function shouldUseWorkers(options: {
 	emit: boolean
 	jobs: number | undefined
 }): boolean {
-	// NOTE: An explicit `--jobs` is an answer rather than a hint — one job stays
+	// An explicit `--jobs` is an answer rather than a hint — one job stays
 	// here, more than one goes to workers whatever the batch looks like.
 	// Otherwise there is no way to measure the choice made below against the one
 	// it did not make.
@@ -111,7 +111,7 @@ export function shouldUseWorkers(options: {
 		return options.jobs > 1
 	}
 
-	// NOTE: One entry is one graph and a graph is compiled by one worker, so
+	// One entry is one graph and a graph is compiled by one worker, so
 	// there is nothing for a second to do and the boot is paid for nothing. This
 	// is what the byte threshold here used to be about: a single large file was
 	// sent to a worker so that the main thread stayed free to draw the spinner,
@@ -126,7 +126,7 @@ export function shouldUseWorkers(options: {
 		: options.totalBytes >= PARALLEL_BYTES
 }
 
-// NOTE: The in-process dispatcher. It exists so that callers never branch on
+// The in-process dispatcher. It exists so that callers never branch on
 // how a compilation is going to run — `--jobs 1` and a one-file build take the
 // same path through the command implementations as a parallel build does.
 //
@@ -145,7 +145,7 @@ export function createInlineDispatcher(): CompileDispatcher {
 	}
 }
 
-// NOTE: A Job only ever resolves. Every failure — including a worker dying
+// A Job only ever resolves. Every failure — including a worker dying
 // mid-compilation — is expressed as a failed CompileOutcome, so that callers
 // have exactly one shape to handle.
 type Job = {
@@ -154,7 +154,7 @@ type Job = {
 	resolve: (outcome: CompileOutcome) => void
 }
 
-// NOTE: One worker and the entries it was given. Workers share nothing, so a
+// One worker and the entries it was given. Workers share nothing, so a
 // Module two of them reach is read and enriched in each — an accepted cost, and
 // the reason the entries whose graphs overlap are handed to one of them.
 type Slot = {
@@ -164,7 +164,7 @@ type Slot = {
 	entries: Array<string>
 }
 
-// NOTE: A worker crash is a Compiler bug, and is reported the same way the
+// A worker crash is a Compiler bug, and is reported the same way the
 // in-process path reports one — as a failed compilation of the file that was
 // being worked on, so that the surrounding batch still finishes and still
 // reports every other file.
@@ -197,7 +197,7 @@ function workerFailure(
 	}
 }
 
-// NOTE: The entry sets, largest first, into the least loaded slot. Which slot a
+// The entry sets, largest first, into the least loaded slot. Which slot a
 // set lands in decides nothing about the answer — only how much reading two
 // workers do twice — so the greedy pass is chosen for how evenly it fills them.
 function assignSlots(
@@ -228,12 +228,12 @@ function assignSlots(
 	return assignment
 }
 
-// NOTE: A worker is booted as whatever the module booting it is running as —
+// A worker is booted as whatever the module booting it is running as —
 // the TypeScript source under Bun in the workspace, the compiled JavaScript in
 // the published package, where no `.ts` exists to boot. Exported for the spec:
 // which file that is is a pure question, the Worker around it is not.
 //
-// NOTE: `base` because there are two Workers in this package and the question
+// `base` because there are two Workers in this package and the question
 // is the same one for both — the compile pool's, and the one a mutation run
 // loads its bundles in. It is asked of the CALLER's own module URL, which is
 // what makes the answer right for a file in either shape.
@@ -256,13 +256,13 @@ export function createWorkerPool(size: number): CompileDispatcher {
 	let nextId = 0
 	let nextSlot = 0
 	let disposed = false
-	// NOTE: The mode the run was begun in, kept because a slot boots LAZILY —
+	// The mode the run was begun in, kept because a slot boots LAZILY —
 	// the first job that lands on it is what spawns its worker, and that is
 	// after `begin` has been and gone. An ordinary run boots every one of its
 	// workers that way, so this is the copy nearly all of them are opened from.
 	let mode = completeMode()
 
-	// NOTE: The one place a worker is told what run it is in, for both moments
+	// The one place a worker is told what run it is in, for both moments
 	// it can be told: `begin` reaches the slots that are already up, `spawn`
 	// reaches the ones that boot afterwards. `WorkerRequest` asks for every
 	// facet rather than allowing it, so a second caller can not leave one out.
@@ -298,7 +298,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 			pump()
 		})
 
-		// NOTE: A worker that dies takes its own job with it — and only its
+		// A worker that dies takes its own job with it — and only its
 		// own. The job it was running is completed as a failed compilation
 		// rather than rejected, so that one dead worker reports one broken
 		// file instead of failing every file that happened to be in flight.
@@ -327,7 +327,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 		return worker
 	}
 
-	// NOTE: A file the run was not planned with — nothing the CLI does today —
+	// A file the run was not planned with — nothing the CLI does today —
 	// is spread over the slots rather than piled onto the first one.
 	let slotIndexFor = (fileName: string): number => {
 		let index = assignment.get(fileName)
@@ -351,14 +351,14 @@ export function createWorkerPool(size: number): CompileDispatcher {
 		slot.jobId = id
 		inFlight.set(id, job)
 
-		// NOTE: A worker is ref'd only while it is working, so that a
+		// A worker is ref'd only while it is working, so that a
 		// finished run exits immediately instead of waiting on idle
 		// threads that will never receive another job.
 		worker.ref()
 		worker.postMessage({ type: "compile", id, request: job.request })
 	}
 
-	// NOTE: The queue is scanned rather than shifted, because a file is pinned
+	// The queue is scanned rather than shifted, because a file is pinned
 	// to the slot holding the rest of its graph: taking only the head would let
 	// one busy slot hold up every other slot's work.
 	let pump = (): void => {
@@ -394,7 +394,7 @@ export function createWorkerPool(size: number): CompileDispatcher {
 			assignment = assignSlots(slots, active, groups)
 			mode = completeMode(begun)
 
-			// NOTE: A worker that already ran carries the Session of the
+			// A worker that already ran carries the Session of the
 			// previous run — a watch rebuild is a new run over new files, and
 			// the graph it holds is the one that just changed.
 			for (let slot of slots) {

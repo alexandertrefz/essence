@@ -18,7 +18,7 @@ import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 import { typedExpressionAt } from "./typedLookups"
 
-// NOTE: Whole Statements lifted out of a Function and written as a Function
+// Whole Statements lifted out of a Function and written as a Function
 // beside it, with the names they read turned into its Parameters. The Types
 // those Parameters carry are the Enricher's, printed back as source — which is
 // the one thing this can not do without and the reason it is offered only where
@@ -49,7 +49,7 @@ export function extractFunctionActions(
 ): Array<CodeActionEntry> {
 	let selection = trimmedRange(lines, range)
 
-	// NOTE: Without the typed Program there are no Types to write, and a
+	// Without the typed Program there are no Types to write, and a
 	// Parameter list is the whole of what makes this an extraction.
 	if (selection === null || enrichedProgram === null) {
 		return []
@@ -58,7 +58,7 @@ export function extractFunctionActions(
 	let from = enclosingStatementOf(program, at(selection.start))
 	let to = enclosingStatementOf(program, at(selection.end))
 
-	// NOTE: Both ends have to be in ONE body. A selection running from inside a
+	// Both ends have to be in ONE body. A selection running from inside a
 	// Match Handler out past its closing brace covers half of two things, and
 	// there is no list of Statements that is what it covers.
 	if (
@@ -85,7 +85,7 @@ export function extractFunctionActions(
 	let last = selected[selected.length - 1] as parser.ImplementationNode
 	let span = { start: first.position.start, end: last.position.end }
 
-	// NOTE: Whole lines move, and a whole line is what is written back — both
+	// Whole lines move, and a whole line is what is written back — both
 	// ends of the selection and the end of the Function it is lifted out of have
 	// to be their lines' own, or the edit would take a neighbour with it.
 	if (
@@ -96,13 +96,13 @@ export function extractFunctionActions(
 		return []
 	}
 
-	// NOTE: A provided Method's body can name nothing the Program declares, so
+	// A provided Method's body can name nothing the Program declares, so
 	// the Function written beside the enclosing one is out of its reach.
 	if (liesInProtocol(enclosing.statement, span)) {
 		return []
 	}
 
-	// NOTE: `@` is the value the Method or the Match Handler around it is
+	// `@` is the value the Method or the Match Handler around it is
 	// about, and a Function written beside them is about nothing.
 	//
 	// An assertion is refused by the Enricher inside a Function literal for the
@@ -115,7 +115,7 @@ export function extractFunctionActions(
 
 	let answers = last.nodeType === "ReturnStatement"
 
-	// NOTE: A Return anywhere but at the very end returns from the FUNCTION,
+	// A Return anywhere but at the very end returns from the FUNCTION,
 	// and inside the extracted one it would return from that instead. A `<-`
 	// written in a Match Handler is the arm's value rather than a return, which
 	// is why `holdsReturn` stops at one.
@@ -131,7 +131,7 @@ export function extractFunctionActions(
 	}
 
 	let written: Array<{ name: string; type: string }> = []
-	// NOTE: Where the extracted Function lands — the end of the Statement the
+	// Where the extracted Function lands — the end of the Statement the
 	// selection was lifted out of — which is the Scope its annotations are read
 	// in.
 	let spelledAt: SpellingScope = {
@@ -149,7 +149,7 @@ export function extractFunctionActions(
 		written.push({ name: parameter.name, type })
 	}
 
-	// NOTE: `{}` is the unit Type, and a Function answering it is called as a
+	// `{}` is the unit Type, and a Function answering it is called as a
 	// Statement — which is what a selection that answers nothing becomes.
 	let returnType = answers
 		? typeAt(
@@ -175,7 +175,7 @@ export function extractFunctionActions(
 	let signature = written
 		.map((parameter) => `_ ${parameter.name}: ${parameter.type}`)
 		.join(", ")
-	// NOTE: The body moves BYTE FOR BYTE — a Comment, a blank line, the
+	// The body moves BYTE FOR BYTE — a Comment, a blank line, the
 	// spelling of a Literal — and is shifted by the difference between the
 	// depth it was written at and the depth it lands at, which is the only
 	// change made to it.
@@ -202,7 +202,7 @@ export function extractFunctionActions(
 					newText: `\n\n${indentation}function ${name}(${signature}) -> ${returnType} {\n${moved}\n${indentation}}`,
 				},
 			],
-			// NOTE: Where the new name will stand once BOTH edits have landed.
+			// Where the new name will stand once BOTH edits have landed.
 			// The call site collapses the selection onto one line, so the
 			// Function written after it moves up by every line the selection
 			// spanned beyond its first.
@@ -223,7 +223,7 @@ function at(cursor: common.Cursor): common.Position {
 
 type FreeName = { name: string; position: common.Position }
 
-// NOTE: The names the selection reads that are declared outside it, in the
+// The names the selection reads that are declared outside it, in the
 // order they are first read — which is the order the Parameters are written in,
 // so that a call reads as the code it replaced did.
 //
@@ -253,7 +253,7 @@ function freeNamesOf(
 		let declaredInside = containsRange(span, definition)
 		let readInside = containsRange(span, occurrence.position)
 
-		// NOTE: A name the selection declares travels with it, so nothing below
+		// A name the selection declares travels with it, so nothing below
 		// may still be reading it.
 		if (declaredInside && !readInside) {
 			return null
@@ -263,13 +263,13 @@ function freeNamesOf(
 			continue
 		}
 
-		// NOTE: An assignment to a Variable declared above — the shape this
+		// An assignment to a Variable declared above — the shape this
 		// deliberately does not handle. See the note at the top.
 		if (occurrence.access === "write") {
 			return null
 		}
 
-		// NOTE: A Function, a Type or a Namespace declared at the top level is
+		// A Function, a Type or a Namespace declared at the top level is
 		// in reach of the extracted Function too; one declared INSIDE the
 		// Function being extracted from is not, and there is no Parameter that
 		// could carry it.
@@ -299,7 +299,7 @@ function freeNamesOf(
 	)
 }
 
-// NOTE: The kinds that name a BINDING rather than a member of a Type. A Record
+// The kinds that name a BINDING rather than a member of a Type. A Record
 // member and a Method resolve against the value they are written on, so neither
 // is a name a Parameter could carry or a Scope could shadow.
 function isBound(kind: DeclarationKind): boolean {
@@ -315,14 +315,14 @@ function isBound(kind: DeclarationKind): boolean {
 	}
 }
 
-// NOTE: And of those, the ones a value can be handed for — which is what a
+// And of those, the ones a value can be handed for — which is what a
 // Parameter is. Everything else is a declaration the extracted Function reaches
 // by name or does not reach at all.
 function isLocal(kind: DeclarationKind): boolean {
 	return kind === "constant" || kind === "variable" || kind === "parameter"
 }
 
-// NOTE: Spelled where the Function is going to be WRITTEN rather than where the
+// Spelled where the Function is going to be WRITTEN rather than where the
 // value stands, which for an Alias is the difference between a name in reach
 // and an `unknown-type`: the extracted Function is written beside the one it
 // came out of, and a name declared inside that body is out of reach there.
@@ -384,7 +384,7 @@ function holdsAssertion(node: parser.ImplementationNode): boolean {
 	return found
 }
 
-// NOTE: A Return that answers the FUNCTION. The walk descends into an If, whose
+// A Return that answers the FUNCTION. The walk descends into an If, whose
 // body is part of the Function's, and stops at a Match Handler and a Function
 // literal — a `<-` written in either of those answers that instead.
 function holdsReturn(node: parser.ImplementationNode): boolean {
@@ -403,7 +403,7 @@ function holdsReturn(node: parser.ImplementationNode): boolean {
 	}
 }
 
-// NOTE: The moved text shifted from the depth it was written at to the depth it
+// The moved text shifted from the depth it was written at to the depth it
 // lands at. The first line carries no indentation of its own — the slice starts
 // at the Statement — so it is given the new one outright; every other line had
 // the old one in front of it and trades it for the new. A blank line is emptied

@@ -1,6 +1,6 @@
 import { format } from "node:util"
 
-// NOTE: What running SOMEBODY ELSE'S code inside this process costs the process:
+// What running SOMEBODY ELSE'S code inside this process costs the process:
 // where the output of it goes, and how what it throws is written down. Both are
 // wanted by the test runner and by the mutant Worker, and a Worker may not
 // import `test.ts` — that file reaches the compile pipeline, the report and the
@@ -8,7 +8,7 @@ import { format } from "node:util"
 // has any use for. So they live here, in a leaf that imports one thing from the
 // standard library and nothing at all from this package.
 
-// NOTE: A Module's own top-level output — a `Terminal.print` outside any test —
+// A Module's own top-level output — a `Terminal.print` outside any test —
 // is written by the bundle as it is evaluated: before any test is running, and
 // with no test to attribute it to. It is not part of the report, and under
 // --json stdout carries the event stream and nothing else — so for the length
@@ -17,7 +17,7 @@ import { format } from "node:util"
 // here: the runtime captures it against the test and the report shows it with
 // the failure.
 //
-// NOTE: `console.log` is pointed at stderr as well, and that is not belt and
+// `console.log` is pointed at stderr as well, and that is not belt and
 // braces. `Terminal.inspect` renders a whole line and writes it through
 // `console.log`, which under Bun goes to the file descriptor DIRECTLY and never
 // through `process.stdout.write` — so a Module that inspects a value at its top
@@ -51,11 +51,11 @@ export function redirectStdout(): () => void {
 	}
 }
 
-// NOTE: A thrown thing as a reader needs it — the stack where there is one,
+// A thrown thing as a reader needs it — the stack where there is one,
 // because what a mutant's bundle threw is only useful with the frames under it,
 // and whatever the thing renders as where it is not an Error at all.
 //
-// NOTE: The Language Server's `testWorker.ts` holds a twin of this, spelled the
+// The Language Server's `testWorker.ts` holds a twin of this, spelled the
 // same way, for the same reason and against a Worker of its own. The two
 // packages share no leaf today; unifying them is worth doing when one of them
 // next needs to change.

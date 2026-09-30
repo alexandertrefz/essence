@@ -1,19 +1,19 @@
-// NOTE: The entry a session debugging a test launches. A test bundle publishes
+// The entry a session debugging a test launches. A test bundle publishes
 // its registry on `$tests` and runs nothing on its own — `essence test` is what
 // drives one — so debugging a test means a script that loads the bundle and asks
 // it for exactly that test. This module writes that script.
 //
-// NOTE: It is a SEPARATE file from the bundle rather than an epilogue appended
+// It is a SEPARATE file from the bundle rather than an epilogue appended
 // to it, and the difference matters to the debugger: the bundle stays the file
 // the source map describes, byte for byte, so every breakpoint the session
 // addresses to it lands where the map says. What is launched and what is mapped
 // are two files, which is why the session carries both.
 //
-// NOTE: Written as source text rather than shipped as a file because it has to
+// Written as source text rather than shipped as a file because it has to
 // name the bundle beside it and the ids to run, and a file would have to be
 // found at run time in a package that may be bundled into one.
 
-// NOTE: Rendered by the runner rather than by the reporter this repository
+// Rendered by the runner rather than by the reporter this repository
 // already has: the script runs inside the debuggee, where the only thing it may
 // depend on is the bundle it loads. Everything it prints reaches a reader
 // through the Debug Console.

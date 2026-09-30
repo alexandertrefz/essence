@@ -15,7 +15,7 @@ import {
 
 export type EsbuildResolveArguments = {
 	path: string
-	// NOTE: The directory the importing file sits in, which is what a relative
+	// The directory the importing file sits in, which is what a relative
 	// specifier is resolved against. esbuild hands it over because a plugin may
 	// answer for a module that has no directory of its own.
 	resolveDir: string
@@ -33,7 +33,7 @@ export type EsbuildLoadArguments = {
 export type EsbuildLoadResult = {
 	contents: string
 	loader: "js"
-	// NOTE: Where the answer's own imports resolve from. Every module this
+	// Where the answer's own imports resolve from. Every module this
 	// plugin serves imports `@essence-lang/runtime/<File>` by name, and a module
 	// esbuild was handed text for has no directory to look from unless it is
 	// told one.
@@ -42,7 +42,7 @@ export type EsbuildLoadResult = {
 }
 
 export type EsbuildBuild = {
-	// NOTE: Only what is read: the working directory of the build, which is the
+	// Only what is read: the working directory of the build, which is the
 	// root every Module of it is spelled against.
 	initialOptions: { absWorkingDir?: string }
 	onStart(callback: () => void): void
@@ -61,37 +61,37 @@ export type EsbuildPlugin = {
 	setup(build: EsbuildBuild): void
 }
 
-// NOTE: The namespace the emitted Modules are served in. esbuild has no `\0`
+// The namespace the emitted Modules are served in. esbuild has no `\0`
 // convention — a module that is not a file is one in a namespace of its own,
 // and the path inside it is the `.es` file it was compiled from.
 const RAW_NAMESPACE = "essence-raw"
 
-// NOTE: A namespace of its own for the standard library's prelude, which is the
+// A namespace of its own for the standard library's prelude, which is the
 // one served module that is not a file at all — its path would have to be
 // invented, and one that could ever be mistaken for a `.es` file would serve
 // the wrong text.
 const PRELUDE_NAMESPACE = "essence-prelude"
 
-// NOTE: Everything, because a namespace is already the filter — every path in
+// Everything, because a namespace is already the filter — every path in
 // it is one this plugin put there.
 const ANY = /.*/
 
-// NOTE: `./Math.es?raw`, as a host writes it. esbuild resolves a relative path
+// `./Math.es?raw`, as a host writes it. esbuild resolves a relative path
 // to a file itself, whatever its extension, so a plain `.es` import needs
 // nothing on the way in — but a query is not part of any file name, and one
 // left unclaimed is a path esbuild would look for and not find.
 const RAW_IMPORT = /\.es\?raw$/
 
-// NOTE: What one served Module imports another by, and the prelude beside it.
+// What one served Module imports another by, and the prelude beside it.
 const SERVED_IMPORT = /^essence:/
 
 export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 	return {
 		name: "essence",
-		// NOTE: `setup` runs once per build, which is exactly the scope the
+		// `setup` runs once per build, which is exactly the scope the
 		// compiler's memory of what it has emitted has to have.
 		setup(build) {
-			// NOTE: The root every Module of this build is spelled against.
+			// The root every Module of this build is spelled against.
 			// esbuild resolves its own entry points from here, so it is the one
 			// directory every entry of the build agrees on — which is what
 			// makes a file two of them share one module rather than two.
@@ -99,19 +99,19 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 				build.initialOptions.absWorkingDir ?? process.cwd(),
 			)
 			let compiler = createCompiler(options, root)
-			// NOTE: The files the HOST asked for through `?raw` — see the same
+			// The files the HOST asked for through `?raw` — see the same
 			// set in the Vite plugin. A sibling reached through the same door
 			// was reached by the graph rather than imported by anybody.
 			let rawDoors = new Set<string>()
 
-			// NOTE: A watch context runs `setup` once and every REBUILD through
+			// A watch context runs `setup` once and every REBUILD through
 			// `onStart`, and what the compiler holds is the JavaScript these
 			// sources emitted — which an edit to any of them makes stale.
 			build.onStart(() => {
 				compiler.invalidate()
 			})
 
-			// NOTE: The wrapper's own import of the Module behind it. The entry
+			// The wrapper's own import of the Module behind it. The entry
 			// is already spelled out in the specifier — it was written by
 			// `wrapperFor` — so there is nothing to resolve, only a namespace to
 			// put it in.
@@ -120,7 +120,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 				namespace: RAW_NAMESPACE,
 			}))
 
-			// NOTE: What one served Module imports another by. The specifier is
+			// What one served Module imports another by. The specifier is
 			// spelled against the ROOT, so it resolves to the same path
 			// whichever entry emitted the importer — which is what leaves the
 			// build with one module per file, one prelude, and therefore one
@@ -136,7 +136,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 				}
 			})
 
-			// NOTE: The same door as a host writes it, which lands in the same
+			// The same door as a host writes it, which lands in the same
 			// namespace under the same path — so a build that imports both
 			// `./Math.es` and `./Math.es?raw` holds ONE Module, and the values
 			// that cross between them are the same Module's.
@@ -158,7 +158,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 				async () => ({
 					contents: compiler.prelude(),
 					loader: "js",
-					// NOTE: The root, because the prelude imports the runtime by
+					// The root, because the prelude imports the runtime by
 					// name and is not a file that could answer where from.
 					resolveDir: root,
 					watchFiles: [],
@@ -183,7 +183,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 					return {
 						contents: module.code,
 						loader: "js",
-						// NOTE: The root, for the same reason the prelude names
+						// The root, for the same reason the prelude names
 						// it: `@essence-lang/runtime` is resolved out of the
 						// project doing the BUILD, which is the one directory
 						// every module of it agrees on and the place the host
@@ -212,7 +212,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 						options,
 					),
 					loader: "js",
-					// NOTE: The root, so that the wrapper's
+					// The root, so that the wrapper's
 					// `@essence-lang/client/marshal-runtime` and its runtime
 					// imports resolve out of the project doing the BUILD — the
 					// host has these packages installed there, and a second copy

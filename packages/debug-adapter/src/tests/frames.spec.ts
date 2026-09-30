@@ -5,7 +5,7 @@ import { SourceMapGenerator } from "source-map"
 import { type CdpCallFrame, presentFrames } from "../frames"
 import { BundleMap } from "../maps"
 
-// NOTE: A bundle whose lines 20-24 belong to `/work/App.es` and whose line 40
+// A bundle whose lines 20-24 belong to `/work/App.es` and whose line 40
 // belongs to nothing — the shape a real bundle has after the map was confined
 // to Essence sources.
 function testMap(): BundleMap {
@@ -86,7 +86,7 @@ describe("presentFrames", () => {
 		expect(presented[0]!.source).toBeNull()
 	})
 
-	// NOTE: The match merge — one construct, two frames, and the anonymous
+	// The match merge — one construct, two frames, and the anonymous
 	// one absorbs its caller's name while keeping its own position and its
 	// own call frame, whose scope chain holds the handler's bindings.
 	it("collapses a match's IIFE into its caller", () => {
@@ -101,7 +101,7 @@ describe("presentFrames", () => {
 		expect(presented[0]!.source?.line).toBe(7)
 	})
 
-	// NOTE: A Function value handed to the standard library also arrives
+	// A Function value handed to the standard library also arrives
 	// anonymous — but it sits over glue, not over a user frame, so it is NOT
 	// absorbed; it reads as `match`, the one anonymous thing user code emits
 	// in place.

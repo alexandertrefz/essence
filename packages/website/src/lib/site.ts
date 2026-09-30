@@ -1,4 +1,4 @@
-// NOTE: Everything the site says about itself that is not content. Kept in one
+// Everything the site says about itself that is not content. Kept in one
 // place because a drifted copy is the kind of wrong nobody notices.
 
 import cliPackage from "../../../cli/package.json" with { type: "json" }
@@ -32,7 +32,7 @@ export const VERSION: string = cliPackage.version
 
 export const GITHUB_URL = "https://github.com/alexandertrefz/essence"
 export const GITHUB_ISSUES_URL = `${GITHUB_URL}/issues`
-// NOTE: There is no changelog page and no releases feed yet — the commit log is
+// There is no changelog page and no releases feed yet — the commit log is
 // the honest answer to "what changed".
 export const GITHUB_COMMITS_URL = `${GITHUB_URL}/commits/master`
 export const GITHUB_CONTRIBUTING_URL = `${GITHUB_URL}/blob/master/Readme.md`

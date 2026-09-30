@@ -18,12 +18,12 @@ import { createRecord } from "../Record"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, typeKeySymbol } from "../type"
 
-// NOTE: The payload of the Optional a fallible Rational Method answers with.
+// The payload of the Optional a fallible Rational Method answers with.
 const itemOf = (value: unknown) =>
 	(value as { item: { numerator: bigint; denominator: bigint } }).item
 
 describe("remembered lowest terms", () => {
-	// NOTE: The invariant the whole numeric tower rests on — a Rational HOLDS
+	// The invariant the whole numeric tower rests on — a Rational HOLDS
 	// what it was built with, and reducing is something the read side does.
 	// Remembering the reduced form must not write it back.
 	test("the stored parts stay as they were built", () => {
@@ -32,10 +32,10 @@ describe("remembered lowest terms", () => {
 		expect(unreduced.numerator).toBe(4n)
 		expect(unreduced.denominator).toBe(2n)
 
-		// NOTE: Asking twice, because the first ask is what fills the memory and
+		// Asking twice, because the first ask is what fills the memory and
 		// the second is what would read a written-back value if one had been.
 		//
-		// NOTE: The accessors answer INTEGERS, whose parts are canonicalised
+		// The accessors answer INTEGERS, whose parts are canonicalised
 		// into the hybrid representation — a number for anything a double
 		// carries — while the Rational goes on holding the bigints it was built
 		// with, which is what the assertions either side of these are for.
@@ -73,7 +73,7 @@ describe("remembered lowest terms", () => {
 		}
 	})
 
-	// NOTE: Printing asks for the reduced form too, so it is the other side of
+	// Printing asks for the reduced form too, so it is the other side of
 	// the same memory — and it has to answer alike whether it asks first or
 	// after an accessor already filled it.
 	test("printing answers alike however often it is asked", () => {
@@ -88,7 +88,7 @@ describe("remembered lowest terms", () => {
 		expect(getStringRepresentation(printedFirst)).toBe("2/1")
 		expect(getStringRepresentation(readFirst)).toBe("2/1")
 
-		// NOTE: The two formatters part company on a whole value: the
+		// The two formatters part company on a whole value: the
 		// structural one above says what a Rational IS, while the two a caller
 		// asks for print `2`, which is text `Rational.parse` reads back.
 		expect(toStringAs(printedFirst, fraction).value).toBe("2")
@@ -101,7 +101,7 @@ describe("remembered lowest terms", () => {
 		)
 	})
 
-	// NOTE: The 80-digit cap can cut an expansion before its first significant
+	// The 80-digit cap can cut an expansion before its first significant
 	// digit — every kept digit a zero. The rounded value is the whole part
 	// alone, so it prints as that whole, and never with a minus sign when the
 	// whole is zero: there is no negative zero for `Rational.parse` to read
@@ -124,7 +124,7 @@ describe("remembered lowest terms", () => {
 		)
 	})
 
-	// NOTE: `raise` reads the reduced form and builds a NEW Rational off it, so
+	// `raise` reads the reduced form and builds a NEW Rational off it, so
 	// it is where a shared, mutated parts object would show up as a wrong
 	// answer the second time round.
 	test("raising answers alike however often it is asked", () => {
@@ -146,7 +146,7 @@ describe("remembered lowest terms", () => {
 		expect(rational.denominator).toBe(2n)
 	})
 
-	// NOTE: Equality cross-multiplies the RAW parts and never asks for the
+	// Equality cross-multiplies the RAW parts and never asks for the
 	// reduced form, so a Rational that has been read is equal to exactly what it
 	// was equal to before — including across the two spellings of one value.
 	test("what is remembered is invisible", () => {
@@ -172,14 +172,14 @@ describe("remembered lowest terms", () => {
 	})
 })
 
-// NOTE: `reduced` is typed code that trusts the Enricher, and nothing in the
+// `reduced` is typed code that trusts the Enricher, and nothing in the
 // language can hand it a pair that is not two bigints. A hole in the Enricher
 // once did, and what came of it was not a wrong answer anybody could read: the
 // Euclid loop compared a `NaN` remainder against `0n` forever, and the run
 // stopped responding. The loop asks `b > 0n` for that reason, and this is what
 // says so.
 describe("a pair that is no pair of bigints", () => {
-	// NOTE: Spawned rather than called here, and on a clock. What this is about
+	// Spawned rather than called here, and on a clock. What this is about
 	// is a call that RETURNS — a synchronous loop on the very thread a spec runs
 	// on would take the whole suite down with it instead of failing, and no
 	// timeout a test runner offers can interrupt one that never yields. The
@@ -203,14 +203,14 @@ describe("a pair that is no pair of bigints", () => {
 			{ deadline: 20_000 },
 		)
 
-		// NOTE: The deadline rejects a spin; this catches a child killed by some
+		// The deadline rejects a spin; this catches a child killed by some
 		// other signal, where `code` is null.
 		expect(result.signal).toBeNull()
 		expect(result.stdout).toContain("answered")
 		expect(result.code).toBe(0)
 	}, 30_000)
 
-	// NOTE: And the guard is the same question of the bigints the loop is
+	// And the guard is the same question of the bigints the loop is
 	// written for, which is what lets it be free: `b` is an absolute value and
 	// a remainder of one, so `> 0n` and `!== 0n` part company nowhere a
 	// Rational goes.

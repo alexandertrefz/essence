@@ -49,7 +49,7 @@ describe("printType", () => {
 			expect(printType(done)).toBe("Step<Integer, Result>#Done")
 		})
 
-		// NOTE: A DECLARED Case abstracts over its Parameters (no `typeArguments`
+		// A DECLARED Case abstracts over its Parameters (no `typeArguments`
 		// yet); a fully unbound instantiation carries only same-named GenericUses.
 		// Neither adds a `<…>` that would just echo the header.
 		it("should print a declared Case tersely", () => {
@@ -104,7 +104,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: A Case declared in a Module is identified by the Module's canonical
+	// A Case declared in a Module is identified by the Module's canonical
 	// path, and a Hover is the last place that path belongs — this is the funnel
 	// every Hover, Completion detail and Document Symbol reads a Case's head
 	// through, so the Choice is named as the declaration wrote it.
@@ -137,7 +137,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: An overloaded free Function such as `loop` resolves at a call site
+	// An overloaded free Function such as `loop` resolves at a call site
 	// to an `OverloadedStaticMethod` callee. Hover and Signature Help both
 	// render it through these, so they must spell every Overload without
 	// collapsing or crashing. Implementation mode cannot declare one, so the
@@ -187,7 +187,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: A checked refinement is named, never spelled out. The predicate is
+	// A checked refinement is named, never spelled out. The predicate is
 	// what the DECLARATION says — a Hover over a value is about the Type it has,
 	// and `Integer where @::isNot(0)` would answer a question nobody asked in
 	// every Signature the alias appears in.
@@ -235,7 +235,7 @@ describe("printType", () => {
 			).toBe("divide(by: NonZeroInteger) -> NonZeroInteger")
 		})
 
-		// NOTE: An APPLIED generic refinement prints as applied — a Hover reading
+		// An APPLIED generic refinement prints as applied — a Hover reading
 		// `NonEmptyList` where the source says `NonEmptyList<String>` names half a Type,
 		// and the applied spelling is carried for that reason alone. An
 		// instantiation whose every Argument is still a Type Parameter stays terse,
@@ -284,7 +284,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: The `?` marking a Parameter a call may leave out is written where a
+	// The `?` marking a Parameter a call may leave out is written where a
 	// signature is READ and never where a Type could be written back into
 	// source. `?` is an ordinary letter to the Lexer, so `(from?: Integer, to:
 	// Integer) -> Integer` written back declares a Parameter labelled `from?` —
@@ -329,7 +329,7 @@ describe("printType", () => {
 			).toBe("(from: Integer, to: Integer) -> Integer")
 		})
 
-		// NOTE: `?` says the whole Argument may be left out, which a PARTIAL
+		// `?` says the whole Argument may be left out, which a PARTIAL
 		// Record default does not grant — the Argument is still written, and
 		// which of its MEMBERS may be left out is Hover's prose to give, not a
 		// mark in a one-line signature.
@@ -356,7 +356,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: The one Hover-facing thing a second Type Parameter changes: both
+	// The one Hover-facing thing a second Type Parameter changes: both
 	// slots are printed, in declaration order, and a bare Dictionary prints as
 	// its name alone the way a bare List does.
 	describe("Dictionaries", () => {
@@ -396,7 +396,7 @@ describe("printType", () => {
 			).toBe("Dictionary")
 		})
 
-		// NOTE: A slot still holding a Type Parameter prints under the name the
+		// A slot still holding a Type Parameter prints under the name the
 		// source wrote, which is what a Hover inside a generic Namespace shows.
 		it("should print an open slot under its Parameter's name", () => {
 			expect(
@@ -409,7 +409,7 @@ describe("printType", () => {
 		})
 	})
 
-	// NOTE: A Record Alias prints as the word the Declaration wrote, on the rule
+	// A Record Alias prints as the word the Declaration wrote, on the rule
 	// a named Union prints by — and the shape stays reachable, for the one
 	// Hover where the Alias itself is the subject.
 	describe("a named Record", () => {
@@ -451,7 +451,7 @@ describe("printType", () => {
 			expect(printType({ type: "Record", members: {} })).toBe("{}")
 		})
 
-		// NOTE: The descriptive form, and one level only: a member that is an
+		// The descriptive form, and one level only: a member that is an
 		// Alias of its own stays named, because expanding it would answer a
 		// Declaration the reader is not looking at.
 		it("should spell its members out where it is the subject", () => {

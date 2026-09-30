@@ -11,7 +11,7 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { typedProgramBodies } from "./sections"
 
-// NOTE: Two completion contexts need to know what is *expected* at the
+// Two completion contexts need to know what is *expected* at the
 // cursor rather than what is in Scope:
 //
 // - Inside a Record literal, the members of the Record Type it is being
@@ -31,12 +31,12 @@ export type ArgumentContext =
 			kind: "record"
 			memberTypes: Record<string, common.Type>
 			presentMembers: Array<string>
-			// NOTE: The members the Parameter this Record answers fills in from
+			// The members the Parameter this Record answers fills in from
 			// its own default, so Completion can say which ones stopping now
 			// would leave to it. Empty everywhere else — a Record Literal
 			// written outside a call has nobody filling anything in.
 			omittableMembers: ReadonlyArray<string>
-			// NOTE: Whether a bare member name is a whole member in these
+			// Whether a bare member name is a whole member in these
 			// braces. True in a Record Literal, where `{ x }` is `{ x = x }`,
 			// and false in an update's key list, which is the one member list
 			// that is not a Literal — a bare name after `with` is already the
@@ -53,7 +53,7 @@ type State = {
 	cursor: common.Cursor
 	best: ArgumentContext | null
 	bestPosition: common.Position | null
-	// NOTE: The document's own lines. An update's key list and a braced Literal
+	// The document's own lines. An update's key list and a braced Literal
 	// on its right-hand side are the SAME Node with the same shape — the
 	// Compiler reads `{ base with a = 1 }` and `{ base with { a = 1 } }` into
 	// one `Combination` over one `RecordValue` — so the only thing that tells
@@ -121,7 +121,7 @@ function visitNode(
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// NOTE: An annotated declaration is what tells a Record literal
+			// An annotated declaration is what tells a Record literal
 			// which Record Type it is written for.
 			visitNode(node.value, node.declaredType ?? node.type, state)
 			return
@@ -182,7 +182,7 @@ function visitNode(
 		case "ReturnStatement":
 			visitNode(node.expression, expected, state)
 			return
-		// NOTE: An assertion holds its Expressions directly — there is no body
+		// An assertion holds its Expressions directly — there is no body
 		// to descend into — so without this an Argument being written inside a
 		// test body has no context at all. See `assertionChildren.ts`.
 		case "ExpectStatement":
@@ -223,7 +223,7 @@ function visitNode(
 			return
 		}
 		case "MethodInvocation":
-			// NOTE: No Argument labels for Methods — the receiver occupies the
+			// No Argument labels for Methods — the receiver occupies the
 			// first Parameter slot and overload resolution is often still
 			// ambiguous while typing, so there is no single signature to read
 			// labels off. Record literals passed as Arguments still work.
@@ -233,7 +233,7 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, null, state)
 			return
-		// NOTE: The operand is a Future or a Started, and no Record shape is
+		// The operand is a Future or a Started, and no Record shape is
 		// expected of one — what the position around the Keyword asks for says
 		// nothing about what stands under it.
 		case "Start":
@@ -246,7 +246,7 @@ function visitNode(
 		case "Combination": {
 			visitNode(node.lhs, expected, state)
 
-			// NOTE: What an update's right-hand side is held to is the LEFT
+			// What an update's right-hand side is held to is the LEFT
 			// side's Type, not the Type the update as a whole answers with:
 			// every member it names has to be one the left side already has,
 			// and `{ base with … }` written into an unannotated Constant has
@@ -272,7 +272,7 @@ function visitNode(
 			visitNode(node.value, null, state)
 
 			for (let handler of node.handlers) {
-				// NOTE: A Guard is a Boolean and a Matcher's literals are plain
+				// A Guard is a Boolean and a Matcher's literals are plain
 				// values — neither expects a Record shape of its own, so what
 				// the Match is expected to produce says nothing about them.
 				for (let expression of typedHandlerExpressions(handler)) {
@@ -283,7 +283,7 @@ function visitNode(
 			}
 
 			return
-		// NOTE: Every arm's value answers the whole `define`, so each stands
+		// Every arm's value answers the whole `define`, so each stands
 		// where the `define` stands and is held to what that position expects —
 		// which is what completes a member name inside `as { … } if …`. A
 		// Condition is a Boolean and expects no Record shape of its own, as a
@@ -331,7 +331,7 @@ function visitNode(
 			return
 		case "CaseValue":
 			if (node.value !== null) {
-				// NOTE: The payload's expected shape is the Case's Record —
+				// The payload's expected shape is the Case's Record —
 				// that is what makes labels complete inside the payload.
 				visitNode(
 					node.value,
@@ -344,7 +344,7 @@ function visitNode(
 
 			return
 		case "ChoiceDeclarationStatement":
-			// NOTE: A payload default fills the payload in, so the payload's
+			// A payload default fills the payload in, so the payload's
 			// own Record is what a member name inside it is expected against —
 			// the same answer a construction's payload gets just above.
 			for (let choiceCase of node.cases) {
@@ -369,7 +369,7 @@ function visitNode(
 	}
 }
 
-// NOTE: One member list, whether it was written as a Record Literal or as an
+// One member list, whether it was written as a Record Literal or as an
 // update's key list. `shorthand` is the one thing the two do not share, and it
 // is decided by the caller — a Literal reaches here from anywhere and always
 // takes it; a key list reaches here from a `Combination` and never does.
@@ -399,7 +399,7 @@ function visitRecordValue(
 	}
 }
 
-// NOTE: Whether a member list is its own Record Literal — which is what makes
+// Whether a member list is its own Record Literal — which is what makes
 // it take the shorthand — read the only way it can be: off the character its
 // Position opens on. A Literal's opens on its own `{`; an update's key list
 // opens on its first key, because it has no braces of its own. A TYPED Literal
@@ -421,7 +421,7 @@ function opensOnBrace(
 	return line?.[node.position.start.column - 1] === "{"
 }
 
-// NOTE: A call written inside a Parameter's `= expression` default offers the
+// A call written inside a Parameter's `= expression` default offers the
 // same labels and the same Record members a call in a body does — the walk below
 // reaches bodies, and a default is not one.
 function visitDefaults(
@@ -433,7 +433,7 @@ function visitDefaults(
 	}
 }
 
-// NOTE: An Argument is paired with a Parameter by its LABEL once anything may be
+// An Argument is paired with a Parameter by its LABEL once anything may be
 // left out — `f(to 3)` writes one Argument and it belongs to the SECOND
 // Parameter — so the Types a Record literal is read against are handed over
 // through that pairing rather than by index. `pairArguments` is the Compiler's
@@ -457,7 +457,7 @@ function visitArguments(
 				? parameterType
 				: null
 
-		// NOTE: The one place a Record Literal knows which members somebody
+		// The one place a Record Literal knows which members somebody
 		// else would fill in — the Argument's own Parameter. Nothing nested
 		// inside it does: a member's Type is a Type, and a default belongs to a
 		// Parameter.
@@ -477,7 +477,7 @@ function visitArguments(
 	})
 }
 
-// NOTE: Exported because the dotted-KEY probe asks the same question — which
+// Exported because the dotted-KEY probe asks the same question — which
 // Parameter an Argument belongs to — before it can say which Record a path key
 // inside that Argument reaches into.
 export function pairedParameters(
@@ -499,7 +499,7 @@ export function pairedParameters(
 		})),
 	)
 
-	// NOTE: Inverted by the Compiler's own helper, which is the same inversion
+	// Inverted by the Compiler's own helper, which is the same inversion
 	// `matchArguments` performs to name the Parameter a mismatching Argument was
 	// held to — one walk, so the two can not disagree about which Parameter an
 	// Argument answers.

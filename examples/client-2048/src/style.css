@@ -88,7 +88,7 @@ button:disabled {
 	cursor: default;
 }
 
-/* NOTE: A fixed 4×4 grid — both axes in equal fractions, so every square is
+/* A fixed 4×4 grid — both axes in equal fractions, so every square is
    the same size whether it holds a tile, a four-digit tile, or nothing. */
 .board {
 	display: grid;
@@ -117,7 +117,7 @@ button:disabled {
 	transition: background 120ms ease;
 }
 
-/* NOTE: A tile that slid starts where it was — `--dx`/`--dy` squares away,
+/* A tile that slid starts where it was — `--dx`/`--dy` squares away,
    a square being its own width plus the gap — and travels to where it is
    drawn. What happens once it lands (a merge swelling, a new tile popping in)
    waits `--after-slide` for it. */

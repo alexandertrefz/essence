@@ -4,11 +4,11 @@ import { conformanceParameterName } from "./names"
 import { patternBindings } from "./patterns"
 import { resolveOverloadedMethodName, typeMentionsGeneric } from "./types"
 
-// NOTE: How much of `Self` a value may hold: none of it, exactly `Self`, or
+// How much of `Self` a value may hold: none of it, exactly `Self`, or
 // `Self` somewhere inside it.
 type Reach = "none" | "self" | "holds"
 
-// NOTE: The entries of its Protocol's witness a provided body reads: the Methods
+// The entries of its Protocol's witness a provided body reads: the Methods
 // it names after `::` or on `Self`, or every entry where `@` or a value of `Self`
 // may reach anything but a call of one of those, which hands the witness on.
 export function providedBodyReads(
@@ -72,7 +72,7 @@ export function providedBodyReads(
 		}
 	}
 
-	// NOTE: A call of one of the Protocol's own Methods on a value that is
+	// A call of one of the Protocol's own Methods on a value that is
 	// exactly `Self` dispatches through the witness, and hands it to nobody.
 	let selfCall = (
 		receiver: Reach,
@@ -102,7 +102,7 @@ export function providedBodyReads(
 		)
 
 		for (let [index, argument] of written.entries()) {
-			// NOTE: A requirement carries no default, so an Overload of the
+			// A requirement carries no default, so an Overload of the
 			// written arity pairs its Parameters with the Arguments by position.
 			let expected = overloads.flatMap((parameters) =>
 				parameters.length === written.length
@@ -124,7 +124,7 @@ export function providedBodyReads(
 			.reduce(join)
 	}
 
-	// NOTE: Anything else that takes a value of `Self`, or stands where one is
+	// Anything else that takes a value of `Self`, or stands where one is
 	// expected and may work its Type Parameters out from that, may be handed
 	// the witness.
 	let otherCall = (
@@ -144,7 +144,7 @@ export function providedBodyReads(
 		return "none"
 	}
 
-	// NOTE: A Function literal takes each Type it leaves out from the Function
+	// A Function literal takes each Type it leaves out from the Function
 	// Type it is handed as, so a Parameter at a requirement's `Self` is one.
 	// Handed as nothing known, a Parameter may hold `Self` where it is wanted.
 	let reachOfLiteral = (
@@ -354,7 +354,7 @@ export function providedBodyReads(
 		}
 	}
 
-	// NOTE: What the `<-` of a body answers with, joined.
+	// What the `<-` of a body answers with, joined.
 	let reachOfBody = (
 		statements: Array<parser.ImplementationNode>,
 		wanted: boolean,
@@ -418,7 +418,7 @@ export function providedBodyReads(
 		return answers.length === 0 ? "none" : answers.reduce(join)
 	}
 
-	// NOTE: `@` or a name holding `Self` anywhere inside a declaration or an
+	// `@` or a name holding `Self` anywhere inside a declaration or an
 	// assertion, which are not read closely.
 	let reachesAnything = (node: parser.ImplementationNode): boolean => {
 		let found = false
@@ -437,7 +437,7 @@ export function providedBodyReads(
 		return found
 	}
 
-	// NOTE: A name may come to hold `Self` after the point where it is first
+	// A name may come to hold `Self` after the point where it is first
 	// read, so the body is read again until no name holds more.
 	let settled = ""
 
@@ -465,7 +465,7 @@ export function providedBodyReads(
 	)
 }
 
-// NOTE: Whether a body reads every entry of its witness, which is what
+// Whether a body reads every entry of its witness, which is what
 // `providedBodyReads` answers wherever it loses sight of `Self`.
 export function readsEveryEntry(
 	reads: Array<string>,
@@ -479,7 +479,7 @@ export function readsEveryEntry(
 	)
 }
 
-// NOTE: The Methods of a Protocol a body reads an entry of.
+// The Methods of a Protocol a body reads an entry of.
 export function methodsRead(
 	reads: Array<string>,
 	methods: Record<string, common.MethodType>,
@@ -493,7 +493,7 @@ export function methodsRead(
 	)
 }
 
-// NOTE: The entries a typed provided body reads: the Methods it calls through
+// The entries a typed provided body reads: the Methods it calls through
 // its witness, those of a Protocol it hands the witness on as, or every entry
 // where the witness is named anywhere this does not know.
 export function typedBodyReads(
@@ -551,7 +551,7 @@ export function typedBodyReads(
 
 		let record = value as Record<string, unknown>
 
-		// NOTE: A Type names no witness.
+		// A Type names no witness.
 		if (typeof record.type === "string" && record.nodeType === undefined) {
 			return
 		}
@@ -629,7 +629,7 @@ export function typedBodyReads(
 
 const NOTHING_SKIPPED: ReadonlySet<string> = new Set()
 
-// NOTE: Whether a Conformance's source is the witness itself, handed on as the
+// Whether a Conformance's source is the witness itself, handed on as the
 // witness for the Protocol that Conformance names.
 function handsOn(source: unknown, witness: string): boolean {
 	let parameter = source as common.ConformanceSource | null | undefined
@@ -646,7 +646,7 @@ function isOverloaded(
 	)
 }
 
-// NOTE: The witness entries one Method is read under: one per Overload.
+// The witness entries one Method is read under: one per Overload.
 function witnessEntries(
 	name: string,
 	method: common.MethodType,
@@ -682,7 +682,7 @@ function join(one: Reach, other: Reach): Reach {
 	return one === other ? one : "holds"
 }
 
-// NOTE: A value built from others holds `Self` where any of them does.
+// A value built from others holds `Self` where any of them does.
 function holding(parts: Array<Reach>): Reach {
 	return parts.some((reach) => reach !== "none") ? "holds" : "none"
 }
@@ -699,7 +699,7 @@ function namesSelf(expression: parser.ExpressionNode): boolean {
 	return expression.nodeType === "Identifier" && expression.content === "Self"
 }
 
-// NOTE: Every Node under a value, in no particular order.
+// Every Node under a value, in no particular order.
 function eachRecord(
 	value: unknown,
 	visit: (record: { nodeType: string }) => void,

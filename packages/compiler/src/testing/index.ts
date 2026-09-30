@@ -16,14 +16,14 @@ import { DEFAULT_CASES } from "@essence-lang/runtime/Testing"
 import { primary, secondary } from "../diagnostics/index"
 import { printableText } from "../helpers/terminalText"
 
-// NOTE: What a test RUN is, read back out of the event stream, and the
+// What a test RUN is, read back out of the event stream, and the
 // Diagnostics a run produces. It lives in the Compiler rather than in the
 // command line because two things consume it — `essence test`'s reporter and
 // the Language Server's live session — and a failed assertion has to be the
 // same Diagnostic in the terminal and in the Problems panel, with the same
 // labels at the same spans.
 //
-// NOTE: Everything here reads EVENTS and nothing else. It never touches a value
+// Everything here reads EVENTS and nothing else. It never touches a value
 // a Program built: a bundle inlines its own runtime, and a value carries a
 // hidden Type key that is a Symbol of the instance that built it, so anything
 // asked from out here would read `undefined` off it. Every event that carries a
@@ -41,49 +41,49 @@ export type TestRecord = {
 	name: string
 	module: string | null
 	suitePath: Array<string>
-	// NOTE: Which row of a table test this is, counting from zero, and null for
+	// Which row of a table test this is, counting from zero, and null for
 	// a test that is not one. What it labels is the row a name did not: a
 	// template with a hole in it renders differently per row and says which one
 	// by itself, and one without a hole renders the same N times.
 	row: number | null
 	state: TestState
-	// NOTE: Why it did not run — a skip's own reason, or the word for how it
+	// Why it did not run — a skip's own reason, or the word for how it
 	// was deselected. Null for a test that ran.
 	reason: string | null
 	duration: number
 	expectations: number
 	failures: Array<FailureEvent>
-	// NOTE: A test body that threw, which is a Compiler or a runtime bug rather
+	// A test body that threw, which is a Compiler or a runtime bug rather
 	// than a failed assertion.
 	error: string | null
 	output: Array<{ stream: OutputStream; text: string }>
-	// NOTE: What the test's `§?` value comments answered, in the order they
+	// What the test's `§?` value comments answered, in the order they
 	// were written. Collected rather than printed: a value comment is a question
 	// asked of an Editor, which draws it beside the line — the terminal report
 	// says what held, and a reader looking at a terminal is looking at the
 	// source anyway.
 	probes: Array<ProbedValue>
-	// NOTE: What the test's `matches snapshot` assertions recorded — a new one
+	// What the test's `matches snapshot` assertions recorded — a new one
 	// to be written, a stored one that still matches, or the difference that
 	// failed. A reporter shows the counts, a rewrite acts on them, and an
 	// Editor offers "Accept snapshot" where one is pending.
 	snapshots: Array<SnapshotRecord>
-	// NOTE: What a property test's run of cases did — how many held, the seed
+	// What a property test's run of cases did — how many held, the seed
 	// they were drawn from, and the smallest failing value the shrink reached.
 	// Null for every test that is not a property test.
 	property: PropertyRecord | null
-	// NOTE: What a benchmark measured, and what it was held to. Null for every
+	// What a benchmark measured, and what it was held to. Null for every
 	// test that is not one — and for a benchmark whose body did not hold, which
 	// is reported as the failure it is and never timed.
 	benchmark: BenchmarkRecord | null
 }
 
-// NOTE: One property test's run of cases, as the report reads it. It is written
+// One property test's run of cases, as the report reads it. It is written
 // whether the property held or not: "a hundred cases held" is an answer, and
 // the seed is what makes today's run repeatable tomorrow.
 export type PropertyRecord = {
 	cases: number
-	// NOTE: How many cases the run was TOLD to run. A replay has to say it back:
+	// How many cases the run was TOLD to run. A replay has to say it back:
 	// the size a case is drawn at grows with the case number over the whole run,
 	// so a hundred cases and four hundred draw two different sequences from one
 	// seed.
@@ -91,7 +91,7 @@ export type PropertyRecord = {
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
-	// NOTE: What the test's failing-example corpus did — the entry it is stored
+	// What the test's failing-example corpus did — the entry it is stored
 	// under, how many stored values were re-run before anything was drawn, which
 	// of them no longer read back, whether the failure came from one of them,
 	// and the shrunk value written down ready to store. A reader is told the
@@ -103,7 +103,7 @@ export type PropertyRecord = {
 	encoded: Array<StoredValue> | null
 }
 
-// NOTE: One benchmark as the run reported it — what it measured, what it was
+// One benchmark as the run reported it — what it measured, what it was
 // measured out of, and what it was held to. `key` is the entry of `module`'s
 // own `__benchmarks__` companion, numbered by the row that recorded it where
 // the benchmark takes rows.
@@ -119,14 +119,14 @@ export type BenchmarkRecord = {
 	status: BenchmarkStatus
 }
 
-// NOTE: Every measurement a run took, in the order the tests ran. The command
+// Every measurement a run took, in the order the tests ran. The command
 // line writes the new baselines down out of these; the report reads the same
 // events, so what one of them writes is what the other says was written.
 export function collectBenchmarks(
 	events: Array<TestEvent>,
 ): Array<BenchmarkRecord> {
 	let benchmarks: Array<BenchmarkRecord> = []
-	// NOTE: A measurement whose test then FAILED is not a baseline — the run it
+	// A measurement whose test then FAILED is not a baseline — the run it
 	// reports on ended wrong, and a number recorded off it would be exactly the
 	// "number about nothing" the driver's own guard exists to refuse. The
 	// measurement is taken before the reported run, so the failure is only
@@ -148,7 +148,7 @@ export function collectBenchmarks(
 	return benchmarks
 }
 
-// NOTE: The record IS the event's fields — spelled once, here, so the fold the
+// The record IS the event's fields — spelled once, here, so the fold the
 // report reads and the collection the baseline writer reads can never carry
 // two different ideas of what a measurement said.
 function benchmarkRecordOf(
@@ -167,7 +167,7 @@ function benchmarkRecordOf(
 	}
 }
 
-// NOTE: One `matches snapshot` as the run reported it. `name` is null for an
+// One `matches snapshot` as the run reported it. `name` is null for an
 // inline snapshot, whose `span` is the slot of the source a recorded value
 // stands in — that is what a rewrite replaces. A named one belongs to
 // `module`'s own `__snapshots__` companion.
@@ -181,7 +181,7 @@ export type SnapshotRecord = {
 	recorded: string | null
 }
 
-// NOTE: Every snapshot a run recorded, in the order the tests ran. The command
+// Every snapshot a run recorded, in the order the tests ran. The command
 // line writes the new ones down and the Language Server offers them; both read
 // the same events, so what one of them writes is what the other would have.
 export function collectSnapshots(
@@ -219,7 +219,7 @@ export type TestRun = {
 	counts: TestCounts
 	duration: number
 	focused: boolean
-	// NOTE: How many ENTRIES of the run were replayed out of a result cache
+	// How many ENTRIES of the run were replayed out of a result cache
 	// rather than run. It is a fact about the stream rather than about a test —
 	// every test in a replayed entry reads exactly as it did when it ran — so it
 	// is counted here and reported beside the tally rather than against any
@@ -241,7 +241,7 @@ export const emptyRun: TestRun = {
 	cached: 0,
 }
 
-// NOTE: The event stream folded back into one record per test, in the order the
+// The event stream folded back into one record per test, in the order the
 // tests started. `run-start` says nothing a reader needs; the counts are
 // recomputed here rather than taken off `run-end`, because a run of several
 // bundles has several of those and only the reporter sees the whole of it.
@@ -390,7 +390,7 @@ export function collectTestRun(events: Array<TestEvent>): TestRun {
 
 				break
 			}
-			// NOTE: Counted rather than skipped. The events after it are an
+			// Counted rather than skipped. The events after it are an
 			// entry's own, replayed verbatim, so every record they fold into is
 			// the record that entry produced — what this adds to the fold is only
 			// that the run did not have to produce it again.
@@ -446,7 +446,7 @@ function samePosition(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// NOTE: The difference between what a comparison held and what it was compared
+// The difference between what a comparison held and what it was compared
 // with, as one multi-line note — Ariadne indents a note's continuation lines
 // under its prefix, so the whole difference stays one block rather than
 // becoming one `Note N:` per line.
@@ -477,7 +477,7 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 
 	let notes: Array<string> = []
 
-	// NOTE: A snapshot's two sides are TEXT, and often several lines of it —
+	// A snapshot's two sides are TEXT, and often several lines of it —
 	// what says how they differ is the difference itself, whatever its length,
 	// and never the two of them written out side by side.
 	if (comparison.kind === "snapshot") {
@@ -495,7 +495,7 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 		)
 	}
 
-	// NOTE: A difference over two scalars is the two of them, which the note
+	// A difference over two scalars is the two of them, which the note
 	// above has already said in one line. Only a walk INTO a Record or a List
 	// says something a reader could not have worked out.
 	if (comparison.diff.length > 2) {
@@ -505,7 +505,7 @@ function comparisonNotes(failure: FailureEvent): Array<string> {
 	return notes
 }
 
-// NOTE: What to DO about it, which is a help rather than a note — a snapshot
+// What to DO about it, which is a help rather than a note — a snapshot
 // that differs is either a bug or a change somebody meant, and the second is
 // one command away.
 function comparisonHelps(failure: FailureEvent): Array<string> {
@@ -514,7 +514,7 @@ function comparisonHelps(failure: FailureEvent): Array<string> {
 		: []
 }
 
-// NOTE: What to call a row that its own name did not name. A table test's suite
+// What to call a row that its own name did not name. A table test's suite
 // path ends in the template its rows share, so a name with no hole in it
 // renders as that template for every row: N lines reading the same thing, under
 // a heading reading it once more. Where the rendering DOES say which row it is
@@ -527,7 +527,7 @@ export function rowLabel(
 		: `row ${test.row + 1}`
 }
 
-// NOTE: What a test is CALLED wherever a person reads it — the suite steps and
+// What a test is CALLED wherever a person reads it — the suite steps and
 // the name, with every character that would ACT on the terminal spelled as the
 // escape a Literal writes it with. A name is the reader's own text and is
 // printed rather than quoted, so nothing else about it is touched; what is
@@ -538,7 +538,7 @@ export function testDisplayPath(steps: Array<string>): string {
 	return steps.map(printableText).join(" › ")
 }
 
-// NOTE: One failed assertion as an ordinary Essence Diagnostic, so that a test
+// One failed assertion as an ordinary Essence Diagnostic, so that a test
 // failure is rendered by the very pipeline every other Diagnostic is — same
 // excerpt, same colours, same margin, in the terminal and in an editor alike.
 // The asserted Expression is the primary Label; every sub-expression the
@@ -557,7 +557,7 @@ export function testFailureDiagnostic(
 	]
 
 	for (let value of failure.values) {
-		// NOTE: A value whose rendering IS its own source explains nothing — a
+		// A value whose rendering IS its own source explains nothing — a
 		// literal traced as an operand of a comparison is what produces one —
 		// and neither does the assertion's own answer, which a failed assertion
 		// already says. Both would be a label the reader has to look past.
@@ -572,7 +572,7 @@ export function testFailureDiagnostic(
 		labels.push(secondary(value.span, value.value))
 	}
 
-	// NOTE: The path without the step the name repeats, which is the template a
+	// The path without the step the name repeats, which is the template a
 	// table test's rows share — said once, with the row beside it.
 	let row = rowLabel(test)
 	let path = row === null ? test.suitePath : test.suitePath.slice(0, -1)
@@ -601,7 +601,7 @@ export function testFailureDiagnostic(
 	}
 }
 
-// NOTE: A measurement, in the largest unit it still reads as a number in.
+// A measurement, in the largest unit it still reads as a number in.
 // Nanoseconds are whole — a fraction of one says nothing anybody can act on —
 // and everything above them keeps two decimals, so two runs of one benchmark
 // are told apart by the digits rather than by the unit.
@@ -621,7 +621,7 @@ export function formatNanoseconds(nanoseconds: number): string {
 	return `${(nanoseconds / 1_000_000_000).toFixed(2)} s`
 }
 
-// NOTE: How far a measurement moved, as the multiple a reader compares against
+// How far a measurement moved, as the multiple a reader compares against
 // the band rather than as two numbers they have to divide. Null where there was
 // nothing to move from.
 function benchmarkChange(benchmark: BenchmarkRecord): string | null {
@@ -640,7 +640,7 @@ function benchmarkChange(benchmark: BenchmarkRecord): string | null {
 			)}, was ${formatNanoseconds(benchmark.baseline)})`
 }
 
-// NOTE: What a benchmark adds to a failure: the measurement, and how far it is
+// What a benchmark adds to a failure: the measurement, and how far it is
 // from what was recorded. It reads beside a property test's counterexample and
 // for the same reason — what the assertions below say is about a run whose cost
 // the reader has just been told.
@@ -656,7 +656,7 @@ export function benchmarkNotes(test: TestRecord): Array<string> {
 	return change === null ? [] : [change]
 }
 
-// NOTE: The one thing to DO about a measurement that moved — a benchmark that
+// The one thing to DO about a measurement that moved — a benchmark that
 // got slower is either a regression or a change somebody meant, and the second
 // is one command away. The same sentence a snapshot that differs is answered
 // with, because it is the same question.
@@ -666,12 +666,12 @@ export function benchmarkHelps(test: TestRecord): Array<string> {
 		: []
 }
 
-// NOTE: What a property test's failure adds to the report: how many cases ran
+// What a property test's failure adds to the report: how many cases ran
 // before one failed, and the smallest values the shrink could reach. It reads
 // above the comparison, because what the assertion says is about THESE values
 // and a reader has to be told which ones first.
 //
-// NOTE: A failure a STORED counterexample found ran no case at all, so "after N
+// A failure a STORED counterexample found ran no case at all, so "after N
 // cases" would be a sentence about nothing. What a reader needs to be told is
 // that the property has broken on this value before — which is different news
 // from a search having just turned one up.
@@ -696,7 +696,7 @@ export function propertyNotes(test: TestRecord): Array<string> {
 	]
 }
 
-// NOTE: The command that draws exactly these values again. The seed pins the
+// The command that draws exactly these values again. The seed pins the
 // whole run and the filter narrows it to this test, which still draws what this
 // test drew — every property test folds its own identity into the run's seed.
 export function propertyHelps(test: TestRecord): Array<string> {
@@ -706,7 +706,7 @@ export function propertyHelps(test: TestRecord): Array<string> {
 		return []
 	}
 
-	// NOTE: `--cases` only where it differs from the default, because a command
+	// `--cases` only where it differs from the default, because a command
 	// naming a default is a command a reader has to check.
 	let cases =
 		property.requested === DEFAULT_CASES
@@ -722,7 +722,7 @@ function countOf(count: number, noun: string): string {
 	return `${count} ${noun}${count === 1 ? "" : "s"}`
 }
 
-// NOTE: A test the run was narrowed to, and where its `test` keyword stands.
+// A test the run was narrowed to, and where its `test` keyword stands.
 // The Position is the keyword rather than the `focused` Modifier because the
 // manifest carries the keyword — and because what has to go is a property of
 // the test, which is what a reader looks at to decide whether it still needs
@@ -734,7 +734,7 @@ export type FocusedTest = {
 	keywordPosition: common.Position
 }
 
-// NOTE: A run that silenced everything else is reported as a Diagnostic like
+// A run that silenced everything else is reported as a Diagnostic like
 // any other refusal, rather than as a line saying so: what a person needs is
 // not the news that a focus was left behind, it is WHICH ones — and that is an
 // excerpt per file with a Label per test, which the Diagnostic pipeline already
@@ -766,7 +766,7 @@ export function focusedTestsDiagnostic(
 			"A focused test silences every other test of the run, so a run " +
 				"nobody narrowed has not answered the question it was asked.",
 		],
-		// NOTE: Single quotes, as every other Help here spells a keyword and a
+		// Single quotes, as every other Help here spells a keyword and a
 		// flag. Backticks are Markdown, and a Diagnostic is read in a terminal.
 		helps: [
 			"Remove 'focused' before this lands, or narrow the run with " +
@@ -775,7 +775,7 @@ export function focusedTestsDiagnostic(
 	}
 }
 
-// NOTE: The coverage-attribution join lives next door so the Language Server
+// The coverage-attribution join lives next door so the Language Server
 // can reach it without a dependency edge to the CLI, and is re-exported here so
 // everything about a test run is still reached through one name.
 export {
@@ -783,7 +783,7 @@ export {
 	coveringPoints,
 	type ModuleAttribution,
 } from "./attribution"
-// NOTE: A benchmark's baselines are read and written next door, exactly as
+// A benchmark's baselines are read and written next door, exactly as
 // snapshots are, and re-exported here for the same reason.
 export {
 	BENCHMARK_DIRECTORY,
@@ -796,7 +796,7 @@ export {
 	readBenchmarks,
 	writeBenchmarks,
 } from "./benchmarks"
-// NOTE: Coverage is folded, weighed and written out next door, and re-exported
+// Coverage is folded, weighed and written out next door, and re-exported
 // here so that everything about a test run is still reached through one name.
 export {
 	caseNameOf,
@@ -858,7 +858,7 @@ export {
 	type SourceRewrite,
 	writeSnapshots,
 } from "./snapshots"
-// NOTE: Staging is shared by the command line and the Language Server, and
+// Staging is shared by the command line and the Language Server, and
 // lives next door so that neither has to import the other to reach it.
 export {
 	removeStagingDirectory,

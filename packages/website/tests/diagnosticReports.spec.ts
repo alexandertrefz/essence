@@ -6,7 +6,7 @@ import { analyseSource } from "@essence-lang/compiler/analysis"
 import { renderDiagnostics } from "@essence-lang/compiler/diagnostics/render"
 import { fixturePath } from "@essence-lang/fixtures"
 
-// NOTE: A report on `/docs/reference/diagnostics` copied from a showcase in
+// A report on `/docs/reference/diagnostics` copied from a showcase in
 // `packages/fixtures/files/diagnostics/` takes that showcase's name and is held
 // to what it reports today. A report written for the page takes another name.
 
@@ -49,7 +49,7 @@ let pageWritten = headed.filter(
 
 let reportsByShowcase = new Map<string, Array<string>>()
 
-// NOTE: With the tests, as `diagnosticShowcase.spec.ts` analyses a showcase, so
+// With the tests, as `diagnosticShowcase.spec.ts` analyses a showcase, so
 // a report only `essence test` gives can be quoted too.
 function reportsOf(fileName: string): Array<string> {
 	let known = reportsByShowcase.get(fileName)
@@ -66,7 +66,7 @@ function reportsOf(fileName: string): Array<string> {
 			color: false,
 		})
 
-		// NOTE: The page quotes a report without the tally that closes a
+		// The page quotes a report without the tally that closes a
 		// rendering.
 		return rendered.slice(0, rendered.lastIndexOf("\n\n"))
 	})
@@ -76,7 +76,7 @@ function reportsOf(fileName: string): Array<string> {
 	return reports
 }
 
-// NOTE: When no report matches, compare with the one at the same place, or else
+// When no report matches, compare with the one at the same place, or else
 // with the same message, so a drift reads as a diff of one report.
 function counterpartOf(quoted: string, reports: Array<string>): string {
 	let opening = (report: string, lines: number) =>
@@ -101,7 +101,7 @@ function withoutFileName(report: string): string {
 
 describe("Diagnostic Reports", () => {
 	it("should read every report on the page", () => {
-		// NOTE: A guard on the parsing, which would otherwise turn this gate
+		// A guard on the parsing, which would otherwise turn this gate
 		// into a no-op by matching nothing.
 		expect(quotedReports.length).toBe(
 			page.split('<div class="error-output">').length - 1,

@@ -13,7 +13,7 @@ import {
 } from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
 
-// NOTE: The graph is built from the PRELUDE Nodes — `common.typedSimple`,
+// The graph is built from the PRELUDE Nodes — `common.typedSimple`,
 // after the Simplifier and the Optimiser — and not from the typed Nodes the
 // Enricher produced, for two reasons. The Simplifier has already resolved
 // every `::` call to the Namespace that answers it, so a Method Invocation
@@ -25,12 +25,12 @@ import { simplify } from "../simplifier/index"
 // what recurses is an emitted Function calling an emitted Function.
 type CallGraph = Map<string, Set<string>>
 
-// NOTE: Only the BODIED Methods are Nodes. A native has no body to walk and
+// Only the BODIED Methods are Nodes. A native has no body to walk and
 // can not begin a cycle of Essence Methods — the cycle this test is planted to
 // catch is `Boolean.isNot` -> `Boolean.is` -> `Boolean.isNot`, where every step
 // is a Method someone wrote in `packages/standard-library/sources`.
 //
-// NOTE: The bodied free Functions are Nodes on the same footing, keyed by the
+// The bodied free Functions are Nodes on the same footing, keyed by the
 // bare `<name>__overload$N` name they are emitted under — a name that can carry
 // no `.`, so it can not collide with a Method's key. They belong in the SAME
 // graph rather than in one of their own: a bodied `loop` entry is written on
@@ -80,7 +80,7 @@ function buildCallGraph(
 	return graph
 }
 
-// NOTE: This recurses into every value rather than knowing the shape of each
+// This recurses into every value rather than knowing the shape of each
 // Node ahead of time — a body is walked in full without a per-Node case — but
 // it still has to RECOGNISE an invocation by its `nodeType`, and there are
 // three spellings a call to a stdlib Method takes after the Simplifier:
@@ -148,7 +148,7 @@ function invocationsIn(node: unknown): Array<string> {
 			let invocation = value as common.typedSimple.FunctionInvocationNode
 			let callee = invocation.name
 
-			// NOTE: A static Method call — `Namespace.method(…)` — lowers to a
+			// A static Method call — `Namespace.method(…)` — lowers to a
 			// `FunctionInvocation` off a `Lookup`. The base Type being a
 			// Namespace is what tells it apart from a Record field access, which
 			// is the same Node shape with a Record base.
@@ -176,13 +176,13 @@ function invocationsIn(node: unknown): Array<string> {
 	return targets
 }
 
-// NOTE: Direct self-recursion is not a cycle worth reporting — it is how a
+// Direct self-recursion is not a cycle worth reporting — it is how a
 // recursive Method is written, and it terminates on its own base case. What
 // this looks for is a cycle THROUGH another Method, which no single
 // Declaration reads as wrong and which two separate, individually reasonable
 // commits can introduce between them.
 //
-// NOTE: `countsSelfEdges` is what the static Properties below need instead. A
+// `countsSelfEdges` is what the static Properties below need instead. A
 // Property's value is computed where its const is emitted rather than when
 // something calls it, so a Property that reads ITSELF is a temporal dead zone —
 // a `ReferenceError` at import — and the skip above would wave it through.
@@ -238,7 +238,7 @@ function findCycle(
 	return null
 }
 
-// NOTE: The bodied static Properties are a graph beside the Methods, and its
+// The bodied static Properties are a graph beside the Methods, and its
 // edges are READS rather than calls: a `Lookup` off an Identifier whose Type is a
 // Namespace, which is the one spelling a Property's value reaches another
 // Property by. They are kept out of the call graph above because a Property has
@@ -246,7 +246,7 @@ function findCycle(
 // read before it exists, so the walk counts a self-edge and the Methods' does
 // not.
 //
-// NOTE: A read reached THROUGH a call is an edge of this graph too, which is why
+// A read reached THROUGH a call is an edge of this graph too, which is why
 // the call graph is built here as well. A Method called from inside a Property's
 // value runs in the value band, not at some later call time, so every Property it
 // reads — and every Property read by the Methods and free Functions it calls in
@@ -254,7 +254,7 @@ function findCycle(
 // through one Method is invisible here, exactly as a cycle routed through a
 // static helper was invisible to the call graph before it followed them.
 //
-// NOTE: This is the complementary guard to the Rewriter's own refusal
+// This is the complementary guard to the Rewriter's own refusal
 // (`orderEssenceMembers`): the emitter orders the value band and throws on a
 // cycle, and this reads the sources in a walker of its own, so a cycle is named
 // here whichever half is wrong.
@@ -291,7 +291,7 @@ function buildPropertyGraph(
 		directReads.set(freeFunction.name, readsOf(freeFunction.node.value))
 	}
 
-	// NOTE: The Properties one callable reads once it runs, itself and everything
+	// The Properties one callable reads once it runs, itself and everything
 	// it calls together. Two Methods calling each other is recursion rather than a
 	// cycle of this graph's kind, so this is plain reachability and `seen` is all
 	// it takes to answer for one.
@@ -343,7 +343,7 @@ function buildPropertyGraph(
 	return graph
 }
 
-// NOTE: A `Lookup` off a Record — `rec.field` — is the same Node with a Record
+// A `Lookup` off a Record — `rec.field` — is the same Node with a Record
 // base Type, and is not a read of a Property; the base Type is what tells them
 // apart, exactly as it does in the Rewriter. A static METHOD reference is
 // collected too, and filtered out by `buildPropertyGraph`, which keeps only a
@@ -388,12 +388,12 @@ function propertyReadsIn(node: unknown): Array<string> {
 	return targets
 }
 
-// NOTE: A whole synthetic standard library rather than hand built Nodes, so
+// A whole synthetic standard library rather than hand built Nodes, so
 // the walker above is exercised on the shapes the real Loader produces — a
 // hand written Node would only prove that the code agrees with the test's own
 // idea of what a Node looks like.
 //
-// NOTE: The free Functions are collected the way `buildStdlibArtifacts` collects
+// The free Functions are collected the way `buildStdlibArtifacts` collects
 // the real ones, copy included. They can not be read off `stdlibFreeFunctions`,
 // which answers for the process-wide standard library rather than for this
 // source.
@@ -430,7 +430,7 @@ function propertyGraphOf(source: string): CallGraph {
 }
 
 describe("Stdlib Call Graph", () => {
-	// NOTE: This now guards real edges — `Integer.isEven` calls
+	// This now guards real edges — `Integer.isEven` calls
 	// `Integer.remainder`, `Boolean.exclusiveOr` calls `Boolean.is`, and the
 	// conversion adds more Methods written in terms of each other every commit.
 	// An accidental cycle among them is a stack overflow at run time with no
@@ -438,14 +438,14 @@ describe("Stdlib Call Graph", () => {
 	// `is`/`isNot` are no longer among them: they are derived, so they are not
 	// written in Essence and have no edges to cycle through.
 	//
-	// NOTE: A Protocol's PROVIDED Methods are Nodes on the same footing, under
+	// A Protocol's PROVIDED Methods are Nodes on the same footing, under
 	// the Protocol's own name — the prelude carries them exactly as it carries a
 	// Namespace's, and `Equatable.isNot` is one body every conformer runs. What
 	// they call THROUGH the conformance witness is no edge here: a Method
 	// reached off a witness is chosen by the receiver, not by the body, so it is
 	// no more a static call than a Function-typed Parameter's is.
 	//
-	// NOTE: The free Functions are in the same graph, which is what makes `loop`'s
+	// The free Functions are in the same graph, which is what makes `loop`'s
 	// bodied entries answerable for: each is written on one of the family's two
 	// natives or on another bodied entry, and an entry written on a bodied one is
 	// a cycle two individually reasonable commits can close between them.
@@ -507,14 +507,14 @@ describe("Stdlib Call Graph", () => {
 			"Dictionary.update__overload$2",
 			"Dictionary.value__overload$2",
 			"Equatable.isNot",
-			// NOTE: The combinators a completing body can write for itself —
+			// The combinators a completing body can write for itself —
 			// each waits for the receiver and answers something else, which is
 			// one line of Essence and no runtime at all.
 			"Future.andThen__overload$1",
 			"Future.andThen__overload$2",
 			"Future.map",
 			"Generatable.shrink",
-			// NOTE: The six verbs, and no `send` beside them: the one native of
+			// The six verbs, and no `send` beside them: the one native of
 			// that Namespace is a Node only where a body writes it, and a
 			// shim's frame is not one. Each of these calls `Http.send`, which
 			// is an edge to a native and therefore no edge here.
@@ -666,13 +666,13 @@ describe("Stdlib Call Graph", () => {
 			"List.replace__overload$2",
 			"List.split__overload$2",
 			"List.starts",
-			// NOTE: `flatten` is the one Optional Method that is not on every
+			// `flatten` is the one Optional Method that is not on every
 			// Optional, so it lives in a Namespace of its own — receiver
 			// `Optional<Optional<ItemType>>` — exactly as `NestedList::flatten`
 			// does, and it is a Node under that Namespace's name rather than
 			// under `Optional`.
 			"NestedOptional.flatten",
-			// NOTE: And the same one level along, for a Result whose value is
+			// And the same one level along, for a Result whose value is
 			// a Result — a Namespace of its own for the reason
 			// `NestedOptional` is one.
 			"NestedResult.flatten",
@@ -787,7 +787,7 @@ describe("Stdlib Call Graph", () => {
 			"Optional.toList",
 			"Optional.toResult",
 			"Optional.value",
-			// NOTE: These three need a receiver not every List is, so they live
+			// These three need a receiver not every List is, so they live
 			// in a Namespace of their own — receiver `List<Optional<ItemType>>`
 			// — exactly as `NestedList::flatten` does.
 			"OptionalList.allValues",
@@ -865,12 +865,12 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.sum",
 			"RationalList.variance__overload$1",
 			"RationalList.variance__overload$2",
-			// NOTE: Both Methods of what a host answered, and both written in
+			// Both Methods of what a host answered, and both written in
 			// Essence — one reads the status and one reads a header, and
 			// neither needs anything the Record does not hold.
 			"Response.header",
 			"Response.isSuccessful",
-			// NOTE: Every Method of the carrier that says why but `toString`
+			// Every Method of the carrier that says why but `toString`
 			// is written in Essence. `toString` is native, for the reason
 			// `Optional.toString` is.
 			"Result.andThen",
@@ -890,19 +890,19 @@ describe("Stdlib Call Graph", () => {
 			"Result.toList",
 			"Result.value__overload$1",
 			"Result.value__overload$2",
-			// NOTE: Written in Essence for the reason the three above are, and
+			// Written in Essence for the reason the three above are, and
 			// on themselves besides: running a description again is starting it
 			// again, so the retry is a Method that calls itself.
 			"ResultFuture.attempt__overload$1",
 			"ResultFuture.attempt__overload$2",
-			// NOTE: These four need a receiver not every List is, so they live
+			// These four need a receiver not every List is, so they live
 			// in a Namespace of their own — receiver `List<Result<…>>` —
 			// exactly as `OptionalList`'s three do.
 			"ResultList.allValues",
 			"ResultList.partition",
 			"ResultList.reasons",
 			"ResultList.values",
-			// NOTE: The Namespace of the Union `Integer | Rational`, whose two
+			// The Namespace of the Union `Integer | Rational`, whose two
 			// bodies are the one 2×2 dispatch of `Number.es` — emitted and
 			// reached exactly as the rest are, and named here for the same
 			// reason: a call graph Node is a body, whatever the target of the
@@ -946,7 +946,7 @@ describe("Stdlib Call Graph", () => {
 			"String.truncate",
 			"Terminal.ask",
 			"Terminal.print",
-			// NOTE: `Transcendental.is` and `absolute` are natives, and
+			// `Transcendental.is` and `absolute` are natives, and
 			// `List.toString` is one too — each was written on a Namespace
 			// heavier than its own (`Number`, `String`) and none could be
 			// rewritten onto a primitive of its own, so all three left Essence
@@ -963,7 +963,7 @@ describe("Stdlib Call Graph", () => {
 			"Transcendental.subtract__overload$3",
 			"Transcendental.toString__overload$2",
 			"Transcendental.toString__overload$3",
-			// NOTE: The bodied free Functions, keyed by the bare name they are
+			// The bodied free Functions, keyed by the bare name they are
 			// emitted under. `loop`'s other two entries are native — there is no
 			// body to walk, exactly as for a native Method. `$5` is the
 			// exclusive count, written on `$3`, the inclusive one, and `$8` is
@@ -1011,12 +1011,12 @@ describe("Stdlib Call Graph", () => {
 	}
 }`)
 
-		// NOTE: `negate` and `and` are natives — invoked, but not Nodes.
+		// `negate` and `and` are natives — invoked, but not Nodes.
 		expect(graph.get("Boolean.isNot")).toEqual(new Set(["Boolean.is"]))
 		expect(graph.get("Boolean.is")).toEqual(new Set())
 	})
 
-	// NOTE: A static Method call is a `FunctionInvocation`, not a
+	// A static Method call is a `FunctionInvocation`, not a
 	// `MethodInvocation` — the spelling the walker used to miss. This proves it
 	// records the edge for a bodied instance Method that calls a bodied static
 	// helper, and for one static calling another.
@@ -1053,12 +1053,12 @@ describe("Stdlib Call Graph", () => {
 
 		expect(graph.get("Boolean.alpha")).toEqual(new Set(["Boolean.beta"]))
 		expect(graph.get("Boolean.beta")).toEqual(new Set(["Boolean.gamma"]))
-		// NOTE: `boxed.field` is a `Lookup` off a Record, the same Node shape
+		// `boxed.field` is a `Lookup` off a Record, the same Node shape
 		// as `Boolean.gamma` but with a Record base — no edge.
 		expect(graph.get("Boolean.gamma")).toEqual(new Set())
 	})
 
-	// NOTE: The proof that the check is a check. Without it the whole file
+	// The proof that the check is a check. Without it the whole file
 	// would pass on a standard library that has no cycles to find, and would go
 	// on passing if `findCycle` returned null unconditionally.
 	it("reports a cycle as the path around it", () => {
@@ -1087,7 +1087,7 @@ describe("Stdlib Call Graph", () => {
 		expect(cycle).toEqual(["Boolean.isNot", "Boolean.is", "Boolean.isNot"])
 	})
 
-	// NOTE: The same proof for a cycle that runs entirely through static
+	// The same proof for a cycle that runs entirely through static
 	// Methods — the edges the walker used to miss. Two statics that defer to
 	// each other are a stack overflow just as surely as two instance Methods.
 	it("reports a cycle between two static Methods", () => {
@@ -1116,7 +1116,7 @@ describe("Stdlib Call Graph", () => {
 		expect(cycle).toEqual(["Boolean.beta", "Boolean.gamma", "Boolean.beta"])
 	})
 
-	// NOTE: And a cycle that crosses the instance/static boundary — an
+	// And a cycle that crosses the instance/static boundary — an
 	// instance Method calling a static helper that calls an instance Method
 	// back. This needs BOTH the `FunctionInvocation` edge (alpha to the static
 	// beta) and the `MethodInvocation` edge (beta to alpha via its argument) to
@@ -1151,11 +1151,11 @@ describe("Stdlib Call Graph", () => {
 		])
 	})
 
-	// NOTE: The free Functions, which are Nodes of the same graph. `loop`'s bodied
+	// The free Functions, which are Nodes of the same graph. `loop`'s bodied
 	// entries are written on the family's natives and on each other; these
 	// fixtures hold each kind of edge on a library of their own.
 	describe("free Functions", () => {
-		// NOTE: Both directions across the boundary at once, which is what makes
+		// Both directions across the boundary at once, which is what makes
 		// the shared graph worth having: a free Function's body reaching a Method,
 		// and a Method's body reaching a free Function.
 		it("records an edge in either direction across the boundary", () => {
@@ -1190,7 +1190,7 @@ describe("Stdlib Call Graph", () => {
 			expect(graph.get("Inner.twice")).toEqual(new Set())
 		})
 
-		// NOTE: The edge the acyclicity check was blind to until the free
+		// The edge the acyclicity check was blind to until the free
 		// Functions became Nodes — one entry of an `overload function` block
 		// written on another, which is how `loop`'s bodied entries are written on
 		// the family's natives and on each other.
@@ -1249,7 +1249,7 @@ describe("Stdlib Call Graph", () => {
 			expect(cycle).toEqual(["alpha", "beta", "alpha"])
 		})
 
-		// NOTE: A cycle that leaves a Method for a free Function and comes back —
+		// A cycle that leaves a Method for a free Function and comes back —
 		// the shape neither half of the graph could see on its own.
 		it("reports a cycle across the Method boundary", () => {
 			let cycle = findCycle(
@@ -1277,11 +1277,11 @@ describe("Stdlib Call Graph", () => {
 		})
 	})
 
-	// NOTE: The static Properties, whose graph answers a different question than
+	// The static Properties, whose graph answers a different question than
 	// the Methods' — not "does this recurse for ever" but "can these consts be
 	// emitted in any order at all".
 	describe("static Properties", () => {
-		// NOTE: Empty today: no standard library Property has a value yet, so the
+		// Empty today: no standard library Property has a value yet, so the
 		// graph has no Nodes and no cycle. It goes on answering as the numeric
 		// tower's constants and the like are given bodies.
 		it("has no cycle among the Essence-implemented static Properties", () => {
@@ -1299,7 +1299,7 @@ describe("Stdlib Call Graph", () => {
 			}
 		})
 
-		// NOTE: The edge the ordering rests on. A Property's value can only read
+		// The edge the ordering rests on. A Property's value can only read
 		// a Namespace declared ABOVE it — or its OWN, and there only a Property
 		// written above it, which the Validator is what enforces — so every edge
 		// points backwards and a cycle can not be written in a source at all,
@@ -1327,13 +1327,13 @@ describe("Stdlib Call Graph", () => {
 			expect(graph.get("Constants.DOUBLE")).toEqual(
 				new Set(["Other.BASE"]),
 			)
-			// NOTE: `Other.doubled` is a Method, so it is no Node of this graph —
+			// `Other.doubled` is a Method, so it is no Node of this graph —
 			// its own const stands above the whole value band. What it READS is
 			// another matter, which is the next test.
 			expect(graph.get("Other.BASE")).toEqual(new Set())
 		})
 
-		// NOTE: The same edge inside ONE Namespace, which is the shape a Namespace
+		// The same edge inside ONE Namespace, which is the shape a Namespace
 		// naming itself opened up — `static Tau = Number.Pi` is the spelling the
 		// numeric tower's constants want, and it is an edge of this graph like any
 		// other rather than something the Namespace hides.
@@ -1354,7 +1354,7 @@ describe("Stdlib Call Graph", () => {
 			expect(graph.get("Constants.BASE")).toEqual(new Set())
 		})
 
-		// NOTE: The edge that is only there in a Method's body. `Constants.DOUBLE`
+		// The edge that is only there in a Method's body. `Constants.DOUBLE`
 		// reads no Property itself — it calls `Reader.readsBase`, and that call runs
 		// where the const stands, so `Other.BASE` is read before `Constants.DOUBLE`
 		// is bound and the two are an edge after all. Cycles routed this way are
@@ -1386,7 +1386,7 @@ describe("Stdlib Call Graph", () => {
 			)
 		})
 
-		// NOTE: The same edge one step longer, through a free Function — which is
+		// The same edge one step longer, through a free Function — which is
 		// why the two graphs are built together rather than the Methods' alone.
 		it("records a read of a static Property through a free Function it calls", () => {
 			let graph = propertyGraphOf(`declarations {
@@ -1425,7 +1425,7 @@ describe("Stdlib Call Graph", () => {
 			).toEqual(["A.ONE", "B.TWO", "A.ONE"])
 		})
 
-		// NOTE: The one place this walk parts from the Methods' — a Property that
+		// The one place this walk parts from the Methods' — a Property that
 		// reads itself is the cycle, where a Method that calls itself is recursion.
 		it("reports a static Property that reads itself", () => {
 			expect(
@@ -1434,7 +1434,7 @@ describe("Stdlib Call Graph", () => {
 		})
 	})
 
-	// NOTE: A Method that calls itself is a recursive Method, not a mistake —
+	// A Method that calls itself is a recursive Method, not a mistake —
 	// the standard library will have them, and a cycle among DIFFERENT Methods
 	// is what this walker is for. The self-call here sits behind a base case on
 	// purpose: an UNCONDITIONAL self-call never returns, and that is caught by

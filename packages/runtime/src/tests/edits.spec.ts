@@ -27,7 +27,7 @@ import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { typeKeySymbol } from "../type"
 
-// NOTE: The four edits that answer with a shorter, longer or altered List —
+// The four edits that answer with a shorter, longer or altered List —
 // `slice`, `remove(at:)`, `insert(_:at:)` and `NonEmptyList::replace(_:at:)`.
 // Each of them may answer by SHARING one or both of the receiver's runs under a
 // view of its own, which is a representation nothing in the language can ask
@@ -44,7 +44,7 @@ const integerPrinting = {
 	toString: (value: IntegerType) => createString(String(value.value)),
 }
 
-// NOTE: The items a List answers, read without disturbing it at all — not even
+// The items a List answers, read without disturbing it at all — not even
 // the trimming `viewOf` does, since half of what is held here is what a box is
 // still holding after somebody else has read or grown it.
 const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
@@ -62,7 +62,7 @@ const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
 	return items
 }
 
-// NOTE: The item a position names, unwrapped — `item(at:)` answers an Optional
+// The item a position names, unwrapped — `item(at:)` answers an Optional
 // for every position, and nothing below is about the Optional.
 const itemAt = (
 	originalList: ListType<IntegerType>,
@@ -75,7 +75,7 @@ const itemAt = (
 		: Number(answer.item.value)
 }
 
-// NOTE: What each edit MEANS, written against a plain JavaScript Array — the
+// What each edit MEANS, written against a plain JavaScript Array — the
 // items the box answers, spliced the way the Method's documentation describes
 // them. Nothing here knows a List has runs, so a disagreement below is always
 // the native's.
@@ -144,7 +144,7 @@ const referenceSlice = (
 	return end <= start ? [] : items.slice(start, end)
 }
 
-// NOTE: A box for every way a List can be holding its items by the time an edit
+// A box for every way a List can be holding its items by the time an edit
 // reaches it. `seam` is where its front run ends and its back run begins, which
 // is the boundary every position below is placed against; `build` answers a
 // fresh one, because reading a List may change how it holds them.
@@ -202,7 +202,7 @@ const shapes: Array<Shape> = [
 		build: () => prependedOnly([11, 22, 33, 44, 55, 66]),
 	},
 	{
-		// NOTE: A box somebody else appended to, so its back view is shorter
+		// A box somebody else appended to, so its back view is shorter
 		// than the Array it holds — the edits must answer for the VIEW.
 		name: "a stale-back box",
 		seam: 0,
@@ -215,7 +215,7 @@ const shapes: Array<Shape> = [
 		},
 	},
 	{
-		// NOTE: The same on the other side — somebody else prepended, so the
+		// The same on the other side — somebody else prepended, so the
 		// front Array holds an item this box never saw.
 		name: "a stale-front box",
 		seam: 3,
@@ -228,7 +228,7 @@ const shapes: Array<Shape> = [
 		},
 	},
 	{
-		// NOTE: The answer of a sharing `slice`, edited in its turn — a box
+		// The answer of a sharing `slice`, edited in its turn — a box
 		// holding two Arrays it owns neither of, and viewing less of both.
 		name: "a freshly shared window",
 		seam: 3,
@@ -252,7 +252,7 @@ const shapes: Array<Shape> = [
 			),
 	},
 	{
-		// NOTE: The same with no front run at all — a prefix of a flat box,
+		// The same with no front run at all — a prefix of a flat box,
 		// which is the only window a flat box can share.
 		name: "a shared prefix of a flat box",
 		seam: 0,
@@ -276,7 +276,7 @@ const shapes: Array<Shape> = [
 	},
 ]
 
-// NOTE: Every position an edit can be given, placed against the box's own seam:
+// Every position an edit can be given, placed against the box's own seam:
 // the two ends, both sides of the seam, both sides of the last item, one past
 // the end and one further — each of them mirrored as the negative position
 // naming the same place, plus the two that reach past either end and the two
@@ -309,7 +309,7 @@ const positionsFor = (total: number, seam: number): Array<number> => {
 describe("edits against every representation", () => {
 	for (let shape of shapes) {
 		describe(shape.name, () => {
-			// NOTE: Read off a FRESH box with `materialise`, which is the one
+			// Read off a FRESH box with `materialise`, which is the one
 			// reader that answers a plain Array — so the reference below is
 			// built from the same items the box answers and from nothing else.
 			let items = materialise(shape.build()).map((item) =>
@@ -388,7 +388,7 @@ describe("edits against every representation", () => {
 	}
 })
 
-// NOTE: The structural claims — the only tests here that look at the box rather
+// The structural claims — the only tests here that look at the box rather
 // than at what it answers, because "shared" is not something a List can be
 // asked. Each pins an answer that costs nothing but a box, and would go on
 // passing the tests above if it quietly started copying.
@@ -430,7 +430,7 @@ describe("what an edit shares", () => {
 		expect(answer.length).toBe(2)
 	})
 
-	// NOTE: A box whose seam is at zero can share no suffix as it stands, so
+	// A box whose seam is at zero can share no suffix as it stands, so
 	// asked for one it moves its seam to the end first: the back run becomes a
 	// front run, and the answer is a window of that. The receiver answers the
 	// same items in its new shape, and the fresh back it is left with is its
@@ -470,7 +470,7 @@ describe("what an edit shares", () => {
 		expect(itemsOf(receiver)).toEqual([11, 22, 33, 44, 55, 66])
 	})
 
-	// NOTE: The half rule — an upgrade copies the whole run where the plain
+	// The half rule — an upgrade copies the whole run where the plain
 	// path copies the window, so a suffix shorter than the prefix it drops is
 	// copied out as it always was, and the receiver is left flat.
 	test("a short suffix of a flat box copies rather than upgrading", () => {
@@ -528,7 +528,7 @@ describe("what an edit shares", () => {
 		expect(itemsOf(atTail)).toEqual([11, 22, 33, 44, 55, 66, 99])
 	})
 
-	// NOTE: A read is where a shared answer pays for itself, and it pays the
+	// A read is where a shared answer pays for itself, and it pays the
 	// ANSWER's size rather than the parent's: a two-item window of a hundred
 	// item List trims to two.
 	test("reading a shared window trims it to its own size", () => {
@@ -543,7 +543,7 @@ describe("what an edit shares", () => {
 		expect(answer.value.length).toBe(2)
 	})
 
-	// NOTE: Counting is not reading. The stdlib writes `removeFirst()` as
+	// Counting is not reading. The stdlib writes `removeFirst()` as
 	// `@::slice(from 1, to @::length())`, so every turn of a drain from the
 	// front asks a shrinking window for its length before slicing it again — and
 	// a `length` that trimmed would copy the whole front run there and hand back
@@ -561,7 +561,7 @@ describe("what an edit shares", () => {
 	})
 })
 
-// NOTE: The claim every shared answer rests on. The answer and the box it was
+// The claim every shared answer rests on. The answer and the box it was
 // cut from hold the same Arrays and neither may ever answer with an item the
 // other added, however either of them grows and in whichever order — which is
 // what the stale-copy paths in `append` and `prepend` are for.
@@ -612,7 +612,7 @@ describe("a shared answer and the box it was cut from", () => {
 			},
 		},
 		{
-			// NOTE: The WHOLE of a flat box, which is what `removeFirst(0)` and
+			// The WHOLE of a flat box, which is what `removeFirst(0)` and
 			// `removeLast(0)` ask for. This one is the case a receiver's view
 			// has to be written down for: both boxes view the whole Array, so
 			// the answer's own append pushes onto it in place, and a receiver
@@ -728,12 +728,12 @@ describe("a shared answer is invisible", () => {
 	})
 })
 
-// NOTE: Draining a List one item at a time from the front, which is what the
+// Draining a List one item at a time from the front, which is what the
 // front run is for. Every step answers a box over the same Array with one item
 // less of it in view, so the whole drain moves no items at all — and reading a
 // box in the middle of the chain must not disturb the rest of it.
 describe("draining from the front", () => {
-	// NOTE: Both ways a List can have been built, because which end it was
+	// Both ways a List can have been built, because which end it was
 	// built at used to decide whether taking it apart from the front copied
 	// the whole of it at every step.
 	for (let [built, build] of [
@@ -821,7 +821,7 @@ describe("draining from the front", () => {
 	})
 })
 
-// NOTE: THE ITEMS A WALK MOVES, counted from outside the runtime rather than
+// THE ITEMS A WALK MOVES, counted from outside the runtime rather than
 // timed. Every Array a box of the chain holds that has not been seen before was
 // BUILT by somebody — the seed, the one upgrade, or a trim under the half rule —
 // and building it moved as many items as it is long. Summing their lengths over
@@ -829,16 +829,16 @@ describe("draining from the front", () => {
 // n items moves a few times n, where trimming at every read moved half of n
 // times n.
 //
-// NOTE: A count rather than a clock. What the half rule promises is WORK, and a
+// A count rather than a clock. What the half rule promises is WORK, and a
 // claim about work holds on a machine under any load at all — where the
 // wall-clock ceilings in `listPerformance.spec.ts` have to sit an order of
 // magnitude above the linear figure to be safe, and can only catch a
 // regression that costs more than that.
 //
-// NOTE: The seed's own runs are recorded before the walk and charged nothing:
+// The seed's own runs are recorded before the walk and charged nothing:
 // the Program built them, and what is being measured is what taking the List
 // apart adds to that.
-// NOTE: WHAT THIS CAN NOT SEE. An item is priced at one item wherever it was
+// WHAT THIS CAN NOT SEE. An item is priced at one item wherever it was
 // moved from and however it was moved, so a path that moves its items DEARLY —
 // one at a time through a call and a branch, rather than in a bulk `slice` —
 // counts exactly the same here as the bulk copy it replaced. That is not a flaw
@@ -873,7 +873,7 @@ const itemsMovedBy = (
 	for (let index = 0; index < turns; index++) {
 		let next = turn(walked)
 
-		// NOTE: BOTH boxes, because either of them may have been trimmed: the
+		// BOTH boxes, because either of them may have been trimmed: the
 		// receiver where the turn read it or cut a window from it, and the
 		// answer where it was read in its turn.
 		record(walked)
@@ -885,7 +885,7 @@ const itemsMovedBy = (
 }
 
 describe("what a walk over a List moves", () => {
-	// NOTE: Twenty thousand items, which is where a quadratic walk stands two
+	// Twenty thousand items, which is where a quadratic walk stands two
 	// thousand times clear of a linear one and no arithmetic is needed to tell
 	// them apart. The ceiling is five times the length: the dearest of the
 	// shapes below moves three times it, and a walk that trimmed at every turn
@@ -909,7 +909,7 @@ describe("what a walk over a List moves", () => {
 	const lengthOf = (originalList: ListType<IntegerType>): number =>
 		Number(length(originalList).value)
 
-	// NOTE: `firstItem()` is `@::item(at 0)` and `removeFirst()` is
+	// `firstItem()` is `@::item(at 0)` and `removeFirst()` is
 	// `@::slice(from 1)`, so the two lines of the canonical walk are these two
 	// natives — and the walk is written BOTH ways round, because which of the
 	// two the turn reaches first used to decide whether it stayed linear.
@@ -937,7 +937,7 @@ describe("what a walk over a List moves", () => {
 		)
 	}
 
-	// NOTE: The palindrome shape — both ends read, both ends dropped — in the
+	// The palindrome shape — both ends read, both ends dropped — in the
 	// two spellings a Program has for it: one `slice` taking an item off each
 	// end, and `removeFirst()` followed by `removeLast()`.
 	const bothEnds = (originalList: ListType<IntegerType>) => {
@@ -1019,7 +1019,7 @@ describe("what a walk over a List moves", () => {
 			turns: ITEMS - 1,
 		},
 		{
-			// NOTE: The proven halves of the pair, which read the two ends off
+			// The proven halves of the pair, which read the two ends off
 			// the view rather than through the Optional `item(at:)` answers.
 			name: "the proven firstItem",
 			seed: flat,
@@ -1065,7 +1065,7 @@ describe("what a walk over a List moves", () => {
 		})
 	}
 
-	// NOTE: THE FRONT half of the rule, which no other test here reaches: a
+	// THE FRONT half of the rule, which no other test here reaches: a
 	// window keeping less than half of a long FRONT run. The front is stored
 	// reversed, so what the trim must keep is the run's LOW end and what the
 	// box's head is standing at is its high one — a trim that took the wrong
@@ -1085,7 +1085,7 @@ describe("what a walk over a List moves", () => {
 		expect(itemsOf(deep)).toEqual([11, 22, 33, 44, 55, 66, 77, 88])
 	})
 
-	// NOTE: The other side of the rule's subject. Cutting a short window out of
+	// The other side of the rule's subject. Cutting a short window out of
 	// a box that views the WHOLE of its run must move nothing at all: the run is
 	// already as short as the receiver can make it, and the answer's own
 	// smallness is the answer's business, settled the first time it is read. A
@@ -1107,7 +1107,7 @@ describe("what a walk over a List moves", () => {
 		).toBe(0)
 	})
 
-	// NOTE: The other half of the claim, and the reason the rule is a HALF rule
+	// The other half of the claim, and the reason the rule is a HALF rule
 	// rather than "never trim": a window that keeps only a little of a long run
 	// still releases it, so nothing indexed for the rest of a Program holds a
 	// parent it can not reach. Two items of twenty thousand, read at a position
@@ -1122,7 +1122,7 @@ describe("what a walk over a List moves", () => {
 		expect(answer.value.length).toBe(2)
 	})
 
-	// NOTE: And the same for a window cut from the far end of a long run, which
+	// And the same for a window cut from the far end of a long run, which
 	// is the other way a box ends up holding much more than it views.
 	test("a short window of a two-run box releases both parents when it is read", () => {
 		let receiver = prepend(flat(), integer(-1))
@@ -1133,7 +1133,7 @@ describe("what a walk over a List moves", () => {
 		expect(answer.value.length).toBe(1)
 	})
 
-	// NOTE: WHERE THE RULE'S BOUNDARY IS, pinned because nothing else pins it:
+	// WHERE THE RULE'S BOUNDARY IS, pinned because nothing else pins it:
 	// the rule trims a view that is LESS than half of its Array, so a box
 	// viewing exactly half keeps the Array it has and one item less lets it go.
 	// Which side of the boundary equality falls on is a policy rather than an
@@ -1155,7 +1155,7 @@ describe("what a walk over a List moves", () => {
 	})
 })
 
-// NOTE: THE PER-ITEM HALF OF THE CLAIM has NO guard here, and that is a
+// THE PER-ITEM HALF OF THE CLAIM has NO guard here, and that is a
 // decision rather than an oversight. What `itemsMovedBy` can not see is a
 // constant — the seam move costing more per item than the `slice` it stands in
 // for — and a constant can only be caught by a clock. A ratio between the two
@@ -1167,7 +1167,7 @@ describe("what a walk over a List moves", () => {
 // fires on a loaded machine is worse than no guard. The per-item cost is held
 // by the numbers in the NOTE beside `upgradedAroundWindow` instead.
 //
-// NOTE: What IS expressible is the other half of the same fix — that a one-shot
+// What IS expressible is the other half of the same fix — that a one-shot
 // interior window of about half moves no more than the copy it asked for, which
 // is what raising the rule to three quarters bought. The work count says it
 // exactly.
@@ -1177,7 +1177,7 @@ describe("what an interior window moves", () => {
 	const flat = (): ListType<IntegerType> =>
 		createList(Array.from({ length: ITEMS }, (_, index) => integer(index)))
 
-	// NOTE: A window of about half, held off both ends: under the half rule this
+	// A window of about half, held off both ends: under the half rule this
 	// moved the whole List to put a seam in the middle of it, and nothing that
 	// follows ever asks for a second window to pay that back. The plain copy
 	// moves the window and no more.
@@ -1195,7 +1195,7 @@ describe("what an interior window moves", () => {
 		).toBeLessThanOrEqual(ITEMS / 2)
 	})
 
-	// NOTE: And the other side of the rule, which is what the palindrome walk
+	// And the other side of the rule, which is what the palindrome walk
 	// rests on: a window keeping three quarters or more DOES move the seam, and
 	// moves the whole List once to do it. Without this the two rules would be
 	// indistinguishable from "never move a seam", which the walks above would

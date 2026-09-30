@@ -1,4 +1,4 @@
-// NOTE: The runtime module of the `GroupedList` Namespace — the bridge from the
+// The runtime module of the `GroupedList` Namespace — the bridge from the
 // first container to the second (`packages/standard-library/sources/Dictionary.es`).
 // The three natives here each walk a List once and answer a Dictionary keyed by
 // something read off its items, and each is native because it promises
@@ -7,14 +7,14 @@
 // entry in it for the proven twin. `removeDuplicates` is a `List` native over
 // a `KeySet` (`keyEncoding.ts`), and reaches none of this file.
 //
-// NOTE: The store is built through `Dictionary.ts`'s own three doors rather
+// The store is built through `Dictionary.ts`'s own three doors rather
 // than out of slots reached from here. A grouping is one walk that folds each
 // item into the entry its key already stands at, and `foldIntoFreshStore` is
 // that fold — so the slots, the two key indexes and the version stamps stay in
 // the one file that owns them, and a Dictionary gathered here is the same shape
 // as one written down.
 //
-// NOTE: The List is walked as every List native walks one, with the two runs'
+// The List is walked as every List native walks one, with the two runs'
 // counts fixed before the first item is read. `sealedRunsOf` rather than
 // `walkOf`: no Method here visits an item twice, so there is no reason to trim
 // the caller's List for it, and each hands the items to a key Function or a
@@ -33,7 +33,7 @@ import type { ListType } from "./List"
 import { append__overload$1, createList, sealedRunsOf } from "./List"
 import type { AnyType } from "./type"
 
-// NOTE: One item into its group, which is the whole of what `group` does with
+// One item into its group, which is the whole of what `group` does with
 // an item. The group is a List and grows through `List`'s own `append`, which
 // pushes onto the Array in place while the group is the tip of its run — and a
 // group gathered here is only ever appended to, so it always is. The
@@ -56,7 +56,7 @@ function gatherItem<Key extends AnyType, ItemType extends AnyType>(
 	)
 }
 
-// NOTE: The groups stand in the order their keys FIRST appear and each group's
+// The groups stand in the order their keys FIRST appear and each group's
 // items keep the order they had, which is what one forward walk over the logical
 // items gives for free — a key opens its slot where it is first met, and every
 // later item is appended to the group already standing there.
@@ -83,7 +83,7 @@ export function group<ItemType extends AnyType, Key extends AnyType>(
 	return dictionaryOverFreshStore(store)
 }
 
-// NOTE: The same walk with the item as its own key and a count in place of a
+// The same walk with the item as its own key and a count in place of a
 // group. The count is an Integer built afresh per item rather than folded
 // through `Integer.add`, because a tally counts the items of ONE List and a
 // List's length is a JavaScript Array's length — so every count here is a number
@@ -121,13 +121,13 @@ function countItem<ItemType extends AnyType>(
 	)
 }
 
-// NOTE: The one-to-one crossing: the same walk as `group`, with the item itself
+// The one-to-one crossing: the same walk as `group`, with the item itself
 // standing where a group would. A key met again REPLACES the value and keeps
 // its slot, which is what `Dictionary.of` and `set` promise about a repeated
 // key, and the fold's two halves say exactly that — the first item under a key
 // opens the slot, and every later one is written over it.
 //
-// NOTE: Native rather than `Dictionary.of(@::map(…))` in Essence, for the
+// Native rather than `Dictionary.of(@::map(…))` in Essence, for the
 // proven twin's sake: the Essence spelling answers a bare `Dictionary` on any
 // receiver, and only a native can say that a List with an item in it indexes
 // into a Dictionary with an entry in it. The base entry is this same walk under

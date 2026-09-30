@@ -1,7 +1,7 @@
 import type { CoverageSummary, FileCoverage } from "./coverage"
 import { isReported, percentageOf } from "./coverage"
 
-// NOTE: The two shapes a coverage run can be WRITTEN as, produced as text and
+// The two shapes a coverage run can be WRITTEN as, produced as text and
 // written to disk by whoever asked. They live beside the fold rather than in
 // the command line because what they mean is a property of the run and not of
 // the terminal: a CI job reads `lcov.info`, and the Compiler is the thing that
@@ -20,13 +20,13 @@ export function isCoverageReportFormat(
 	return (coverageReportFormats as ReadonlyArray<string>).includes(name)
 }
 
-// NOTE: What the written file is CALLED, per format — so a caller asking for a
+// What the written file is CALLED, per format — so a caller asking for a
 // directory does not have to know either.
 export function coverageReportFileName(format: CoverageReportFormat): string {
 	return format === "lcov" ? "lcov.info" : "coverage.json"
 }
 
-// NOTE: `lcov`'s tracefile format, which is what every coverage viewer reads.
+// `lcov`'s tracefile format, which is what every coverage viewer reads.
 // Only the records that mean something here are written:
 //
 //   SF   the source file
@@ -80,7 +80,7 @@ export function toLcov(summary: CoverageSummary): string {
 	return lines.length === 0 ? "" : `${lines.join("\n")}\n`
 }
 
-// NOTE: The same answer as data, for a consumer that would rather read the
+// The same answer as data, for a consumer that would rather read the
 // Compiler's own vocabulary than lcov's — the Cases, the doorways and the
 // scopes are all here, and none of them survive the translation above.
 export function toCoverageJson(summary: CoverageSummary): string {
@@ -106,7 +106,7 @@ export function toCoverageJson(summary: CoverageSummary): string {
 	)}\n`
 }
 
-// NOTE: A `BRDA` record is four COMMA-separated fields, so a label holding a
+// A `BRDA` record is four COMMA-separated fields, so a label holding a
 // comma — `case { x: Integer, y: Integer }` is one an ordinary Record Matcher
 // produces — would move the count into the name and leave the record
 // unreadable. The commas go; the label with them intact is in the JSON report,
@@ -115,7 +115,7 @@ function branchName(label: string): string {
 	return label.replaceAll(",", ";")
 }
 
-// NOTE: How often each line ran, which is the one thing lcov asks for that the
+// How often each line ran, which is the one thing lcov asks for that the
 // point table does not hold directly: a line may carry several Statements, and
 // what a viewer draws is the greatest of their counts — the line ran that often.
 function lineCounts(file: FileCoverage): Array<[number, number]> {

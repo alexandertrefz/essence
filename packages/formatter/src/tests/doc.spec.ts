@@ -22,7 +22,7 @@ import {
 	verbatim,
 } from "../doc"
 
-// NOTE: A run of lines, each of them a head, the padding that carries it to
+// A run of lines, each of them a head, the padding that carries it to
 // the run's column, and a tail. `fit` is what the whole line must fit for its
 // padding to be worth writing — a `define` arm reports one, because an arm
 // that breaks writes the very word the column runs through on a line of its
@@ -50,7 +50,7 @@ function alignedLines(
 	)
 }
 
-// NOTE: The shape every list-like construct in the printer uses — an opening
+// The shape every list-like construct in the printer uses — an opening
 // bracket, comma separated entries that break one per line, and a trailing
 // comma that appears only when broken.
 function bracketed(entries: Array<string>): Doc {
@@ -118,7 +118,7 @@ describe("doc", () => {
 	})
 
 	it("measures a tab as four columns", () => {
-		// NOTE: At width 10 the entries fit only if the leading tab is counted
+		// At width 10 the entries fit only if the leading tab is counted
 		// as one character; counted as four they do not.
 		let doc = indent(concat([hardline, bracketed(["abcd", "ef"])]))
 
@@ -142,7 +142,7 @@ describe("doc", () => {
 	})
 
 	it("counts what follows the group when deciding whether it fits", () => {
-		// NOTE: `(a, b)` is six columns and the width is seven, but the `;;;`
+		// `(a, b)` is six columns and the width is seven, but the `;;;`
 		// queued behind it belongs to the same line, so the group must break.
 		let doc = concat([bracketed(["a", "b"]), text(";;;")])
 
@@ -155,7 +155,7 @@ describe("doc", () => {
 		expect(printDoc(doc, 80)).toBe("a\n\n\tb")
 	})
 
-	// NOTE: A multi-line String Literal's trailing spaces are characters of the
+	// A multi-line String Literal's trailing spaces are characters of the
 	// value, not layout — trimming them changes what the file says.
 	it("keeps trailing whitespace inside verbatim text", () => {
 		let doc = concat([verbatim('"hello   \nworld"'), hardline, text("b")])
@@ -169,7 +169,7 @@ describe("doc", () => {
 		expect(printDoc(doc, 80)).toBe("a  \nb")
 	})
 
-	// NOTE: What a Comment claimed onto a Statement rides on — the group can
+	// What a Comment claimed onto a Statement rides on — the group can
 	// never render flat, but no line break is written where the marker stands.
 	it("renders breakParent as nothing and breaks the enclosing group", () => {
 		let doc = group(concat([text("a"), line, text("b"), breakParent]))
@@ -294,7 +294,7 @@ describe("doc", () => {
 			)
 		})
 
-		// NOTE: A head further from its neighbours than the run's span starts a
+		// A head further from its neighbours than the run's span starts a
 		// block of its own rather than dragging every sibling out to meet it.
 		it("splits a run into blocks its heads span", () => {
 			expect(
@@ -309,7 +309,7 @@ describe("doc", () => {
 			).toBe("a  = 1\nbb = 2\ncccccccccccccccccccc = 3")
 		})
 
-		// NOTE: The column a run stands at is the renderer's to know, and the
+		// The column a run stands at is the renderer's to know, and the
 		// same run resolves differently at two of them: with the whole page to
 		// itself the first line takes its padding, and two indents in the
 		// padding would carry it past the width — so it is out of the run, and
@@ -332,7 +332,7 @@ describe("doc", () => {
 			)
 		})
 
-		// NOTE: Taking one line out is not the end of it — the two lines either
+		// Taking one line out is not the end of it — the two lines either
 		// side of it become one block, which can widen the padding of a line
 		// that fit before. The pass runs again until nothing more comes out.
 		it("takes a line out that the padding alone would break", () => {
@@ -354,7 +354,7 @@ describe("doc", () => {
 			)
 		})
 
-		// NOTE: The lines either side of one taken out line up with each other
+		// The lines either side of one taken out line up with each other
 		// across it — unless the run is parted by its breaks, where each side
 		// is a run of its own: a `match` Handler that breaks opens a block,
 		// and a column carried across a block would run through two tables.
@@ -387,7 +387,7 @@ describe("doc", () => {
 			)
 		})
 
-		// NOTE: A line that reports no width holds its column however long it
+		// A line that reports no width holds its column however long it
 		// runs — nothing about the room it stands in can move the thing the
 		// column is drawn through.
 		it("keeps a line with no width of its own in the run", () => {

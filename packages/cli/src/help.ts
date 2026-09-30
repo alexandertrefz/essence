@@ -11,7 +11,7 @@ import {
 import type { Palette } from "./theme"
 import { visibleLength } from "./theme"
 
-// NOTE: Help is rendered to a fixed comfortable measure rather than to the
+// Help is rendered to a fixed comfortable measure rather than to the
 // full terminal width — long lines of prose are hard to scan, and a help
 // screen that reflows differently on every terminal is hard to talk about.
 const MAX_WIDTH = 88
@@ -61,7 +61,7 @@ function heading(context: HelpContext, text: string): string {
 	return context.palette.heading(text.toUpperCase())
 }
 
-// NOTE: `-o, --out <path>` — the exact string the user has to type, which is
+// `-o, --out <path>` — the exact string the user has to type, which is
 // also what the two-column layout is aligned on. That layout pads away a
 // missing short flag so every long name starts in the same column. The block
 // layout must not: there is no column to line up with, and the padding would
@@ -101,7 +101,7 @@ function columns(
 	let lines: Array<string> = []
 
 	for (let row of rows) {
-		// NOTE: A row with nothing in its right column is written without the
+		// A row with nothing in its right column is written without the
 		// padding that would otherwise leave trailing whitespace behind.
 		if (row.right === "") {
 			lines.push(`${INDENT}${INDENT}${row.left}`)
@@ -129,7 +129,7 @@ function section(context: HelpContext, title: string): Array<string> {
 	return ["", `${INDENT}${heading(context, title)}`, ""]
 }
 
-// NOTE: The placeholder is substituted as each spec string enters the renderer
+// The placeholder is substituted as each spec string enters the renderer
 // rather than once over the finished screen, so that wrapping and column widths
 // are measured against the name the user will actually read.
 function named(text: string, context: HelpContext): string {
@@ -163,7 +163,7 @@ function renderExamples(
 	return lines
 }
 
-// NOTE: The compact form, used where an option list is a reference rather than
+// The compact form, used where an option list is a reference rather than
 // documentation — only the summary is shown, details live in the command help.
 function renderCompactOptions(
 	options: Array<OptionSpec>,
@@ -178,7 +178,7 @@ function renderCompactOptions(
 	)
 }
 
-// NOTE: The expanded form, used in command help — summary, the long
+// The expanded form, used in command help — summary, the long
 // explanation, and what happens when the option is omitted.
 function renderDetailedOptions(
 	options: Array<OptionSpec>,
@@ -362,7 +362,7 @@ export function renderCommandHelp(
 		lines.push(...renderDetailedOptions(specificOptions, context))
 	}
 
-	// NOTE: A passthrough Command's arguments are read by the tool it delegates
+	// A passthrough Command's arguments are read by the tool it delegates
 	// to, which knows nothing of --json or --quiet, so listing them here would
 	// document flags that do nothing.
 	if (command.passthrough !== true) {

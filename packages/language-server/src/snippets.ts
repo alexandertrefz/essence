@@ -1,4 +1,4 @@
-// NOTE: Every snippet the language ships, held once. Two things read this
+// Every snippet the language ships, held once. Two things read this
 // table: Completion offers them as snippet-format entries scoped to the block
 // the cursor stands in, and `bun run generate:snippets` writes the VS Code
 // `.code-snippets` file out of it for the readers who switch the Server off.
@@ -14,7 +14,7 @@
 // inserted snippet to the line the cursor stands on, so a body says how deep
 // its own lines are relative to each other and nothing about the file.
 
-// NOTE: The block a body parses in, which is what says whether it is offered.
+// The block a body parses in, which is what says whether it is offered.
 // Some of these carry no body of their own and still earn their place by what
 // they refuse: a cursor inside a `match` is offered the handlers that belong
 // there rather than the `function` and `namespace` a statement position would
@@ -47,7 +47,7 @@ export type SnippetContext =
 	| "overload"
 	| "parameters"
 
-// NOTE: A context that is a NARROWER reading of another: everything the wider
+// A context that is a NARROWER reading of another: everything the wider
 // one offers is offered here too, and a snippet that needs the narrower one
 // says so and is offered nowhere else. `method` is a value position inside a
 // Namespace Method or a provided Protocol Method, which is the one place `{ @
@@ -56,27 +56,27 @@ const widerContext: Partial<Record<SnippetContext, SnippetContext>> = {
 	method: "expression",
 }
 
-// NOTE: The Module sections a file is made of. `implementation` stands for the
+// The Module sections a file is made of. `implementation` stands for the
 // BODY section under either of its two spellings — a file that opened one has
 // no room for a `declarations { … }` beside it, and none for a second
 // `implementation { … }` either.
 export type ModuleSection = "implementation" | "tests" | "import" | "export"
 
 export type Snippet = {
-	// NOTE: What is typed to reach it, and the name it is written under in the
+	// What is typed to reach it, and the name it is written under in the
 	// generated file — one word, so the two can not disagree.
 	prefix: string
 	description: string
 	body: Array<string>
 	contexts: Array<SnippetContext>
-	// NOTE: The sections the body OPENS, for the six that open one. A second
+	// The sections the body OPENS, for the six that open one. A second
 	// `tests { … }` is a Diagnostic and so is a second implementation section,
 	// so a file that already writes one is not offered the snippet that writes
 	// it again — `tests-file` is the one body that writes two.
 	writes?: Array<ModuleSection>
 }
 
-// NOTE: What a body reads as before anything is typed: every tab stop's
+// What a body reads as before anything is typed: every tab stop's
 // default text in its place, and a bare stop — `$0`, which carries none —
 // replaced by whatever the caller stands in for it. Completion shows the first
 // line of this beside the prefix, and the spec compiles the whole of it to
@@ -141,7 +141,7 @@ export function snippetsFor(context: SnippetContext): Array<Snippet> {
 	)
 }
 
-// NOTE: Ordered by what each one writes rather than alphabetically — a reader
+// Ordered by what each one writes rather than alphabetically — a reader
 // adding one belongs beside the forms it is a variant of, and the Completion
 // list is sorted by the Editor anyway.
 export const snippets: Array<Snippet> = [
@@ -692,7 +692,7 @@ export const snippets: Array<Snippet> = [
 		prefix: "narrow",
 		description:
 			"A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it.",
-		// NOTE: The doorway HOLDS its answer rather than returning it. This is
+		// The doorway HOLDS its answer rather than returning it. This is
 		// offered wherever a Statement may stand, and the top of a section is
 		// one of those places — a `<-` written there is a `top-level-return`,
 		// which makes this a scaffold that writes a Diagnostic into the

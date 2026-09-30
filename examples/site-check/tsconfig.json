@@ -1,7 +1,7 @@
 {
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
-		// NOTE: What makes `./survey/Survey.es` resolve to `Survey.d.es.ts`.
+		// What makes `./survey/Survey.es` resolve to `Survey.d.es.ts`.
 		"allowArbitraryExtensions": true
 	},
 	"include": ["*.ts"]

@@ -5,7 +5,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import type { CompletionEntry } from "./completion"
 import type { WorkspaceOffer } from "./workspace"
 
-// NOTE: Completion inside the two Module sections, which the ordinary modes
+// Completion inside the two Module sections, which the ordinary modes
 // have nothing to say about: a name in Scope is no answer to a cursor that is
 // asking which file to import from, or which of that file's exports to take.
 //
@@ -18,7 +18,7 @@ import type { WorkspaceOffer } from "./workspace"
 // a specifier being written.
 
 export type ModuleSectionCursor =
-	// NOTE: Inside the specifier of a `from`. `typed` is what stands between
+	// Inside the specifier of a `from`. `typed` is what stands between
 	// the opening quote and the cursor; `quoted` says a closing quote already
 	// follows, so accepting an entry must not write a second one.
 	| {
@@ -28,10 +28,10 @@ export type ModuleSectionCursor =
 			replaces: common.Position
 			quoted: boolean
 	  }
-	// NOTE: Inside the braces of a group, whose specifier says which Module's
+	// Inside the braces of a group, whose specifier says which Module's
 	// exports are the answer.
 	| { at: "names"; section: "import" | "export"; specifier: string }
-	// NOTE: Directly inside the block's own braces, where a group starts — or,
+	// Directly inside the block's own braces, where a group starts — or,
 	// in an export block, where one of the Module's own names is listed.
 	| { at: "members"; section: "import" | "export"; replaces: common.Position }
 
@@ -46,7 +46,7 @@ export function moduleSectionCursor(
 	let section: "import" | "export" | null = null
 	let openingColumn = 0
 
-	// NOTE: The nearest section head at or above the cursor says which block
+	// The nearest section head at or above the cursor says which block
 	// the cursor could be in. The heads stand at the start of their line, and
 	// nothing else in a file does.
 	for (let line = cursor.line; line >= 1; line--) {
@@ -75,7 +75,7 @@ export function moduleSectionCursor(
 
 	let depth = 0
 	let quoteStart: common.Cursor | null = null
-	// NOTE: The specifier of the last `from "…"` read one deep, which is what
+	// The specifier of the last `from "…"` read one deep, which is what
 	// the `{` after it opens a group for.
 	let pendingSpecifier: string | null = null
 	let groupSpecifier: string | null = null
@@ -119,7 +119,7 @@ export function moduleSectionCursor(
 			}
 		}
 
-		// NOTE: A specifier never spans lines, so a String still open at the
+		// A specifier never spans lines, so a String still open at the
 		// end of one that is not the cursor's own is a broken line rather than
 		// a String the cursor is in.
 		if (quoteStart !== null && line !== cursor.line) {
@@ -160,7 +160,7 @@ export function moduleSectionCursor(
 			: { at: "names", section, specifier: groupSpecifier }
 	}
 
-	// NOTE: What accepting a group replaces: the `from` the writer may have
+	// What accepting a group replaces: the `from` the writer may have
 	// begun, with the space after it, or the word under the cursor — so that
 	// `from ` completed to a group is not `from from "./A.es" { }`.
 	let tail = /(?:from\s+|[A-Za-z_]*)$/.exec(beforeCursor)
@@ -176,13 +176,13 @@ export function moduleSectionCursor(
 	}
 }
 
-// NOTE: Two spellings of one file — `./A.es` and `././A.es` — are one
+// Two spellings of one file — `./A.es` and `././A.es` — are one
 // specifier, and the offers are written the canonical way.
 function sameSpecifier(left: string, right: string): boolean {
 	return path.posix.normalize(left) === path.posix.normalize(right)
 }
 
-// NOTE: The specifiers the section already writes a group for, read off the
+// The specifiers the section already writes a group for, read off the
 // text for the reason the cursor is: the block may not parse. The cursor's
 // own line is left out, since a specifier being typed is not a group that is
 // already there.
@@ -205,7 +205,7 @@ function writtenSpecifiers(
 	return written
 }
 
-// NOTE: LSP snippet syntax gives `$`, `}` and `\` a meaning, and a path may
+// LSP snippet syntax gives `$`, `}` and `\` a meaning, and a path may
 // carry any of them.
 function escapeSnippet(text: string): string {
 	return text.replace(/[\\$}]/g, "\\$&")
@@ -219,7 +219,7 @@ function localNames(
 	)
 }
 
-// NOTE: The names an export block may list bare: what the Module declares at
+// The names an export block may list bare: what the Module declares at
 // its top level. A Constant or Variable bound by a Pattern declares several
 // names and no single one to export under, so it is left out.
 function ownDeclarations(
@@ -267,7 +267,7 @@ function ownDeclarations(
 	return declarations
 }
 
-// NOTE: What the section offers where the cursor stands. `specifiers` is every
+// What the section offers where the cursor stands. `specifiers` is every
 // Module of the workspace as this file would write it; `offers` is every name
 // those Modules export that this file could still bind.
 export function moduleSectionCompletions(
@@ -284,7 +284,7 @@ export function moduleSectionCompletions(
 	)
 
 	switch (at.at) {
-		// NOTE: Every Module of the workspace, as a path from this file. The
+		// Every Module of the workspace, as a path from this file. The
 		// whole specifier is offered and the whole of what was typed replaced,
 		// because the Editor's word ends at every `.` and `/` and would keep
 		// the `./math/` in front of what it inserted.
@@ -300,7 +300,7 @@ export function moduleSectionCompletions(
 					: `${escapeSnippet(specifier)}" { $0 }`,
 			}))
 
-		// NOTE: The exports of the one Module the group names, less what the
+		// The exports of the one Module the group names, less what the
 		// file already binds — from the Workspace's reading of it, and from
 		// the buffer as it stands, since the two can differ by a keystroke.
 		case "names": {
@@ -322,7 +322,7 @@ export function moduleSectionCompletions(
 				}))
 		}
 
-		// NOTE: A group for every Module not yet written, opened with the
+		// A group for every Module not yet written, opened with the
 		// cursor inside its braces — and, in an export block, the Module's own
 		// names that are not yet listed.
 		case "members": {

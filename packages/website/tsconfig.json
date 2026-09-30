@@ -1,5 +1,5 @@
 {
-	// NOTE: Editor-only. The root program excludes `src/` because the
+	// Editor-only. The root program excludes `src/` because the
 	// `astro:*` virtual modules it imports exist only after `astro sync`
 	// has generated `.astro/types.d.ts`, and the repository's `tsc` gate
 	// must not depend on a generated file.

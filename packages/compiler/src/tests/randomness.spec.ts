@@ -14,7 +14,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The Namespace a Program could not reach until `entropy()` and
+// The Namespace a Program could not reach until `entropy()` and
 // `seeded(_)` were declared, tested by running Programs that build a source and
 // draw from it. `packages/runtime/src/tests/randomness.spec.ts` drives the
 // natives directly and is where a draw's range, exactness and replay are
@@ -23,7 +23,7 @@ import { validate } from "../validator/index"
 // seed replays through the whole pipeline, and that no pass pools or hoists a
 // draw.
 //
-// NOTE: Every assertion over a drawn value is about a RANGE or a replay, never
+// Every assertion over a drawn value is about a RANGE or a replay, never
 // about a number, so nothing here is pinned to the generator's own words. A
 // seeded draw is the same draw at every run, so only the two tests over
 // `entropy()` can miss at all, and the odds are written beside each.
@@ -43,7 +43,7 @@ function compile(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: The lines a Program printed, in order. `Terminal.print` adds its
+// The lines a Program printed, in order. `Terminal.print` adds its
 // newline in Essence and hands the text to `Terminal.write`, which reaches
 // `process.stdout.write` on a host with streams — so that is what is
 // intercepted here, as `terminal.spec.ts` intercepts it.
@@ -73,12 +73,12 @@ async function linesOf(source: string): Promise<Array<string>> {
 	return written.split("\n").slice(0, -1)
 }
 
-// NOTE: A `for any` run of the Program's own `tests { … }` section, driven
+// A `for any` run of the Program's own `tests { … }` section, driven
 // through the loaded program's OWN `$tests` for the reason
 // `testingProperties.spec.ts` states: every Essence value carries a hidden Type
 // key belonging to the runtime instance that built it.
 //
-// NOTE: What comes back is every test's outcome and its name, rather than the
+// What comes back is every test's outcome and its name, rather than the
 // failures alone. A list of failures is empty when a property held and empty
 // again when nothing ran at all, and the two are the same reading.
 type Loaded = { $tests: typeof entryPoints }
@@ -153,7 +153,7 @@ describe("Randomness", () => {
 			expect(lines[0]).toBe(lines[1] as string)
 		})
 
-		// NOTE: Three draws of a million agree across two seeds with odds of
+		// Three draws of a million agree across two seeds with odds of
 		// one in 10^18.
 		it("answers a different sequence for a different seed", async () => {
 			let lines = await linesOf(`implementation {
@@ -172,7 +172,7 @@ describe("Randomness", () => {
 			expect(lines[0]).not.toBe(lines[1] as string)
 		})
 
-		// NOTE: The rule the `§§` block states, run: a source is carried by
+		// The rule the `§§` block states, run: a source is carried by
 		// hand, and every draw off the one it is handed advances it. So the
 		// items of a mapped List are drawn one after the other rather than
 		// being one draw repeated.
@@ -206,7 +206,7 @@ describe("Randomness", () => {
 			expect(lines[0]).toBe("true")
 		})
 
-		// NOTE: What the purity table decides, seen from the emitted Program.
+		// What the purity table decides, seen from the emitted Program.
 		// `Randomness` has no entry in it — the table is an allowlist
 		// (`packages/compiler/src/optimiser/purity.ts`) — so no pass pools the
 		// two Argument-identical draws into one const, hoists either out, or
@@ -226,7 +226,7 @@ describe("Randomness", () => {
 			expect(javaScript.split("Randomness.entropy()").length).toBe(3)
 		})
 
-		// NOTE: The same again, run rather than read: two draws of the emitted
+		// The same again, run rather than read: two draws of the emitted
 		// expression answer two values. A span of 10^15 answers the same number
 		// twice with odds of one in 10^15.
 		it("answers two values for two draws in one expression", async () => {
@@ -332,7 +332,7 @@ describe("Randomness", () => {
 			expect(lines[1]).toBe('["Lions", "Tigers", "Bears", "Wolves"]')
 		})
 
-		// NOTE: The proven entries, reached by a written Argument the Compiler
+		// The proven entries, reached by a written Argument the Compiler
 		// read the proof off. The two annotations are the whole assertion: a
 		// bare `List<Integer>` is refused where a `NonEmptyList<Integer>` is
 		// declared, so a run that compiles is a run that reached them.
@@ -351,7 +351,7 @@ describe("Randomness", () => {
 		})
 	})
 
-	// NOTE: The two promises a draw makes over EVERY input rather than over the
+	// The two promises a draw makes over EVERY input rather than over the
 	// ones a case happened to write down: a drawn number is inside the range
 	// whichever way round the bounds were given, and one seed answers one
 	// sequence whatever the seed says.

@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `NormalizationForm` is a builtin Choice, like `Side` — its values carry
+// `NormalizationForm` is a builtin Choice, like `Side` — its values carry
 // Case tags (`"NormalizationForm#ComposedCanonical"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/String.es` declares the conformances beside `normalize`,

@@ -11,14 +11,14 @@ export function toCursor(position: Position): common.Cursor {
 	return { line: position.line + 1, column: position.character + 1 }
 }
 
-// NOTE: A whole Range rather than the two Cursors separately — a request that
+// A whole Range rather than the two Cursors separately — a request that
 // carries a selection (Code Actions) reads it as one span, and `toLspRange`
 // below is already the way back.
 export function toRange(range: Range): common.Position {
 	return { start: toCursor(range.start), end: toCursor(range.end) }
 }
 
-// NOTE: Compiler Positions are 1-based, LSP Ranges are 0-based. Diagnostics
+// Compiler Positions are 1-based, LSP Ranges are 0-based. Diagnostics
 // without a Position are mapped to the very start of the document.
 export function toLspRange(position: common.Position | null): Range {
 	if (position === null) {
@@ -40,7 +40,7 @@ export function toLspRange(position: common.Position | null): Range {
 	}
 }
 
-// NOTE: The terminal renderer gives Labels their own arrows, Notes and Helps
+// The terminal renderer gives Labels their own arrows, Notes and Helps
 // their own footers. The Language Server protocol has neither: a Diagnostic
 // is one message plus related locations. So the primary Label's message is
 // folded into the message — it is the sentence the arrow would have carried —
@@ -71,7 +71,7 @@ export function toLspDiagnostic(
 	diagnostic: common.Diagnostic,
 	uri: string,
 ): Diagnostic {
-	// NOTE: Secondary Labels are what `relatedInformation` is for — an Editor
+	// Secondary Labels are what `relatedInformation` is for — an Editor
 	// renders each as a link the reader can jump to, which is the closest
 	// thing it has to the terminal renderer's second arrow.
 	let relatedInformation = (diagnostic.labels ?? [])

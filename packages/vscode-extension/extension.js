@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 
 import * as vscode from "vscode"
-// NOTE: The explicit `.js` is required — under native ESM resolution an
+// The explicit `.js` is required — under native ESM resolution an
 // extensionless specifier is not resolved, and vscode-languageclient ships no
 // `exports` map that would map one.
 import {
@@ -24,16 +24,16 @@ import { revealForRename } from "./renameAt.js"
 import { createTestView } from "./testView.js"
 
 let client
-// NOTE: The Test Explorer, the gutter marks and the test output channel. It
+// The Test Explorer, the gutter marks and the test output channel. It
 // outlives a client — a restarted Language Server re-runs everything it finds,
 // and the view is reset rather than rebuilt — so it is created once, on
 // activation, and told when a run happened.
 let testView
-// NOTE: The `essence/testRun` subscription belongs to the client it was made on:
+// The `essence/testRun` subscription belongs to the client it was made on:
 // a restart builds a new client, and a handler left on the old one is a handler
 // that will never be called again.
 let testListener
-// NOTE: `onDidChangeState` belongs to the client, and a restart builds a new
+// `onDidChangeState` belongs to the client, and a restart builds a new
 // one. Held here so the subscription can be disposed with the client it came
 // from — a listener left attached to a dead client keeps driving the status
 // item, and after a few restarts the item is answering to all of them.
@@ -41,7 +41,7 @@ let stateListener
 let outputChannel
 let statusItem
 let currentServer = null
-// NOTE: A failure outranks the state that follows it. The client stops itself
+// A failure outranks the state that follows it. The client stops itself
 // after refusing to initialise, so the state listener arrives second and would
 // answer "stopped" — true, and the less useful of the two answers once the
 // notification has been dismissed. Cleared by the next start.
@@ -55,7 +55,7 @@ function workspaceRoot() {
 	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 }
 
-// NOTE: The login shell asked what VS Code failed to ask it at launch. Bounded,
+// The login shell asked what VS Code failed to ask it at launch. Bounded,
 // because a shell that hangs is the very reason VS Code gave up, and an
 // extension that hangs with it has made nothing better; the output channel
 // names the runtime it was looking for, so a slow answer is at least
@@ -114,7 +114,7 @@ function listDirectory(directory) {
 	}
 }
 
-// NOTE: Everything `launch.js` is handed about the machine, in one place, so
+// Everything `launch.js` is handed about the machine, in one place, so
 // the Language Server and the debugger cannot disagree about where to look.
 function runtimeContext(settingName) {
 	return {
@@ -129,7 +129,7 @@ function runtimeContext(settingName) {
 	}
 }
 
-// NOTE: `essence.bun.path` and `essence.node.path` are the explicit answers;
+// `essence.bun.path` and `essence.node.path` are the explicit answers;
 // each runtime's `resolveRuntime` reads its own.
 function findRuntime(name) {
 	let settingName = `essence.${name}.path`
@@ -141,7 +141,7 @@ function findRuntime(name) {
 	)
 }
 
-// NOTE: What the output channel says about how a runtime was — or was not —
+// What the output channel says about how a runtime was — or was not —
 // found. A runtime found anywhere but PATH (or by the setting) means PATH is
 // not what the user thinks it is, which is worth a line even on success: the
 // next tool to need it may not look as hard.
@@ -219,7 +219,7 @@ function setStatusFromState(state) {
 	setStatus(status.icon, status.detail)
 }
 
-// NOTE: Everything the user is told is also written to the channel, and the
+// Everything the user is told is also written to the channel, and the
 // button is the only route there that does not require knowing the channel
 // exists — a notification is gone in a few seconds, and the detail worth
 // reading is rarely the first line.
@@ -249,7 +249,7 @@ async function reportFallback(message) {
 	}
 }
 
-// NOTE: One attempt at one server. Answers whether it is running; a failure
+// One attempt at one server. Answers whether it is running; a failure
 // is reported here, and the caller decides whether there is another server to
 // try. The spawn advice is specific to the kind: a module is forked on VS
 // Code's own Node, so a failed fork is a broken bundle and not a PATH
@@ -261,7 +261,7 @@ async function launch(server) {
 
 	stateListener?.dispose()
 
-	// NOTE: Whether the handler below has already spoken. The client re-throws
+	// Whether the handler below has already spoken. The client re-throws
 	// after calling it, so `start()` rejects for a failed handshake as well as
 	// for a failed spawn — and the spawn advice, shown on top of a standard
 	// library that could not be read, would contradict it. Whoever spoke first
@@ -275,14 +275,14 @@ async function launch(server) {
 		{
 			documentSelector: [
 				{ scheme: "file", language: "essence" },
-				// NOTE: Never-saved documents are served too. The server keys
+				// Never-saved documents are served too. The server keys
 				// documents by their URI string and never resolves one to a
 				// path — the only thing it reads off a URI is whether it names
 				// a standard library source, which `untitled:` cannot — and it
 				// loads the standard library itself off its own location on
 				// disk, so a document without a file behind it costs nothing.
 				{ scheme: "untitled", language: "essence" },
-				// NOTE: And the project file, which is not Essence at all. The
+				// And the project file, which is not Essence at all. The
 				// server refuses every request over it and reads it with its
 				// own reader — what forwarding it buys is that a setting it
 				// could not read is reported while the line is being typed,
@@ -297,7 +297,7 @@ async function launch(server) {
 			initializationFailedHandler: (error) => {
 				reportedByHandler = true
 
-				// NOTE: Where the standard library's own "missing sources"
+				// Where the standard library's own "missing sources"
 				// throw arrives — `loadStdlib` runs inside `initialize`, and
 				// the message already names the directory it searched, so it
 				// is passed on untouched. `false`, because the answer will not
@@ -318,7 +318,7 @@ async function launch(server) {
 	try {
 		await client.start()
 
-		// NOTE: After the start, because a client refuses to be subscribed to
+		// After the start, because a client refuses to be subscribed to
 		// before it is running. The session begins its first cycle at
 		// `initialized`, so the first batch can be in flight already — which is
 		// why the view is fed rather than asked.
@@ -348,7 +348,7 @@ async function startClient(context) {
 	failure = null
 	currentServer = null
 
-	// NOTE: A new Server is a new session, which re-runs everything it finds —
+	// A new Server is a new session, which re-runs everything it finds —
 	// so what the view holds is at best about to be replaced and at worst about
 	// a file this Server will never mention.
 	testView?.reset()
@@ -368,7 +368,7 @@ async function startClient(context) {
 	})
 
 	if (resolution.error !== undefined) {
-		// NOTE: The configured server cannot run, and the bundled one can. The
+		// The configured server cannot run, and the bundled one can. The
 		// bundled one is what runs, and the user is told in a warning rather
 		// than an error — diagnostics are still coming, just not from the
 		// checkout — because silently serving a stale server to someone
@@ -399,7 +399,7 @@ async function startClient(context) {
 		return
 	}
 
-	// NOTE: A configured server that resolved but would not start. A source
+	// A configured server that resolved but would not start. A source
 	// entry's Bun was a path that existed a moment ago, so this is the rare
 	// case — but the bundled server is still there, and still better than
 	// nothing. A bundle that fails to fork has nowhere left to go, and says so.
@@ -450,7 +450,7 @@ async function stopClient() {
 
 	client = undefined
 
-	// NOTE: A client refuses to stop unless it is running — one whose start
+	// A client refuses to stop unless it is running — one whose start
 	// failed throws instead — and a restart begins by stopping exactly that
 	// client. Unguarded, the failure the user is restarting BECAUSE OF is what
 	// takes the restart command down, and clicking the status item again does
@@ -464,7 +464,7 @@ async function stopClient() {
 	}
 }
 
-// NOTE: Every start and stop runs on this chain rather than concurrently. The
+// Every start and stop runs on this chain rather than concurrently. The
 // restart command is bound to a status bar item, where a second click is one
 // gesture away, and two restarts overlapping leak a server: the second one
 // sees the `client = undefined` the first has already written, skips the stop,
@@ -475,7 +475,7 @@ async function stopClient() {
 // stop.
 let lifecycle = Promise.resolve()
 
-// NOTE: The `catch` is what keeps the chain usable. A rejected link would skip
+// The `catch` is what keeps the chain usable. A rejected link would skip
 // every step queued behind it, so a single failure would mean the Language
 // Server could never be started again. Neither half rejects today — both
 // report their own failures — and this is what stops that from becoming
@@ -490,7 +490,7 @@ function queue(work) {
 	return lifecycle
 }
 
-// NOTE: The Debug Adapter is the CLI's own `dap` command — the same binary
+// The Debug Adapter is the CLI's own `dap` command — the same binary
 // that compiles is the one that debugs, so the two can never disagree about a
 // bundle or its map. A bundle runs on VS Code's own Node, the way the
 // Language Server's does: `process.execPath` is the extension host, and
@@ -548,7 +548,7 @@ async function createDebugAdapter() {
 	)
 }
 
-// NOTE: What the Run-and-Debug view offers before any launch.json exists —
+// What the Run-and-Debug view offers before any launch.json exists —
 // the same configuration the empty-config F5 path synthesizes, so the two
 // entry points cannot drift apart.
 function provideDynamicConfigurations() {
@@ -572,7 +572,7 @@ function provideDynamicConfigurations() {
 	]
 }
 
-// NOTE: The session itself is `essence dap`'s — the Debug Adapter compiles
+// The session itself is `essence dap`'s — the Debug Adapter compiles
 // the program and drives it; this resolver only completes the configuration.
 // The empty object is what F5 sends with no launch.json, and it becomes the
 // same launch the contribution's `initialConfigurations` writes, built from
@@ -606,7 +606,7 @@ async function resolveEssenceDebugConfiguration(folder, config) {
 		}
 	}
 
-	// NOTE: A precompiled `artifact` is the Adapter's business entirely; only
+	// A precompiled `artifact` is the Adapter's business entirely; only
 	// the ordinary source launch is worth validating here, where the failure
 	// can be reported before a session ever starts.
 	if (typeof config.artifact !== "string") {
@@ -630,7 +630,7 @@ async function resolveEssenceDebugConfiguration(folder, config) {
 		config.cwd = folder.uri.fsPath
 	}
 
-	// NOTE: The program itself runs on a real Node — the Adapter speaks its
+	// The program itself runs on a real Node — the Adapter speaks its
 	// inspector protocol — which the Adapter would otherwise spawn as `node`
 	// off its own PATH, the same PATH that may have nothing on it. Resolved
 	// here, where there is a login shell to ask; a configuration that names
@@ -650,7 +650,7 @@ async function resolveEssenceDebugConfiguration(folder, config) {
 }
 
 export async function activate(context) {
-	// NOTE: One channel for both halves of the story. The client writes its
+	// One channel for both halves of the story. The client writes its
 	// own traffic wherever `outputChannel` says, and the extension writes which
 	// server it spawned and why a start failed to the same place, so "what is
 	// running, and what went wrong" is answered without switching views.
@@ -663,10 +663,10 @@ export async function activate(context) {
 	statusItem.name = "Essence Language Server"
 	statusItem.command = "essence.restartServer"
 
-	// NOTE: Built before the client, so that the first `essence/testRun` — the
+	// Built before the client, so that the first `essence/testRun` — the
 	// session starts its first cycle at `initialized` — has somewhere to land.
 	testView = createTestView({
-		// NOTE: The Server answers with the cycle number the results will
+		// The Server answers with the cycle number the results will
 		// arrive under. A client that is not running answers with nothing,
 		// which the view reports as "nothing ran".
 		runTests: async (selection) => {
@@ -690,7 +690,7 @@ export async function activate(context) {
 		outputChannel,
 		statusItem,
 		testView,
-		// NOTE: A file opened in a second editor group, or an editor scrolled
+		// A file opened in a second editor group, or an editor scrolled
 		// back to, has never been drawn on — decorations belong to an editor
 		// rather than to a document.
 		vscode.window.onDidChangeVisibleTextEditors((editors) => {
@@ -704,7 +704,7 @@ export async function activate(context) {
 				await startClient(context)
 			}),
 		),
-		// NOTE: What the Run lens above every `test` and every `suite` sends.
+		// What the Run lens above every `test` and every `suite` sends.
 		// The server owns the run — it holds the session, the compiled bundles
 		// and the results — so the whole of this is forwarding the ids it put
 		// on the lens back to it. The results arrive as `essence/testRun`
@@ -720,7 +720,7 @@ export async function activate(context) {
 
 			await testView?.runIds(item.ids ?? [], [item.filePath])
 		}),
-		// NOTE: The "Accept snapshot" lens. It is the same run, asked to record
+		// The "Accept snapshot" lens. It is the same run, asked to record
 		// what it finds — the Server writes the `__snapshots__` companions and
 		// hands the sources back as a workspace edit, so an unsaved buffer is
 		// edited rather than written round.
@@ -737,7 +737,7 @@ export async function activate(context) {
 				await testView?.acceptSnapshots(item.ids ?? [], [item.filePath])
 			},
 		),
-		// NOTE: What failed is what a reader is iterating on, and re-running
+		// What failed is what a reader is iterating on, and re-running
 		// everything to get back to it is the loop this is here to shorten. It
 		// runs by id rather than by file: one failure in forty is not a reason
 		// to run forty.
@@ -747,7 +747,7 @@ export async function activate(context) {
 		vscode.commands.registerCommand("essence.test.showOutput", () => {
 			testView?.show()
 		}),
-		// NOTE: The "Debug" lens. It goes through the Test Explorer for the
+		// The "Debug" lens. It goes through the Test Explorer for the
 		// reason "Run" does — one place decides what a gesture means — and what
 		// it starts is a session of the `essence` debug type, over a bundle
 		// compiled WITH the file's tests section.
@@ -761,7 +761,7 @@ export async function activate(context) {
 
 			await testView?.debugIds(item.ids ?? [], [item.filePath])
 		}),
-		// NOTE: What an extraction carries. The Editor applies an action's edits
+		// What an extraction carries. The Editor applies an action's edits
 		// before it runs the action's command, so by the time this is called the
 		// derived name is standing where the Server said it would, and all that
 		// is left is to put the cursor on it and open rename.
@@ -787,7 +787,7 @@ export async function activate(context) {
 		vscode.debug.registerDebugAdapterDescriptorFactory("essence", {
 			createDebugAdapterDescriptor: () => createDebugAdapter(),
 		}),
-		// NOTE: Only the spawn path is worth interrupting for, and only by
+		// Only the spawn path is worth interrupting for, and only by
 		// asking — a restart drops every open document's diagnostics for a
 		// moment. `essence.trace.server` is deliberately absent:
 		// vscode-languageclient watches it itself and applies it live.

@@ -71,7 +71,7 @@ import { resolveOverloadedMethodName } from "../helpers/types"
 import { runtimeNamespaceNames } from "../rewriter/index"
 import { nativeArity } from "../tools/generateNatives"
 
-// NOTE: The Rewriter imports one runtime module per builtin Namespace, under
+// The Rewriter imports one runtime module per builtin Namespace, under
 // the Namespace's own name, so the mapping is the identity. The keys are
 // cross-checked against `runtimeNamespaceNames` below, so this table can not
 // silently fall out of step with what the Rewriter actually imports.
@@ -88,7 +88,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NonZeroRational: nonZeroRational,
 	NonNegativeRational: nonNegativeRational,
 	PositiveRational: positiveRational,
-	// NOTE: A Namespace with no native at all, so its module holds only the
+	// A Namespace with no native at all, so its module holds only the
 	// type a native taking a Scalar would spell — the row is here because the
 	// cross-check below is over the Rewriter's whole import list.
 	Scalar: scalar,
@@ -98,7 +98,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Optional: optional,
 	NestedOptional: nestedOptional,
 	Result: result,
-	// NOTE: A Namespace with no native at all, so its module holds only the
+	// A Namespace with no native at all, so its module holds only the
 	// re-export comment — `flatten` is written in Essence, exactly as
 	// `NestedOptional`'s is.
 	NestedResult: nestedResult,
@@ -111,7 +111,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	SignStyle: signStyle,
 	Division: division,
 	SortOrder: sortOrder,
-	// NOTE: A Namespace with no native either: every one of its Methods is
+	// A Namespace with no native either: every one of its Methods is
 	// derived from the Choice.
 	Stream: stream,
 	Record: record,
@@ -134,7 +134,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	GroupedList: groupedList,
 	GroupedNonEmptyList: groupedNonEmptyList,
 	Randomness: randomness,
-	// NOTE: The one module that is the runtime asynchrony itself is built out
+	// The one module that is the runtime asynchrony itself is built out
 	// of — read by the emission under the alias `$future` — as well as the
 	// Namespace's own. Every combinator of the four Namespaces under it is
 	// implemented here and re-exported there, which is what a Namespace whose
@@ -144,29 +144,29 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	FutureList: futureList,
 	NonEmptyFutureList: nonEmptyFutureList,
 	ResultFutureList: resultFutureList,
-	// NOTE: And the run's own Namespace, whose two Methods are about the run
+	// And the run's own Namespace, whose two Methods are about the run
 	// rather than about the description it came from.
 	Started: started,
 	Async: async,
-	// NOTE: The one module in this table that reaches another host. Its
+	// The one module in this table that reaches another host. Its
 	// name is load-bearing twice over: the Rewriter imports it under the
 	// Namespace's own name, and `cli/src/resultCache.ts` refuses to remember a
 	// run whose bundle carries the label esbuild writes for this very file.
 	Http: http,
-	// NOTE: A Namespace with no native at all, so its module holds only the
+	// A Namespace with no native at all, so its module holds only the
 	// re-export comment — both of its Methods are written in Essence, exactly
 	// as `NestedResult`'s one is.
 	Response: response,
-	// NOTE: Two Choices with no native either, for the reason `Stream` has
+	// Two Choices with no native either, for the reason `Stream` has
 	// none: every Method of each is derived from the Choice.
 	HttpMethod: httpMethod,
 	Redirects: redirects,
-	// NOTE: And the third, which does carry one — its Cases have a reason to
+	// And the third, which does carry one — its Cases have a reason to
 	// print, so `toString` is written rather than derived.
 	HttpFailure: httpFailure,
 }
 
-// NOTE: What the Simplifier will emit for a declared Method — the bare name for
+// What the Simplifier will emit for a declared Method — the bare name for
 // a single signature, `name__overload$N` for each overload of an Overloaded
 // one (`resolveOverloadedMethodName`). The index is the one it was WRITTEN
 // at, natives included, which is exactly how `nativeBindings` is indexed too.
@@ -189,7 +189,7 @@ function expectedExports(
 	return [{ name, arity: nativeArity(method) }]
 }
 
-// NOTE: Which entries of a Namespace member are native. Every builtin
+// Which entries of a Namespace member are native. Every builtin
 // Namespace is declared in `packages/standard-library/sources/*.es` and so has an entry, but the
 // default stays "all native": a Namespace or Method the loader did not record
 // a binding for is one whose declaration carried no body, which is exactly a
@@ -212,7 +212,7 @@ function nativeFlagsFor(
 }
 
 describe("Builtins", () => {
-	// NOTE: The stronger, per-signature form of this cross-check now lives in
+	// The stronger, per-signature form of this cross-check now lives in
 	// `natives.generated.ts`, which tsc holds against every runtime module. This
 	// stays because it gives a friendlier, Namespace-grouped message at test
 	// time and is the only check that covers a Namespace with NO runtime module
@@ -226,15 +226,15 @@ describe("Builtins", () => {
 		let imported = [...runtimeNamespaceNames].sort()
 		let tabled = Object.keys(runtimeModules).sort()
 
-		// NOTE: Every declared Namespace has a runtime module the Rewriter
+		// Every declared Namespace has a runtime module the Rewriter
 		// imports, and the Rewriter imports nothing the standard library does not
 		// declare.
 		expect(imported).toEqual(declared)
-		// NOTE: This spec's own module table agrees with the Rewriter's list.
+		// This spec's own module table agrees with the Rewriter's list.
 		expect(tabled).toEqual(imported)
 	})
 
-	// NOTE: `builtinMemberOrder` decides which Namespace claims a shared Method
+	// `builtinMemberOrder` decides which Namespace claims a shared Method
 	// name for Completion, and `Dictionary` sits after every List Namespace on
 	// the strength of a claim its own NOTE makes: the names it shares are
 	// shared harmlessly, because no value reaches a Dictionary Namespace and
@@ -286,7 +286,7 @@ describe("Builtins", () => {
 		])
 	})
 
-	// NOTE: The Enricher's tables promise a Method exists; the runtime module
+	// The Enricher's tables promise a Method exists; the runtime module
 	// has to keep that promise. A declared Method with no matching export
 	// passes `essence check`, and a Program that calls it calls `undefined` at
 	// run time. `removeLast` shipped that way: declared with two overloads,
@@ -295,14 +295,14 @@ describe("Builtins", () => {
 	// runtime directly, under the name it happens to have, rather than the name
 	// the Simplifier will ask for.
 	//
-	// NOTE: The check runs in BOTH directions now that a standard library
+	// The check runs in BOTH directions now that a standard library
 	// Method may be implemented in Essence rather than bound to the runtime. A
 	// native without an export is the broken call above; an Essence-bodied
 	// Method WITH an export is dead code — the leftover TypeScript nobody
 	// deleted when the Method moved, which will never be called again and will
 	// quietly rot out of step with the Essence that replaced it.
 	//
-	// NOTE: The export's own `.length` is checked against the declared arity as
+	// The export's own `.length` is checked against the declared arity as
 	// well — the shape `natives.generated.ts` can not see, because a default or
 	// rest Parameter hides the real count from the type system.
 	describe("every declared Method has a runtime implementation", () => {
@@ -326,7 +326,7 @@ describe("Builtins", () => {
 
 						if (native[index] ?? true) {
 							if (typeof implementation === "function") {
-								// NOTE: `natives.generated.ts` pins the same
+								// `natives.generated.ts` pins the same
 								// arity under tsc, but only for a plain
 								// signature — a default or rest Parameter makes
 								// `Parameters<T>['length']` non-literal, and
@@ -361,7 +361,7 @@ describe("Builtins", () => {
 					}
 				}
 
-				// NOTE: A Namespace whose every member is written in Essence
+				// A Namespace whose every member is written in Essence
 				// needs no runtime module at all — only one that still binds
 				// something native does.
 				if (missing.length > 0) {
@@ -375,14 +375,14 @@ describe("Builtins", () => {
 		}
 	})
 
-	// NOTE: The free Functions — the ones that belong to no Namespace, like
+	// The free Functions — the ones that belong to no Namespace, like
 	// `loop` — are held to the same two promises a Namespace Method is: a
 	// native one must have a runtime export under the name the Simplifier will
 	// ask for, and every one must be documented. `natives.generated.ts` checks
 	// the SHAPE of each export under tsc; this gives the friendlier miss-by-name
 	// message and covers the documentation the generated contract does not.
 	describe("free Functions", () => {
-		// NOTE: The emitted name(s) of a free Function — its bare name when it is a
+		// The emitted name(s) of a free Function — its bare name when it is a
 		// single `Function`, one `__overload$N` per overload otherwise — paired
 		// with whether each is native, so the runtime check asks for exactly the
 		// exports the Rewriter will read off the `functions` module.
@@ -441,7 +441,7 @@ describe("Builtins", () => {
 			expect(undocumented).toEqual([])
 		})
 
-		// NOTE: `loop` is the only free Function left — printing used to be one
+		// `loop` is the only free Function left — printing used to be one
 		// as well and is a Namespace now — and it is the shape this whole block
 		// exists for: an `overload function` block mixing native entries with
 		// Essence-bodied ones, where the flag's POSITION is the `__overload$N`
@@ -467,7 +467,7 @@ describe("Builtins", () => {
 		})
 	})
 
-	// NOTE: The Namespace printing moved onto, and reading with it. It is
+	// The Namespace printing moved onto, and reading with it. It is
 	// checked here, beside the free Functions it replaced, because its natives
 	// are the only ones in the language whose whole purpose is an effect —
 	// nothing about the value they answer with says whether they ran, so the
@@ -477,7 +477,7 @@ describe("Builtins", () => {
 		it("binds exactly the native entries to the runtime", () => {
 			let bindings = loadStdlib().nativeBindings["Terminal"]
 
-			// NOTE: `print` and `ask` are Essence, the other five are native —
+			// `print` and `ask` are Essence, the other five are native —
 			// one Method each now that the Stream is a DEFAULT rather than an
 			// Overload entry, so each Array holds one flag and the runtime
 			// export wears the plain name.
@@ -505,7 +505,7 @@ describe("Builtins", () => {
 		})
 	})
 
-	// NOTE: "Every stdlib Method is documented" is a completion gate, not an
+	// "Every stdlib Method is documented" is a completion gate, not an
 	// aspiration — Hover and Signature Help surface these descriptions, so an
 	// undocumented Method ships a blank tooltip. The backfill of 2026-07-22
 	// took coverage to 100%; this keeps it there.

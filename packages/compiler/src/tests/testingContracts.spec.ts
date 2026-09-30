@@ -15,7 +15,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `essence test --contracts` end to end — what the Enricher synthesizes
+// `essence test --contracts` end to end — what the Enricher synthesizes
 // out of a Namespace's own declarations, what it refuses to synthesize, and
 // what a run of the goals reports. The property machinery underneath is
 // `testingProperties.spec.ts`; what a DECLARATION says to test is here.
@@ -45,7 +45,7 @@ function analyse(
 	return { program: enriched.program, diagnostics }
 }
 
-// NOTE: A Module with one Namespace in it and a written test beside it, so
+// A Module with one Namespace in it and a written test beside it, so
 // every case below is the declarations and nothing else. The written test is
 // there on purpose: a contract run runs what a project WROTE as well, and the
 // goals are appended after it.
@@ -111,7 +111,7 @@ function generate(source: string): string {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// NOTE: The whole pipeline and then the run, driven through the loaded
+// The whole pipeline and then the run, driven through the loaded
 // program's OWN `$tests` — see `testingProperties.spec.ts`, which says why.
 async function run(
 	source: string,
@@ -284,7 +284,7 @@ describe("Contract tests", () => {
 			])
 		})
 
-		// NOTE: What the expects ASK, spelled out — the answer is bound, and
+		// What the expects ASK, spelled out — the answer is bound, and
 		// each conjunct is the predicate a reader could have written about it.
 		// A goal that bound the answer and asked nothing of it would pass every
 		// run without saying so.
@@ -320,7 +320,7 @@ describe("Contract tests", () => {
 			])
 		})
 
-		// NOTE: Totality over the declared domain is the contract every Method
+		// Totality over the declared domain is the contract every Method
 		// makes, refinement or none — so a Method whose answer refines nothing
 		// still has a goal, and the call still has to survive it.
 		it("still calls a Method whose answer promises nothing", () => {
@@ -339,7 +339,7 @@ describe("Contract tests", () => {
 	})
 
 	describe("What a goal carries", () => {
-		// NOTE: The ratified budget: a Namespace is dozens of goals, and a
+		// The ratified budget: a Namespace is dozens of goals, and a
 		// hundred cases each is a run nobody asked to wait for.
 		it("budgets a generated goal at twenty-five cases", () => {
 			let [goal] = goalsOf(
@@ -388,7 +388,7 @@ describe("Contract tests", () => {
 			)
 		})
 
-		// NOTE: The speculative synthesis reports what it can not build and
+		// The speculative synthesis reports what it can not build and
 		// what does not typecheck, about code nobody wrote. Every one of those
 		// is answered once, about the Namespace, and none of them leaks.
 		it("leaves no stray Diagnostic behind a skipped goal", () => {
@@ -403,7 +403,7 @@ describe("Contract tests", () => {
 			expect(messages).toEqual(["ungeneratable-contract"])
 		})
 
-		// NOTE: A goal's body is the call as a bare Expression Statement, which
+		// A goal's body is the call as a bare Expression Statement, which
 		// for a Method answering work is exactly what `unused-future` names —
 		// and the Statement is generated, so the report landed on the whole
 		// `implementation` block, where no edit could answer it. The whole file
@@ -439,7 +439,7 @@ describe("Contract tests", () => {
 			)
 		})
 
-		// NOTE: Without a remark, deliberately: the rule is documented, and the
+		// Without a remark, deliberately: the rule is documented, and the
 		// only help a remark could offer — a Generatable conformance — could
 		// never make a generic Method eligible.
 		it("leaves a generic Method alone, and says nothing about it", () => {
@@ -464,7 +464,7 @@ describe("Contract tests", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A second same-file declaration of one Namespace is its own
+		// A second same-file declaration of one Namespace is its own
 		// compile error, but the enrichment carries on — and the Scope answers
 		// BOTH statements with the SURVIVING Namespace, so without the
 		// own-members filter its Methods would goal once per statement: one
@@ -542,7 +542,7 @@ tests {
 			expect(failed(events)).toEqual([])
 		})
 
-		// NOTE: A goal reports under the Method's own spelling and under the
+		// A goal reports under the Method's own spelling and under the
 		// synthetic suite, which is what makes it findable with `--filter` and
 		// what a stored counterexample is keyed by.
 		it("reports a goal under the contracts suite", async () => {
@@ -563,7 +563,7 @@ tests {
 			expect(start?.name).toBe("written")
 		})
 
-		// NOTE: One refinement, several entries over it. The synthesis derives
+		// One refinement, several entries over it. The synthesis derives
 		// the refinement's generator ONCE per Module and every goal shares it,
 		// so the typed check inside is simplified once per goal that holds it —
 		// and a Simplifier that wrote the mangled Overload name back into the

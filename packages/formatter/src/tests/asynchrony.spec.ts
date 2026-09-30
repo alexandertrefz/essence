@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { format } from "../index"
 
-// NOTE: The two prefix Keywords. Each is written as one word, one space and its
+// The two prefix Keywords. Each is written as one word, one space and its
 // operand — there is nothing else to decide, because the operand is the whole
 // postfix chain and Essence has no grouping parentheses to put around one.
 //
@@ -60,7 +60,7 @@ describe("start and complete", () => {
 		)
 	})
 
-	// NOTE: And both are ordinary names wherever no Expression follows them on
+	// And both are ordinary names wherever no Expression follows them on
 	// their own line, which the printer has nothing to decide about.
 	it("writes either word where it is a name", () => {
 		roundTrips(
@@ -72,7 +72,7 @@ describe("start and complete", () => {
 		)
 	})
 
-	// NOTE: A word that ends its line is a name and the Statement below it is a
+	// A word that ends its line is a name and the Statement below it is a
 	// Statement of its own, so there are two here for the printer to print and
 	// it leaves both where they are. The Parser's line rule is what makes that
 	// true: while the operand could begin on a later line, these two came in as
@@ -89,7 +89,7 @@ describe("start and complete", () => {
 		)
 	})
 
-	// NOTE: A chain the Keyword holds breaks the way any chain does, with each
+	// A chain the Keyword holds breaks the way any chain does, with each
 	// link on a line of its own and the Keyword staying with the head.
 	it("breaks a chain that does not fit under the Keyword", () => {
 		roundTrips(

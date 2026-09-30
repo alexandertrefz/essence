@@ -58,7 +58,7 @@ import {
 	tallyMutants,
 } from "./testReport"
 
-// NOTE: The driver of `essence test --mutate`. Coverage says a line RAN; this
+// The driver of `essence test --mutate`. Coverage says a line RAN; this
 // says a bug there would be CAUGHT.
 //
 // The shape of a run is three movements. A BASELINE compile with the counters
@@ -68,7 +68,7 @@ import {
 // deliberate lie compiled through the same warm Session the baseline was
 // compiled through, run against ONLY the tests that reach it.
 //
-// NOTE: The run is pinned to ONE seed, made once and handed to the baseline and
+// The run is pinned to ONE seed, made once and handed to the baseline and
 // to every mutant alike. It is what makes the answer reproducible in the one
 // place a mutation run could otherwise be a coin toss: a property test in the
 // covering set draws exactly the values it drew when the baseline was declared
@@ -77,7 +77,7 @@ import {
 // replayed first, so a mutant that reintroduces a bug the corpus remembers is
 // killed by the very case that caught it the first time.
 
-// NOTE: What `--mutate` may not be asked alongside, and why each is a
+// What `--mutate` may not be asked alongside, and why each is a
 // contradiction rather than a combination. Refused before anything runs, the
 // way `--contracts` and `--no-contracts` are.
 const CONTRADICTIONS: Array<[keyof OptionValues, string, string]> = [
@@ -113,7 +113,7 @@ function contradiction(
 		}
 	}
 
-	// NOTE: The same refusal `essence test` makes, made here too, because this
+	// The same refusal `essence test` makes, made here too, because this
 	// run resolves contracts exactly as that one does and a run that guessed
 	// which of the two was meant would prove either more or less than the
 	// reader asked for.
@@ -121,14 +121,14 @@ function contradiction(
 		return "--contracts and --no-contracts contradict each other — say one."
 	}
 
-	// NOTE: Turning the instrumentation pass OFF is the one way to leave a
+	// Turning the instrumentation pass OFF is the one way to leave a
 	// mutation run compiling, running and reporting while quietly answering
 	// about nothing: no counters means no coverage table, no table means no
 	// test reaches any site, and every site in the project comes back as one no
 	// test reaches. Refused rather than warned about, because the report it
 	// would print is a plausible one.
 	if (options.withoutOptimisation.includes(coveragePassName)) {
-		// NOTE: Named where it was written. The pass is left out by a flag or
+		// Named where it was written. The pass is left out by a flag or
 		// by the project's own `build.withoutOptimisations`, and a refusal that
 		// named a flag nobody typed would send its reader looking through a
 		// command line that does not hold it.
@@ -150,7 +150,7 @@ function contradiction(
 
 // #region The attribution join
 
-// NOTE: The tests that reach a site, in the order the RUN met them, so that a
+// The tests that reach a site, in the order the RUN met them, so that a
 // report names the same killer twice and a Worker is handed the same list.
 function coveringTests(
 	site: MutationSite,
@@ -189,12 +189,12 @@ type MutantRequest = Omit<
 	"kind" | "id"
 >
 
-// NOTE: The recycled Worker, from this side. It boots on the first mutant, and
+// The recycled Worker, from this side. It boots on the first mutant, and
 // it is TERMINATED and replaced whenever it says it has loaded its last bundle
 // — which is the whole reason it exists: every bundle a run loads is a Module
 // that can never be unloaded, and a run compiles hundreds of them.
 type MutantRunner = {
-	// NOTE: `timeout` is per mutant, in milliseconds, and it is not optional:
+	// `timeout` is per mutant, in milliseconds, and it is not optional:
 	// a run that could wait forever is a run that can hang a CI job forever,
 	// which is worse than no mutation report at all. What the number is, is
 	// `mutantTimeout`'s business.
@@ -202,7 +202,7 @@ type MutantRunner = {
 	dispose: () => Promise<void>
 }
 
-// NOTE: How long ONE mutant may run before the driver stops waiting. A mutant
+// How long ONE mutant may run before the driver stops waiting. A mutant
 // is a deliberate lie, and one of the lies this walker tells — a comparison
 // rotated, a literal nudged, an `if` turned inside out — is exactly the shape
 // that turns a terminating loop into a loop with no end. So the wait is bounded
@@ -220,7 +220,7 @@ export function mutantTimeout(baselineMilliseconds: number): number {
 	)
 }
 
-// NOTE: Whether the Worker that answered this way is still worth keeping. One
+// Whether the Worker that answered this way is still worth keeping. One
 // that crashed on a bundle caught its own error and is as good as it was; one
 // that was TERMINATED mid-spin, one that died, and one whose port would not
 // carry an answer are each a thread the next mutant may not be handed.
@@ -229,7 +229,7 @@ function keepsWorker(phase: MutantPhase | null): boolean {
 }
 
 function createMutantRunner(stores: MutantStores): MutantRunner {
-	// NOTE: Asked of THIS module's own URL, because that is what says whether
+	// Asked of THIS module's own URL, because that is what says whether
 	// the package is running as sources or as what was published — see
 	// `workerFileName`, which the compile pool asks the same question of.
 	let workerURL = new URL(
@@ -239,7 +239,7 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 	let worker: Worker | null = null
 	let next = 0
 
-	// NOTE: The stores cross ONCE per thread rather than once per mutant. They
+	// The stores cross ONCE per thread rather than once per mutant. They
 	// belong to the run — every mutant of it compares itself against the same
 	// snapshots and replays the same counterexamples — and a Worker recycles
 	// every sixty-four bundles, so a project with a large `__snapshots__` was
@@ -284,7 +284,7 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 			let answer = await new Promise<MutantRun>((resolve) => {
 				let timer: ReturnType<typeof setTimeout> | null = null
 				let settled = false
-				// NOTE: Every way out of the wait goes through here, and it
+				// Every way out of the wait goes through here, and it
 				// answers ONCE: a Worker that dies a moment after it was given
 				// up on, or one whose message arrives as the timer fires, must
 				// not resolve a Promise that is already resolved and must not
@@ -320,7 +320,7 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 						settle(message)
 					}
 				}
-				// NOTE: A Worker that dies takes its mutant with it, and what
+				// A Worker that dies takes its mutant with it, and what
 				// died was the mutant's own run — so it is answered as a
 				// mutant the world noticed rather than as one nothing could be
 				// learnt from. The thread is dropped either way, so the next
@@ -328,7 +328,7 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 				let onError = (error: unknown): void => {
 					failed(rendered(error), "worker")
 				}
-				// NOTE: The listener without which this whole Promise could
+				// The listener without which this whole Promise could
 				// never settle. A Worker can go away without ever raising an
 				// `error` — a native crash, a `process.exit` inside a mutated
 				// Module's top level — and the driver was left waiting on a
@@ -356,7 +356,7 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 				} satisfies MutantWorkerRequest)
 			})
 
-			// NOTE: A hung mutant is still SPINNING, and terminating it is the
+			// A hung mutant is still SPINNING, and terminating it is the
 			// only thing that stops it. The same call recycles the Worker for
 			// every other answer that leaves one unfit — see `keepsWorker` —
 			// and for the ordinary case of a Worker that has loaded its last
@@ -377,19 +377,19 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 
 type MutantStatus = MutantRecord["status"]
 
-// NOTE: Which MODULES a run mutates, which the paths on the command line scope
+// Which MODULES a run mutates, which the paths on the command line scope
 // and the tests they select do not: `essence test --mutate src/Standings.es`
 // asks about the lies THAT file admits, and runs whatever tests reach them.
 // Nothing named means every Module the run compiled.
 //
-// NOTE: A glob is read down to its literal head — `src/*.es` scopes to `src` —
+// A glob is read down to its literal head — `src/*.es` scopes to `src` —
 // rather than expanded a second time. What is being answered is "is this Module
 // one the reader pointed at", and the head is what they pointed at. WHAT counts
 // as a glob character is the resolver's own answer, imported rather than
 // restated: a second spelling that disagreed about `]` or `}` would scope a run
 // to a directory nobody named.
 //
-// NOTE: CANONICAL, because the other side of the comparison is: a Module names
+// CANONICAL, because the other side of the comparison is: a Module names
 // itself by the path the graph resolved, symlinks followed and casing as the
 // filesystem stores it. On a Mac a temporary directory is `/var/…` lexically and
 // `/private/var/…` really, and one un-canonicalised side is enough to scope a
@@ -421,7 +421,7 @@ export function isInScope(module: string, scope: Array<string>): boolean {
 	)
 }
 
-// NOTE: Every site the run holds, once per Module and in one order — file name,
+// Every site the run holds, once per Module and in one order — file name,
 // then the walk's own numbering. A Module two entries reach is enumerated under
 // each of them and the two lists are identical, so the second is dropped rather
 // than believed.
@@ -459,7 +459,7 @@ export function collectSites(
 		)
 }
 
-// NOTE: What a SPEC may reach in and change, and nothing a command line can
+// What a SPEC may reach in and change, and nothing a command line can
 // say. `mutantTimeout` never answers under `MINIMUM_MUTANT_TIMEOUT`, and a
 // spec that proves a hang is caught asks for a shorter wait, so the seam is a
 // parameter of this Function rather than an Option or an environment variable,
@@ -484,7 +484,7 @@ export async function runMutation(
 		return EXIT_USAGE
 	}
 
-	// NOTE: BOUND before anything redirects it. The baseline is run with stdout
+	// BOUND before anything redirects it. The baseline is run with stdout
 	// pointed at stderr — a mutated Module's own top-level output belongs to
 	// nobody and may not land in the middle of the stream — and this is the
 	// reference to the real one.
@@ -494,14 +494,14 @@ export async function runMutation(
 			writeEvent(`${JSON.stringify(event)}\n`)
 		}
 	}
-	// NOTE: Every way out that is not the report, answered the same way: the
+	// Every way out that is not the report, answered the same way: the
 	// stream ends with a `mutation-end` whatever happened, so a consumer reading
 	// it is never left waiting for a tally that is not coming. What it carries
 	// where the run learnt nothing is zeros, and the baseline's own events go
 	// out ahead of it — a red baseline under `--json` used to write an empty
 	// stream and exit 1, which told a reader nothing about which test failed.
 	//
-	// NOTE: The baseline's events are replayed HERE rather than streamed as
+	// The baseline's events are replayed HERE rather than streamed as
 	// they happen, and that is the reproducibility claim keeping its shape: a
 	// `test-pass` carries a duration, and a duration is a fact about a machine.
 	// Two runs at one seed write the same stream, and a run that streamed its
@@ -540,7 +540,7 @@ export async function runMutation(
 		return stopEarly(EXIT_SUCCESS)
 	}
 
-	// NOTE: The baseline compiles with the counters IN, whatever the command
+	// The baseline compiles with the counters IN, whatever the command
 	// line said about coverage — the attribution join reads them, and a site no
 	// counter stands over is a site no test can be shown to reach. It is not a
 	// coverage report and never prints one; `--coverage` is refused beside
@@ -549,7 +549,7 @@ export async function runMutation(
 		...context,
 		options: { ...context.options, coverage: true },
 	}
-	// NOTE: The mode the project's own `essence test` runs in, goals and all —
+	// The mode the project's own `essence test` runs in, goals and all —
 	// see `resolveContracts`. A generated goal is a test like any other: it
 	// reaches sites, it kills mutants, and a run that left it out would report a
 	// project that tests its declarations as testing less than it does. The
@@ -563,7 +563,7 @@ export async function runMutation(
 		enumerateMutations: true,
 	})
 	let staging = await createStagingDirectory("essence-mutate-")
-	// NOTE: Built once the stores it hands its Workers are known, which is after
+	// Built once the stores it hands its Workers are known, which is after
 	// the baseline compiled — so it is a name declared here and assigned there,
 	// because the `finally` below is what disposes of it however the run ends.
 	let runner: MutantRunner | null = null
@@ -576,7 +576,7 @@ export async function runMutation(
 
 		printDiagnostics(context, compilation)
 
-		// NOTE: The baseline must be GREEN, and a compile that stopped is the
+		// The baseline must be GREEN, and a compile that stopped is the
 		// first way it can fail to be. Everything a mutation run says rests on
 		// "these tests pass over this code" — a project where they do not is a
 		// project with a question to answer before this one.
@@ -611,7 +611,7 @@ export async function runMutation(
 
 		runner = createMutantRunner({ snapshots: stored, counterexamples })
 
-		// NOTE: ONE seed for the baseline and for every mutant of the run. See
+		// ONE seed for the baseline and for every mutant of the run. See
 		// the note at the top of the file: it is what makes a property test in
 		// the covering set answer the same question of the mutant that it
 		// answered of the code.
@@ -637,7 +637,7 @@ export async function runMutation(
 					suites,
 					filters,
 					(event) => events.push(event),
-					// NOTE: The counters, AND what each test touched of them —
+					// The counters, AND what each test touched of them —
 					// which is the whole of what turns "this line ran" into "these
 					// tests reach this site".
 					{ byTest: true },
@@ -667,7 +667,7 @@ export async function runMutation(
 			return stopEarly(EXIT_FAILURE, events)
 		}
 
-		// NOTE: A focused baseline is REFUSED, and not for the reason `essence
+		// A focused baseline is REFUSED, and not for the reason `essence
 		// test` refuses one at the end of a plain run. A focus silences most of
 		// the suite, and this run reads what ran to learn which tests reach
 		// which site — so every site the silenced tests cover comes back as one
@@ -694,14 +694,14 @@ export async function runMutation(
 
 		let { attribution, durations } = foldBaseline(baseline, events)
 
-		// NOTE: And the stream is DROPPED here, which is the last moment
+		// And the stream is DROPPED here, which is the last moment
 		// anything needs it: the early exits above replay it, and everything
 		// past this point reads the folds instead. A green suite's baseline is
 		// several events per test, and the loop it is standing in front of
 		// compiles and loads hundreds of Modules.
 		events.length = 0
 
-		// NOTE: The order the RUN met each test, which is what makes a covering
+		// The order the RUN met each test, which is what makes a covering
 		// set a list rather than a set: the Worker runs them in it and stops at
 		// the first kill, so the killer a report names is the same one twice.
 		let order = new Map<string, number>()
@@ -718,7 +718,7 @@ export async function runMutation(
 		let sites = collectSites(compilation.outcomes, scope)
 		let mutants: Array<MutantRecord> = []
 		let compiled = 0
-		// NOTE: Written as each mutant is judged rather than at the end, so a
+		// Written as each mutant is judged rather than at the end, so a
 		// consumer watching a long run learns what it learns when it is learnt
 		// — the same discipline the test stream keeps. The list beside it is
 		// what the human report reads, which is written once at the end.
@@ -727,7 +727,7 @@ export async function runMutation(
 			emit({ schema: 1, kind: "mutant", ...mutant })
 		}
 
-		// NOTE: The limit caps what is JUDGED and nothing else. A mutant costs a
+		// The limit caps what is JUDGED and nothing else. A mutant costs a
 		// compile and a run, which is what a reader narrowing a large project is
 		// buying their way out of; a site no test reaches costs neither, and
 		// leaving those out under a limit would report a project as having fewer
@@ -735,7 +735,7 @@ export async function runMutation(
 		// is recorded whatever the limit, in the walk's own order, and the limit
 		// is counted against the mutants that were actually built.
 		//
-		// NOTE: A site past the limit is neither judged nor DROPPED. `sites`
+		// A site past the limit is neither judged nor DROPPED. `sites`
 		// counts every site the walker kept, and the five statuses under it
 		// count what became of the ones that were looked at — so what the limit
 		// left alone is the remainder, which a consumer subtracts and the human
@@ -784,7 +784,7 @@ export async function runMutation(
 
 		emit({ schema: 1, kind: "mutation-end", ...counts })
 
-		// NOTE: Skipped under `--json` exactly as the test report is: stdout
+		// Skipped under `--json` exactly as the test report is: stdout
 		// carries the event stream and nothing else.
 		if (!context.options.json && !context.options.quiet) {
 			for (let line of renderMutation(
@@ -797,7 +797,7 @@ export async function runMutation(
 			}
 		}
 
-		// NOTE: Exit 0 by default, because a mutation score is INFORMATION: a
+		// Exit 0 by default, because a mutation score is INFORMATION: a
 		// project learning what its tests would catch has not failed by being
 		// told. `--strict` is what a job holding a project to its score asks
 		// for.
@@ -811,7 +811,7 @@ export async function runMutation(
 	}
 }
 
-// NOTE: The baseline read down to what the rest of the run needs from it: which
+// The baseline read down to what the rest of the run needs from it: which
 // tests reach which point, and how long each test took while the code still
 // told the truth. The caller empties the event stream once this answers.
 function foldBaseline(
@@ -823,7 +823,7 @@ function foldBaseline(
 } {
 	return {
 		attribution: attributionOf(events),
-		// NOTE: Read off the FOLD rather than off the events a second time,
+		// Read off the FOLD rather than off the events a second time,
 		// because the fold has already answered it.
 		durations: new Map(
 			baseline.tests.map((test) => [test.id, test.duration]),
@@ -831,7 +831,7 @@ function foldBaseline(
 	}
 }
 
-// NOTE: A site and what became of it, in the shape the event and the report
+// A site and what became of it, in the shape the event and the report
 // both read — see `MutantRecord`, which is the one place those fields are
 // spelled.
 function recordOf(
@@ -851,7 +851,7 @@ function recordOf(
 	}
 }
 
-// NOTE: One mutant, compiled and asked. Every entry holding a covering test is
+// One mutant, compiled and asked. Every entry holding a covering test is
 // recompiled with the lie in it — usually one, and more only where two entries
 // both reach the mutated Module and both test it — and each is run against its
 // own share of the covering set.
@@ -865,11 +865,11 @@ async function judge(work: {
 	index: number
 	runner: MutantRunner
 	seed: string
-	// NOTE: What each covering test took in the BASELINE, which is what this
+	// What each covering test took in the BASELINE, which is what this
 	// mutant's own wait is measured against — see `mutantTimeout`.
 	durations: Map<string, number>
 	timeoutFor: (baselineMilliseconds: number) => number
-	// NOTE: Whether the goals a Namespace's declarations promise are compiled
+	// Whether the goals a Namespace's declarations promise are compiled
 	// into the mutant as well. It has to be the baseline's own answer: a
 	// covering set holding a generated goal is a covering set that names a test
 	// which is not in a bundle compiled without them.
@@ -901,7 +901,7 @@ async function judge(work: {
 	let step = 0
 
 	for (let [entry, ids] of byEntry) {
-		// NOTE: A directory per bundle. Bun's resolver remembers what a
+		// A directory per bundle. Bun's resolver remembers what a
 		// directory held the first time it read anything out of it, so a second
 		// bundle written beside the first would be invisible to the `import()`
 		// that runs it — the same trap `stageBundle` exists for, answered here
@@ -922,7 +922,7 @@ async function judge(work: {
 			outputFileName: path.join(directory, "mutant.mjs"),
 			minify: false,
 			sourcemap: false,
-			// NOTE: WITHOUT the counters. The baseline's are what said which
+			// WITHOUT the counters. The baseline's are what said which
 			// tests reach this site, and the answer is already in hand — a
 			// mutant counts nothing, and instrumenting hundreds of bundles
 			// would pay for a table nobody reads.
@@ -935,7 +935,7 @@ async function judge(work: {
 			},
 		})
 
-		// NOTE: A mutant that would not compile is INVALID rather than killed.
+		// A mutant that would not compile is INVALID rather than killed.
 		// It is the walker's own shortfall — a swap it could not prove sound —
 		// and counting it as a kill would credit the tests for catching
 		// something they never saw.
@@ -958,12 +958,12 @@ async function judge(work: {
 			),
 		)
 
-		// NOTE: A mutant that never came back is CAUGHT. A run that does not end
+		// A mutant that never came back is CAUGHT. A run that does not end
 		// is a failure anybody would notice — the loop that no longer stops is
 		// exactly what a rotated comparison or a nudged bound turns a good one
 		// into — so it counts for the tests rather than against them.
 		//
-		// NOTE: Every other problem is a KILL. A bundle that would not load, a
+		// Every other problem is a KILL. A bundle that would not load, a
 		// runner that threw, a Worker that died: a program that comes apart is a
 		// program the world notices, and `invalid` means one thing only, which
 		// is that the mutant did not COMPILE. There is no killer to name.

@@ -5,12 +5,12 @@ import type { CompileMode } from "@essence-lang/compiler/compileMode"
 import { type CompileRequest, compileFile } from "./pipeline"
 import { type CompileSession, createCompileSession } from "./session"
 
-// NOTE: The Enricher is a single synchronous call that can take most of a
+// The Enricher is a single synchronous call that can take most of a
 // second on a large file. Running it on the main thread would freeze the
 // spinner exactly when there is finally something worth spinning about, so
 // compilation happens here and the main thread is left free to draw.
 
-// NOTE: Every facet of the mode is REQUIRED here rather than left optional. The
+// Every facet of the mode is REQUIRED here rather than left optional. The
 // mode is the whole run's and a worker is opened in it — a `begin` that forgets
 // to say opens the worker as a build, which compiles every file of a test run
 // without the section the run exists to check. Requiring them is what makes the
@@ -29,7 +29,7 @@ let port = parentPort
 
 if (port !== null) {
 	let channel = port
-	// NOTE: The entries this worker was given, as one Session, so that a Module
+	// The entries this worker was given, as one Session, so that a Module
 	// two of them import is read and enriched once here. A worker shares
 	// nothing with its siblings: a Module two workers were both given is
 	// enriched in each, which is why the entries are handed out in graph-shaped

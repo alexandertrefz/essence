@@ -24,7 +24,7 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// NOTE: The parts are held unreduced — a Rational built from 4 and 2 HOLDS 4
+// The parts are held unreduced — a Rational built from 4 and 2 HOLDS 4
 // and 2 — and are treated as immutable everywhere; reduction happens on read,
 // in `reducedParts`, so that same Rational PRINTS as `2/1`. The two sides matter
 // separately: `compare` and `anyIs` cross-multiply the raw parts, which is what
@@ -36,7 +36,7 @@ export type RationalType = {
 	denominator: bigint
 }
 
-// NOTE: The single gateway every Rational is built through, and the reason the
+// The single gateway every Rational is built through, and the reason the
 // ordering primitives may cross-multiply the raw parts: the sign lives on the
 // numerator, never on the denominator. Zero is canonicalised here as well —
 // a zero reached by cancellation (`1/2 − 1/2` gives `0/4`) has one
@@ -65,7 +65,7 @@ export function of__overload$1(
 	numerator: IntegerType,
 	denominator: IntegerType,
 ): OptionalType<RationalType> {
-	// NOTE: Zero is in safe range, so the canonical invariant makes it the
+	// Zero is in safe range, so the canonical invariant makes it the
 	// number `0` — `0n` would answer `false` for the value it looks for.
 	if (denominator.value === 0) {
 		return createEmpty()
@@ -76,7 +76,7 @@ export function of__overload$1(
 	)
 }
 
-// NOTE: The same construction with the zero check taken OUT rather than skipped
+// The same construction with the zero check taken OUT rather than skipped
 // — it was already made. This entry is reached only for a denominator the
 // Compiler proved is not zero, so what is left is exactly what the entry above
 // does once it has decided the same thing, and there is nothing left to wrap an
@@ -88,14 +88,14 @@ export function of__overload$2(
 	return createRational(BigInt(numerator.value), BigInt(denominator.value))
 }
 
-// NOTE: The lowest-terms form with the sign on the numerator — the shape the
+// The lowest-terms form with the sign on the numerator — the shape the
 // accessors, the rounding family and the formatters read. Reducing is a
 // greatest-common-divisor over two bigints, and the SAME Rational is asked for
 // it over and over: printing one as a decimal asks, `raise` asks, and reading
 // its numerator and then its denominator asks twice for one answer. So the
 // answer is remembered on the value itself, under a Symbol key.
 //
-// NOTE: What is stored is untouched by this. A Rational holds its parts exactly
+// What is stored is untouched by this. A Rational holds its parts exactly
 // as it was built with them — `createRational(4n, 2n)` still holds 4 and 2, and
 // `compare` and `anyIs` still cross-multiply those raw parts — and this is the
 // READ-side view the accessors and the formatters take of them. A Symbol key is
@@ -103,7 +103,7 @@ export function of__overload$2(
 // Record equality, the printer and the runtime Type checks read a value with,
 // and a Rational is immutable, so a remembered form can never go stale.
 //
-// NOTE: The remembered `BigRational` IS what is handed back rather than a copy,
+// The remembered `BigRational` IS what is handed back rather than a copy,
 // so every caller here only ever READS it.
 const reducedPartsKey = Symbol("$reducedParts")
 
@@ -121,14 +121,14 @@ function reducedParts(rational: RationalType): BigRational {
 	return parts
 }
 
-// NOTE: A Rational built FROM parts already in lowest terms — which is what the
+// A Rational built FROM parts already in lowest terms — which is what the
 // four arithmetic entries below are handed, since the bigint-rational core
 // reduces what it answers. The parts are remembered as the read-side view right
 // away, so the first accessor, formatter or `raise` to ask pays no
 // greatest-common-divisor of its own: the answer is the value it was built
 // with.
 //
-// NOTE: `createRational` is still the gateway, and it changes nothing here —
+// `createRational` is still the gateway, and it changes nothing here —
 // `reduced` already puts the sign on the numerator and canonicalises zero as
 // `0/1`, which is exactly what it would otherwise do — so what is stored and
 // what is remembered are the same two bigints rather than two views that must
@@ -146,21 +146,21 @@ function createReducedRational(parts: BigRational): RationalType {
 
 // #region Arithmetic
 
-// NOTE: The four same-kind operations, each a few products of the parts and
+// The four same-kind operations, each a few products of the parts and
 // one reduction on the parts themselves. The Essence bodies they replace read
 // `numerator()` and `denominator()` off both operands — four Integers built
 // only to be unwrapped — did the same arithmetic through four more boxes, and
 // handed the parts to `Rational.of`, whose answer was UNREDUCED and charged its
 // next reader a greatest-common-divisor.
 //
-// NOTE: Same answers, and a smaller representation of them. `4/2` built by
+// Same answers, and a smaller representation of them. `4/2` built by
 // `Rational.of` still HOLDS 4 and 2 — nothing here touches what construction
 // stores — but a SUM now holds its lowest terms rather than the products the
 // cross-multiplication left. Nothing can tell: every accessor and every
 // formatter already answered in lowest terms, and equality cross-multiplies the
 // raw parts, so `(1/2)::add(1/2)` equals `1` whether it holds `4/4` or `1/1`.
 //
-// NOTE: Through `reducedParts` rather than `bigRationalOf`, which is the same
+// Through `reducedParts` rather than `bigRationalOf`, which is the same
 // answer off the remembered form — an operand that has been read, printed or
 // operated on before reduces once for all of them.
 export function add__overload$1(
@@ -190,7 +190,7 @@ export function multiply__overload$1(
 	)
 }
 
-// NOTE: The one entry that can fail, and it answers the same Optional the
+// The one entry that can fail, and it answers the same Optional the
 // Essence body did: it multiplied with `other::reciprocal()`, which is empty
 // for zero, so a zero divisor was the whole of what came back empty. Asked
 // outright here — a Rational is zero exactly when its numerator is, in lowest
@@ -210,7 +210,7 @@ export function divide__overload$1(
 	)
 }
 
-// NOTE: The same division under the proof its refined entry carries. The
+// The same division under the proof its refined entry carries. The
 // divisor is a `NonZeroRational` in the source, so the numerator test above can
 // not fire and the Optional always holds a value. A read of that value rather
 // than a second division: the arithmetic stays in one place.
@@ -225,7 +225,7 @@ export function divide__overload$7(
 
 // #region Everyday methods
 
-// NOTE: Through `createInteger` rather than written out, because the parts are
+// Through `createInteger` rather than written out, because the parts are
 // bigints and an Integer holding one that fits a double would be a second
 // spelling of a value that already has one.
 export function numerator(rational: RationalType): IntegerType {
@@ -236,7 +236,7 @@ export function denominator(rational: RationalType): IntegerType {
 	return createInteger(reducedParts(rational).denominator)
 }
 
-// NOTE: Native so that the answer can be declared a `NonNegativeRational`: a
+// Native so that the answer can be declared a `NonNegativeRational`: a
 // refinement erases before anything runs, and an Essence body could only
 // answer a bare Rational for the arm that negates. The value itself is handed
 // back where it is not negative — the same object, since a Rational is never
@@ -246,7 +246,7 @@ export function denominator(rational: RationalType): IntegerType {
 // `NonZeroRational` declares this Function again under its own name, where the
 // same answer is a `PositiveRational`.
 //
-// NOTE: The sign is on the numerator by the invariant `createRational` keeps,
+// The sign is on the numerator by the invariant `createRational` keeps,
 // so the numerator alone answers which arm this is.
 export function absolute(rational: RationalType): RationalType {
 	return rational.numerator < 0n
@@ -275,7 +275,7 @@ export function raise__overload$1(
 	)
 }
 
-// NOTE: The exponent of this entry is a `NonNegativeInteger` in the source —
+// The exponent of this entry is a `NonNegativeInteger` in the source —
 // proven while compiling, erased to an Integer here — so there is no empty arm
 // to build and no reciprocal to take. It holds the non-negative power rather
 // than reading it back out of the Optional entry, which is the direction
@@ -292,7 +292,7 @@ export function raise__overload$3(
 
 // #endregion
 
-// NOTE: Exported for `getStringRepresentation` in `Terminal.ts`, which renders
+// Exported for `getStringRepresentation` in `Terminal.ts`, which renders
 // a Rational off this helper. This is the STRUCTURAL form, which
 // `Terminal.inspect`, `Terminal.describe` and the test runtime's difference
 // ask for: a whole Rational shows as `5/1`, because what `inspect` shows is
@@ -303,7 +303,7 @@ export function formatAsRational(rational: RationalType): string {
 	return `${parts.numerator}/${parts.denominator}`
 }
 
-// NOTE: The fraction form a CALLER asks for, which is not the structural form
+// The fraction form a CALLER asks for, which is not the structural form
 // above: a whole Rational prints its numerator alone, so `5/1` reads as `5`.
 // Every `Printable` rendering answers this one, and they have to agree — the
 // Essence `toString()` entry beside this one, `toString(as #Fraction)` here,
@@ -319,11 +319,11 @@ export function formatAsFraction(rational: RationalType): string {
 	return `${parts.numerator}/${parts.denominator}`
 }
 
-// NOTE: A deliberate cap, not a technical one: a non-terminating expansion is
+// A deliberate cap, not a technical one: a non-terminating expansion is
 // cut after this many fractional digits, with the last kept digit rounded.
 const DECIMAL_DIGIT_LIMIT = 80
 
-// NOTE: Long division on the magnitude, sign prefixed afterwards — so the cut
+// Long division on the magnitude, sign prefixed afterwards — so the cut
 // digit rounds halves away from zero, matching `round`. A terminating
 // expansion stops at its last digit, and a whole value prints without a dot,
 // so every result is text `Rational.parse` reads back.
@@ -356,14 +356,14 @@ function formatAsDecimal(rational: RationalType): string {
 			wholePart = wholePart + 1n
 		}
 
-		// NOTE: Zeroes the carry walked over are rounding artifacts, not
+		// Zeroes the carry walked over are rounding artifacts, not
 		// expansion digits — `0.0999…` rounds to `0.1`, not `0.1000…`.
 		while (digits.length > 0 && digits[digits.length - 1] === "0") {
 			digits.pop()
 		}
 	}
 
-	// NOTE: A cut that kept only zeroes rounded to the whole part alone — the
+	// A cut that kept only zeroes rounded to the whole part alone — the
 	// digits are dropped so the value prints as the whole it rounded to, and
 	// the sign goes with them when nothing is left: there is no negative zero.
 	if (digits.length > 0 && digits.every((digit) => digit === "0")) {
@@ -382,7 +382,7 @@ function formatAsDecimal(rational: RationalType): string {
 	return `${sign}${wholePart}.${digits.join("")}`
 }
 
-// NOTE: The one place a `Rounding` Case decides an answer here, shared by the
+// The one place a `Rounding` Case decides an answer here, shared by the
 // fixed-width formatter and the scientific mantissa. It is asked about the
 // MAGNITUDE — `digits` and `remainder` are both non-negative, and the sign is
 // prefixed afterwards — so the two directions that name a side of the number
@@ -420,14 +420,14 @@ function roundsUpTheMagnitude(
 	}
 }
 
-// NOTE: The same long division as `formatAsDecimal`, over a fixed width: the
+// The same long division as `formatAsDecimal`, over a fixed width: the
 // magnitude is scaled by a power of ten first, so the quotient IS the digit
 // string and the remainder decides the one rounding. The direction decides
 // which way that one rounding goes, and `#Nearest` is what a call that names
 // none is handed. A width below one rounds to a whole number, the same answer
 // `round(toPlaces:)` gives, and no dot is written for it.
 //
-// NOTE: The sign is prefixed only where something is left of it, so a value
+// The sign is prefixed only where something is left of it, so a value
 // that rounds to nothing prints `0.00` rather than `-0.00`.
 function formatAsFixedDecimal(
 	rational: RationalType,
@@ -461,7 +461,7 @@ function formatAsFixedDecimal(
 		return `${sign}${digits}`
 	}
 
-	// NOTE: Padded to one digit more than the width, so that a value below one
+	// Padded to one digit more than the width, so that a value below one
 	// keeps the `0` in front of its point.
 	let text = digits.toString().padStart(places + 1, "0")
 
@@ -470,7 +470,7 @@ function formatAsFixedDecimal(
 	)}`
 }
 
-// NOTE: A percentage is the same decimal one hundred times over, with a `%`
+// A percentage is the same decimal one hundred times over, with a `%`
 // after it. The factor goes on the numerator rather than through
 // `multiplyRationals`, because a whole number times a fraction needs no
 // cross-multiplication and no reduction: `reducedParts` reduces on read.
@@ -480,7 +480,7 @@ function scaledByAHundred(rational: RationalType): RationalType {
 	return createRational(parts.numerator * 100n, parts.denominator)
 }
 
-// NOTE: Whether the magnitude is at or above a power of ten, asked without
+// Whether the magnitude is at or above a power of ten, asked without
 // building a decimal expansion: `n / d >= 10^exponent` is a comparison of two
 // products, and a negative exponent scales the other side instead of dividing.
 function isAtLeastPowerOfTen(
@@ -495,7 +495,7 @@ function isAtLeastPowerOfTen(
 	return numerator * 10n ** -exponent >= denominator
 }
 
-// NOTE: The exponent of the scientific form: the largest power of ten at or
+// The exponent of the scientific form: the largest power of ten at or
 // below the magnitude. The digit counts bracket it within one — a numerator of
 // `a` digits over a denominator of `b` is between `10^(a-b-1)` and
 // `10^(a-b+1)` — so one comparison settles which of the two it is, whatever the
@@ -513,7 +513,7 @@ function decimalExponentOf(numerator: bigint, denominator: bigint): bigint {
 	return guess - 1n
 }
 
-// NOTE: The receiver divided by a power of ten, which is the mantissa of the
+// The receiver divided by a power of ten, which is the mantissa of the
 // scientific form.
 function shiftedByPowerOfTen(
 	rational: RationalType,
@@ -531,7 +531,7 @@ function shiftedByPowerOfTen(
 	return createRational(parts.numerator * 10n ** -exponent, parts.denominator)
 }
 
-// NOTE: How many digits stand before the point, sign apart. A mantissa written
+// How many digits stand before the point, sign apart. A mantissa written
 // at a fixed width can round UP into the next power of ten — `9.99` at one
 // place is `10.0` — and this is what says so, off the text rather than off a
 // second exact comparison, because the rounding happened inside the formatter.
@@ -542,7 +542,7 @@ function wholeDigitCount(text: string): number {
 	return point === -1 ? magnitude.length : point
 }
 
-// NOTE: One digit before the point, the rest after it, and the power of ten
+// One digit before the point, the rest after it, and the power of ten
 // that was taken out written as `e` and a decimal exponent. The exponent takes
 // a minus sign and never a plus, so `1.23e3` and `5e-4` are the two shapes, and
 // zero is `0e0`. Rounding the mantissa can carry it to ten, and one step of
@@ -569,7 +569,7 @@ function formatAsScientific(
 	return `${text}e${exponent}`
 }
 
-// NOTE: The separator goes between every three digits of a run that stands
+// The separator goes between every three digits of a run that stands
 // before a point, counted from the right. Which runs those are is decided per
 // format by where the run ENDS: the decimal and percent forms end theirs at the
 // point or at the `%`, the scientific form's mantissa is one digit and takes
@@ -594,7 +594,7 @@ function groupedWholePart(part: string, separator: string): string {
 	let tail = rest.slice(boundary)
 	let groups: Array<string> = []
 
-	// NOTE: The groups are pushed and the Array is turned round once, rather
+	// The groups are pushed and the Array is turned round once, rather
 	// than each group being unshifted onto the front of it. An unshift moves
 	// every group already there, so the walk is quadratic in the count of them:
 	// 100,000 whole digits measured 92 ms that way against 6.2 ms this way,
@@ -618,7 +618,7 @@ function withGrouping(text: string, separator: string): string {
 
 // #region toString
 
-// NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
+// The format arrives as a `NumberFormat` Case rather than a String, so
 // there is no unrecognised spelling to fall back from — the four Cases are the
 // only four a caller can write.
 export function toString__overload$2(
@@ -638,7 +638,7 @@ export function toString__overload$2(
 	}
 }
 
-// NOTE: The width is meaningless to a fraction — `3/4` has no digits after a
+// The width is meaningless to a fraction — `3/4` has no digits after a
 // point to count — so `#Fraction` answers what the entry above answers for it
 // and ignores the count and the direction alike, as the declaration says it
 // does.
@@ -663,7 +663,7 @@ export function toString__overload$3(
 	}
 }
 
-// NOTE: The two grouped entries are the two above with a separator written into
+// The two grouped entries are the two above with a separator written into
 // the digits of the answer. They are natives beside them rather than Essence
 // bodies over them, because an Essence body would have to take the text apart
 // with `split` and `characters` and put it back together, which reaches the
@@ -710,14 +710,14 @@ export function divide__overload$3(
 export function squareRoot__overload$1(
 	rational: RationalType,
 ): OptionalType<RationalType | AlgebraicType> {
-	// NOTE: Handed straight on — `squareRootOfRational` already answers the
+	// Handed straight on — `squareRootOfRational` already answers the
 	// Optional, so wrapping it here would nest one inside another.
 	return squareRootOfRational(bigRationalOf(rational))
 }
 
 // #endregion
 
-// NOTE: Same-kind ordering stays native — see the NOTE on `Integer.compare`.
+// Same-kind ordering stays native — see the NOTE on `Integer.compare`.
 // Cross-multiplication is exact, and denominators are kept positive by
 // `createRational`, so the sign of the comparison is the sign of the products.
 export function compare(

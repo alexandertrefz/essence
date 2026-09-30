@@ -1,4 +1,4 @@
-// NOTE: How a batch of Essence values is rendered INSIDE the debuggee.
+// How a batch of Essence values is rendered INSIDE the debuggee.
 // `Runtime.callFunctionOn` evaluates this function's source over there — the
 // values arrive as live arguments, bigints and all, and one JSON string comes
 // back — so it must stay SELF-CONTAINED: nothing of this module exists in the
@@ -37,7 +37,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		return typeof tag === "string" ? tag : null
 	}
 
-	// NOTE: The runtime's own `quotedText` (runtime/src/String.ts), inlined for
+	// The runtime's own `quotedText` (runtime/src/String.ts), inlined for
 	// the reason everything here is inlined: this source is evaluated in the
 	// debuggee, where nothing else of this module exists. A String used to be
 	// drawn with its quotes and nothing else, so a value holding a line break
@@ -115,7 +115,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		return `${out}"`
 	}
 
-	// NOTE: The text a Case is SHOWN as — `Door#Open`, with the Module the tag
+	// The text a Case is SHOWN as — `Door#Open`, with the Module the tag
 	// also carries cut off. It retells `caseText` in runtime/src/registry.ts,
 	// inlined for the reason everything here is inlined: this source is
 	// evaluated in the debuggee, where nothing else of this module exists.
@@ -154,7 +154,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		}
 
 		if (tag === "Rational") {
-			// NOTE: LOWEST TERMS, computed here. A Rational is stored as the
+			// LOWEST TERMS, computed here. A Rational is stored as the
 			// two bigints it was built from — `createRational` puts the sign on
 			// the numerator and settles zero as `0/1`, and reduces nothing —
 			// and the runtime's structural printer (`formatAsRational` in
@@ -164,7 +164,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// ever prints reduced; drawing it raw would show a reader a value
 			// no output of theirs can ever hold.
 			//
-			// NOTE: Euclid's, inlined for the reason everything here is
+			// Euclid's, inlined for the reason everything here is
 			// inlined — this source is evaluated in the debuggee, where nothing
 			// else of this module exists. A denominator of zero is no Rational
 			// the language can build, so it is handed back untouched rather
@@ -192,7 +192,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return `${numerator}/${denominator}`
 		}
 
-		// NOTE: `Future` and `Started` are here rather than among the structures
+		// `Future` and `Started` are here rather than among the structures
 		// below for the reason the runtime's own printer renders them as bare
 		// names: what a Future holds is a JavaScript closure and what a Started
 		// holds is a promise and a controller, which are this Compiler's
@@ -208,7 +208,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		}
 
 		if (tag === "List") {
-			// NOTE: A List is two runs and a VIEW into each — the back run
+			// A List is two runs and a VIEW into each — the back run
 			// forward in `value`, the front run REVERSED in `front`, each as
 			// long as its count says and no longer (`ListType` in
 			// runtime/src/List.ts is the authority). Both Arrays are SHARED
@@ -216,7 +216,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// never had, so what is shown is the view and never the Array: a
 			// box viewing four items may not be drawn as five.
 			//
-			// NOTE: A box the chain has WRITTEN PAST holds an Array
+			// A box the chain has WRITTEN PAST holds an Array
 			// whose items have moved on — a positional write changes a
 			// run in place and counts a version up, and `writes` is the
 			// log of what each write overwrote beside the version this
@@ -226,7 +226,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// a box wherever it reads one, and looking at a paused
 			// Program may not write to it.
 			//
-			// NOTE: Inlined for the reason everything here is inlined —
+			// Inlined for the reason everything here is inlined —
 			// this source is evaluated in the debuggee, where nothing
 			// else of this module exists.
 			let back = record.value as Array<unknown>
@@ -287,7 +287,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		}
 
 		if (tag === "Dictionary") {
-			// NOTE: A Dictionary is a shared STORE and a box's GENERATION into
+			// A Dictionary is a shared STORE and a box's GENERATION into
 			// it (`DictionaryType` in runtime/src/Dictionary.ts is the
 			// authority). The store holds one slot per key in insertion order,
 			// and each slot the versions its value has had, every version
@@ -298,7 +298,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// List above under another name: the structure is shared and only
 			// the view is the value.
 			//
-			// NOTE: A version whose value is a SYMBOL is the tombstone a
+			// A version whose value is a SYMBOL is the tombstone a
 			// removal pushes — the key stands in the store but this box does
 			// not hold it. `typeof` decides that here because no value of the
 			// language is a Symbol, and the runtime's own `TOMBSTONE` is a
@@ -335,7 +335,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 				}
 			}
 
-			// NOTE: `[=]` rather than `[]`, which is the empty LIST — the one
+			// `[=]` rather than `[]`, which is the empty LIST — the one
 			// place the two written forms had to be told apart, and the
 			// runtime's printer tells them apart the same way.
 			if (pairs.length === 0) {
@@ -365,7 +365,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return tag === "Record" ? "{}" : shown
 		}
 
-		// NOTE: A ONE-member Case renders its payload bare, in parentheses —
+		// A ONE-member Case renders its payload bare, in parentheses —
 		// `Optional#Value(3)`, not `Optional#Value { item = 3 }` — because that
 		// is how the language writes one. Mirrors `getStringRepresentation` in
 		// the runtime, which `src/tests/render.spec.ts` pins the two together
@@ -414,7 +414,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return { display: render(value, 0), kind: "list" }
 		}
 
-		// NOTE: Its own kind rather than `record`, because a Dictionary's
+		// Its own kind rather than `record`, because a Dictionary's
 		// members are its store and its generation — the machinery — and what
 		// a reader means by opening one is its entries. `record` would have
 		// offered the store.
@@ -443,17 +443,17 @@ function describeEssenceValues(...values: Array<unknown>): string {
 	}
 }
 
-// NOTE: A List's logical items, gathered INSIDE the debuggee so that expanding
+// A List's logical items, gathered INSIDE the debuggee so that expanding
 // a List in the Variables view offers exactly the items the box views, in
 // order — its inner Array is shared with the rest of its chain and may run past
 // the view, and a box that was prepended to holds a second, reversed run in
 // front of it.
 //
-// NOTE: It repeats the renderer's view arithmetic rather than sharing it, for
+// It repeats the renderer's view arithmetic rather than sharing it, for
 // the reason the renderer inlines everything: this source is evaluated in a
 // realm where nothing else of this module exists.
 //
-// NOTE: A NEW Array, never the runtime's own `materialise`, which would swap
+// A NEW Array, never the runtime's own `materialise`, which would swap
 // the box's representation in place. That swap is invisible to a running
 // program, but looking at a paused one may not write to it at all.
 function essenceListItems(list: unknown): Array<unknown> {
@@ -471,7 +471,7 @@ function essenceListItems(list: unknown): Array<unknown> {
 		  }
 		| undefined
 
-	// NOTE: The same undoing the renderer does, and inlined for the same
+	// The same undoing the renderer does, and inlined for the same
 	// reason — a box the chain has written past says what it holds by undoing
 	// the writes made since it looked, into a copy.
 	if (writes !== undefined && writes.seen !== writes.log.version) {
@@ -506,28 +506,28 @@ function essenceListItems(list: unknown): Array<unknown> {
 	return items
 }
 
-// NOTE: A Dictionary's entries, gathered INSIDE the debuggee so that expanding
+// A Dictionary's entries, gathered INSIDE the debuggee so that expanding
 // one in the Variables view offers exactly the entries the box views, in
 // insertion order — its store is shared with the rest of its chain and carries
 // versions stamped past this box along with tombstoned slots for the keys it no
 // longer holds, none of which are this box's.
 //
-// NOTE: It repeats the renderer's view arithmetic rather than sharing it, for
+// It repeats the renderer's view arithmetic rather than sharing it, for
 // the reason the renderer inlines everything: this source is evaluated in a
 // realm where nothing else of this module exists.
 //
-// NOTE: An entry is the Record `{ key, value }` the language itself is written
+// An entry is the Record `{ key, value }` the language itself is written
 // in — the shape `entries()` answers and every Dictionary callback receives —
 // but it is MINTED here rather than asked of the debuggee's own `entries`,
 // which is a binding a bundle may have renamed or shaken away and which would
 // be program code run inside a paused program. The key and the value it holds
 // are the live boxes, so expanding an entry opens what the Dictionary holds.
 //
-// NOTE: A NEW Array of new Records, and not one property of the box is written
+// A NEW Array of new Records, and not one property of the box is written
 // — the same rule the List reader keeps, and for the same reason: looking at a
 // paused program may not write to it.
 //
-// NOTE: The tag is read OFF the Dictionary rather than minted here, because
+// The tag is read OFF the Dictionary rather than minted here, because
 // every bundle mints its own `Symbol("$type")` and a Record wearing a second
 // one is a Record the renderer over there would not recognise.
 function essenceDictionaryEntries(dictionary: unknown): Array<unknown> {
@@ -575,7 +575,7 @@ function essenceDictionaryEntries(dictionary: unknown): Array<unknown> {
 	return entries
 }
 
-// NOTE: Shipped as the functions' own source — one implementation each,
+// Shipped as the functions' own source — one implementation each,
 // testable here as a value and evaluated over there as text.
 export const DESCRIBE_BATCH_SOURCE = describeEssenceValues.toString()
 export const LIST_ITEMS_SOURCE = essenceListItems.toString()

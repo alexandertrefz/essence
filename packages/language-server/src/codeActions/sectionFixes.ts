@@ -10,7 +10,7 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findVariableDeclaration } from "./lookups"
 
-// NOTE: The Diagnostics about a Program's SECTIONS rather than about anything
+// The Diagnostics about a Program's SECTIONS rather than about anything
 // written inside one — which keyword opens it, which files its imports name, and
 // what its export block is allowed to publish. Each of them is answered from a
 // span the section itself carries, so none of them reads a body.
@@ -18,7 +18,7 @@ import { findVariableDeclaration } from "./lookups"
 const declarationsKeyword = "declarations"
 const implementationKeyword = "implementation"
 
-// NOTE: The Diagnostic spans exactly the `declarations` keyword, and the whole
+// The Diagnostic spans exactly the `declarations` keyword, and the whole
 // of what is wrong is that word: the block behind it is parsed as an
 // implementation section either way, so swapping the keyword is what makes the
 // source say what the Parser already read.
@@ -40,7 +40,7 @@ export function implementationHeaderAction(
 	}
 }
 
-// NOTE: One group per dependency, in both sections — `from "./A.es" { … }` is
+// One group per dependency, in both sections — `from "./A.es" { … }` is
 // written the same way whether it imports names or forwards them — so a
 // Diagnostic reported on a specifier names exactly one of these, and which
 // section it stands in is what says how much removing it costs.
@@ -68,7 +68,7 @@ function groupOf(
 	return null
 }
 
-// NOTE: One action per section, because the two sections mean opposite things by
+// One action per section, because the two sections mean opposite things by
 // the same group. An IMPORT group naming this file asks for names that are in
 // scope inside it already, so the whole group goes and the Program provably
 // answers what it answered before — preferred, and the whole group rather than
@@ -107,7 +107,7 @@ export function removeSelfImportAction(
 		return null
 	}
 
-	// NOTE: An `as` is kept. A bare entry renames the same way a forwarded one
+	// An `as` is kept. A bare entry renames the same way a forwarded one
 	// does, so `area as squareArea` says the same thing on either side of this
 	// edit and the Module goes on publishing the name it published.
 	let written = entries.map((entry) =>
@@ -116,7 +116,7 @@ export function removeSelfImportAction(
 			: `${entry.name.content} as ${entry.alias.content}`,
 	)
 
-	// NOTE: Laid out the way the group was — one name per line under the
+	// Laid out the way the group was — one name per line under the
 	// group's own indentation where it stood on a line of its own, and beside
 	// each other where it shared its line with something else.
 	let separator = opensItsLine(lines, found.group.position.start)
@@ -138,7 +138,7 @@ export function removeSelfImportAction(
 	}
 }
 
-// NOTE: Read off the Diagnostic's own Help rather than worked out again here.
+// Read off the Diagnostic's own Help rather than worked out again here.
 // Which specifiers are refused and what each of them should have said is
 // `reportRejection`'s to decide — four rejections share this code and only two
 // of them have a concrete answer at all — and re-deriving that rule in the
@@ -170,7 +170,7 @@ export function moduleSpecifierActions(
 			return []
 		}
 
-		// NOTE: Preferred only for the extension. The `.es` a specifier ends in
+		// Preferred only for the extension. The `.es` a specifier ends in
 		// is part of the path this Module names and nothing else could have been
 		// meant; a `./` in front of it is a guess at where the file sits, which
 		// the Help itself says out loud — "if the file sits beside this one".
@@ -201,7 +201,7 @@ export function moduleSpecifierActions(
 const variableKeyword = "variable"
 const constantHelpPrefix = "Declare it as a Constant"
 
-// NOTE: The mirror of `constantToVariableAction`, answering the other direction:
+// The mirror of `constantToVariableAction`, answering the other direction:
 // a name the export block publishes has to be a Constant, so the Declaration the
 // Diagnostic points back at is the one to rewrite.
 //
@@ -246,7 +246,7 @@ export function variableToConstantAction(
 		},
 	}
 
-	// NOTE: The Statement's Position starts at its keyword, but a `§§` block or
+	// The Statement's Position starts at its keyword, but a `§§` block or
 	// a Declaration this Parser recovered from could move it — replacing a span
 	// that does not read `variable` would corrupt the line silently.
 	if (sliceOf(lines, keyword) !== variableKeyword) {

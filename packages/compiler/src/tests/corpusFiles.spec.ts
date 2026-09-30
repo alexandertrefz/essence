@@ -27,7 +27,7 @@ import {
 	writeCorpus,
 } from "../testing/corpus"
 
-// NOTE: The companion a property test's failing values live in — what it looks
+// The companion a property test's failing values live in — what it looks
 // like on disk, what a run's changes do to it, and what a file nobody should
 // have edited is read as. Nothing here runs a test: what a run REPORTS is the
 // runtime's spec, and what is done with the report is here.
@@ -41,7 +41,7 @@ function values(digits: string): Array<StoredValue> {
 	return [{ name: "n", data: whole(digits) }]
 }
 
-// NOTE: The body is AWAITED before the directory goes. Everything the store
+// The body is AWAITED before the directory goes. Everything the store
 // does is a file, and a `finally` that ran while the write was still in flight
 // would take the file away underneath it.
 async function withDirectory<Value>(
@@ -99,7 +99,7 @@ describe("The counterexample companion file", () => {
 		expect(parseCorpusFile(printCorpusFile(entries))).toEqual(entries)
 	})
 
-	// NOTE: Byte-stable, so that recording the same thing twice writes the same
+	// Byte-stable, so that recording the same thing twice writes the same
 	// file and a diff shows what CHANGED rather than what moved.
 	it("writes the same bytes for the same entries in any order", () => {
 		let first = printCorpusFile({
@@ -116,7 +116,7 @@ describe("The counterexample companion file", () => {
 		expect(first).toContain('\n\t"entries": {')
 	})
 
-	// NOTE: Null rather than an empty store, and the two must never be
+	// Null rather than an empty store, and the two must never be
 	// confused: an empty store is a file the next write may lay a value over,
 	// and a mangled one — a merge conflict, a stray edit — is a file the next
 	// write must LEAVE, or everything its bytes still hold is gone.
@@ -126,7 +126,7 @@ describe("The counterexample companion file", () => {
 		expect(parseCorpusFile("")).toBeNull()
 	})
 
-	// NOTE: A corpus is an optimisation over a search that works without it, so
+	// A corpus is an optimisation over a search that works without it, so
 	// the worst a version nobody here understands can cost is the values it
 	// held — but they are held, not overwritten.
 	it("refuses a file of another schema", () => {
@@ -167,7 +167,7 @@ describe("Reading a run's stored counterexamples", () => {
 		})
 	})
 
-	// NOTE: THE reason unreadable is its own answer. The run before this fix
+	// THE reason unreadable is its own answer. The run before this fix
 	// read a mangled file as empty, replayed nothing — correct — and then the
 	// next failing write rewrote the file whole from that emptiness, silently
 	// discarding every counterexample the bytes still held.
@@ -259,7 +259,7 @@ describe("Writing what a run said about its corpus", () => {
 		})
 	})
 
-	// NOTE: By the DATA rather than by the printed value. A property that fails
+	// By the DATA rather than by the printed value. A property that fails
 	// on the same value on ten runs would otherwise fill its own corpus with one
 	// value and push every other one out.
 	it("does not store one counterexample twice", async () => {
@@ -304,7 +304,7 @@ describe("Writing what a run said about its corpus", () => {
 		})
 	})
 
-	// NOTE: Every index is into the list as it was READ, so they are taken from
+	// Every index is into the list as it was READ, so they are taken from
 	// the back — dropping one from the front would move every index after it.
 	it("drops exactly the entries a run could not read back", async () => {
 		await withDirectory(async (directory) => {
@@ -356,7 +356,7 @@ describe("Writing what a run said about its corpus", () => {
 			})
 
 			expect(existsSync(fileOf(directory))).toBe(false)
-			// NOTE: The FILE goes; the directory may hold another Module's
+			// The FILE goes; the directory may hold another Module's
 			// companion, and an empty one is not litter anybody sees.
 			expect(
 				existsSync(path.join(directory, "__counterexamples__")),
@@ -364,7 +364,7 @@ describe("Writing what a run said about its corpus", () => {
 		})
 	})
 
-	// NOTE: The snapshot rule, for the same reason: a run narrowed by a filter
+	// The snapshot rule, for the same reason: a run narrowed by a filter
 	// or a tag has not visited every test, and deleting what it did not visit
 	// would lose a regression for the price of a `-f`.
 	it("keeps a key no test of this run claimed", async () => {
@@ -438,7 +438,7 @@ describe("What a run's events say about its corpus", () => {
 		})
 	})
 
-	// NOTE: A run driven by a spec rather than by the command line may have no
+	// A run driven by a spec rather than by the command line may have no
 	// path for a Module at all, and a counterexample with nowhere to live is a
 	// counterexample nobody can store.
 	it("says nothing about a Module with no path", () => {
@@ -454,7 +454,7 @@ describe("What a run's events say about its corpus", () => {
 	})
 })
 
-// NOTE: The key a stored counterexample lives under, spelled by the Compiler
+// The key a stored counterexample lives under, spelled by the Compiler
 // here and by the runtime in `Testing.ts` — the runtime can not import this,
 // because it is inlined into a user's bundle. The two are pinned to each other
 // by this string and its twin in `testing.spec.ts`.

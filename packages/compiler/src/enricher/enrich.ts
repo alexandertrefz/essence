@@ -69,7 +69,7 @@ import {
 	type TestModifiers,
 } from "./tests"
 
-// NOTE: Names to leave OUT of the top level Scope, per table. Exactly one
+// Names to leave OUT of the top level Scope, per table. Exactly one
 // caller needs this: the Language Server, editing a standard library source.
 // That file's declarations are ALREADY in the builtin tables — the loader put
 // them there — so enriching it against the untouched tables reports every one
@@ -95,13 +95,13 @@ export type TopLevelScopeOptions = {
 	shadowedBuiltins?: ShadowedBuiltins
 	modulePath?: string
 	unimportedNamespaces?: () => Array<enricher.UnimportedNamespace>
-	// NOTE: What the Parser abandoned on its way to this Program — see
+	// What the Parser abandoned on its way to this Program — see
 	// `Scope.abandonedDeclarations`. Handed over as the Program's own record, so
 	// that every way into a Scope reads it off the one thing that carries it.
 	recovery?: parser.Recovery
 }
 
-// NOTE: WHERE a dropped Declaration's silence reaches, decided here because
+// WHERE a dropped Declaration's silence reaches, decided here because
 // this is the stage that knows the rule. The rule is the language's own: a
 // `function`, `overload function`, `type`, `choice`, `namespace` or `protocol`
 // written at the top level of a section is HOISTED — `hoistDeclarations` runs
@@ -128,7 +128,7 @@ function abandonedDeclaration(
 	}
 }
 
-// NOTE: The Scope a Program's top level is enriched in: the builtins first, and
+// The Scope a Program's top level is enriched in: the builtins first, and
 // then whatever the Program declares itself, in ONE table per kind. One Scope
 // rather than a builtin Scope with a child holding the declarations, because a
 // duplicate is an occupied slot in the same table — a Program declaring over a
@@ -154,29 +154,29 @@ export function topLevelScope(
 		parent: null,
 		modulePath: options.modulePath,
 		unimportedNamespaces: options.unimportedNamespaces,
-		// NOTE: A Program's own Statements are the body of the emitted Module,
+		// A Program's own Statements are the body of the emitted Module,
 		// and a Module may `await` at its top level — so `complete` is written
 		// here exactly as it is written in a completing body, and nothing has to
 		// be declared for it.
 		completing: "top-level",
 		members,
-		// NOTE: Taken HERE, where `members` holds the builtins and nothing
+		// Taken HERE, where `members` holds the builtins and nothing
 		// else — the Program's own declarations are written into this same
 		// table afterwards, which is what makes the snapshot the only way to
 		// tell the two apart later.
 		preludeNames: new Set(Object.keys(members)),
-		// NOTE: Left absent where the Parser abandoned nothing, which is nearly
+		// Left absent where the Parser abandoned nothing, which is nearly
 		// every Program — the reports that read it then have nothing to ask.
 		abandonedDeclarations:
 			options.recovery === undefined ||
 			options.recovery.declarations.length === 0
 				? undefined
 				: options.recovery.declarations.map(abandonedDeclaration),
-		// NOTE: The builtins are declared in TypeScript, not in Essence —
+		// The builtins are declared in TypeScript, not in Essence —
 		// there is no source Position to point a Diagnostic at.
 		declarations: scopeMap(),
 		constants: new Set(Object.keys(members)),
-		// NOTE: Empty rather than absent, which is what marks this Scope as the
+		// Empty rather than absent, which is what marks this Scope as the
 		// one a Program's own Constants are recorded in — the builtins have no
 		// Essence value to record, and every child Scope leaves the field off.
 		constantValues: scopeMap(),
@@ -188,7 +188,7 @@ export function topLevelScope(
 	}
 }
 
-// NOTE: The MODE is where this Program's `tests { … }` block and the goals its
+// The MODE is where this Program's `tests { … }` block and the goals its
 // declarations promise are finally read — see `CompileMode`, which is the one
 // place either is spelled. Everything else here is about the one Program in
 // hand rather than about the run it is part of.
@@ -196,28 +196,28 @@ export const enrich = (
 	program: parser.Program,
 	options: CompileMode & {
 		shadowedBuiltins?: ShadowedBuiltins
-		// NOTE: Only the Language Server sets this, for Hovers over a written
+		// Only the Language Server sets this, for Hovers over a written
 		// Type. A compile leaves it off and the collector stays null.
 		annotations?: boolean
-		// NOTE: The canonical path of the Module this Program is, which its
+		// The canonical path of the Module this Program is, which its
 		// Choices take their nominal identity from — `choiceIdentity`. Left out
 		// by every caller that compiles one file on its own, and then the
 		// Choices are identified by name alone, exactly as they were before
 		// Modules: same Types, same Diagnostics, same emitted tags.
 		//
-		// NOTE: It names the Module on the Scope the builtins are in, which does
+		// It names the Module on the Scope the builtins are in, which does
 		// not reach them: the standard library's Types are resolved by its own
 		// load, under no Module at all, and this Scope only holds the objects
 		// that came back. The standard library's Choices are the canonical ones
 		// and stay unqualified, tags included.
 		modulePath?: string
-		// NOTE: What a test's identity spells as its Module where the Scope
+		// What a test's identity spells as its Module where the Scope
 		// carries none of its own. The standard library is the one compile that
 		// is not a graph of Modules — its Choices are deliberately unqualified,
 		// so its Scope names no Module — and its files still have to name
 		// themselves in a report.
 		testsPath?: string
-		// NOTE: The Program's own source text, which only a test compile reads:
+		// The Program's own source text, which only a test compile reads:
 		// an `@example` block is Essence written inside a Comment, and it is
 		// compiled out of the file's own lines so that every Position it
 		// produces is a Position in the file. Left out, a file's examples are
@@ -238,7 +238,7 @@ export const enrich = (
 				recovery: program.recovery,
 			})
 
-			// NOTE: The tests section is enriched AFTER the implementation and
+			// The tests section is enriched AFTER the implementation and
 			// against the Scope the implementation filled, because that is the
 			// order the two are written in and the order they run in: a test
 			// names what the file declares, and nothing the file declares names
@@ -270,7 +270,7 @@ export const enrich = (
 				}
 			}
 
-			// NOTE: The collector opens AFTER the builtin tables are built, and
+			// The collector opens AFTER the builtin tables are built, and
 			// that is not a matter of taste either. Building them is what loads
 			// the standard library on the first call of a process, and that
 			// load enriches every library file — every annotation in every one
@@ -293,14 +293,14 @@ export const enrich = (
 	return { program: result, diagnostics, annotations }
 }
 
-// NOTE: A value comment written where nothing will ever answer it. `§?` asks
+// A value comment written where nothing will ever answer it. `§?` asks
 // for the value of the Statement it ends, and the points that record one are
 // handed out while the `tests { … }` block is lowered — so a value comment in
 // the implementation records nothing, draws no ghost text beside its line, and
 // said nothing at all about why. A reader who asks a question deserves an
 // answer or a refusal, and this is the refusal.
 //
-// NOTE: A Warning, and only ever from a compile that asked for the tests. To a
+// A Warning, and only ever from a compile that asked for the tests. To a
 // build a value comment is an ordinary Comment and costs a shipped Program
 // nothing, which is the whole of what makes it writable in the first place.
 function reportStrayValueComments(
@@ -337,14 +337,14 @@ function reportStrayValueComments(
 	}
 }
 
-// NOTE: The one place the mode flag is read. A compile that did not ask for the
+// The one place the mode flag is read. A compile that did not ask for the
 // tests answers null, and a file that wrote none answers null as well — which
 // is why nothing downstream may read a null `tests` as "this file has no
 // tests": the Parser's Program is what says that.
 function testsSectionOf(
 	program: parser.Program,
 	scope: enricher.Scope,
-	// NOTE: The whole mode, because the goals ride BESIDE the tests rather than
+	// The whole mode, because the goals ride BESIDE the tests rather than
 	// replacing them: a contract run runs a project's written tests as well, and
 	// a goal is reported in the same manifest they are. See `contractSuite`.
 	mode: CompileMode,
@@ -357,7 +357,7 @@ function testsSectionOf(
 
 	reportStrayValueComments(program, source)
 
-	// NOTE: The `@example` blocks of the file, as the tests they are. They are
+	// The `@example` blocks of the file, as the tests they are. They are
 	// gathered before the written section is enriched so that the whole of what
 	// a file proves — what it wrote and what its documentation promises — goes
 	// through ONE enrichment, in one Scope, and comes out as one manifest.
@@ -373,7 +373,7 @@ function testsSectionOf(
 
 	let position = program.tests?.position ?? program.implementation.position
 	let written = program.tests?.nodes ?? []
-	// NOTE: A written suite under a name a synthesis fills is refused, and the
+	// A written suite under a name a synthesis fills is refused, and the
 	// synthesis dropped with it — appending the twin anyway would let the walk
 	// below report the same collision a second time, as a duplicate of a suite
 	// no source holds.
@@ -387,7 +387,7 @@ function testsSectionOf(
 	let section = enrichTestsSection(
 		{
 			nodeType: "TestsSection",
-			// NOTE: The examples come LAST, so that a file's own tests keep the
+			// The examples come LAST, so that a file's own tests keep the
 			// indices they had — and read first, which is the order they were
 			// written in.
 			nodes:
@@ -414,7 +414,7 @@ function testsSectionOf(
 		return section
 	}
 
-	// NOTE: AFTER the written walk, and against the Scope the implementation
+	// AFTER the written walk, and against the Scope the implementation
 	// filled rather than the one the section opened: what a goal names is a
 	// declaration, and a helper a test declared for itself is none of its
 	// business. The suite is appended, so every written item keeps the manifest
@@ -433,22 +433,22 @@ function testsSectionOf(
 	return { ...section, nodes: [...section.nodes, contractsSuite] }
 }
 
-// NOTE: One Program and the Scope its top level is enriched in. The standard
+// One Program and the Scope its top level is enriched in. The standard
 // library hands the SAME Scope for every one of its files — they are one
 // declaration space, not a chain of imports — while a group of Modules hands one
 // Scope each, so that a name is only visible where it was imported.
 export type EnrichedProgramInput = {
 	program: parser.Program
 	scope: enricher.Scope
-	// NOTE: The Module's own text, which only a test compile reads — see
+	// The Module's own text, which only a test compile reads — see
 	// `enrich`'s own `source`.
 	source?: string
 }
 
-// NOTE: The MODE covers every Program of the group — one compile is one mode,
+// The MODE covers every Program of the group — one compile is one mode,
 // so a graph linked for a contract run synthesizes goals in every Module of it.
 export type EnrichProgramsOptions = CompileMode & {
-	// NOTE: Called at the top of every hoist round, and once more after the
+	// Called at the top of every hoist round, and once more after the
 	// last one, to bind whatever became bindable since — the seam a cycle of
 	// Modules needs: an import across an SCC can only be seeded once the
 	// dependency's declaration has hoisted, and the dependency's declaration
@@ -461,12 +461,12 @@ export type EnrichProgramsOptions = CompileMode & {
 	// an entry still unbound by then has to be given up on rather than left
 	// for every use of its name to report.
 	seedRound?: (final: boolean) => boolean
-	// NOTE: Index of the one input whose written annotations are wanted — only
+	// Index of the one input whose written annotations are wanted — only
 	// a Hover ever asks, and only for the file under the cursor.
 	annotationsFor?: number
 }
 
-// NOTE: Several Programs enriched with hoisting run ONCE over every file's Nodes
+// Several Programs enriched with hoisting run ONCE over every file's Nodes
 // concatenated, so the speculative rounds resolve across file boundaries — a
 // Protocol declared in one file and a Namespace conforming to it in another
 // hoist in whichever order they happen to resolve, exactly as two Statements in
@@ -475,7 +475,7 @@ export type EnrichProgramsOptions = CompileMode & {
 // can be resolved before the rest of it. Diagnostics are collected per Program,
 // so each stays attributable to the file it came from.
 //
-// NOTE: Annotations are collected around the WHOLE run rather than around one
+// Annotations are collected around the WHOLE run rather than around one
 // Program's enrichment, because the hoist — which runs once over every input —
 // is where a top level declaration's written Types resolve, and they are
 // reused rather than re-resolved afterwards. A collector that wide holds every
@@ -519,12 +519,12 @@ const enrichProgramsInner = (
 ): Array<{
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
-	// NOTE: The names this Program reached a conformance through without
+	// The names this Program reached a conformance through without
 	// writing them. See `collectReachedNames`; the linker's unused-import check
 	// is the only reader.
 	reachedNames: Set<string>
 }> => {
-	// NOTE: The hoist spans every file, so it runs BEFORE any Program's
+	// The hoist spans every file, so it runs BEFORE any Program's
 	// collection is open — a Diagnostic reported from inside it would land in
 	// whatever collection happens to surround the load instead. The standard
 	// library loads lazily, inside the first compile of a process, so "whatever
@@ -587,7 +587,7 @@ const enrichProgramsInner = (
 	})
 }
 
-// NOTE: A Program's Nodes and the Scope they hoist into. Several units may share
+// A Program's Nodes and the Scope they hoist into. Several units may share
 // one Scope — the standard library's files do — or hold one each, which is what
 // keeps a group of Modules from seeing each other's declarations unimported.
 type HoistUnit = {
@@ -620,7 +620,7 @@ type HoistableTypeNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
 
-// NOTE: One refined Alias whose predicate has not been read yet — hoisted as a
+// One refined Alias whose predicate has not been read yet — hoisted as a
 // Refinement with `conjuncts: null`, waiting for the Namespace that answers the
 // predicate to arrive. The `refinement` is the very object registered in Scope,
 // held so the fill can write into it in place — and for a GENERIC Alias it is the
@@ -632,7 +632,7 @@ type PendingPredicate = {
 	refinement: common.RefinementType
 }
 
-// NOTE: A reading that checks a value against a refinement still unread waits,
+// A reading that checks a value against a refinement still unread waits,
 // and is retried once a pass settles something. In the final call the readings
 // still waiting wait on each other, and each cycle among them is reported.
 function fillPendingPredicates(
@@ -666,7 +666,7 @@ function fillPendingPredicates(
 	}
 }
 
-// NOTE: One attempt at reading each pending predicate, entries dropping off the
+// One attempt at reading each pending predicate, entries dropping off the
 // list as they resolve. During the rounds (`final` false) a Diagnostic means
 // "not this round" and the entry stays — the Namespace it needs may be one
 // round away — while warnings that come WITH a clean resolution go to the sink,
@@ -712,7 +712,7 @@ function readPendingPredicates(
 						: resolveRefinementConjuncts(
 								node.predicate,
 								refinement.base,
-								// NOTE: Rebuilt per attempt rather than kept from the
+								// Rebuilt per attempt rather than kept from the
 								// round the Alias hoisted in, so that a Namespace
 								// hoisted since is in Scope: the Parameters are added
 								// to a CHILD of the Alias' own Scope, which keeps
@@ -736,7 +736,7 @@ function readPendingPredicates(
 			continue
 		}
 
-		// NOTE: A leaf whose reading is still to come is not written down. The
+		// A leaf whose reading is still to come is not written down. The
 		// conjuncts are written ONCE — the object is already bound into every
 		// signature that named the Alias — so a leaf recorded before what it
 		// names was read would stay the name it was, while the `if` beside it
@@ -756,7 +756,7 @@ function readPendingPredicates(
 				copy.conjuncts = result
 			}
 
-			// NOTE: The Alias was already in Scope while its predicate was
+			// The Alias was already in Scope while its predicate was
 			// pending, and a written receiver standing inside a hoisting round
 			// skipped it for exactly that reason. What it PROVES has changed
 			// without a name being declared, so the count is bumped by hand —
@@ -771,7 +771,7 @@ function readPendingPredicates(
 	return waiting
 }
 
-// NOTE: Each copy is poisoned to its own instantiated base, so a signature that
+// Each copy is poisoned to its own instantiated base, so a signature that
 // applied the Alias keeps saying what it applied it to. The Alias is
 // unregistered, and the in-order enrichment resolves and reports it.
 function abandonPendingPredicate(
@@ -791,7 +791,7 @@ function abandonPendingPredicate(
 	countTypeDeclaration()
 }
 
-// NOTE: Every reading still waiting waits on another, so the walk from one of
+// Every reading still waiting waits on another, so the walk from one of
 // them comes back round. The members of that cycle are reported and abandoned,
 // and whatever waited on them is read in the next pass.
 function reportPredicateCycle(
@@ -820,12 +820,12 @@ function reportPredicateCycle(
 					)
 	}
 
-	// NOTE: A wait leading off the list is a Compiler bug. The entry is
+	// A wait leading off the list is a Compiler bug. The entry is
 	// abandoned unreported, and the in-order enrichment meets the unread
 	// predicate outside a hoist, where reading it reports as one.
 	let cycle = next === undefined ? [] : path.slice(path.indexOf(next))
 
-	// NOTE: Reported in the order the Aliases hoisted in, not the order the
+	// Reported in the order the Aliases hoisted in, not the order the
 	// walk met them.
 	for (let entry of [...cycle].sort(
 		(left, right) => pending.indexOf(left) - pending.indexOf(right),
@@ -877,14 +877,14 @@ function reportPredicateCycle(
 	}
 }
 
-// NOTE: The in-place half of poison recovery. The Refinement was registered and
+// The in-place half of poison recovery. The Refinement was registered and
 // bound by reference before its predicate could be read, so returning the base
 // from a resolver reaches nobody — the object itself has to BECOME its base.
 // The base's own record is left alone; its fields are copied over, and a shared
 // child (a List base's item Type) stays shared, which every reader of a Type
 // already assumes.
 //
-// NOTE: A generic Alias needs nothing more: the object handed over is the one
+// A generic Alias needs nothing more: the object handed over is the one
 // INSIDE the Generic Alias, so the wrapper is left standing over a plain
 // `List<Item>` and every `NonEmptyList<String>` written anywhere goes on applying its
 // Arguments — to a Type that has simply stopped claiming anything.
@@ -898,12 +898,12 @@ function poisonRefinementToBase(refinement: common.RefinementType): void {
 
 	Object.assign(record, base)
 
-	// NOTE: The object may already be a receiver or a Namespace target that
+	// The object may already be a receiver or a Namespace target that
 	// Method resolution has indexed and answered for as a refinement.
 	forgetNamespaceTargets()
 }
 
-// NOTE: One declaration still waiting for a round, with the Scope it resolves and
+// One declaration still waiting for a round, with the Scope it resolves and
 // is declared in. The Scope travels with the Node rather than with the round,
 // because a round spans every unit.
 type PendingDeclaration = {
@@ -911,7 +911,7 @@ type PendingDeclaration = {
 	scope: enricher.Scope
 }
 
-// NOTE: Where the Diagnostics the hoist itself reports go. A lone Program
+// Where the Diagnostics the hoist itself reports go. A lone Program
 // hoists inside its own collection and the default sink just reports them on;
 // `enrichPrograms` hoists every file at once, before any collection is open,
 // and needs each one attributed to the Node's own Program — which is why the
@@ -927,7 +927,7 @@ const reportOnwards: HoistDiagnosticSink = (_node, diagnostics) => {
 	}
 }
 
-// NOTE: The Type names a Type declaration mentions. The body — an alias' Type,
+// The Type names a Type declaration mentions. The body — an alias' Type,
 // a Choice's payloads — is read minus the declaration's own Type Parameters:
 // `choice Holder<Item> { Full { value: Item } }` mentions nothing, because
 // `Item` there is the Parameter and not whatever else `Item` may name further
@@ -966,7 +966,7 @@ function typeNamesMentionedBy(
 	]
 }
 
-// NOTE: The one recursive shape this pass does NOT own — a generic Choice that
+// The one recursive shape this pass does NOT own — a generic Choice that
 // names itself in a payload, which `resolveGenericCaseMembers` reports as
 // `recursive-generic-choice` member by member and resolves to Error, so the
 // declaration hoists regardless. The test mirrors that one exactly, Type
@@ -986,7 +986,7 @@ function namesItselfInAPayload(node: HoistableTypeNode): boolean {
 	)
 }
 
-// NOTE: Which declaration each hoistable Type name belongs to, and which of
+// Which declaration each hoistable Type name belongs to, and which of
 // those names each of them mentions — the graph the cycle search runs on. Two
 // restrictions make an edge mean "resolving this needs that one resolved
 // first": a name the surrounding Scope ALREADY holds (a builtin, a standard
@@ -1033,7 +1033,7 @@ function typeDeclarationGraph(
 	return { declarations, edges }
 }
 
-// NOTE: The shortest way from `start` back to itself through `members`, as the
+// The shortest way from `start` back to itself through `members`, as the
 // names it passes on the way — empty when `start` names itself outright. Only
 // ever asked about a declaration already known to be part of a cycle, so its
 // cost is paid by broken Programs alone; the search that FINDS the cycles is
@@ -1078,7 +1078,7 @@ function cyclePathThrough(
 	return []
 }
 
-// NOTE: Tarjan's strongly connected components over the declaration graph: one
+// Tarjan's strongly connected components over the declaration graph: one
 // depth-first walk, linear in declarations and mentions, because this runs on
 // EVERY compile — the standard library's included, where there is no cycle to
 // find. A component of two or more declarations is a cycle by construction; a
@@ -1148,7 +1148,7 @@ function recursiveTypeDeclarationGroups(
 		}
 	}
 
-	// NOTE: Tarjan pops components in the order it finishes them, which is
+	// Tarjan pops components in the order it finishes them, which is
 	// neither the order the declarations were written in nor a stable one.
 	// Members and groups alike are put back into declaration order, so that the
 	// Diagnostics read down the file — one cycle at a time — rather than in an
@@ -1169,7 +1169,7 @@ function recursiveTypeDeclarationGroups(
 		)
 }
 
-// NOTE: Every recursive Type declaration, reported once per member of the cycle
+// Every recursive Type declaration, reported once per member of the cycle
 // it belongs to, and handed back so the hoist can poison it. A cycle can not be
 // resolved at all — a Type declaration is substituted where it is named, so
 // resolving one that (transitively) names itself would never finish — which is
@@ -1194,7 +1194,7 @@ function reportRecursiveTypeDeclarations(
 
 		for (let node of group.members) {
 			let name = node.name.content
-			// NOTE: An empty path is a declaration that names ITSELF: every
+			// An empty path is a declaration that names ITSELF: every
 			// member of a group of two or more is reachable from itself through
 			// the others, so the search only comes back empty where a self
 			// mention closed the cycle on the spot. Either way the name it ends
@@ -1255,7 +1255,7 @@ function reportRecursiveTypeDeclarations(
 	return recursiveNodes
 }
 
-// NOTE: A Protocol extension is a promise about conformers, and a Protocol that
+// A Protocol extension is a promise about conformers, and a Protocol that
 // (transitively) extends itself promises nothing that can ever be checked: its
 // surface is its ancestors' Methods plus its own, so reading it would never
 // finish. Reported before the hoist rounds, exactly as a recursive Type
@@ -1286,7 +1286,7 @@ function reportRecursiveProtocolDeclarations(
 		}
 	}
 
-	// NOTE: The shortest way from a Protocol back to itself, as the names it
+	// The shortest way from a Protocol back to itself, as the names it
 	// passes — empty where it extends itself outright. A plain breadth-first
 	// walk: an extension list is a handful of names, and this runs only for a
 	// Program that is already broken.
@@ -1386,7 +1386,7 @@ function reportRecursiveProtocolDeclarations(
 	return recursive
 }
 
-// NOTE: Type Aliases, Functions & Namespaces are order-independent — their
+// Type Aliases, Functions & Namespaces are order-independent — their
 // Types are hoisted into scope before the statement-by-statement enrichment,
 // so that top level declarations can reference each other regardless of
 // their order, including mutually recursive Functions.
@@ -1397,7 +1397,7 @@ function reportRecursiveProtocolDeclarations(
 // not hoisted) is left to the in-order enrichment, which reports its
 // Diagnostics.
 //
-// NOTE: The hoist is also the ONE window in which a refinement whose predicate
+// The hoist is also the ONE window in which a refinement whose predicate
 // has not been read yet may be copied — a signature applying a generic refined
 // Alias takes one, and the fill below finishes it. The registry that makes that
 // safe is opened here and closed in the `finally`, so that a throw escaping the
@@ -1431,7 +1431,7 @@ function hoistDeclarationsInner(
 			.map((node) => ({ node, scope: unit.scope })),
 	)
 
-	// NOTE: The recursive Type declarations are diagnosed and taken out of the
+	// The recursive Type declarations are diagnosed and taken out of the
 	// rounds BEFORE they start, and the name of each is seeded as an Error in
 	// their place. Without the seed every declaration naming one of them fails
 	// to hoist too, and the in-order enrichment then reports each of them as a
@@ -1440,7 +1440,7 @@ function hoistDeclarationsInner(
 	// written straight into the map rather than through `declareTypeInScope`,
 	// whose occupied-slot check would report a duplicate declaration.
 	//
-	// NOTE: Once per Scope, never once over all of them: the cycle search is a
+	// Once per Scope, never once over all of them: the cycle search is a
 	// graph over Type NAMES, and two Modules of one group each declaring `type
 	// Foo` declare two different Types. Sharing the graph would join them into a
 	// cycle neither file wrote. The standard library hands one Scope for every
@@ -1481,7 +1481,7 @@ function hoistDeclarationsInner(
 		)
 	}
 
-	// NOTE: The extension cycles, found once per Scope for the reason the Type
+	// The extension cycles, found once per Scope for the reason the Type
 	// cycles are: the graph is over Protocol NAMES, and two Modules each
 	// declaring `protocol Foo` declare two Protocols. Unlike a recursive Type
 	// these stay in the rounds — a Protocol in a cycle still has a surface of
@@ -1507,7 +1507,7 @@ function hoistDeclarationsInner(
 		}
 	}
 
-	// NOTE: The Namespaces and Protocols whose Methods could not all be read as
+	// The Namespaces and Protocols whose Methods could not all be read as
 	// the questions they ask, because a body named something still on its way —
 	// `Integer::isLessThanOrEqualTo` is written on a Rational's own comparison,
 	// and one of the two numeric kinds reaches Scope first. Offered again at the
@@ -1515,7 +1515,7 @@ function hoistDeclarationsInner(
 	// reading, so a `where` clause written on such a Method is filled with the
 	// alias already known. A reading that succeeds drops out of the list.
 	//
-	// NOTE: A reading is offered again only once something it could have been
+	// A reading is offered again only once something it could have been
 	// waiting for has arrived: a Namespace hoisting, an import binding or a
 	// predicate filling. A body naming something hoisting never puts in Scope,
 	// such as a Program's Constant, fails every time and is not worth rereading.
@@ -1536,7 +1536,7 @@ function hoistDeclarationsInner(
 			return !entry.reread()
 		})
 	}
-	// NOTE: Whether a leaf could still be read further. A Namespace whose own
+	// Whether a leaf could still be read further. A Namespace whose own
 	// bodies did not all resolve blocks every leaf naming IT; a Protocol blocks
 	// every leaf naming one of its Methods, whichever conformance answered —
 	// what a provided body says is recorded on the Protocol and reaches a
@@ -1546,7 +1546,7 @@ function hoistDeclarationsInner(
 		unreadAliases.some((entry) => entry.blocks(conjunct))
 
 	while (pendingNodes.length > 0) {
-		// NOTE: Before the resolution rounds rather than after, so a Module whose
+		// Before the resolution rounds rather than after, so a Module whose
 		// import became bindable by the previous round has it in Scope while its
 		// own declarations are resolved.
 		let seeded = seedRound?.(false) ?? false
@@ -1555,7 +1555,7 @@ function hoistDeclarationsInner(
 			hoistGeneration++
 		}
 
-		// NOTE: Before the declarations too, and for the mirror reason: a
+		// Before the declarations too, and for the mirror reason: a
 		// predicate left pending by the previous round may be answerable by a
 		// Namespace that round hoisted, and whatever reads the conjuncts THIS
 		// round — a bodied static Property enriched while its Namespace resolves —
@@ -1572,7 +1572,7 @@ function hoistDeclarationsInner(
 			unreadLeaf,
 		)
 
-		// NOTE: A filled predicate is something a body or a declaration can have
+		// A filled predicate is something a body or a declaration can have
 		// been waiting for, so it counts as progress even if nothing hoists.
 		let filled = pendingPredicates.length < unfilled
 
@@ -1581,7 +1581,7 @@ function hoistDeclarationsInner(
 		}
 
 		let remainingNodes: Array<PendingDeclaration> = []
-		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
+		// The Protocols this round can still hoist, per Scope — a Namespace
 		// conforming to one of them can not have its conditional bounds woven yet
 		// — and a Namespace Type reaching Scope without them is exactly what let
 		// a use site above the declaration solve against an unbounded Method — so
@@ -1612,7 +1612,7 @@ function hoistDeclarationsInner(
 			try {
 				speculation = collectDiagnostics(
 					(): common.Type | common.ProtocolType => {
-						// NOTE: The SKELETON, not the full Type — a refined
+						// The SKELETON, not the full Type — a refined
 						// Alias' predicate is answered by a Namespace that may
 						// name this very Alias in a signature, and resolving
 						// the two in one breath deadlocks the rounds. The
@@ -1670,7 +1670,7 @@ function hoistDeclarationsInner(
 					},
 				)
 			} catch (error) {
-				// NOTE: Only `NotHoistedYet` is retried. Any other throw is a
+				// Only `NotHoistedYet` is retried. Any other throw is a
 				// Compiler bug, reported against the declaration, which is then
 				// left to the in-order enrichment like any that does not hoist.
 				if (error instanceof NotHoistedYet) {
@@ -1695,7 +1695,7 @@ function hoistDeclarationsInner(
 						? scope.protocols
 						: scope.members
 
-			// NOTE: Errors are what disqualify a speculative resolution —
+			// Errors are what disqualify a speculative resolution —
 			// a Declaration that could not be typed yet is one to retry in a
 			// later round, once whatever it names has been hoisted. A Warning
 			// says nothing about whether the Type resolved, and rejecting on
@@ -1728,7 +1728,7 @@ function hoistDeclarationsInner(
 					)
 				}
 
-				// NOTE: "Which Namespaces can this Scope see" is memoised
+				// "Which Namespaces can this Scope see" is memoised
 				// against a version that every declaration bumps, and the hoist
 				// writes into the Scope DIRECTLY rather than through
 				// `declareVariableInScope`, which is what usually bumps it. It
@@ -1755,7 +1755,7 @@ function hoistDeclarationsInner(
 					scope.constants.add(node.name.content)
 				}
 
-				// NOTE: Which of this Namespace's Methods are written as one
+				// Which of this Namespace's Methods are written as one
 				// call on another — `isZero` is `@::is(0)`, `hasItems` is
 				// `@::isEmpty()::negate()` — recorded onto the Method Types now
 				// that the Namespace is in Scope and its own Methods can be
@@ -1786,7 +1786,7 @@ function hoistDeclarationsInner(
 						})
 					}
 				} else if (node.nodeType === "ProtocolDeclarationStatement") {
-					// NOTE: And which of a PROTOCOL's provided Methods are
+					// And which of a PROTOCOL's provided Methods are
 					// written on another — `isGreaterThanOrEqualTo` is
 					// `@::isLessThan(other)::negate()`, `isNot` is the `if`
 					// that says the same of `is`. A conformer answers both
@@ -1812,14 +1812,14 @@ function hoistDeclarationsInner(
 					}
 				}
 
-				// NOTE: A refined Alias hoists with its predicate still to be
+				// A refined Alias hoists with its predicate still to be
 				// read — `conjuncts: null` — and joins the fill list. The
 				// registered object is shared by reference from here on, which
 				// is the whole trick: the fill writes into it in place, and
 				// every signature that bound the name between now and then is
 				// already holding the answer.
 				//
-				// NOTE: A GENERIC one is registered as a Generic Alias WRAPPING
+				// A GENERIC one is registered as a Generic Alias WRAPPING
 				// that object, so the pending refinement is looked for one level
 				// in — and it is the INNER object the entry holds, because the
 				// wrapper is not what the fill writes into.
@@ -1854,13 +1854,13 @@ function hoistDeclarationsInner(
 		pendingNodes = remainingNodes
 	}
 
-	// NOTE: The rounds stop the moment nothing is left to hoist, which is one
+	// The rounds stop the moment nothing is left to hoist, which is one
 	// round before the last hoisted declaration has been offered to the seeding —
 	// so it is offered here. Nothing can hoist off the back of it any more, but
 	// an import naming it still has to bind before the bodies are enriched.
 	seedRound?.(true)
 
-	// NOTE: The final reading of the predicates still pending, after the seeding
+	// The final reading of the predicates still pending, after the seeding
 	// since an answering Namespace may reach the Alias' Scope only through an
 	// import bound just now. Each is written in, or poisoned and unregistered: a
 	// cycle of them is reported here, any other failure by the in-order
@@ -1868,7 +1868,7 @@ function hoistDeclarationsInner(
 	rereadAliases(true)
 	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
-	// NOTE: After the final seeding, so that a clause or a condition is left
+	// After the final seeding, so that a clause or a condition is left
 	// out only where its Protocol never arrives. A solve made during the rounds
 	// saw the clauses unsettled, so every Scope's memo is dropped.
 	let settled: Array<common.NamespaceType> = []
@@ -1893,7 +1893,7 @@ function hoistDeclarationsInner(
 		}
 	}
 
-	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
+	// Each recursive declaration is resolved once, with the seeded Errors
 	// in Scope: the back edges of the cycle resolve to Error silently, so what
 	// comes out is a structurally real Type whose recursive members are Error —
 	// enough for the rest of the Program to be enriched against, and no
@@ -1904,7 +1904,7 @@ function hoistDeclarationsInner(
 	// the in-order enrichment from resolving — and re-declaring — it again.
 	for (let { node, scope } of recursiveNodes) {
 		let { result, diagnostics } = collectDiagnostics((): common.Type => {
-			// NOTE: A throw here is a Compiler bug, reported as one rather than
+			// A throw here is a Compiler bug, reported as one rather than
 			// escaping `enrich`. The seeded Error stays for the rest of the
 			// Program to be enriched against.
 			try {
@@ -1925,7 +1925,7 @@ function hoistDeclarationsInner(
 		hoistedTypes.set(node, result)
 	}
 
-	// NOTE: A body whose `@` the syntactic reading loses reads what its typing
+	// A body whose `@` the syntactic reading loses reads what its typing
 	// says, where every declaration hoisted so the in-order typing agrees. Each
 	// is typed against the others' syntactic reads, which only ask for more.
 	if (pendingNodes.length === 0) {
@@ -1963,7 +1963,7 @@ function hoistDeclarationsInner(
 	return hoistedTypes
 }
 
-// NOTE: `hoistedTypes` is passed in when the hoist already ran over a WIDER
+// `hoistedTypes` is passed in when the hoist already ran over a WIDER
 // set of Nodes than this section's — the standard library hoists every file at
 // once before any of them is enriched. A lone Program hoists its own.
 const enrichImplementation = (
@@ -1976,7 +1976,7 @@ const enrichImplementation = (
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) =>
-			// NOTE: An `overload function` block is not one Node but one per
+			// An `overload function` block is not one Node but one per
 			// BODIED entry — each becomes a top-level Function named
 			// `<name>__overload$N` for its slot in the hoisted Type, the native
 			// entries carrying none. The body enrich sits inside the guard so a
@@ -1996,7 +1996,7 @@ const enrichImplementation = (
 	}
 }
 
-// NOTE: Expected errors are reported as Diagnostics and recovered from in
+// Expected errors are reported as Diagnostics and recovered from in
 // place — anything thrown past this point is a Compiler bug. It is reported as
 // a Diagnostic as well, so that a single broken statement can not take down the
 // enrichment of the remaining Program.
@@ -2027,18 +2027,18 @@ function reportInternalError(error: unknown, position: common.Position): void {
 	)
 }
 
-// NOTE: What every item of a tests section is read against — where it sits and
+// What every item of a tests section is read against — where it sits and
 // what covers it. `suitePath` is what a test's identity is built from, and
 // `covering` holds the Modifiers of the suites around it, because a Modifier
 // written on a suite covers every test inside it.
 type TestsContext = {
 	suitePath: Array<string>
 	covering: TestModifiers
-	// NOTE: What every identity in the section spells as its Module.
+	// What every identity in the section spells as its Module.
 	modulePath: string | null
 }
 
-// NOTE: The `tests { … }` block, enriched only where the compile ASKED for it —
+// The `tests { … }` block, enriched only where the compile ASKED for it —
 // `essence build` and `essence run` leave it parsed and never come here, which
 // is what makes a test cost a shipped Program nothing.
 //
@@ -2051,20 +2051,20 @@ type TestsContext = {
 // would be a redeclaration rather than the shadow every other nested block
 // makes it.
 //
-// NOTE: A Constant written here is setup, and is specified as indistinguishable
+// A Constant written here is setup, and is specified as indistinguishable
 // from fresh evaluation for every test that can see it. Nothing in enrichment
 // decides that — it is what the lowering emits — but it is why nothing here
 // treats these Statements as a shared, once-evaluated preamble.
 export const enrichTestsSection = (
 	section: parser.TestsSectionNode,
 	scope: enricher.Scope,
-	// NOTE: See `enrich`'s own `testsPath`. Null everywhere a Scope names its
+	// See `enrich`'s own `testsPath`. Null everywhere a Scope names its
 	// Module, which is every compile but the standard library's own.
 	testsPath?: string,
 ): common.typed.TestsSectionNode => {
 	return {
 		nodeType: "TestsSection",
-		// NOTE: No barrier here. The runner waits for what it called — one test
+		// No barrier here. The runner waits for what it called — one test
 		// at a time, each awaited before the next — so a `complete` written in
 		// the setup or in a test body is an `await` in a Function that is
 		// awaited, and the Scope chain reaches the Program's own "top-level"
@@ -2086,7 +2086,7 @@ const enrichTestsNodes = (
 ): Array<common.typed.TestsNode> => {
 	refuseDuplicateNames(nodes)
 
-	// NOTE: Only the ordinary Statements hoist. A test and a suite declare no
+	// Only the ordinary Statements hoist. A test and a suite declare no
 	// name — what they are called is a String, not an Identifier — so there is
 	// nothing about either one for a Statement above it to resolve against.
 	let hoistedTypes = hoistDeclarations([
@@ -2125,7 +2125,7 @@ function isStatementOfTests(
 	return node.nodeType !== "Test" && node.nodeType !== "Suite"
 }
 
-// NOTE: Whether the test's NAME reads the row the table binds. A table test's
+// Whether the test's NAME reads the row the table binds. A table test's
 // name is what tells forty tests apart, so it usually does — and that is what
 // makes widening the row Parameter's Type a decision rather than a free edit:
 // the name prints the row, so the widened Type has to stay Printable.
@@ -2165,11 +2165,11 @@ const enrichTest = (
 		resolveTestModifiers(node.modifiers, "test"),
 		context.covering,
 	)
-	// NOTE: A body of its own, so that what one test declares is gone by the
+	// A body of its own, so that what one test declares is gone by the
 	// next one — the Scope is what says two tests share nothing but the setup
 	// above them.
 	//
-	// NOTE: And the one place asynchrony is barred from a `tests { … }` block.
+	// And the one place asynchrony is barred from a `tests { … }` block.
 	// A plain test is run once and awaited, so it may `complete` whatever it
 	// likes; the other two forms run their body many times under machinery that
 	// is measured or replayed, and neither can wait for a run without changing
@@ -2182,7 +2182,7 @@ const enrichTest = (
 		bodyScope.completingBarrier =
 			node.form === "benchmark" ? "benchmark-body" : "property-body"
 	}
-	// NOTE: Before the name and before the body: a table test binds its row in
+	// Before the name and before the body: a table test binds its row in
 	// the body's Scope, and both of them read it — the name because it says
 	// which row it ran for, which is the whole point of interpolating one.
 	let table =
@@ -2195,7 +2195,7 @@ const enrichTest = (
 					modifiers.skipped !== null,
 					nameReadsTheRow(node.name, node.table),
 				)
-	// NOTE: Beside the table for the same reason, and never with one: a table
+	// Beside the table for the same reason, and never with one: a table
 	// runs a row a reader wrote and a property runs a value the runner made up,
 	// so a test asking for both is asking for two runs of one body.
 	let properties =
@@ -2225,7 +2225,7 @@ const enrichTest = (
 
 	return {
 		nodeType: "Test",
-		// NOTE: Carried rather than decided: what the Keyword said is what the
+		// Carried rather than decided: what the Keyword said is what the
 		// runner is told, and everything between here and the run — the
 		// identity, the Modifiers, the rows — answers for one shape.
 		form: node.form,
@@ -2234,7 +2234,7 @@ const enrichTest = (
 			suitePath: context.suitePath,
 			name: nameTemplate(node.name),
 		},
-		// NOTE: A property test's name is read in the OUTER Scope: what a
+		// A property test's name is read in the OUTER Scope: what a
 		// property generates is a different value every case, so a name saying
 		// which one it ran for could not be worked out once and could not name
 		// the test at all.
@@ -2254,7 +2254,7 @@ const enrichTest = (
 	}
 }
 
-// NOTE: A name is worked out BEFORE the run — the whole section is walked once
+// A name is worked out BEFORE the run — the whole section is walked once
 // with no test selected to render every interpolated one, so that a `--filter`
 // matches what a reader sees — and a rendered name is a String the manifest
 // carries. So it is the one Expression of a `tests { … }` block that can not
@@ -2276,7 +2276,7 @@ const enrichSuite = (
 		context.covering,
 	)
 	let name = nameTemplate(node.name)
-	// NOTE: A suite is a group AND a Scope: what it declares is the setup its
+	// A suite is a group AND a Scope: what it declares is the setup its
 	// own tests share, and is gone outside it.
 	let bodyScope = childScope(scope)
 
@@ -2301,7 +2301,7 @@ const enrichSuite = (
 	}
 }
 
-// NOTE: `across` and `for any` are two answers to one question — what the body
+// `across` and `for any` are two answers to one question — what the body
 // runs for. A test writing both would run every row for every generated value,
 // which is a third thing nobody asked for.
 const refuseBothTestForms = (node: parser.TestNode): void => {
@@ -2331,12 +2331,12 @@ const refuseBothTestForms = (node: parser.TestNode): void => {
 	)
 }
 
-// NOTE: A benchmark is a MEASUREMENT, and a measurement is comparable only
+// A benchmark is a MEASUREMENT, and a measurement is comparable only
 // where every run does the same work. A generated value is a different value
 // every case, so the body would be timed doing something else each time and the
 // baseline it is held to would be a number about nothing.
 //
-// NOTE: The properties are enriched all the same — the Error above has already
+// The properties are enriched all the same — the Error above has already
 // stopped anything from running, and error recovery keeps the tree whole so
 // that everything an Editor draws off it is still there.
 const refuseGeneratedBenchmark = (node: parser.TestNode): void => {
@@ -2366,7 +2366,7 @@ const refuseGeneratedBenchmark = (node: parser.TestNode): void => {
 	)
 }
 
-// NOTE: An inline snapshot inside a table test has nowhere to be written: every
+// An inline snapshot inside a table test has nowhere to be written: every
 // row runs the same body, so N rows produce N values for the one slot the source
 // holds. A named one has a place per row — see `snapshotted` in the runtime,
 // which numbers a stored entry by the row that recorded it — so what this asks
@@ -2444,7 +2444,7 @@ const refuseSnapshots = (
 	visit(nodes)
 }
 
-// NOTE: The cast holds because the Parser puts nothing else there — a name is a
+// The cast holds because the Parser puts nothing else there — a name is a
 // String Literal or an interpolated one — and enriching either answers with the
 // Node of the same kind.
 const enrichTestName = (

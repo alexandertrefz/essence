@@ -1,4 +1,4 @@
-# NOTE: The gate runs the root scripts a contributor runs, cheapest first, so
+# The gate runs the root scripts a contributor runs, cheapest first, so
 # the quickest failure to read is the first one reported.
 name: Test
 
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # NOTE: `.bun-version` holds the Bun this repository is developed against,
+      # `.bun-version` holds the Bun this repository is developed against,
       # so CI runs the one a contributor does rather than whatever the runner
       # ships this week. Bun is not merely the task runner here: the packages
       # are TypeScript executed straight through it with no build step, the
@@ -27,13 +27,13 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # NOTE: `bun.lock` decides the dependency versions, and `--frozen-lockfile`
+      # `bun.lock` decides the dependency versions, and `--frozen-lockfile`
       # is what makes that binding rather than advisory — an install that would
       # have to change the lockfile fails here instead of quietly resolving
       # something newer than what the versions were pinned to.
       - run: bun install --frozen-lockfile
 
-      # NOTE: `.es` sources are held to `esfmt` by the formatter's own spec, so
+      # `.es` sources are held to `esfmt` by the formatter's own spec, so
       # `bun run test` is their format check.
       - run: bun run format:check
 
@@ -41,7 +41,7 @@ jobs:
 
       - run: bun run typecheck
 
-      # NOTE: Through the script rather than as `bun test` spelled out, so that
+      # Through the script rather than as `bun test` spelled out, so that
       # what CI runs is what a contributor runs — the script is where the
       # flags live, and a flag added there is added here without anybody
       # remembering to. What it carries today is `--parallel`: a worker per
@@ -51,7 +51,7 @@ jobs:
       # bug here, not a feature.
       - run: bun run test
 
-  # NOTE: The Netlify deploy's own build and link check, so a broken link fails
+  # The Netlify deploy's own build and link check, so a broken link fails
   # the pull request rather than the deploy after it.
   website:
     runs-on: ubuntu-latest

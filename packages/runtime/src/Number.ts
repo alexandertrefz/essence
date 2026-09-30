@@ -31,7 +31,7 @@ export const GoldenRatio = createAlgebraic(
 
 // #endregion
 
-// NOTE: `lowest`, `highest`, `sum`, `product` and `average` are
+// `lowest`, `highest`, `sum`, `product` and `average` are
 // written in Essence now — `packages/standard-library/sources/Number.es`. The pairwise
 // `lowest`/`highest` entries were already there; the List entries
 // fold them over the items, and the aggregates fold the members' own
@@ -48,7 +48,7 @@ export type NumberType =
 
 type RationalKind = IntegerType | RationalType
 
-// NOTE: The cross-member semantics of `Number`: two Numbers are compared by
+// The cross-member semantics of `Number`: two Numbers are compared by
 // numeric value, so the Integer `1` and the Rational `1/1` are the same
 // Number even though the member Namespaces treat them as different values.
 // Cross-multiplication keeps everything in bigint arithmetic; equality is
@@ -70,13 +70,13 @@ function denominatorOf(number: RationalKind): bigint {
 	}
 }
 
-// NOTE: `is`, `isNot` and `toString` are written in Essence now —
+// `is`, `isNot` and `toString` are written in Essence now —
 // `packages/standard-library/sources/Number.es`. `is` reads the covering `compare` against
 // `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
 // and defers to that member's own `toString`. `compare` below is the one
 // ordering primitive they all fall out of, and it stays native.
 
-// NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
+// Wiring B — the covering Namespace hand-writes all sixteen cells.
 // Every cell involving a single-base Transcendental is total and exact,
 // because equality across kinds is impossible by definition. Only a
 // Transcendental carrying several bases — π and e, today — meets the one
@@ -153,14 +153,14 @@ export function compare(number: NumberType, other: NumberType): OrderingType {
 
 // #region Comparisons
 
-// NOTE: The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
+// The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
 // `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
 // `packages/standard-library/sources/Number.es`. Each reads the covering `compare` above against the
 // matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
 // on), and the `…OrEqualTo` pair negates the strict opposite. `compare` is
 // the one ordering primitive they all fall out of, and it stays native.
 
-// NOTE: `isBetween` is written in Essence now — `Orderable` provides it, in
+// `isBetween` is written in Essence now — `Orderable` provides it, in
 // `packages/standard-library/sources/Orderable.es` — as
 // `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
 // is the same two comparisons this function made, read off the same covering

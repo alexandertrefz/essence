@@ -4,7 +4,7 @@ import * as path from "node:path"
 
 import { projectSchema } from "@essence-lang/compiler/configuration"
 
-// NOTE: The extension bundles the JSON Schema for `essence.json` and registers
+// The extension bundles the JSON Schema for `essence.json` and registers
 // it for the filename, which is what gives the file completion, hover text and
 // validation without a line of server code. The copy is generated from the
 // reader's catalogue; this spec re-renders and compares, and NEVER writes — a

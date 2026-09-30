@@ -20,7 +20,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: What `loop-self-tail-calls` exists for, which is not a speed: it is that
+// What `loop-self-tail-calls` exists for, which is not a speed: it is that
 // the walk the language teaches runs on every host Essence supports. Bundles run
 // on Bun, on Node and on Deno byte-identically, JavaScriptCore eliminates a tail
 // frame and V8 does not — so before this pass, 10,000 items was a `RangeError`
@@ -29,18 +29,18 @@ import { validate } from "../validator/index"
 // JavaScript, which is what makes the claim hold on an engine no suite here
 // runs.
 //
-// NOTE: And it holds the pass to saying the same thing as the Program it
+// And it holds the pass to saying the same thing as the Program it
 // rewrote, over generated Programs rather than written ones — `optimiser.spec`
 // carries the written cases, one per thing the pass has to get right, and the
 // fuzzer at the foot of this file is what covers their combinations.
 
 const TURNS = 200_000
 
-// NOTE: One Program per shape the pass has to reach, each counting to the same
+// One Program per shape the pass has to reach, each counting to the same
 // answer so a wrong one names the shape rather than the arithmetic.
 const ANSWER = String((TURNS * (TURNS + 1)) / 2)
 
-// NOTE: The canonical walk: take the head, answer with the walk of the tail,
+// The canonical walk: take the head, answer with the walk of the tail,
 // with the `match` over the `Optional` that `firstItem` answers deciding when to
 // stop. This is the shape the documentation teaches and the one that overflowed.
 const headAndTail = `implementation {
@@ -54,7 +54,7 @@ const headAndTail = `implementation {
 	Terminal.print(total(List.of(integersFrom 1, through ${TURNS}), 0))
 }`
 
-// NOTE: An accumulator walk with no List in it at all — nothing but two
+// An accumulator walk with no List in it at all — nothing but two
 // Integers, so what it measures is the turn and not the walk of a structure.
 const accumulator = `implementation {
 	function countdown(_ n: Integer, _ sum: Integer) -> Integer {
@@ -68,7 +68,7 @@ const accumulator = `implementation {
 	Terminal.print(countdown(${TURNS}, 0))
 }`
 
-// NOTE: A walk over an `Optional` that is not a List's head — the Choice is
+// A walk over an `Optional` that is not a List's head — the Choice is
 // carried by the Program itself, so the `match` is over a value the walk built
 // rather than over one a native answered.
 const optionalWalk = `implementation {
@@ -88,7 +88,7 @@ const optionalWalk = `implementation {
 	Terminal.print(drain(#Value(${TURNS}), 0))
 }`
 
-// NOTE: A Namespace Method, where the receiver is Parameter zero and `@` inside
+// A Namespace Method, where the receiver is Parameter zero and `@` inside
 // a Handler means the matched value — so the walk binds the receiver outside the
 // chain and the loop rebinds it through a slot.
 const methodWalk = `implementation {
@@ -129,7 +129,7 @@ function generate(
 	return rewrite(optimise(simplify(enriched.program), options), options)
 }
 
-// NOTE: The rendered report rather than a boolean, so a generated Program that
+// The rendered report rather than a boolean, so a generated Program that
 // does not compile says which line of itself to read.
 function refusal(
 	diagnostics: Array<common.Diagnostic>,
@@ -140,7 +140,7 @@ function refusal(
 		: ""
 }
 
-// NOTE: BUNDLED for the runs under Node. What the Rewriter emits imports the
+// BUNDLED for the runs under Node. What the Rewriter emits imports the
 // runtime as TypeScript, which Bun reads and Node does not — and what ships is
 // the bundle anyway, so this is also the artefact the portability claim is
 // about.
@@ -164,7 +164,7 @@ const withoutPass: OptimiserOptions = {
 	disabledPasses: new Set(["loop-self-tail-calls"]),
 }
 
-// NOTE: One emitted Function's own text, found by its header and taken to the
+// One emitted Function's own text, found by its header and taken to the
 // brace that closes it. It is read off the EMISSION rather than off the Nodes,
 // because what the portability claim is about is the JavaScript: a test that
 // asked the Optimiser whether it had looped a Function would be asking the pass
@@ -195,7 +195,7 @@ function emittedBody(generated: string, name: string): string {
 	throw new Error(`the emitted '${name}' has no closing brace`)
 }
 
-// NOTE: `node` if there is one on the PATH, and null where there is not. It is
+// `node` if there is one on the PATH, and null where there is not. It is
 // resolved by ASKING it rather than by looking for a file, so a shim, a version
 // manager's shell function and a real binary all answer the same way.
 async function nodeVersion(): Promise<string | null> {
@@ -214,7 +214,7 @@ async function nodeVersion(): Promise<string | null> {
 
 const node = await nodeVersion()
 
-// NOTE: A subprocess, and the emitted Module written to a file — an import into
+// A subprocess, and the emitted Module written to a file — an import into
 // the runner's own process would run it on Bun, which is the engine this whole
 // file exists to look past.
 async function runUnder(
@@ -237,7 +237,7 @@ async function runUnder(
 
 describe("self tail calls", () => {
 	describe("the emitted shape", () => {
-		// NOTE: The guard that holds EVERYWHERE, including on an engine nothing
+		// The guard that holds EVERYWHERE, including on an engine nothing
 		// here runs: the Function does not call itself where its answer goes. It
 		// is asked of the emitted text, and the same question is asked of the
 		// build with the pass off, where the answer has to be the opposite —
@@ -267,7 +267,7 @@ describe("self tail calls", () => {
 	})
 
 	describe("under Node", () => {
-		// NOTE: Skipped with a reason rather than silently, because the whole
+		// Skipped with a reason rather than silently, because the whole
 		// point of this block is the engine it runs on. `node` is on the PATH of
 		// every machine this repository is developed on and of CI; a machine
 		// without one still runs everything else here, and the shape guard above
@@ -287,7 +287,7 @@ describe("self tail calls", () => {
 				})
 			}
 
-			// NOTE: What makes the four above a guard rather than four passing
+			// What makes the four above a guard rather than four passing
 			// tests. With the pass off, V8 is handed 200,000 frames and says so
 			// — so a change that quietly stopped looping these walks fails the
 			// block above rather than passing it more slowly. It is a claim
@@ -308,17 +308,17 @@ describe("self tail calls", () => {
 		}
 	})
 
-	// NOTE: The differential the written cases can not cover: not one thing at a
+	// The differential the written cases can not cover: not one thing at a
 	// time but their COMBINATIONS — a swap under a `define` under a `match`, with
 	// a default that reads a Parameter the same turn rebinds, with a closure
 	// holding one of them. Each generated Program is compiled twice and run
 	// twice, and the two answers have to be the same text.
 	//
-	// NOTE: Deterministic. The seed is fixed, so a failure is reproducible and
+	// Deterministic. The seed is fixed, so a failure is reproducible and
 	// the counterexample is in the message; a random seed would make this a test
 	// that fails for somebody once and never again.
 	describe("the fuzzer", () => {
-		// NOTE: Sixty-four rather than forty-eight, because four knobs were
+		// Sixty-four rather than forty-eight, because four knobs were
 		// added to the nine that were here and the combinations they stand for
 		// are what this block is: two of them, a closure in a default and a
 		// default reading a Record member, are each a bug an independent review
@@ -348,7 +348,7 @@ describe("self tail calls", () => {
 			let turns = 1 + Math.floor(random() * 6)
 			let start = 1 + Math.floor(random() * 9)
 			let step = 1 + Math.floor(random() * 4)
-			// NOTE: Every knob the written cases hold one at a time, drawn
+			// Every knob the written cases hold one at a time, drawn
 			// independently: which shape decides the turn, whether a Parameter
 			// is swapped with another, whether one takes a default that reads
 			// the Parameter before it, whether a closure captures one, and
@@ -359,7 +359,7 @@ describe("self tail calls", () => {
 			let defaulted = random() < 0.5
 			let captured = random() < 0.35
 			let alsoRecurses = random() < 0.3
-			// NOTE: And four more, each of which is a corner an independent
+			// And four more, each of which is a corner an independent
 			// review reached and this could not. A Record Parameter with a
 			// default that reads a MEMBER of it spelled like a Parameter, which
 			// is the difference between renaming a binding and renaming a key.
@@ -374,7 +374,7 @@ describe("self tail calls", () => {
 			let paired = captured && random() < 0.5
 			let closured = captured && random() < 0.5
 
-			// NOTE: A value that says it was evaluated, where the Program has
+			// A value that says it was evaluated, where the Program has
 			// something to say it with. `note` answers what it is given, so the
 			// knob changes the ORDER a difference would show up in and never the
 			// answer.
@@ -395,7 +395,7 @@ describe("self tail calls", () => {
 						]
 					: []),
 				...(recorded ? ["at mark: Integer = opts.n"] : []),
-				// NOTE: AFTER the two Parameters with defaults, and written by
+				// AFTER the two Parameters with defaults, and written by
 				// every call — so a turn that leaves those out has a written
 				// Argument standing behind an omitted one, which a call
 				// evaluates first and a turn therefore has to hold.
@@ -406,7 +406,7 @@ describe("self tail calls", () => {
 					: []),
 			]
 
-			// NOTE: One call, written from the values its Arguments take — so
+			// One call, written from the values its Arguments take — so
 			// the first call and the turn differ only in what they hand over,
 			// and a Parameter drawn into the signature above is handed something
 			// in both. The two with defaults are handed nothing by either, so
@@ -428,7 +428,7 @@ describe("self tail calls", () => {
 					...(captured ? [made] : []),
 				].join(", ")})`
 
-			// NOTE: What the turn carries in its accumulator. A `paired` walk
+			// What the turn carries in its accumulator. A `paired` walk
 			// adds the counter rather than the stride, which leaves `stride`
 			// read by nobody but the answer — and that is what makes such a
 			// turn one whose Arguments mention no Parameter it assigns where it
@@ -438,12 +438,12 @@ describe("self tail calls", () => {
 				defaulted && !paired
 					? "sum::add(stride)"
 					: `sum::add(${swapped ? "left" : "n"})`
-			// NOTE: The closure the turn hands on is built where it stands
+			// The closure the turn hands on is built where it stands
 			// unless a default builds it — and where a default does, it closes
 			// over a Parameter the turn rebinds, which is the shape the pass
 			// declines rather than loops.
 			//
-			// NOTE: A `paired` one closes over every value the walk carries
+			// A `paired` one closes over every value the walk carries
 			// rather than over the counter alone, so every one of them is
 			// rebound through a slot — which is the other half of "a binding per
 			// turn is decided per Parameter".
@@ -452,7 +452,7 @@ describe("self tail calls", () => {
 						swapped ? "::add(left)::add(right)" : ""
 					}::add(made::length()) }`
 				: "() -> Integer { <- n }"
-			// NOTE: The turn swaps its pair, takes the defaults again by leaving
+			// The turn swaps its pair, takes the defaults again by leaving
 			// them out, and hands on a closure built in THIS turn — so a loop
 			// that rebound in the wrong order, carried a stale default or shared
 			// one binding across turns answers differently.
@@ -470,7 +470,7 @@ describe("self tail calls", () => {
 					? "sum::add(left)"
 					: "sum"
 
-			// NOTE: Every Parameter drawn is READ by the answer, so a default
+			// Every Parameter drawn is READ by the answer, so a default
 			// nothing reads can not hide a difference in what it was given.
 			if (recorded) {
 				answer = `${answer}::add(mark)`
@@ -489,7 +489,7 @@ describe("self tail calls", () => {
 			<- ${turn}
 		}`
 			} else if (driver === "match") {
-				// NOTE: A Choice of the Program's own, because a `match` needs a
+				// A Choice of the Program's own, because a `match` needs a
 				// Union to decide over — so the turn is decided by a Case rather
 				// than by a Boolean, which is the shape the canonical walk has.
 				body = `		<- match decided(n) -> Integer {
@@ -513,7 +513,7 @@ describe("self tail calls", () => {
 		}`
 			}
 
-			// NOTE: A second call to the same Function standing where its answer
+			// A second call to the same Function standing where its answer
 			// is still worked on. It must stay a call, and the Program must
 			// still answer the same thing either way — which is what says the
 			// pass told the two apart.
@@ -530,7 +530,7 @@ describe("self tail calls", () => {
 `
 				: ""
 
-			// NOTE: Declared only where an Argument or a default is asked to
+			// Declared only where an Argument or a default is asked to
 			// say when it was evaluated.
 			let helper = noisy
 				? `	function note(_ tag: String, _ value: Integer) -> Integer {
@@ -542,7 +542,7 @@ describe("self tail calls", () => {
 `
 				: ""
 
-			// NOTE: Declared only where the `match` driver needs it, so every
+			// Declared only where the `match` driver needs it, so every
 			// other generated Program stays the shape it was.
 			let choice =
 				driver === "match"
@@ -585,7 +585,7 @@ ${extra}	Terminal.print(${called(
 				let plain = await runUnder("bun", generate(source, withoutPass))
 
 				expect(looped.stderr).toBe("")
-				// NOTE: The source is in the message, because a generated
+				// The source is in the message, because a generated
 				// counterexample nobody can read is a failure nobody can fix.
 				expect({ source, ...looped }).toEqual({ source, ...plain })
 			})

@@ -5,7 +5,7 @@ import * as path from "node:path"
 
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
-// NOTE: The showcase's own tests are Essence — `Standings.es` writes a
+// The showcase's own tests are Essence — `Standings.es` writes a
 // `tests { … }` section and `Season.tests.es` is a file of nothing else. What
 // is left here is the one thing a bun spec can say that they can not: that
 // `essence test` finds them, runs them and answers with the exit code CI reads.
@@ -20,7 +20,7 @@ const ESSENCE = path.join(
 	"essence",
 )
 
-// NOTE: A bundle cache of this run's own, so that a spec compiling the example
+// A bundle cache of this run's own, so that a spec compiling the example
 // neither answers out of the user's cache nor fills it — and a result cache
 // beside it, for the same reason and one more: this spec runs `essence test` in
 // the example's OWN directory, so an answer left in the user's store would be
@@ -53,7 +53,7 @@ async function test(
 }
 
 describe("examples/league", () => {
-	// NOTE: The budget `scripts/testBudget.ts` gives every spec, written out.
+	// The budget `scripts/testBudget.ts` gives every spec, written out.
 	// Spawning `essence test` over the example is bounded, deterministic work.
 	it("passes its own tests", async () => {
 		let { code, out } = await test(EXAMPLE)
@@ -99,7 +99,7 @@ describe("examples/league", () => {
 			expect(run.stderr).toBe("")
 			expect(run.code).toBe(0)
 
-			// NOTE: Every claim this program makes, and nothing about the shape
+			// Every claim this program makes, and nothing about the shape
 			// around them. The table's own layout is asserted by the Essence
 			// tests in `Season.tests.es`, against `Table.render` directly; what
 			// is left here is `Main.es`'s own reading of the season, which is
@@ -125,7 +125,7 @@ describe("examples/league", () => {
 		}
 	})
 
-	// NOTE: A test that fails, in a directory of its own, so that the exit code
+	// A test that fails, in a directory of its own, so that the exit code
 	// CI reads is proven against a run that really did fail rather than assumed
 	// from the run that passed.
 	it("exits non-zero when a test fails", async () => {

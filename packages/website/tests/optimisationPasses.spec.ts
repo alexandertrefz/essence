@@ -4,14 +4,14 @@ import * as path from "node:path"
 
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 
-// NOTE: "Every Optimiser pass is documented" is a completion gate, not an
+// "Every Optimiser pass is documented" is a completion gate, not an
 // aspiration — the name is what `--without-optimisation` takes, and a pass
 // nobody can look up is a flag nobody can use. The registry is the source of
 // truth and can be read directly, unlike the Diagnostic codes next door: a pass
 // is a value at run time rather than a member of a union that leaves nothing
 // behind.
 
-// NOTE: This spec lives in the documentation's own package, beside the page it
+// This spec lives in the documentation's own package, beside the page it
 // holds to account — the published one, read as a file, so what the gate holds
 // is what a reader of `/docs/reference/optimisations` is shown and moving the
 // site means moving them together.
@@ -20,7 +20,7 @@ const OPTIMISATIONS_PAGE = path.resolve(
 	"../src/content/docs/reference/optimisations.mdx",
 )
 
-// NOTE: The headings of ONE section, so that the pass list and the runtime
+// The headings of ONE section, so that the pass list and the runtime
 // improvements — which are documented on the same page, in the same style, and
 // are deliberately not passes — can not be mistaken for one another.
 function headingsUnder(section: string): Array<string> {
@@ -43,7 +43,7 @@ function headingsUnder(section: string): Array<string> {
 
 describe("Optimisation Passes", () => {
 	it("documents every registered pass, in the order they run", () => {
-		// NOTE: An exact list rather than a set comparison, because the order
+		// An exact list rather than a set comparison, because the order
 		// the passes run in is part of what the page states — and a pass
 		// documented out of order would describe a Compiler that does not
 		// exist.
@@ -51,7 +51,7 @@ describe("Optimisation Passes", () => {
 	})
 
 	it("documents every runtime improvement, by name", () => {
-		// NOTE: These have no registry to be read out of — they are how the
+		// These have no registry to be read out of — they are how the
 		// runtime works rather than values a Compiler holds — so the list is
 		// written out here, and this spec is what makes them nameable at all. A
 		// runtime improvement that is renamed, dropped or added without the page
@@ -83,7 +83,7 @@ describe("Optimisation Passes", () => {
 	})
 
 	it("documents every emitted shape, by name", () => {
-		// NOTE: Written out here for the reason the runtime improvements are:
+		// Written out here for the reason the runtime improvements are:
 		// there is no registry to read them out of, because they are decisions
 		// the Rewriter makes while writing a Program out rather than values a
 		// Compiler holds. One that is renamed, dropped or added without the page
@@ -96,7 +96,7 @@ describe("Optimisation Passes", () => {
 	})
 
 	it("keeps the emitted shapes apart from the passes", () => {
-		// NOTE: The distinction the section is FOR. An emitted shape has no name
+		// The distinction the section is FOR. An emitted shape has no name
 		// `--without-optimisation` takes, so one that shared a name with a pass
 		// would be a flag that half worked.
 		expect(

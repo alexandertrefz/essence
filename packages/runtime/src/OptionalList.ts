@@ -1,4 +1,4 @@
-// NOTE: The runtime module of the `OptionalList` Namespace — a List whose items
+// The runtime module of the `OptionalList` Namespace — a List whose items
 // are Optionals. All three of its Methods — `values`, `allValues` and
 // `firstValue` — are written in Essence
 // (`packages/standard-library/sources/List.es`), so there is nothing native

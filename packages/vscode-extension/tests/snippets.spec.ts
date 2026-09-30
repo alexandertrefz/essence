@@ -6,7 +6,7 @@ import { snippets } from "@essence-lang/language-server/snippets"
 
 import { renderSnippets } from "../../../scripts/generateSnippets"
 
-// NOTE: The extension SHIPS the snippet file and deliberately does not
+// The extension SHIPS the snippet file and deliberately does not
 // contribute it. VS Code loads a contributed `.code-snippets` whenever the
 // language is active rather than only when the Server is off, and it does not
 // deduplicate a file snippet against an identically labelled one the Server
@@ -38,7 +38,7 @@ describe("the bundled snippets", () => {
 		expect(Object.keys(JSON.parse(bundled))).toHaveLength(snippets.length)
 	})
 
-	// NOTE: And the manifest says nothing about it, which is the point: a
+	// And the manifest says nothing about it, which is the point: a
 	// contributed file would be loaded beside the Server rather than instead of
 	// it, and the reader would be offered each prefix twice — once scoped to
 	// the block the cursor stands in, once not scoped at all.

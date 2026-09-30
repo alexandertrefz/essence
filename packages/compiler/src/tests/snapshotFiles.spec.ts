@@ -11,7 +11,7 @@ import {
 	snapshotFileOf,
 } from "../testing/snapshots"
 
-// NOTE: The two places a recorded snapshot ends up: the `__snapshots__`
+// The two places a recorded snapshot ends up: the `__snapshots__`
 // companion beside the source, and the source itself. Both are read back after
 // they are written, because what a snapshot is worth is exactly what survives
 // the round trip.
@@ -55,7 +55,7 @@ describe("The snapshot companion file", () => {
 		expect(parseSnapshotFile(printSnapshotFile(entries))).toEqual(entries)
 	})
 
-	// NOTE: The format writes `\n` and only `\n`, so a `\r` in a file is either
+	// The format writes `\n` and only `\n`, so a `\r` in a file is either
 	// a value's own or a tool's rewriting of the line endings — and which of
 	// the two it is, is what the whole file says rather than one line.
 	it("keeps a carriage return a value put there", () => {
@@ -123,7 +123,7 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).not.toContain('"old"')
 	})
 
-	// NOTE: Essence has no multi-line String Literal, so a value that spans
+	// Essence has no multi-line String Literal, so a value that spans
 	// lines is spelled on one with the escapes the Lexer knows — and read back
 	// as the very text it was recorded from.
 	it("spells a value that spans lines on one line", () => {
@@ -162,7 +162,7 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).toContain('snapshot "second"')
 	})
 
-	// NOTE: A Position that names nothing is a file that moved under the run.
+	// A Position that names nothing is a file that moved under the run.
 	// Nothing is written at it, and nothing else is either.
 	it("writes nothing at a slot that is not there", () => {
 		let written = writeInlineSnapshots(source, [
@@ -179,7 +179,7 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).toBe(source)
 	})
 
-	// NOTE: Recording a snapshot is a test run writing into a source, and a run
+	// Recording a snapshot is a test run writing into a source, and a run
 	// that also reformatted the file would be a build formatting your code.
 	// Only the slot moves; the rest of the file is left exactly as it was
 	// written, however it was written.

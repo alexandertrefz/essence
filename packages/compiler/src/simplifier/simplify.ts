@@ -11,7 +11,7 @@ import { bodyDefinitelyReturns } from "../helpers/returns"
 import { isMergedLevel, resolveOverloadedMethodName } from "../helpers/types"
 import { valueCommentLines } from "../valueComments"
 
-// NOTE: What the Simplifier needs to know beyond the Program, which today is
+// What the Simplifier needs to know beyond the Program, which today is
 // one thing and only for a test compile: the Module's own text. The span table
 // a test lowering emits carries the SOURCE of every instrumented point, so that
 // a reader of an event — a `--json` consumer, an editor showing a value beside
@@ -34,7 +34,7 @@ export const simplify = (
 			program.tests === null
 				? null
 				: simplifyTestsSection(program.tests, options),
-		// NOTE: Always null here. Coverage is not a lowering of anything the
+		// Always null here. Coverage is not a lowering of anything the
 		// source wrote: it is instrumentation an Optimiser pass adds when the
 		// caller asked to be told what ran, and `instrument-coverage` is the
 		// one thing that fills this.
@@ -43,7 +43,7 @@ export const simplify = (
 	}
 }
 
-// NOTE: Both sections travel through untouched but for their Positions and the
+// Both sections travel through untouched but for their Positions and the
 // specifiers as written — neither survives simplification anywhere else, and
 // nothing downstream reports about an entry. What emission needs is the
 // canonical path and the `runtime` flag linking annotated each entry with.
@@ -134,7 +134,7 @@ function simplifyImplementationNode(
 		case "ReturnStatement":
 		case "FunctionStatement":
 			return simplifyStatement(node)
-		// NOTE: An assertion can only be written in a test body, and a test
+		// An assertion can only be written in a test body, and a test
 		// body only reaches here through a `tests` section, which no build
 		// carries — so nothing an `essence build` emits comes through this
 		// case.
@@ -186,7 +186,7 @@ function simplifyExpression(
 			return simplifyDefine(node)
 		case "CaseValue":
 			return simplifyCaseValue(node)
-		// NOTE: Both survive whole. Neither can be lowered here, because what
+		// Both survive whole. Neither can be lowered here, because what
 		// each becomes needs the context the RUN belongs to, and that is a fact
 		// about the emitted JavaScript — the enclosing completing body's own
 		// parameter, or a fresh root where there is none — which only the
@@ -205,7 +205,7 @@ function simplifyExpression(
 				type: node.type,
 				position: node.position,
 			}
-		// NOTE: Never reached. A refused value carries an Error Type, Error
+		// Never reached. A refused value carries an Error Type, Error
 		// Types gate codegen, and nothing is simplified for a Program that was
 		// reported on. It stands for the value written in front of the brackets
 		// it was refused at, and that is what the arm answers with — an arm that
@@ -216,7 +216,7 @@ function simplifyExpression(
 	}
 }
 
-// NOTE: All the runtime needs is the tag the constructed value carries —
+// All the runtime needs is the tag the constructed value carries —
 // `"CalculatorOperation#Add"` — and the payload it is built from. An Error
 // Type never reaches this stage (Diagnostics gate codegen), so the empty tag
 // fallback is purely for the type checker.
@@ -243,7 +243,7 @@ function simplifyCaseValue(
 	}
 }
 
-// NOTE: The members a payload left out, written into the Record the
+// The members a payload left out, written into the Record the
 // construction builds. Unlike a Parameter's default there is no callee to fill
 // them in at — a Case is built where it is written — so the merge is spliced per
 // site, and it allocates exactly the Record the author would have written out.
@@ -251,7 +251,7 @@ function simplifyCaseValue(
 // A payload that is not a Record Literal is complete by rule (see
 // `casePayloadIsPartial`), so this only ever meets one that is.
 //
-// NOTE: The values are built afresh per site, so no two constructions share a
+// The values are built afresh per site, so no two constructions share a
 // Node, and each carries the construction's Position: the value appears where
 // the Case is built, which is where a step and a source map should stop, and the
 // declaration it was written at may be in another file entirely.
@@ -280,7 +280,7 @@ function fillCasePayloadDefault(
 	)
 }
 
-// NOTE: One level of the payload. A member a PATH KEY wrote is a level of its
+// One level of the payload. A member a PATH KEY wrote is a level of its
 // own — `#Get({ limits.calls = 2 })` writes only `calls` — and the default's
 // Literal for that member fills the rest of it in, exactly as this level's
 // default fills in this level. A member written WHOLE is complete by rule and
@@ -334,7 +334,7 @@ function filledPayloadLevel(
 	return filled ? { ...value, members, type } : value
 }
 
-// NOTE: A deep copy of a simplified Expression with one Position stamped
+// A deep copy of a simplified Expression with one Position stamped
 // throughout. `type` is stepped over rather than walked — a Type holds no
 // Positions and is shared by reference everywhere else too — and nothing else in
 // a payload default is anything but a literal, so the walk is over a value the
@@ -371,7 +371,7 @@ function simplifyMethodInvocation(
 		return simplifyUnionMethodInvocation(node, node.dispatch)
 	}
 
-	// NOTE: The mangled name goes into the NEW node and is never written back.
+	// The mangled name goes into the NEW node and is never written back.
 	// The typed Program is read again after this — the Language Server holds
 	// it for every hover and rename, and a contract goal shares one typed
 	// check between every entry over the same refinement — and the suffix
@@ -410,14 +410,14 @@ function simplifyMethodInvocation(
 			simplifyConformanceArguments(node.conformances),
 		),
 		derivedDescriptor: node.derivedDescriptor,
-		// NOTE: The routed member names of a Record receiver, carried for the
+		// The routed member names of a Record receiver, carried for the
 		// reason the descriptor above is: the Namespace is the builtin `Record`
 		// either way, and this is what tells the Rewriter to reach for the
 		// member-routing helper rather than the flat native.
 		...(node.derivedMembers === undefined
 			? {}
 			: { derivedMembers: node.derivedMembers }),
-		// NOTE: Read off the resolved Namespace, which is the Protocol's pseudo
+		// Read off the resolved Namespace, which is the Protocol's pseudo
 		// Namespace for a provided Method and carries the Protocol's name. The
 		// Rewriter needs it because the Namespace NAME does not say whether a
 		// Protocol or a Namespace answered.
@@ -427,7 +427,7 @@ function simplifyMethodInvocation(
 	}
 }
 
-// NOTE: A dispatched Invocation flattens into one statically resolved target
+// A dispatched Invocation flattens into one statically resolved target
 // per member Type — the receiver and the shared Arguments are emitted once,
 // and each case carries its overload-mangled Method name, the hidden
 // conformance Arguments that target requires, and any Argument that was
@@ -474,20 +474,20 @@ function simplifyUnionMethodInvocation(
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
-	// NOTE: Mangled on the SIMPLIFIED callee, which is a fresh node, for the
+	// Mangled on the SIMPLIFIED callee, which is a fresh node, for the
 	// reason `simplifyMethodInvocation` gives: the typed one is read again.
 	let name = simplifyExpression(node.name)
 
 	if (node.overloadedMethodIndex !== null) {
 		if (name.nodeType === "Lookup") {
-			// NOTE: A `Namespace.method(…)` call whose Method is overloaded — the
+			// A `Namespace.method(…)` call whose Method is overloaded — the
 			// index names which Overload the Enricher picked.
 			name.member.name = resolveOverloadedMethodName(
 				name.member.name,
 				node.overloadedMethodIndex,
 			)
 		} else if (name.nodeType === "Identifier") {
-			// NOTE: A bare `loop(…)` call whose callee is an overloaded free
+			// A bare `loop(…)` call whose callee is an overloaded free
 			// Function — same numbering, on the Identifier itself. The Rewriter
 			// then reads `loop__overload$N` off the runtime `functions` module.
 			name.name = resolveOverloadedMethodName(
@@ -514,7 +514,7 @@ function simplifyFunctionInvocation(
 	}
 }
 
-// NOTE: The hidden trailing Arguments matching a bounded signature's hidden
+// The hidden trailing Arguments matching a bounded signature's hidden
 // trailing Parameters — a forwarded conformance parameter stays an
 // Identifier, a resolved Namespace becomes a ConformanceValue that the
 // Rewriter emits as a method-map object.
@@ -528,7 +528,7 @@ function simplifyConformanceArguments(
 	}))
 }
 
-// NOTE: One conformance witness — a forwarded parameter stays an Identifier; a
+// One conformance witness — a forwarded parameter stays an Identifier; a
 // resolved Namespace becomes a ConformanceValue whose own `where` conditions
 // are witnessed recursively, in the order the Enricher fixed to match the
 // fulfilling Methods' hidden conformance Parameters.
@@ -586,13 +586,13 @@ function conformanceExpression(
 			: { sharedConditions: conformance.source.sharedConditions }),
 		conditions: conformance.source.conditions.map(conformanceExpression),
 		derivedDescriptor: conformance.source.derivedDescriptor,
-		// NOTE: The routed member names a Record's conditional witness is built
+		// The routed member names a Record's conditional witness is built
 		// from, carried for the same reason: the method map names `Record.is`,
 		// and only this says the emission has to route rather than read it.
 		...(conformance.source.derivedMembers === undefined
 			? {}
 			: { derivedMembers: conformance.source.derivedMembers }),
-		// NOTE: The Case tags a derived `Enumerable` witness is built from,
+		// The Case tags a derived `Enumerable` witness is built from,
 		// carried for the reason the descriptor beside it is: no Namespace
 		// holds the Method, so the emission has nothing else to read.
 		...(conformance.source.derivedCases === undefined
@@ -609,7 +609,7 @@ function simplifyCombination(
 		nodeType: "Combination",
 		lhs: simplifyExpression(node.lhs),
 		rhs: simplifyExpression(node.rhs),
-		// NOTE: A Dictionary update's witness, carried the same way the
+		// A Dictionary update's witness, carried the same way the
 		// literal's is. Written only where there is one, so a Record update
 		// stays the Node it has always been.
 		...(node.keyConformance === undefined
@@ -633,7 +633,7 @@ function simplifyRecordValue(
 	}
 }
 
-// NOTE: A written value's own kind, with the proof a RECEIVER position gave it
+// A written value's own kind, with the proof a RECEIVER position gave it
 // taken back off. Only six Node kinds can carry one and only in that one
 // position — see `writtenReceiver` in the Enricher — and by here it has done the
 // whole of its work: which Namespace and which entry the call reached is already
@@ -657,7 +657,7 @@ function simplifyStringValue(
 	}
 }
 
-// NOTE: Each hole's resolved `Printable` Conformance becomes its witness
+// Each hole's resolved `Printable` Conformance becomes its witness
 // Expression through the same `conformanceExpression` a bounded call's hidden
 // Arguments go through — a method-map object for a Namespace source, a
 // forwarded Identifier for a parameter source. The Rewriter reads
@@ -739,7 +739,7 @@ function simplifyListValue(
 	}
 }
 
-// NOTE: The witness travels with the literal, turned into the same Expression a
+// The witness travels with the literal, turned into the same Expression a
 // bounded call's hidden Argument becomes — a ConformanceValue for a resolved
 // Namespace, an Identifier for a bound forwarded from a Method's own Parameter.
 // The empty Dictionary carries none: there is no key in it to compare.
@@ -770,13 +770,13 @@ function simplifyLookup(
 		member: simplifyIdentifier(node.member),
 		type: node.type,
 		position: node.position,
-		// NOTE: Carried for the same reason a Method Invocation carries it: the
+		// Carried for the same reason a Method Invocation carries it: the
 		// member name alone can not say whether the Namespace declares it or a
 		// Protocol provided it.
 		...(node.providedBy === undefined
 			? {}
 			: { providedBy: node.providedBy }),
-		// NOTE: And the three answers a member the base does not spell needs: the
+		// And the three answers a member the base does not spell needs: the
 		// tags a derived `cases` is built from, the hidden Parameter a bounded
 		// Type Parameter's member is read off, and the Namespace a `cases`
 		// written beside the Choice is read off.
@@ -803,7 +803,7 @@ function simplifyIdentifier(
 	}
 }
 
-// NOTE: `@` lowers to the receiver Parameter every INSTANCE Method is emitted
+// `@` lowers to the receiver Parameter every INSTANCE Method is emitted
 // with — `simplifyMethods` unshifts `_self` for exactly those. A static Method
 // is emitted without one, so an `@` reaching here from a static body would name
 // a Variable nothing declares and the emitted Program would throw on first
@@ -827,7 +827,7 @@ function simplifySelf(
 	}
 }
 
-// NOTE: Module state rather than a parameter threaded through every simplify
+// Module state rather than a parameter threaded through every simplify
 // function — the check above is an invariant guard, and paying for it at each
 // of the ~40 hand-offs between a Method and the Expressions in its body would
 // cost more than the guard is worth. Counted rather than set, so that nesting
@@ -858,7 +858,7 @@ function withoutStaticMethodBarrier<Result>(run: () => Result): Result {
 function simplifyMatch(
 	node: common.typed.MatchNode,
 ): common.typedSimple.MatchNode {
-	// NOTE: The matched value is still the enclosing Method's business — `@`
+	// The matched value is still the enclosing Method's business — `@`
 	// written there is the receiver — so it is simplified before the Handlers
 	// lift the static barrier.
 	let value = simplifyExpression(node.value)
@@ -866,7 +866,7 @@ function simplifyMatch(
 	return {
 		nodeType: "Match",
 		value,
-		// NOTE: A Handler is emitted as a Function of its own taking `_self`,
+		// A Handler is emitted as a Function of its own taking `_self`,
 		// the value that matched, so `@` inside one is bound however the
 		// Handler was reached — including inside a static Method, where the
 		// receiver `@` is refused. The barrier is lifted for the Handlers and
@@ -875,7 +875,7 @@ function simplifyMatch(
 			node.handlers.map((handler) => {
 				return {
 					matcher: handler.matcher,
-					// NOTE: The Matcher's own descriptor check, until an
+					// The Matcher's own descriptor check, until an
 					// Optimiser pass finds something cheaper that answers the
 					// same — the Simplifier states what the Program says and
 					// nothing about how it is tested.
@@ -895,9 +895,9 @@ function simplifyMatch(
 										],
 									),
 								),
-					// NOTE: Types, not Expressions — nothing to simplify.
+					// Types, not Expressions — nothing to simplify.
 					memberTypes: handler.memberTypes,
-					// NOTE: Filled by `compile-type-tests`, like `typeTest`.
+					// Filled by `compile-type-tests`, like `typeTest`.
 					memberTests: null,
 					guard:
 						handler.guard === null
@@ -907,7 +907,7 @@ function simplifyMatch(
 				}
 			}),
 		),
-		// NOTE: Every Handler is tested, and the chain ends in the
+		// Every Handler is tested, and the chain ends in the
 		// fall-through that names a Compiler bug — until an Optimiser pass can
 		// say which Handler the end of the chain IS.
 		finalHandlerIsElse: false,
@@ -916,11 +916,11 @@ function simplifyMatch(
 	}
 }
 
-// NOTE: No static barrier to lift, unlike a Match: an arm is an Expression of
+// No static barrier to lift, unlike a Match: an arm is an Expression of
 // the surrounding body and `@` written in one is the receiver, exactly as it is
 // in the Expression a `define` was written inside.
 //
-// NOTE: Fresh arms, never the typed ones written back into. The Simplifier is a
+// Fresh arms, never the typed ones written back into. The Simplifier is a
 // pure reader of the typed Program — the standard library's is a process-wide
 // value handed out again and again — and `simplifierInput.spec.ts` holds it to
 // that by simplifying one Program twice.
@@ -932,12 +932,12 @@ function simplifyDefine(
 		arms: node.arms.map((arm) => ({
 			value: simplifyExpression(arm.value),
 			condition: simplifyExpression(arm.condition),
-			// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript
+			// An Essence Boolean, which the Rewriter reads the JavaScript
 			// one out of — until an Optimiser pass finds the question already
 			// asked in JavaScript's own terms. The Simplifier states what the
 			// Program says and nothing about how it is tested.
 			conditionIsRaw: false,
-			// NOTE: Carried down untouched, both of them. The Enricher is the
+			// Carried down untouched, both of them. The Enricher is the
 			// only stage that can say whether an arm's Condition established
 			// anything — for its own value, or for the arms below it — and by
 			// here the refinement it established has been erased, so a reader
@@ -956,7 +956,7 @@ function simplifyDefine(
 
 // #region Statements
 
-// NOTE: The two assertions are NOT among these — an `expect` is no Statement
+// The two assertions are NOT among these — an `expect` is no Statement
 // once it is lowered, it is what it asserted — so `simplifyImplementationNode`
 // answers for them before they get here. Excluding them from the parameter Type
 // rather than leaving unreachable cases in the switch is what keeps that
@@ -999,7 +999,7 @@ function simplifyConstantDeclarationStatement(
 	return {
 		nodeType: "VariableDeclarationStatement",
 		name: simplifyIdentifier(node.name),
-		// NOTE: A Matcher's subject is INSTRUMENTED, the whole of it — every
+		// A Matcher's subject is INSTRUMENTED, the whole of it — every
 		// sub-expression that computes and the value itself. It is what
 		// `require MATCHER = EXPR` has to explain a failure out of: the
 		// assertion behind this Statement drains what was recorded here, so a
@@ -1016,7 +1016,7 @@ function simplifyConstantDeclarationStatement(
 				: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
-		// NOTE: Every Constant keeps its Position, the base a Pattern
+		// Every Constant keeps its Position, the base a Pattern
 		// Declaration reads its members off included. It is synthesized in the
 		// sense that no source wrote its NAME, but what it holds is the
 		// Declaration's own value Expression — real source, on the line the
@@ -1078,7 +1078,7 @@ function simplifyNamespaceDefinitionStatement(
 	}
 }
 
-// NOTE: The same two things `simplifyMethods` does to a bodied Method, done to
+// The same two things `simplifyMethods` does to a bodied Method, done to
 // the frame a native's default needs: the name is mangled with the Overload slot
 // it was declared in, and the receiver `_self` is unshifted onto an instance
 // Method's Parameters. Both have to agree with what the call site resolved to,
@@ -1105,7 +1105,7 @@ function simplifyNativeShim(
 		})
 	}
 
-	// NOTE: The frame a native's default is evaluated in is a Function like any
+	// The frame a native's default is evaluated in is a Function like any
 	// other, so a Record default is merged in it the same way — and the native
 	// still receives a whole Record, which is the whole point of the shim.
 	// `_self` is unshifted above, so the Parameter list this is built against is
@@ -1119,7 +1119,7 @@ function simplifyNativeShim(
 		parameters,
 	)
 
-	// NOTE: The hidden trailing Parameters a bounded Type Parameter adds, the
+	// The hidden trailing Parameters a bounded Type Parameter adds, the
 	// same ones `simplifyFunctionDefinition` appends to a bodied Method — a call
 	// that leaves an Argument out still passes its witnesses, positionally,
 	// after the hole it opened for the default.
@@ -1150,7 +1150,7 @@ function simplifyNativeShim(
 	}
 }
 
-// NOTE: The typed counterpart of the `_self` Parameter unshifted above — the
+// The typed counterpart of the `_self` Parameter unshifted above — the
 // prologue reads a Parameter's Type and its default off the TYPED list and its
 // emitted name off the simplified one, so the two lists have to line up. A
 // receiver carries no default and so contributes nothing.
@@ -1171,7 +1171,7 @@ function receiverPlaceholder(
 	}
 }
 
-// NOTE: A Protocol's REQUIREMENTS are a contract only — they are erased here
+// A Protocol's REQUIREMENTS are a contract only — they are erased here
 // and emit no JavaScript, and the conformance values passed at call sites are
 // their whole runtime footprint. Its PROVIDED Methods are bodies, and go
 // through the very `simplifyMethods` a Namespace's do: `_self` unshifted onto
@@ -1184,7 +1184,7 @@ function simplifyProtocolDeclarationStatement(
 		nodeType: "ProtocolDeclarationStatement",
 		name: simplifyIdentifier(node.name),
 		identity: node.protocolType.identity,
-		// NOTE: `_self` is typed as the bounded `Self` — the receiver of a
+		// `_self` is typed as the bounded `Self` — the receiver of a
 		// provided Method is not one Type but whichever conformer called it.
 		methods: simplifyMethods(node.methods, {
 			type: "GenericUse",
@@ -1206,7 +1206,7 @@ function simplifyTypeAliasStatement(
 	}
 }
 
-// NOTE: A Choice Declaration is purely a Type-level construct — like a Type
+// A Choice Declaration is purely a Type-level construct — like a Type
 // Alias it erases to nothing; only Case *constructions* have a runtime
 // footprint.
 function simplifyChoiceDeclarationStatement(
@@ -1229,7 +1229,7 @@ function simplifyConditional(
 			nodeType: "IfElseStatement",
 			condition: node.condition,
 			narrows: node.narrows,
-			// NOTE: An `if` with no `else` has no false body, so nothing was
+			// An `if` with no `else` has no false body, so nothing was
 			// ever read under the complement of its condition and the claim
 			// about that branch is `false` rather than unknown. The Enricher
 			// does not work the complement out for one, and this is why.
@@ -1245,12 +1245,12 @@ function simplifyConditional(
 	return {
 		nodeType: "ConditionalStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		// NOTE: Carried through untouched, both of them — what a branch
+		// Carried through untouched, both of them — what a branch
 		// established was decided by the Enricher, and the evidence it decided
 		// from does not survive simplification.
 		narrows: convertedNode.narrows,
 		narrowsFalse: convertedNode.narrowsFalse,
-		// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript one
+		// An Essence Boolean, which the Rewriter reads the JavaScript one
 		// out of — until an Optimiser pass finds the question already asked in
 		// JavaScript's terms. The Simplifier states what the Program says and
 		// nothing about how it is tested.
@@ -1323,7 +1323,7 @@ function simplifyMethods(
 			}
 
 			memberValue.methods.forEach((method, index) => {
-				// NOTE: INVARIANT — the `__overload$N` suffix is derived from
+				// INVARIANT — the `__overload$N` suffix is derived from
 				// the Overload's position in the Method TYPE's `overloads`
 				// array, NEVER from its position in this Node's `methods`. The
 				// two differ when the Method Type holds Overloads the Node does
@@ -1394,7 +1394,7 @@ function simplifyMethods(
 	return result
 }
 
-// NOTE: A Parameter that binds no name still occupies a position in the
+// A Parameter that binds no name still occupies a position in the
 // emitted Function, so it needs *some* name to be generated. Any unique one
 // will do, precisely because nothing can reference it — and `_0` can not
 // collide with a user Identifier, since `_` lexes as a Symbol and so can never
@@ -1415,14 +1415,14 @@ function simplifyParameter(
 					name: `_${index}`,
 					type: { type: "Unknown" },
 				},
-		// NOTE: Lowered to a JavaScript default parameter by the Rewriter,
+		// Lowered to a JavaScript default parameter by the Rewriter,
 		// whose semantics are the ones the language declares term for term:
 		// evaluated per call, only when the Argument came in `undefined`, left
 		// to right, able to read the Parameters before it, and a temporal
 		// dead-zone Error on one after it. We are not building an evaluation
 		// model; we are naming one the target already has.
 		//
-		// NOTE: A RECORD default is the one that model can not name. A
+		// A RECORD default is the one that model can not name. A
 		// JavaScript default fires only where the Argument came in `undefined`,
 		// and what a Record default has to do is fill in the MEMBERS a caller
 		// left out of an Argument it did write. So it carries no JavaScript
@@ -1435,7 +1435,7 @@ function simplifyParameter(
 	}
 }
 
-// NOTE: A Parameter whose Argument is merged into its default at the callee's
+// A Parameter whose Argument is merged into its default at the callee's
 // entry rather than replaced by it. Asked of the Parameter's TYPE and not of
 // what the default supplies: a COMPLETE Record default is merged too, because
 // the Argument a caller writes against one may itself be partial, and because
@@ -1447,7 +1447,7 @@ function hasRecordDefault(node: common.typed.ParameterNode): boolean {
 	return node.defaultValue !== null && node.type.type === "Record"
 }
 
-// NOTE: The Statements a body opens with, one Parameter at a time:
+// The Statements a body opens with, one Parameter at a time:
 //
 //   options = Record.createRecord({
 //     host: options.host,
@@ -1460,12 +1460,12 @@ function hasRecordDefault(node: common.typed.ParameterNode): boolean {
 // width subtyping means that Record may carry members of its own. Reading the
 // members the TYPE declares takes exactly what was promised and nothing else.
 //
-// NOTE: One allocation per call — the very allocation a caller writing the whole
+// One allocation per call — the very allocation a caller writing the whole
 // Record would have made — so there is nothing here for the Optimiser to skip.
 // `collapse-construction` turns the `RecordValue` into a `direct-record` like
 // any other.
 //
-// NOTE: A default written as a LITERAL is taken apart, so each member's
+// A default written as a LITERAL is taken apart, so each member's
 // expression is evaluated only where the caller left THAT member out. Any other
 // expression is hoisted into one `const` and read per member, which evaluates it
 // once per call, unconditionally — there is no way to take an expression apart
@@ -1493,7 +1493,7 @@ function recordDefaultPrologue(
 			name: simplified[index]!.internalName.name,
 			type: recordType,
 		})
-		// NOTE: The Argument's own value for a member the default does not
+		// The Argument's own value for a member the default does not
 		// supply — a plain read, because the Argument is then required and
 		// every member of it is written.
 		//
@@ -1526,7 +1526,7 @@ function recordDefaultPrologue(
 			return node
 		}
 
-		// NOTE: `recordDefaultMembers` and nothing local, because this has to be
+		// `recordDefaultMembers` and nothing local, because this has to be
 		// the very set the Parameter's TYPE carries as `defaultMembers` — what a
 		// call may leave out and what the prologue fills in are one answer, and
 		// two spellings of it would be two answers waiting to disagree. The same
@@ -1560,7 +1560,7 @@ function recordDefaultPrologue(
 				position,
 			})
 
-			// NOTE: One step only — a default that is not a Literal can not be
+			// One step only — a default that is not a Literal can not be
 			// taken apart, so `recordDefaultNesting` names nothing under it and
 			// no path ever reaches past its first member.
 			fallbackFor = (path) => ({
@@ -1575,14 +1575,14 @@ function recordDefaultPrologue(
 			})
 		}
 
-		// NOTE: The base may be `undefined` exactly where the whole Argument
+		// The base may be `undefined` exactly where the whole Argument
 		// may be left out, which is where the default supplies every member —
 		// the same answer `hasDefault` carries on the Parameter's Type. Every
 		// step PAST the first reads optionally whatever this says: a level the
 		// Argument left out is a level that is not there.
 		let optional = supplied.size === declared(recordType).length
 
-		// NOTE: One level of the Record the callee rebuilds. A member the
+		// One level of the Record the callee rebuilds. A member the
 		// default writes as a Record LITERAL is rebuilt one level further in
 		// rather than taken whole, which is what makes a path key MERGE: the
 		// Argument carries only the members the path wrote, and every other one
@@ -1650,13 +1650,13 @@ function recordDefaultPrologue(
 	return prologue
 }
 
-// NOTE: The members a Record Type declares, in one spelling, because the
+// The members a Record Type declares, in one spelling, because the
 // prologue asks for them at every level it rebuilds.
 function declared(type: common.RecordType): Array<string> {
 	return Object.keys(type.members)
 }
 
-// NOTE: The Expression a Record default writes at one path — `server.port`'s
+// The Expression a Record default writes at one path — `server.port`'s
 // `8080`. Every step but the last is a Record Literal by `recordDefaultNesting`,
 // which is the only thing that ever hands a path longer than one step in.
 function defaultMemberAt(
@@ -1672,7 +1672,7 @@ function defaultMemberAt(
 	return node
 }
 
-// NOTE: The hole a call leaves where a Parameter took its default. See
+// The hole a call leaves where a Parameter took its default. See
 // `openArgumentHoles`, which is the walk this and the emitted dispatch branch
 // share, and `OmittedArgumentNode` for what a hole is.
 function expandOmittedArguments(
@@ -1698,7 +1698,7 @@ function expandOmittedArguments(
 	)
 }
 
-// NOTE: A body that can fall off its end is only legal when it promises unit —
+// A body that can fall off its end is only legal when it promises unit —
 // for every other Return Type the Validator has already reported
 // `missing-return` — but falling off the end of an emitted JavaScript Function
 // answers `undefined`, which carries no hidden Type key and so is not an
@@ -1731,7 +1731,7 @@ function simplifyBody(
 function simplifyFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 ): common.typedSimple.FunctionDefinitionNode {
-	// NOTE: Every Protocol-bounded Type Parameter appends one hidden trailing
+	// Every Protocol-bounded Type Parameter appends one hidden trailing
 	// Parameter (`Item__conformance`) — call sites append the matching
 	// conformance values in the same Generic declaration order.
 	let conformanceParameters: Array<common.typedSimple.ParameterNode> =
@@ -1755,7 +1755,7 @@ function simplifyFunctionDefinition(
 	return {
 		nodeType: "FunctionDefinition",
 		parameters: [...parameters, ...conformanceParameters],
-		// NOTE: The prologue goes before the body and not inside `simplifyBody`,
+		// The prologue goes before the body and not inside `simplifyBody`,
 		// because what `simplifyBody` adds is a Return at the END — the two are
 		// the two ends of the same Function and neither knows about the other.
 		body: [
@@ -1780,13 +1780,13 @@ function simplifyArgument(
 
 // #region Tests
 
-// NOTE: The lowering of a `tests { … }` block, and the one place instrumented
+// The lowering of a `tests { … }` block, and the one place instrumented
 // points are handed out. It is Simplifier work rather than a stage of its own
 // because what a test IS by the time it is emitted is Statements: the setup
 // where it was written, the suites as nested Scopes, and each test as a closure
 // registered from inside whatever setup it can see.
 //
-// NOTE: The state below stands for one Module's lowering and is installed for
+// The state below stands for one Module's lowering and is installed for
 // the length of `simplifyTestsSection` — the same discipline the Rewriter's
 // `withEmission` keeps, and for the same reason: a throw out of one Module's
 // lowering must not leave the next one handing out points against a span table
@@ -1794,12 +1794,12 @@ function simplifyArgument(
 type TestLowering = {
 	spans: Array<common.typedSimple.TestSpan>
 	lines: Array<string>
-	// NOTE: The lines that END in a `§?` value comment, and the Position of the
+	// The lines that END in a `§?` value comment, and the Position of the
 	// comment itself — read off the source once per Module rather than at each
 	// Statement, because a value comment is a fact about the text and the text
 	// does not change while a section is lowered.
 	valueComments: Map<number, common.Position>
-	// NOTE: The lines a probe has already been handed out for. One value
+	// The lines a probe has already been handed out for. One value
 	// comment asks one question: a Statement the Enricher desugared into
 	// several — `require MATCHER = EXPR` is a Constant and an assertion — must
 	// not answer it once per piece.
@@ -1841,7 +1841,7 @@ function simplifyTestsSection(
 	}
 }
 
-// NOTE: The path every identity in the section is spelled against, read off the
+// The path every identity in the section is spelled against, read off the
 // first item rather than threaded in — the Enricher put it on every one of them
 // and they can not disagree, since one section is one Module. Null where the
 // section holds no item at all, and where the Program is no Module.
@@ -1861,7 +1861,7 @@ function modulePathOfTests(
 	return null
 }
 
-// NOTE: One Scope's run of Nodes. A test becomes an entry — numbered by its
+// One Scope's run of Nodes. A test becomes an entry — numbered by its
 // place in the manifest, which is the number the context selects by — and a
 // suite becomes a Scope holding its own, so that what a suite declares is gone
 // outside it and may shadow what the section declares. Everything else is an
@@ -1875,7 +1875,7 @@ function simplifyTestsNodes(
 			let index = tests.length
 			let interpolated = node.name.nodeType === "InterpolatedStringValue"
 
-			// NOTE: A table test is N entries of the manifest and ONE emitted
+			// A table test is N entries of the manifest and ONE emitted
 			// body: each row is a test in its own right, carrying its row
 			// number as the last step of its identity, and the body they share
 			// reads whichever row is running.
@@ -1917,7 +1917,7 @@ function simplifyTestsNodes(
 				row: null,
 			})
 
-			// NOTE: A property test is ONE entry of the manifest and one body,
+			// A property test is ONE entry of the manifest and one body,
 			// like a plain test — what differs is that the runtime runs the
 			// body once per generated case rather than once, which is a fact
 			// about the call and not about the identity.
@@ -1944,12 +1944,12 @@ function simplifyTestsNodes(
 			return {
 				nodeType: "TestEntry" as const,
 				index,
-				// NOTE: Only where the name INTERPOLATES. A plain one is in the
+				// Only where the name INTERPOLATES. A plain one is in the
 				// manifest already, and emitting it a second time would be two
 				// spellings of one thing that could come to disagree.
 				name: interpolated ? simplifyExpression(node.name) : null,
 				benchmark: node.form === "benchmark",
-				// NOTE: A Constant a test WROTE is probed whether or not a `§?`
+				// A Constant a test WROTE is probed whether or not a `§?`
 				// asked for it. What a reader wants beside a test body is the
 				// value of every step of it, which is what an Editor draws from
 				// these — and a Constant is a step the author named, so the
@@ -1968,7 +1968,7 @@ function simplifyTestsNodes(
 		}
 
 		if (node.nodeType === "Suite") {
-			// NOTE: Read off the manifest as it fills rather than counted out
+			// Read off the manifest as it fills rather than counted out
 			// of the tree: a table test is N entries for one written item, and
 			// the run a Scope holds is whatever its own items pushed.
 			let first = tests.length
@@ -1987,7 +1987,7 @@ function simplifyTestsNodes(
 	})
 }
 
-// NOTE: A generator with its two Expression leaves lowered — a refinement's
+// A generator with its two Expression leaves lowered — a refinement's
 // checks and a `Generatable` call. Everything else is data the Enricher settled
 // and nothing here decides.
 function simplifyTestGenerator(
@@ -2064,7 +2064,7 @@ function simplifyGeneratorMembers(
 	}))
 }
 
-// NOTE: Everything a manifest entry says about a test that is not its identity.
+// Everything a manifest entry says about a test that is not its identity.
 // A table test's rows differ in the id and the row number and in nothing else —
 // they share the template, the Modifiers and the span they were written at.
 function manifestEntry(
@@ -2085,11 +2085,11 @@ function manifestEntry(
 	}
 }
 
-// NOTE: The `§?` value comments of this Module, applied to Statements that have
+// The `§?` value comments of this Module, applied to Statements that have
 // already been simplified — so that what a probe records is the Expression as it
 // will be emitted, wrapped where every other instrumented point is wrapped.
 //
-// NOTE: A Conditional's two bodies are descended into, because a value comment
+// A Conditional's two bodies are descended into, because a value comment
 // inside an `if` is the case a reader most wants an answer for. A Function
 // literal's body is NOT: it is a closure the test builds, and what a probe
 // promises is the value of the line, once, in the test that ran.
@@ -2099,7 +2099,7 @@ function probeStatements(
 	return nodes.map((node) => probeStatement(node))
 }
 
-// NOTE: `always` is what a test BODY asks for: every Constant of one is probed
+// `always` is what a test BODY asks for: every Constant of one is probed
 // whether or not a value comment named it. Everywhere else a probe is what a
 // `§?` asked for and nothing more.
 function probeStatement(
@@ -2120,7 +2120,7 @@ function probeStatement(
 		}
 	}
 
-	// NOTE: The line the Statement ENDS on, which is the line the comment that
+	// The line the Statement ENDS on, which is the line the comment that
 	// asks about it was written on — a Statement spanning several lines is
 	// answered by a `§?` behind its last one.
 	let line = node.position?.end.line
@@ -2150,7 +2150,7 @@ function probeStatement(
 				}
 	}
 
-	// NOTE: Everything else is only probed where it IS an Expression — a bare
+	// Everything else is only probed where it IS an Expression — a bare
 	// Expression Statement, which is the other half of what the spec says a
 	// value comment answers. A Return, a Namespace, an assertion and a Type
 	// alias have no value a line could be asking about.
@@ -2172,7 +2172,7 @@ function probeStatement(
 	return node
 }
 
-// NOTE: One point per value comment, whoever asks first. The Enricher desugars
+// One point per value comment, whoever asks first. The Enricher desugars
 // `require MATCHER = EXPR` into a Constant and an assertion that stand on one
 // line, and a reader who wrote one `§?` asked one question.
 function probePoint(
@@ -2209,13 +2209,13 @@ function isSimpleExpression(
 	}
 }
 
-// NOTE: One instrumented point, handed out against the Module's span table. The
+// One instrumented point, handed out against the Module's span table. The
 // source is sliced HERE, where the text is, so that everything downstream of
 // the Compiler can say what stood at a point without reading the file again.
 function testPoint(position: common.Position): number {
 	let lowering = testLowering
 
-	// NOTE: Unreachable — an assertion only reaches this file through a tests
+	// Unreachable — an assertion only reaches this file through a tests
 	// section — and answered rather than thrown so that a Compiler bug costs a
 	// point with no span instead of the whole compile.
 	if (lowering === null) {
@@ -2230,7 +2230,7 @@ function testPoint(position: common.Position): number {
 	return lowering.spans.length - 1
 }
 
-// NOTE: Essence Positions are 1-based on both axes and the end column stands
+// Essence Positions are 1-based on both axes and the end column stands
 // one PAST the last character, which is what makes a single-line slice the
 // plain `slice(start - 1, end - 1)` below.
 function sourceOfSpan(lines: Array<string>, position: common.Position): string {
@@ -2250,7 +2250,7 @@ function sourceOfSpan(lines: Array<string>, position: common.Position): string {
 	].join("\n")
 }
 
-// NOTE: `expect EXPR` / `require EXPR`, and both `is MATCHER` forms.
+// `expect EXPR` / `require EXPR`, and both `is MATCHER` forms.
 //
 // The Boolean form is INSTRUMENTED: every sub-expression that computes
 // something — a call, a member read — is wrapped in a point that records what
@@ -2266,10 +2266,10 @@ function simplifyAssertion(
 		node.nodeType === "ExpectStatement"
 			? ("expect" as const)
 			: ("require" as const)
-	// NOTE: Asked of the typed Node: the simplified one spells an overloaded
+	// Asked of the typed Node: the simplified one spells an overloaded
 	// `is` by its mangled name and passes the receiver as its first Argument.
 	let operands = comparedOperands(node.value)
-	// NOTE: What a failure UNDERLINES. For the Boolean form that is the whole
+	// What a failure UNDERLINES. For the Boolean form that is the whole
 	// asserted Expression; for `require MATCHER = EXPR` it runs from the
 	// Matcher to the end of the value — the value alone would leave a reader
 	// looking at `lions` and wondering what it was supposed to be. The value's
@@ -2289,7 +2289,7 @@ function simplifyAssertion(
 				: node.value.position,
 	)
 
-	// NOTE: A snapshot asserts nothing of its own — what it records is the
+	// A snapshot asserts nothing of its own — what it records is the
 	// value RENDERED, which the Enricher already turned into the interpolation
 	// an author could have written. The point behind it is the slot a run
 	// writes a recorded value into.
@@ -2340,7 +2340,7 @@ function simplifyAssertion(
 	}
 }
 
-// NOTE: The test half of one `match` Handler, built from an assertion's Matcher
+// The test half of one `match` Handler, built from an assertion's Matcher
 // — the same shape, so the same emission answers both. `typeTest` and
 // `memberTests` are what `compile-type-tests` leaves where it has found
 // something cheaper, and are null here for the same reason they are null on a
@@ -2374,7 +2374,7 @@ function assertionHandler(
 	}
 }
 
-// NOTE: Whether the asserted Expression IS a comparison of two values, and
+// Whether the asserted Expression IS a comparison of two values, and
 // where each of them was written. `is` and `isNot` are `Equatable`'s, and a
 // one-Argument call of either answering a Boolean is one wherever it came
 // from: a Namespace that declares an `is` of its own with that shape is
@@ -2405,23 +2405,23 @@ type TestOperands = {
 	right: common.Position
 }
 
-// NOTE: The power-assert half. Every sub-expression that COMPUTES — a call and
+// The power-assert half. Every sub-expression that COMPUTES — a call and
 // a member read — is wrapped in a point, so the report can say what each part
 // of the assertion answered. A literal and a bare name are left alone: what
 // they hold is what the source says they hold.
 //
-// NOTE: The outermost Expression is not wrapped. Its value is the assertion's
+// The outermost Expression is not wrapped. Its value is the assertion's
 // own answer, which the assertion records — a point there would say the same
 // thing twice.
 //
-// NOTE: The two operands of a comparison ARE wrapped, whatever kind they are,
+// The two operands of a comparison ARE wrapped, whatever kind they are,
 // because a structural difference needs both values and one of them is often a
 // literal Record. That is the whole of what the diff costs: no second capture,
 // no second traversal, two points off the same table everything else uses.
 function instrumentAssertion(
 	value: common.typedSimple.ExpressionNode,
 	operands: TestOperands | null,
-	// NOTE: Whether the outermost Expression is recorded too. It is not for an
+	// Whether the outermost Expression is recorded too. It is not for an
 	// asserted Boolean — its value is the assertion's own answer, which the
 	// assertion records — and it is for a Matcher's subject, whose value is
 	// exactly what the reader was not told.
@@ -2497,7 +2497,7 @@ function samePosition(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// NOTE: What is worth recording: a call's answer and a member read. A literal
+// What is worth recording: a call's answer and a member read. A literal
 // holds what the source says, a bare name is a binding the reader can see, and
 // neither tells anybody anything a report does not already show.
 function isTraceable(node: common.typedSimple.ExpressionNode): boolean {
@@ -2509,12 +2509,12 @@ function isTraceable(node: common.typedSimple.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: The Expression positions an asserted Expression EVALUATES, and only
+// The Expression positions an asserted Expression EVALUATES, and only
 // those. A Function literal's body is not among them — it is a closure the
 // assertion builds and does not run — and neither is a Match Handler's, which
 // is Statements. A witness is references to Methods and never a call of one.
 //
-// NOTE: A `match` is left ALONE, subject and all, and that is a decision rather
+// A `match` is left ALONE, subject and all, and that is a decision rather
 // than the omission a `define` was. The two things a reader wants of one are
 // which arm ran and what it answered, and both are Statements this walker can
 // not reach — so the whole of what could be traced here is the subject, which
@@ -2572,14 +2572,14 @@ function instrumentChildren(
 			return node.value === null
 				? node
 				: { ...node, value: walk(node.value) }
-		// NOTE: Every Condition and every answer of a `define`, which is a
+		// Every Condition and every answer of a `define`, which is a
 		// ladder of Expressions all the way down — so it is the one branching
 		// construct this walker can reach INTO, and an assertion is exactly
 		// where one gets written. What each Condition answered and what the arm
 		// that held answered with is the whole of what the ladder did, and a
 		// report used to show none of it.
 		//
-		// NOTE: An arm nobody took builds nothing and so records nothing. That
+		// An arm nobody took builds nothing and so records nothing. That
 		// is a point behaving as points behave rather than a hole in one: a
 		// trace is a recording made where a value was built, so what a report
 		// shows is the values that were.

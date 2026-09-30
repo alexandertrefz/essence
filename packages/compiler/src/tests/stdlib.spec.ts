@@ -26,7 +26,7 @@ const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 
-// NOTE: `Optional` is a nominal Choice
+// `Optional` is a nominal Choice
 // (`packages/standard-library/sources/Optional.es`), so a fallible native
 // answers `Optional#Value { item }` or `Optional#Empty`. These two build
 // exactly what the natives build, so an assertion about a fallible native
@@ -35,7 +35,7 @@ const value = <ItemType extends AnyType>(item: ItemType) =>
 	optional.createValue(item)
 const empty = () => optional.createEmpty()
 
-// NOTE: For the assertions that have to POKE at the value inside — the ones
+// For the assertions that have to POKE at the value inside — the ones
 // that check a Type tag or cross-multiply two Rationals — rather than compare
 // the whole answer. The `#Value` Case is asserted on the way through, so a
 // native that came back empty fails here instead of further down with an
@@ -48,7 +48,7 @@ const unwrap = <ItemType extends AnyType>(
 	return (answer as optional.ValueType<ItemType>).item
 }
 
-// NOTE: `Rational.is` is written in Essence now (packages/standard-library/sources/Rational.es), so
+// `Rational.is` is written in Essence now (packages/standard-library/sources/Rational.es), so
 // there is no runtime function left to compare two Rationals with. The
 // assertions below that reach for it are about OTHER natives — `parse`,
 // `raise`, the Number aggregates — and only need value equality, so
@@ -60,13 +60,13 @@ const ratIs = (
 	first.numerator * second.denominator ===
 	second.numerator * first.denominator
 
-// NOTE: `String.toString` is written in Essence now (packages/standard-library/sources/String.es) —
+// `String.toString` is written in Essence now (packages/standard-library/sources/String.es) —
 // `<- @`, the identity — so there is no runtime export left to hand `join`
 // as its `Printable` witness. This spells the identity out, which is exactly
 // what the Simplifier now passes.
 const stringToString = (value: string.StringType) => value
 
-// NOTE: The same story for `Integer.is` (packages/standard-library/sources/Integer.es), which the
+// The same story for `Integer.is` (packages/standard-library/sources/Integer.es), which the
 // List Methods bounded by `Equatable` now take as their hidden witness. The
 // Essence body reads `compare(other)::is(Ordering#Equal)`; two Integers
 // answer that exactly when their values match, so this is what the Simplifier
@@ -101,7 +101,7 @@ describe("Stdlib", () => {
 				empty(),
 			)
 
-			// NOTE: The total entry — its divisor is a NonZeroInteger in the
+			// The total entry — its divisor is a NonZeroInteger in the
 			// source, so there is no Optional around the answer.
 			expect(integer.remainder__overload$2(int(-7n), int(3n))).toEqual(
 				int(2n),
@@ -116,7 +116,7 @@ describe("Stdlib", () => {
 				value(int(1n)),
 			)
 
-			// NOTE: A negative exponent widens the answer to a Rational, so the
+			// A negative exponent widens the answer to a Rational, so the
 			// `#Value` payload here is not an Integer — the Type tag is read off
 			// the payload rather than off the Optional.
 			const reciprocalPower = unwrap(
@@ -131,7 +131,7 @@ describe("Stdlib", () => {
 		})
 
 		it("negates a value", () => {
-			// NOTE: Parity, sign and `clamp` are written in Essence, and the
+			// Parity, sign and `clamp` are written in Essence, and the
 			// golden harness covers them and the native `absolute`. This drives
 			// the native `negate`.
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
@@ -165,7 +165,7 @@ describe("Stdlib", () => {
 		})
 	})
 
-	// NOTE: `negate` is native on both Algebraic and Transcendental, and is
+	// `negate` is native on both Algebraic and Transcendental, and is
 	// driven here. The golden harness,
 	// `packages/fixtures/files/StdlibExhaustive.es`, covers the rest of their
 	// sign Methods.
@@ -191,7 +191,7 @@ describe("Stdlib", () => {
 	})
 
 	describe("List round trips and construction", () => {
-		// NOTE: `join` is bounded by `Printable` rather than fixed to a
+		// `join` is bounded by `Printable` rather than fixed to a
 		// List of Strings, so the conformance witness is passed by hand here
 		// the way the Simplifier passes it — String's `toString` is the
 		// identity, Integer's is the conversion the widening bought.
@@ -218,7 +218,7 @@ describe("Stdlib", () => {
 			).toBe("1, 2, 3")
 		})
 
-		// NOTE: The four range natives share one walk, and what tells them
+		// The four range natives share one walk, and what tells them
 		// apart is the step it is handed and whether the answer is promised to
 		// hold something. Both halves are read here; `ranges.spec.ts` reads the
 		// same entries through Programs that call them.
@@ -264,7 +264,7 @@ describe("Stdlib", () => {
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
-		// NOTE: The equality counterpart of "sorts nested Lists through a bound
+		// The equality counterpart of "sorts nested Lists through a bound
 		// conformance" below. `List is Equatable` is conditional, so the witness
 		// a `List<List<Integer>>` is compared through is `List.is` curried with
 		// the inner Integer equality — exactly what `$type.boundConformance(...)`
@@ -325,7 +325,7 @@ describe("Stdlib", () => {
 			expect(list.split__overload$1(ints(1n, 2n), int(0n))).toEqual(
 				list.createList([ints(1n, 2n)]),
 			)
-			// NOTE: There is no item to put in a group, so the empty List
+			// There is no item to put in a group, so the empty List
 			// answers with no groups whatever the size names.
 			expect(
 				list.split__overload$1(list.createList([]), int(0n)),
@@ -362,12 +362,12 @@ describe("Stdlib", () => {
 			).toBe("Ordering#Less")
 		})
 
-		// NOTE: `List::sort` is native, and the golden harness covers the flat
+		// `List::sort` is native, and the golden harness covers the flat
 		// case. The nested sorts keep the witness a nested List is sorted
 		// through: the `compare` that `boundConformance` curries the inner
 		// ordering onto, handed to the `by:` entry.
 		it("sorts nested Lists through a bound conformance", () => {
-			// NOTE: The witness the codegen builds for `List<List<Integer>>` —
+			// The witness the codegen builds for `List<List<Integer>>` —
 			// `boundConformance` curries the inner Integer ordering onto
 			// `List.compare`, exactly what `$type.boundConformance(...)` emits.
 			let nested = boundConformance({ compare: list.compare }, [
@@ -398,7 +398,7 @@ describe("Stdlib", () => {
 				[listOfListOfIntegers],
 			)
 
-			// NOTE: a and b are List<List<List<Integer>>>. Their first (only)
+			// a and b are List<List<List<Integer>>>. Their first (only)
 			// items order Greater vs Less at the innermost pair (2 vs 1), so a
 			// sorts after b.
 			let a = list.createList([list.createList([ints(2n)])])
@@ -416,11 +416,11 @@ describe("Stdlib", () => {
 	})
 
 	describe("Enricher typings", () => {
-		// NOTE: `Optional` is a nominal Choice, so `value(defaultingTo:)` is
+		// `Optional` is a nominal Choice, so `value(defaultingTo:)` is
 		// typed by the Choice's own Type Argument, the `item` the `#Value` Case
 		// carries, and the fallback has to match that.
 		//
-		// NOTE: The List is bound to a `List` Type. A written one proves it
+		// The List is bound to a `List` Type. A written one proves it
 		// holds an item, and `firstItem` on a proven receiver answers no
 		// Optional for `value(defaultingTo:)` to collapse.
 		it("types value(defaultingTo:) by the Optional's item Type", () => {
@@ -470,7 +470,7 @@ describe("Stdlib", () => {
 				}`),
 			).toEqual([])
 
-			// NOTE: The bound is what refuses a join, not a missing Method —
+			// The bound is what refuses a join, not a missing Method —
 			// an unbounded Type Parameter conforms to nothing, so its items
 			// have no `toString` to hand in.
 			expect(
@@ -489,7 +489,7 @@ describe("Stdlib", () => {
 				}`),
 			).toEqual([])
 
-			// NOTE: A Record is `Equatable` and `Printable` and nothing else,
+			// A Record is `Equatable` and `Printable` and nothing else,
 			// so it is the negative here. A Boolean is `Comparable` now.
 			expect(
 				diagnosticsFor(`implementation {
@@ -507,7 +507,7 @@ describe("Stdlib", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `isBetween` is `Orderable`'s provided Method, and its
+		// `isBetween` is `Orderable`'s provided Method, and its
 		// Parameters are `Self` — the RECEIVER's own Type. So a question
 		// across two kinds names the covering `Number` on the receiver, and
 		// one within a kind writes the receiver as it stands.
@@ -529,7 +529,7 @@ describe("Stdlib", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Splitting opens a group per item, so every group it answers
+		// Splitting opens a group per item, so every group it answers
 		// holds one — which is the item Type, and true of the empty receiver
 		// too, since it answers no groups at all. What the RECEIVER carries is
 		// a second promise on top: a List proven to have something in it
@@ -554,7 +554,7 @@ describe("Stdlib", () => {
 				}`),
 			).toEqual([])
 
-			// NOTE: The one a computed receiver can NOT promise, which is what
+			// The one a computed receiver can NOT promise, which is what
 			// keeps the two entries apart: nothing said the List had an item,
 			// so nothing says it answers a group.
 			expect(
@@ -565,7 +565,7 @@ describe("Stdlib", () => {
 			).not.toEqual([])
 		})
 
-		// NOTE: Pairing stops with the shorter List, so the proof has to come
+		// Pairing stops with the shorter List, so the proof has to come
 		// from BOTH sides — the receiver's alone leaves the pairing as empty as
 		// what it was paired with.
 		it("types pair by what both Lists prove", () => {

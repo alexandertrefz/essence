@@ -9,7 +9,7 @@ import {
 	startSession,
 } from "./lspSession"
 
-// NOTE: The live test session as an Editor meets it: over the connection,
+// The live test session as an Editor meets it: over the connection,
 // through the debounce, with the real Worker compiling and running behind it.
 // What every other spec in this package asks of a function, this asks of the
 // loop — because what a client is shown is a consequence of the whole of it.
@@ -90,7 +90,7 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// NOTE: A file writing NEITHER Module section is judged by an entry of its
+	// A file writing NEITHER Module section is judged by an entry of its
 	// own rather than by the graph that reaches it — the graph's answer for such
 	// a file is dropped — so the root above it publishes nothing for it, and its
 	// own entry is what carries what a run found there. It has to run for every
@@ -133,7 +133,7 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), passing)
 		await session.waitForTestRuns(2)
-		// NOTE: For the CLEAR rather than for a length of time. The run's end
+		// For the CLEAR rather than for a length of time. The run's end
 		// crosses the wire before the republish that drops what it found does,
 		// so a test that waits out a fixed settle here is betting that the
 		// analysis between the two fits inside it — a bet this machine wins and
@@ -197,7 +197,7 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), failing)
 
-		// NOTE: For the run that SAW the edit rather than for the second run to
+		// For the run that SAW the edit rather than for the second run to
 		// end. Opening a file ends two runs of the same text — the scan's, and
 		// the cycle the overlay asked for, which the scan's own run deferred —
 		// so on a machine slow enough for that deferred window to fire before
@@ -229,7 +229,7 @@ describe("The Server's live test session", () => {
 
 		expect(result.run).not.toBeNull()
 
-		// NOTE: Waited for by the NUMBER the request answered with rather than
+		// Waited for by the NUMBER the request answered with rather than
 		// by its ordinal among the runs that have ended. Opening a file ends
 		// two runs of the same text — the scan's, and the cycle the overlay
 		// asked for, which the scan's own run deferred — so "the second run to
@@ -242,7 +242,7 @@ describe("The Server's live test session", () => {
 		expect(ended).toMatchObject({ reason: "request" })
 	}, 60_000)
 
-	// NOTE: The ordering a loaded machine falls into, forced: the edit arms a
+	// The ordering a loaded machine falls into, forced: the edit arms a
 	// cycle, and the request goes out once that cycle has STARTED. Such a
 	// request is deferred rather than cancelling the compile in flight — and
 	// what it is answered with has to be the number of the cycle that will run
@@ -267,7 +267,7 @@ describe("The Server's live test session", () => {
 
 		expect(result.run).not.toBeNull()
 		expect(result.run).not.toBe(flying)
-		// NOTE: And it really was DEFERRED, which is the whole subject. A
+		// And it really was DEFERRED, which is the whole subject. A
 		// request the session takes STRAIGHT AWAY is started from inside the
 		// request handler — the `start` notification is written to the
 		// connection before the response is — so a number no `start` has
@@ -292,7 +292,7 @@ describe("The Server's live test session", () => {
 		})
 	}, 60_000)
 
-	// NOTE: The whole round trip of a structural identity: the lens spells one
+	// The whole round trip of a structural identity: the lens spells one
 	// off the PARSE, the request carries it back, and the runtime selects by it
 	// off the MANIFEST. Two spellings of an id would silently run nothing, and
 	// nothing else in this suite would notice.
@@ -329,14 +329,14 @@ describe("The Server's live test session", () => {
 
 			expect(result.run).not.toBeNull()
 
-			// NOTE: Waited for by the NUMBER the request answered with. The
+			// Waited for by the NUMBER the request answered with. The
 			// session runs on its own account too, so a run of its own slipping
 			// in between would make the second run to end somebody else's — and
 			// the assertion below would then be about a batch nobody narrowed.
 			return session.waitForTestRun(result.run as number)
 		}
 
-		// NOTE: Once, however loaded the machine is. A request landing while a
+		// Once, however loaded the machine is. A request landing while a
 		// run is in flight used to be folded into it with only its entries
 		// kept, so the batch that ended was the whole file's and this had to
 		// ask a second time — the session now remembers the request whole and
@@ -352,7 +352,7 @@ describe("The Server's live test session", () => {
 		expect(started).toHaveLength(1)
 		expect(started[0]).toMatchObject({ name: "two" })
 
-		// NOTE: And the OTHER test is still reported as it was — its failure is
+		// And the OTHER test is still reported as it was — its failure is
 		// still published. A run narrowed to one test may not be read as
 		// "forget the rest", which is what adopting the deselections the batch
 		// also carries would do.
@@ -363,7 +363,7 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// NOTE: What a file's tags say is a fact about the WHOLE workspace, so the
+	// What a file's tags say is a fact about the WHOLE workspace, so the
 	// list published for one can move while its own text sits still — and a file
 	// writing neither Module section has nothing but its own entry to publish it.
 	// That entry has to run for every batch that reached the file, whether or
@@ -414,7 +414,7 @@ describe("The Server's live test session", () => {
 			"similar-tags",
 		)
 
-		// NOTE: In the IMPORTER, so nothing about the section-less file moves —
+		// In the IMPORTER, so nothing about the section-less file moves —
 		// its analysis stays cached, and the only thing that changed about it is
 		// what the workspace's other tags now look like.
 		await session.change(pathOf("Main.es"), main("network"))
@@ -448,7 +448,7 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// NOTE: A file is an entry because it has tests, and under a project that
+	// A file is an entry because it has tests, and under a project that
 	// asked for `test.contracts` a file declaring a Namespace HAS them: the
 	// goals its declarations promise, synthesized into a `contracts` suite by
 	// the compile. Nothing here wrote a `tests { … }` block at all.
@@ -482,7 +482,7 @@ describe("The Server's live test session", () => {
 		expect(ended?.counts.passed).toBe(1)
 	}, 60_000)
 
-	// NOTE: And it is the PROJECT that decides. The same file under a project
+	// And it is the PROJECT that decides. The same file under a project
 	// that said nothing is no entry at all, so a workspace that never asked for
 	// the goals does not start compiling and running every Namespace it holds.
 	it("leaves the same Namespace alone where the project did not ask", async () => {

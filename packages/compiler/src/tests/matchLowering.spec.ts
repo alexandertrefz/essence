@@ -17,7 +17,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The same stages the CLI runs, minus bundling — a Match is lowered to
+// The same stages the CLI runs, minus bundling — a Match is lowered to
 // an emitted `if` chain, and both halves of what it does wrong are only
 // visible once that chain RUNS, so these go all the way through.
 function generate(
@@ -39,7 +39,7 @@ function generate(
 	)
 }
 
-// NOTE: Writes the emitted Program to a throwaway module and imports it so its
+// Writes the emitted Program to a throwaway module and imports it so its
 // top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
 // this repo's runtime, so the module resolves from anywhere; `console.log` is
 // captured to collect the output, then restored.
@@ -67,7 +67,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: The counterpart for a Program that is supposed to be reported on —
+// The counterpart for a Program that is supposed to be reported on —
 // a Warning is not an error, so the Program still compiles and still runs.
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
@@ -82,7 +82,7 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 }
 
 describe("Match Lowering", () => {
-	// NOTE: Regression tests — a Record Matcher naming a Function-typed member
+	// Regression tests — a Record Matcher naming a Function-typed member
 	// lowered to a runtime check that could never answer true, because the
 	// Function descriptor reached `isValueOfType`'s "not implemented" branch:
 	// it printed a line of Compiler prose into the Program's own output and
@@ -133,7 +133,7 @@ describe("Match Lowering", () => {
 			).toEqual(["42"])
 		})
 
-		// NOTE: A Signature does not survive to runtime, so a callback member
+		// A Signature does not survive to runtime, so a callback member
 		// only ever answers "callable" — two Cases are told apart by the OTHER
 		// members they name, and a pair that names nothing else is reported as
 		// unreachable rather than silently taking the first branch.
@@ -156,7 +156,7 @@ describe("Match Lowering", () => {
 			).toEqual(['"string handler"'])
 		})
 
-		// NOTE: A Guard is ANDed onto the Matcher's own check, so a Matcher
+		// A Guard is ANDed onto the Matcher's own check, so a Matcher
 		// that never answered true made the Guard unreachable too.
 		it("narrows a Guarded Case naming a callback member", async () => {
 			expect(
@@ -183,7 +183,7 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// NOTE: Regression tests — an Essence identifier may hold characters no
+	// Regression tests — an Essence identifier may hold characters no
 	// JavaScript IdentifierName may, and a Matcher's Record members reached the
 	// emitted Type descriptor as bare Identifiers, so `case { ok?: Boolean }`
 	// emitted `members: { ok?: … }`. Nothing in the Compiler objected: the
@@ -227,7 +227,7 @@ describe("Match Lowering", () => {
 			).toEqual(['"flag"'])
 		})
 
-		// NOTE: The check and the Record literal have to spell the name the
+		// The check and the Record literal have to spell the name the
 		// same way — whichever of the two forms the check takes reads the
 		// member back off the value by the key the literal wrote — so the
 		// quoted form is pinned here rather than left to whichever of them the
@@ -241,7 +241,7 @@ describe("Match Lowering", () => {
 			).toContain('members: { "ok?":')
 		})
 
-		// NOTE: And the same invariant for the check the decision tree writes,
+		// And the same invariant for the check the decision tree writes,
 		// which is what an ordinary build emits for this Match: the read has to
 		// spell the member the way the literal wrote it, and `ok?` is not
 		// something JavaScript can spell after a dot.
@@ -252,14 +252,14 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// NOTE: Regression test — the emitted chain used to simply END after the
+	// Regression test — the emitted chain used to simply END after the
 	// last Handler. Nothing answered for a value no Matcher accepted: the
 	// wrapper returned `undefined`, which is not an Essence value at all, so
 	// the Program failed later and elsewhere, in whatever read the missing
 	// Type key next.
 	describe("Exhaustiveness fallback", () => {
 		it("ends the emitted chain in an else no Handler owns", () => {
-			// NOTE: Asked with `elide-final-match-test` off, because that pass
+			// Asked with `elide-final-match-test` off, because that pass
 			// is the considered decision to give this up: it proves the last
 			// Handler is what the end of the chain IS, so the fallback goes
 			// with its test. What is pinned here is what the chain ends in when
@@ -285,7 +285,7 @@ describe("Match Lowering", () => {
 		})
 
 		it("keeps the fallback where the last Handler can decline", () => {
-			// NOTE: TWO Record members, both carrying the one Record tag, so
+			// TWO Record members, both carrying the one Record tag, so
 			// what tells them apart is their members — the elision does not
 			// apply and the chain ends where it always did, under the ordinary,
 			// fully optimised build.
@@ -301,7 +301,7 @@ describe("Match Lowering", () => {
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 		})
 
-		// NOTE: A Match written for its effects promises the unit Type, `{}`,
+		// A Match written for its effects promises the unit Type, `{}`,
 		// and its Handlers answer nothing useful, so the fallback has to be the
 		// innermost `else` rather than a Statement after the chain — a Handler
 		// that RAN and fell off its own end must not reach it.
@@ -319,7 +319,7 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// NOTE: Regression tests — Types erase before a Match runs, so the check
+	// Regression tests — Types erase before a Match runs, so the check
 	// emitted for a Generic Matcher is unconditionally true. A Generic Case
 	// written above a concrete one therefore swallowed every value, and neither
 	// the Enricher nor the Validator said so: `pick("missing", fallback 7)`
@@ -361,7 +361,7 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// NOTE: Regression tests — item Types erase before a Match runs, so a List
+	// Regression tests — item Types erase before a Match runs, so a List
 	// Matcher asks about the items the value HOLDS. An empty List holds none
 	// and fits every List Matcher there is, so an empty `List<Integer>` takes
 	// the `case List<String>` written above it. The Program compiled without a
@@ -404,7 +404,7 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// NOTE: A Match on an Integer or a String takes the VALUE apart, and there is
+	// A Match on an Integer or a String takes the VALUE apart, and there is
 	// no Union under it — so what the Handlers are is a chain of value
 	// comparisons ending in the one Case that answers for the rest. That last Case
 	// is also evidence: reaching it proves the value is none of the values named
@@ -438,7 +438,7 @@ describe("Match Lowering", () => {
 		it("emits a value comparison and no trace of the evidence", () => {
 			let generated = generate(doubledOrZero)
 
-			// NOTE: A literal Matcher is a value comparison rather than a Type
+			// A literal Matcher is a value comparison rather than a Type
 			// check, and the refinement is not a Type the emitted Program has ever
 			// heard of — it erases to the Integer it refines, which is the same
 			// object built by the same constructor. The scrutinee is exactly an
@@ -449,7 +449,7 @@ describe("Match Lowering", () => {
 			expect(generated).not.toContain("anyIs")
 			expect(generated).not.toContain("Divisor")
 
-			// NOTE: What the product resolved to IS `NonZeroInteger` — a Namespace
+			// What the product resolved to IS `NonZeroInteger` — a Namespace
 			// rather than a Type, declared for exactly this predicate, so a
 			// `Divisor` is answered by the total `multiply` written for it. Asked
 			// with the Optimiser off, because that is where a Namespace name is
@@ -463,7 +463,7 @@ describe("Match Lowering", () => {
 			expect(unoptimised).toContain("NonZeroInteger.multiply")
 			expect(unoptimised).not.toContain("Divisor")
 
-			// NOTE: And with the Optimiser on there is no call at all:
+			// And with the Optimiser on there is no call at all:
 			// `lower-scalar-operations` writes the product out as the bigint
 			// multiplication it always was, exactly as it does for `Integer`'s own
 			// entry — the evidence was spent while compiling, and the two
@@ -472,7 +472,7 @@ describe("Match Lowering", () => {
 			expect(generated).toContain("value: d.value * $pool_0.value")
 		})
 
-		// NOTE: The last Handler of such a Match asks a tag question — every value
+		// The last Handler of such a Match asks a tag question — every value
 		// reaching it is an Integer — so the elision applies exactly as it does to a
 		// Union's last Case, and the chain ends in the Handler rather than in the
 		// throw.

@@ -15,7 +15,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `test "…" for any (…)` end to end — what the Enricher DERIVES from each
+// `test "…" for any (…)` end to end — what the Enricher DERIVES from each
 // Parameter's Type, what it refuses, what the emission looks like, and what a
 // run of a hundred generated cases actually reports. The generator interpreter
 // itself is `packages/runtime/src/tests/generators.spec.ts`; what a Type says to
@@ -43,7 +43,7 @@ function codesOf(source: string): Array<string> {
 	return analyse(source).diagnostics.map((diagnostic) => diagnostic.code)
 }
 
-// NOTE: A section with one property test in it, wrapped so every case below is
+// A section with one property test in it, wrapped so every case below is
 // the `for any (…)` and its body and nothing else.
 function sectionOf(parameters: string, body = "expect true"): string {
 	return `tests {
@@ -82,10 +82,10 @@ function generatorOf(
 	return propertiesOf(source).parameters[0]!.generator
 }
 
-// NOTE: The generator with its Expressions replaced by a word, because what
+// The generator with its Expressions replaced by a word, because what
 // this asks about is the SHAPE — an enriched Expression is a tree nobody wants
 // to read in an assertion.
-// NOTE: A witness is a whole resolved conformance and reads as a wall of method
+// A witness is a whole resolved conformance and reads as a wall of method
 // names, so it is shown as the NAMESPACE it resolved to — which is the only
 // thing about it these tests are claims about: whose `is` a drawn Dictionary
 // compares its keys with.
@@ -130,7 +130,7 @@ type Loaded = { $tests: typeof entryPoints }
 
 type Run = { events: Array<TestEvent> }
 
-// NOTE: The whole pipeline and then the run, driven through the loaded
+// The whole pipeline and then the run, driven through the loaded
 // program's OWN `$tests` — every Essence value carries a hidden Type key that
 // belongs to the runtime instance that built it, so anything asked from this
 // package's copy would read `undefined` off every generated value.
@@ -144,7 +144,7 @@ async function run(
 
 	writeFileSync(file, javaScript)
 
-	// NOTE: Read immediately before the load: an emitted `.ts` program imports
+	// Read immediately before the load: an emitted `.ts` program imports
 	// the runtime by absolute path, so every program loaded anywhere in this
 	// process registers into ONE array.
 	let before = registry().modules.length
@@ -209,7 +209,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: Both slots, drawn apart — a Dictionary is the first Type with
+		// Both slots, drawn apart — a Dictionary is the first Type with
 		// two of them, and what the derivation must not do is read one off the
 		// other.
 		it("derives a Dictionary from both of its slots", () => {
@@ -219,14 +219,14 @@ describe("Property tests", () => {
 				kind: "dictionary",
 				key: { kind: "string" },
 				value: { kind: "integer" },
-				// NOTE: And the key Type's own Equatable rides along, because a
+				// And the key Type's own Equatable rides along, because a
 				// Dictionary's keys are compared by it and the drawn one has to
 				// agree with the written one about which two keys are one key.
 				keyConformance: "<String>",
 			})
 		})
 
-		// NOTE: A bare Dictionary decides neither slot, so BOTH take the ladder
+		// A bare Dictionary decides neither slot, so BOTH take the ladder
 		// an unapplied generic's items take — see the List test below, which is
 		// the same answer for the one slot a List has.
 		it("derives a bare Dictionary as that ladder in both slots", () => {
@@ -313,7 +313,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: The design's own answer for a Type Parameter: whatever a use
+		// The design's own answer for a Type Parameter: whatever a use
 		// site could instantiate it with, which is a scalar, a sequence of
 		// characters and a structure.
 		it("instantiates an unapplied generic over Integer, String and a Record", () => {
@@ -344,7 +344,7 @@ describe("Property tests", () => {
 	})
 
 	describe("What a refinement adds", () => {
-		// NOTE: `NonEmptyList<ItemType> = List<ItemType> where @::hasItems()`.
+		// `NonEmptyList<ItemType> = List<ItemType> where @::hasItems()`.
 		it("holds the standard library's NonEmptyList by construction", () => {
 			expect(shapeOf(generatorOf("items: NonEmptyList<String>"))).toEqual(
 				{
@@ -358,7 +358,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: `NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType,
+		// `NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType,
 		// ValueType> where @::hasEntries()`. A Dictionary is counted in
 		// ENTRIES, so the same `minimumLength` rule a List narrows by is what
 		// says a drawn one holds something — and the key witness rides along
@@ -383,7 +383,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: `NonZeroInteger = Integer where @::isNot(0)`.
+		// `NonZeroInteger = Integer where @::isNot(0)`.
 		it("holds the standard library's NonZeroInteger by construction", () => {
 			expect(shapeOf(generatorOf("n: NonZeroInteger"))).toEqual({
 				kind: "refined",
@@ -425,7 +425,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: A predicate no narrowing holds becomes the FILTER: the
+		// A predicate no narrowing holds becomes the FILTER: the
 		// Enricher enriches it as the Boolean Expression an author could have
 		// written about the value.
 		it("enriches a predicate it can not narrow as a check", () => {
@@ -445,7 +445,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: A refinement flows freely into its base, so a Namespace
+		// A refinement flows freely into its base, so a Namespace
 		// declared for the BASE is offered for the refinement — and taking it
 		// would generate values the refinement says are impossible.
 		it("does not let a conformance for the base claim a refinement", () => {
@@ -465,7 +465,7 @@ describe("Property tests", () => {
 			).toMatchObject({
 				kind: "refined",
 				name: "EvenInteger",
-				// NOTE: The BASE still generates through the conformance —
+				// The BASE still generates through the conformance —
 				// a Namespace declared for a Type is usually declared because
 				// the structural generator is wrong for it, and a refinement of
 				// that Type wants the same values. What the fix is about is the
@@ -476,7 +476,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: A Program may declare `namespace Weird for Integer` and mean
+		// A Program may declare `namespace Weird for Integer` and mean
 		// something else by a word the narrowing table knows. Reading the name
 		// alone would narrow by a promise nobody made — and drop the check that
 		// would have caught it. `isLessThan` is one of the words the table
@@ -499,7 +499,7 @@ describe("Property tests", () => {
 			).toMatchObject({ kind: "refined", checks: 1, narrowing: {} })
 		})
 
-		// NOTE: And a body that forwards the Argument it was handed is read
+		// And a body that forwards the Argument it was handed is read
 		// through to the same leaf a written bound reaches. `Weird::isLessThan`
 		// is `@::isGreaterThan(other)`, so the refinement below asks for a value
 		// above zero and the generator draws one — under the name of the
@@ -525,7 +525,7 @@ describe("Property tests", () => {
 			})
 		})
 
-		// NOTE: What a Namespace's own body says IS read, which is the other
+		// What a Namespace's own body says IS read, which is the other
 		// half of the same rule. `Weird::isPositive` is written as one call on
 		// `@`, so the predicate it stands for is that call — a value below zero
 		// — and the generator holds it by construction rather than by drawing
@@ -576,7 +576,7 @@ describe("Property tests", () => {
 				name: "Team",
 				binding: expect.any(String) as unknown as string,
 				call: "<call>",
-				// NOTE: And the other half of the conformance, which is what
+				// And the other half of the conformance, which is what
 				// says how a value it drew is made smaller. `Generatable`
 				// provides a body answering no candidates, so a Namespace that
 				// writes none still carries the call.
@@ -599,7 +599,7 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).team).toMatch(/"(Lions|Tigers)"/)
 		})
 
-		// NOTE: One Namespace written twice, with a `shrink` and without, so
+		// One Namespace written twice, with a `shrink` and without, so
 		// that the difference between the two reports below is that Method and
 		// nothing else. Every value it draws fails the property the tests ask.
 		function counting(shrinking = ""): string {
@@ -614,7 +614,7 @@ describe("Property tests", () => {
 				}`
 		}
 
-		// NOTE: The other half of the conformance. A Namespace that writes
+		// The other half of the conformance. A Namespace that writes
 		// `shrink` is asked for the smaller values its counterexample is
 		// reported as, and the runner walks them the way it walks the
 		// structural ones: the first candidate that fails as well is kept, and
@@ -642,7 +642,7 @@ describe("Property tests", () => {
 			expect(property?.shrinks).toBeGreaterThan(0)
 		})
 
-		// NOTE: And a Namespace that writes none keeps `Generatable`'s own
+		// And a Namespace that writes none keeps `Generatable`'s own
 		// body, which answers no candidates — so the value stands as it was
 		// drawn, which is what a conformance answered before it could say
 		// anything else.
@@ -664,7 +664,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: A GENERIC Namespace's conformance can not be reached: `generate`
+		// A GENERIC Namespace's conformance can not be reached: `generate`
 		// is a static taking a `Randomness` and nothing else, so nothing at the
 		// call binds the Namespace's own Type Parameters, and the language has
 		// no spelling for a Type Argument at a call — the very call an author
@@ -719,7 +719,7 @@ describe("Property tests", () => {
 			])
 		})
 
-		// NOTE: And a Namespace over the APPLIED Type is what the Help asks
+		// And a Namespace over the APPLIED Type is what the Help asks
 		// for, so one standing beside the generic Namespace answers and nothing
 		// is refused — the draw is the written one and the value stands as it
 		// was drawn, both of which the generic conformance failed to do.
@@ -752,7 +752,7 @@ describe("Property tests", () => {
 		})
 	})
 
-	// NOTE: A drawn value is a value like any other, so a `require` takes it
+	// A drawn value is a value like any other, so a `require` takes it
 	// apart where it stands — and a case that misses ends there, which is what
 	// makes the property fail on that draw rather than run on with a name that
 	// stands for nothing.
@@ -775,7 +775,7 @@ describe("Property tests", () => {
 			expect(codesOf(sectionOf("n"))).toEqual(["property-parameters"])
 		})
 
-		// NOTE: `for any (Integer)` is a reader who wrote the TYPE and left the
+		// `for any (Integer)` is a reader who wrote the TYPE and left the
 		// NAME out — the Parser reads the one word written as the name, so the
 		// Help would otherwise ask for 'for any (Integer: Integer)', naming a
 		// Parameter after a builtin. What the word resolves to is what says
@@ -818,7 +818,7 @@ describe("Property tests", () => {
 			])
 		})
 
-		// NOTE: A Type that names itself is refused by the language before a
+		// A Type that names itself is refused by the language before a
 		// generator is ever derived from it. The derivation carries a guard of
 		// its own all the same — a descriptor is finite data, and a Compiler
 		// that overflowed its stack would be worse than one line of insurance.
@@ -837,7 +837,7 @@ describe("Property tests", () => {
 			).toEqual(["recursive-type-declaration"])
 		})
 
-		// NOTE: A predicate is rebuilt as the call an author could have
+		// A predicate is rebuilt as the call an author could have
 		// written, in the Scope the TEST stands in — so a Namespace that Scope
 		// does not name is a predicate nothing can check, and a value nothing
 		// can check is not one to generate.
@@ -894,7 +894,7 @@ describe("Property tests", () => {
 			).toEqual(["snapshot-in-property"])
 		})
 
-		// NOTE: A Parameter that was reported is still BOUND, so the body
+		// A Parameter that was reported is still BOUND, so the body
 		// reports what IT says rather than a cascade about a name that vanished.
 		it("binds a Parameter it refused, so the body does not cascade", () => {
 			expect(codesOf(sectionOf("n", "expect n::is(n)"))).toEqual([
@@ -918,7 +918,7 @@ describe("Property tests", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A property's values are made up per case, so a name that read
+		// A property's values are made up per case, so a name that read
 		// one could not be worked out before anything ran.
 		it("does not bind a Parameter in the name", () => {
 			expect(
@@ -960,7 +960,7 @@ describe("Property tests", () => {
 			expect(javaScript).toContain("$es_Integer_isEven($candidate")
 		})
 
-		// NOTE: Both halves of the conformance, each a closure of the one name
+		// Both halves of the conformance, each a closure of the one name
 		// it binds — the source a draw reads, and the value a shrink is asked
 		// about. The Namespace below writes no `shrink`, so the second closure
 		// calls the Protocol's provided body, which is a call like any other.
@@ -986,7 +986,7 @@ describe("Property tests", () => {
 			expect(javaScript).toContain("$es_Generatable__shrink(")
 		})
 
-		// NOTE: And a Namespace that writes one is called on its own Method
+		// And a Namespace that writes one is called on its own Method
 		// instead, which is the override rule as every other provided Method
 		// follows it.
 		it("emits a written shrink as the Namespace's own call", () => {
@@ -1040,7 +1040,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: THE claim a drawn Dictionary has to keep. A Dictionary's keys
+		// THE claim a drawn Dictionary has to keep. A Dictionary's keys
 		// are compared by the keys' OWN `is` — that is the ratified design,
 		// and every construction the Compiler emits threads a witness for it —
 		// so a key Type whose Namespace writes its own `is` decides which two
@@ -1090,7 +1090,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: The Dictionary generator end to end — derived, lowered, emitted
+		// The Dictionary generator end to end — derived, lowered, emitted
 		// and interpreted. What is under test is that a hundred cases BUILD one
 		// and the run reports on them rather than throwing somewhere in the
 		// interpreter.
@@ -1122,7 +1122,7 @@ describe("Property tests", () => {
 			expect(propertyEvents(events)[0]?.cases).toBe(7)
 		})
 
-		// NOTE: 500 is the smallest Integer whose double is not below 1000, and
+		// 500 is the smallest Integer whose double is not below 1000, and
 		// the shrink has to reach exactly it.
 		it("shrinks a failure to the smallest value that still fails", async () => {
 			let { events } = await run(doubling)
@@ -1144,7 +1144,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: The size a case is drawn at grows with the case number over the
+		// The size a case is drawn at grows with the case number over the
 		// WHOLE run, so a hundred cases and four hundred draw two different
 		// sequences from one seed — which is why a replay has to name the count.
 		it("names --cases in the replay where it is not the default", async () => {
@@ -1169,7 +1169,7 @@ describe("Property tests", () => {
 			)
 		})
 
-		// NOTE: A hundred cases that all held leave NOTHING behind — the
+		// A hundred cases that all held leave NOTHING behind — the
 		// buffers are cut back after each one, so what a failure reports is the
 		// failing case's own recordings.
 		it("reports one expectation for a hundred passing cases", async () => {
@@ -1193,7 +1193,7 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).items).toBe("[ 0, 0, 0 ]")
 		})
 
-		// NOTE: THE claim a refinement rests on: no case is ever run with a
+		// THE claim a refinement rests on: no case is ever run with a
 		// value the Type says is impossible.
 		it("never runs a case with an empty non-empty List", async () => {
 			let { events } = await run(`tests {
@@ -1205,7 +1205,7 @@ describe("Property tests", () => {
 			expect(propertyEvents(events)[0]?.counterexample).toBeNull()
 		})
 
-		// NOTE: The same claim over the second container, and the reason it is
+		// The same claim over the second container, and the reason it is
 		// worth a case of its own: a Dictionary is narrowed by a length the
 		// generator has to spend on distinct KEYS, so a draw that met the
 		// minimum by repeating one key would answer a Dictionary with fewer
@@ -1273,7 +1273,7 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).shade).toBe("Shade#Dark(0)")
 		})
 
-		// NOTE: `Result` is an ordinary generic Choice to the derivation — two
+		// `Result` is an ordinary generic Choice to the derivation — two
 		// Cases, a payload each — so a property over one draws BOTH, and a
 		// property that holds on only one of them fails with the other. Two
 		// tests rather than one, because each direction is a claim of its own:
@@ -1299,7 +1299,7 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).answered).toBe("Result#Value(0)")
 		})
 
-		// NOTE: And it shrinks the payload the way any Case's is shrunk — the
+		// And it shrinks the payload the way any Case's is shrunk — the
 		// smallest Integer that still fails, inside the Case that carries it.
 		it("shrinks a Result's payload to the smallest one that still fails", async () => {
 			let { events } = await run(`tests {
@@ -1311,7 +1311,7 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).answered).toBe("Result#Value(4)")
 		})
 
-		// NOTE: A refinement nothing satisfies is a failure of the RUN rather
+		// A refinement nothing satisfies is a failure of the RUN rather
 		// than of the property — the test asserted nothing, and a report saying
 		// it passed would be claiming otherwise.
 		it("ends the test where nothing could be generated", async () => {

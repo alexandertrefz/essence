@@ -47,10 +47,10 @@ import {
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: Runs the same stages the CLI runs, minus bundling — enough to assert
+// Runs the same stages the CLI runs, minus bundling — enough to assert
 // on the shape of the emitted JavaScript without touching the file system.
 //
-// NOTE: `modulePath` enriches the source as a Module, which identifies its
+// `modulePath` enriches the source as a Module, which identifies its
 // Choices by that path — left out, the Program is no Module and its Cases carry
 // the bare tags every other test here asserts on.
 function generate(
@@ -76,7 +76,7 @@ function generate(
 	)
 }
 
-// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `Terminal.inspect` calls run. The emitted imports are absolute paths
 // into this repo's runtime, so the module resolves from anywhere; `console.log`
 // is captured to collect the output, then restored.
@@ -107,7 +107,7 @@ async function run(
 	return output
 }
 
-// NOTE: The counterpart for cases that are supposed to be rejected — returns
+// The counterpart for cases that are supposed to be rejected — returns
 // whatever the first failing stage reported instead of asserting success.
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
@@ -133,7 +133,7 @@ function hasCode(
 }
 
 describe("Code Generation", () => {
-	// NOTE: A Namespace's static Property is the one node the code generator
+	// A Namespace's static Property is the one node the code generator
 	// cannot emit on its own. `escodegen` has no `PropertyDefinition` case
 	// upstream and throws on a node type it does not know, so the vendored copy
 	// in `packages/escodegen` carries a twelve-line patch that adds one — see
@@ -174,7 +174,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A value the Program computes and drops. Before `collapse-construction`
+	// A value the Program computes and drops. Before `collapse-construction`
 	// every one of them was a runtime CALL, which no engine may take away; now a
 	// Record, a List and a Case are object literals, and an object literal whose
 	// value is unused is something an engine may decide not to build. Bun's
@@ -198,7 +198,7 @@ describe("Code Generation", () => {
 			expect(generated).not.toContain("({\n\t\t[$type.typeKeySymbol]")
 		})
 
-		// NOTE: Regression test — the name held a `$` and no `_`, and `$` is a
+		// Regression test — the name held a `$` and no `_`, and `$` is a
 		// legal Essence identifier character while `_` is a Symbol the Lexer
 		// ends an Identifier at. So `$discarded` was a name a Program could
 		// bind, and one bound HERE around an Expression that READS it was read
@@ -219,7 +219,7 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a call where it stands", () => {
-			// NOTE: Which is what every Statement of this kind a real Program
+			// Which is what every Statement of this kind a real Program
 			// writes actually is — a call can not be taken away, because it may
 			// print.
 			let generated = generate(`
@@ -252,7 +252,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: Structural printing used to be a free Function read off the runtime
+	// Structural printing used to be a free Function read off the runtime
 	// `functions` module. It is `Terminal.inspect` now — an ordinary native
 	// static Method of an ordinary Namespace, emitted as a read off that
 	// Namespace's runtime import like every other native. The observable
@@ -267,7 +267,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("Terminal.inspect(")
-			// NOTE: `$_` is the runtime `functions` module, where a native FREE
+			// `$_` is the runtime `functions` module, where a native FREE
 			// Function lives. A Namespace member never comes off it, and this is
 			// the assertion that says so.
 			expect(generated).not.toContain("$_.inspect(")
@@ -281,19 +281,19 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// NOTE: A String prints QUOTED, an Integer bare — the structural
+			// A String prints QUOTED, an Integer bare — the structural
 			// representation `getStringRepresentation` always produced, which is
 			// exactly what tells `inspect` apart from `print`.
 			expect(output).toEqual(['"hello"', "42"])
 		})
 	})
 
-	// NOTE: The four end-to-end guards for what the runtime PRINTS and what it
+	// The four end-to-end guards for what the runtime PRINTS and what it
 	// calls EQUAL. Each fault below was invisible to every stage before the
 	// emitted Program ran, so each is pinned by running one — the unit-level
 	// counterparts live in `runtimeInternal.spec.ts`.
 	describe("Runtime Printing and Equality", () => {
-		// NOTE: A Record whose single-line rendering reaches sixty characters
+		// A Record whose single-line rendering reaches sixty characters
 		// goes multi-line, and every member used to be printed TWICE — once
 		// unindented from the single-line attempt, once indented.
 		it("prints each member of a multi-line Record exactly once", async () => {
@@ -316,7 +316,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: A Function is the one value carrying no Type key, so printing
+		// A Function is the one value carrying no Type key, so printing
 		// one — or anything holding one — read `undefined.includes` and threw a
 		// TypeError at run time out of a Program that compiled clean.
 		it("prints a Function, and a value holding one, without crashing", async () => {
@@ -333,7 +333,7 @@ describe("Code Generation", () => {
 			).toEqual(["Function", "{ callback = Function }", "[ Function ]"])
 		})
 
-		// NOTE: `String::is` is canonical equivalence — `compare` normalises
+		// `String::is` is canonical equivalence — `compare` normalises
 		// to NFC — so a composed and a decomposed `café` are the same String.
 		// Deep equality compared the raw code units, so the same pair came out
 		// unequal the moment it was wrapped.
@@ -350,7 +350,7 @@ describe("Code Generation", () => {
 			).toEqual(["true", "true", "true"])
 		})
 
-		// NOTE: `Number::is` is numeric equality — `1 is 1/1` holds — but deep
+		// `Number::is` is numeric equality — `1 is 1/1` holds — but deep
 		// equality demanded the same member Type on both sides, so a Record
 		// holding the Integer answered unequal to one holding the Rational.
 		it("compares Numbers inside a Record across the tower", async () => {
@@ -369,7 +369,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Match", () => {
-		// NOTE: Regression test — the Handlers used to be folded into the
+		// Regression test — the Handlers used to be folded into the
 		// if/else cascade in a way that only kept the first and the last, so
 		// every Match with more than two Handlers silently dropped the ones in
 		// between and fell through to `undefined`.
@@ -406,7 +406,7 @@ describe("Code Generation", () => {
 				}
 			`
 
-			// NOTE: Three Handlers produce one `if` plus two `else` branches,
+			// Three Handlers produce one `if` plus two `else` branches,
 			// and the chain ends in a third `else` that no Handler owns — the
 			// exhaustiveness fallback, which throws rather than letting the
 			// wrapper answer `undefined`. Asked with `elide-final-match-test`
@@ -420,7 +420,7 @@ describe("Code Generation", () => {
 			expect(generated.split("else").length - 1).toBe(3)
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 
-			// NOTE: And with it on, the same chain is two `else`s and no
+			// And with it on, the same chain is two `else`s and no
 			// fallback — the nesting itself is unchanged.
 			let elided = generate(source)
 
@@ -428,7 +428,7 @@ describe("Code Generation", () => {
 			expect(elided).not.toContain("$type.noCaseMatched(_self)")
 		})
 
-		// NOTE: Regression test — a Union Matcher used to be serialised with
+		// Regression test — a Union Matcher used to be serialised with
 		// `Object.entries`, which turned its member list into `{ 0: …, 1: … }`
 		// and left the runtime Type check calling Array Methods on an Object.
 		it("serialises the member list of a Union Matcher as an Array", () => {
@@ -463,7 +463,7 @@ describe("Code Generation", () => {
 			expect(generated).toContain("handled the rest")
 		})
 
-		// NOTE: The matched value's tag is read once for a chain that asks about
+		// The matched value's tag is read once for a chain that asks about
 		// it more than once. It is emission rather than a pass — nothing about
 		// the Program changes, the same key is read off the same immutable value
 		// before the same tests — so it is held to account here rather than in
@@ -492,7 +492,7 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a chain that asks once reading the key where it stands", () => {
-			// NOTE: One tag test is one read, and a name for it would say what
+			// One tag test is one read, and a name for it would say what
 			// the read already says. Two Handlers is one test: the last is the
 			// `else` `elide-final-match-test` proved it is.
 			let generated = generate(`
@@ -513,7 +513,7 @@ describe("Code Generation", () => {
 		})
 
 		it("binds nothing where the Optimiser left no tag test", () => {
-			// NOTE: The binding is made off the `tag-test` Nodes
+			// The binding is made off the `tag-test` Nodes
 			// `compile-type-tests` leaves. With the phase off there are none, so
 			// the chain is emitted exactly as it was — which is what makes this
 			// safe under any subset of the registry.
@@ -540,7 +540,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Match Wildcards", () => {
-		// NOTE: The point of resolving a wildcard to the still-unhandled
+		// The point of resolving a wildcard to the still-unhandled
 		// members rather than to Unknown — `@` has to keep a Type precise
 		// enough to call Methods on and to return where a member Type is
 		// expected.
@@ -588,7 +588,7 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// NOTE: A literal Matcher is a value comparison, not a Type check
+			// A literal Matcher is a value comparison, not a Type check
 			// — `anyIs` is already false across differing Types, so it needs
 			// no `isValueOfType` in front of it.
 			expect(generated).toContain("anyIs")
@@ -610,7 +610,7 @@ describe("Code Generation", () => {
 			expect(generated).toContain("&&")
 		})
 
-		// NOTE: The rule both features share — a Handler that can decline a
+		// The rule both features share — a Handler that can decline a
 		// value it Type-matched cannot make the Union exhaustive.
 		it("does not let a literal Matcher discharge its Type", () => {
 			let diagnostics = diagnosticsOf(`
@@ -643,7 +643,7 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a literal's Type in the residual of a later wildcard", () => {
-			// NOTE: `case 0` catches one Integer, so `@` inside the wildcard is
+			// `case 0` catches one Integer, so `@` inside the wildcard is
 			// still Integer|Boolean — calling an Integer Method on it has to
 			// stay an error.
 			let diagnostics = diagnosticsOf(`
@@ -677,7 +677,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A `define` holds no Statements — every half of every arm is an
+	// A `define` holds no Statements — every half of every arm is an
 	// Expression — so it is emitted as the chain of JavaScript conditionals it
 	// is, where a Match is emitted as a Function holding Statements and called
 	// at once. That is the whole reason the Node exists.
@@ -724,7 +724,7 @@ describe("Code Generation", () => {
 			).toEqual(['"one"', '"many"', '"none"'])
 		})
 
-		// NOTE: The payload slot of a one-member Case offers the Record the
+		// The payload slot of a one-member Case offers the Record the
 		// Case carries and the member's own Type at once, and the `define`
 		// settles which of them it answers with — so what reaches the runtime
 		// is the member's value, wrapped into the Record exactly as
@@ -746,7 +746,7 @@ describe("Code Generation", () => {
 			).toEqual(["Optional#Value(1)"])
 		})
 
-		// NOTE: `otherwise` is a valid Identifier, so a Method may be named it
+		// `otherwise` is a valid Identifier, so a Method may be named it
 		// — `Optional::otherwise` was one of the standard library's own until
 		// it was renamed. Here the word is a Method's name and an arm's
 		// terminator inside the same `define`, and each reads where it stands.
@@ -792,7 +792,7 @@ describe("Code Generation", () => {
 				unoptimisedOptions,
 			)
 
-			// NOTE: Read with the Optimiser off, so the Conditions stay the
+			// Read with the Optimiser off, so the Conditions stay the
 			// calls the Program wrote and the chain is the only thing the shape
 			// of the output is about. The `.value` on each is the Essence
 			// Boolean being asked as a JavaScript one — an Essence Boolean is an
@@ -808,7 +808,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Record Matchers", () => {
-		// NOTE: Regression test — matching a Record used to fall through the
+		// Regression test — matching a Record used to fall through the
 		// runtime Type check entirely, so `case { a: Integer }` compiled
 		// cleanly and then never matched anything.
 		it("matches a Record structurally", () => {
@@ -890,7 +890,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: Record assignability is WIDTH subtyping — every member the expected
+	// Record assignability is WIDTH subtyping — every member the expected
 	// Type names has to exist, and a value is free to carry more. So the Type of
 	// a Combination's right-hand side says which members it updates and says
 	// NOTHING about which members it holds, and an update copied whole put
@@ -898,7 +898,7 @@ describe("Code Generation", () => {
 	// that, and it is not an optimisation: all three of the Optimiser on, the
 	// pass off and the whole Optimiser off have to answer the same.
 	describe("a Record Combination's expression right-hand side", () => {
-		// NOTE: The Program the hole was found with. `partial`'s Type names
+		// The Program the hole was found with. `partial`'s Type names
 		// `port` alone; the value beside it also carries a `tls` of the wrong
 		// Type, which a whole copy wrote over the Boolean the answer declares —
 		// so `merged.tls::negate()` computed on a String and printed `false`
@@ -937,7 +937,7 @@ describe("Code Generation", () => {
 			).toContain("port: partial.port")
 		})
 
-		// NOTE: A bare name is read once per member and needs no temporary —
+		// A bare name is read once per member and needs no temporary —
 		// `_self`, which is what `@` lowers to, is one of those names.
 		it("reads a bare name and `@` in place", () => {
 			let generated = generate(`
@@ -975,7 +975,7 @@ describe("Code Generation", () => {
 			expect(generated).not.toContain("=> ({")
 		})
 
-		// NOTE: Anything that has to be COMPUTED is bound by an arrow first, so
+		// Anything that has to be COMPUTED is bound by an arrow first, so
 		// that a right-hand side with two members does not call its call twice —
 		// and so that both operands are still evaluated exactly once, in the
 		// order they were written.
@@ -1000,7 +1000,7 @@ describe("Code Generation", () => {
 			expect(await run(counted)).toEqual(["{ x = 9, y = 8 }", "1"])
 		})
 
-		// NOTE: A dotted key is enriched into the nesting an author could have
+		// A dotted key is enriched into the nesting an author could have
 		// written by hand, so nothing below the Enricher knows about it at all
 		// — and what is emitted has to be exactly the nesting, spread for
 		// spread. Run as well as read: the value updated must come out
@@ -1039,7 +1039,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: A path key is a nesting the Enricher wrote, so the Optimiser
+		// A path key is a nesting the Enricher wrote, so the Optimiser
 		// sees exactly what a hand-written nesting gives it — including with
 		// every pass off, where the Rewriter's own path emits the merge.
 		it("nests a dotted key with the Optimiser off", () => {
@@ -1063,7 +1063,7 @@ describe("Code Generation", () => {
 			expect(generated).toContain("config.server.tls")
 		})
 
-		// NOTE: `?` is a legal Essence identifier character and not a legal
+		// `?` is a legal Essence identifier character and not a legal
 		// JavaScript one, so a projected member is a quoted key on the way in
 		// and a bracketed read on the way out. Written as an identifier either
 		// side, the bundle dies on generated text.
@@ -1082,7 +1082,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: The shorthand desugars in the Parser, so everything from the
+	// The shorthand desugars in the Parser, so everything from the
 	// Enricher down sees `{ x = x }` — these pin that there is nothing else to
 	// it, in each of the four places a Record Literal stands.
 	describe("Property shorthand", () => {
@@ -1150,14 +1150,14 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// NOTE: Distinct placeholders — two Parameters sharing a name
+			// Distinct placeholders — two Parameters sharing a name
 			// would be a redeclaration in the emitted Function.
 			expect(generated).toContain("_0")
 			expect(generated).toContain("_1")
 			expect(generated).toContain("_2")
 		})
 
-		// NOTE: The reason the form is worth having — in a Function Type there
+		// The reason the form is worth having — in a Function Type there
 		// is no body, so a Parameter name could never be referred to anyway.
 		it("accepts a nameless Parameter in a Function Type", () => {
 			expect(() =>
@@ -1176,7 +1176,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A Record default is not a JavaScript default parameter — it fills in
+	// A Record default is not a JavaScript default parameter — it fills in
 	// the MEMBERS a caller left out of an Argument it did write, which a
 	// JavaScript default, firing only on `undefined`, can not do. The callee
 	// opens by rebuilding the Parameter member by member.
@@ -1199,7 +1199,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"a|h|3"', '"a|h|9"'])
 		})
 
-		// NOTE: A complete default keeps its old meaning — the whole Argument
+		// A complete default keeps its old meaning — the whole Argument
 		// may be left out — AND takes a partial Argument, so every member is
 		// read through `?.`, the one short-circuiting read an emitted Program
 		// has.
@@ -1220,7 +1220,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"d|3"', '"d|1"', '"h|9"'])
 		})
 
-		// NOTE: Each member's expression is evaluated only where the caller left
+		// Each member's expression is evaluated only where the caller left
 		// THAT member out — the per-call, only-when-needed semantics the
 		// language promises a default, kept member by member.
 		it("evaluates only the members the caller left out", async () => {
@@ -1246,7 +1246,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"a"', '"b"', "1"])
 		})
 
-		// NOTE: A default that is not a literal can not be taken apart without
+		// A default that is not a literal can not be taken apart without
 		// being evaluated, so it is hoisted into one `const` and read per member
 		// — once per call, unconditionally.
 		it("hoists a default that is not a literal", async () => {
@@ -1288,7 +1288,7 @@ describe("Code Generation", () => {
 			).toEqual(['"self|2"', '"over|5"'])
 		})
 
-		// NOTE: A Function taken as a value drops its defaults, so every
+		// A Function taken as a value drops its defaults, so every
 		// Argument is written — and the entry merge still runs, which is what
 		// projects a whole Record to the members the Parameter's Type declares.
 		it("merges an Argument passed through a Function value", async () => {
@@ -1307,7 +1307,7 @@ describe("Code Generation", () => {
 			).toEqual(['"v|4"'])
 		})
 
-		// NOTE: A member name JavaScript can not spell reaches the merge as a
+		// A member name JavaScript can not spell reaches the merge as a
 		// quoted key and a bracketed read, exactly as a projected Combination's
 		// does.
 		it("merges a member JavaScript can not spell", async () => {
@@ -1325,7 +1325,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true|1"'])
 		})
 
-		// NOTE: A member the default writes as a Record LITERAL is rebuilt one
+		// A member the default writes as a Record LITERAL is rebuilt one
 		// level further in rather than taken whole, which is what a path key in
 		// an Argument merges into. A caller that wrote the member whole wrote
 		// every one of ITS members — only the top level of an Argument may be
@@ -1352,7 +1352,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: As deep as the default's own Literal goes, and no deeper: the
+		// As deep as the default's own Literal goes, and no deeper: the
 		// nesting is what the default WRITES, so a Type may nest forever without
 		// the prologue growing with it.
 		it("rebuilds as deep as the default's Literal nests", async () => {
@@ -1374,7 +1374,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"80|self"'])
 		})
 
-		// NOTE: A member the default does NOT write as a Literal can not be
+		// A member the default does NOT write as a Literal can not be
 		// taken apart without being evaluated, so it is read whole — and a path
 		// key into one is refused where it is written, rather than quietly
 		// replacing the member here.
@@ -1396,7 +1396,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"3|f"'])
 		})
 
-		// NOTE: An Argument written for a defaulted Record Parameter IS the
+		// An Argument written for a defaulted Record Parameter IS the
 		// right-hand side of `{ default with argument }`, so it takes path keys
 		// on the terms every other right-hand side of a merge does — and means
 		// exactly what the same key means after a `with`.
@@ -1422,7 +1422,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: The Argument carries only the members the path wrote — the merge
+		// The Argument carries only the members the path wrote — the merge
 		// is the callee's, which is where the default is. Nothing about the
 		// emitted callee says a path key was ever written: it rebuilds the
 		// member for every call site alike, and a complete one comes back out
@@ -1448,7 +1448,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("String Methods", () => {
-		// NOTE: String gained Comparable, so a List of Strings sorts with a
+		// String gained Comparable, so a List of Strings sorts with a
 		// real comparator — this pins that `compare` resolves on the String
 		// receiver and the whole pipeline emits.
 		it("sorts a List of Strings through String.compare", () => {
@@ -1466,12 +1466,12 @@ describe("Code Generation", () => {
 	})
 
 	describe("Higher-order List Methods", () => {
-		// NOTE: `map`/`reduce` are the first builtins with a Method-level
+		// `map`/`reduce` are the first builtins with a Method-level
 		// Generic and the first to take a contextually typed callback all the
 		// way through codegen. This pins that the callback's body reached the
 		// emitted JavaScript with its Parameters bound and its Types resolved.
 		//
-		// NOTE: The CALL is no longer here to pin: a walk whose callback is
+		// The CALL is no longer here to pin: a walk whose callback is
 		// written AT the call is written out where it stands — `inline-loops` —
 		// so the Method is reached only where the callback is a value instead.
 		// The pass's own spec pins both halves of that; these two pin what the
@@ -1499,7 +1499,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("let $loop_0_state = $pool_")
-			// NOTE: `total::add(n)` on two Integers is lowered to the addition
+			// `total::add(n)` on two Integers is lowered to the addition
 			// itself — `lower-scalar-operations` — so what says the callback's
 			// body resolved is the operation rather than the call. The
 			// accumulator is the walk's own, so it is carried as the value it
@@ -1508,7 +1508,7 @@ describe("Code Generation", () => {
 			expect(generated).toContain("total + n.value")
 		})
 
-		// NOTE: And the Method itself, which is reached exactly where the
+		// And the Method itself, which is reached exactly where the
 		// callback is not written at the call — the same Program with the
 		// literal bound to a name first.
 		it("emits the call where the callback is a value", () => {
@@ -1527,7 +1527,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Contextual Function literals", () => {
-		// NOTE: The whole point is that the inferred Parameter Type reaches
+		// The whole point is that the inferred Parameter Type reaches
 		// the body's Scope. The comparison is lowered to a bigint one, which
 		// `lower-scalar-operations` does only where the receiver and the
 		// Argument are exactly Integers — so it says what the emitted
@@ -1595,7 +1595,7 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
-		// NOTE: The desugar is the Enricher's, so what the Optimiser inlines is
+		// The desugar is the Enricher's, so what the Optimiser inlines is
 		// an ordinary Function literal — the emitted body reads the Parameter
 		// `simplifyParameter` names for a Parameter the source left unnamed.
 		it("emits the Function literal it stands for", () => {
@@ -1621,7 +1621,7 @@ describe("Code Generation", () => {
 			).toEqual(["7"])
 		})
 
-		// NOTE: The riskiest interaction in the feature — the path's own return
+		// The riskiest interaction in the feature — the path's own return
 		// Type is what binds `Key`, and the path is only readable once `Item` is
 		// bound. `deferredArgumentOrder` already holds a Function Parameter back
 		// until the Arguments that name its Types have been matched, and this is
@@ -1642,7 +1642,7 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
-		// NOTE: The Type a Parameter here would need is the one thing this site
+		// The Type a Parameter here would need is the one thing this site
 		// has not got, since what is missing IS the context that would name it.
 		// So the first Help moves the path to a position that names a Function,
 		// and the second writes both Types out as blanks: a literal standing
@@ -1696,7 +1696,7 @@ describe("Code Generation", () => {
 			expect(diagnostics[0].code).toBe("path-step-not-a-record")
 		})
 
-		// NOTE: The step that is not there is an unknown MEMBER, not a step off
+		// The step that is not there is an unknown MEMBER, not a step off
 		// something with no members — the Record is right, the name is not.
 		it("names a member the Record does not declare", () => {
 			let diagnostics = diagnosticsOf(`implementation {
@@ -1754,7 +1754,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(describeValue({ x = 1, y = 2 }))
 			}`)
 
-			// NOTE: The bounded Function gains a hidden trailing parameter, its
+			// The bounded Function gains a hidden trailing parameter, its
 			// body dispatches through it, and the call site packages the
 			// conforming Namespace's Methods into an object literal.
 			expect(code).toContain("Value__conformance")
@@ -1812,7 +1812,7 @@ describe("Code Generation", () => {
 				constant ordered: List<Integer> = [3, 1, 2]::sort()
 			}`)
 
-			// NOTE: An unconditional witness stays exactly the method-map object
+			// An unconditional witness stays exactly the method-map object
 			// literal — no `boundConformance` wrapper. `Integer.compare` is
 			// native, so the witness is a plain member read.
 			expect(code).toContain("compare: Integer.compare")
@@ -1824,7 +1824,7 @@ describe("Code Generation", () => {
 				constant ordered = [[1, 2], [3]]::sort()
 			}`)
 
-			// NOTE: `List<List<Integer>>` sorts through List's own `compare`,
+			// `List<List<Integer>>` sorts through List's own `compare`,
 			// curried with the inner Integer ordering — the conditional witness.
 			expect(code).toContain("$type.boundConformance(")
 			expect(code).toContain("compare: List.compare")
@@ -1851,7 +1851,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(a::compare(to b))
 			}`)
 
-			// NOTE: The hidden conformance Parameters follow the Namespace's
+			// The hidden conformance Parameters follow the Namespace's
 			// Generic declaration order (Key, then Value), and the call site's
 			// witnesses appear in that same order so they line up.
 			expect(code).toContain(
@@ -1866,7 +1866,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A free Function's Arguments carry labels exactly as a Method's do —
+	// A free Function's Arguments carry labels exactly as a Method's do —
 	// the standard library's `loop` family is told apart by nothing else — and a
 	// label is spent entirely at compile time: what it decides is which
 	// Parameter, and which Overload, an Argument is matched against, after which
@@ -1883,7 +1883,7 @@ describe("Code Generation", () => {
 
 			const code = generate(source)
 
-			// NOTE: The internal names survive as the emitted Parameters; the
+			// The internal names survive as the emitted Parameters; the
 			// LABELS are not names the JavaScript has anything to do with.
 			expect(code).toContain("function shout(topic, count)")
 			expect(code).not.toContain("about")
@@ -1892,7 +1892,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"hi!hi!"'])
 		})
 
-		// NOTE: The one thing a free Function has instead of a receiver. Both
+		// The one thing a free Function has instead of a receiver. Both
 		// calls pass the same three Arguments in the same order, and the middle
 		// label is the whole of the difference: `while` steps until the predicate
 		// stops holding, `until` steps until it starts. The predicate holds on the
@@ -1916,14 +1916,14 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A default is lowered to the JavaScript default parameter, whose
+	// A default is lowered to the JavaScript default parameter, whose
 	// semantics are the language's term for term. A call that leaves an Argument
 	// out therefore emits SHORT where nothing follows the hole, and passes
 	// `void 0` where something does — the one place "no Argument given" is
 	// deliberately introduced into emitted code, and spelled so that a Program
 	// binding the NAME `undefined` can not capture it.
 	describe("Default Parameter Values", () => {
-		// NOTE: Asked with `pool-constants` off, so what is read back is the
+		// Asked with `pool-constants` off, so what is read back is the
 		// default itself rather than the name the pool gave it — that pass
 		// reaches a default too, and what IT does is `optimiser.spec`'s.
 		it("should emit a default as the Parameter's own default", () => {
@@ -1969,7 +1969,7 @@ describe("Code Generation", () => {
 			).toMatch(/g\(void 0, \$pool_\d\)/)
 		})
 
-		// NOTE: The case a naive reading of "trailing omissions are simply not
+		// The case a naive reading of "trailing omissions are simply not
 		// passed" breaks on — the hidden `__conformance` Argument a bounded
 		// Generic appends comes AFTER the hole, so the hole has to be passed.
 		it("should emit void 0 for an omission before a conformance Argument", () => {
@@ -1984,7 +1984,7 @@ describe("Code Generation", () => {
 			).toMatch(/show\(\$pool_\d, void 0, \$pool_\d\)/)
 		})
 
-		// NOTE: `undefined` is a NAME a Program may bind — `constant undefined =
+		// `undefined` is a NAME a Program may bind — `constant undefined =
 		// 99` is legal Essence and emits a `const undefined` — so the hole is
 		// spelled `void 0`, which is the same value under a spelling nothing can
 		// rebind. Written as the Identifier, every hole in that Module was
@@ -2045,7 +2045,7 @@ describe("Code Generation", () => {
 			).toEqual(["1", "5", "7", "5", "3", "9"])
 		})
 
-		// NOTE: Every branch of a dispatch resolves to a DIFFERENT Method, so
+		// Every branch of a dispatch resolves to a DIFFERENT Method, so
 		// they need not agree on what may be left out — the shared Argument list
 		// holds what the call wrote and each branch opens its own holes.
 		const divergentDispatch = `implementation {
@@ -2073,7 +2073,7 @@ describe("Code Generation", () => {
 			expect(await run(divergentDispatch)).toEqual(["30", "3"])
 		})
 
-		// NOTE: The same Program through the runtime's own search, which is
+		// The same Program through the runtime's own search, which is
 		// what `--without-optimisation compile-union-dispatch` builds — the two
 		// have to agree, so the holes are opened in both.
 		it("should let the runtime search open a branch's holes too", () => {
@@ -2086,7 +2086,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A user's `overload` block defines every Overload itself, so the
+	// A user's `overload` block defines every Overload itself, so the
 	// emitted names run 1, 2, 3 in written order — the same numbering the call
 	// site resolves against the Method Type. Only the Namespaces the standard
 	// library declares can leave a gap, where a native holds the slot.
@@ -2123,7 +2123,7 @@ describe("Code Generation", () => {
 			}`
 			const code = generate(source)
 
-			// NOTE: `compile-union-dispatch` writes the search out where it
+			// `compile-union-dispatch` writes the search out where it
 			// stands — a test on the receiver's tag and the branch it selects.
 			// With the pass off the same targets are reached through
 			// `$type.dispatchMethod`, which is what this Namespace asked about
@@ -2135,7 +2135,7 @@ describe("Code Generation", () => {
 					disabledPasses: new Set(["compile-union-dispatch"]),
 				}),
 			).toContain("$type.dispatchMethod")
-			// NOTE: One target per member, and the two are spelled differently
+			// One target per member, and the two are spelled differently
 			// on purpose — `Integer.toString` is native, a member read off the
 			// plain import, while `Boolean.toString` is Essence and so is its
 			// own const. Dispatch does not care which.
@@ -2150,14 +2150,14 @@ describe("Code Generation", () => {
 				Terminal.inspect(number::multiply(with 2)::toString())
 			}`)
 
-			// NOTE: The mangled name survives into both spellings — the
+			// The mangled name survives into both spellings — the
 			// Integer entry is native, a member read off the plain import,
 			// while the Rational entry is Essence and so is its own const.
 			expect(code).toContain("Integer.multiply__overload$")
 			expect(code).toContain("$es_Rational_multiply__overload$")
 		})
 
-		// NOTE: `fallback` is `Item | Boolean`, so `toString` dispatches over a
+		// `fallback` is `Item | Boolean`, so `toString` dispatches over a
 		// Union — the `Item` case through the conformance witness, the
 		// `Boolean` case to `Boolean.toString`, which is implemented in
 		// Essence. This is the Union-dispatch-to-an-Essence-Method path: the
@@ -2165,7 +2165,7 @@ describe("Code Generation", () => {
 		// gate has to pull that const in off the emitted branch for the Program
 		// to run — no other expression in the Program names it.
 		//
-		// NOTE: The Union is spelled out by hand and `Item` is inferred from a
+		// The Union is spelled out by hand and `Item` is inferred from a
 		// second Parameter, because an argument that lands on the concrete
 		// member leaves `Item` unbound and the call is rejected as
 		// uninferable. An Optional would not do: it is a Choice, so `toString`
@@ -2201,7 +2201,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(describe(1, or true))
 			}`)
 
-			// NOTE: `lastIndexOf` is what picks the emitted branch out —
+			// `lastIndexOf` is what picks the emitted branch out —
 			// `$es_Boolean_toString` is also the name of the prelude const,
 			// which is emitted above every Function and would otherwise be the
 			// occurrence found. The conformance read appears in the chain and
@@ -2258,7 +2258,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A standard library Namespace may be half native and half Essence.
+	// A standard library Namespace may be half native and half Essence.
 	// The runtime module is imported under the Namespace's own name, and each
 	// Essence-implemented Method is a top-level const of its own beside it.
 	// `Boolean.isNot` was the first Method to have made the trip; it is
@@ -2275,14 +2275,14 @@ describe("Code Generation", () => {
 		})
 
 		it("returns null for a native Method", () => {
-			// NOTE: `Boolean.negate` is bound to the runtime module, so it stays
+			// `Boolean.negate` is bound to the runtime module, so it stays
 			// a member read and has no top-level const.
 			expect(essenceMethodName("Boolean", "negate")).toBeNull()
 			expect(essenceMethodName("String", "append")).toBeNull()
 		})
 
 		it("returns null for a native static Property", () => {
-			// NOTE: The lookup keys on Methods only. `Number.Pi` is a Property
+			// The lookup keys on Methods only. `Number.Pi` is a Property
 			// and reaches a call site through a member read, never a const.
 			expect(essenceMethodName("Number", "Pi")).toBeNull()
 		})
@@ -2293,7 +2293,7 @@ describe("Code Generation", () => {
 			)
 		})
 
-		// NOTE: The Properties are asked for separately, because a Property's const
+		// The Properties are asked for separately, because a Property's const
 		// is emitted in a band of its own — but under the same name, so the two
 		// tables must not both answer for one member. No standard library Property
 		// has a value today, so every one of them is a member read.
@@ -2311,7 +2311,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Reserved-word identifiers", () => {
-		// NOTE: A JavaScript reserved word — `new`, `default`, `delete` — is a
+		// A JavaScript reserved word — `new`, `default`, `delete` — is a
 		// legal Essence identifier, so a Constant or Parameter can be named one.
 		// Emitting it verbatim produced invalid JavaScript (`const new = …`,
 		// `function (…, default)`) that died at runtime; it is now escaped with a
@@ -2362,7 +2362,7 @@ describe("Code Generation", () => {
 		})
 
 		it("keeps a reserved word verbatim as a Record field", async () => {
-			// NOTE: The counterpart guard — a member/property name is NOT escaped,
+			// The counterpart guard — a member/property name is NOT escaped,
 			// because a reserved word is legal as a property key and the read has
 			// to match the key the record literal wrote.
 			expect(
@@ -2378,7 +2378,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("Standard Library Prelude", () => {
-		// NOTE: A synthetic standard library, so a shape the real one does not
+		// A synthetic standard library, so a shape the real one does not
 		// have yet can be handed to the Rewriter — the edges are read off the
 		// prelude that comes back, so a prelude the process-wide one knows nothing
 		// about is exactly what these must answer for.
@@ -2393,7 +2393,7 @@ describe("Code Generation", () => {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
-			// NOTE: The Namespace is imported under its own name, with no
+			// The Namespace is imported under its own name, with no
 			// `$native_` alias and no merged const, and the Essence Method the
 			// Program reaches is a top-level const beside it. The native half stays
 			// a member read off the plain import, which is what keeps it
@@ -2405,13 +2405,13 @@ describe("Code Generation", () => {
 				"const $es_Boolean_exclusiveOr = function (_self, other) {",
 			)
 
-			// NOTE: A Namespace whose Essence Methods the Program does not reach
+			// A Namespace whose Essence Methods the Program does not reach
 			// keeps the plain import and gains no const.
 			expect(code).toContain('import * as String from "')
 			expect(code).not.toContain("$es_String_")
 		})
 
-		// NOTE: The const's body names another Namespace — `exclusiveOr` is
+		// The const's body names another Namespace — `exclusiveOr` is
 		// `@::is(other)::negate()`, and `Boolean.is` is a native, so it is a
 		// plain member read off the runtime module the plain import binds. The
 		// `negate` around it is not a call any more: `lower-scalar-operations`
@@ -2424,7 +2424,7 @@ describe("Code Generation", () => {
 			expect(code).toContain("!Boolean.is(_self, other).value")
 		})
 
-		// NOTE: An unused const is not free — it still names the runtime Methods
+		// An unused const is not free — it still names the runtime Methods
 		// its body reaches, and once a module is in the graph its impure
 		// top-level initialisers can not be dropped — so a Program that never
 		// names the Method must not get its const. The plain import stays and,
@@ -2438,7 +2438,7 @@ describe("Code Generation", () => {
 			expect(code).toContain('import * as Boolean from "')
 		})
 
-		// NOTE: The gate runs over the FINISHED tree, after generation, which is
+		// The gate runs over the FINISHED tree, after generation, which is
 		// the only place a conformance witness, a `dispatchMethod` target and a
 		// plain call all look alike — they are `Identifier` nodes. A survey of
 		// the source would have to know every one of those shapes.
@@ -2457,7 +2457,7 @@ describe("Code Generation", () => {
 			expect(code).toContain("const $es_Boolean_toString")
 		})
 
-		// NOTE: A dotted member name is text, not a reference — a Record whose
+		// A dotted member name is text, not a reference — a Record whose
 		// member is spelled like a Namespace must stay a plain member read, never
 		// be mistaken for an Essence Method and rewritten to a bare `$es_…`
 		// Identifier. `rewriteLookup` routes a Record field through the same
@@ -2473,7 +2473,7 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$es_")
 		})
 
-		// NOTE: The regression is the merged const, whose whole cost was the
+		// The regression is the merged const, whose whole cost was the
 		// spread that materialised a module namespace object: `{ ...Number, … }`.
 		// `Everyday.es` reaches an Essence Method and a large runtime module, the
 		// shape that spread, and writes no spread of its own, so an object
@@ -2488,7 +2488,7 @@ describe("Code Generation", () => {
 			expect(generate(source)).not.toMatch(/\{\s*\.\.\./)
 		})
 
-		// NOTE: The `$es_` prefix can not collide with a user identifier because
+		// The `$es_` prefix can not collide with a user identifier because
 		// `_` is a Lexer Symbol — no user name contains one.
 		// `$esBooleanexclusiveOr` is the closest a user can write, and it must
 		// survive as its own distinct binding alongside the Rewriter's
@@ -2517,7 +2517,7 @@ describe("Code Generation", () => {
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
 
-		// NOTE: The conformance witness reads the Essence Method as the bare
+		// The conformance witness reads the Essence Method as the bare
 		// `$es_Boolean_toString` const rather than off the runtime module, so a
 		// Boolean that reaches a bounded generic finds the Essence
 		// implementation. `Printable` and not `Equatable`, because Boolean's
@@ -2537,7 +2537,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: A dispatch case reaches an Essence Method as the bare
+		// A dispatch case reaches an Essence Method as the bare
 		// `$es_…` Identifier, exactly as a plain call does. `Boolean.toString`
 		// is Essence, so this is the Union-dispatch-to-an-Essence-Method path
 		// end to end: the const has to be emitted off the dispatch triple alone
@@ -2553,16 +2553,16 @@ describe("Code Generation", () => {
 
 			expect(code).toContain("$es_Boolean_toString")
 			expect(code).toContain("const $es_Boolean_toString")
-			// NOTE: The Integer case stays a native member read.
+			// The Integer case stays a native member read.
 			expect(code).toContain("Integer.toString")
 			expect(await run(source)).toEqual(['"true"'])
 		})
 
-		// NOTE: `Orderable.isBetween` is written in Essence as well, and reaches
+		// `Orderable.isBetween` is written in Essence as well, and reaches
 		// other Essence consts in turn. Each of them has to be emitted exactly
 		// when the Program reaches it.
 		//
-		// NOTE: Both bounds included, both bounds excluded from outside, and a
+		// Both bounds included, both bounds excluded from outside, and a
 		// pair written the other way round, run through the compiled Method. The
 		// last two are what makes the exchange visible: the same range named
 		// backwards holds `5` and does not hold `15`.
@@ -2588,7 +2588,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: `isBetween` is `Orderable`'s provided Method, over `Self` — the
+		// `isBetween` is `Orderable`'s provided Method, over `Self` — the
 		// target of the Namespace whose conformance offered it — so a bound of
 		// another kind is compared on the covering `Number`'s rung, through the
 		// one conformance `Number` declares. π against an Integer and a
@@ -2608,7 +2608,7 @@ describe("Code Generation", () => {
 			).toEqual(['"true"', '"false"', '"true"', '"true"'])
 		})
 
-		// NOTE: Each Essence Method's const is emitted exactly where the Program
+		// Each Essence Method's const is emitted exactly where the Program
 		// reaches it, gated per Method rather than per Namespace, so reaching
 		// `Orderable.isBetween` pulls in no `Boolean` const.
 		it("emits each Essence Method's const only where it is reached", () => {
@@ -2619,7 +2619,7 @@ describe("Code Generation", () => {
 			expect(both).toContain("const $es_Orderable__isBetween")
 			expect(both).toContain("const $es_Boolean_exclusiveOr")
 
-			// NOTE: `exclusiveOr` alone — a Program that never names a Number.
+			// `exclusiveOr` alone — a Program that never names a Number.
 			const booleanOnly = generate(`implementation {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
@@ -2627,7 +2627,7 @@ describe("Code Generation", () => {
 			expect(booleanOnly).not.toContain("$es_Orderable__isBetween")
 			expect(booleanOnly).toContain("const $es_Boolean_exclusiveOr")
 
-			// NOTE: `isBetween` alone, which reaches no `Boolean` const.
+			// `isBetween` alone, which reaches no `Boolean` const.
 			const numberReached = generate(`implementation {
 				Terminal.inspect(5::isBetween(1, and 10))
 			}`)
@@ -2637,7 +2637,7 @@ describe("Code Generation", () => {
 			)
 			expect(numberReached).not.toContain("$es_Boolean_exclusiveOr")
 
-			// NOTE: Neither. A String-only Program names no Essence Method at all
+			// Neither. A String-only Program names no Essence Method at all
 			// and gets no const.
 			const neither = generate(`implementation {
 				Terminal.inspect("hello")
@@ -2647,7 +2647,7 @@ describe("Code Generation", () => {
 			expect(neither).not.toContain("$es_Boolean_exclusiveOr")
 		})
 
-		// NOTE: A value-LESS `static PI: Transcendental` is a native — it reaches
+		// A value-LESS `static PI: Transcendental` is a native — it reaches
 		// no typed Node, so the prelude has nothing to emit for it — and it stays a
 		// plain member read off the runtime module, `Number.Pi`, like every native.
 		it("reads Pi and Tau as native member reads", async () => {
@@ -2662,14 +2662,14 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"π"', '"2·π"', '"true"'])
 		})
 
-		// NOTE: Simplifying and optimising the standard library for every file
+		// Simplifying and optimising the standard library for every file
 		// compiled would be paid once per file for an answer that can not
 		// differ.
 		it("builds the prelude once per process", () => {
 			expect(stdlibPrelude()).toBe(stdlibPrelude())
 		})
 
-		// NOTE: The standard library's typed Programs are a process-wide
+		// The standard library's typed Programs are a process-wide
 		// singleton. Building the prelude must leave them exactly as they were,
 		// or the Language Server and the tests would read the Rewriter's
 		// leavings.
@@ -2681,7 +2681,7 @@ describe("Code Generation", () => {
 			expect(JSON.stringify(loadStdlib().typedPrograms)).toBe(before)
 		})
 
-		// NOTE: The `__overload$N` suffix is the Overload's position in the
+		// The `__overload$N` suffix is the Overload's position in the
 		// Method Type. A native holds its slot even though the prelude emits
 		// nothing for it, because the runtime export it binds to already answers
 		// to that name. Emitted under the filtered index, the bodied Overload
@@ -2713,7 +2713,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// NOTE: The two tables the Rewriter reads a free Function off. They are
+		// The two tables the Rewriter reads a free Function off. They are
 		// complementary and both derived from the loader's `functionBindings`, so
 		// they can only be right together: a bodied entry is emitted as a
 		// declaration of its own and a native one is a read off the runtime
@@ -2736,7 +2736,7 @@ describe("Code Generation", () => {
 				])
 			})
 
-			// NOTE: The name the Rewriter keys a candidate by has to be the name
+			// The name the Rewriter keys a candidate by has to be the name
 			// the emitted declaration answers to, or the fixed point would pull in
 			// a declaration that defines something else.
 			it("names each one after the Node it hands over", () => {
@@ -2763,7 +2763,7 @@ describe("Code Generation", () => {
 				)
 			})
 
-			// NOTE: The invariant the two tables exist to keep, read off the
+			// The invariant the two tables exist to keep, read off the
 			// loader's flags rather than off a list written by hand — every
 			// declared entry is accounted for by exactly one of them, under the
 			// `__overload$N` name its SLOT gives it.
@@ -2793,13 +2793,13 @@ describe("Code Generation", () => {
 			})
 		})
 
-		// NOTE: The search has to run to a fixed point: an Essence Method may be
+		// The search has to run to a fixed point: an Essence Method may be
 		// reached only through the body of another one. It is driven here over
 		// a synthetic prelude. The edges are read off the typed body, so
 		// injecting a prelude the process-wide one does not know is exactly
 		// what this must handle.
 		describe("reachability", () => {
-			// NOTE: `Outer.quadruple` calls `Inner.double`, and nothing else
+			// `Outer.quadruple` calls `Inner.double`, and nothing else
 			// mentions `Inner`.
 			const pair = `declarations {
 	namespace Inner for Integer {
@@ -2817,7 +2817,7 @@ describe("Code Generation", () => {
 	}
 }`
 
-			// NOTE: An Essence Method is reached as a bare `$es_…` Identifier —
+			// An Essence Method is reached as a bare `$es_…` Identifier —
 			// the same shape the user Program's emitted calls take.
 			function callOf(
 				namespaceName: string,
@@ -2867,7 +2867,7 @@ describe("Code Generation", () => {
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
 			})
 
-			// NOTE: The free Functions share the one fixed point with the
+			// The free Functions share the one fixed point with the
 			// Methods, so an edge that crosses between the two kinds has to be
 			// followed like any other. It is driven over a synthetic library
 			// whose chain crosses the boundary twice: Method to free Function,
@@ -2907,7 +2907,7 @@ describe("Code Generation", () => {
 	}
 }`
 
-				// NOTE: The free-Function half of a synthetic prelude, built the
+				// The free-Function half of a synthetic prelude, built the
 				// way `buildStdlibArtifacts` builds the real one, copy included.
 				// It can not be read off `stdlibFreeFunctions`, which answers for
 				// the process-wide standard library.
@@ -2927,7 +2927,7 @@ describe("Code Generation", () => {
 					)
 				}
 
-				// NOTE: A free Function is reached as a bare Identifier call —
+				// A free Function is reached as a bare Identifier call —
 				// the emitted spelling of `quadruple(…)`, and of an overloaded
 				// entry's `quadruple__overload$2(…)` alike.
 				function callOfFunction(
@@ -2982,7 +2982,7 @@ describe("Code Generation", () => {
 					expect([...reachable.keys()]).toEqual(["$es_Inner_twice"])
 				})
 
-				// NOTE: A free Function is emitted as a declaration of its own
+				// A free Function is emitted as a declaration of its own
 				// rather than as a const — nothing has to hold a Function
 				// expression for it, and the name it answers to is the bare one a
 				// call site resolved to.
@@ -3002,7 +3002,7 @@ describe("Code Generation", () => {
 					).toBe("VariableDeclaration")
 				})
 
-				// NOTE: The set handed in is what decides an edge, exactly as
+				// The set handed in is what decides an edge, exactly as
 				// `implemented` does for a Method — so a NATIVE free Function,
 				// which is a read off `$_` and reaches no const, drops out along
 				// with everything it would have pulled in.
@@ -3018,7 +3018,7 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// NOTE: The sweep the emitted Program is held to after every rewrite
+			// The sweep the emitted Program is held to after every rewrite
 			// — the net under the fixed point above, and the reason a shape the
 			// edge finder does not know about can not reach a user again. Driven
 			// with a hand-built tree, because while the Rewriter is right the
@@ -3051,7 +3051,7 @@ describe("Code Generation", () => {
 					)
 				})
 
-				// NOTE: The sweep reads REFERENCES, so an object literal's key
+				// The sweep reads REFERENCES, so an object literal's key
 				// and a dotted member — text, both of them — are none of its
 				// business. `{ $es_Inner_double: … }` is a witness's method map,
 				// which names a Method it does not call.
@@ -3097,7 +3097,7 @@ describe("Code Generation", () => {
 					).not.toThrow()
 				})
 
-				// NOTE: A free Function's const is emitted under its bare name,
+				// A free Function's const is emitted under its bare name,
 				// which a user's own binding can be spelled exactly like — the
 				// prefix is what makes the sweep safe, so everything without it
 				// is left to the fixed point.
@@ -3119,7 +3119,7 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// NOTE: The edge finder must recognise every shape `namespaceMember`
+			// The edge finder must recognise every shape `namespaceMember`
 			// turns into a `$es_…` Identifier, or a Method reached only through a
 			// missing shape is named in an emitted body while its const is never
 			// pulled in: a `ReferenceError` at run time that compiles green. Each
@@ -3179,7 +3179,7 @@ describe("Code Generation", () => {
 						"$es_Target_static",
 					])
 
-					// NOTE: A static Method passed as a value, not called — the
+					// A static Method passed as a value, not called — the
 					// shape an earlier version missed by only inspecting a
 					// `FunctionInvocation`'s callee. It is an edge for
 					// reachability, since the const is named, and NOT an ordering
@@ -3196,7 +3196,7 @@ describe("Code Generation", () => {
 					expect([...handedOn.evaluatedReferences]).toEqual([])
 				})
 
-				// NOTE: A static Property READ is the same Node shape as a static
+				// A static Property READ is the same Node shape as a static
 				// Method reference, so which table holds the pair is the whole of
 				// the difference — and a native Property is in neither, which is why
 				// `Number.Pi` draws no edge to a const nothing emitted.
@@ -3221,7 +3221,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([
 						"$es_Target_CONSTANT",
 					])
-					// NOTE: A Property read is evaluated wherever it stands —
+					// A Property read is evaluated wherever it stands —
 					// reading the const IS taking the value, so there is no
 					// handing it on the way a Method reference is.
 					expect([...refs.evaluatedReferences]).toEqual([
@@ -3234,7 +3234,7 @@ describe("Code Generation", () => {
 					]).toEqual([])
 				})
 
-				// NOTE: A Method handed to a call is a Method that call may run at
+				// A Method handed to a call is a Method that call may run at
 				// once — `items::map(Boolean.isNot)` and every native taking a
 				// callback — so it counts as evaluated where a stored one does
 				// not. Without this a Property could be emitted above a Property
@@ -3285,7 +3285,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([
 						"$es_Target_witnessed",
 					])
-					// NOTE: A witness holds its Methods, it does not run them —
+					// A witness holds its Methods, it does not run them —
 					// whoever is handed the witness calls them, later — so the
 					// value band is not ordered against what they read.
 					expect([...refs.evaluatedReferences]).toEqual([])
@@ -3313,7 +3313,7 @@ describe("Code Generation", () => {
 					])
 				})
 
-				// NOTE: The one shape that draws a free-Function edge instead of a
+				// The one shape that draws a free-Function edge instead of a
 				// Method one — a `FunctionInvocation` off a bare Identifier, which
 				// is what an overloaded free Function's call site looks like once
 				// the Simplifier has mangled the callee. The reference IS the bare
@@ -3336,7 +3336,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual(["loop__overload$2"])
 				})
 
-				// NOTE: A native free Function is reached off `$_`, and a call on a
+				// A native free Function is reached off `$_`, and a call on a
 				// Function-typed local or Parameter is the very same Node shape —
 				// neither is in the set, so neither draws an edge to a const that
 				// was never emitted for it.
@@ -3357,7 +3357,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([])
 				})
 
-				// NOTE: One body reaches both kinds, and the two sets decide
+				// One body reaches both kinds, and the two sets decide
 				// independently — the free-Function edge is keyed by the bare name
 				// and the Method edge by the `$es_…` one, so neither filter can
 				// answer for the other.
@@ -3395,7 +3395,7 @@ describe("Code Generation", () => {
 				})
 
 				it("draws no edge to a Method the prelude does not implement", () => {
-					// NOTE: A Record field access is an Identifier-based `Lookup`
+					// A Record field access is an Identifier-based `Lookup`
 					// too — it must not be mistaken for a static reference.
 					let refs = essenceMethodReferences(
 						{
@@ -3416,7 +3416,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([])
 				})
 
-				// NOTE: `[ages with other]` is emitted as a call of `merge`, and
+				// `[ages with other]` is emitted as a call of `merge`, and
 				// `[ages with "kim" = 7]` as a call of `set` per entry.
 				describe("a Dictionary update", () => {
 					const updates = new Set([
@@ -3503,7 +3503,7 @@ describe("Code Generation", () => {
 						expect([...refs.references]).toEqual([])
 					})
 
-					// NOTE: The update runs the call it is emitted as, so a Method
+					// The update runs the call it is emitted as, so a Method
 					// handed to it counts as evaluated, as it does under a written
 					// `set`.
 					it("evaluates a static Method stored by the update", () => {
@@ -3541,7 +3541,7 @@ describe("Code Generation", () => {
 					})
 				})
 
-				// NOTE: `Shade.cases()` beside `namespace Shades for Shade` names
+				// `Shade.cases()` beside `namespace Shades for Shade` names
 				// the Choice in its base and is emitted off the Namespace the
 				// Lookup carries.
 				it("follows a `cases` read off the Namespace that writes it", () => {
@@ -3562,7 +3562,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual(["$es_Shades_cases"])
 				})
 
-				// NOTE: A witness and a devirtualised witness name a native at
+				// A witness and a devirtualised witness name a native at
 				// full arity, which is where `namespaceMember` routes a native
 				// whose shim merges a Record default.
 				describe("a native whose shim merges a Record default", () => {
@@ -3606,11 +3606,11 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// NOTE: The real sources and one more file, installed as the library
+			// The real sources and one more file, installed as the library
 			// for the length of the block, so the emitted bodies spell their
 			// consts from the prelude the walk is handed.
 			describe("the edges of a library body", () => {
-				// NOTE: Appended to the real sources, so its imports resolve to
+				// Appended to the real sources, so its imports resolve to
 				// the real files and `merge` is the library's own.
 				const reached = `import {
 	from "./Dictionary.es" { Dictionary }
@@ -3733,7 +3733,7 @@ export {
 					])
 				})
 
-				// NOTE: `namespaceMember` spells each body's consts and the walk
+				// `namespaceMember` spells each body's consts and the walk
 				// reads its edges off the typed body, so a shape only one of the
 				// two knows fails here for every body that writes it.
 				it("draws an edge to every const a library body names", () => {
@@ -3767,7 +3767,7 @@ export {
 			})
 		})
 
-		// NOTE: A bodied static Property is emitted as a const of its own, in a
+		// A bodied static Property is emitted as a const of its own, in a
 		// band BELOW every Function-valued member — its value is computed where
 		// the const stands, not when something calls it, so the band is the only
 		// place from which it can read the Methods it needs. No standard library
@@ -3775,7 +3775,7 @@ export {
 		// byte-identical while the machinery below is live; the fixtures are
 		// synthetic for the same reason.
 		describe("a bodied static Property", () => {
-			// NOTE: `Constants.DOUBLE` reads `Other.BASE` and calls `Other.doubled`
+			// `Constants.DOUBLE` reads `Other.BASE` and calls `Other.doubled`
 			// — one edge into the value band and one out of it. The reading
 			// Namespace is written BELOW the one it reads on purpose: a Property's
 			// value is enriched where the `namespace` stands, so it can only name a
@@ -3800,7 +3800,7 @@ export {
 	}
 }`
 
-			// NOTE: A read of an Essence-implemented member is a bare `$es_…`
+			// A read of an Essence-implemented member is a bare `$es_…`
 			// Identifier by the time the seed sees it, whether it is a Property's
 			// value or a Method passed as one.
 			function referenceOf(name: string): estree.ExpressionStatement {
@@ -3834,7 +3834,7 @@ export {
 				])
 			})
 
-			// NOTE: The fixed point runs over the Properties on the same footing as
+			// The fixed point runs over the Properties on the same footing as
 			// the Methods: the Program names one Property, whose value reaches the
 			// other and the Method it calls. The KIND comes back with each, because
 			// nothing about the name or the declaration tells a Method's const from
@@ -3877,7 +3877,7 @@ export {
 				expect([...reachable.keys()]).toEqual(["$es_Other_doubled"])
 			})
 
-			// NOTE: Both bands in one list. The Map is in DISCOVERY order —
+			// Both bands in one list. The Map is in DISCOVERY order —
 			// `DOUBLE`, then the members its value reaches — so this is exactly
 			// what the partition and the topological sort are for: every Function
 			// first, and `BASE` above the `DOUBLE` that reads it. Emitted in
@@ -3897,7 +3897,7 @@ export {
 				])
 			})
 
-			// NOTE: The edge that is only visible through a Method's body, and the
+			// The edge that is only visible through a Method's body, and the
 			// one an earlier version of this band dropped: `Constants.DOUBLE` reads
 			// no Property at all, it CALLS `Reader.readsBase` — and that call runs
 			// where the const stands, so `Other.BASE` is read there and has to be
@@ -3942,7 +3942,7 @@ export {
 				])
 			})
 
-			// NOTE: The edge inside ONE Namespace, which is the shape a Namespace
+			// The edge inside ONE Namespace, which is the shape a Namespace
 			// naming itself made writable — `static Tau = Number.Pi` is the
 			// spelling the numeric tower's constants want. It is an ordinary edge
 			// of the band, and it is the only direction there is: a Property
@@ -3973,7 +3973,7 @@ export {
 				])
 			})
 
-			// NOTE: The shapes the band can not survive, handed in directly because
+			// The shapes the band can not survive, handed in directly because
 			// none of them can be written in a source: a Property's value only
 			// names Namespaces above it — or its own, and there only a Property
 			// written above it — so every edge points backwards. They are
@@ -3981,7 +3981,7 @@ export {
 			// whichever const comes first reads one that does not exist yet, which
 			// is a `ReferenceError` at import out of a Program that compiled green.
 			//
-			// NOTE: The edges are the EVALUATED ones, since those are what the
+			// The edges are the EVALUATED ones, since those are what the
 			// ordering follows, and a name listed in `functions` is a
 			// Function-valued member — which is how a route from a Property through
 			// a Method and back is written here.
@@ -4014,7 +4014,7 @@ export {
 				)
 			}
 
-			// NOTE: The seam between the two bands, asked for directly —
+			// The seam between the two bands, asked for directly —
 			// the pooled constants are emitted BETWEEN them, so which
 			// declaration is in which band decides whether a Program's
 			// constants can be read where they are needed. `orderEssenceMembers`
@@ -4049,7 +4049,7 @@ export {
 				).toThrow("$es_A_ONE -> $es_B_TWO -> $es_A_ONE")
 			})
 
-			// NOTE: A self-edge is a cycle here, unlike among the Methods, where a
+			// A self-edge is a cycle here, unlike among the Methods, where a
 			// Method calling itself is how recursion is written.
 			it("refuses a Property that reads itself", () => {
 				expect(() =>
@@ -4057,7 +4057,7 @@ export {
 				).toThrow("$es_A_ONE -> $es_A_ONE")
 			})
 
-			// NOTE: The edge a Method HIDES. `A` calls a Method that reads `B`, and
+			// The edge a Method HIDES. `A` calls a Method that reads `B`, and
 			// the call runs inside `A`'s own initialiser, so `B` is read before `A`
 			// is bound and its const has to stand above `A`'s — the Method's own
 			// const is in the band above and constrains nothing.
@@ -4080,7 +4080,7 @@ export {
 				])
 			})
 
-			// NOTE: The same route closing on itself — a temporal dead zone no
+			// The same route closing on itself — a temporal dead zone no
 			// order can fix, and the shape the band was blind to while it followed
 			// Property-to-Property edges alone. The refusal names the Methods it
 			// went through, because the two Properties on their own read nothing of
@@ -4102,7 +4102,7 @@ export {
 				)
 			})
 
-			// NOTE: Two Methods calling each other is recursion, not a cycle of
+			// Two Methods calling each other is recursion, not a cycle of
 			// this band's kind — the walk over the Function nodes is plain
 			// reachability, so it answers what they read between them and returns.
 			it("orders a Property against what mutually recursive Methods read", () => {
@@ -4126,7 +4126,7 @@ export {
 				])
 			})
 
-			// NOTE: A Property and a Method of one Namespace are emitted under the
+			// A Property and a Method of one Namespace are emitted under the
 			// one const name, and nothing upstream refuses the overlap — the two
 			// are declared in records of their own — so the prelude does.
 			it("refuses a Property spelled like a Method of its own Namespace", () => {
@@ -4149,7 +4149,7 @@ export {
 				)
 			})
 
-			// NOTE: The Method is NATIVE here, so it reaches no typed Node — the
+			// The Method is NATIVE here, so it reaches no typed Node — the
 			// clash is invisible to the prelude's own tables and has to be read
 			// off the loader's `nativeBindings`. Emitted, this is the worse half
 			// of the two: the Method's call sites find no Essence Method of that
@@ -4172,7 +4172,7 @@ export {
 				)
 			})
 
-			// NOTE: And the mirror — a value-LESS static Property is native, so it
+			// And the mirror — a value-LESS static Property is native, so it
 			// reaches no typed Node either, while the Method beside it does. A read
 			// of `Clash.PI` would be routed to the Method's const and hand back the
 			// Function itself.
@@ -4196,7 +4196,7 @@ export {
 				)
 			})
 
-			// NOTE: The clash is looked for inside ONE Namespace — the const name
+			// The clash is looked for inside ONE Namespace — the const name
 			// carries the Namespace, so a Property and a Method of the same name in
 			// two different Namespaces are two different consts and collide with
 			// nothing.
@@ -4223,7 +4223,7 @@ export {
 				])
 			})
 
-			// NOTE: Everything above hands the prelude in and reads the answer
+			// Everything above hands the prelude in and reads the answer
 			// back. This block reaches the same machinery the way a PROGRAM
 			// reaches it — the whole standard library with one more file on the
 			// end, installed as THE library for the length of the block, so a
@@ -4233,11 +4233,11 @@ export {
 			// in Essence produces one), so a source of its own is the only way to
 			// compile against the band at all.
 			describe("read from a user Program", () => {
-				// NOTE: The three shapes the band has to get right in one file:
+				// The three shapes the band has to get right in one file:
 				// a Property whose value CALLS a Method, a Property that reads
 				// another one of its OWN Namespace, and a Namespace declared
 				// below every one it names.
-				// NOTE: Appended to the REAL sources, so `./Integer.es` resolves
+				// Appended to the REAL sources, so `./Integer.es` resolves
 				// to the real one — a standard library specifier is matched by
 				// file name against the set being loaded, which is what lets a
 				// library assembled in a test name a file it did not write.
@@ -4266,7 +4266,7 @@ declarations {
 				let replacedStdlib: Stdlib | null = null
 
 				beforeAll(() => {
-					// NOTE: The prelude is extended along with the sources.
+					// The prelude is extended along with the sources.
 					// Exporting `Constants` from its own file makes it reachable
 					// by the standard library; it takes a line in `Prelude.es`
 					// to make it a name a user Program can write, which is the
@@ -4290,7 +4290,7 @@ declarations {
 					replacedStdlib = useStdlib(loadStdlibFrom(sources))
 				})
 
-				// NOTE: Put back, rather than dropped: every consumer of the
+				// Put back, rather than dropped: every consumer of the
 				// standard library reads the one process-wide object, so a test
 				// that left its own in place would compile every file after it
 				// against a library the repository does not have.
@@ -4315,7 +4315,7 @@ declarations {
 	Terminal.inspect(Constants.DOUBLE::toString())
 }`)
 
-					// NOTE: The read is the bare const, not the
+					// The read is the bare const, not the
 					// `Constants.DOUBLE` member read a native Property emits —
 					// and no import for the Namespace is emitted at all, since
 					// nothing about it is native.
@@ -4325,7 +4325,7 @@ declarations {
 					expect(code).not.toContain("Constants.DOUBLE")
 					expect(code).not.toContain('import * as Constants from "')
 
-					// NOTE: The order the initialisers need: the Method's const
+					// The order the initialisers need: the Method's const
 					// stands above the whole value band, `BASE` above the
 					// `DOUBLE` whose value reads it. Emitted in discovery order
 					// this is a `ReferenceError` at import out of a Program that
@@ -4338,7 +4338,7 @@ declarations {
 					).toBeLessThan(code.indexOf("const $es_Constants_DOUBLE ="))
 				})
 
-				// NOTE: And the proof that the order is not just written down but
+				// And the proof that the order is not just written down but
 				// runs: the values are computed at import, so a band in the wrong
 				// order throws before the first line of the Program.
 				it("runs the value band", async () => {
@@ -4352,7 +4352,7 @@ declarations {
 			})
 		})
 
-		// NOTE: A native Method that declares a default. The native calling
+		// A native Method that declares a default. The native calling
 		// convention has nowhere to put one — a native takes exactly the
 		// Parameters its declaration does, and a JavaScript default parameter
 		// would stop the `Function.length` `builtins.spec.ts` checks — so the
@@ -4361,7 +4361,7 @@ declarations {
 		// the library's own case: `slice(from start: Integer = 0, to end:
 		// Integer = @::length())`.
 		describe("a native Method that declares a default", () => {
-			// NOTE: The whole of what the shim buys, and the whole of what it
+			// The whole of what the shim buys, and the whole of what it
 			// costs: a call that writes every Argument is byte for byte the
 			// direct runtime read it always was, and names no const at all.
 			it("emits a full call as the plain native read", () => {
@@ -4387,7 +4387,7 @@ declarations {
 				expect(code).toContain("$es_String_slice($pool_0, $pool_1)")
 			})
 
-			// NOTE: `@` is `_self`, which is Parameter 0 — so a default reading
+			// `@` is `_self`, which is Parameter 0 — so a default reading
 			// the receiver reads a BINDING, and the receiver Expression is
 			// evaluated once however many defaults name it. That property is
 			// exactly what filling a default in at the call site could not
@@ -4412,7 +4412,7 @@ declarations {
 			})
 		})
 
-		// NOTE: And the other kind of default a native can declare: a RECORD,
+		// And the other kind of default a native can declare: a RECORD,
 		// which is MERGED into the Argument rather than standing in for one the
 		// call left out. That is a different rule from the one above, and the
 		// difference is what these tests hold: a Record default is needed by a
@@ -4431,7 +4431,7 @@ declarations {
 				expect(code).not.toContain("Http.send({")
 			})
 
-			// NOTE: Every member of the default, merged onto what the call
+			// Every member of the default, merged onto what the call
 			// wrote — `??`, so a member the call DID write survives. The
 			// Argument's own `url` is carried through unchanged, which is what
 			// says the merge is a merge and not a replacement.
@@ -4454,7 +4454,7 @@ declarations {
 				)
 			})
 
-			// NOTE: The edge the reachability walk has to draw for the two
+			// The edge the reachability walk has to draw for the two
 			// above to be emittable at all. `Http.get` is an Essence body that
 			// writes `Http.send({ url, method = #Get, headers })` and omits no
 			// Argument, so the const it names is pulled in by a full-arity call
@@ -4472,7 +4472,7 @@ declarations {
 			})
 		})
 
-		// NOTE: A Namespace whose every member is native keeps its plain import,
+		// A Namespace whose every member is native keeps its plain import,
 		// and no const is emitted for it.
 		it("skips a Namespace with no Essence-implemented member", () => {
 			let stdlib = loadStdlibFrom([
@@ -4491,7 +4491,7 @@ declarations {
 		})
 	})
 
-	// NOTE: A Case's tag is its Choice's identity and its name, so a Module's
+	// A Case's tag is its Choice's identity and its name, so a Module's
 	// Cases are tagged with the Module's path — which is what keeps two files'
 	// same-named Choices apart at runtime as well as in the Type checker, since
 	// `isValueOfType` compares nothing but that tag. Rendering the path
@@ -4543,7 +4543,7 @@ declarations {
 		})
 	})
 
-	// NOTE: A doorway is an ordinary Function that takes a bare value, asks a
+	// A doorway is an ordinary Function that takes a bare value, asks a
 	// refinement's question of it, and hands the checked value onwards under the
 	// refined name. It is the whole point of flow narrowing, and it needs no code
 	// generation at all: a refinement erases to its base, so what runs here is the
@@ -4572,7 +4572,7 @@ declarations {
 	Terminal.inspect(doubledOrZero(0))
 }`
 
-		// NOTE: The same Program with the check taken out, which is the only thing
+		// The same Program with the check taken out, which is the only thing
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNCHECKED = `implementation {
@@ -4601,7 +4601,7 @@ declarations {
 		})
 	})
 
-	// NOTE: A value written DOWN is its own evidence — the predicate is decided
+	// A value written DOWN is its own evidence — the predicate is decided
 	// while compiling, so a literal reaches a total operation with no branch in
 	// front of it and no `Optional` coming back. The emitted Program is the plain
 	// one: `3` is `3`, and the proof left no trace to run.
@@ -4631,7 +4631,7 @@ declarations {
 	Terminal.inspect(shouted("essence"))
 }`
 
-		// NOTE: The same Program with the values the predicates refuse, which is
+		// The same Program with the values the predicates refuse, which is
 		// what makes the run above mean anything: admission is a decision about
 		// the value, not a hole that lets every literal through.
 		const REFUSED = `implementation {
@@ -4655,7 +4655,7 @@ declarations {
 		})
 	})
 
-	// NOTE: A Match Handler's Guard is the doorway a Handler carries with it: the
+	// A Match Handler's Guard is the doorway a Handler carries with it: the
 	// Matcher's own check is ANDed in front of it, so what it proves holds over
 	// every Statement of the body — of the value the Handler NAMED as much as of
 	// `@`. The emitted Program is a Case tag test and an `if`, which is what
@@ -4689,7 +4689,7 @@ declarations {
 	Terminal.inspect(shoutedOr(#Empty))
 }`
 
-		// NOTE: The same Program with the Guard taken out, which is the only thing
+		// The same Program with the Guard taken out, which is the only thing
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNGUARDED = `implementation {
@@ -4729,7 +4729,7 @@ declarations {
 		})
 	})
 
-	// NOTE: A Guard names a Handler's binding through the `@.member` it stands
+	// A Guard names a Handler's binding through the `@.member` it stands
 	// for, because the Constant the body reads it through does not exist yet
 	// where a Guard runs. A `define` in that Guard NARROWS the binding, and a
 	// narrowing is a shadow declaration of the very same name — so the arm below
@@ -4773,7 +4773,7 @@ declarations {
 			).toEqual(['"large"', '"small"', '"nothing"'])
 		})
 
-		// NOTE: The silent half of the same mistake. Emitted as a bare name, the
+		// The silent half of the same mistake. Emitted as a bare name, the
 		// arm read the Parameter the binding shadows — a Constant that exists,
 		// holds a different value, and divides without complaining. 100 over the
 		// outer 1 is large where 100 over the bound 50 is not.
@@ -4802,7 +4802,7 @@ declarations {
 			).toEqual(['"small"'])
 		})
 
-		// NOTE: And the outer name need not even be a Number. The shadow types
+		// And the outer name need not even be a Number. The shadow types
 		// what it declares by what the Guard proved of `@.n`, so a String
 		// Constant of that name compiled clean and reached the stdlib as a
 		// `NonZeroInteger` — where it threw out of `BigInt`.
@@ -4833,7 +4833,7 @@ declarations {
 			).toEqual(['"small"'])
 		})
 
-		// NOTE: An `otherwise` arm holds the complements of every Condition above
+		// An `otherwise` arm holds the complements of every Condition above
 		// it, which is a narrowing like any other and was lost the same way.
 		it("reads it through '@' in the otherwise arm too", async () => {
 			expect(
@@ -4861,7 +4861,7 @@ declarations {
 			).toEqual(['"large"', '"small"'])
 		})
 
-		// NOTE: The counterpart that was always right, pinned so it stays that
+		// The counterpart that was always right, pinned so it stays that
 		// way: in the BODY the binding is a Constant the Program can name, and a
 		// `define` there narrows it under that name.
 		it("still narrows the same binding in the Handler's body", async () => {
@@ -4891,7 +4891,7 @@ declarations {
 		})
 	})
 
-	// NOTE: The doorway nobody has to write. A Match on a bare Integer takes the
+	// The doorway nobody has to write. A Match on a bare Integer takes the
 	// VALUE apart, and its Cases are evidence in both directions: the Case
 	// answering for the rest is reached only by a value none of the Cases above it
 	// named, and a Case that NAMES a value proves that. So both total operations
@@ -4925,7 +4925,7 @@ declarations {
 	Terminal.inspect(namedOrDoubled(0))
 }`
 
-		// NOTE: The same Match with a different value named, which is what makes the
+		// The same Match with a different value named, which is what makes the
 		// run above mean anything: what the last Case knows is decided by the Cases
 		// that were actually written, and a Match naming `1` proves nothing about
 		// zero.
@@ -4958,7 +4958,7 @@ declarations {
 		})
 	})
 
-	// NOTE: The same doorway over a GENERIC refinement, which is the one shape
+	// The same doorway over a GENERIC refinement, which is the one shape
 	// where the Type the branch establishes was written nowhere: `Filled<String>`
 	// is worked out from the receiver standing in front of the question. What runs
 	// is still the Program someone would have written without a refinement
@@ -4992,7 +4992,7 @@ declarations {
 	Terminal.inspect(firstOf(proven))
 }`
 
-		// NOTE: The same Program with the check taken out, which is the only thing
+		// The same Program with the check taken out, which is the only thing
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNCHECKED = `implementation {
@@ -5009,7 +5009,7 @@ declarations {
 	Terminal.inspect(firstOrEmpty(["a", "b"]))
 }`
 
-		// NOTE: And the same Program asking about a List of the wrong items, which
+		// And the same Program asking about a List of the wrong items, which
 		// is what says that the Type Arguments are part of the evidence: the branch
 		// proves `hasItems` of a `List<Integer>` and proves nothing whatever about a
 		// `Filled<String>`.
@@ -5048,7 +5048,7 @@ declarations {
 		})
 	})
 
-	// NOTE: The doorway an `else` opens, which is the one this campaign added.
+	// The doorway an `else` opens, which is the one this campaign added.
 	// No Method is declared to be another's contrary anywhere: `isZero` is
 	// written `<- @::is(0)` and `isNegative` `<- @::isLessThan(0)`, so the leaf
 	// each `else` proves is that call asked the other way round — and the two
@@ -5090,7 +5090,7 @@ declarations {
 	Terminal.inspect(safelyShared(9, among 0))
 }`
 
-		// NOTE: The same Program with the branches taken out, which is the only
+		// The same Program with the branches taken out, which is the only
 		// thing that makes the run above mean anything.
 		const UNCHECKED = `implementation {
 	function raised(_ base: Integer, by exponent: NonNegativeInteger) -> Integer {
@@ -5115,7 +5115,7 @@ declarations {
 		})
 	})
 
-	// NOTE: The same total operation over a Parameter whose Type Argument the CALL
+	// The same total operation over a Parameter whose Type Argument the CALL
 	// works out, which is the one position where nothing has spelled the refinement
 	// at all: `NonEmptyList<Item>` is a Type only once something says what `Item` is,
 	// and the written List is the only thing that ever could. What runs is again the
@@ -5135,7 +5135,7 @@ declarations {
 	Terminal.inspect(firstOf([1, 2]))
 }`
 
-		// NOTE: The empty List is what says the evidence is still being read: it
+		// The empty List is what says the evidence is still being read: it
 		// decides no 'Item' AND answers the predicate with a no, either of which is
 		// enough to refuse it.
 		const EMPTY = `implementation {
@@ -5157,7 +5157,7 @@ declarations {
 		})
 	})
 
-	// NOTE: The one operation that KEEPS the evidence — a product of two proven
+	// The one operation that KEEPS the evidence — a product of two proven
 	// Integers is proven too — and the one whose Namespace the Optimiser writes
 	// out. `lower-scalar-operations` lowers `NonZeroInteger.multiply` exactly as
 	// it lowers `Integer.multiply`: the refinement erases before the first pass
@@ -5196,7 +5196,7 @@ declarations {
 			])
 		})
 
-		// NOTE: The same Program with the Optimiser off answers the same thing,
+		// The same Program with the Optimiser off answers the same thing,
 		// which is the whole contract a pass is held to — there it is the runtime
 		// Method that multiplies, and here it is JavaScript's own operator.
 		it("answers the same with the Optimiser off", async () => {

@@ -4,7 +4,7 @@ import { attributionOf, coveringPoints } from "@essence-lang/compiler/testing"
 import type { common } from "@essence-lang/interfaces"
 import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 
-// NOTE: The coverage-attribution join, read the way both readers read it — the
+// The coverage-attribution join, read the way both readers read it — the
 // `--mutate` driver and the Language Server's live session. `attributionOf`
 // folds an event stream into one table per Module; `coveringPoints` asks that
 // table which of its points stand over a site. Everything here builds events by
@@ -21,7 +21,7 @@ describe("The attribution table", () => {
 		end: { line: endLine, column: endColumn },
 	})
 
-	// NOTE: A CoveredPoint whose only field the join reads is its position. The
+	// A CoveredPoint whose only field the join reads is its position. The
 	// rest are filled with what the runtime would emit, so the fixture is a real
 	// event and not a shape the type happens to admit.
 	let point = (position: common.Position): CoveredPoint => ({
@@ -88,7 +88,7 @@ describe("The attribution table", () => {
 		])
 	})
 
-	// NOTE: A `test-coverage` naming a Module no `coverage` event described has
+	// A `test-coverage` naming a Module no `coverage` event described has
 	// nowhere to land — the table is keyed by the coverage events alone, and a
 	// test of an uninstrumented Module is dropped rather than inventing a row.
 	it("drops a test-coverage for a Module with no coverage event", () => {
@@ -135,7 +135,7 @@ describe("The attribution join", () => {
 		expect(coveringPoints(points, at(3, 4, 3, 10))).toEqual([0, 1])
 	})
 
-	// NOTE: The fallback, and the reason it is EVERY overlap: a site the
+	// The fallback, and the reason it is EVERY overlap: a site the
 	// Simplifier trimmed differently from the Node the counter stands in front
 	// of overlaps rather than nests, and answering with nothing would report a
 	// well-tested site as one no test reaches.
@@ -145,7 +145,7 @@ describe("The attribution join", () => {
 		expect(coveringPoints(points, at(4, 6, 5, 2))).toEqual([0, 1])
 	})
 
-	// NOTE: A site that STRADDLES two points is reached by whatever reached
+	// A site that STRADDLES two points is reached by whatever reached
 	// either of them: neither span holds it, and the tests of the narrower one
 	// alone are a covering set with a test missing — which is a survivor nobody
 	// can trust.

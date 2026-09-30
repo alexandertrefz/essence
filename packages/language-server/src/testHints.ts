@@ -3,7 +3,7 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import type { InlayHint } from "./inlayHints"
 
-// NOTE: The ghost text a live session draws beside a test — the values a run
+// The ghost text a live session draws beside a test — the values a run
 // RECORDED, shown where they were recorded. Three kinds, all from the same
 // events and all from the same trace mechanism underneath:
 //
@@ -13,7 +13,7 @@ import type { InlayHint } from "./inlayHints"
 //   and the absence of a squiggle already say, and a value beside every line
 //   that is fine is a line nobody reads.
 
-// NOTE: How much of a value is drawn inline. A Record or a List renders to
+// How much of a value is drawn inline. A Record or a List renders to
 // whatever it renders to, and a hint is a margin note rather than a document —
 // what does not fit is read on hover, where the whole of it is.
 const MAXIMUM_LENGTH = 60
@@ -26,7 +26,7 @@ function clipped(value: string): string {
 		: `${single.slice(0, MAXIMUM_LENGTH - 1)}…`
 }
 
-// NOTE: A value Hint carries no edit — there is nothing to accept — and sits at
+// A value Hint carries no edit — there is nothing to accept — and sits at
 // the END of the line the value was recorded on rather than at the end of the
 // span. A `§?` comment stands between the two, and ghost text drawn in front of
 // a comment reads as part of it.
@@ -49,7 +49,7 @@ function comparisonLabel(
 	let comparison = event.comparison
 
 	if (comparison !== null && comparison.left !== null) {
-		// NOTE: A snapshot's two sides are not an equality that failed but a
+		// A snapshot's two sides are not an equality that failed but a
 		// recording and a run that differ, and saying "is" of them would claim
 		// the very thing the failure is about.
 		if (comparison.kind === "snapshot") {
@@ -61,7 +61,7 @@ function comparisonLabel(
 		} ${comparison.right}`
 	}
 
-	// NOTE: Every sub-expression the assertion evaluated, in the order they
+	// Every sub-expression the assertion evaluated, in the order they
 	// were written — which is what the report shows as Labels and the closest
 	// thing to an explanation a single line has room for.
 	let values = event.values
@@ -73,7 +73,7 @@ function comparisonLabel(
 	return values.length === 0 ? `this ${event.form} failed` : values.join(", ")
 }
 
-// NOTE: The Hints for one file, out of the events its tests produced. Sorted by
+// The Hints for one file, out of the events its tests produced. Sorted by
 // line, and at most one per line: two tests may record at one place — a suite's
 // setup runs once per test — and a reader looking at that line wants one answer
 // rather than one per test. The LAST one is kept, which is the most recent run

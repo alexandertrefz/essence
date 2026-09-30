@@ -1,4 +1,4 @@
-// NOTE: The runtime module of the `ResultList` Namespace — a List whose items
+// The runtime module of the `ResultList` Namespace — a List whose items
 // are Results. All four of its Methods — `values`, `reasons`, `partition` and
 // `allValues` — are written in Essence
 // (`packages/standard-library/sources/List.es`), so there is nothing native

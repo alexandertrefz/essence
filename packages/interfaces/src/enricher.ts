@@ -1,6 +1,6 @@
 import type * as common from "./common/index"
 
-// NOTE: A Namespace another Module in the graph exports and this one has not
+// A Namespace another Module in the graph exports and this one has not
 // imported: its exported name, the specifier an import would write and the
 // Module's canonical path. It names what declares a Method no import reaches.
 export type UnimportedNamespace = {
@@ -10,7 +10,7 @@ export type UnimportedNamespace = {
 	namespace: common.NamespaceType
 }
 
-// NOTE: A Module that declares a Protocol at its top level, by its canonical
+// A Module that declares a Protocol at its top level, by its canonical
 // path, and the name its export block publishes it under, which an `as` may
 // make another than its own. Null where the Module keeps it private. Where
 // `declares` is false, the Module declares it under another name and publishes
@@ -21,7 +21,7 @@ export type ProtocolDeclaration = {
 	exportedAs: string | null
 }
 
-// NOTE: One Declaration the Parser dropped, as the Enricher consults it — the
+// One Declaration the Parser dropped, as the Enricher consults it — the
 // Parser's own record (`parser.AbandonedDeclaration`) with its two halves of
 // hoisting already decided. `hoists` is what says the silence is file-wide
 // rather than bounded by `enclosing` and `position`; see `topLevelScope`, which
@@ -33,7 +33,7 @@ export type AbandonedDeclaration = {
 	hoists: boolean
 }
 
-// NOTE: The four positions a `complete` can not be written in, each because of
+// The four positions a `complete` can not be written in, each because of
 // something about WHEN the position runs rather than about the word. A
 // Parameter's default is filled in by the callee before its own asynchrony
 // begins; a test's name is rendered once, before the run, so `--filter` matches
@@ -49,15 +49,15 @@ export type CompletionBarrier =
 export type Scope = {
 	parent: Scope | null
 	members: Record<string, common.Type>
-	// NOTE: Where each name in `members` was declared, so that a Diagnostic
+	// Where each name in `members` was declared, so that a Diagnostic
 	// about a use can point back at the declaration it is judged against.
 	// Names declared by the Compiler itself — the builtin Namespaces, `@` —
 	// have no Essence source to point at and are absent here.
 	declarations: Record<string, common.Position>
-	// NOTE: Names in `members` that are not reassignable — Constants,
+	// Names in `members` that are not reassignable — Constants,
 	// Functions, Namespaces, Parameters and `@`.
 	constants: Set<string>
-	// NOTE: What each Constant this Scope declares was given, as the Enricher
+	// What each Constant this Scope declares was given, as the Enricher
 	// typed it. Present on a Program's TOP LEVEL Scope alone — a child Scope is
 	// built fresh and carries none — because the one reader wants a value that
 	// stands wherever the Module does: a Case payload default, which is baked
@@ -73,42 +73,42 @@ export type Scope = {
 	// read past a binding that shadows the Constant.
 	constantValues?: Record<string, common.typed.ExpressionNode>
 	types: Record<string, common.Type>
-	// NOTE: Protocols live beside `types` rather than in them — a Protocol is
+	// Protocols live beside `types` rather than in them — a Protocol is
 	// not a Type, and keeping the maps apart is what lets Type positions
 	// reject Protocol names with a dedicated Diagnostic.
 	protocols: Record<string, common.ProtocolType>
-	// NOTE: Every Protocol the compile declared, by identity, which is how a
+	// Every Protocol the compile declared, by identity, which is how a
 	// stored identity is read back where no name in Scope binds it. Read through
 	// the parent chain; one Map is shared by every Module of a graph.
 	protocolRegistry?: Map<string, common.ProtocolType>
-	// NOTE: Set on the Scope a Program's top level declarations are made in. A
+	// Set on the Scope a Program's top level declarations are made in. A
 	// Protocol declared in any other Scope carries its Position in its identity.
 	programTop?: true
-	// NOTE: The canonical path of the Module whose declarations this Scope
+	// The canonical path of the Module whose declarations this Scope
 	// holds, which is what a Choice declared in it takes its nominal identity
 	// from. Absent — the default — for a Program that is no Module: the standard
 	// library and a single file compile name their Choices by name alone. Read
 	// through the parent chain, so every body Scope answers with the Module
 	// around it.
 	modulePath?: string
-	// NOTE: Asked on demand rather than handed over as an Array, because only a
+	// Asked on demand rather than handed over as an Array, because only a
 	// Diagnostic ever reads it: building the answer walks every dependency's
 	// export surface, and a Program with no mistake in it would pay for that per
 	// Module and never look. Absent for a Program that is no Module, and read
 	// through the parent chain like `modulePath`.
 	unimportedNamespaces?: () => Array<UnimportedNamespace>
-	// NOTE: Every Module this one reaches that declares a Protocol of this name,
+	// Every Module this one reaches that declares a Protocol of this name,
 	// asked when a bound names a Protocol this Scope can not see. Absent for a
 	// Program that is no Module, and read through the parent chain.
 	protocolDeclarations?: (name: string) => Array<ProtocolDeclaration>
-	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
+	// The Type a `<-` in this Scope is expected to produce — set by
 	// Function bodies and Match Handler bodies. Bare Case Expressions
 	// (`<- #Less`) consult it before falling back to the scope scan. Null is a
 	// BARRIER rather than the mere absence of one: the search walks outwards,
 	// and a Scope whose `<-` belongs to a Function that has no expected return
 	// Type yet must not answer with the enclosing Function's.
 	expectedReturnType?: common.Type | null
-	// NOTE: Whether a `complete` may be written in this Scope, and what it is
+	// Whether a `complete` may be written in this Scope, and what it is
 	// held to where it may. A Function body Scope carries the Type its
 	// Declaration wrote — a completing body's `Future<T>`, and whatever a body
 	// that suspends nothing wrote where the word turns up in one anyway; a
@@ -122,12 +122,12 @@ export type Scope = {
 	// Handler and an `if` body inside a completing body answer with that body's
 	// Type — and, like it, `null` is a BARRIER rather than a missing answer.
 	completing?: common.Type | "top-level" | null
-	// NOTE: WHICH barrier a `completing: null` is, set on the same Scope and
+	// WHICH barrier a `completing: null` is, set on the same Scope and
 	// meaningless anywhere else. There are four of them and they are four
 	// different mistakes — a report that listed all four left the reader to work
 	// out which one they were in, and the edit that answers each is its own.
 	completingBarrier?: CompletionBarrier
-	// NOTE: The Namespace this Scope is INSIDE, set on the Scope a Namespace
+	// The Namespace this Scope is INSIDE, set on the Scope a Namespace
 	// declares its own name into and read through the parent chain — so every
 	// signature, property and Method body under it answers with it.
 	//
@@ -137,27 +137,27 @@ export type Scope = {
 	// asked whether the Namespace around it declares one — which is the whole of
 	// what `noon` needed to be told, and what it was told `loop` instead.
 	namespace?: { name: string; type: common.NamespaceType }
-	// NOTE: The Namespace Method whose BODY this Scope is, set on that body's
+	// The Namespace Method whose BODY this Scope is, set on that body's
 	// own Scope and read through the parent chain. One Diagnostic reads it: a
 	// bound a Namespace's Type Parameter wants can be answered by a `where` on a
 	// conformance only when the Method asking fulfils that conformance, and this
 	// is what says which Method is asking. Absent everywhere else, including in
 	// a Method's signature — the question is only ever asked from a body.
 	methodName?: string
-	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
+	// Set on a static Method's body Scope, where `@` means nothing: a
 	// static Method is called on the Namespace and is emitted without the
 	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere
 	// absence of a binding — an enclosing `@` must not answer through it —
 	// while a Match Handler nested inside still binds its own `@` and wins,
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
-	// NOTE: Set on a Match Handler's body Scope, which is the other thing that
+	// Set on a Match Handler's body Scope, which is the other thing that
 	// binds `@` — the value matched rather than a receiver. Nothing resolves
 	// through this either: it exists so that a report about a name which
 	// resolved to nothing can say WHICH of the two `@` is here, and offer the
 	// one edit that reaches the receiver again from inside a Handler.
 	isMatchHandlerBody?: boolean
-	// NOTE: The identity of the Protocol whose provided Method this Scope is the
+	// The identity of the Protocol whose provided Method this Scope is the
 	// body of. The body is emitted once, outside every Program that reaches it,
 	// so the name walk reports a Program's name read from inside it.
 	//
@@ -165,7 +165,7 @@ export type Scope = {
 	// resolves to still stands, so one out-of-reach name reports once instead
 	// of cascading through everything written around it.
 	providedMethodOf?: string
-	// NOTE: The names the emitted PRELUDE binds — every builtin and every
+	// The names the emitted PRELUDE binds — every builtin and every
 	// standard library Namespace — set on the top level Scope, where they are
 	// seeded, and read by nothing but the check above. It has to be recorded
 	// separately because the Program's own declarations land in the same
@@ -177,10 +177,10 @@ export type Scope = {
 	// name whatever its file imports, because all of it is emitted above the
 	// Program too.
 	preludeNames?: ReadonlySet<string>
-	// NOTE: The same for the Protocols, which is how a report tells a standard
+	// The same for the Protocols, which is how a report tells a standard
 	// library Protocol from one a single file declares under a bare identity.
 	preludeProtocols?: ReadonlySet<string>
-	// NOTE: The names a Statement the Parser ABANDONED would have declared, and
+	// The names a Statement the Parser ABANDONED would have declared, and
 	// the text each one's silence covers — see `parser.Recovery` and
 	// `declarationWasAbandoned`. Set on the top level Scope and read through the
 	// parent chain, by the reports about a name that resolved to nothing and by
@@ -191,7 +191,7 @@ export type Scope = {
 	// Absent — the default — for every Program that parsed, which is nearly all
 	// of them.
 	abandonedDeclarations?: ReadonlyArray<AbandonedDeclaration>
-	// NOTE: The names a Parameter's `= expression` default may NOT read, and
+	// The names a Parameter's `= expression` default may NOT read, and
 	// where each one is written. A default may read `@`, the Parameters to its
 	// left and everything the Declaration is written inside; what is barred is
 	// the Parameter it is written on, every Parameter after it, and every name a
@@ -218,7 +218,7 @@ export type Scope = {
 		names: ReadonlyMap<string, BarredParameterName>
 		index: number
 	}
-	// NOTE: Names that stand for a member of `@` rather than for a binding of
+	// Names that stand for a member of `@` rather than for a binding of
 	// their own — what a Matcher's Pattern and payload bindings lend their
 	// Guard. A use resolves into the Lookup the author could have written
 	// instead, because a Guard is emitted into the Handler's TEST and runs
@@ -238,7 +238,7 @@ export type Scope = {
 		string,
 		{
 			path: Array<string>
-			// NOTE: Where each step of `path` was WRITTEN. The Lookup a use
+			// Where each step of `path` was WRITTEN. The Lookup a use
 			// lowers to is indexed by the Language Server, so a step given the
 			// USE's span instead would be read as an occurrence of that member
 			// there — and renaming the member would overwrite the Guard's text.
@@ -248,7 +248,7 @@ export type Scope = {
 	>
 }
 
-// NOTE: One name a Parameter list binds, as a default is allowed to see it.
+// One name a Parameter list binds, as a default is allowed to see it.
 // `kind` is what the report is about: a Parameter is declared at `index` and is
 // either the one the default is written on or one still to come, while a Pattern
 // binding is a Constant at the head of the body whatever position it was written

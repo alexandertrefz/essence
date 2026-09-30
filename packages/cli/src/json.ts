@@ -3,7 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { type CompileOutcome, ownDiagnostics } from "./pipeline"
 
-// NOTE: The machine-readable form of a run. Positions are flattened to plain
+// The machine-readable form of a run. Positions are flattened to plain
 // line and column numbers — a consumer should not have to know the Compiler's
 // internal Position shape — and every field is present on every entry, so a
 // reader never has to distinguish "absent" from "not applicable".
@@ -90,7 +90,7 @@ export function toJSONReport(
 			gzipBytes: outcome.gzipBytes,
 			durationMs: round(outcome.duration),
 			stages,
-			// NOTE: Every Diagnostic under the file it was written in, which
+			// Every Diagnostic under the file it was written in, which
 			// with Modules is regularly not the file that was compiled. An
 			// Editor jumping to `input` for a dependency's error would open the
 			// wrong file at a line number that means nothing there.

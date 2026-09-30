@@ -1,6 +1,6 @@
 import type { BundleMap } from "./maps"
 
-// NOTE: What V8 is told to step over. `Debugger.setBlackboxedRanges` takes a
+// What V8 is told to step over. `Debugger.setBlackboxedRanges` takes a
 // list of TOGGLE positions — the interval before the first is plain, the one
 // after it blackboxed, and so on — so the bundle's mapped lines are collected
 // into runs and everything between them, prelude and runtime alike, becomes
@@ -38,7 +38,7 @@ export function blackboxPositions(map: BundleMap): Array<ScriptPosition> {
 		return []
 	}
 
-	// NOTE: Blackboxing starts at the top of the file — the first toggle at
+	// Blackboxing starts at the top of the file — the first toggle at
 	// 0:0 switches it ON — and every run of mapped lines switches it off and
 	// back on around itself. A run that begins at line 0 makes the leading
 	// toggle pair degenerate, so it is dropped rather than sent as an empty

@@ -10,7 +10,7 @@ import { collectComments, commentAnchors, TriviaCursor } from "./trivia"
 export { WIDTH }
 
 export type Refusal = {
-	// NOTE: `syntax` means the source never parsed; `unsafe` means it did, was
+	// `syntax` means the source never parsed; `unsafe` means it did, was
 	// formatted, and the result failed one of the checks below — a formatter
 	// bug, not the author's problem. They are kept apart because only the first
 	// is worth showing as the file's own fault.
@@ -20,7 +20,7 @@ export type Refusal = {
 }
 
 export type FormatResult = {
-	// NOTE: The formatted source, or — whenever anything at all went wrong —
+	// The formatted source, or — whenever anything at all went wrong —
 	// the original, byte for byte. `esfmt` can only ever improve a file or
 	// leave it exactly as it found it.
 	text: string
@@ -38,7 +38,7 @@ function formatOnce(source: string, documentPath?: string): string | null {
 	return printProgram(program, source)
 }
 
-// NOTE: The Printer over a tree rather than over one parsed from the text, and
+// The Printer over a tree rather than over one parsed from the text, and
 // deliberately not exported: nothing outside this file holds a Program the
 // Printer has not just parsed, and a caller that did would be printing a tree
 // the safety gate has never compared against anything.
@@ -51,7 +51,7 @@ function printProgram(program: parser.Program, source: string): string {
 	return printDoc(printer.printProgram(program), WIDTH)
 }
 
-// NOTE: Strips every Position so that two ASTs can be compared for the only
+// Strips every Position so that two ASTs can be compared for the only
 // thing formatting is allowed to change: nothing. `documentation` is compared
 // rather than stripped, because Documentation attaches to a Declaration by
 // line adjacency — a blank line wrongly inserted between a `§§` block and what
@@ -97,7 +97,7 @@ function parsed(source: string, documentPath?: string): parser.Program | null {
 	return program
 }
 
-// NOTE: Both Module sections are brought into canonical order first, because
+// Both Module sections are brought into canonical order first, because
 // sorting a block is the one reordering the Formatter is allowed to make.
 function astOf(program: parser.Program): unknown {
 	return stripPositions(canonicalSections(program))
@@ -111,7 +111,7 @@ function unsafe(source: string, message: string): FormatResult {
 	}
 }
 
-// NOTE: The last line of the safety story. Every check below catches a
+// The last line of the safety story. Every check below catches a
 // mistake the formatter is known to be able to make; this catches the ones it
 // is not — a printer thrown off by an AST shape it has never seen must still
 // hand the original bytes back, not take the process down. Exported so the
@@ -142,7 +142,7 @@ function formatUnguarded(
 ): FormatResult {
 	let { documentPath, verify = true } = options
 
-	// NOTE: Line endings are normalised to `\n` before anything else looks at
+	// Line endings are normalised to `\n` before anything else looks at
 	// the source — the Lexer reads a `\r` as part of whatever Token it lands
 	// in, so a CRLF file otherwise parses as one syntax error after another
 	// and is refused. Formatting writes `\n`, and only that.
@@ -150,7 +150,7 @@ function formatUnguarded(
 
 	let { diagnostics } = parseDocument(source, documentPath)
 
-	// NOTE: Formatting a file that does not parse would delete code — the
+	// Formatting a file that does not parse would delete code — the
 	// parser's recovery drops a broken Statement entirely rather than keeping
 	// text it could not read.
 	if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
@@ -186,7 +186,7 @@ function formatUnguarded(
 			)
 		}
 
-		// NOTE: Compares each Comment's place among the Tokens around it, not
+		// Compares each Comment's place among the Tokens around it, not
 		// just the Comments themselves — a Comment that moved across a brace is
 		// still present and still in order, and only its anchor gives it away.
 		// Inside a Module section the comparison is per entry rather than per

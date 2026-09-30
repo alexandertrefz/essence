@@ -11,7 +11,7 @@ function offsetOf(text: string, cursor: common.Cursor): number {
 	return offset + cursor.column - 1
 }
 
-// NOTE: How every spec here applies an action's edits. Spans are measured
+// How every spec here applies an action's edits. Spans are measured
 // against the original text and written in position order, since an action's
 // own order means nothing; insertions at one point keep the order listed, ahead
 // of a replacement that starts there.

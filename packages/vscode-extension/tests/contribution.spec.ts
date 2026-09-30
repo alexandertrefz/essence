@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import manifest from "../package.json"
 
-// NOTE: The manifest is data VS Code reads, not code anything type-checks —
+// The manifest is data VS Code reads, not code anything type-checks —
 // a missing `breakpoints` entry or a snippet without its required attribute
 // fails silently in the product, so the contract is pinned here instead.
 describe("the debugger contribution", () => {
@@ -26,7 +26,7 @@ describe("the debugger contribution", () => {
 		])
 	})
 
-	// NOTE: A starter configuration that omits a required attribute is a
+	// A starter configuration that omits a required attribute is a
 	// launch.json the user has to repair before first use.
 	it("writes complete starter configurations", () => {
 		for (let configuration of debuggers[0]!.initialConfigurations) {
@@ -42,14 +42,14 @@ describe("the debugger contribution", () => {
 		}
 	})
 
-	// NOTE: VS Code derives every activation event this extension needs from
+	// VS Code derives every activation event this extension needs from
 	// its contributions — the language and the debugger both — so none may be
 	// spelled out: a spelled-out one is the warning the manifest linter raises.
 	it("relies on the generated activation events", () => {
 		expect(manifest).not.toHaveProperty("activationEvents")
 	})
 
-	// NOTE: Every one of these settings names an executable to spawn, so every
+	// Every one of these settings names an executable to spawn, so every
 	// one is ignored in untrusted workspaces — a workspace could point any of
 	// them at a program it ships itself.
 	it("restricts every executable-path setting", () => {
@@ -78,7 +78,7 @@ describe("the debugger contribution", () => {
 	})
 })
 
-// NOTE: The live test session is a thing that RUNS a project's code as it is
+// The live test session is a thing that RUNS a project's code as it is
 // typed, so the setting that declines it is part of the contract rather than a
 // convenience — a reader who cannot find it has no way to stop it.
 describe("the test session contribution", () => {
@@ -92,7 +92,7 @@ describe("the test session contribution", () => {
 	})
 
 	it("keeps the lens commands out of the palette", () => {
-		// NOTE: `essence.test.run` and `essence.test.debug` are registered in
+		// `essence.test.run` and `essence.test.debug` are registered in
 		// `extension.js` and invoked by a Code Lens, which carries the ids to
 		// run. A command in `contributes.commands` is a command the palette
 		// offers with no ids at all, which could only ever do nothing. The two
@@ -107,7 +107,7 @@ describe("the test session contribution", () => {
 		])
 	})
 
-	// NOTE: The palette groups by the prefix, and a `category` beside a title
+	// The palette groups by the prefix, and a `category` beside a title
 	// that already carries one reads as "Test: Essence: …".
 	it("names every palette command the same way", () => {
 		for (let command of manifest.contributes.commands) {
@@ -116,7 +116,7 @@ describe("the test session contribution", () => {
 		}
 	})
 
-	// NOTE: The live session runs a project's code on every edit, so whether it
+	// The live session runs a project's code on every edit, so whether it
 	// runs and how often are settings rather than constants — and each one is
 	// only real because the Server reads it back out of the client.
 	it("offers the settings that say whether it runs and how often", () => {
@@ -127,21 +127,21 @@ describe("the test session contribution", () => {
 			type: "number",
 			default: 450,
 		})
-		// NOTE: Off by default, and it has to be: instrumenting compiles a
+		// Off by default, and it has to be: instrumenting compiles a
 		// different bundle from the one a build produces and makes the program
 		// do more work on every keystroke.
 		expect(properties["essence.tests.coverage"]).toMatchObject({
 			type: "boolean",
 			default: false,
 		})
-		// NOTE: And WHAT runs is deliberately not among them. Which tags a run
+		// And WHAT runs is deliberately not among them. Which tags a run
 		// skips is a fact about the project rather than about the reader, so it
 		// lives in the `essence.json` the terminal reads too — a setting here
 		// would be a second list to keep agreeing with that one.
 		expect(properties).not.toHaveProperty("essence.tests.skipTags")
 	})
 
-	// NOTE: The project file. VS Code has no `essence.json` of its own, so the
+	// The project file. VS Code has no `essence.json` of its own, so the
 	// extension says three things about one: that it is JSON with comments, so
 	// a reason written beside a setting is not red; that the Schema generated
 	// from the reader's catalogue describes it, which is where completion and

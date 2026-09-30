@@ -31,13 +31,13 @@ import {
 } from "./Terminal"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The test runtime. It is a runtime module rather than a standard library
+// The test runtime. It is a runtime module rather than a standard library
 // Namespace on purpose: nothing here has a spelling in Essence, and nothing a
 // Program can write reaches it. The Compiler emits calls to these exports for a
 // `tests { … }` section and for nothing else, so a Program compiled by `essence
 // build` never names this module and esbuild shakes it away whole.
 //
-// NOTE: Most of what a running test touches hangs off a CONTEXT object it is
+// Most of what a running test touches hangs off a CONTEXT object it is
 // handed — the trace buffer, the captured output, the recorded expectations,
 // what failed. Three things that belong to the running test are module-level:
 // the coverage span (`epoch` and `touched`) and the output sink and input
@@ -48,20 +48,20 @@ import { type AnyType, typeKeySymbol } from "./type"
 
 // #region The manifest a Module registers
 
-// NOTE: The Compiler's own Position, spelled here rather than imported: this
+// The Compiler's own Position, spelled here rather than imported: this
 // module is inlined into a user's bundle and compiles under the runtime's
 // tsconfig, which knows nothing of `@essence-lang/interfaces`. Lines are
 // 1-based and columns are 1-based, which is the Essence convention everywhere.
 export type Cursor = { line: number; column: number }
 export type Range = { start: Cursor; end: Cursor }
 
-// NOTE: One instrumented point: where the sub-expression stands, and its source
+// One instrumented point: where the sub-expression stands, and its source
 // text so a reader outside the Compiler — a `--json` consumer, an editor
 // showing a value beside the line — can say what was recorded without going
 // back to the file. Emitted once per Module, indexed by point id.
 export type Span = Range & { source: string }
 
-// NOTE: What a test IS, independently of what it does — the half of a test the
+// What a test IS, independently of what it does — the half of a test the
 // runner can read without running anything. `id` is the STRUCTURAL identity
 // (module path, suite path, name template); `name` is the template rather than
 // the rendering, because an interpolated name is worked out where the test
@@ -69,12 +69,12 @@ export type Span = Range & { source: string }
 export type TestManifestEntry = {
 	id: string
 	name: string
-	// NOTE: Whether the template has a hole in it. It is the whole of what says
+	// Whether the template has a hole in it. It is the whole of what says
 	// a Module has to be evaluated before anything runs — see `renderedNames` —
 	// and it is recorded by the Compiler rather than guessed from the name here,
 	// because a plain name may hold a brace of its own.
 	interpolated: boolean
-	// NOTE: Which row of a table test this is, and null for the ordinary test
+	// Which row of a table test this is, and null for the ordinary test
 	// that runs once. Everything a report groups by reads it: the rows of one
 	// table share a template, and what they are shown under is that template.
 	row: number | null
@@ -82,17 +82,17 @@ export type TestManifestEntry = {
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
-	// NOTE: Whether the item was written as a `benchmark` rather than as a
+	// Whether the item was written as a `benchmark` rather than as a
 	// `test`. It is what says whether the entry runs at all: measuring a body
 	// takes hundreds of runs of it, which is work no ordinary run asked for, so
 	// a benchmark runs where a run said `bench` and where somebody named it.
 	benchmark: boolean
-	// NOTE: How many cases this entry's property runs where the run says
+	// How many cases this entry's property runs where the run says
 	// nothing — a synthesized contract goal's budget, and null for every
 	// written test. An explicit `--cases` beats it: the reader who typed a
 	// number meant it for everything.
 	cases: number | null
-	// NOTE: The identity WITHOUT the Module path, a row spelled as its last
+	// The identity WITHOUT the Module path, a row spelled as its last
 	// step — what everything stored BESIDE the file is keyed by: a benchmark's
 	// baseline, a property test's counterexamples. The Compiler spells it, so
 	// the escaping exists once; nothing in here re-derives it.
@@ -101,7 +101,7 @@ export type TestManifestEntry = {
 	keywordPosition: Range
 }
 
-// NOTE: Where a test is REPORTED — its suite path, and for a row of a table
+// Where a test is REPORTED — its suite path, and for a row of a table
 // test the template the rows share as one more step of it. So a table test
 // reads as a group of its own wherever a suite does, in the terminal's tree and
 // in an Editor's, and nothing that draws either had to learn what a row is.
@@ -111,7 +111,7 @@ export function pathOf(entry: TestManifestEntry): Array<string> {
 		: [...entry.suitePath, entry.name]
 }
 
-// NOTE: One Module's tests. `run` is the whole section as one Function: the
+// One Module's tests. `run` is the whole section as one Function: the
 // setup Statements, the suites as nested scopes, and each test as an `entry`
 // call standing where it was written. Calling it with a context whose `index`
 // names a test runs the setup that test can see and then that test — which is
@@ -124,7 +124,7 @@ export type TestModule = {
 	run: (context: TestContext) => Ran
 }
 
-// NOTE: THE WAIT RULE, and the one shape every entry point below answers with.
+// THE WAIT RULE, and the one shape every entry point below answers with.
 // A body that completes something is emitted as an `async` Function and the
 // call handing it over is emitted awaited, so what each of these has to do is
 // hand the promise back — one Scope at a time, up to the `run` the runner
@@ -138,7 +138,7 @@ export type TestModule = {
 // tests that wait for nothing the run it has always been.
 export type Ran = void | Promise<void>
 
-// NOTE: The registry is per BUNDLE, not per process: esbuild inlines this
+// The registry is per BUNDLE, not per process: esbuild inlines this
 // module into each bundle it builds, so two bundles loaded in one process hold
 // two of these. A Module registers as it is evaluated, dependencies first, so
 // the `registry` the entry Module publishes under `$tests` — a Function rather
@@ -155,7 +155,7 @@ export function register(module: TestModule): TestModule {
 export type RegisteredTest = {
 	module: TestModule
 	entry: TestManifestEntry
-	// NOTE: Which `entry` call inside `module.run` this is. The context carries
+	// Which `entry` call inside `module.run` this is. The context carries
 	// it to say which test to run.
 	index: number
 }
@@ -163,7 +163,7 @@ export type RegisteredTest = {
 export type Registry = {
 	modules: Array<TestModule>
 	tests: Array<RegisteredTest>
-	// NOTE: Keyed by structural id, which is what everything durable is keyed by
+	// Keyed by structural id, which is what everything durable is keyed by
 	// — a stored snapshot, a focus the editor remembers, a timing baseline. Two
 	// tests sharing an id is a Compiler bug the Enricher already refuses as
 	// `duplicate-test-name`; the LAST one registered wins here rather than
@@ -172,14 +172,14 @@ export type Registry = {
 	byId: Map<string, RegisteredTest>
 }
 
-// NOTE: Everything registered so far, indexed. It is asked for AFTER a bundle
+// Everything registered so far, indexed. It is asked for AFTER a bundle
 // has been loaded — a Module registers as it is evaluated, dependencies first —
 // which is why what a bundle publishes is this Function rather than its answer.
 export function registry(): Registry {
 	return registryOf(registered)
 }
 
-// NOTE: The same answer over Modules a caller holds rather than over the ones
+// The same answer over Modules a caller holds rather than over the ones
 // this instance was told about. It is what makes the indexing testable without
 // a bundle, and it is the whole of what `registry` does.
 export function registryOf(modules: Array<TestModule>): Registry {
@@ -202,7 +202,7 @@ export function registryOf(modules: Array<TestModule>): Registry {
 
 // #region Coverage
 
-// NOTE: What one counter counts, and everything a report needs to say so. It is
+// What one counter counts, and everything a report needs to say so. It is
 // the Compiler's `CoveragePoint`, spelled here because this module compiles
 // under the runtime's own tsconfig and is inlined into a user's bundle.
 export type CoveragePoint = {
@@ -214,7 +214,7 @@ export type CoveragePoint = {
 	tag: string | null
 }
 
-// NOTE: What a Choice DECLARES, so a report can say which of its Cases nothing
+// What a Choice DECLARES, so a report can say which of its Cases nothing
 // ever built. A construction is counted where it happens, which may be any
 // Module of the graph; what is declared is known only in the Module that
 // declares it.
@@ -230,7 +230,7 @@ export type CoverageModule = {
 	choices: Array<CoverageChoice>
 }
 
-// NOTE: What the emitted JavaScript calls. Standing alone it counts; handed a
+// What the emitted JavaScript calls. Standing alone it counts; handed a
 // value it counts and answers with that very value, so wrapping an Expression
 // in one changes nothing about what it evaluates to.
 export type CoverageCounter = {
@@ -241,25 +241,25 @@ export type CoverageCounter = {
 type CoverageRecord = {
 	module: CoverageModule
 	counts: Array<number>
-	// NOTE: What the counts were when the FIRST run began — which is what a
+	// What the counts were when the FIRST run began — which is what a
 	// Module's top-level Statements had already added by simply being loaded.
 	// A second run resets to this rather than to zero, because a Module is
 	// evaluated once however many times its tests are run, and zeroing what it
 	// did would report every top-level Statement as never executed.
 	baseline: Array<number> | null
-	// NOTE: The span each point last registered under — see
+	// The span each point last registered under — see
 	// `beginCoverageSpan`. Hits before any span began mark nothing: nothing is
 	// running that they could be attributed to.
 	marks: Array<number>
 }
 
-// NOTE: Per BUNDLE, exactly as the test registry beside it is: a bundle inlines
+// Per BUNDLE, exactly as the test registry beside it is: a bundle inlines
 // this module, so two bundles loaded in one process count into two of these.
 // That is what makes coverage isolated per run without anybody arranging it —
 // a run loads its bundles, reads their counts and drops them.
 const covered: Array<CoverageRecord> = []
 
-// NOTE: The SPAN the counters attribute to — one test, begun by the runner.
+// The SPAN the counters attribute to — one test, begun by the runner.
 // Every counter marks the points it touches against the current span, first
 // touch only, into one list: `touchedGround()` is an O(1) read a property
 // search asks after every generated case, and the list itself is what a run
@@ -279,13 +279,13 @@ export function touchedGround(): number {
 	return touched.length
 }
 
-// NOTE: The span's touches themselves, for the runner that attributes them —
+// The span's touches themselves, for the runner that attributes them —
 // read whole after a test, never mutated by a reader.
 function coverageTouches(): Array<{ record: CoverageRecord; point: number }> {
 	return touched
 }
 
-// NOTE: Called once per instrumented Module, as the Module is evaluated. It
+// Called once per instrumented Module, as the Module is evaluated. It
 // answers with a closure over that Module's own counts, so a counter costs one
 // call and one increment rather than a lookup by Module name.
 export function counters(module: CoverageModule): CoverageCounter {
@@ -296,7 +296,7 @@ export function counters(module: CoverageModule): CoverageCounter {
 	covered.push(record)
 
 	return ((point: number, value?: AnyType) => {
-		// NOTE: First touch per span, recorded where the count already flows —
+		// First touch per span, recorded where the count already flows —
 		// one compare and, rarely, one push. This is what per-test attribution
 		// and the guided search both read; the counting below is what the
 		// coverage report reads, and neither pays for the other.
@@ -311,7 +311,7 @@ export function counters(module: CoverageModule): CoverageCounter {
 	}) as CoverageCounter
 }
 
-// NOTE: What a run counted, per Module — the table the Compiler emitted, with
+// What a run counted, per Module — the table the Compiler emitted, with
 // the count each point reached. Asked at the end of a run, and callable at any
 // point during one: `TestContext.coverage` is this, offered to a test that
 // wants to know what it has reached so far.
@@ -321,7 +321,7 @@ export type CoverageReport = {
 	module: string | null
 	points: Array<CoveredPoint>
 	choices: Array<CoverageChoice>
-	// NOTE: The indices of the points a Module executed simply by being LOADED —
+	// The indices of the points a Module executed simply by being LOADED —
 	// a top-level Constant's initializer, code a suite's setup runs before any
 	// test. Their hits land in `counts` but in no test's span (the span opens
 	// after load), so per-test attribution cannot credit them to anyone. A
@@ -339,7 +339,7 @@ export function coverage(): Array<CoverageReport> {
 			count: record.counts[index] ?? 0,
 		})),
 		choices: record.module.choices,
-		// NOTE: `baseline` is what loading the bundle had counted before the
+		// `baseline` is what loading the bundle had counted before the
 		// first test span — so a point non-zero there ran at load. Null only
 		// before the first `beginCoverageRun`, which every counted run calls at
 		// its start, so by the time a report is read it is set.
@@ -352,7 +352,7 @@ export function coverage(): Array<CoverageReport> {
 	}))
 }
 
-// NOTE: The line between one run and the next. The first call RECORDS what
+// The line between one run and the next. The first call RECORDS what
 // loading the bundle already counted; every call after it puts the counts back
 // to exactly that. A watch session and the Language Server's session both run
 // the same loaded bundle again and again, and without this each cycle would
@@ -375,10 +375,10 @@ export function beginCoverageRun(): void {
 
 // #region The per-test context
 
-// NOTE: One recorded value: the point it was recorded at, and what stood there.
+// One recorded value: the point it was recorded at, and what stood there.
 export type Trace = { point: number; value: AnyType }
 
-// NOTE: What an `expect`/`require` recorded — whether it held, every
+// What an `expect`/`require` recorded — whether it held, every
 // sub-expression value evaluated on the way, and, where the assertion compared
 // two values with `Equatable`, the two operands so the report can diff them.
 export type Expectation = {
@@ -387,7 +387,7 @@ export type Expectation = {
 	passed: boolean
 	traces: Array<Trace>
 	comparison: RecordedComparison | null
-	// NOTE: What a snapshot assertion compared, as TEXT — a snapshot is two
+	// What a snapshot assertion compared, as TEXT — a snapshot is two
 	// strings by the time anything compares them, so there is no value to
 	// render and no structure to walk. Null for every other assertion.
 	snapshot: SnapshotComparison | null
@@ -399,7 +399,7 @@ export type SnapshotComparison = {
 	actual: string
 }
 
-// NOTE: What the LOWERING says about an assertion whose top-level call is
+// What the LOWERING says about an assertion whose top-level call is
 // `Equatable::is`/`::isNot` — the two operands, named by the points they were
 // traced at. It is written by the Compiler and read here, which is what keeps
 // the diff a consequence of the general trace mechanism rather than a second
@@ -414,13 +414,13 @@ export type RecordedComparison = {
 
 export type OutputChunk = { stream: OutputStream; text: string }
 
-// NOTE: The STORED snapshots of one Module, keyed by the name written after
+// The STORED snapshots of one Module, keyed by the name written after
 // `matches snapshot from`. They are read off `__snapshots__/<File>.es.snap`
 // beside the source and handed to the run, because the runtime is a bundle: it
 // may be running in a browser, and nothing in it reads a file.
 export type SnapshotStore = Record<string, string>
 
-// NOTE: One Parameter of a stored counterexample. It is kept under the
+// One Parameter of a stored counterexample. It is kept under the
 // Parameter's NAME rather than at a position, because a property whose
 // Parameters were reordered is one a stored tuple would otherwise be silently
 // wrong about — and a name that is no longer there is what says the entry has
@@ -429,7 +429,7 @@ export type StoredValue = { name: string; data: EncodedValue }
 
 export type StoredCounterexample = { values: Array<StoredValue> }
 
-// NOTE: The STORED counterexamples of one Module, keyed by the test's identity
+// The STORED counterexamples of one Module, keyed by the test's identity
 // WITHOUT the Module step — the file they were read from is that Module's
 // already. Every one of them is re-run before a single case is drawn, so a bug
 // a search found once is caught by the run after it, and by every run after
@@ -438,7 +438,7 @@ export type StoredCounterexample = { values: Array<StoredValue> }
 // it may be running in a browser, and nothing in it reads a file.
 export type CorpusStore = Record<string, Array<StoredCounterexample>>
 
-// NOTE: What `matches snapshot` compares against, as the emitted call hands it
+// What `matches snapshot` compares against, as the emitted call hands it
 // over. `slot` is the point of the Module's span table where a recorded value
 // stands, or would stand — what a run writes one back into.
 export type SnapshotSlot = {
@@ -447,7 +447,7 @@ export type SnapshotSlot = {
 	slot: number
 }
 
-// NOTE: What one snapshot assertion did. `written` is a snapshot that had none
+// What one snapshot assertion did. `written` is a snapshot that had none
 // recorded, or one an updating run replaced — both a pass, and both something
 // the runner has to write down somewhere. `mismatched` is the failure.
 export type SnapshotStatus = "written" | "matched" | "mismatched"
@@ -461,14 +461,14 @@ export type RecordedSnapshot = {
 	recorded: string | null
 }
 
-// NOTE: The STORED baselines of one Module, keyed the way a stored snapshot is
+// The STORED baselines of one Module, keyed the way a stored snapshot is
 // — by the entry a measurement is written under, which is the identity without
 // the Module path and with a table row's number behind it. Read off
 // `__benchmarks__/<File>.es.bench` beside the source and handed to the run,
 // because the runtime is a bundle and nothing in it reads a file.
 export type BenchmarkStore = Record<string, number>
 
-// NOTE: What one measurement did against what was recorded. `written` is a
+// What one measurement did against what was recorded. `written` is a
 // benchmark that had no baseline, or one an updating run replaced — both a
 // pass, and both something the runner has to write down. `regressed` is the
 // failure; `improved` passes and says so, because a measurement that got faster
@@ -476,7 +476,7 @@ export type BenchmarkStore = Record<string, number>
 // somebody asked.
 export type BenchmarkStatus = "written" | "matched" | "regressed" | "improved"
 
-// NOTE: One measurement. `nanoseconds` is the time of ONE run of the body — the
+// One measurement. `nanoseconds` is the time of ONE run of the body — the
 // median sample's batch divided by the runs in it — in whole nanoseconds,
 // because that is the unit at which the number stops being a float that reads
 // differently every time it is printed. `iterations` and `samples` are what it
@@ -492,82 +492,82 @@ export type BenchmarkResult = {
 }
 
 export type TestContext = {
-	// NOTE: Which `entry` of the Module's `run` is the one to run. `-1` runs
+	// Which `entry` of the Module's `run` is the one to run. `-1` runs
 	// none of them, which is how a run ENUMERATES: the setup evaluates once and
 	// every interpolated name is worked out, and nothing else happens.
 	index: number
-	// NOTE: The rendered names, by entry index. An interpolated name reaches
+	// The rendered names, by entry index. An interpolated name reaches
 	// here from the scope it was written in; a plain one is in the manifest
 	// already and is never recorded.
 	names: Map<number, string>
-	// NOTE: What has been traced since the last assertion drained the buffer.
+	// What has been traced since the last assertion drained the buffer.
 	// It is drained rather than cleared so that the values belong to the
 	// assertion that evaluated them.
 	traces: Array<Trace>
-	// NOTE: What the `§?` value comments of this test recorded. Never drained:
+	// What the `§?` value comments of this test recorded. Never drained:
 	// a value comment asks a question no assertion asked, and its answer belongs
 	// to the line it was written on for the whole of the test.
 	probes: Array<Trace>
 	expectations: Array<Expectation>
-	// NOTE: What the snapshot assertions of this test recorded, whether they
+	// What the snapshot assertions of this test recorded, whether they
 	// held or not: a run has to write a new one down, and an updating run has
 	// to write a replaced one down too.
 	snapshots: Array<RecordedSnapshot>
-	// NOTE: The stored snapshots this Module's tests may name, read from disk
+	// The stored snapshots this Module's tests may name, read from disk
 	// by whoever started the run, and whether a mismatch is to be REPLACED
 	// rather than reported. Both belong to the context because a capability a
 	// test can not reach is a capability it does not have.
 	stored: SnapshotStore
-	// NOTE: The stored baselines this Module's benchmarks are held to, read off
+	// The stored baselines this Module's benchmarks are held to, read off
 	// disk by whoever started the run. It is on the context for the same reason
 	// the snapshots are: a capability a test can not reach is a capability it
 	// does not have.
 	benchStored: BenchmarkStore
 	updating: boolean
-	// NOTE: Which row of a table test is running, and null for the ordinary
+	// Which row of a table test is running, and null for the ordinary
 	// test that runs once. A stored snapshot is keyed by it — every row of a
 	// table runs the same body, so one name would be one entry the rows
 	// overwrite in turn, and only the last of them could ever match.
 	row: number | null
-	// NOTE: The running entry's durable identity as the Compiler spelled it —
+	// The running entry's durable identity as the Compiler spelled it —
 	// suite path and name, a row as its last step, the Module left off. It is
 	// what a baseline is stored under, and it arrives through the manifest so
 	// that the escaping exists in exactly one place.
 	key: string
-	// NOTE: Whether a benchmark of this run MEASURES. A coverage run does not:
+	// Whether a benchmark of this run MEASURES. A coverage run does not:
 	// its bundle counts every branch it takes, which makes the body slower by
 	// an amount only the instrumentation knows — a number measured there is
 	// about the counters, and a baseline recorded off it would fail the first
 	// uninstrumented run. The body still runs once, so its lines are covered.
 	measure: boolean
-	// NOTE: Whether the recording primitives write anything down. The
+	// Whether the recording primitives write anything down. The
 	// measurement batches turn this off: a batch of sixty-five thousand runs
 	// would otherwise record sixty-five thousand expectations, and the clock
 	// would be timing the runner's own bookkeeping alongside the body. What a
 	// `require` DOES — end the run where it failed — is not recording, and
 	// never turns off.
 	recording: boolean
-	// NOTE: What a property test draws with, and how many cases it runs. The
+	// What a property test draws with, and how many cases it runs. The
 	// seed is the RUN's, printed on a failure and read back by `--seed`; `word`
 	// is that seed folded together with the test's own id, so replaying one
 	// test with `-f` draws exactly the sequence the whole run drew for it.
 	property: PropertySettings
-	// NOTE: What the property test of THIS context did, and null for every
+	// What the property test of THIS context did, and null for every
 	// ordinary test. It is written by `properties` and read by the run, which
 	// is what turns it into the one event that says how many cases held.
 	propertyResult: PropertyResult | null
-	// NOTE: What the benchmark of THIS context measured, and null for every
+	// What the benchmark of THIS context measured, and null for every
 	// test that is not one — the same arrangement `propertyResult` has, and for
 	// the same reason: the driver writes it and the run turns it into the one
 	// event that says how long the body took.
 	benchmarkResult: BenchmarkResult | null
-	// NOTE: The clock a measurement is read off, in high-resolution
+	// The clock a measurement is read off, in high-resolution
 	// milliseconds. It is on the context rather than reached for so that a spec
 	// can drive it: a measurement asserted against a real clock is a test whose
 	// answer depends on the machine, which is a flake with a schedule.
 	clock: () => number
 	output: Array<OutputChunk>
-	// NOTE: What has been counted so far, asked from inside a running test
+	// What has been counted so far, asked from inside a running test
 	// rather than only read out at the end of a run. Coverage is a fact about
 	// the BUNDLE and not about one test, so this is the same answer for every
 	// context — it is offered here because the context is what a test holds,
@@ -575,10 +575,10 @@ export type TestContext = {
 	coverage: () => Array<CoverageReport>
 }
 
-// NOTE: What a property test draws with. `word` is the state a source is built
+// What a property test draws with. `word` is the state a source is built
 // from and `seed` is what a reader types after `--seed` to get it back.
 //
-// NOTE: `replays` are the counterexamples THIS test has failed on before, run
+// `replays` are the counterexamples THIS test has failed on before, run
 // first and in the order they were stored. A run that finds one still failing
 // never draws a case at all: the answer is already in hand, and a search that
 // went looking for it again would report whatever it happened to find instead.
@@ -592,10 +592,10 @@ export type PropertySettings = {
 export type PropertyCounterexample = { name: string; value: string }
 
 export type PropertyResult = {
-	// NOTE: How many cases RAN, which is every one of them where the property
+	// How many cases RAN, which is every one of them where the property
 	// held and the number it took to break it where it did not.
 	cases: number
-	// NOTE: How many the run was told to run, which is what a replay has to say
+	// How many the run was told to run, which is what a replay has to say
 	// back: the size a case is drawn at grows with the case number over the
 	// WHOLE run, so a hundred cases and four hundred draw two different
 	// sequences from one seed.
@@ -603,34 +603,34 @@ export type PropertyResult = {
 	seed: string
 	shrinks: number
 	counterexample: Array<PropertyCounterexample> | null
-	// NOTE: How many stored counterexamples were read back and re-run before
+	// How many stored counterexamples were read back and re-run before
 	// anything was drawn. It is counted APART from `cases` on purpose: a replay
 	// takes no word from the source, so a run of ten replays and a hundred cases
 	// draws exactly what a run of a hundred cases draws — which is what keeps
 	// `--seed` reproducing a run whose corpus has grown since.
 	replayed: number
-	// NOTE: Which stored entries no longer read back, by their index in the
+	// Which stored entries no longer read back, by their index in the
 	// stored list. The Types changed under them, or a refinement stopped
 	// admitting what it once did; the runner drops exactly these on the next
 	// write.
 	stale: Array<number>
-	// NOTE: Whether the failure came from a replay rather than from a draw,
+	// Whether the failure came from a replay rather than from a draw,
 	// which is what a report says in place of "after N cases".
 	fromCorpus: boolean
-	// NOTE: The SHRUNK counterexample written down, ready to be stored — and
+	// The SHRUNK counterexample written down, ready to be stored — and
 	// null where any Parameter refuses to be written down at all, because one
 	// `Generatable` conformance anywhere inside a generator costs the whole test
 	// its corpus.
 	encoded: Array<StoredValue> | null
 }
 
-// NOTE: The cases a property runs where nobody said. A hundred is the number
+// The cases a property runs where nobody said. A hundred is the number
 // the design names, and it is the number every property testing library has
 // settled on: enough that a shape-level mistake shows, few enough that a suite
 // of them still runs while a reader waits.
 export const DEFAULT_CASES = 100
 
-// NOTE: `performance.now` where the host has one, and `Date.now` where it has
+// `performance.now` where the host has one, and `Date.now` where it has
 // not. A bundle is inlined wherever it is loaded, which is not always somewhere
 // with a high-resolution clock — and a measurement read off a coarse one is
 // still a measurement, taken over a batch big enough to show.
@@ -683,14 +683,14 @@ export function createContext(
 
 // #region What the emitted JavaScript calls
 
-// NOTE: One suite's Scope, holding the tests `first` up to `last`. A run is one
+// One suite's Scope, holding the tests `first` up to `last`. A run is one
 // test, and the setup that test must see is the section's and that of the suites
 // it is written IN — so a Scope holding no part of the run is stepped over
 // whole. Without that, every test of a file evaluated every suite's setup: work
 // nobody asked for, and, where a suite printed something, output attributed to
 // tests written beside it rather than in it.
 //
-// NOTE: `-1` is the enumeration pass, which walks the section to work out every
+// `-1` is the enumeration pass, which walks the section to work out every
 // rendered name and runs no test. It enters every Scope, because a name it did
 // not reach is a name nothing can report.
 export function scope(
@@ -707,7 +707,7 @@ export function scope(
 	}
 }
 
-// NOTE: One test, standing where it was written — inside whatever setup it can
+// One test, standing where it was written — inside whatever setup it can
 // see, which has just been evaluated afresh. The name is handed over only where
 // it interpolates, because a plain one is a String the manifest carries and
 // emitting it twice would be two spellings of one thing.
@@ -726,7 +726,7 @@ export function entry(
 	}
 }
 
-// NOTE: One table test's rows, standing where the test was written. Only the
+// One table test's rows, standing where the test was written. Only the
 // row that is running is built into anything: the name is worked out for the
 // row being enumerated or run, and the body for the one selected. Everything
 // else about a row — its identity, its Modifiers, where it was written — is in
@@ -738,14 +738,14 @@ export function rows<Value extends AnyType>(
 	name: ((row: Value) => StringType) | null,
 	run: (row: Value) => Ran,
 ): Ran {
-	// NOTE: At most one row RUNS — the one the context selects — so there is at
+	// At most one row RUNS — the one the context selects — so there is at
 	// most one answer to hand back, and the walk is over the names either way.
 	let answered: Ran = undefined
 
 	values.forEach((value, offset) => {
 		let index = first + offset
 
-		// NOTE: `-1` is the enumeration pass, which works out every rendered
+		// `-1` is the enumeration pass, which works out every rendered
 		// name and runs nothing.
 		if (context.index !== index && context.index !== -1) {
 			return
@@ -763,7 +763,7 @@ export function rows<Value extends AnyType>(
 	return answered
 }
 
-// NOTE: One benchmark, standing where it was written. It is the `entry` call
+// One benchmark, standing where it was written. It is the `entry` call
 // with the driver wrapped round the body: which entry is selected, and what its
 // rendered name is, are the same questions for both forms, and answering them
 // twice is how the two would come to disagree.
@@ -788,7 +788,7 @@ export function benchmarkRows<Value extends AnyType>(
 	)
 }
 
-// NOTE: One property test, standing where it was written. The body is run once
+// One property test, standing where it was written. The body is run once
 // per generated case rather than once, and what a reader is shown when it fails
 // is the SMALLEST case that still fails — everything a run records about the
 // cases that held is rolled back, so a hundred passing cases leave exactly
@@ -813,7 +813,7 @@ export function properties(
 	runProperty(context, parameters, run)
 }
 
-// NOTE: What a case may leave on the context. A case that held leaves none of
+// What a case may leave on the context. A case that held leaves none of
 // it: the buffers are cut back to these lengths, so what a report reads is the
 // FAILING case's recordings and nothing from the ninety-nine before it.
 type ContextMark = {
@@ -842,12 +842,12 @@ function rewind(context: TestContext, mark: ContextMark): void {
 	context.output.length = mark.output
 }
 
-// NOTE: How many candidates a shrink is allowed to try before it answers with
+// How many candidates a shrink is allowed to try before it answers with
 // the smallest thing it has. A pass over one Parameter is cheap; a property
 // whose body is slow is what this bounds.
 const SHRINK_ATTEMPTS = 400
 
-// NOTE: THE coverage-guided search. Where the bundle is instrumented — which is
+// THE coverage-guided search. Where the bundle is instrumented — which is
 // `essence test --coverage` and nothing else — a case whose run reached ground
 // no case before it had is KEPT, and a share of the later cases step one move
 // away from one of the kept cases instead of drawing blind. A property that
@@ -855,26 +855,26 @@ const SHRINK_ATTEMPTS = 400
 // have to meet every condition at once, while a neighbour holds the ones a case
 // already met and moves one coordinate.
 //
-// NOTE: It has no flag of its own, and needs none. An uninstrumented bundle
+// It has no flag of its own, and needs none. An uninstrumented bundle
 // counts nothing, so `touchedGround` never moves, so the pool never fills and
 // the branch below is never taken — the draws such a run makes are word for
 // word the draws it made before this existed. That is also the CONTROL a spec
 // gets for free: the same module without counters is the same search blind.
 //
-// NOTE: Ground is measured from the start of the test's OWN span — see
+// Ground is measured from the start of the test's OWN span — see
 // `beginCoverageSpan` — so what a case counts as reaching does not depend on
 // which tests ran before this one, or on a `--filter` having left them out:
 // the search a seed replays is the search the full run ran.
 //
-// NOTE: How many cases are kept. Eight is small on purpose: a pool that held
+// How many cases are kept. Eight is small on purpose: a pool that held
 // every interesting case would spend the run mutating whatever it found first,
 // and the oldest is dropped so the search follows where the coverage went.
 const GUIDED_POOL = 8
-// NOTE: What share of the cases after the warm-up take a neighbour rather than
+// What share of the cases after the warm-up take a neighbour rather than
 // a fresh draw. Half — a search that only exploited would never find the ground
 // it has not seen, and one that only explored is the blind search.
 const GUIDED_SHARE = 0.5
-// NOTE: How much of the run draws blind before any of it exploits. A quarter,
+// How much of the run draws blind before any of it exploits. A quarter,
 // and at least one case: there is nothing worth searching around until
 // something has reached somewhere, and the early cases are the small ones a
 // failure is nearly minimal already at.
@@ -893,12 +893,12 @@ function runProperty(
 	let fromCorpus = false
 	let replayed = 0
 	let ran = 0
-	// NOTE: The cases whose run reached ground nothing before them had, newest
+	// The cases whose run reached ground nothing before them had, newest
 	// last. It stays EMPTY for an uninstrumented bundle, which is what makes the
 	// search below cost nothing where there is nothing to guide it.
 	let pool: Array<Array<AnyType>> = []
 	let warmup = Math.max(1, Math.floor(settings.cases * GUIDED_WARMUP))
-	// NOTE: One case, asked whether it holds and watched for new ground on the
+	// One case, asked whether it holds and watched for new ground on the
 	// way. Every case goes through here — the corpus replays included, because a
 	// stored counterexample that reaches somewhere fresh is exactly the
 	// neighbourhood worth searching.
@@ -917,7 +917,7 @@ function runProperty(
 		return outcome
 	}
 
-	// NOTE: The corpus BEFORE the search, in the order it was stored, newest
+	// The corpus BEFORE the search, in the order it was stored, newest
 	// first. What it holds is every value this test has ever failed on, so a
 	// regression on an old bug is caught before a single word is drawn — and
 	// found in the one case that is known to have found it, rather than in
@@ -925,7 +925,7 @@ function runProperty(
 	for (let [index, replay] of settings.replays.entries()) {
 		let values = decodeReplay(parameters, replay)
 
-		// NOTE: An entry the generators no longer read back — the Types moved
+		// An entry the generators no longer read back — the Types moved
 		// under it. It is recorded rather than dropped here, because a bundle
 		// writes no file: what happens to the entry is the runner's to decide.
 		if (values === null) {
@@ -944,11 +944,11 @@ function runProperty(
 		}
 	}
 
-	// NOTE: Only where every stored case held. A replay that failed IS the
+	// Only where every stored case held. A replay that failed IS the
 	// counterexample, and drawing a hundred more would report whichever value
 	// the search happened to reach first in place of the one already in hand.
 	for (let index = 0; failing === null && index < settings.cases; index++) {
-		// NOTE: The size grows with the case number, so the early cases are
+		// The size grows with the case number, so the early cases are
 		// small — a failure found among them is nearly minimal already — and
 		// the late ones are big enough to break an assumption a short List
 		// never would.
@@ -957,7 +957,7 @@ function runProperty(
 		let values: Array<AnyType>
 
 		try {
-			// NOTE: The coin is drawn LAST and only where the pool could serve,
+			// The coin is drawn LAST and only where the pool could serve,
 			// so a run with nothing in the pool spends no word on the question
 			// and draws exactly the sequence it drew before this existed.
 			values =
@@ -969,7 +969,7 @@ function runProperty(
 							generate(parameter.generator, source, size),
 						)
 		} catch (thrown) {
-			// NOTE: A refinement nothing could satisfy. The result is recorded
+			// A refinement nothing could satisfy. The result is recorded
 			// FIRST so the report still says how many cases held, and then the
 			// failure ends the test the way any other thrown error does.
 			context.propertyResult = {
@@ -1012,7 +1012,7 @@ function runProperty(
 		return
 	}
 
-	// NOTE: A replayed failure is shrunk as well, rather than reported as it
+	// A replayed failure is shrunk as well, rather than reported as it
 	// was stored: the code has changed since it was written down, and it may
 	// now fail on something smaller than what broke it the first time.
 	let shrunk = shrinkCase(context, mark, run, parameters, failing)
@@ -1032,7 +1032,7 @@ function runProperty(
 		encoded: encodeCase(parameters, shrunk.values),
 	}
 
-	// NOTE: The last run is the one whose recordings the report is built from,
+	// The last run is the one whose recordings the report is built from,
 	// and it is NOT guarded: a body that throws has to end the test the way it
 	// would have ended an ordinary one, and a failed `require` has to unwind
 	// exactly as far as it always does.
@@ -1040,7 +1040,7 @@ function runProperty(
 	run(...shrunk.values)
 }
 
-// NOTE: One case built out of a case that reached new ground: the tuple copied,
+// One case built out of a case that reached new ground: the tuple copied,
 // and ONE of its Parameters replaced by a structural neighbour of what it held.
 // Everything else is shared rather than redrawn — a value is immutable, and
 // keeping the rest is the whole point: what the kept case reached, it reached
@@ -1056,7 +1056,7 @@ function neighbourOf(
 	let parameter = parameters[index]
 	let held = values[index]
 
-	// NOTE: A property with no Parameters at all runs one case, and that case
+	// A property with no Parameters at all runs one case, and that case
 	// has no neighbour to step to.
 	if (parameter === undefined || held === undefined) {
 		return values
@@ -1067,7 +1067,7 @@ function neighbourOf(
 	return values
 }
 
-// NOTE: One stored counterexample read back as the values to run the body with,
+// One stored counterexample read back as the values to run the body with,
 // and nothing where it no longer describes this property. The Parameters are
 // matched by NAME and the name set has to be exactly the generators' — a
 // Parameter that was added, removed or renamed makes the entry a claim about a
@@ -1109,7 +1109,7 @@ function decodeReplay(
 	return values
 }
 
-// NOTE: The whole case written down, or nothing at all. One Parameter that can
+// The whole case written down, or nothing at all. One Parameter that can
 // not be written down costs the test its corpus: half a case is not a case, and
 // storing it would replay a property with a value nobody chose in the hole.
 function encodeCase(
@@ -1131,7 +1131,7 @@ function encodeCase(
 	return stored
 }
 
-// NOTE: One case, rolled back where it held. A case FAILS when it recorded a
+// One case, rolled back where it held. A case FAILS when it recorded a
 // failed assertion or when it threw — a failed `require` throws the runtime's
 // own sentinel, which is a failure like any other here rather than the end of
 // the test.
@@ -1150,7 +1150,7 @@ function holds(
 			return false
 		}
 
-		// NOTE: A generation failure inside a body is nobody's counterexample —
+		// A generation failure inside a body is nobody's counterexample —
 		// it says the run could not ask the question at all.
 		if (thrown instanceof GenerationFailure) {
 			throw thrown
@@ -1172,7 +1172,7 @@ function holds(
 	return true
 }
 
-// NOTE: The smallest failing case this can reach: one Parameter at a time,
+// The smallest failing case this can reach: one Parameter at a time,
 // keeping every candidate that still fails, and starting over whenever one did
 // — so a List that shrinks to three items has its items shrunk afterwards.
 function shrinkCase(
@@ -1218,7 +1218,7 @@ function shrinkCase(
 	return { values, shrinks }
 }
 
-// NOTE: How a measurement is taken. A single run of a fast body is mostly the
+// How a measurement is taken. A single run of a fast body is mostly the
 // clock's own resolution, so the body is run in BATCHES big enough to take a
 // few milliseconds, and the batch is timed rather than the run. Several batches
 // are taken and the MIDDLE one answers: a mean is dragged by the one batch the
@@ -1226,23 +1226,23 @@ function shrinkCase(
 // rather than the one a reader will meet.
 const BENCHMARK_SAMPLES = 7
 const BENCHMARK_BATCH_MILLISECONDS = 5
-// NOTE: What the calibration stops at, whatever the body costs. A body fast
+// What the calibration stops at, whatever the body costs. A body fast
 // enough to want more than this is measured well enough already, and one that
 // is not is a body a reader would rather see the answer for than wait out.
 const BENCHMARK_MAX_ITERATIONS = 65536
-// NOTE: The batch times behind the sample tiers — see the note where the tier
+// The batch times behind the sample tiers — see the note where the tier
 // is chosen. Two hundred milliseconds is a body no batching helped; a second
 // is a body whose one run is the measurement.
 const BENCHMARK_STEADY_BATCH_MILLISECONDS = 200
 const BENCHMARK_SLOW_BATCH_MILLISECONDS = 1000
-// NOTE: The band a measurement is allowed to move in before it is news. A
+// The band a measurement is allowed to move in before it is news. A
 // quarter slower is a regression a reader has to look at; a fifth faster is an
 // improvement worth recording. Everything between the two is the machine.
 const REGRESSION_RATIO = 1.25
 const IMPROVEMENT_RATIO = 0.8
 
 function runBenchmark(context: TestContext, run: () => void): void {
-	// NOTE: A run that is not measuring — a coverage run — takes the body the
+	// A run that is not measuring — a coverage run — takes the body the
 	// way it takes a test's: once, unguarded, nothing recorded about time.
 	// Measuring an instrumented body would time the counters, and a baseline
 	// recorded off one would fail the first uninstrumented run.
@@ -1254,7 +1254,7 @@ function runBenchmark(context: TestContext, run: () => void): void {
 
 	let mark = markOf(context)
 
-	// NOTE: A body that does not hold is REPORTED and never timed. Timing
+	// A body that does not hold is REPORTED and never timed. Timing
 	// something that is wrong measures the wrong thing, and the number would go
 	// into a baseline as if it meant something. The last run is unguarded, so
 	// exactly one execution's recordings are left behind — the move
@@ -1271,7 +1271,7 @@ function runBenchmark(context: TestContext, run: () => void): void {
 	let perRun: Array<number> = []
 	let samples: number
 
-	// NOTE: Nothing is recorded while the clock runs — see
+	// Nothing is recorded while the clock runs — see
 	// `TestContext.recording`. The flag comes back on whatever the body does,
 	// because the run below it is the one the report is built from.
 	context.recording = false
@@ -1287,7 +1287,7 @@ function runBenchmark(context: TestContext, run: () => void): void {
 			elapsed = timeBatch(context, mark, run, iterations)
 		}
 
-		// NOTE: Fewer samples the slower the body. Seven batches of a body that
+		// Fewer samples the slower the body. Seven batches of a body that
 		// takes seconds is a minute a reader did not ask to wait — and the
 		// editor's run-by-id door has a session deadline behind it — while a
 		// slow body's batches barely jitter: one long run IS its own average.
@@ -1305,17 +1305,17 @@ function runBenchmark(context: TestContext, run: () => void): void {
 		context.recording = true
 	}
 
-	// NOTE: At least one nanosecond. A body the clock can not tell from nothing
+	// At least one nanosecond. A body the clock can not tell from nothing
 	// is not free, and a baseline of zero is a number every later run is
 	// infinitely slower than.
 	let nanoseconds = Math.max(1, Math.round(median(perRun) * 1_000_000))
-	// NOTE: The entry a stored baseline is kept under is the one durable
+	// The entry a stored baseline is kept under is the one durable
 	// identity the Compiler spelled for this entry — a table row's key already
 	// carries the row as its last step, so the rows of one table never share
 	// an entry they would overwrite in turn.
 	let storedKey = context.key
 	let stored = context.benchStored[storedKey]
-	// NOTE: A baseline of nothing is not a baseline. No measurement writes one
+	// A baseline of nothing is not a baseline. No measurement writes one
 	// — the driver floors at a nanosecond — so a zero can only be a hand-edited
 	// or merge-mangled file, and holding a run to it would report every later
 	// measurement as infinitely slower. It is re-recorded instead.
@@ -1342,14 +1342,14 @@ function runBenchmark(context: TestContext, run: () => void): void {
 		status,
 	}
 
-	// NOTE: The run whose recordings the report is built from, and it is NOT
+	// The run whose recordings the report is built from, and it is NOT
 	// guarded — a body that throws has to end the test the way it always would,
 	// exactly as the last run of a shrunk property does.
 	rewind(context, mark)
 	run()
 }
 
-// NOTE: One batch, timed. The context is rewound BEFORE the clock is read and
+// One batch, timed. The context is rewound BEFORE the clock is read and
 // never inside it: a batch of a thousand runs records a thousand times over,
 // and clearing that between them would be timing the runner's bookkeeping
 // alongside the body.
@@ -1370,14 +1370,14 @@ function timeBatch(
 	return context.clock() - started
 }
 
-// NOTE: The lower middle of the samples, which for an odd count is the middle.
+// The lower middle of the samples, which for an odd count is the middle.
 function median(values: Array<number>): number {
 	let sorted = [...values].sort((left, right) => left - right)
 
 	return sorted[(sorted.length - 1) >> 1] ?? 0
 }
 
-// NOTE: THE trace mechanism — record a value at an instrumented point,
+// THE trace mechanism — record a value at an instrumented point,
 // attributed to a source span, and answer with the very value so that wrapping
 // an Expression in one changes nothing about what it evaluates to. `expect` and
 // `require` are its first consumers; the `§?` value comment and coverage are
@@ -1394,7 +1394,7 @@ export function trace<Value extends AnyType>(
 	return value
 }
 
-// NOTE: The `§?` value comment — the same recording as a trace, into the buffer
+// The `§?` value comment — the same recording as a trace, into the buffer
 // no assertion drains, so what a line asked about survives to the end of the
 // test whatever was asserted after it. A line inside a loop records once per
 // turn and the last one is what is reported, for the same reason a traced
@@ -1411,7 +1411,7 @@ export function probe<Value extends AnyType>(
 	return value
 }
 
-// NOTE: `expect` — record and carry on, so one test can report several failures
+// `expect` — record and carry on, so one test can report several failures
 // at once. The traces the asserted Expression left are drained INTO the
 // expectation: they are what that assertion evaluated, and the next one starts
 // with an empty buffer.
@@ -1424,7 +1424,7 @@ export function expected(
 	record(context, "expect", point, passed, comparison)
 }
 
-// NOTE: What a failed `require` unwinds with. It is thrown rather than
+// What a failed `require` unwinds with. It is thrown rather than
 // returned, because "ends the test" has to hold WHEREVER the assertion was
 // written: a `match` used as an Expression is emitted as a call to an arrow
 // Function, and an early `return` inside one of its Handlers would end that
@@ -1434,7 +1434,7 @@ export function expected(
 // "the test threw", and no stack is built for something nobody reads.
 const requirementFailed = { requirementFailed: true }
 
-// NOTE: `require` — the same recording as an `expect`, and then a failure ends
+// `require` — the same recording as an `expect`, and then a failure ends
 // the test where it stands. What ended it is already on the context, so the
 // unwinding carries nothing.
 export function required(
@@ -1450,7 +1450,7 @@ export function required(
 	}
 }
 
-// NOTE: `matches snapshot`. What it is handed is the value already RENDERED —
+// `matches snapshot`. What it is handed is the value already RENDERED —
 // `Printable::toString`, which the Compiler lowers as the interpolation an
 // author could have written — so the whole of the comparison here is two
 // strings, and a Type that says what it looks like is recorded in that form.
@@ -1502,7 +1502,7 @@ export function snapshotted(
 	}
 }
 
-// NOTE: The entry a stored snapshot is kept under. A row of a table test gets
+// The entry a stored snapshot is kept under. A row of a table test gets
 // one per row, spelled with the row number, because the rows share a body and
 // would otherwise share the entry: the first run would store the last row's
 // value and every run after would report the others as differing, for ever.
@@ -1546,7 +1546,7 @@ function record(
 	})
 }
 
-// NOTE: The LAST value traced at a point, because a point inside a loop — which
+// The LAST value traced at a point, because a point inside a loop — which
 // a test body may hold — records once per turn, and what a failure is about is
 // the turn that failed.
 function valueAt(traces: Array<Trace>, point: number): AnyType | undefined {
@@ -1563,13 +1563,13 @@ function valueAt(traces: Array<Trace>, point: number): AnyType | undefined {
 
 // #region The structural diff
 
-// NOTE: One line of a rendered difference. `same` is context, `left` is what
+// One line of a rendered difference. `same` is context, `left` is what
 // the receiver held and `right` what it was compared against — the reporter
 // decides how to mark them, because a terminal, an editor hover and a JSON
 // consumer each want something different.
 export type DiffLine = { kind: "same" | "left" | "right"; text: string }
 
-// NOTE: What `Equatable::is` compared, written out as a difference rather than
+// What `Equatable::is` compared, written out as a difference rather than
 // as two dumps. A Record is walked member by member and a List index by index,
 // so what a reader sees is the ONE member that differs surrounded by the ones
 // that do not — which is the whole reason the lowering keeps both operands.
@@ -1590,7 +1590,7 @@ function diffValue(
 	right: AnyType,
 	indent: string,
 	label: string,
-	// NOTE: What follows the value — the comma of the member it stands for, or
+	// What follows the value — the comma of the member it stands for, or
 	// nothing at the top. It is handed IN rather than appended afterwards
 	// because an unequal pair of values is TWO lines, both of which end a
 	// member, and appending to the last of them commas only one.
@@ -1623,7 +1623,7 @@ function diffValue(
 		)
 	}
 
-	// NOTE: A kind neither arm above names may still have said how it is taken
+	// A kind neither arm above names may still have said how it is taken
 	// apart — the registry in `registry.ts` is where a container's own module
 	// leaves that, and probing it here rather than writing an arm is what keeps
 	// a container's difference in the container's module. A Dictionary is one
@@ -1645,7 +1645,7 @@ function diffValue(
 	}
 
 	if (isCase(left) && isCase(right) && sameTag(left, right)) {
-		// NOTE: The rendered text rather than the tag — `Door#Open`, not the
+		// The rendered text rather than the tag — `Door#Open`, not the
 		// Module the tag also carries. A failure report is read by a person, and
 		// `caseText` in `registry.ts` says why a path is no part of what they
 		// need; the two sides are already known to carry the SAME tag here, so
@@ -1667,7 +1667,7 @@ function diffValue(
 	]
 }
 
-// NOTE: Keys in the LEFT's order, then whatever only the right side has — so a
+// Keys in the LEFT's order, then whatever only the right side has — so a
 // difference reads down the value the test computed, and a member that was
 // never there arrives at the end rather than in a place it never had.
 function diffEntries(
@@ -1676,7 +1676,7 @@ function diffEntries(
 	indent: string,
 	open: string,
 	close: string,
-	// NOTE: Whether an entry is written under its key. A Record's members are;
+	// Whether an entry is written under its key. A Record's members are;
 	// a List's items are not — its keys are the indices this walk pairs the two
 	// sides up by, and printing them would show a List as something no source
 	// can write.
@@ -1727,7 +1727,7 @@ function diffEntries(
 	return lines
 }
 
-// NOTE: What a snapshot's difference reads as: the lines the two texts share,
+// What a snapshot's difference reads as: the lines the two texts share,
 // and the ones only one of them has. It is the plainest correct answer — a
 // common-prefix and common-suffix walk, with whatever is left in the middle
 // reported whole — because a snapshot is text a reader wrote or a Program
@@ -1803,7 +1803,7 @@ function recordEntries(value: AnyType): Array<[string, AnyType]> {
 	return Object.entries(value as object) as Array<[string, AnyType]>
 }
 
-// NOTE: A List holds its items in two runs with a view into each, so what is
+// A List holds its items in two runs with a view into each, so what is
 // diffed is the LOGICAL items rather than whatever the backing Array holds —
 // the same reading `Terminal.inspect` does.
 function listEntries(value: AnyType): Array<[string, AnyType]> {
@@ -1816,7 +1816,7 @@ function listEntries(value: AnyType): Array<[string, AnyType]> {
 
 // #region Events
 
-// NOTE: ONE stream, newline-delimited JSON, every event carrying `schema` and
+// ONE stream, newline-delimited JSON, every event carrying `schema` and
 // `kind`. A consumer that meets a kind it does not know must ignore it, so that
 // a kind added to this list changes nothing that reads the stream.
 export type TestEvent =
@@ -1828,7 +1828,7 @@ export type TestEvent =
 			name: string
 			suitePath: Array<string>
 			module: string | null
-			// NOTE: Which row of a table test this is, counting from zero, and
+			// Which row of a table test this is, counting from zero, and
 			// null for every test that is not one. The id ends in it already —
 			// this is the same fact where a reporter can read it without
 			// taking a name apart.
@@ -1850,7 +1850,7 @@ export type TestEvent =
 			duration: number
 			expectations: number
 			failures: Array<FailureEvent>
-			// NOTE: A test body that threw, rendered. It is a Compiler or a
+			// A test body that threw, rendered. It is a Compiler or a
 			// runtime bug rather than a failed assertion, and it ends the test
 			// where it stands.
 			error: string | null
@@ -1865,7 +1865,7 @@ export type TestEvent =
 			reason: string
 			row: number | null
 	  }
-	// NOTE: `suitePath` and `module` on a test that never started, for the same
+	// `suitePath` and `module` on a test that never started, for the same
 	// reason `test-start` carries them: a report groups by where a test was
 	// written, and a skip is reported in its place in that tree rather than in a
 	// list of its own. Nothing can derive them from the id — the id escapes its
@@ -1891,11 +1891,11 @@ export type TestEvent =
 			values: Array<TracedValue>
 			comparison: ComparisonEvent | null
 	  }
-	// NOTE: What a `§?` value comment recorded. It is not a failure and not an
+	// What a `§?` value comment recorded. It is not a failure and not an
 	// assertion — it is the answer to a question a reader wrote into the source,
 	// which an Editor draws beside the line and a `--json` consumer may ignore.
 	| ({ schema: 1; kind: "probe"; id: string } & ProbedValue)
-	// NOTE: What one `matches snapshot` did. It is written whether the snapshot
+	// What one `matches snapshot` did. It is written whether the snapshot
 	// held or not, because a runner needs the text of a new one and the span to
 	// write it into as much as it needs to know a stored one still matches.
 	// `span` is where a recorded value stands or would stand, and `module` says
@@ -1911,12 +1911,12 @@ export type TestEvent =
 			text: string
 			recorded: string | null
 	  }
-	// NOTE: What one property test's run of cases did. It is written whether the
+	// What one property test's run of cases did. It is written whether the
 	// property held or not, because "a hundred cases held" is the answer a
 	// reader wants as much as the counterexample is — and the seed is on it
 	// either way, so a run that passed today can be run again tomorrow.
 	//
-	// NOTE: `module` and `key` say where a counterexample belongs, exactly as a
+	// `module` and `key` say where a counterexample belongs, exactly as a
 	// snapshot event's `module` and `name` do. The key is the test's identity
 	// without the Module step, worked out HERE so that no consumer has to spell
 	// the escaping a second time and risk spelling it differently.
@@ -1937,7 +1937,7 @@ export type TestEvent =
 			fromCorpus: boolean
 			encoded: Array<StoredValue> | null
 	  }
-	// NOTE: What one benchmark measured. It is written whether the measurement
+	// What one benchmark measured. It is written whether the measurement
 	// held to its baseline or not, because a runner needs the number of a new
 	// one to write down as much as it needs to know an old one still holds —
 	// and `module` says which file's `__benchmarks__` the entry belongs to.
@@ -1962,7 +1962,7 @@ export type TestEvent =
 			stream: OutputStream
 			text: string
 	  }
-	// NOTE: What one Module's counters counted, written once per instrumented
+	// What one Module's counters counted, written once per instrumented
 	// Module at the end of a run. Only a run that ASKED for coverage carries
 	// these; every other stream has none, which is what "a consumer ignores
 	// what it does not know" is for.
@@ -1972,13 +1972,13 @@ export type TestEvent =
 			module: string | null
 			points: Array<CoveredPoint>
 			choices: Array<CoverageChoice>
-			// NOTE: The indices of points executed at LOAD, credited to no test
+			// The indices of points executed at LOAD, credited to no test
 			// — see `CoverageReport.loaded`. Optional so a stream written before
 			// it existed, or a report built by hand, still reads: absent means
 			// "not told", which a consumer treats as none.
 			loaded?: Array<number>
 	  }
-	// NOTE: The points ONE test touched in one instrumented Module, by index
+	// The points ONE test touched in one instrumented Module, by index
 	// into that Module's coverage table — written per test, and only where the
 	// run asked to attribute. The inverse of the affected-set map: a consumer
 	// folding these knows, for every point, which tests cover it.
@@ -1989,25 +1989,25 @@ export type TestEvent =
 			module: string | null
 			points: Array<number>
 	  }
-	// NOTE: That the events which follow were REPLAYED rather than run — one
+	// That the events which follow were REPLAYED rather than run — one
 	// compiled entry whose answer a runner already held, under a name that can
 	// only mean the code, the stores and the filters this run has. It carries the
 	// entry it stands for and how many tests that entry planned, so a reader is
 	// told what was skipped and a summary can count it.
 	//
-	// NOTE: Written by the COMMAND LINE and never by the runtime. It lives in
+	// Written by the COMMAND LINE and never by the runtime. It lives in
 	// this union because this union IS the stream's schema, and a consumer that
 	// meets it has to read it the way it reads every other kind — which for this
 	// one, per the stream's own contract at the top of the union, is to ignore it.
 	| { schema: 1; kind: "results-cached"; entry: string; tests: number }
-	// NOTE: What ONE deliberate lie about the code did — the site it was told
+	// What ONE deliberate lie about the code did — the site it was told
 	// at, the sentence the Compiler's own walker spells for it, and whether any
 	// test noticed. `killedBy` is the id of the first test that failed, null for
 	// every other status; `tests` is how many tests reach the site at all, which
 	// is what makes a survivor readable: a mutant no test covers and a mutant
 	// twelve tests miss are different findings.
 	//
-	// NOTE: The five statuses, and the line each of them draws. `killed` is a
+	// The five statuses, and the line each of them draws. `killed` is a
 	// test that failed — and a mutant that CRASHED, whether it would not load or
 	// threw as it ran, because a program that comes apart is a program the world
 	// notices. `hung` is a mutant whose run never came back and was stopped,
@@ -2016,7 +2016,7 @@ export type TestEvent =
 	// mutant DID NOT COMPILE, which is the walker's own shortfall rather than
 	// anything the tests did or did not do.
 	//
-	// NOTE: Written by the COMMAND LINE and never by the runtime, exactly as
+	// Written by the COMMAND LINE and never by the runtime, exactly as
 	// `results-cached` is, and here for exactly the same reason — this union IS
 	// the stream's schema, and a consumer that meets one of these reads it the
 	// way it reads every other kind it does not know, which is to ignore it.
@@ -2031,7 +2031,7 @@ export type TestEvent =
 			killedBy: string | null
 			tests: number
 	  }
-	// NOTE: The tally of a mutation run, written once where a `run-end` would
+	// The tally of a mutation run, written once where a `run-end` would
 	// stand. `sites` counts every mutant the walker found, whatever became of
 	// it, so the five statuses below it add up to it — and where a
 	// `--mutation-limit` stopped the judging early, the remainder a consumer
@@ -2057,21 +2057,21 @@ export type TestEvent =
 			focused: boolean
 	  }
 
-// NOTE: `not-focused` and `tag` are the spec's two; `filter` is the third a
+// `not-focused` and `tag` are the spec's two; `filter` is the third a
 // `--filter` needs, and `bench` the fourth — which together are why a consumer
 // is told to tolerate what it does not know rather than to switch exhaustively.
 export type DeselectionReason = "not-focused" | "tag" | "filter" | "bench"
 
 export type TracedValue = { point: number; span: Span | null; value: string }
 
-// NOTE: What one `§?` line answered — the same three fields a traced value
+// What one `§?` line answered — the same three fields a traced value
 // carries, named apart because a consumer keeps them apart: a traced value
 // explains an assertion that failed, and a probed one answers a question that
 // was asked whether or not anything failed.
 export type ProbedValue = { point: number; span: Span | null; value: string }
 
 export type ComparisonEvent = {
-	// NOTE: `snapshot` is the third: what an `is` compares are two values, and
+	// `snapshot` is the third: what an `is` compares are two values, and
 	// what a snapshot compares are two texts, which a reader wants shown as
 	// lines rather than as a structure.
 	kind: "is" | "isNot" | "snapshot"
@@ -2094,24 +2094,24 @@ export type EventSink = (event: TestEvent) => void
 // #region Selection
 
 export type Filters = {
-	// NOTE: A substring of the test's suites and name joined by `/`, the name as
+	// A substring of the test's suites and name joined by `/`, the name as
 	// rendered and as written, or the whole `key` a stored baseline is headed
 	// with. Rendering an interpolated name evaluates its Module's setup, which
 	// `selectTests` does once, and only under a filter.
 	filter?: string | null
 	tags?: Array<string>
 	skipTags?: Array<string>
-	// NOTE: Structural ids. Where any are named, ONLY those run — which is what
+	// Structural ids. Where any are named, ONLY those run — which is what
 	// an Editor's "run this test" asks for, and the one selection a name can not
 	// express: two tests may render the same name and never share an id.
 	ids?: Array<string>
-	// NOTE: Whether the benchmarks of the run are to be MEASURED. Measuring a
+	// Whether the benchmarks of the run are to be MEASURED. Measuring a
 	// body takes hundreds of runs of it, which is not what somebody waiting on
 	// `essence test` asked for — so a benchmark is deselected as `bench` unless
 	// this says otherwise, and it ADDS to a run rather than replacing it: a run
 	// that measures still judges everything beside the measurements.
 	bench?: boolean
-	// NOTE: Whether a registry BESIDE this one holds a focused test. Focus is
+	// Whether a registry BESIDE this one holds a focused test. Focus is
 	// decided across a whole run rather than per bundle — the design's
 	// "focusing one test in Standings.es also silences Season.tests.es" — and a
 	// registry can not see the bundles loaded next to it. Told so, one that
@@ -2126,12 +2126,12 @@ export type Selection =
 	| { test: RegisteredTest; state: "skip"; reason: string }
 	| { test: RegisteredTest; state: "deselected"; reason: DeselectionReason }
 
-// NOTE: What runs, what is reported skipped, and what was deselected and by
+// What runs, what is reported skipped, and what was deselected and by
 // what — one answer, so that the command line, the Language Server's session
 // and any other runner all select the same way. `focused` says whether the
 // registry holds a focused test at all, which is what a plain run exits
 // non-zero about.
-// NOTE: Asynchronous for one reason: a `--filter` matches what a READER sees,
+// Asynchronous for one reason: a `--filter` matches what a READER sees,
 // which for an interpolated name means rendering it, which means evaluating the
 // Module's setup — and a setup that completes something can only be evaluated
 // by waiting for it. A caller that holds the rendered names already, or that
@@ -2139,21 +2139,21 @@ export type Selection =
 export async function selectTests(
 	registry: Registry,
 	filters: Filters = {},
-	// NOTE: The rendered names, where the caller holds them already — `runTests`
+	// The rendered names, where the caller holds them already — `runTests`
 	// works them out for the report and hands them down rather than paying for
 	// them twice.
 	rendered?: Map<string, string>,
 ): Promise<{
 	selections: Array<Selection>
 	focused: boolean
-	// NOTE: How many tests the FILTER matched, whatever narrowed them
+	// How many tests the FILTER matched, whatever narrowed them
 	// afterwards. A run that selected nothing because no test is called that is
 	// worth saying out loud, and a run that selected nothing because a tag took
 	// them is a different sentence.
 	matched: number
 }> {
 	let bench = filters.bench === true
-	// NOTE: A focused BENCHMARK narrows nothing while the run is not measuring
+	// A focused BENCHMARK narrows nothing while the run is not measuring
 	// — it does not run either way, and counting it would silence every test of
 	// the project because somebody left a focus on something nobody is running.
 	let focused =
@@ -2172,7 +2172,7 @@ export async function selectTests(
 		filter === null
 			? new Map<string, string>()
 			: (rendered ?? (await renderedNames(registry)))
-	// NOTE: The key is compared whole because a table's rows differ only in its
+	// The key is compared whole because a table's rows differ only in its
 	// last step, and row 1's key is the start of row 10's.
 	let matches = (entry: TestManifestEntry): boolean =>
 		filter === null ||
@@ -2190,7 +2190,7 @@ export async function selectTests(
 			return { test, state: "skip", reason: entry.skipped }
 		}
 
-		// NOTE: Before focus, deliberately. Naming a test IS the narrowing, and
+		// Before focus, deliberately. Naming a test IS the narrowing, and
 		// a run somebody asked for by id is not the run a leftover `focused`
 		// was meant to narrow.
 		if (ids.length > 0) {
@@ -2199,7 +2199,7 @@ export async function selectTests(
 				: { test, state: "deselected", reason: "filter" }
 		}
 
-		// NOTE: After the ids branch, deliberately: naming a benchmark IS asking
+		// After the ids branch, deliberately: naming a benchmark IS asking
 		// for it to be measured, which is what an Editor's "run this one" sends
 		// and the one door a measurement has without a flag. Before focus,
 		// because a benchmark nobody asked to measure did not run for a reason
@@ -2212,7 +2212,7 @@ export async function selectTests(
 			return { test, state: "deselected", reason: "not-focused" }
 		}
 
-		// NOTE: `--skip-tag` wins over `--tag`, per the spec: a tag a run is
+		// `--skip-tag` wins over `--tag`, per the spec: a tag a run is
 		// told to leave out is left out however it was also named.
 		if (skipTags.some((tag) => entry.tags.includes(tag))) {
 			return { test, state: "deselected", reason: "tag" }
@@ -2246,48 +2246,48 @@ export async function selectTests(
 export type RunOptions = {
 	sink: EventSink
 	filters?: Filters
-	// NOTE: Handed in so a spec can run the clock itself. `Date.now` otherwise.
+	// Handed in so a spec can run the clock itself. `Date.now` otherwise.
 	now?: () => number
-	// NOTE: The stored snapshots of every Module in the run, keyed by the
+	// The stored snapshots of every Module in the run, keyed by the
 	// Module's canonical path and then by the name written after `from`. Read
 	// off disk by whoever started the run; a bundle reads nothing.
 	snapshots?: Record<string, SnapshotStore>
-	// NOTE: The stored baselines of every Module in the run, keyed by the
+	// The stored baselines of every Module in the run, keyed by the
 	// Module's canonical path and then by the entry a measurement is written
 	// under — the same shape `snapshots` takes, read off disk by whoever
 	// started the run.
 	benchmarks?: Record<string, BenchmarkStore>
-	// NOTE: The clock every measurement of the run is read off. Handed in so a
+	// The clock every measurement of the run is read off. Handed in so a
 	// spec can measure a body without measuring the machine; `performance.now`
 	// otherwise.
 	clock?: () => number
-	// NOTE: The stored counterexamples of every Module in the run, keyed the
+	// The stored counterexamples of every Module in the run, keyed the
 	// same way the snapshots beside them are: the Module's canonical path, and
 	// then the test's identity without that path in it. Read off disk by
 	// whoever started the run; a bundle reads nothing. A runner that hands none
 	// over simply replays nothing, which is what the Language Server's session
 	// does today.
 	counterexamples?: Record<string, CorpusStore>
-	// NOTE: Whether a snapshot that differs is REPLACED rather than reported —
+	// Whether a snapshot that differs is REPLACED rather than reported —
 	// `essence test --update`, and the Editor's "Accept snapshot". A benchmark
 	// reads it too: a measurement outside its band is recorded rather than
 	// reported, which is how a baseline is moved on purpose.
 	update?: boolean
-	// NOTE: What every property test of the run draws from, spelled as the
+	// What every property test of the run draws from, spelled as the
 	// hexadecimal a reader types after `--seed`. One is made up where none was
 	// handed over, and it is on every `property` event either way, so a failure
 	// says how to see it again. Each test folds its own id into it, which is
 	// what makes replaying ONE test with a filter draw what the whole run drew.
 	seed?: string
-	// NOTE: How many cases each property test runs. `DEFAULT_CASES` otherwise.
+	// How many cases each property test runs. `DEFAULT_CASES` otherwise.
 	cases?: number
-	// NOTE: Whether to write a `coverage` event per instrumented Module when
+	// Whether to write a `coverage` event per instrumented Module when
 	// the run ends, and to put the counts back to what loading the bundle left
 	// them at before it starts. A bundle compiled without `--coverage` has no
 	// counters at all and the events are empty, so asking costs nothing; a
 	// runner that did not ask is not told.
 	coverage?: boolean
-	// NOTE: Whether each TEST also says which points IT touched — a
+	// Whether each TEST also says which points IT touched — a
 	// `test-coverage` event per instrumented Module the test reached, worked
 	// out by diffing the counts around the test's run. It is the inverse of
 	// the affected-set map: which tests cover this line. Apart from
@@ -2307,7 +2307,7 @@ export type RunSummary = {
 	failedIds: Array<string>
 }
 
-// NOTE: A seed nobody asked for, as the eight hexadecimal characters `--seed`
+// A seed nobody asked for, as the eight hexadecimal characters `--seed`
 // reads back. It is made HERE rather than left empty so that every run of a
 // property test is a different run, and so that the one that failed can be run
 // again exactly. It is an entropy word rather than `Math.random` so the runtime
@@ -2316,7 +2316,7 @@ export function randomSeed(): string {
 	return nextWord(entropy()).toString(16).padStart(8, "0")
 }
 
-// NOTE: One test at a time, each awaited before the next is started. Nothing
+// One test at a time, each awaited before the next is started. Nothing
 // about a run is concurrent: the output sink, the coverage span and the
 // recordings a report is built from are all per test and all dynamically
 // scoped, so two tests in flight at once would be two tests writing into one
@@ -2333,7 +2333,7 @@ export async function runTests(
 		options = { ...options, seed: randomSeed() }
 	}
 
-	// NOTE: The rendered names, worked out ONCE per Module by running its
+	// The rendered names, worked out ONCE per Module by running its
 	// section with a context that selects no test. It is what an interpolated
 	// name needs — the scope it was written in — and it costs one evaluation of
 	// the setup rather than one per test. Before the selection, because a
@@ -2359,7 +2359,7 @@ export async function runTests(
 		failedIds: [],
 	}
 
-	// NOTE: After the enumeration, which evaluates a Module's setup and would
+	// After the enumeration, which evaluates a Module's setup and would
 	// otherwise be counted into the run that follows it.
 	if (options.coverage === true) {
 		beginCoverageRun()
@@ -2406,7 +2406,7 @@ export async function runTests(
 
 	summary.duration = now() - started
 
-	// NOTE: Before `run-end`, so that a consumer folding the stream has every
+	// Before `run-end`, so that a consumer folding the stream has every
 	// Module's counts in hand by the time the run is declared over.
 	if (options.coverage === true) {
 		for (let report of coverage()) {
@@ -2435,12 +2435,12 @@ export async function runTests(
 	return summary
 }
 
-// NOTE: One evaluation of every Module's setup with `index: -1`, which runs no
+// One evaluation of every Module's setup with `index: -1`, which runs no
 // test and records every interpolated name. A Module whose setup throws gets no
 // names and nothing else: the failure surfaces per test, where a reader can see
 // which test it stopped.
 //
-// NOTE: Only for a Module that HAS an interpolated name — a template with no
+// Only for a Module that HAS an interpolated name — a template with no
 // hole in it is what the test will be called, and running a section to be told
 // so would make every run pay for the one shape that needs it. Whatever the
 // setup writes on the way is dropped: the output a reader is shown belongs to a
@@ -2456,7 +2456,7 @@ async function renderedNames(registry: Registry): Promise<Map<string, string>> {
 		let context = createContext(-1)
 
 		try {
-			// NOTE: Awaited, because a section whose SETUP completes something
+			// Awaited, because a section whose SETUP completes something
 			// is `async` whole — the names it renders are written on the
 			// context after the wait, and reading them before it would answer
 			// with the manifest's templates.
@@ -2498,12 +2498,12 @@ async function runOne(
 		updating: options.update ?? false,
 		row: entry.row,
 		key: entry.key,
-		// NOTE: A coverage run counts, and a counted body must not be timed —
+		// A coverage run counts, and a counted body must not be timed —
 		// see `TestContext.measure`.
 		measure: options.coverage !== true,
 		property: {
 			seed,
-			// NOTE: The run's seed folded together with the test's own id. Two
+			// The run's seed folded together with the test's own id. Two
 			// property tests of one run therefore draw two unrelated sequences,
 			// and running either of them ALONE draws exactly what the whole run
 			// drew for it — which is what makes the replay a report prints work
@@ -2526,7 +2526,7 @@ async function runOne(
 		row: entry.row,
 	})
 
-	// NOTE: The test's own coverage span opens here, unconditionally — it is
+	// The test's own coverage span opens here, unconditionally — it is
 	// one increment and a truncation, and it is what makes a guided property's
 	// "new ground" a fact about THIS test rather than about whichever tests
 	// happened to run before it.
@@ -2536,12 +2536,12 @@ async function runOne(
 	let error: string | null = null
 
 	try {
-		// NOTE: Awaited INSIDE the `try`, so that a test which waits reports a
+		// Awaited INSIDE the `try`, so that a test which waits reports a
 		// failure the same way one that does not does: what a body throws after
 		// its first `complete` arrives here as a rejection, and the arm below
 		// is what turns either of them into the one error a report carries.
 		//
-		// NOTE: The input is empty whatever the host holds, so what a test
+		// The input is empty whatever the host holds, so what a test
 		// answers does not depend on it, and a runner's own input, a terminal
 		// or an editor's protocol, is never read.
 		await withOutputSink(
@@ -2553,11 +2553,11 @@ async function runOne(
 			() => withInputSource("", () => test.module.run(context)),
 		)
 	} catch (thrown) {
-		// NOTE: A failed `require` unwinds the test on purpose and is not an
+		// A failed `require` unwinds the test on purpose and is not an
 		// error — what it recorded is on the context already, and the report is
 		// about the assertion rather than about the way the test ended.
 		if (thrown !== requirementFailed) {
-			// NOTE: A GenerationFailure is the one Error the test runtime
+			// A GenerationFailure is the one Error the test runtime
 			// raises ON PURPOSE, and its message is already written for
 			// a reader — everything under it is frames inside a staged bundle
 			// and the paths of the machinery that staged it, which is noise in
@@ -2585,7 +2585,7 @@ async function runOne(
 		})
 	}
 
-	// NOTE: The points this one test touched, per instrumented Module — read
+	// The points this one test touched, per instrumented Module — read
 	// off the span's own list, so the cost is the points actually touched
 	// rather than a copy of every counter per test. Written before the verdict
 	// events, the way every other fact about the run is; the points are sorted
@@ -2618,7 +2618,7 @@ async function runOne(
 		}
 	}
 
-	// NOTE: One event per PROBED POINT rather than per recording, carrying the
+	// One event per PROBED POINT rather than per recording, carrying the
 	// last value that point held — a `§?` on a line inside a loop is one
 	// question, asked once, and an Editor draws one answer beside it.
 	for (let point of probedPoints(context.probes)) {
@@ -2632,7 +2632,7 @@ async function runOne(
 		})
 	}
 
-	// NOTE: Before the assertions, because what a property test's assertions say
+	// Before the assertions, because what a property test's assertions say
 	// is about ONE case — the smallest one that failed — and a reader has to be
 	// told that before being shown it.
 	if (context.propertyResult !== null) {
@@ -2655,7 +2655,7 @@ async function runOne(
 		})
 	}
 
-	// NOTE: Beside the property event and for the same reason: what a benchmark
+	// Beside the property event and for the same reason: what a benchmark
 	// says is about the whole of the test, and the assertions below it are what
 	// the ONE reported run left behind rather than what was measured.
 	if (context.benchmarkResult !== null) {
@@ -2677,7 +2677,7 @@ async function runOne(
 		})
 	}
 
-	// NOTE: Before the assertions, because a snapshot event carries what has to
+	// Before the assertions, because a snapshot event carries what has to
 	// be WRITTEN and a reader of the stream acts on it whether the test passed
 	// or not.
 	for (let recorded of context.snapshots) {
@@ -2697,7 +2697,7 @@ async function runOne(
 	let failures: Array<FailureEvent> = []
 
 	for (let expectation of context.expectations) {
-		// NOTE: Only a FAILED assertion has its values rendered. A run that
+		// Only a FAILED assertion has its values rendered. A run that
 		// passes records as many values as it evaluated and needs none of
 		// them, and rendering a Record is a walk of the whole Record.
 		let event = expectation.passed
@@ -2725,7 +2725,7 @@ async function runOne(
 		}
 	}
 
-	// NOTE: A measurement outside its band is a FAILED test and not a note
+	// A measurement outside its band is a FAILED test and not a note
 	// beside a passing one. A benchmark says what a body is allowed to cost,
 	// the way an assertion says what it is allowed to answer — and the run that
 	// silently reported "slower, but passing" is the run nobody reads.
@@ -2745,7 +2745,7 @@ async function runOne(
 		return
 	}
 
-	// NOTE: A regression failed no assertion and threw nothing, so without
+	// A regression failed no assertion and threw nothing, so without
 	// this the failure event would carry an empty `failures` and a null
 	// `error` — and a consumer of the stream, which the contract tells to
 	// ignore the `benchmark` kind it may not know, would see a failure with no
@@ -2775,7 +2775,7 @@ async function runOne(
 	})
 }
 
-// NOTE: The points a test probed, in the order they were first recorded at —
+// The points a test probed, in the order they were first recorded at —
 // which is the order the value comments were written in, so an Editor drawing
 // them reads down the file.
 function probedPoints(probes: Array<Trace>): Array<number> {
@@ -2790,13 +2790,13 @@ function probedPoints(probes: Array<Trace>): Array<number> {
 	return points
 }
 
-// NOTE: One recorded assertion, rendered — every value as the text a reader
+// One recorded assertion, rendered — every value as the text a reader
 // sees, every point resolved against the Module's span table, and the two
 // operands of an `Equatable` comparison diffed. Rendering happens HERE rather
 // than at the sink so that a JSON consumer and a terminal reporter are shown
 // the same thing.
 function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
-	// NOTE: A snapshot failure has no traced values and no structure — two
+	// A snapshot failure has no traced values and no structure — two
 	// texts, and the lines that differ between them.
 	if (expectation.snapshot !== null) {
 		let snapshot = expectation.snapshot
@@ -2847,7 +2847,7 @@ function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
 
 // #region The way in
 
-// NOTE: What a bundle publishes, under `$tests` on its entry Module — the one
+// What a bundle publishes, under `$tests` on its entry Module — the one
 // name a runner looks up, and the reason the runner does not reach for this
 // module itself. Every value an Essence Program builds carries a hidden Type
 // key that is a `Symbol` of the runtime instance that built it, and a bundle
@@ -2857,11 +2857,11 @@ function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
 // a value runs in here, and what crosses the boundary is events — plain data,
 // already rendered.
 //
-// NOTE: An object rather than an export per member, so that adding to the
+// An object rather than an export per member, so that adding to the
 // contract adds a member rather than a name the Rewriter has to learn.
 export const entryPoints = {
 	registry,
-	// NOTE: Offered here as well as exported, for a runner that can not import
+	// Offered here as well as exported, for a runner that can not import
 	// this module at all — the Language Server's session runs a bundle inside a
 	// Worker, whose only way to reach anything is the bundle it was handed. It
 	// indexes what it is given and reads no value, so unlike everything beside
@@ -2869,16 +2869,16 @@ export const entryPoints = {
 	registryOf,
 	run: runTests,
 	select: selectTests,
-	// NOTE: What a Module's counters have counted, read from INSIDE the bundle
+	// What a Module's counters have counted, read from INSIDE the bundle
 	// like everything else here. The report is plain data — numbers and the
 	// table the Compiler emitted — so it crosses the boundary safely once it
 	// has been asked for in here.
 	coverage,
-	// NOTE: Whether this bundle read the host's input. Every test reads an
+	// Whether this bundle read the host's input. Every test reads an
 	// empty one, so the reads it reports are a Module's own statements, run as
 	// the bundle loaded.
 	hasReadHostInput,
-	// NOTE: Whether this bundle drew from the machine's entropy, in a test or
+	// Whether this bundle drew from the machine's entropy, in a test or
 	// as it loaded. A `run` handed no seed draws one here too, so a runner that
 	// asks this hands it one.
 	hasDrawnEntropy,

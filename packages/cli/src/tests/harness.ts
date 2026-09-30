@@ -2,13 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-// NOTE: What every spec that drives the command line END TO END needs, and
+// What every spec that drives the command line END TO END needs, and
 // nothing else: a throwaway project on disk, and a hold on the two streams the
 // CLI writes to. Both were spelled twice, once in `testRunner.spec` and once in
 // `mutation.spec`, and two copies of a harness are two chances for a spec to be
 // asking a slightly different question than the one beside it.
 
-// NOTE: A project written into a fresh directory and removed afterwards,
+// A project written into a fresh directory and removed afterwards,
 // whatever the body did. The prefix is the caller's so that a directory left
 // behind by a crash still says which suite made it.
 export async function withFiles<Value>(
@@ -32,7 +32,7 @@ export async function withFiles<Value>(
 	}
 }
 
-// NOTE: Everything the CLI writes goes through `process.stdout` and
+// Everything the CLI writes goes through `process.stdout` and
 // `process.stderr`, so driving `run` from a spec means holding both for the
 // length of the call — including the window in which the runner points stdout
 // at stderr while a bundle is loading.
@@ -63,7 +63,7 @@ export async function capture(
 	}
 }
 
-// NOTE: A project's settings are read out of the nearest essence.json, found by
+// A project's settings are read out of the nearest essence.json, found by
 // walking up from the WORKING DIRECTORY — so a spec about a configured project
 // has to stand in one. Restored before `withFiles` removes the directory, which
 // is why the two are nested rather than folded together.

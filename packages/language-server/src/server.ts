@@ -121,19 +121,19 @@ import {
 
 const analysisDebounceInMilliseconds = 200
 
-// NOTE: `essence/idle`. Answered once the Server has nothing left to do for the
+// `essence/idle`. Answered once the Server has nothing left to do for the
 // workspace — no window armed and no sweep queued — and at once where it
 // already has nothing. The answer is written behind every publish the loop
 // made on its way there, so a client that has it has the Diagnostics too.
 //
-// NOTE: What it is FOR is a client that has to know the difference between a
+// What it is FOR is a client that has to know the difference between a
 // Server that has answered and one that has not started: a test harness that
 // would otherwise sleep for some multiple of the debounce and hope, or an
 // Editor's "analysing…" indicator. It changes nothing about what the loop does
 // or when — a waiter is told, never waited for.
 export const IDLE_REQUEST = "essence/idle"
 
-// NOTE: One turn of the event loop before a request does anything expensive,
+// One turn of the event loop before a request does anything expensive,
 // and it is what makes a Cancellation observable at all: `$/cancelRequest` is a
 // message on the same connection, and a handler that runs straight through from
 // the moment it is called reads its token before that message was ever read off
@@ -158,7 +158,7 @@ function yieldToConnection(): Promise<void> {
 	})
 }
 
-// NOTE: Module level rather than written into the `onInitialize` result, so
+// Module level rather than written into the `onInitialize` result, so
 // that the answer to "what does this Server advertise" is a value a test can
 // read. A capability that silently stops being announced disables its feature
 // in every Editor while every handler behind it keeps passing its own spec.
@@ -173,7 +173,7 @@ export const serverCapabilities: ServerCapabilities = {
 	documentHighlightProvider: true,
 	documentSymbolProvider: true,
 	documentFormattingProvider: true,
-	// NOTE: No `resolveProvider`: every action carries its edits already,
+	// No `resolveProvider`: every action carries its edits already,
 	// computed on the buffer as it is now. Deliberately no `source.fixAll`
 	// either: removing an import nothing uses is the one fix that is both
 	// unambiguous and semantics-preserving, which is what a bulk action has to
@@ -191,12 +191,12 @@ export const serverCapabilities: ServerCapabilities = {
 	},
 	completionProvider: {
 		triggerCharacters: [".", ":", "<", "#"],
-		// NOTE: Announced although every entry is complete when it is handed
+		// Announced although every entry is complete when it is handed
 		// over: a client that knows the Server resolves may send back an item it
 		// trimmed for the wire, and the round trip is what returns it intact.
 		resolveProvider: true,
 	},
-	// NOTE: Answered from the workspace index, which is why this could not be
+	// Answered from the workspace index, which is why this could not be
 	// announced before Modules — a symbol worth finding across files is a symbol
 	// files can share, and until an entry could carry one, none could.
 	workspaceSymbolProvider: true,
@@ -205,7 +205,7 @@ export const serverCapabilities: ServerCapabilities = {
 			supported: true,
 			changeNotifications: true,
 		},
-		// NOTE: Asked BEFORE a file moves, so that the entries naming it are
+		// Asked BEFORE a file moves, so that the entries naming it are
 		// rewritten in one edit with the move rather than repaired after it —
 		// the file is never on disk under a name nothing points at.
 		//
@@ -246,7 +246,7 @@ export const serverCapabilities: ServerCapabilities = {
 	},
 	signatureHelpProvider: {
 		triggerCharacters: ["(", ","],
-		// NOTE: Closing a nested call puts the cursor back inside the outer
+		// Closing a nested call puts the cursor back inside the outer
 		// one, which is a different signature than the one on screen.
 		retriggerCharacters: [")"],
 	},
@@ -259,7 +259,7 @@ export const serverCapabilities: ServerCapabilities = {
 	},
 	foldingRangeProvider: true,
 	selectionRangeProvider: true,
-	// NOTE: Run and Debug above every `test` and every `suite`. No resolve: a
+	// Run and Debug above every `test` and every `suite`. No resolve: a
 	// lens carries its command and its arguments already, because what it needs
 	// is the ids of the tests under it and those are read off the same parse the
 	// lens itself was.
@@ -269,7 +269,7 @@ export const serverCapabilities: ServerCapabilities = {
 	callHierarchyProvider: true,
 }
 
-// NOTE: vscode-languageserver reads the transport off process.argv and throws
+// vscode-languageserver reads the transport off process.argv and throws
 // if it finds none. Editors always pass one, but a person starting the Server
 // by hand — or `essence lsp` — passes nothing, and stdio is the transport this
 // Server documents itself as speaking, so name it instead of failing. A
@@ -292,7 +292,7 @@ function defaultConnection(): Connection {
 	return createConnection(ProposedFeatures.all)
 }
 
-// NOTE: The connection is injectable for one reason: what this Server costs is
+// The connection is injectable for one reason: what this Server costs is
 // a property of the whole request loop — the debounce, the document store, the
 // order the Editor asks in — and a test that calls the handlers' insides
 // measures something else. A harness hands in a connection over a pair of
@@ -301,7 +301,7 @@ function defaultConnection(): Connection {
 export function startServer(options: { connection?: Connection } = {}) {
 	let connection = options.connection ?? defaultConnection()
 	let documents = new TextDocuments(TextDocument)
-	// NOTE: ONE timer for every file waiting to be analysed, rather than one
+	// ONE timer for every file waiting to be analysed, rather than one
 	// each, so that a burst of keystrokes and a branch switch that touched forty
 	// files both come out as a single window — and inside that window the
 	// entries are analysed in an order that makes their graphs overlap instead
@@ -313,21 +313,21 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// per debounce, which is ordinary typing, the file the reader is not in
 	// waits for them to stop, and nothing bounds how long that is.
 	//
-	// NOTE: What is pending is the file that CHANGED, not the analysis that will
+	// What is pending is the file that CHANGED, not the analysis that will
 	// cover it — the unit of analysis is a ROOT of the workspace's dependency
 	// graph, and which roots reach a changed file is worked out when the window
 	// fires. That walk reads the entries of every file whose text moved, which
 	// means parsing them, and a parse per keystroke is the cost this whole cache
 	// exists to remove.
 	let pendingChanges = new Map<string, number>()
-	// NOTE: The deadline of a whole-workspace sweep — every root rather than the
+	// The deadline of a whole-workspace sweep — every root rather than the
 	// ones reaching a change. Null when none is waiting. It has no file of its
 	// own to be pending for, because what it covers is not a change: it is the
 	// answer to "what does this project say", asked at startup and whenever the
 	// set of folders moves.
 	let pendingSweep: number | null = null
 	let analysisTimer: ReturnType<typeof setTimeout> | null = null
-	// NOTE: What a sweep that has STARTED still owes, biggest graph first — one
+	// What a sweep that has STARTED still owes, biggest graph first — one
 	// entry per callback rather than every root inside one. A project shaped like
 	// forty test files over one library is forty roots and therefore forty links,
 	// and the count is inherent: each of those files is a graph of its own. What
@@ -340,11 +340,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// a Hover arriving mid-sweep waits for is one more root rather than all of
 	// them.
 	let sweepQueue: Array<string> = []
-	// NOTE: What the queued entries are expected to cover, walked once when the
+	// What the queued entries are expected to cover, walked once when the
 	// queue is built — the order the queue runs in is read off it, and so is the
 	// coverage each entry is asked about the moment it has run.
 	let sweepReaches = new Map<string, Set<string>>()
-	// NOTE: Which half of the sweep the queue is holding: its entries, or the
+	// Which half of the sweep the queue is holding: its entries, or the
 	// files those entries were supposed to judge and did not. The second half
 	// RUNS once the first has drained, exactly as `analyseBatch` runs its
 	// fallbacks once every entry of a batch has — a file one root could not read
@@ -357,37 +357,37 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// WHICH files they are is a different question and is asked earlier, entry by
 	// entry — see `sweepUncovered`.
 	let sweepPhase: "entries" | "fallbacks" = "entries"
-	// NOTE: What the queue's entries were supposed to judge and did not, each of
+	// What the queue's entries were supposed to judge and did not, each of
 	// them recorded by the callback of the entry that was supposed to — see
 	// `uncoveredIn` for why it can not be asked at the end.
 	let sweepUncovered = new Set<string>()
-	// NOTE: The URIs the sweep's entries have stopped reporting on, held until
+	// The URIs the sweep's entries have stopped reporting on, held until
 	// the queue is empty — the same rule `analyseBatch` follows, over a batch
 	// that now spans callbacks. Deliberately not cleared when a sweep REPLACES
 	// another: what the abandoned one let go is still owed a clear, and the queue
 	// taking over is what will finally give it one.
 	let sweepDropped = new Set<string>()
-	// NOTE: The focus the sweep started with, carried by every one of its
+	// The focus the sweep started with, carried by every one of its
 	// callbacks. A batch collects the annotations of ONE Module and a root once
 	// analysed is never re-linked to collect them again, so the file a keystroke
 	// landed in has to be named to the whole queue or to none of it.
 	let sweepFocus: string | undefined
 	let sweepChunk: ReturnType<typeof setImmediate> | null = null
-	// NOTE: Who asked `essence/idle` while the loop still had work, each to be
+	// Who asked `essence/idle` while the loop still had work, each to be
 	// answered the moment it has none — see `answerIdle`.
 	let idleWaiters: Array<() => void> = []
-	// NOTE: The file the last keystroke landed in, which is the one a Hover is
+	// The file the last keystroke landed in, which is the one a Hover is
 	// about to be asked over — see `annotationsFor`. Deliberately not the first
 	// entry of `pendingChanges`: that is whichever file opened the window, so a
 	// burst crossing files would collect the annotations for the file the reader
 	// has already left, and the Hover that follows would pay for its own link.
 	let analysisFocus: string | null = null
-	// NOTE: An open document by its canonical path, which is what the workspace
+	// An open document by its canonical path, which is what the workspace
 	// and the Module graph both key on. Maintained alongside `documents` rather
 	// than searched for on every read: the graph asks for a file once per Module
 	// per analysis, and an Editor's unsaved buffer must win every one of them.
 	let openPaths = new Map<string, string>()
-	// NOTE: The open `essence.json` buffers, the same bookkeeping and kept
+	// The open `essence.json` buffers, the same bookkeeping and kept
 	// deliberately apart from it: a project file is not a source. Everything
 	// keyed by `openPaths` treats what it holds as Essence — the Module host
 	// reads it, the test session sends it to the Worker as an overlay, and a
@@ -403,7 +403,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				? undefined
 				: { text: document.getText(), version: document.version }
 		},
-		// NOTE: The Editor types the `tests { … }` section. A build drops it, so
+		// The Editor types the `tests { … }` section. A build drops it, so
 		// nothing else would ever tell a writer that an assertion is not a
 		// Boolean or that a name inside a test body does not exist — an editor
 		// that says nothing about a section is an editor claiming it is
@@ -411,7 +411,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// session answers by compiling each entry in its Worker.
 		tests: true,
 	})
-	// NOTE: Which URIs this Server has published Diagnostics to, by the ENTRY
+	// Which URIs this Server has published Diagnostics to, by the ENTRY
 	// whose analysis produced them — a root of the workspace's dependency graph,
 	// a file analysed on its own because the root above it could not be read, or
 	// an open document no root will ever reach. Keyed by canonical path rather
@@ -423,24 +423,24 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// analysis is sent an explicitly empty set — unless another entry still
 	// reports on it.
 	let publishedByEntry = new Map<string, Set<string>>()
-	// NOTE: The list each URI was last SENT, so an unchanged one is not sent
+	// The list each URI was last SENT, so an unchanged one is not sent
 	// again. Kept by URI rather than by entry because two roots can both reach
 	// one dependency, and what the client holds for it is one list.
 	let publishedContent = new Map<string, string>()
-	// NOTE: The URIs the CONFIGURATION was last published to — an `essence.json`
+	// The URIs the CONFIGURATION was last published to — an `essence.json`
 	// and any `package.json` still spelling the old key. Held for the reason
 	// `publishedByEntry` is held: a file whose problems went away is owed an
 	// explicitly empty list, and nothing else will ever clear one. Kept apart
 	// from the entries, because no analysis reaches these files and no entry can
 	// take them over.
 	let publishedConfiguration = new Set<string>()
-	// NOTE: Whether Type Hints are served — the client's
+	// Whether Type Hints are served — the client's
 	// `essence.inlayHints.enabled`. True until a client says otherwise, so an
 	// editor that answers no configuration requests keeps the Hints it always
 	// had.
 	let inlayHintsEnabled = true
 	let clientSupportsConfiguration = false
-	// NOTE: What the client can APPLY, which is not the same question as what
+	// What the client can APPLY, which is not the same question as what
 	// the Server can compute. A Workspace Edit carries its edits one of two
 	// ways: `changes`, a map of files, which every client takes; and
 	// `documentChanges`, which also carries RESOURCE OPERATIONS — creating a
@@ -453,7 +453,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// capability means.
 	let clientSupportsDocumentChanges = false
 	let clientCreatesFiles = false
-	// NOTE: The live test session. It compiles and runs in a Worker of its own,
+	// The live test session. It compiles and runs in a Worker of its own,
 	// so everything the Server does with it is bookkeeping: which files changed,
 	// what to publish, what to draw. Off by a setting, because running a
 	// project's tests on every keystroke is a thing a reader must be able to
@@ -461,7 +461,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	let session = createTestSession({
 		testFiles,
 		dependentsOf: (filePath) => workspace.dependentsOf(filePath),
-		// NOTE: The project governing THIS entry, rather than one answer for the
+		// The project governing THIS entry, rather than one answer for the
 		// whole session: the tags it skips and whether its declarations are
 		// tested are the project's to say, and a workspace holds as many
 		// projects as it holds `essence.json` files.
@@ -485,7 +485,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return overlays
 		},
 		notify: (notification) => {
-			// NOTE: A connection that has gone away THROWS rather than
+			// A connection that has gone away THROWS rather than
 			// rejecting, and a run finishing after an Editor closed is an
 			// ordinary end to a session rather than a failure — so the throw is
 			// swallowed here, where the alternative is an unhandled error that
@@ -496,18 +496,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 					.catch(() => {})
 			} catch {}
 		},
-		// NOTE: New results mean new `test-failed` Diagnostics, and those are
+		// New results mean new `test-failed` Diagnostics, and those are
 		// published BESIDE the analysis's own — one list per URI is what the
 		// protocol has, so the two are merged where the analysis publishes.
 		//
-		// NOTE: Through the entries that report on those files rather than
+		// Through the entries that report on those files rather than
 		// through the files themselves, because that is who owns their URIs.
 		// The analyses are cache reads whenever nothing is pending — a run
 		// finishing moves no source — and misses whenever this lands inside a
 		// window a keystroke opened, since that keystroke dropped the whole
 		// component's enrichment.
 		//
-		// NOTE: With the focus the Server is holding, for that second case: an
+		// With the focus the Server is holding, for that second case: an
 		// entry analysed without it collects the annotations of the wrong
 		// Module, and a root once analysed is never re-linked to collect them
 		// again — the Hover the reader is about to ask for would pay for a link
@@ -522,7 +522,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				`essence: the test session could not run ${filePath}: ${problem}`,
 			)
 		},
-		// NOTE: An accepted snapshot is applied as an EDIT rather than written
+		// An accepted snapshot is applied as an EDIT rather than written
 		// to disk: the run compiled whatever the buffer says, and a buffer with
 		// unsaved work in it would be overwritten by a write. The whole
 		// document is replaced, because what the Formatter answered with is a
@@ -552,7 +552,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		},
 	})
 
-	// NOTE: A range that covers whatever the document holds. An open one is
+	// A range that covers whatever the document holds. An open one is
 	// measured; one nothing has opened is replaced from its start to a line
 	// number nothing can exceed, which is what the protocol says a client must
 	// clamp.
@@ -571,12 +571,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	}
 
-	// NOTE: Every file of the workspace that WROTE a `tests { … }` block, read
+	// Every file of the workspace that WROTE a `tests { … }` block, read
 	// off the parses the Workspace already holds. A file is an entry because of
 	// what it says rather than because of what it is called: `Foo.tests.es` is a
 	// convention and a section is the fact.
 	//
-	// NOTE: And, under a project that asked for `test.contracts`, every file
+	// And, under a project that asked for `test.contracts`, every file
 	// that declares a Namespace — because such a file HAS tests: the goals its
 	// declarations promise, synthesized into a `contracts` suite by the compile
 	// (see `contractSuite`). A file with neither is still no entry, and the
@@ -603,14 +603,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		})
 	}
 
-	// NOTE: What the tags of the WHOLE workspace say about each other, which no
+	// What the tags of the WHOLE workspace say about each other, which no
 	// compile can answer: `tagged netwrok` is well-formed inside its own Module.
 	// Recomputed when a file changes and cached in between, because it is asked
 	// once per publish and once per lightbulb.
 	let tags: Map<string, Array<common.Diagnostic>> | null = null
 
 	function tagDiagnosticsFor(filePath: string): Array<common.Diagnostic> {
-		// NOTE: Gated on the setting although it runs nothing, because it walks
+		// Gated on the setting although it runs nothing, because it walks
 		// every parse in the workspace to answer — and a reader who declined
 		// the live session declined the Server going through the project on its
 		// own account.
@@ -631,12 +631,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return tags.get(filePath) ?? []
 	}
 
-	// NOTE: Everything the test session has to say about a file: the failed
+	// Everything the test session has to say about a file: the failed
 	// assertions of its last run, and what its tags say about the workspace's.
 	// Published BESIDE the analysis's own Diagnostics, because the protocol has
 	// one list per URI and the second sender would otherwise clear the first.
 	//
-	// NOTE: Not gated on the setting, unlike the tags below. What a session
+	// Not gated on the setting, unlike the tags below. What a session
 	// that is switched off holds is nothing — being switched off empties it —
 	// so the only failures here are the ones a run somebody ASKED for found,
 	// and hiding those would be hiding the answer to the question.
@@ -645,7 +645,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 		return [
 			...session.diagnosticsFor(filePath),
-			// NOTE: Ungated, unlike the tags: what a `focused` does is refuse a
+			// Ungated, unlike the tags: what a `focused` does is refuse a
 			// plain run at the command line, and a reader who switched the live
 			// session off still wants to be told before that happens. It costs
 			// a walk of one parse the workspace is holding anyway.
@@ -654,11 +654,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 		]
 	}
 
-	// NOTE: The standard library is read, hoisted, enriched and validated once
+	// The standard library is read, hoisted, enriched and validated once
 	// per process. Doing it here — while the client is still setting up —
 	// means the first Hover does not pay for it, and a Diagnostic in the
 	// library itself surfaces at startup rather than on a keystroke.
-	// NOTE: The folders come from the client and from nowhere else. This Server
+	// The folders come from the client and from nowhere else. This Server
 	// ships as a single bundled file inside the VS Code extension, so a path
 	// relative to its own location names somewhere inside the extension rather
 	// than anywhere in the workspace.
@@ -687,18 +687,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 	})
 
 	connection.onInitialized(() => {
-		// NOTE: A file changing on disk is the half of the workspace the
+		// A file changing on disk is the half of the workspace the
 		// document events can not see — a branch switch, a file another tool
 		// wrote, a Module deleted. Registered dynamically because the glob is
 		// the Server's business rather than the extension manifest's.
-		// NOTE: And `essence.json`, which is where a project says which of its
+		// And `essence.json`, which is where a project says which of its
 		// directories are not its sources and how its tests run. It is not a
 		// Module and nothing analyses it — what it changes is which files this
 		// Server is entitled to report on at all, and a reader who has just
 		// excluded a corpus should watch the panel empty rather than be told to
 		// restart the editor.
 		//
-		// NOTE: `package.json` is watched for one reason only: an `essence` key
+		// `package.json` is watched for one reason only: an `essence` key
 		// in one is where these settings USED to live, and a manifest that still
 		// spells it is told so on the key. Nothing is read from it, so a change
 		// to one moves no boundary and re-runs nothing — it only republishes
@@ -713,7 +713,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			})
 			.catch(() => {})
 
-		// NOTE: What this Server reads of the client's settings. Pulled rather
+		// What this Server reads of the client's settings. Pulled rather
 		// than taken off the notification, which only says that something
 		// under `essence` changed and not what it is now, and pulled again on
 		// every change, with a refresh so open editors drop or regain their
@@ -732,14 +732,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 					})
 					.catch(() => {})
 
-			// NOTE: The live test session, which a reader must be able to
+			// The live test session, which a reader must be able to
 			// decline: it compiles and runs a project's tests on every edit,
 			// and a project where that is too much work is a project where
 			// this has to be off rather than merely quiet. The whole section
 			// is pulled at once — three settings that are one decision, and
 			// three round trips to answer it would be three.
 			//
-			// NOTE: Which tags a run skips is NOT among them. It is a fact
+			// Which tags a run skips is NOT among them. It is a fact
 			// about the project rather than about the reader — the same list
 			// `essence test` obeys — so it is read out of the project file, per
 			// entry, and the editor's copy of it is gone.
@@ -751,13 +751,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 							session.setDebounce(tests.debounce)
 						}
 
-						// NOTE: Off unless it was asked for. Counting what a
+						// Off unless it was asked for. Counting what a
 						// run reached compiles a different bundle and makes
 						// the Program do more work on every keystroke, so it
 						// is the reader who decides it is worth that.
 						session.setCoverage(tests?.coverage === true)
 
-						// NOTE: Last, so that a session being switched ON runs
+						// Last, so that a session being switched ON runs
 						// with the delay it was just told about rather than
 						// with the one it started with.
 						session.setEnabled(tests?.enabled !== false)
@@ -777,19 +777,19 @@ export function startServer(options: { connection?: Connection } = {}) {
 			readTestSettings()
 		}
 
-		// NOTE: Before anything is walked or run, because it is what the walk
+		// Before anything is walked or run, because it is what the walk
 		// and the run were configured BY: a project file that could not be read
 		// is why the panel is about to list a corpus, and the reader is owed
 		// that before the listing rather than after it.
 		publishConfiguration()
 
-		// NOTE: Started once the client has finished initialising, rather than
+		// Started once the client has finished initialising, rather than
 		// in `onInitialize`: the first thing it does is walk the workspace for
 		// files that write tests, and a client is entitled to a prompt answer
 		// to its initialize request.
 		session.runAll("open")
 
-		// NOTE: The whole project, analysed from the files nothing imports, so
+		// The whole project, analysed from the files nothing imports, so
 		// that the Problems panel lists what the workspace holds rather than
 		// what happens to be open. Debounced like everything else, so a client
 		// that opens six documents on restore pays for one window rather than
@@ -810,7 +810,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			workspace.setFolders([...folders])
 			tags = null
 			session.runAll("open")
-			// NOTE: A folder arriving brings a project's worth of files nothing
+			// A folder arriving brings a project's worth of files nothing
 			// has ever analysed, and a folder leaving takes the owners of every
 			// squiggle in it — both are answered by working the roots out again
 			// from scratch.
@@ -818,11 +818,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 		})
 	})
 
-	// NOTE: The Run and Debug lenses. Read off the PARSE — nothing has to have
+	// The Run and Debug lenses. Read off the PARSE — nothing has to have
 	// run for a test to be worth offering to run — so a file opened in a
 	// session that is still starting up already carries them.
 	//
-	// NOTE: Offered while the session is switched off, too. What that setting
+	// Offered while the session is switched off, too. What that setting
 	// declines is compiling and running a project on every keystroke; pressing
 	// Run is the gesture it promises to keep, and a Run lens is where a reader
 	// presses it.
@@ -849,7 +849,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}))
 	})
 
-	// NOTE: The tests of this file whose last run left a snapshot to accept —
+	// The tests of this file whose last run left a snapshot to accept —
 	// one nothing had recorded, or one that differs from what was stored. It is
 	// read off the session's own records, so a file nothing has run yet offers
 	// no such lens, which is right: there is nothing to accept.
@@ -857,7 +857,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let pending = new Set<string>()
 
 		for (let record of session.recordsFor(filePath)) {
-			// NOTE: `written` counts as pending here, and it does not on the
+			// `written` counts as pending here, and it does not on the
 			// command line: an ordinary cycle of the session records NOTHING,
 			// so a snapshot nothing had stored is one the reader still has to
 			// accept. A cycle that DID record re-runs what it recorded, so
@@ -875,7 +875,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return pending
 	}
 
-	// NOTE: What a lens's command ends up sending, and what a Test Explorer's
+	// What a lens's command ends up sending, and what a Test Explorer's
 	// run button sends. It answers with the run number the notifications will
 	// carry, so a client can tie what it asked for to what arrives.
 	connection.onRequest(
@@ -889,7 +889,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}),
 	)
 
-	// NOTE: Idle is the two timers both being clear. A window armed means a
+	// Idle is the two timers both being clear. A window armed means a
 	// batch or a sweep still to run; a chunk armed means a sweep still to
 	// drain. Nothing is pending without one of them: scheduling anything arms
 	// the window, and the window firing either runs the batch to completion
@@ -898,7 +898,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return analysisTimer === null && sweepChunk === null
 	}
 
-	// NOTE: Called wherever the loop may have just gone quiet — the end of a
+	// Called wherever the loop may have just gone quiet — the end of a
 	// window's callback, the end of a sweep, a shutdown — and a no-op wherever
 	// it has not. The waiters are taken before they are told, so that one whose
 	// continuation asks again is queued for the next quiet moment rather than
@@ -930,7 +930,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	})
 
 	connection.onShutdown(() => {
-		// NOTE: The window goes with the client. An analysis is scheduled for
+		// The window goes with the client. An analysis is scheduled for
 		// every file a closing Editor hands back to disk, and one that fires
 		// after the connection is gone publishes into nothing — a throw out of a
 		// timer callback is the process.
@@ -939,7 +939,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			analysisTimer = null
 		}
 
-		// NOTE: And the sweep in flight with it. It is a queue rather than one
+		// And the sweep in flight with it. It is a queue rather than one
 		// callback now, so a shutdown that lands in the middle of one has a
 		// callback armed and a project's worth of roots still to publish for a
 		// client that has gone.
@@ -955,14 +955,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		sweepUncovered.clear()
 		sweepDropped.clear()
 
-		// NOTE: Idle now, with nothing left to become idle FROM — a waiter left
+		// Idle now, with nothing left to become idle FROM — a waiter left
 		// in the list would wait for a callback that was just cancelled.
 		answerIdle()
 
 		void session.dispose()
 	})
 
-	// NOTE: A file NAMED `essence.json`, wherever it sits. It is the question
+	// A file NAMED `essence.json`, wherever it sits. It is the question
 	// every document handler asks — a document the client forwarded is either a
 	// project file or Essence, and where it lies has nothing to do with which —
 	// while the watcher below asks the narrower one.
@@ -970,7 +970,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return path.basename(filePath) === PROJECT_FILE_NAME
 	}
 
-	// NOTE: A file this Server reads a project's settings out of, or used to.
+	// A file this Server reads a project's settings out of, or used to.
 	// Not every one under the folder: `bun install` rewrites thousands of
 	// manifests inside `node_modules`, and answering each of them with a project
 	// rebuilt from scratch would make an install cost more than the install. The
@@ -987,12 +987,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 			.some((segment) => skippedDirectories.has(segment))
 	}
 
-	// NOTE: The project file itself, which draws the boundary.
+	// The project file itself, which draws the boundary.
 	function isProjectFile(filePath: string): boolean {
 		return isConfigured(filePath, PROJECT_FILE_NAME)
 	}
 
-	// NOTE: And a `package.json`, which draws nothing any more. All it can say
+	// And a `package.json`, which draws nothing any more. All it can say
 	// is that its `essence` key has moved.
 	function isManifest(filePath: string): boolean {
 		return isConfigured(filePath, "package.json")
@@ -1027,7 +1027,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}
 		}
 
-		// NOTE: A project file is answered by working the whole project out
+		// A project file is answered by working the whole project out
 		// again, the way a workspace folder arriving is. Every cached answer
 		// here was derived for a project with one boundary, and the file that
 		// moved is the one that draws it — including the discovery walk, which
@@ -1048,7 +1048,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return
 		}
 
-		// NOTE: A manifest moves nothing, so nothing is worked out again: the
+		// A manifest moves nothing, so nothing is worked out again: the
 		// settings are read once more — which is what finds, or stops finding,
 		// the `essence` key — and the Diagnostics that come of it are published.
 		// No sweep and no test run: what the file says about this project is
@@ -1065,7 +1065,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		tags = null
 		session.changed(changed)
 
-		// NOTE: A file changing on disk changes the graphs it sits in, and an
+		// A file changing on disk changes the graphs it sits in, and an
 		// analysis is the only thing that ever publishes: the Diagnostics an
 		// entry owns for a file beneath it are cleared by that entry being
 		// analysed again, which no keystroke is going to ask for.
@@ -1076,7 +1076,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// the file was still missing, so the walk finds that importer's root the
 		// moment the file appears.
 		//
-		// NOTE: N files changed is not N analyses. They go through the same
+		// N files changed is not N analyses. They go through the same
 		// debounce every keystroke does, so a checkout switching branches under
 		// the Editor coalesces into one window — and inside it one root's
 		// analysis fills the cache for every Module of its graph, which the
@@ -1084,7 +1084,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		scheduleAnalysis(changed)
 	})
 
-	// NOTE: A request answered with edits to files nobody asked about, and made
+	// A request answered with edits to files nobody asked about, and made
 	// before the client does something rather than after: what it wants to know
 	// is what has to change for the move to leave the workspace saying what it
 	// said. Answering nothing lets the move happen untouched, which is what a
@@ -1118,7 +1118,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return { changes }
 	})
 
-	// NOTE: The open document behind a request, and the ONE place that answers
+	// The open document behind a request, and the ONE place that answers
 	// "is this Essence at all". Every request that reads a buffer comes through
 	// here, so a document the client forwards that is not a source is refused
 	// once rather than in each of twenty handlers — and a project file is
@@ -1138,14 +1138,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return document
 	}
 
-	// NOTE: Every request that answers ABOUT a document comes through here, and
+	// Every request that answers ABOUT a document comes through here, and
 	// what it gets is the Workspace's cache entry for that document at its
 	// current version — the parse, the typed Program, the rename index and, for
 	// Hover, the written annotations. A request arriving before the debounced
 	// analysis has run for this version computes the entry itself; the analysis
 	// that follows then reads it. Whoever asks first pays, once.
 	//
-	// NOTE: The fallback below is not a fast path for anything — it is the
+	// The fallback below is not a fast path for anything — it is the
 	// answer for the documents the Workspace deliberately holds nothing for: a
 	// standard library source, which is enriched with its own declarations
 	// subtracted back out of the builtin tables, and a buffer whose path can not
@@ -1169,7 +1169,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				cancellation: options.cancellation,
 			})
 
-			// NOTE: Abandoned. The Workspace holds this file, so the fallback
+			// Abandoned. The Workspace holds this file, so the fallback
 			// below is not what it wants answering with — nothing is.
 			if (cached === null) {
 				return null
@@ -1180,7 +1180,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				enrichedProgram: cached.enrichedProgram,
 				index: cached.index,
 				module: cached.module,
-				// NOTE: Only Hover asks for these, and collecting them for a
+				// Only Hover asks for these, and collecting them for a
 				// Module of a component whose analysis was anchored elsewhere
 				// costs one more link — so they are asked for and not merely
 				// read.
@@ -1217,7 +1217,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	}
 
-	// NOTE: A Compiler throw that a request answers around without the typed
+	// A Compiler throw that a request answers around without the typed
 	// Program. The log is the only place it shows; a stack's first line carries
 	// the message.
 	function logInternalError(filePath: string, error: unknown): void {
@@ -1230,7 +1230,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: A request that has to compile pays for the graph the WINDOW behind it
+	// A request that has to compile pays for the graph the WINDOW behind it
 	// is going to link anyway, rather than for the smaller one this document
 	// would need on its own. Both would be paid: the Editor asks for Semantic
 	// Tokens, Code Actions and a Hover inside the same 200 ms in which the
@@ -1261,7 +1261,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		})
 	}
 
-	// NOTE: Whether a request is still worth answering, checked after the one
+	// Whether a request is still worth answering, checked after the one
 	// suspension a REQUEST makes (see `yieldToConnection`, which the workspace
 	// sweep suspends beside it — between two roots and never inside one, which
 	// is why the two of them can be in flight at once). Two ways it stops being
@@ -1280,7 +1280,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return !isCancelled(token) && documents.get(uri)?.version === version
 	}
 
-	// NOTE: The protocol's own answer for a request nobody is waiting for any
+	// The protocol's own answer for a request nobody is waiting for any
 	// more, and the two reasons `isCurrent` refuses for are two different codes.
 	// `RequestCancelled` says the Editor asked for this to stop; `ContentModified`
 	// says the document moved on underneath it. Clients act on the difference —
@@ -1303,7 +1303,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				)
 	}
 
-	// NOTE: The Parser AST alone, for the requests that need no Types. Read from
+	// The Parser AST alone, for the requests that need no Types. Read from
 	// the same cache as everything else so that a Folding Range and a Hover over
 	// one document are two readers of one parse.
 	function parsedOf(uri: string): parser.Program | null {
@@ -1319,7 +1319,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: The `uri` is what lets `findRenameableOccurrence` refuse inside a
+	// The `uri` is what lets `findRenameableOccurrence` refuse inside a
 	// standard library source — see the NOTE on it, which is where the reason
 	// lives.
 	function renameableOccurrenceAt(uri: string, position: Position) {
@@ -1365,7 +1365,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: The workspace's answer where there is one, the document's own where
+	// The workspace's answer where there is one, the document's own where
 	// there is not — an untitled buffer, or a file outside every folder, is
 	// still one file whose names rename among themselves. The standard library
 	// refusal is checked first for the reason it exists in `rename.ts`: a rename
@@ -1386,7 +1386,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: The occurrence a rename would be anchored at, as the workspace sees
+	// The occurrence a rename would be anchored at, as the workspace sees
 	// it — the Identifier under the cursor, which for a Method dispatching
 	// through an imported Namespace is in no local Scope at all and is still
 	// what the reader is pointing at.
@@ -1430,7 +1430,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 		let folders = workspace.folders()
 
-		// NOTE: Refused rather than half-applied. A declaration outside every
+		// Refused rather than half-applied. A declaration outside every
 		// workspace folder is one whose other occurrences this Server was never
 		// asked to index, so renaming it would rewrite the uses it happens to
 		// have found and leave the rest naming something that no longer exists.
@@ -1481,12 +1481,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: What counts as a valid new name depends on what is renamed: a
+		// What counts as a valid new name depends on what is renamed: a
 		// LABEL lives in the grammar's Identifier rule, which reads Keywords
 		// like `with` and `from` as ordinary Identifiers — the standard
 		// library's own labels are spelled with them.
 		//
-		// NOTE: And a Parameter whose name DOUBLES as its label has to satisfy
+		// And a Parameter whose name DOUBLES as its label has to satisfy
 		// both rules at once. Its kind is `parameter`, so the Identifier rule
 		// alone would let `start` and `complete` through — and the rename then
 		// rewrites every call site into `compute(start 1)`, which the Parser
@@ -1519,7 +1519,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let changes: Record<string, Array<TextEdit>> = {}
 
 		for (let entry of occurrences) {
-			// NOTE: The URI the request came in under wins for the document it
+			// The URI the request came in under wins for the document it
 			// names, so the edit lands on the buffer the Editor is holding
 			// rather than on a second spelling of the same path.
 			let uri =
@@ -1533,7 +1533,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				changes[uri] = edits
 			}
 
-			// NOTE: Most sites are the new name written over the Identifier
+			// Most sites are the new name written over the Identifier
 			// that was found. The two shorthands are not: `{ width }` names
 			// two things with ONE Identifier — a Pattern's binds the Record's
 			// member and a local, a Record Literal's writes the member and
@@ -1563,7 +1563,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		// NOTE: The workspace join answers first, because the local index
+		// The workspace join answers first, because the local index
 		// stops at the import entry — the entry IS this file's declaration of
 		// the name, and a reader asking from it (or from any use bound through
 		// it) is pointing at the declaration in whichever Module writes it.
@@ -1629,7 +1629,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: The signature goes in a code fence so the Editor highlights
+		// The signature goes in a code fence so the Editor highlights
 		// it; the Documentation below the rule is Markdown as written.
 		let signature = `\`\`\`essence\n${hover.content}\n\`\`\``
 
@@ -1645,7 +1645,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	})
 
-	// NOTE: Every file, not only this one — a name an entry carries is one
+	// Every file, not only this one — a name an entry carries is one
 	// symbol, and half its uses being findable is the failure mode References
 	// exists to prevent.
 	connection.onReferences(async (params, token) => {
@@ -1696,7 +1696,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}))
 	})
 
-	// NOTE: The same join, restricted to this one file — Document Highlight is
+	// The same join, restricted to this one file — Document Highlight is
 	// per-file by protocol and fires on every cursor move, so it must not be the
 	// request that enriches a workspace. What the join still buys here is the
 	// two Module sections: highlighting a name in the body lights up the entry
@@ -1712,7 +1712,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			{ localOnly: true },
 		)
 
-		// NOTE: The same fallback References takes — a builtin has no workspace
+		// The same fallback References takes — a builtin has no workspace
 		// symbol, but highlighting is read-only and works on builtins too, and
 		// `findOccurrences` keeps the access each entry carries.
 		if (symbol === null) {
@@ -1752,7 +1752,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}))
 	})
 
-	// NOTE: Not debounced, and deliberately: once the whole request is a read of
+	// Not debounced, and deliberately: once the whole request is a read of
 	// the analysis cache, coalescing it would only delay a highlight that costs
 	// nothing to draw. What it does need is the abandonment above — an Editor
 	// asks for these on every keystroke and cancels the ones it overtook.
@@ -1785,7 +1785,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		// NOTE: Editing one occurrence updates the rest as they are typed, so
+		// Editing one occurrence updates the rest as they are typed, so
 		// this is deliberately restricted to what renaming would accept —
 		// Builtins are excluded, since typing over `Terminal` must not look
 		// like it is renaming it.
@@ -1798,7 +1798,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: Linked editing propagates the SAME text to every range, so a
+		// Linked editing propagates the SAME text to every range, so a
 		// symbol with a site that needs different text can not be offered —
 		// which is exactly a Pattern's shorthand binder: typing over `width` in
 		// `{ width }` has to leave the member behind as `{ width as … }`, and
@@ -1817,7 +1817,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			ranges: occurrence.declaration.occurrences.map((site) =>
 				toLspRange(site.position),
 			),
-			// NOTE: Typing a character an Identifier cannot contain ends the
+			// Typing a character an Identifier cannot contain ends the
 			// linked edit instead of propagating something unparseable.
 			wordPattern: identifierPattern,
 		}
@@ -1849,7 +1849,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return [toLspCallHierarchyItem(item, params.textDocument.uri)]
 	})
 
-	// NOTE: An Item round-trips its uri and its selectionRange, so the
+	// An Item round-trips its uri and its selectionRange, so the
 	// Declaration it names is resolved again from the document's current
 	// analysis. Nothing is kept between the prepare and the expansion.
 	connection.languages.callHierarchy.onIncomingCalls(
@@ -1902,7 +1902,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		},
 	)
 
-	// NOTE: The outline enriches so that entries can carry their Types, and
+	// The outline enriches so that entries can carry their Types, and
 	// degrades to the Parser's answer alone when enrichment throws — the whole
 	// point of building it off the Parser AST is that it survives a Program
 	// that does not type check.
@@ -1938,7 +1938,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			params.textDocument.uri,
 		)
 
-		// NOTE: An `unsafe` refusal means the formatter distrusted its own
+		// An `unsafe` refusal means the formatter distrusted its own
 		// output and kept the file as it was — a formatter bug, which the CLI
 		// reports loudly and the editor should not swallow. The warning names
 		// the component, not an executable: the user may have arrived here
@@ -1959,7 +1959,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 		let filePath = documentFilePath(params.textDocument.uri)
 
-		// NOTE: The one request a project file answers — see
+		// The one request a project file answers — see
 		// `projectFileActions`. Every other one is refused where it always was:
 		// `sourceDocument` hands back nothing for a file that is not a source,
 		// and this leaves that alone by answering ahead of it.
@@ -1984,13 +1984,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: The same analysis the Diagnostics were published from, which is
+		// The same analysis the Diagnostics were published from, which is
 		// what a quick fix is an answer to — half of what a Code Action offers
 		// IS a Diagnostic, so reading them from anywhere else would let the
 		// lightbulb disagree with the squiggle it is offered on.
 		let analysis = workspace.analysisOf(filePath, { cancellation: token })
 
-		// NOTE: Checked rather than inferred from the null: `findCodeActions`
+		// Checked rather than inferred from the null: `findCodeActions`
 		// runs the pipeline itself when it is handed nothing, which is right for
 		// a document the Workspace holds none of and exactly wrong for a request
 		// that was abandoned halfway.
@@ -2012,7 +2012,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	})
 
-	// NOTE: What the client asked for, in the protocol's own shape — the kinds
+	// What the client asked for, in the protocol's own shape — the kinds
 	// a request narrowed itself to, and each entry turned into a CodeAction.
 	// Shared by the two documents that answer this request at all, so that a
 	// project file's lightbulb obeys the same `only` filter a source's does.
@@ -2024,7 +2024,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			.filter(
 				(entry) =>
 					isRequestedKind(entry.kind, params.context.only) &&
-					// NOTE: An action that writes a file the workspace does not
+					// An action that writes a file the workspace does not
 					// have yet is withheld from a client that can not create
 					// one. There is no second shape for it — a text edit can
 					// not create the file it edits — so what such a client
@@ -2060,7 +2060,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return params.positions.map((position) => {
 			let chain = findSelectionRanges(program, toCursor(position))
 
-			// NOTE: The protocol nests the chain outwards through `parent`.
+			// The protocol nests the chain outwards through `parent`.
 			let range: SelectionRange | undefined
 
 			for (let selection of chain) {
@@ -2071,7 +2071,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		})
 	})
 
-	// NOTE: Not debounced either, for the same reason Semantic Tokens are not.
+	// Not debounced either, for the same reason Semantic Tokens are not.
 	connection.languages.inlayHint.on(async (params, token) => {
 		if (!inlayHintsEnabled) {
 			return null
@@ -2086,7 +2086,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			end: toCursor(params.range.end),
 		}
 		let document = sourceDocument(params.textDocument.uri)
-		// NOTE: What the last run RECORDED, beside the Types the source left
+		// What the last run RECORDED, beside the Types the source left
 		// out. Two kinds of ghost text with two sources: one is read off the
 		// typed Program and is true of the code, the other is read off the
 		// events and is true of one run.
@@ -2125,7 +2125,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: The offers cost a walk of what the workspace publishes, which is
+		// The offers cost a walk of what the workspace publishes, which is
 		// read off parses; the Namespace half enriches the Modules that publish
 		// one, and only those. A document outside every folder gets neither, and
 		// the list is exactly what it was before there were Modules.
@@ -2143,7 +2143,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 						specifiers: workspace.specifiersFor(filePath),
 					}
 				: { offers: [], namespaces: [] },
-			// NOTE: The analysis of the unmodified document, as the Workspace
+			// The analysis of the unmodified document, as the Workspace
 			// holds it; `findCompletions` derives one itself only where this is
 			// null.
 			workspace.documentOf(filePath),
@@ -2153,7 +2153,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return entries.map(toLspCompletionItem)
 	})
 
-	// NOTE: Every entry is complete when it is handed over — the detail, the
+	// Every entry is complete when it is handed over — the detail, the
 	// documentation and the import edit are all computed against the buffer the
 	// request was answered on, and a second pass over a buffer that has moved on
 	// would be worse than no pass at all.
@@ -2183,7 +2183,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
-		// NOTE: Parameters are handed over as offset ranges into the label
+		// Parameters are handed over as offset ranges into the label
 		// rather than as text — the protocol resolves a text label by
 		// searching the signature for it, which always finds the first of two
 		// identically printed Parameters.
@@ -2201,7 +2201,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	})
 
-	// NOTE: A URI is cleared only once NO other entry's analysis still reports
+	// A URI is cleared only once NO other entry's analysis still reports
 	// on it. Two roots whose graphs both reach one broken Module both publish
 	// its Diagnostics, and retiring one of them must not wipe the squiggles the
 	// other is still answering for. Asked without an exception too, for a URI
@@ -2216,7 +2216,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return false
 	}
 
-	// NOTE: Where a file's Diagnostics go: the document's own URI while
+	// Where a file's Diagnostics go: the document's own URI while
 	// something has it open, so the Editor ties them to the buffer it is
 	// showing, and the path's own URI otherwise — which is what makes a mistake
 	// in a file nobody opened visible in the Problems panel at all.
@@ -2224,13 +2224,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return openPaths.get(filePath) ?? uriOf(filePath)
 	}
 
-	// NOTE: Only what CHANGED goes over the wire. Refreshing a file whose
+	// Only what CHANGED goes over the wire. Refreshing a file whose
 	// meaning moved is the point of analysing the root above it; re-sending it
 	// the same list it already has is a message and a client-side rebuild for a
 	// file the reader is not even in, and a workspace-wide analysis produces one
 	// of those per file it holds.
 	//
-	// NOTE: The `version` is the buffer the list was computed against, which is
+	// The `version` is the buffer the list was computed against, which is
 	// what lets a client throw away a publish that raced a keystroke — the one
 	// window a debounce widens. Absent for a file nobody has open: there is no
 	// version to name, and its content came off disk.
@@ -2245,7 +2245,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 
 		publishedContent.set(uri, signature)
-		// NOTE: A connection that has gone away fails BOTH ways — it throws
+		// A connection that has gone away fails BOTH ways — it throws
 		// where it has been closed or disposed, and the write itself rejects
 		// where the pipe went first — and every publish here is inside a
 		// callback of the analysis loop, where either one is the process rather
@@ -2263,7 +2263,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		} catch {}
 	}
 
-	// NOTE: A URI this entry has stopped reporting on is not cleared here but
+	// A URI this entry has stopped reporting on is not cleared here but
 	// COLLECTED, and cleared by `retireEntries` once every analysis of the batch
 	// has published — or, for a sweep and for whatever fires while one is in
 	// flight, once its queue has emptied, which is the same moment reached over
@@ -2292,14 +2292,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		publishedByEntry.set(entryPath, new Set(results.keys()))
 	}
 
-	// NOTE: What the project files themselves could not be read as, published on
+	// What the project files themselves could not be read as, published on
 	// those files. A mistake in an `essence.json` is a Warning with a span like
 	// every other Diagnostic — the setting falls back to its default and the
 	// note says so — and the file it is about is the only place a reader would
 	// look for it. The stale `essence` key of a `package.json` lands here too,
 	// on the key.
 	//
-	// NOTE: An OPEN project file answers out of its buffer rather than off disk,
+	// An OPEN project file answers out of its buffer rather than off disk,
 	// because that is the text the reader is looking at. Everything else the
 	// Server reads out of the settings — the exclusions, the tags an entry skips
 	// — still comes off the file that was SAVED: what a walk obeys and what a
@@ -2336,7 +2336,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			publish(uri, diagnostics)
 		}
 
-		// NOTE: A file whose problems went away is owed an explicitly empty
+		// A file whose problems went away is owed an explicitly empty
 		// list, exactly as a retired entry's files are: nothing else is ever
 		// going to clear a squiggle in a file no analysis reaches.
 		for (let uri of publishedConfiguration) {
@@ -2348,14 +2348,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		publishedConfiguration = new Set(byUri.keys())
 	}
 
-	// NOTE: The mirror of `uriFor` for a file no analysis reports on — the
+	// The mirror of `uriFor` for a file no analysis reports on — the
 	// buffer's own URI while something has it open, and the path's otherwise, so
 	// that a project file is not published under two spellings of itself.
 	function configurationUriFor(filePath: string): string {
 		return openProjectFiles.get(filePath) ?? uriOf(filePath)
 	}
 
-	// NOTE: Everything an entry's graph is expected to cover — the entry and its
+	// Everything an entry's graph is expected to cover — the entry and its
 	// transitive dependencies, read off the parses the Workspace already holds.
 	// Two things ride on it: the order a batch runs in, and which files a batch
 	// was supposed to have judged.
@@ -2379,7 +2379,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return reached
 	}
 
-	// NOTE: What each entry of a batch is expected to cover, walked ONCE for the
+	// What each entry of a batch is expected to cover, walked ONCE for the
 	// two things that read it — the order the batch runs in, and which of those
 	// files it turned out to have judged. Each is a transitive walk per entry,
 	// and a batch is every root that reaches an edited Module.
@@ -2389,7 +2389,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: The entries whose graphs reach the most files first. One analysis
+	// The entries whose graphs reach the most files first. One analysis
 	// fills the cache for every Module its graph touched, so analysing a
 	// dependency BEFORE the file importing it links the same Modules twice —
 	// once as a graph of their own, and once again inside the larger one.
@@ -2405,7 +2405,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: An open document no root's graph will ever reach: a standard library
+	// An open document no root's graph will ever reach: a standard library
 	// source, which the Workspace deliberately holds nothing for, and a buffer
 	// outside the workspace folders, which no discovery walk finds. Those are
 	// entries of their own — analysed on their own, exactly as every open
@@ -2417,7 +2417,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: What has to be analysed to cover a set of changed files. Three
+	// What has to be analysed to cover a set of changed files. Three
 	// kinds, and each of them is a file nothing else in the batch answers for:
 	//
 	//   • the roots of the graphs REACHING them, and never all the roots — one
@@ -2435,7 +2435,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	function entriesFor(filePaths: Array<string>): Array<string> {
 		let entries = new Set(workspace.rootsReaching(filePaths))
 		let changed = new Set(filePaths)
-		// NOTE: Except the roots a sweep in flight still owes an analysis to.
+		// Except the roots a sweep in flight still owes an analysis to.
 		// Every one of those has published nothing yet, so the scan below would
 		// read the whole remaining sweep as newly promoted and pull it into this
 		// batch — which is the one callback the chunking exists to break up, and
@@ -2444,7 +2444,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// drops whatever this batch analyses (see `analyseBatch`).
 		let queued = new Set(sweepQueue)
 
-		// NOTE: By whether it has ever PUBLISHED rather than by whether its
+		// By whether it has ever PUBLISHED rather than by whether its
 		// analysis is cached. `invalidateEnrichment` drops the whole UNDIRECTED
 		// component, so after one keystroke every root that merely shares a
 		// dependency with the edited file reports as unanalysed — and scheduling
@@ -2473,7 +2473,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return [...entries]
 	}
 
-	// NOTE: Every root of the workspace, which between them cover every file of
+	// Every root of the workspace, which between them cover every file of
 	// it. This is what makes the Problems panel the project's rather than the
 	// open documents': once the roots have been analysed every file has
 	// Diagnostics, and the Server publishes all of them.
@@ -2489,7 +2489,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return [...entries]
 	}
 
-	// NOTE: One batch of analyses, start to finish, inside one timer callback.
+	// One batch of analyses, start to finish, inside one timer callback.
 	// Three steps, in this order and for this reason:
 	//
 	//   • the entries, biggest graph first, each of them filling the cache for
@@ -2512,7 +2512,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// the same three steps spread over a callback each — see `startSweep`.
 	function analyseBatch(entries: Array<string>, focus?: string): void {
 		let reaches = reachesOf(entries)
-		// NOTE: The URIs the batch's entries stopped reporting on, cleared once
+		// The URIs the batch's entries stopped reporting on, cleared once
 		// at the end rather than as each entry finds them — see
 		// `publishAnalysis`.
 		let dropped = new Set<string>()
@@ -2524,7 +2524,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 
 		for (let uncovered of analysisOrder(reachesOf(uncoveredBy(reaches)))) {
-			// NOTE: An entry that ran meanwhile may have covered it after all —
+			// An entry that ran meanwhile may have covered it after all —
 			// the fallbacks are worked out once, before any of them runs, and
 			// one of them standing above another is the ordinary case.
 			if (!needsOwnAnalysis(uncovered)) {
@@ -2535,7 +2535,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			analysed.add(uncovered)
 		}
 
-		// NOTE: An entry a sweep still owed and this batch has just run is owed
+		// An entry a sweep still owed and this batch has just run is owed
 		// no longer. Analysing it again would be a cache read, and publishing it
 		// again would be a second message for a list that did not move — the
 		// dedup would swallow it, but the queue is what the change batch is
@@ -2550,7 +2550,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		retireEntries(dropped)
 	}
 
-	// NOTE: A whole-workspace sweep, QUEUED rather than run. Everything a batch
+	// A whole-workspace sweep, QUEUED rather than run. Everything a batch
 	// does, in the same order and for the same reasons — the entries biggest
 	// graph first, then whatever they were supposed to cover and did not, then
 	// what the whole of it stopped reporting on — with the loop handed back
@@ -2569,7 +2569,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		armSweepChunk()
 	}
 
-	// NOTE: The next entry of the sweep, one macrotask from now. A macrotask
+	// The next entry of the sweep, one macrotask from now. A macrotask
 	// deliberately, and for the same reason `yieldToConnection` is one: a
 	// microtask runs before any I/O, so a sweep that yielded to one would still
 	// be a sweep nothing can interrupt. `setImmediate` runs after the loop has
@@ -2590,7 +2590,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		})
 	}
 
-	// NOTE: One entry of the sweep, start to finish. Analysing a root is
+	// One entry of the sweep, start to finish. Analysing a root is
 	// synchronous and atomic — it publishes before it returns — so the sweep is
 	// interruptible between two entries and never inside one, which is the whole
 	// safety argument: the Compiler collects its Diagnostics into module level
@@ -2612,7 +2612,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				return
 			}
 
-			// NOTE: Retirement once, at the end, rather than after every entry.
+			// Retirement once, at the end, rather than after every entry.
 			// It is the cheaper of the two — it works the roots out again and
 			// walks everything published — and it is the only correct one:
 			// retiring an entry before the entry taking its files over has run
@@ -2621,13 +2621,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 			retireEntries(sweepDropped)
 			sweepDropped.clear()
 			sweepFocus = undefined
-			// NOTE: With the panel it just filled. A sweep is the one moment
+			// With the panel it just filled. A sweep is the one moment
 			// the Server speaks for the whole workspace, and what a project
 			// file could not be read as belongs beside what its sources could
 			// not: the walk the sweep performed is the walk that setting
 			// narrowed.
 			publishConfiguration()
-			// NOTE: After the last publish, which is what puts the answer
+			// After the last publish, which is what puts the answer
 			// behind it on the wire. A window that came due mid-sweep has its
 			// own timer armed and keeps this a no-op.
 			answerIdle()
@@ -2638,7 +2638,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		if (sweepPhase === "entries") {
 			analyseAndPublish(entryPath, sweepFocus, sweepDropped)
 
-			// NOTE: What this entry was supposed to judge and did not, collected
+			// What this entry was supposed to judge and did not, collected
 			// now and analysed once the queue's entries have all run — a file one
 			// root could not read is often one the root beside it can, and the
 			// root beside it is still queued.
@@ -2648,7 +2648,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				sweepUncovered.add(filePath)
 			}
 		} else if (needsOwnAnalysis(entryPath)) {
-			// NOTE: A fallback worked out before the queue reached it may have
+			// A fallback worked out before the queue reached it may have
 			// been covered since — by a later entry of the sweep, or by a change
 			// batch that ran between two of these callbacks. Asked again for the
 			// same reason `analyseBatch` asks.
@@ -2658,7 +2658,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		armSweepChunk()
 	}
 
-	// NOTE: The files these entries were supposed to judge and did not, which is
+	// The files these entries were supposed to judge and did not, which is
 	// "the closest to root we can actually analyse" — the fallback that keeps
 	// one unreadable file from hiding a whole project beneath it. A file the
 	// Workspace holds nothing for is left out: a specifier naming a file that is
@@ -2684,7 +2684,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return [...uncovered]
 	}
 
-	// NOTE: The same question about ONE entry's reach, which is how a sweep asks
+	// The same question about ONE entry's reach, which is how a sweep asks
 	// it: right after the entry ran, rather than once the whole queue has. What
 	// this reads is whether an analysis is CACHED, and a keystroke landing
 	// between two entries of a sweep drops the enrichment of a whole undirected
@@ -2709,7 +2709,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		return uncovered
 	}
 
-	// NOTE: Whether this file still needs an entry of its OWN in a batch that
+	// Whether this file still needs an entry of its OWN in a batch that
 	// reached it. Two reasons it does, and they are not the same reason. Nothing
 	// has judged it — a root the Compiler threw on, a graph that could not read
 	// one of its Modules — or no graph ever judges it, because it writes neither
@@ -2727,7 +2727,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		)
 	}
 
-	// NOTE: An entry stops owning what it published once it has stopped being
+	// An entry stops owning what it published once it has stopped being
 	// one: a root something now imports, a coverage fallback whose root can be
 	// read again, a file that was deleted. It is retired only when somebody else
 	// answers for its own URI or there is nothing left to answer about, because
@@ -2751,7 +2751,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let retiring = new Set<string>()
 
 		for (let entryPath of publishedByEntry.keys()) {
-			// NOTE: A current root answers for its whole graph, and an open
+			// A current root answers for its whole graph, and an open
 			// document no root reaches answers for itself for as long as it is
 			// open. Nothing else is going to publish for either.
 			if (
@@ -2772,7 +2772,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 		let orphaned = new Set(dropped)
 
-		// NOTE: Every retirement is recorded before any of them publishes, so
+		// Every retirement is recorded before any of them publishes, so
 		// that two entries owning each other's URIs do not each conclude the
 		// other is still answering. What survives is what the entries left over
 		// own.
@@ -2784,7 +2784,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			publishedByEntry.delete(entryPath)
 		}
 
-		// NOTE: And held rather than made while a sweep still has a callback
+		// And held rather than made while a sweep still has a callback
 		// armed, because what `claimedElsewhere` reads is what has PUBLISHED and
 		// mid-queue that is a fraction of the project. A keystroke that takes a
 		// dependency away from the file it is in orphans that dependency's URI
@@ -2810,7 +2810,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 	}
 
-	// NOTE: The files whose Diagnostics a change may have moved. Which roots
+	// The files whose Diagnostics a change may have moved. Which roots
 	// have to run to answer for them is worked out when the window fires — see
 	// `pendingChanges`.
 	function scheduleAnalysis(filePaths: Iterable<string>, focus?: string) {
@@ -2827,7 +2827,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		armAnalysis()
 	}
 
-	// NOTE: Every root of the workspace, once the window fires — and then a
+	// Every root of the workspace, once the window fires — and then a
 	// callback each, rather than all of them in the one that fired (see
 	// `startSweep`). What a sweep covers is not a change, which is why it names
 	// no file: it is the whole project, asked for at startup and whenever the
@@ -2837,7 +2837,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		armAnalysis()
 	}
 
-	// NOTE: Everything pending is flushed together once the FIRST of them is due,
+	// Everything pending is flushed together once the FIRST of them is due,
 	// rather than each at its own deadline. Both halves of that matter: waiting
 	// for the earliest is what stops a document from being held back by an edit
 	// somewhere else, and flushing the rest with it is what keeps a batch to one
@@ -2845,7 +2845,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// A document still being typed in pays at most one extra analysis per other
 	// document that came due, and its own debounce starts again from there.
 	//
-	// NOTE: A window that comes due mid-sweep is answered ahead of what the
+	// A window that comes due mid-sweep is answered ahead of what the
 	// sweep has left, because the sweep gives the loop back between two of its
 	// entries and a timer that is due is what the loop reaches first. That is the
 	// order this Server wants: the file the reader is typing in must not wait for
@@ -2878,7 +2878,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 				pendingSweep = null
 				analysisFocus = null
 
-				// NOTE: A sweep subsumes whatever changed alongside it — every
+				// A sweep subsumes whatever changed alongside it — every
 				// root covers every file, the changed ones included.
 				if (sweeping) {
 					startSweep(focus)
@@ -2886,7 +2886,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 					analyseBatch(entriesFor(changed), focus)
 				}
 
-				// NOTE: A batch ran to completion inside this callback and
+				// A batch ran to completion inside this callback and
 				// published on its way; a sweep only armed its first chunk, and
 				// answers for itself when the queue drains.
 				answerIdle()
@@ -2900,13 +2900,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 		focus: string | undefined,
 		dropped: Set<string>,
 	) {
-		// NOTE: The Diagnostics collector is module-level state, so entries are
+		// The Diagnostics collector is module-level state, so entries are
 		// analysed strictly one at a time — every call here runs to completion
 		// inside the callback that made it, whether that is a change batch or one
 		// entry of a sweep, and it is the reason a request may only suspend
 		// before it compiles anything (see `yieldToConnection`).
 		//
-		// NOTE: Through the Workspace, so that this WRITES the cache every
+		// Through the Workspace, so that this WRITES the cache every
 		// request reads: one analysis fills the entry for this file and for
 		// every other Module of its graph, and a Hover that already paid for one
 		// finds it here rather than paying again.
@@ -2914,7 +2914,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		let document = uri === undefined ? undefined : documents.get(uri)
 		let analysis = workspace.analysisOf(filePath, { annotationsFor: focus })
 
-		// NOTE: The fallback is not a fast path for anything — it is the answer
+		// The fallback is not a fast path for anything — it is the answer
 		// for the documents the Workspace deliberately holds nothing for: a
 		// standard library source, and a buffer whose path can not be read. Both
 		// were always analysed on their own. A file nobody has open that the
@@ -2927,13 +2927,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 			analysis = analyseDocument(document.getText(), uri, {
 				host: workspace.host,
-				// NOTE: As the Workspace itself has it — a document it holds
+				// As the Workspace itself has it — a document it holds
 				// nothing for still has its `tests { … }` block typed.
 				tests: true,
 			})
 		}
 
-		// NOTE: Under each file's OWN URI, dependencies included and whether or
+		// Under each file's OWN URI, dependencies included and whether or
 		// not anything has them open. A Module's Diagnostics depend on that
 		// Module and on what it reaches and on nothing else, so what the root
 		// that happened to load the graph says about a file is exactly what the
@@ -2947,7 +2947,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		])
 
 		for (let [dependencyPath, diagnostics] of analysis.dependencies) {
-			// NOTE: Except a dependency writing NEITHER Module section, whose
+			// Except a dependency writing NEITHER Module section, whose
 			// own answer is not this one. The graph enriches such a file under a
 			// Module path and the Workspace drops what it made of it — so the
 			// list here is a second opinion about a file that has its own, the
@@ -2968,11 +2968,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 		publishAnalysis(filePath, results, dropped)
 	}
 
-	// NOTE: `onDidChangeContent` also fires when a document is opened.
+	// `onDidChangeContent` also fires when a document is opened.
 	documents.onDidChangeContent((event) => {
 		let filePath = documentFilePath(event.document.uri)
 
-		// NOTE: A project file is answered for out of its own reader rather
+		// A project file is answered for out of its own reader rather
 		// than as a source, and it is kept out of `openPaths` so that nothing
 		// downstream mistakes it for one — see the NOTE there. It is reported
 		// on per keystroke, which is what makes an unclosed brace visible while
@@ -2988,7 +2988,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		workspace.changed(filePath)
 		tags = null
 		scheduleAnalysis([filePath], filePath)
-		// NOTE: On the UNSAVED buffer, exactly as the analysis is. What a
+		// On the UNSAVED buffer, exactly as the analysis is. What a
 		// reader is looking at is what the session answers for; a file on disk
 		// nobody has open is answered for out of the file.
 		session.changed([filePath])
@@ -2997,7 +2997,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	documents.onDidClose((event) => {
 		let filePath = documentFilePath(event.document.uri)
 
-		// NOTE: The buffer is gone, so the file on disk answers for it again —
+		// The buffer is gone, so the file on disk answers for it again —
 		// which for a project file means the settings every other reader of it
 		// has been obeying all along.
 		if (openProjectFiles.delete(filePath)) {
@@ -3007,12 +3007,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 
 		openPaths.delete(filePath)
-		// NOTE: The buffer is gone, so what the workspace holds for it was built
+		// The buffer is gone, so what the workspace holds for it was built
 		// from text that no longer exists anywhere — the file on disk is the
 		// truth again.
 		workspace.changed(filePath)
 
-		// NOTE: Nothing is cleared: what this file's Diagnostics say is still
+		// Nothing is cleared: what this file's Diagnostics say is still
 		// true the moment its buffer goes, because they are what the file on
 		// disk says. The Problems panel reports on a workspace rather than on a
 		// set of tabs, so a Module closed while broken keeps its squiggles.
@@ -3029,7 +3029,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	connection.listen()
 }
 
-// NOTE: Accepting a TYPE Hint writes its own label at its own position, which
+// Accepting a TYPE Hint writes its own label at its own position, which
 // the protocol asks for as an edit — and an insertion is an empty Range there
 // rather than a Position of its own. A VALUE Hint has nothing to accept: what a
 // test recorded is a fact about one run, not something the source could have
@@ -3068,14 +3068,14 @@ export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
 	}
 }
 
-// NOTE: The inverse of the decoding `documentFilePath` does. Each segment is
+// The inverse of the decoding `documentFilePath` does. Each segment is
 // encoded on its own so that the separators survive — a file named `a b.es`
 // becomes `a%20b.es`, and the client matches the URI it handed over.
 export function uriOf(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }
 
-// NOTE: A workspace symbol is a document symbol, open or not, so it renders
+// A workspace symbol is a document symbol, open or not, so it renders
 // under the same kinds: there is one table, and the outline and the search can
 // not disagree about what a Namespace looks like.
 function toLspWorkspaceSymbol(entry: WorkspaceSymbolEntry): LspWorkspaceSymbol {
@@ -3149,7 +3149,7 @@ function toLspCallHierarchyItem(
 	}
 }
 
-// NOTE: An entry's kinds are spelled as the protocol spells them, so this
+// An entry's kinds are spelled as the protocol spells them, so this
 // table reads as an identity; its Record Type requires a row for every kind an
 // entry can carry. `serverCapabilities` announces the kinds in a list of its
 // own, which has to hold the same ones: a kind offered and not announced is a
@@ -3163,14 +3163,14 @@ const codeActionKinds: Record<CodeActionEntry["kind"], CodeActionKind> = {
 	"source.organizeImports": CodeActionKind.SourceOrganizeImports,
 }
 
-// NOTE: The edits were computed on the current buffer, so the client's own
+// The edits were computed on the current buffer, so the client's own
 // Diagnostics are used for nothing but attribution — matched by code and
 // overlapping range so the Editor can tie the fix to the squiggle it is
 // offered on, and retire it once applied.
 export function toLspCodeAction(
 	entry: CodeActionEntry,
 	params: CodeActionParams,
-	// NOTE: What the client said it can apply at `initialize`. False answers
+	// What the client said it can apply at `initialize`. False answers
 	// with `changes`, the map of files every client takes. Defaulted to true
 	// for the callers that are not a live session — the specs, which assert on
 	// the richer shape.
@@ -3194,14 +3194,14 @@ export function toLspCodeAction(
 							),
 					),
 		edit: workspaceEditOf(entry, params, documentChanges),
-		// NOTE: Handed through untouched. What a command does happens in the
+		// Handed through untouched. What a command does happens in the
 		// Editor after the edits land — an extraction opens rename on the name
 		// it just invented — and there is no edit that puts a cursor anywhere.
 		command: entry.command,
 	}
 }
 
-// NOTE: A map of files against their edits, which is what every action but one
+// A map of files against their edits, which is what every action but one
 // needs — and `documentChanges` for the one that writes a file that is not
 // there yet. A text edit can not create the file it edits: creating one is a
 // RESOURCE OPERATION, and the protocol only carries those in the other shape.
@@ -3217,7 +3217,7 @@ function workspaceEditOf(
 	let changes = changesOf(entry, params)
 	let created = entry.edits.filter((edit) => edit.createFile === true)
 
-	// NOTE: And a client that never advertised `documentChanges` is answered
+	// And a client that never advertised `documentChanges` is answered
 	// with `changes` whatever the action is. The only action that NEEDS the
 	// other shape is the one creating a file, and `offered` has already
 	// withheld that from a client that can not create one.
@@ -3232,7 +3232,7 @@ function workspaceEditOf(
 				uri: uriOf(edit.filePath as string),
 			})),
 			...Object.entries(changes).map(([uri, edits]) => ({
-				// NOTE: Null rather than the version the Editor is holding: a
+				// Null rather than the version the Editor is holding: a
 				// file this action creates has no version at all, and a Move
 				// that named one for the others would be refused wholesale the
 				// moment any of them changed while the lightbulb was open.
@@ -3243,7 +3243,7 @@ function workspaceEditOf(
 	}
 }
 
-// NOTE: One key per file. Every edit of an action used to belong to the
+// One key per file. Every edit of an action used to belong to the
 // document it was asked about, and a refactoring that moves something does not
 // — a name lifted into another Module is two files edited at once, which the
 // protocol says as two entries of one map.
@@ -3308,7 +3308,7 @@ const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	snippet: CompletionItemKind.Snippet,
 }
 
-// NOTE: The kinds that are invoked rather than referred to. This is only the
+// The kinds that are invoked rather than referred to. This is only the
 // fallback now — an entry whose signature resolved carries the call written
 // out, labels and all, and this inserts the bare parentheses for the ones
 // halfway through a keystroke where nothing resolved yet.
@@ -3332,7 +3332,7 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 		kind: completionItemKinds[entry.kind],
 		detail: entry.detail ?? undefined,
 		documentation: toMarkdown(entry.documentation ?? null),
-		// NOTE: Overloads deliberately share a label, so the Editor is told to
+		// Overloads deliberately share a label, so the Editor is told to
 		// filter every one of them on it; `labelDetails` is what tells them
 		// apart in the list.
 		labelDetails:
@@ -3342,12 +3342,12 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 		filterText: entry.label,
 		sortText: `${entry.tier}${entry.label}`,
 		preselect: entry.preselect === true ? true : undefined,
-		// NOTE: The fallback is snippet-formatted too, so the label goes
+		// The fallback is snippet-formatted too, so the label goes
 		// through the same escape the resolved snippet is built with — `$` is
 		// an ordinary Identifier character, and an unescaped one in `we$rd`
 		// reads as the snippet variable `$rd` and writes the wrong name.
 		//
-		// NOTE: An entry that names what it replaces is handed over as a text
+		// An entry that names what it replaces is handed over as a text
 		// edit, which is the one form that carries a range. The Editor then
 		// filters it on the text of that range rather than on its own word.
 		insertText:
@@ -3363,7 +3363,7 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 					},
 		insertTextFormat:
 			insertText === null ? undefined : InsertTextFormat.Snippet,
-		// NOTE: Accepting a callable inserts the call's parentheses and commas
+		// Accepting a callable inserts the call's parentheses and commas
 		// as snippet text, so the trigger characters Signature Help listens
 		// for are never typed — without this nudge the parameter hints only
 		// ever appear for a call written out by hand.
@@ -3374,7 +3374,7 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 						command: "editor.action.triggerParameterHints",
 					}
 				: undefined,
-		// NOTE: The `import { … }` entry that makes the name resolve, applied in
+		// The `import { … }` entry that makes the name resolve, applied in
 		// the same undo step as the insertion at the cursor.
 		additionalTextEdits: entry.additionalEdits?.map((edit) => ({
 			range: toLspRange(edit.range),

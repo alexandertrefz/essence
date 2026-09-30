@@ -39,7 +39,7 @@ async function withFiles<Value>(
 	}
 }
 
-// NOTE: Every Diagnostic of every file, flattened, because most tests ask
+// Every Diagnostic of every file, flattened, because most tests ask
 // about one problem and do not care which file's list it sat in.
 function diagnosticsOf(configuration: {
 	problems: Array<{ diagnostics: Array<common.Diagnostic> }>
@@ -174,7 +174,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		expect(diagnostic.helps).toEqual(['Did you mean "exclude"?'])
 	})
 
-	// NOTE: `"exclusions"` is three edits from `"exclude"` — past the near-miss
+	// `"exclusions"` is three edits from `"exclude"` — past the near-miss
 	// rule, and rightly so — and the whole report was two Notes and nothing to
 	// do about them. The key reads as nothing, and taking it out is the edit.
 	it("says what to do with a key that resembles nothing", () => {
@@ -191,7 +191,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		}
 	})
 
-	// NOTE: `"test.cases": 200` — a setting written FLAT, the way a flag or a
+	// `"test.cases": 200` — a setting written FLAT, the way a flag or a
 	// dotted property spells one. The catalogue is a tree, so the key names a
 	// real setting and names it whole; what is missing is the object around it.
 	it("nests a setting written as a dotted key", () => {
@@ -206,7 +206,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		).toBe(200)
 	})
 
-	// NOTE: A dotted key whose parts name nothing is an unknown key like any
+	// A dotted key whose parts name nothing is an unknown key like any
 	// other, and is answered as one.
 	it("leaves a dotted key that names no setting to the ordinary answer", () => {
 		expect(diagnosticsOf(parse(`{ "test.nope": 1 }`))[0].helps).toEqual([
@@ -214,7 +214,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
-	// NOTE: The example in the catalogue is the CATALOGUE's, never the author's,
+	// The example in the catalogue is the CATALOGUE's, never the author's,
 	// and printing it as the answer said something the file did not:
 	// `"minify": "false"` was answered `Write it as true or false: true`, which
 	// turns minification ON, and `"cases": "50"` was answered `200`.
@@ -235,7 +235,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		}
 	})
 
-	// NOTE: And where the written value says nothing about what was meant, the
+	// And where the written value says nothing about what was meant, the
 	// catalogue's example is offered AS an example rather than as the answer.
 	it("offers the catalogue's value as an example where nothing coerces", () => {
 		expect(
@@ -259,7 +259,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
-	// NOTE: An empty String is not a list of one. `"skipTags": ""` says nothing
+	// An empty String is not a list of one. `"skipTags": ""` says nothing
 	// is to be skipped, and `[""]` is a tag no test can carry — a Help that
 	// offered it was asking the author to write down a rule that matches
 	// nothing and then accepting it in silence.
@@ -273,7 +273,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
-	// NOTE: And a number too big to read back is not the number that was
+	// And a number too big to read back is not the number that was
 	// written. `Number` rounds past 2^53, so the Help offered a value nobody
 	// had typed — and its Quick Fix would have written it into the file.
 	it("offers the example rather than a number it rounded", () => {
@@ -339,7 +339,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		expect(configuration.build).toEqual(defaultConfiguration().build)
 	})
 
-	// NOTE: One bad item must not drop the whole list — a project with no
+	// One bad item must not drop the whole list — a project with no
 	// exclusions in force over one typo is the failure the file exists to
 	// prevent.
 	it("leaves out one wrong item of a list and keeps the rest", () => {
@@ -378,7 +378,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		expect(diagnostic.notes[1]).toContain(optimiserPassNames.join(", "))
 	})
 
-	// NOTE: The key moved out of "test" when the editor grew a Problems panel
+	// The key moved out of "test" when the editor grew a Problems panel
 	// that speaks for the whole workspace and needed the same answer. A project
 	// still writing it in the old place has no exclusions in force at all.
 	it("says where test.exclude went", () => {
@@ -403,7 +403,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		)
 		expect(diagnostic.position?.start.line).toBe(4)
 		expect(diagnostic.labels[0]?.message).toBe("a '}' was expected here")
-		// NOTE: The rule is a Note and the EDIT is the Help. "The file is JSON
+		// The rule is a Note and the EDIT is the Help. "The file is JSON
 		// with comments allowed" used to be the Help, and it is not an edit
 		// anybody makes — jsonc already says which Token it wanted, which is.
 		expect(diagnostic.notes).toEqual([
@@ -415,7 +415,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
-	// NOTE: And the edit is offered for the FIRST refusal alone. jsonc recovers
+	// And the edit is offered for the FIRST refusal alone. jsonc recovers
 	// generously and goes on reporting about text it has lost track of:
 	// `{ test: 1 }` is one unquoted key, and the third report asked the reader
 	// to "write the value the key holds" at the `}`, with the value written two
@@ -458,7 +458,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 
 // #region Editing the file
 
-// NOTE: The Language Server offers these as Quick Fixes, and it is the only
+// The Language Server offers these as Quick Fixes, and it is the only
 // thing that does — but what they change is this file's format, so they are
 // computed and tested here.
 describe("essence.json — what a reader could do about a mistake", () => {
@@ -497,7 +497,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		expect(edited(`{\n\t"zzzz": 1\n}\n`)).toEqual([])
 	})
 
-	// NOTE: A setting written FLAT is the same edit a moved one is — the
+	// A setting written FLAT is the same edit a moved one is — the
 	// property comes out and goes back in at the path its own name spells.
 	it("nests a setting written as a dotted key", () => {
 		expect(edited(`{\n\t"test.cases": 200\n}\n`)).toEqual([
@@ -508,7 +508,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		])
 	})
 
-	// NOTE: And the shape a written value can be read as is one span rewritten.
+	// And the shape a written value can be read as is one span rewritten.
 	// The Help and this edit come out of one computation, so a reader is never
 	// offered one number and shown another.
 	it("writes the author's own value back in the setting's shape", () => {
@@ -536,7 +536,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		)
 	})
 
-	// NOTE: The table it leaves behind goes with it — `"test": { }` is a pair
+	// The table it leaves behind goes with it — `"test": { }` is a pair
 	// of braces nothing reads.
 	it("moves a key that has moved, and takes an emptied table along", () => {
 		expect(
@@ -559,7 +559,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		expect(moved.text).not.toContain('"test": {\n\t}')
 	})
 
-	// NOTE: What is written between the braces is the author's, and a fix that
+	// What is written between the braces is the author's, and a fix that
 	// took a sentence away with the key it was about would be deleting the
 	// reason the key was there.
 	it("keeps a table whose only other content is a Comment", () => {
@@ -570,7 +570,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		expect(moved.text).toContain("// why")
 	})
 
-	// NOTE: Both values are the author's and only one of them survives the
+	// Both values are the author's and only one of them survives the
 	// move, so the choice between them is theirs.
 	it("offers nothing where the key it would move to is written", () => {
 		expect(
@@ -580,7 +580,7 @@ describe("essence.json — what a reader could do about a mistake", () => {
 		).toEqual([])
 	})
 
-	// NOTE: jsonc's own property removal reaches back to the previous sibling and
+	// jsonc's own property removal reaches back to the previous sibling and
 	// takes everything in between, a Comment included. This one does not.
 	it("keeps a Comment standing beside the key it moves", () => {
 		let [moved] = edited(
@@ -645,7 +645,7 @@ describe("essence.json — the nearest file governs", () => {
 		})
 	})
 
-	// NOTE: The old home of the settings. A project that has not moved yet is
+	// The old home of the settings. A project that has not moved yet is
 	// told so ON the key, from any directory the old walk would have read it
 	// from, so the symptom is never a silently unconfigured project.
 	it("reports the essence key of a package.json as moved", async () => {
@@ -836,7 +836,7 @@ describe("essence.json — the cache", () => {
 				expect(
 					configuration.problems.map((each) => each.filePath),
 				).toEqual([path.join(directory, "package.json")])
-				// NOTE: Asked again from the manifest's own directory, the
+				// Asked again from the manifest's own directory, the
 				// problem is not reported twice.
 				expect(cache.forDirectory(directory).problems).toHaveLength(1)
 			},

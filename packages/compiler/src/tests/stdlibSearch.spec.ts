@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The full pipeline minus bundling, mirroring loop.spec — the searching
+// The full pipeline minus bundling, mirroring loop.spec — the searching
 // Methods below are only proven once the emitted JavaScript RUNS, because what
 // went wrong in them was never a Type error: a List that STORES an empty
 // Optional, a `List<Optional<Integer>>` walked by `hasItems(where:)` and
@@ -54,7 +54,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: An `Integer | String` conformance spelled by hand — the hand-written
+// An `Integer | String` conformance spelled by hand — the hand-written
 // counterpart to the equality a Choice DERIVES for `Optional<Integer>`, on the
 // other kind of item Type a List can hold. A Union derives nothing, so without
 // this Namespace `List<Integer | String>` does not conform to `Equatable` at
@@ -93,7 +93,7 @@ const integersOrStrings = `namespace IntegersOrStrings for Integer | String is E
 }`
 
 describe("Stdlib searching Methods", () => {
-	// NOTE: The whole point of this block: an EMPTY Optional stored in a List
+	// The whole point of this block: an EMPTY Optional stored in a List
 	// is an item like any other, and the Methods that search by value have to
 	// compare it rather than read it as "no item here".
 	//
@@ -131,7 +131,7 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"true"', '"false"', '"2"'])
 		})
 
-		// NOTE: `removeDuplicates` is `tally`'s keys, and a tally finds an
+		// `removeDuplicates` is `tally`'s keys, and a tally finds an
 		// item's entry through the item's own `is` — so it inherits the
 		// answer the same way `contains` does, and an `is` blind to a stored
 		// empty Optional would have kept every one of them.
@@ -145,7 +145,7 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"1"'])
 		})
 
-		// NOTE: The sharper half of the block, and the one that could not be
+		// The sharper half of the block, and the one that could not be
 		// written at all while `Optional` was a Type Alias: reading a stored
 		// empty item now answers `Value(Empty)` — a value that IS there and
 		// happens to be empty — where reading past the end answers `Empty`.
@@ -170,7 +170,7 @@ describe("Stdlib searching Methods", () => {
 			])
 		})
 
-		// NOTE: The searches run on the equality a Choice DERIVES from its
+		// The searches run on the equality a Choice DERIVES from its
 		// tags and its payloads, so `#Empty` matches only the empty items and
 		// `#Value(1)` only the one holding a 1 — no Namespace is written for
 		// `Optional<Integer>` anywhere in this Program.
@@ -203,7 +203,7 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: The same searching Methods over the other kind of item Type that
+	// The same searching Methods over the other kind of item Type that
 	// carries more than one shape: a Union, whose equality nothing derives.
 	// `Optional<Integer>` above hands the search the equality its Choice built
 	// from tags and payloads; here the search has to find and run a conformance
@@ -240,7 +240,7 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: The quantified `hasItems` entries used to be
+	// The quantified `hasItems` entries used to be
 	// `firstItem(where:)::hasValue()`,
 	// which reads the matching item back out — and while `Optional` collapsed
 	// when nested, a matching item that was itself empty came back as the very
@@ -281,7 +281,7 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"false"'])
 		})
 
-		// NOTE: The claim the NOTE above makes, pinned: the Optional the
+		// The claim the NOTE above makes, pinned: the Optional the
 		// reading formulation builds is `Value(Empty)` for the empty item it
 		// FOUND and `Empty` for the List that holds no empty item at all, so
 		// `hasValue` agrees with `hasItems(where:)` on both. Nothing depends on
@@ -350,7 +350,7 @@ describe("Stdlib searching Methods", () => {
 			])
 		})
 
-		// NOTE: `Terminal.inspect` answers with the value it prints, so a check that
+		// `Terminal.inspect` answers with the value it prints, so a check that
 		// wraps its item leaves a record of every item the walk reached. This is
 		// what proves the Boolean fold still LEAVES the walk: both stop at the
 		// item that decided the answer and never see the fourth.
@@ -371,13 +371,13 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: A `lastIndex` derived from `split(on:)`, which scans left to right
+	// A `lastIndex` derived from `split(on:)`, which scans left to right
 	// and CONSUMES each match it finds, answers the last non-overlapping match
 	// rather than the last occurrence. The native walks the grapheme view from
 	// the end, so the first match it meets is the last occurrence.
 	describe("String.lastIndex(of:)", () => {
 		it("finds the last occurrence when occurrences overlap", async () => {
-			// NOTE: The positions JavaScript's own `lastIndexOf` answers, which
+			// The positions JavaScript's own `lastIndexOf` answers, which
 			// is what "the last occurrence" means: "aaa" has "aa" at 0 AND at 1.
 			expect(
 				await run(`implementation {
@@ -418,7 +418,7 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"Value(5)"', '"Value(0)"', '"Empty"', '"Value(0)"'])
 		})
 
-		// NOTE: Positions are by GRAPHEME everywhere in the Namespace, and the
+		// Positions are by GRAPHEME everywhere in the Namespace, and the
 		// searches read the same view `split` reads, which never splits one —
 		// so a String of emoji counts the same from either end.
 		it("counts the positions by grapheme", async () => {
@@ -431,7 +431,7 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: The List Methods that were already right, kept right — the reversal
+	// The List Methods that were already right, kept right — the reversal
 	// `lastIndex` is written on has to leave an ordinary List's positions where
 	// they were, and the fold `firstIndex` counts with has to keep answering an
 	// EMPTY Optional for an absent item rather than the length it settles on.
@@ -463,7 +463,7 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"Empty"', '"Empty"', '"Empty"', '"Empty"'])
 		})
 
-		// NOTE: The bound is what carries equality down: a `List<List<Integer>>`
+		// The bound is what carries equality down: a `List<List<Integer>>`
 		// searches through `List.is` curried with the Integers' own, and both
 		// Methods have to hand that witness on — `lastIndex` through the
 		// `firstIndex` call it is written on.

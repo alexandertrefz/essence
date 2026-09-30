@@ -30,14 +30,14 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: THE CLAIMS ABOUT A STRING THAT NO ANSWER CAN CARRY, in the two shapes
+// THE CLAIMS ABOUT A STRING THAT NO ANSWER CAN CARRY, in the two shapes
 // one of them can be made in. The first block asks what WORK a Method did — a
 // String the ASCII scan accepts is searched, split and cut by the JavaScript
 // intrinsics where every other String goes through the grapheme view, so the
 // receiver is asked afterwards whether a view was built, and the intrinsics a
 // Method must NOT reach for are COUNTED while it runs. Neither reads a clock.
 //
-// NOTE: The second block is for the claims that are about COMPLEXITY, which no
+// The second block is for the claims that are about COMPLEXITY, which no
 // single figure can carry and no count of calls can either: that a Program's
 // cost grows with the length of its String rather than with the square of it,
 // or does not grow with that length at all. Each is compiled once and run as a
@@ -45,7 +45,7 @@ import { validate } from "../validator/index"
 // scheduler that stalls one run does not decide the test — and a doubling that
 // reads too steep is measured a second time before it is believed.
 //
-// NOTE: WHAT CAN BE COUNTED IS COUNTED, and the block below it has grown at the
+// WHAT CAN BE COUNTED IS COUNTED, and the block below it has grown at the
 // timed block's expense twice over now. A drain's claim is how much TEXT it
 // folds; a folded search's claim is which chunks it read. Both were timed
 // against a subprocess and both are exact as counts, so both moved up — the
@@ -53,7 +53,7 @@ import { validate } from "../validator/index"
 // native search STOPS where it finds, and that one `separate` call does not
 // walk its answer twice.
 //
-// NOTE: THERE IS NO WALL-CLOCK CEILING IN THIS FILE ANY MORE, and the shape
+// THERE IS NO WALL-CLOCK CEILING IN THIS FILE ANY MORE, and the shape
 // above is what replaced it. One stood over two of these Programs for a long
 // time — 300 ms, which had to sit eleven times over the figure it judged to
 // survive a loaded machine, and could therefore only catch a regression that
@@ -64,11 +64,11 @@ import { validate } from "../validator/index"
 // what stays timed is only what a count can not say.
 const CHARACTERS = 10_800
 
-// NOTE: Three hundred lines of thirty-six characters and a line break, which is
+// Three hundred lines of thirty-six characters and a line break, which is
 // the shape a Program reading text takes.
 const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 
-// NOTE: `separate` makes a claim no single figure can carry: ONE call groups a
+// `separate` makes a claim no single figure can carry: ONE call groups a
 // String in time proportional to its length. It used to walk the characters
 // backwards and `unshift` each group onto the front of its answer, which moves
 // every group already standing there — quadratic inside a single call, and the
@@ -77,21 +77,21 @@ const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 // quadratic one, and three against a doubling is reached by no linear Program
 // and missed by no quadratic one.
 //
-// NOTE: THE THRESHOLD IS THE SAME THREE FOR EVERY GROWTH CASE HERE and the
+// THE THRESHOLD IS THE SAME THREE FOR EVERY GROWTH CASE HERE and the
 // LADDER is what each one claims. A case claiming its cost grows no faster than
 // its receiver doubles its lengths, where three catches the quadratic it fears;
 // a case claiming its cost does not grow with the receiver AT ALL quadruples
 // them, where three catches the linear one. Reading which claim a case makes is
 // therefore reading its ladder.
 //
-// NOTE: AND WHAT THREE LETS THROUGH, which is a good deal more than a reader
+// AND WHAT THREE LETS THROUGH, which is a good deal more than a reader
 // might take "catches a quadratic" to mean. Over a DOUBLING it admits anything
 // growing slower than n^1.58, so an n^1.5 Program (2.83x a doubling) passes;
 // over a QUADRUPLING it admits anything below n^0.79. The margin is deliberate
 // — every figure carries a subprocess spawn and the machine is shared — and it
 // is why what can be COUNTED is counted instead: a count needs no margin at all.
 //
-// NOTE: The lengths start where the quadratic term OUTGROWS THE SPAWN, which is
+// The lengths start where the quadratic term OUTGROWS THE SPAWN, which is
 // the whole of what makes this guard able to see its own defect. The subprocess
 // costs some 22 ms whatever it runs and the grouping costs 0.2 ms at 40,000
 // characters, so at any shorter length BOTH shapes read as the spawn and both
@@ -105,19 +105,19 @@ const GROUPED_LENGTHS = [40_000, 80_000, 160_000, 320_000]
 const GROUP_WIDTH = 3
 const GROWTH_THRESHOLD = 3
 
-// NOTE: A FOLDED FIRST-MATCH SEARCH COSTS THE DISTANCE TO THE MATCH, which is
+// A FOLDED FIRST-MATCH SEARCH COSTS THE DISTANCE TO THE MATCH, which is
 // what the case-sensitive search beside it has always cost and what the folded
 // one did not: it lower-cased the WHOLE receiver and then searched, so a drain
 // asking `firstIndex(of:, comparing #Insensitive)` per turn read the rest of
 // its String every turn — the same n² the copying was, and in pure ASCII, where
 // the same drain asking the case-sensitive question was linear.
 //
-// NOTE: BOTH ROUTES ARE DRAINED, because they share no line of code: folding an
+// BOTH ROUTES ARE DRAINED, because they share no line of code: folding an
 // ASCII receiver is one engine call over the whole text, where folding a
 // segmented one is a call per character, and each route has its own chunk walk
 // written out for that difference.
 //
-// NOTE: THE DRAIN IS COUNTED RATHER THAN TIMED, and that is a change from the
+// THE DRAIN IS COUNTED RATHER THAN TIMED, and that is a change from the
 // first shape of this guard. It compiled two Programs, drained each in a
 // subprocess at three lengths and ratioed their wall clocks — figures of 27 to
 // 35 ms, of which some 22 ms is the SPAWN. The signal was therefore 5 to 13 ms,
@@ -134,7 +134,7 @@ const DRAIN_TURNS = 2_200
 const ASCII_DRAIN_LENGTHS = [20_000, 80_000]
 const VIEW_DRAIN_LENGTHS = [11_000, 44_000]
 
-// NOTE: "ZZ" every twenty-two characters, so a drain that has eaten any number
+// "ZZ" every twenty-two characters, so a drain that has eaten any number
 // of them still has one within twenty-one of the front of what is LEFT. The
 // positions it reads therefore cycle 0, 21, 20 … 1 over each period and sum to
 // the arithmetic series 231 a period — which is what the drain adds up, and
@@ -142,7 +142,7 @@ const VIEW_DRAIN_LENGTHS = [11_000, 44_000]
 // than win. The turns are a whole number of periods and are fewer than the
 // SHORTEST receiver's characters, so every length answers the same sum.
 //
-// NOTE: The second period is the same text with an accent in it, which is the
+// The second period is the same text with an accent in it, which is the
 // whole of what sends the drain down the grapheme route rather than the
 // intrinsics — so the two routes below differ in ONE character. They are the
 // same number of characters on purpose: what a turn folds is counted in
@@ -179,7 +179,7 @@ async function millisecondsToRun(
 
 			best = Math.min(best, performance.now() - start)
 
-			// NOTE: Each Program prints a count that only the right answers
+			// Each Program prints a count that only the right answers
 			// add up to, and it is checked here — a search that threw, or
 			// answered the wrong position, would otherwise be the fastest run
 			// of all.
@@ -193,7 +193,7 @@ async function millisecondsToRun(
 	}
 }
 
-// NOTE: THE PART OCCURS EARLY, and that is the whole of this claim: `contains`
+// THE PART OCCURS EARLY, and that is the whole of this claim: `contains`
 // is written on `firstIndex(of:)`, which is native and stops where it finds, so
 // a search costs the DISTANCE to the part however long the String after it is.
 // It used to be written on `split(on:)` — so a Boolean about a ten-kilobyte
@@ -201,11 +201,11 @@ async function millisecondsToRun(
 // lengths QUADRUPLE and the turn count is fixed, so a search costing the
 // distance reads flat and one building the pieces reads four times per step.
 //
-// NOTE: The Program prints how many of its searches answered `true`, which is
+// The Program prints how many of its searches answered `true`, which is
 // all of them — a search that threw, or looked in the wrong place, would
 // otherwise be the fastest run of all.
 //
-// NOTE: The REPLACEMENT Program that stood beside this one is gone rather than
+// The REPLACEMENT Program that stood beside this one is gone rather than
 // converted, and its claim is in the first block. `replaceFirst` is written on
 // `firstIndex(of:)` and two `slice`s, and both the Method and the defect it
 // feared — splitting the String and joining the pieces back — cost the whole
@@ -227,7 +227,7 @@ function containsSource(length: number): string {
 }`
 }
 
-// NOTE: One call per Program, so what is timed is the grouping of ONE String
+// One call per Program, so what is timed is the grouping of ONE String
 // rather than a drain over many — the defect was inside a single call.
 function groupingSource(length: number): string {
 	return `implementation {
@@ -237,7 +237,7 @@ function groupingSource(length: number): string {
 }`
 }
 
-// NOTE: The separator goes BETWEEN the groups, so the answer is as long as the
+// The separator goes BETWEEN the groups, so the answer is as long as the
 // receiver plus one character for every group after the first. Checked for the
 // reason every other printed answer here is: a call that threw, or grouped the
 // wrong way, would otherwise be the fastest run of all.
@@ -245,13 +245,13 @@ function printedGroupedLength(length: number): string {
 	return String(length + Math.ceil(length / GROUP_WIDTH) - 1)
 }
 
-// NOTE: Every doubling held to the same ratio rather than the whole span held to
+// Every doubling held to the same ratio rather than the whole span held to
 // one, and the walk STOPS at the first doubling that is too steep — which is
 // what keeps a failure quick, since the length after the one that caught a
 // quadratic Program is the one that would run for long enough to be killed by
 // the runner and report a timeout instead of its growth.
 //
-// NOTE: A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
+// A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
 // its lengths are measured again. Every figure here carries a subprocess spawn
 // of some 22 ms, four suites share this machine, and a spawn that stalls under
 // load moves a ratio of two small figures further than any regression in these
@@ -303,7 +303,7 @@ async function expectGrowthUnderThreshold(
 	expect(tooSteep).toEqual([])
 }
 
-// NOTE: HOW OFTEN A METHOD REACHED FOR AN INTRINSIC IT IS NOT MEANT TO REACH
+// HOW OFTEN A METHOD REACHED FOR AN INTRINSIC IT IS NOT MEANT TO REACH
 // FOR, counted while the body runs. `split` and `join` are how a String is cut
 // into pieces and put back together, which is what the searches and the
 // replacements are not allowed to do; `segment` is the Segmenter, which an
@@ -313,7 +313,7 @@ async function expectGrowthUnderThreshold(
 // with, and for the same reason: a claim that a Method does NOT do something is
 // a claim about work, and a stopwatch can only ever say it was fast today.
 //
-// NOTE: A FOLDING IS COUNTED TWICE OVER — once as a CALL and once as the number
+// A FOLDING IS COUNTED TWICE OVER — once as a CALL and once as the number
 // of characters that call folded — because the two routes spend it differently.
 // The view route folds each cluster on its own, so its callings ARE its
 // characters and either number says what its chunks did; the ASCII route hands
@@ -321,7 +321,7 @@ async function expectGrowthUnderThreshold(
 // chunk of 256 from the whole receiver and only the TEXT folded says what it
 // read. That is the number a drain is held to below.
 //
-// NOTE: Every intrinsic is put back in a `finally`, so a body that throws does
+// Every intrinsic is put back in a `finally`, so a body that throws does
 // not leave a counting wrapper standing on `String.prototype` for whatever the
 // runner does next.
 type IntrinsicCalls = {
@@ -388,7 +388,7 @@ function position(answer: ReturnType<typeof firstIndex>): number {
 }
 
 describe("String work", () => {
-	// NOTE: The receiver is asked afterwards whether it has a character view,
+	// The receiver is asked afterwards whether it has a character view,
 	// which only the walk builds — so this is the whole of "the ASCII path was
 	// taken", and it is a fact about the run rather than a reading off a
 	// clock. The answers are asserted beside it, because a fast path that
@@ -424,7 +424,7 @@ describe("String work", () => {
 		expect(hasCharacterView(text)).toBeFalse()
 	})
 
-	// NOTE: THE CONVERTED CLAIM OF THE TWO PROGRAMS THIS FILE USED TO TIME.
+	// THE CONVERTED CLAIM OF THE TWO PROGRAMS THIS FILE USED TO TIME.
 	// `contains` is `firstIndex(of:)`, which used to be written on `split(on:)`
 	// and built a String per piece to answer a Boolean; `replaceFirst` is that
 	// search and the two `slice`s below it, where it used to split the receiver
@@ -450,7 +450,7 @@ describe("String work", () => {
 		expect(hasCharacterView(text)).toBeFalse()
 	})
 
-	// NOTE: And `separate`, which cut its receiver into an Array of its units
+	// And `separate`, which cut its receiver into an Array of its units
 	// to slice groups out of it — where an ASCII receiver's groups are cuts of
 	// its own text. The ONE join is the groups and the separator becoming the
 	// answer, which is what the Method is for.
@@ -466,20 +466,20 @@ describe("String work", () => {
 		expect(hasCharacterView(text)).toBeFalse()
 	})
 
-	// NOTE: HOW MANY TIMES A FOLDED SEARCH FOLDS, which is the claim the chunks
+	// HOW MANY TIMES A FOLDED SEARCH FOLDS, which is the claim the chunks
 	// in `String.ts` make and the one no growth ratio can see: every shape of
 	// chunking that reads the receiver once is linear, and only the count says
 	// whether the chunks DOUBLE, whether one is wider than the part it looks
 	// for, and whether the last one swallows the tail rather than leaving it to
 	// a chunk of its own.
 	//
-	// NOTE: THE COUNT SAYS THAT OF THE ROUTE ITS RECEIVER TAKES AND OF NO OTHER,
+	// THE COUNT SAYS THAT OF THE ROUTE ITS RECEIVER TAKES AND OF NO OTHER,
 	// which is why the case below this one asks the same question of a SEGMENTED
 	// receiver. The two routes chunk by the same rules and share not one line,
 	// so a count taken on an ASCII receiver holds nothing of the view route's
 	// shape in place.
 	//
-	// NOTE: The figures are exact rather than bounded, and they are arithmetic
+	// The figures are exact rather than bounded, and they are arithmetic
 	// rather than observation: one folding for the part, then chunks of 1,024,
 	// 2,048, 4,096 … each beginning two units back inside the one before it,
 	// until what is left is no longer than the next chunk would be. Four chunks
@@ -502,13 +502,13 @@ describe("String work", () => {
 		).toBe(4)
 	})
 
-	// NOTE: THE SAME LADDER ON THE VIEW ROUTE, where a folding is a call PER
+	// THE SAME LADDER ON THE VIEW ROUTE, where a folding is a call PER
 	// CHARACTER — `foldedRun` folds each cluster on its own — rather than one
 	// call over a whole chunk. So the count here is the number of characters the
 	// search read, and it is the chunk shape that decides it: an ASCII count can
 	// not see this route at all, and the two routes share no line of code.
 	//
-	// NOTE: Arithmetic again, for a part of three characters and a floor of
+	// Arithmetic again, for a part of three characters and a floor of
 	// sixteen: chunks of 16, 32, 64 … characters, each beginning two characters
 	// back inside the one before it — `separator.length - 1`, the widest a match
 	// straddling the boundary can hang over it by — and the search stops at the
@@ -521,7 +521,7 @@ describe("String work", () => {
 	// and that remainder is cut in two, which costs exactly the two characters of
 	// one more overlap — 20,023, which this case reads as a wrong answer.
 	//
-	// NOTE: The backward walk is the same ladder from the other end, so a match
+	// The backward walk is the same ladder from the other end, so a match
 	// 1,000 characters from the END costs what one 1,000 from the front costs.
 	// It is asserted because the two walks are written out separately — the
 	// backward one re-folds a wider chunk where the forward one folds ahead of
@@ -568,7 +568,7 @@ describe("String work", () => {
 		})
 	})
 
-	// NOTE: AND WHAT A DRAIN FOLDS, which is the claim the chunks were written
+	// AND WHAT A DRAIN FOLDS, which is the claim the chunks were written
 	// for: a Program that cuts a character off the front of its String every
 	// turn and asks each turn where a part first stands in what is LEFT used to
 	// fold the whole of that String every turn, so it read n² characters in pure
@@ -576,7 +576,7 @@ describe("String work", () => {
 	// driven through the runtime here — the same Functions the compiled Program
 	// calls, and the same window a `slice` hands it.
 	//
-	// NOTE: The arithmetic, per turn. The ASCII route folds the PART (two
+	// The arithmetic, per turn. The ASCII route folds the PART (two
 	// characters) and its first chunk (1,024), and the match always stands
 	// inside that chunk, so a turn folds 1,026 characters and 2,200 turns fold
 	// 2,257,200 — at BOTH lengths, since neither the chunk nor the distance to
@@ -587,7 +587,7 @@ describe("String work", () => {
 	// 15 × 16 + 7 × 48 = 576 characters of receiver and 2 × 22 = 44 of part, so
 	// the 100 periods of this drain fold 62,000.
 	//
-	// NOTE: The positions are summed and asserted beside the folding, for the
+	// The positions are summed and asserted beside the folding, for the
 	// reason every other count here is: a search that stopped answering, or
 	// answered the front of the String every time, would fold beautifully.
 	it("folds the distance to its match however long the drained receiver is", () => {
@@ -611,7 +611,7 @@ describe("String work", () => {
 			return { sum, folded: counted.folded }
 		}
 
-		// NOTE: Each route's expected sum is worked out from ITS OWN period, so
+		// Each route's expected sum is worked out from ITS OWN period, so
 		// that a period changed on one side can not be judged by the other's
 		// arithmetic — the two happen to be the same length today, and the
 		// folding figures below lean on that, which is what the first assertion
@@ -636,7 +636,7 @@ describe("String work", () => {
 		}
 	})
 
-	// NOTE: The other side of the claim — a receiver the scan refuses goes
+	// The other side of the claim — a receiver the scan refuses goes
 	// through the view, and the view is remembered on it. Without this the
 	// three cases above would pass just as well if nothing built a view ever.
 	it("builds the view for a receiver the ASCII scan refuses", () => {

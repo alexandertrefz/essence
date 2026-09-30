@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process"
 
-// NOTE: How the debuggee starts: Node, paused before the first line by
+// How the debuggee starts: Node, paused before the first line by
 // `--inspect-brk`, on an ephemeral port so two sessions never fight over one.
 // Node announces the inspector endpoint on stderr — the one line (plus its
 // "For help" follow-up) that is the runtime's own and must not be shown as
@@ -17,7 +17,7 @@ const inspectorNoise =
 
 export function launchProgram(options: {
 	runtime: string
-	// NOTE: The script node is pointed at. It is the bundle for an ordinary
+	// The script node is pointed at. It is the bundle for an ordinary
 	// launch and the test runner beside it for one debugging a test — which is
 	// why this is not called the bundle's path: the bundle is what a breakpoint
 	// is addressed to, and that is the session's to know.
@@ -33,7 +33,7 @@ export function launchProgram(options: {
 			options.runtime,
 			[
 				"--inspect-brk=127.0.0.1:0",
-				// NOTE: A crash the debugger does not catch still prints its
+				// A crash the debugger does not catch still prints its
 				// trace to stderr — read through the bundle's map, it names
 				// `.es` lines there too.
 				"--enable-source-maps",
@@ -66,7 +66,7 @@ export function launchProgram(options: {
 			options.onStdout(chunk.toString())
 		})
 
-		// NOTE: stderr is scanned line-wise for the endpoint; everything that
+		// stderr is scanned line-wise for the endpoint; everything that
 		// is not inspector housekeeping is the program's own and passes
 		// through. The buffer carries a line split across chunks.
 		child.stderr?.on("data", (chunk: Buffer) => {

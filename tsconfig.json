@@ -1,5 +1,5 @@
 {
-	// NOTE: One program over every package rather than project references.
+	// One program over every package rather than project references.
 	// Nothing is built — `tsc` only ever type-checks here — so there are no
 	// output artifacts for references to order, and a single program is what
 	// lets a cross-package import be checked against the imported package's
@@ -7,7 +7,7 @@
 	// generated first.
 	"extends": "./tsconfig.base.json",
 	"include": ["packages/*/src/**/*", "packages/*/tests/**/*", "scripts/**/*"],
-	// NOTE: The website's `src/` is checked by its own `tsconfig.json`, not
+	// The website's `src/` is checked by its own `tsconfig.json`, not
 	// here. Its modules import `astro:content` and `astro:assets` — virtual
 	// modules whose types only exist once `astro sync` has written
 	// `packages/website/.astro/types.d.ts`. This gate has to pass on a fresh

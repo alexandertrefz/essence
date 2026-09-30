@@ -93,13 +93,13 @@ import {
 	unimportedNamespacesOf,
 } from "./scope"
 
-// NOTE: Type resolution: the Types written in annotations and signatures, the
+// Type resolution: the Types written in annotations and signatures, the
 // Types declarations resolve to, the Types a Combination, a Lookup and a Record
 // or List literal answer from their enriched children, conformance solving,
 // and the Namespaces a Scope can see. No Expression is walked here; enrichment
 // is the only Expression walker.
 
-// NOTE: THE choke point where a written annotation meets the Type it resolves
+// THE choke point where a written annotation meets the Type it resolves
 // to, which is why the annotation index is recorded here and nowhere else. The
 // switch below recurses back through this function for a Generic's Arguments, a
 // Union's members, a Record's member Types and a Function Type's Parameters and
@@ -198,7 +198,7 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Records"
 		case "Case":
 			return "Cases"
-		// NOTE: A refinement is combined exactly as much as its base is, which
+		// A refinement is combined exactly as much as its base is, which
 		// for every v1 base is not at all — so it is described as what it is,
 		// under the name the Declaration gave it.
 		case "Refinement":
@@ -206,7 +206,7 @@ function describeTypesForCombination(type: common.Type): string {
 	}
 }
 
-// NOTE: A container Type nothing applied Type Arguments to — the `Dictionary` of
+// A container Type nothing applied Type Arguments to — the `Dictionary` of
 // `constant d: Dictionary = ["a" = 1]`, which is accepted exactly as a bare
 // `List` is. Updating one is refused as a "Generic Type", and what is missing is
 // the very thing that would make it updatable, so the Help names it: a
@@ -224,7 +224,7 @@ function unappliedGenericHelps(type: common.Type): Array<string> {
 	return []
 }
 
-// NOTE: The result Type of a Combination, computed from its operands' already
+// The result Type of a Combination, computed from its operands' already
 // enriched Types. It only needs the operand Positions, to point the Diagnostics
 // at — and the RIGHT operand's Node, where the caller has one, so a refusal can
 // point at the member that caused it rather than at the whole update.
@@ -285,7 +285,7 @@ export function combinationTypeOf(
 
 	// TODO: Resolve Applied Types and check wether they are Records
 
-	// NOTE: An update WRITES the members it names, so it DECIDES the ones the
+	// An update WRITES the members it names, so it DECIDES the ones the
 	// original left undecided: `{ box with items = ["a"] }` over a `box` whose
 	// `items` came from an empty List Literal answers `{ items: List<String> }`,
 	// and not the `{ items: List<Unknown> }` the base still carries. Handing the
@@ -296,7 +296,7 @@ export function combinationTypeOf(
 	// update just settled rather than the blank it filled — an update is what
 	// SETTLES a slot, never what has to fit into one. A member the update does
 	// not name keeps whatever the original said about it, undecided included.
-	// NOTE: Asked rather than asserted. `resolveUnknownSlots` answers the Type it
+	// Asked rather than asserted. `resolveUnknownSlots` answers the Type it
 	// was given wherever it decided nothing, and both sides here are Records, so
 	// a Record is what comes back — but the answer is a `common.Type` and a cast
 	// would be this code promising something the helper's signature does not.
@@ -307,14 +307,14 @@ export function combinationTypeOf(
 		return combined
 	}
 
-	// NOTE: The update is measured against `combined`, so a member this update
+	// The update is measured against `combined`, so a member this update
 	// DECIDED is not what refused it — what can be is a member it names and
 	// leaves undecided, `items = 1` over an `items` that came from an empty List
 	// Literal. `{ items: List<Unknown> }` names no Type a reader can act on, and
 	// the two sentences that make it answerable are the ones a Variable's own
 	// assignment is refused with.
 	let undecided = undecidedSlotEvidence(combined, rhsType, null)
-	// NOTE: A PARTIAL, so a member the update leaves out is not missing from it
+	// A PARTIAL, so a member the update leaves out is not missing from it
 	// — leaving members out is the whole of what an update is for. Only what it
 	// WRITES can be wrong, which is the same rule `isPartialOf` just refused it
 	// by.
@@ -353,7 +353,7 @@ export function combinationTypeOf(
 	return lhsType
 }
 
-// NOTE: Every Type name a Type declaration Node mentions, as the Identifier
+// Every Type name a Type declaration Node mentions, as the Identifier
 // Nodes that spell them so a Diagnostic can point at one, in written order —
 // walking Records, Lists / applications, Unions and Functions. The scan is
 // SYNTACTIC and runs before any of the Nodes is resolved, which is what the
@@ -388,7 +388,7 @@ export function referencedTypeNames(
 	}
 }
 
-// NOTE: The first mention of `choiceName` in a payload's Type declaration, for
+// The first mention of `choiceName` in a payload's Type declaration, for
 // the recursion restriction below, or null when the payload does not name the
 // Choice. Name-based on purpose: during speculative hoisting the Choice's own
 // name is not yet in scope, so a resolved-Type check could not see it.
@@ -403,7 +403,7 @@ function typeDeclarationNamesChoice(
 	)
 }
 
-// NOTE: A generic Choice's Case payload, resolved with the Choice's Type
+// A generic Choice's Case payload, resolved with the Choice's Type
 // Parameters in scope so a member may mention them (`Done { value: Result }`).
 // The recursion restriction is applied member by member and syntactically: a
 // member that names the Choice being declared would, when substituted eagerly
@@ -421,7 +421,7 @@ function resolveGenericCaseMembers(
 		return {}
 	}
 
-	// NOTE: A Type Parameter may spell the Choice's own name
+	// A Type Parameter may spell the Choice's own name
 	// (`choice Bad<Bad> { A { next: Bad } }`) — then a payload naming it names
 	// the Parameter, which is in scope and substitutes fine, and there is no
 	// recursion to report. The name-based scan can not see that on its own; the
@@ -467,7 +467,7 @@ function resolveGenericCaseMembers(
 	return members
 }
 
-// NOTE: Each Case becomes a nominal Record Type, and a plain Choice is declared
+// Each Case becomes a nominal Record Type, and a plain Choice is declared
 // as the *named* Union of them — every existing Union mechanism
 // (exhaustiveness, dispatch, `|` composition) applies to a Choice unchanged. A
 // *generic* Choice instead becomes a Generic Alias over the ANONYMOUS Union of
@@ -481,7 +481,7 @@ export function resolveChoiceDeclarationStatementType(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.UnionType | common.GenericAliasType {
-	// NOTE: Checked here as well as in `declareTypeInScope`, for the reason a
+	// Checked here as well as in `declareTypeInScope`, for the reason a
 	// Type Alias is: hoisting resolves speculatively and declares the name
 	// without ever reaching the declaration check, so `choice Self { … }`
 	// compiled while `type Self = …` was refused — and what the Note said about
@@ -494,7 +494,7 @@ export function resolveChoiceDeclarationStatementType(
 		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
 			labels: [primary(node.position, "this Choice declares none")],
-			// NOTE: A Choice IS its Cases — a Union of none is a Type no value
+			// A Choice IS its Cases — a Union of none is a Type no value
 			// can ever have, so there is nothing to do with the declaration but
 			// fill it in or take it out.
 			helps: [
@@ -510,7 +510,7 @@ export function resolveChoiceDeclarationStatementType(
 	let generics = isGeneric
 		? resolveGenericDeclarations(node.generics, scope)
 		: []
-	// NOTE: The Cases are identified by the Module this declaration is in, while
+	// The Cases are identified by the Module this declaration is in, while
 	// the Union and the Generic Alias below stay named as written — their name is
 	// a key in the Type Scope and the spelling every Hover shows, and neither is
 	// an identity.
@@ -535,7 +535,7 @@ export function resolveChoiceDeclarationStatementType(
 							"declared a second time here",
 						),
 					],
-					// NOTE: The Case the Choice HAS is the first one — this
+					// The Case the Choice HAS is the first one — this
 					// declaration is skipped below — so the edit is to take
 					// this one out, and saying so is the difference between a
 					// report and a report a reader can act on.
@@ -564,7 +564,7 @@ export function resolveChoiceDeclarationStatementType(
 						notes: [
 							`'${node.name.content}' abstracts over ${countOf(node.generics.length, "Type Parameter")}, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.`,
 						],
-						// NOTE: The second clause used to read "declare a Choice
+						// The second clause used to read "declare a Choice
 						// for the Type this default is a value of", which is a
 						// Choice of what the MEMBER holds — `1` is an Integer,
 						// and a Choice of Integers defaults nothing. What
@@ -606,7 +606,7 @@ export function resolveChoiceDeclarationStatementType(
 		}
 	}
 
-	// NOTE: Which members a Case's `= { … }` fills in, registered on the Case Type
+	// Which members a Case's `= { … }` fills in, registered on the Case Type
 	// as an object the Enricher writes the VALUES into later. Read off what the
 	// default writes — the same answer, and through the same helper, that a Record
 	// Parameter's `defaultMembers` is read off — so a payload and a Record Argument
@@ -645,14 +645,14 @@ export function resolveChoiceDeclarationStatementType(
 		}
 	}
 
-	// NOTE: Stamped once every Case is resolved, because it is the one fact
+	// Stamped once every Case is resolved, because it is the one fact
 	// about a Case that can not be read off the Case: whether its SIBLINGS carry
 	// payloads. A Case reaches the embedding boundary on its own — `constant up
 	// = #Up` is inferred as the Case rather than as the Union an annotation
 	// would have named — and that boundary has no scope to ask. So the question
 	// is answered here, where the whole declaration is in hand, and carried.
 	//
-	// NOTE: A generic Choice none of whose Cases carry a payload is a unit
+	// A generic Choice none of whose Cases carry a payload is a unit
 	// Choice too. Its Generics are then unused by every Case, so nothing an
 	// application substitutes can give one a payload.
 	if (
@@ -678,7 +678,7 @@ export function resolveChoiceDeclarationStatementType(
 	return { type: "UnionType", name: node.name.content, types: caseTypes }
 }
 
-// NOTE: The Type of a Record Literal, computed from its members' already
+// The Type of a Record Literal, computed from its members' already
 // enriched Types. A valid Record annotation wins; anything else reports and
 // falls back to the members' structural Type. `annotationPosition` is only read
 // when there is an annotation to point the Diagnostic at.
@@ -712,7 +712,7 @@ export function recordValueTypeOf(
 		}
 	}
 
-	// NOTE: Missing or invalid Type Annotations fall back to the
+	// Missing or invalid Type Annotations fall back to the
 	// structural Type of the Record Literal itself.
 	return {
 		type: "Record",
@@ -720,7 +720,7 @@ export function recordValueTypeOf(
 	}
 }
 
-// NOTE: The item Type of a List Literal from its elements' already enriched
+// The item Type of a List Literal from its elements' already enriched
 // Types. An empty List has an Unknown item Type; otherwise the item Type is the
 // Union of the distinct element Types, in first-seen order.
 export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
@@ -743,7 +743,7 @@ export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
 	return buildUnion(itemTypes)
 }
 
-// NOTE: What a Lookup that finds no member can be told beyond "there is no such
+// What a Lookup that finds no member can be told beyond "there is no such
 // member": whether a METHOD of that name answers for the base. That is the first
 // mistake anyone arriving from a language whose Methods are members makes —
 // `names.length()` for `names::length()` — and the only thing that tells it from
@@ -754,15 +754,15 @@ export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
 // Supplied by the Lookup enricher alone. A member PATH is handed none: a path
 // reads members off its Argument and calls nothing, whatever separator it wrote.
 export type MemberAccessContext = {
-	// NOTE: The span between the base and the member — the `.` a fix writes
+	// The span between the base and the member — the `.` a fix writes
 	// `::` over. Read off the two Positions rather than off the Token, because
 	// no Node stands for a separator.
 	separator: common.Position
-	// NOTE: Whether the Lookup is a call's callee: `names.length()` rather than
+	// Whether the Lookup is a call's callee: `names.length()` rather than
 	// `names.length`. The two get different Helps and different fixes — the
 	// second has to grow the parentheses the first already wrote.
 	isCalled: boolean
-	// NOTE: The base as it was WRITTEN — `box`, `box.inner` — and null where it
+	// The base as it was WRITTEN — `box`, `box.inner` — and null where it
 	// is anything a Help can not print back. A member read off a call or off a
 	// Literal has no spelling the reader would recognise, and a Help built from
 	// one would be a sentence about text nobody wrote.
@@ -770,10 +770,10 @@ export type MemberAccessContext = {
 	methodNamed: (name: string) => common.MethodType | null
 }
 
-// NOTE: The result Type of a Lookup, computed from its base's already enriched
+// The result Type of a Lookup, computed from its base's already enriched
 // Type. The member and base Positions are all it needs to point the Diagnostics.
 //
-// NOTE: `scope` is handed in only where the base can BE a Namespace, which is
+// `scope` is handed in only where the base can BE a Namespace, which is
 // the Lookup enricher and a Pattern's member path. A record path key steps
 // through Records by its own Type, and a member path is guarded to Records and
 // Cases before it gets here, so neither can reach the branch that reads it.
@@ -797,14 +797,14 @@ export function lookupTypeOf(
 			scope !== null &&
 			memberDeclarationWasAbandoned(scope, memberName)
 		) {
-			// NOTE: A member the Parser dropped out of a Namespace body is a
+			// A member the Parser dropped out of a Namespace body is a
 			// member this Program declares, so reading it is the syntax error
 			// once more rather than a name the reader got wrong. The `::` side
 			// has asked this since the recovery was written; the `.` side never
 			// did, so one `static broken 20` reported twice — where it was
 			// written, and again at every `Config.broken` below it.
 			//
-			// NOTE: FILE-WIDE, like every other question about a member name. A
+			// FILE-WIDE, like every other question about a member name. A
 			// Namespace's Type carries no source span, so there is nothing to
 			// ask whether the dropped run stood inside, and a span worked back
 			// from the name would be a guess. What that costs is a genuinely
@@ -851,7 +851,7 @@ export function lookupTypeOf(
 			return { type: "Error" }
 		}
 	} else if (baseType.type === "Case") {
-		// NOTE: A Case *is* a Record with a nominal identity — its payload
+		// A Case *is* a Record with a nominal identity — its payload
 		// members are read exactly like a Record's.
 		if (Object.hasOwn(baseType.members, memberName)) {
 			return baseType.members[memberName]
@@ -893,7 +893,7 @@ export function lookupTypeOf(
 				),
 			],
 			notes: ["Only Records, Cases and Namespaces have members."],
-			// NOTE: Offered for a member READ here, where `unknown-member`
+			// Offered for a member READ here, where `unknown-member`
 			// withholds it. That one stands on a value that HAS members, so a
 			// `.` is how one of them is reached and a Method is only a guess.
 			// This value has none at all, so whatever was written after the `.`
@@ -909,7 +909,7 @@ export function lookupTypeOf(
 	}
 }
 
-// NOTE: The one sentence a member access that found nothing is worth adding
+// The one sentence a member access that found nothing is worth adding
 // where the member was CALLED and no Method answers it: a `.` there is a call
 // written the way another language writes one, and the reader is one Token away
 // from `unknown-method`, which lists what the value does answer and offers the
@@ -932,12 +932,12 @@ function methodSeparatorHelps(
 	]
 }
 
-// NOTE: `names.length()` — the Method is there, it is simply not reached this
+// `names.length()` — the Method is there, it is simply not reached this
 // way, which is a different mistake from a misspelled member and the first one
 // anybody writes. Answers whether it reported, so each caller falls through to
 // the report it always made when no Method of the name answers.
 //
-// NOTE: The Namespace branch above asks nothing: a `.` is how a Namespace's own
+// The Namespace branch above asks nothing: a `.` is how a Namespace's own
 // members are reached, so `Terminal.prnt(…)` is a misspelling and nothing else.
 function reportMethodCalledWithDot(
 	baseType: common.Type,
@@ -952,12 +952,12 @@ function reportMethodCalledWithDot(
 	}
 
 	let answersAlone = answersWithoutArguments(method)
-	// NOTE: Where the `()` a READ never wrote belongs — just past the member,
+	// Where the `()` a READ never wrote belongs — just past the member,
 	// which is a zero-width span. Null where the reader already wrote the call.
 	let call = access.isCalled
 		? null
 		: { start: positions.member.end, end: positions.member.end }
-	// NOTE: No payload at all where the member was READ and the Method takes an
+	// No payload at all where the member was READ and the Method takes an
 	// Argument: the `()` a fix would write answers it with none, so the edit
 	// would trade one refusal for another. What to pass is the reader's to say,
 	// and the Help says so with its ellipsis.
@@ -997,7 +997,7 @@ function reportMethodCalledWithDot(
 	return true
 }
 
-// NOTE: Whether a call of this Method may write no Arguments at all — every
+// Whether a call of this Method may write no Arguments at all — every
 // Parameter of it defaulted, or of ONE of its Overloads. It decides whether the
 // `()` a fix writes is a call that resolves, and nothing else: a Method that
 // needs an Argument is named in the Help with the `…` the reader has to fill in.
@@ -1010,7 +1010,7 @@ function answersWithoutArguments(method: common.MethodType): boolean {
 
 	return overloads.some((overload) =>
 		overload.parameterTypes
-			// NOTE: The receiver occupies the first Parameter of every instance
+			// The receiver occupies the first Parameter of every instance
 			// signature and is written left of the `::` — see
 			// `OverloadCandidate`.
 			.slice(
@@ -1023,7 +1023,7 @@ function answersWithoutArguments(method: common.MethodType): boolean {
 	)
 }
 
-// NOTE: The name lookup a Parameter's default is subject to — the ordinary
+// The name lookup a Parameter's default is subject to — the ordinary
 // outward walk, with the Parameter list's own barrier consulted at the Scope
 // that carries it and AHEAD of that Scope's members. Ahead, because the barred
 // names are exactly the ones that are not bound yet; at that Scope rather than
@@ -1037,13 +1037,13 @@ type BarredName = enricher.BarredParameterName & {
 	reads: "own" | "later" | "pattern"
 }
 
-// NOTE: What a default is told when it reads a name the Parameter list binds and
+// What a default is told when it reads a name the Parameter list binds and
 // it may not see. Three shapes rather than one, because the fix differs: move
 // the Parameter, write the value out, or read what the Pattern reads.
 function reportBarredDefaultName(
 	node: parser.IdentifierNode,
 	barred: BarredName,
-	// NOTE: Whether the name ALSO stands outside the Parameter list, which is
+	// Whether the name ALSO stands outside the Parameter list, which is
 	// the whole of what makes "rename the Parameter" an edit rather than a dead
 	// end: renaming it leaves the default reading the name it always read, and
 	// that name has to resolve to something. Without one, a reader who followed
@@ -1117,7 +1117,7 @@ function reportBarredDefaultName(
 	)
 }
 
-// NOTE: Whether the name a barred default reads is bound somewhere OUTSIDE the
+// Whether the name a barred default reads is bound somewhere OUTSIDE the
 // Parameter list as well — the `constant times` written above the Function. The
 // barrier is ignored on this walk on purpose: the question is not what the
 // default may read where it stands, it is what the default WOULD read if the
@@ -1152,7 +1152,7 @@ function findVariableOrBarredName(
 		let barrier = searchScope.parameterDefaultBarrier
 		let barred = barrier?.names.get(name)
 
-		// NOTE: A Parameter to the LEFT is bound and is barred by nothing — it
+		// A Parameter to the LEFT is bound and is barred by nothing — it
 		// is in `names` because the map is built once for the whole list, and
 		// the index is what tells the two apart. A Pattern binding is barred
 		// wherever it was written.
@@ -1186,7 +1186,7 @@ function findVariableOrBarredName(
 	return null
 }
 
-// NOTE: A provided Method is emitted ONCE, as a const in the band ABOVE every
+// A provided Method is emitted ONCE, as a const in the band ABOVE every
 // Program that reaches it — so its body may name what that band holds, which is
 // the standard library and the builtins, and nothing the Program declares. A
 // Constant, a Function or a Namespace written beside the Protocol is in Scope
@@ -1216,7 +1216,7 @@ function reportProvidedMethodOutOfReach(
 			declaringScope === null &&
 			Object.hasOwn(searchScope.members, name)
 		) {
-			// NOTE: Bound at or inside the body — a Parameter, a Constant the
+			// Bound at or inside the body — a Parameter, a Constant the
 			// body declares, a Function literal's own binding — so the walk
 			// never crossed the Protocol and the name is emitted with the body.
 			if (protocolName === null) {
@@ -1271,7 +1271,7 @@ function reportProvidedMethodOutOfReach(
 	)
 }
 
-// NOTE: `provided-method-out-of-reach` for what the emitted body names and the
+// `provided-method-out-of-reach` for what the emitted body names and the
 // body never writes: a Method of a Namespace the Program declares, called on a
 // value or built into a witness a call in the body needs.
 export function reportProvidedBodyReaches(
@@ -1279,7 +1279,7 @@ export function reportProvidedBodyReaches(
 	protocolIdentity: string,
 	scope: enricher.Scope,
 ): void {
-	// NOTE: One report for each call, naming every Namespace a Union receiver
+	// One report for each call, naming every Namespace a Union receiver
 	// may run it off.
 	let groups = new Map<
 		string,
@@ -1371,7 +1371,7 @@ export function reportProvidedBodyReaches(
 	}
 }
 
-// NOTE: The Scope that binds a Namespace name to a Namespace the Program
+// The Scope that binds a Namespace name to a Namespace the Program
 // declares or imports, or null where the name is the prelude's or no Namespace.
 // The standard library's own load has no prelude snapshot, and reaches nothing.
 function programNamespaceScope(
@@ -1404,12 +1404,12 @@ function programNamespaceScope(
 		: declaringScope
 }
 
-// NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup
+// The bare form (`#Add({ … })`) resolves the way Method lookup
 // resolves its Namespace — every Choice in Type scope is scanned for the
 // Case, and only actual ambiguity asks for the prefix. Shadowed Type names
 // are skipped, mirroring `getAllNamespacesInScope`.
 //
-// NOTE: Every Case rather than only the ones spelled a given way, because the
+// Every Case rather than only the ones spelled a given way, because the
 // near miss a failed resolution offers is drawn from the same scan — a
 // candidate set narrowed to exact matches has nothing left to suggest from.
 export function findCaseTypesInScope(
@@ -1427,7 +1427,7 @@ export function findCaseTypesInScope(
 
 			seenTypeNames.add(typeName)
 
-			// NOTE: A generic Choice is a Generic Alias over the anonymous
+			// A generic Choice is a Generic Alias over the anonymous
 			// Union of its Cases — a bare `#Continue` scans that body Union too,
 			// finding the DECLARED Case the way it finds a plain Choice's.
 			let members =
@@ -1451,13 +1451,13 @@ export function findCaseTypesInScope(
 	return [...cases.values()]
 }
 
-// NOTE: What a name nothing declares is answered with BEFORE `unknown-name` —
+// What a name nothing declares is answered with BEFORE `unknown-name` —
 // the habits of the languages people arrive from, and the one slip Essence's own
 // grammar invites: a Case written without its `#`. Answers whether it reported,
 // so that everything it has nothing to say about falls through to the report
 // that has always been made.
 //
-// NOTE: Asked only of a name that resolved to NOTHING, which is what makes the
+// Asked only of a name that resolved to NOTHING, which is what makes the
 // whole table safe: a Program that declares `const`, `print` or `Red` itself
 // never reaches here, and none of these words is reserved by it.
 function reportForeignName(
@@ -1467,7 +1467,7 @@ function reportForeignName(
 ): boolean {
 	let name = node.content
 
-	// NOTE: The table stands FIRST, and for one entry: `println!` is a name a
+	// The table stands FIRST, and for one entry: `println!` is a name a
 	// reader wrote whole, and every rule below it would take the `!` off the end
 	// and answer about that instead — the postfix habits before the operators,
 	// and both before the words. Every other entry is a plain word that none of
@@ -1477,7 +1477,7 @@ function reportForeignName(
 		return true
 	}
 
-	// NOTE: The rest of a String written in the other quotes. One refusal about
+	// The rest of a String written in the other quotes. One refusal about
 	// it already stands on this line, and the names behind it are pieces of the
 	// same String — see `reportForeignString`.
 	if (
@@ -1496,7 +1496,7 @@ function reportForeignName(
 		return true
 	}
 
-	// NOTE: A `;` ends no name and no Statement, so a Statement written with one
+	// A `;` ends no name and no Statement, so a Statement written with one
 	// carries it into the name in front of it. What goes is the `;` alone — the
 	// name it was written against is the reader's own, and whatever is wrong with
 	// it is reported once it stands on its own again.
@@ -1524,17 +1524,17 @@ function reportForeignName(
 		return true
 	}
 
-	// NOTE: `user!` and `user?` — the two postfix habits, each of which ends no
+	// `user!` and `user?` — the two postfix habits, each of which ends no
 	// name and so arrives inside one. Answered before the operator table, which
 	// would read the `!` as a negation and offer the reader the opposite of what
 	// they asked for.
 	//
-	// NOTE: `user?.name` names the member it was reaching for — `map(.name)` —
+	// `user?.name` names the member it was reaching for — `map(.name)` —
 	// because the Lookup around it hands that down. `.member` is what is left
 	// where there is no member to name, which is `user?` standing on its own.
 	if (name.length > 1 && (name.endsWith("!") || name.endsWith("?"))) {
 		let value = name.slice(0, -1)
-		// NOTE: The `map` clause is offered only where a member was BEING
+		// The `map` clause is offered only where a member was BEING
 		// reached — `user?.name` hands `name` down and the Help writes
 		// `map(.name)`. `user!` standing on its own reaches for nothing, and
 		// `map(.member)` was a path into a member called `member`: on an
@@ -1566,7 +1566,7 @@ function reportForeignName(
 	let operator = foreignOperatorIn(name)
 
 	if (operator !== null) {
-		// NOTE: `count++` is one Identifier too — a `+` ends no name — so the
+		// `count++` is one Identifier too — a `+` ends no name — so the
 		// binding being counted is in hand and the Help can write the
 		// reassignment out with it. Only the POSTFIX form arrives whole:
 		// `count += 1` is broken in two by the `=`, and the Parser answers that
@@ -1580,7 +1580,7 @@ function reportForeignName(
 					)
 				: null
 
-		// NOTE: `!ready` is one Identifier, so the operand is in hand and the
+		// `!ready` is one Identifier, so the operand is in hand and the
 		// Help can name it — which is the difference between being told the rule
 		// and being shown the line. Only a PREFIX operator has one to name: an
 		// infix one is refused by the Parser, where the right operand has not
@@ -1601,16 +1601,16 @@ function reportForeignName(
 	return reportBareCaseName(node, scope, context)
 }
 
-// NOTE: The one sentence a String in the other quotes is answered with, spelled
+// The one sentence a String in the other quotes is answered with, spelled
 // here so that the report and the rule that silences the rest of its line read
 // the same text rather than two copies of it.
 const foreignStringMessage = "A String is written in double quotes"
 
-// NOTE: `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
+// `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
 // name — so the whole of what was written is in hand, and the Essence spelling
 // of it is that text in the quotes this language has.
 //
-// NOTE: `` `Hello ${name}` `` is NOT one Identifier. A `{` ends a name, so the
+// `` `Hello ${name}` `` is NOT one Identifier. A `{` ends a name, so the
 // holes break the run into a name, a `$`, a Record Literal and a quote standing
 // on its own, and each of the four was answered as an undeclared name of its
 // own. A name that merely OPENS with a quote is answered about the String, and
@@ -1652,7 +1652,7 @@ function reportForeignString(node: parser.IdentifierNode, name: string): void {
 	})
 }
 
-// NOTE: One word of another language, answered where it stands. Answers whether
+// One word of another language, answered where it stands. Answers whether
 // it reported, so that the one call site reads as the question it is asking.
 function reportForeignWord(
 	node: parser.IdentifierNode,
@@ -1681,14 +1681,14 @@ function reportForeignWord(
 	return true
 }
 
-// NOTE: `constant light: Light = Red` — the Case is there, the `#` in front of
+// `constant light: Light = Red` — the Case is there, the `#` in front of
 // it is not. Reported as the undeclared name it is, because that is what it is:
 // `Red` names no value, and the Choice that declares the Case is what the Notes
 // add. EVERY Choice that declares it is named rather than one, for the reason
 // `ambiguous-case` names every one — which of them was meant is not something
 // this can decide, and the `#Red` a fix writes is what asks that question next.
 //
-// NOTE: This is a GUESS about a name, and the whole of what makes a guess worth
+// This is a GUESS about a name, and the whole of what makes a guess worth
 // making is that the edit it offers is the one the reader wanted. Three shapes
 // where it is not:
 //
@@ -1737,7 +1737,7 @@ function reportBareCaseName(
 		),
 	]
 
-	// NOTE: And the member spelled out where the name is a Record Literal's
+	// And the member spelled out where the name is a Record Literal's
 	// shorthand, for the reason the Namespace reach spells one out — `{ #Red }`
 	// is not even a Record Literal, it is `Expected 'with'`.
 	let written = memberSpelling(
@@ -1775,7 +1775,7 @@ function reportBareCaseName(
 	return true
 }
 
-// NOTE: Reported from here and thrown by the Parser, because which of the two
+// Reported from here and thrown by the Parser, because which of the two
 // meets an operator is decided by how it lexes rather than by what it is. Both
 // read `foreignOperatorAccount` for the whole of what is SAID — see
 // `helpers/foreign` — so the two can not drift into two voices; what is left
@@ -1783,7 +1783,7 @@ function reportBareCaseName(
 export function reportOperatorNotSupported(
 	operator: string,
 	position: common.Position,
-	// NOTE: What the site knows that the table can not — the operand of a prefix
+	// What the site knows that the table can not — the operand of a prefix
 	// operator, which only the Enricher has in hand. It replaces the table's own
 	// Help, which is the same sentence with a placeholder standing where the
 	// reader's name goes.
@@ -1803,25 +1803,25 @@ export function reportOperatorNotSupported(
 	})
 }
 
-// NOTE: What the POSITION a name stands in knows about it, which the name
+// What the POSITION a name stands in knows about it, which the name
 // itself can not say. None of it changes a lookup — a name resolves the same
 // way wherever it is written — and all of it is read by what a name NOTHING
 // declares is answered with, which is a guess, and a guess is only ever as good
 // as what the site around it knows.
 export type NameContext = {
-	// NOTE: Written as a Record literal's whole member — `{ x }` — which earns
+	// Written as a Record literal's whole member — `{ x }` — which earns
 	// one extra sentence on `unknown-name`: a reader who wrote the shorthand
 	// without knowing it was one otherwise gets told that a name they never
 	// meant to read is not declared.
 	shorthandMember?: boolean
-	// NOTE: Written with Arguments behind it, which is what tells `Error("x")`
+	// Written with Arguments behind it, which is what tells `Error("x")`
 	// from `Error`. See `reportBareCaseName`.
 	applied?: boolean
-	// NOTE: The member being read off it — the `name` of `user?.name` — so that
+	// The member being read off it — the `name` of `user?.name` — so that
 	// the postfix habits offer the reader the member they were reaching for
 	// rather than the word "member".
 	readMember?: string | null
-	// NOTE: Written as the WHOLE of a String's hole — `"use { and } carefully"`.
+	// Written as the WHOLE of a String's hole — `"use { and } carefully"`.
 	// A hole holds an Expression, so the braces a reader meant to print read as
 	// one, and the word between them reads as a name. Only a hole holding
 	// nothing but a name is marked: a hole holding a call or a path is one
@@ -1851,7 +1851,7 @@ export function resolveIdentifierType(
 	let result = resolved?.type ?? null
 
 	if (result === null) {
-		// NOTE: Ahead of every reading of the name, because none of them is worth
+		// Ahead of every reading of the name, because none of them is worth
 		// making about a Declaration the Parser dropped — see
 		// `declarationWasAbandoned`. A near miss would offer the reader another
 		// name for the one they already wrote, and a foreign-habit guess would
@@ -1870,7 +1870,7 @@ export function resolveIdentifierType(
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
 					],
-					// NOTE: What a reader reaching for a Protocol by name
+					// What a reader reaching for a Protocol by name
 					// wanted is a value that CONFORMS to it, which is what a
 					// bounded Parameter carries — the Note names the two
 					// positions and this names the edit in the nearer one.
@@ -1880,7 +1880,7 @@ export function resolveIdentifierType(
 				},
 			)
 		} else if (!reportForeignName(node, scope, context)) {
-			// NOTE: What a Namespace around the name — or one in scope — declares
+			// What a Namespace around the name — or one in scope — declares
 			// under it, asked BEFORE the near miss. The name is not misspelled
 			// where the Namespace it stands INSIDE has it: it is written without
 			// the thing that reaches it, and that is evidence from the site
@@ -1914,7 +1914,7 @@ export function resolveIdentifierType(
 								`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
 							]
 						: []),
-					// NOTE: `"use { and } carefully"` — the braces opened a
+					// `"use { and } carefully"` — the braces opened a
 					// HOLE, and a hole holds an Expression, so the word between
 					// them is read as a name. A reader who meant the braces to
 					// stand for themselves was told their prose was not
@@ -1926,7 +1926,7 @@ export function resolveIdentifierType(
 						: []),
 					...(reached?.notes ?? []),
 				],
-				// NOTE: The braces come LAST where anything else was found, for
+				// The braces come LAST where anything else was found, for
 				// the reason the near miss leads the Namespace reach: a hole
 				// holding a name one edit away from a Constant is a hole
 				// somebody meant to open and mistyped, and a hole holding a
@@ -1965,7 +1965,7 @@ export function resolveIdentifierType(
 	}
 }
 
-// NOTE: What a name NOTHING declares can still be reached through, which is the
+// What a name NOTHING declares can still be reached through, which is the
 // last thing `unknown-name` knows and never said. A static is reached as
 // `Namespace.name` inside its own Namespace exactly as outside it, so a `noon`
 // written one line under `static noon = 43_200` resolves to nothing — and was
@@ -2014,7 +2014,7 @@ function namespaceReach(
 		}
 	}
 
-	// NOTE: An instance Method is reached through the value it works on, and
+	// An instance Method is reached through the value it works on, and
 	// that value is `@`. A static Method's body has no `@` at all, and
 	// `findSelfBinding` says so rather than answering with the instance
 	// Methods' binding around it — so the reach is offered exactly where
@@ -2022,7 +2022,7 @@ function namespaceReach(
 	let self = findSelfBinding(scope)
 
 	if (self !== null && self !== "static") {
-		// NOTE: WHICH Methods `@` answers is asked of the lookup a `::` call is
+		// WHICH Methods `@` answers is asked of the lookup a `::` call is
 		// decided by, rather than read off the enclosing Namespace's own table.
 		// The two agree in a Method body and part company wherever `@` was
 		// rebound: inside a Match Handler `@` is the value matched, and
@@ -2067,7 +2067,7 @@ function namespaceReach(
 			}
 		}
 
-		// NOTE: The Namespace around the name has the Method and `@` is not what
+		// The Namespace around the name has the Method and `@` is not what
 		// it works on, which is the Match Handler's `@` and no other: a Handler
 		// rebinds the one name a Method's receiver has, and this language has
 		// nothing that names the receiver THROUGH that rebinding. So the reach
@@ -2097,7 +2097,7 @@ function namespaceReach(
 		}
 	}
 
-	// NOTE: And a static named from outside its Namespace, which is the same
+	// And a static named from outside its Namespace, which is the same
 	// mistake with the Namespace further away. One Namespace declaring it is an
 	// answer; several is a question only the reader can settle, so they are
 	// listed and no fix is offered.
@@ -2142,7 +2142,7 @@ function namespaceReach(
 	return null
 }
 
-// NOTE: A Help that stands BEHIND another one, which is a Help that opens on
+// A Help that stands BEHIND another one, which is a Help that opens on
 // "Or": the two are alternatives, and the reader picks between them rather than
 // following both. Written here rather than spelled twice in the reaches, none of
 // which knows whether anything came before it.
@@ -2150,7 +2150,7 @@ function following(help: string): string {
 	return `Or ${(help[0] as string).toLowerCase()}${help.slice(1)}`
 }
 
-// NOTE: What a reach is written as WHERE IT STANDS, which is the reach itself
+// What a reach is written as WHERE IT STANDS, which is the reach itself
 // everywhere but one place: a Record Literal's shorthand `{ head }` is the
 // member AND its value, so a spelling written over the name — `{ Http.head }` —
 // is refused as `shorthand-on-path-key`, one refusal traded for the next. The
@@ -2164,7 +2164,7 @@ function memberSpelling(
 	return context.shorthandMember === true ? `${name} = ${reach}` : reach
 }
 
-// NOTE: Which Method of this name a `::` call on the value would reach, asked
+// Which Method of this name a `::` call on the value would reach, asked
 // of the very lookup an Invocation is decided by rather than of one Namespace's
 // table — see `methodAnswersFor`, which asks the same question on the
 // Invocation's own failure path. Null where no Method of the name answers for
@@ -2201,7 +2201,7 @@ function methodReachedThroughSelf(
 	return null
 }
 
-// NOTE: The same rule `reportMethodCalledWithDot` follows about the
+// The same rule `reportMethodCalledWithDot` follows about the
 // parentheses: a name written APPLIED already has them, and one written bare
 // needs them written for it — with an ellipsis where the Method takes
 // Arguments, which is the reader's to fill in and so is no fix at all.
@@ -2222,7 +2222,7 @@ function spelledMethodReach(
 	}
 }
 
-// NOTE: Whether a Namespace declares this name as something reached on the
+// Whether a Namespace declares this name as something reached on the
 // Namespace itself (`Namespace.method(…)`) rather than on a value. `undefined`
 // — a Namespace that does not declare the name at all — is not one: that is the
 // unknown-Method case, which is a different report.
@@ -2234,7 +2234,7 @@ export function isStaticMethod(method: common.Type | undefined): boolean {
 	)
 }
 
-// NOTE: The Namespace a Scope stands inside, walking outwards — see
+// The Namespace a Scope stands inside, walking outwards — see
 // `Scope.namespace`. A Namespace can not be written inside another, so the first
 // answer is the only one.
 export function enclosingNamespaceOf(
@@ -2253,7 +2253,7 @@ export function enclosingNamespaceOf(
 	return null
 }
 
-// NOTE: What `@` refers to at this point in the Program, walking outwards: the
+// What `@` refers to at this point in the Program, walking outwards: the
 // nearest binding wins, and a static Method's body stops the walk. The barrier
 // is the whole point — a static Method is declared inside a `namespace … for
 // Type` whose instance Methods bind `@` all around it, and letting one of those
@@ -2265,7 +2265,7 @@ function findSelfBinding(
 
 	while (searchScope !== null) {
 		if (Object.hasOwn(searchScope.members, "@")) {
-			// NOTE: `matched` says which of the two `@` this is — the value a
+			// `matched` says which of the two `@` this is — the value a
 			// Match Handler matched, or the receiver of the Method around it.
 			// Read by `namespaceReach` and by nothing else: what the name
 			// resolves to is the same either way.
@@ -2303,7 +2303,7 @@ export function resolveSelfType(
 			notes: [
 				"'@' is the receiver of an instance Method, and a static Method is called without one.",
 			],
-			// NOTE: What dropping 'static' COSTS, said out loud. It is a
+			// What dropping 'static' COSTS, said out loud. It is a
 			// change to how the Method is called, not only to how it is
 			// written: every existing call reads `Namespace.name(…)` and a
 			// Method with a receiver is reached as `value::name(…)`, so a
@@ -2358,7 +2358,7 @@ export function resolveGenericDeclarations(
 				? null
 				: resolveWrittenProtocol(generic.constraint, scope)
 
-		// NOTE: Not carried, so that no call is refused over it a second time.
+		// Not carried, so that no call is refused over it a second time.
 		if (generic.constraint !== null && protocol === null) {
 			reportUnknownProtocol(generic.constraint, scope)
 		}
@@ -2372,14 +2372,14 @@ export function resolveGenericDeclarations(
 	})
 }
 
-// NOTE: Declared Generics are registered as GenericUses so that Parameter
+// Declared Generics are registered as GenericUses so that Parameter
 // and Return Types can reference them. They stay opaque within the
 // declaration; binding them to concrete Types happens at each use site,
 // where Generic Inference substitutes the Arguments' Types.
 export function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	scope: enricher.Scope,
-	// NOTE: Bounds nothing wrote at this declaration but that hold here anyway —
+	// Bounds nothing wrote at this declaration but that hold here anyway —
 	// today only a Namespace's, implied by a bounded generic Choice it targets.
 	// A written bound wins, because a written one is what the reader can see.
 	implied: Map<string, string> = new Map(),
@@ -2389,7 +2389,7 @@ export function scopeWithGenerics(
 	for (let generic of generics) {
 		let name = generic.name.content
 
-		// NOTE: A written bound that names no Protocol is reported by
+		// A written bound that names no Protocol is reported by
 		// `resolveGenericDeclarations`, and marked here so that nothing asks
 		// the Parameter to answer for it again.
 		if (generic.constraint === null) {
@@ -2416,7 +2416,7 @@ export function scopeWithGenerics(
 	return childScope(scope, { types })
 }
 
-// NOTE: The Type Parameters a Choice DECLARES, with their bounds — looked up by
+// The Type Parameters a Choice DECLARES, with their bounds — looked up by
 // the Choice's own name, which every Case of it carries. Empty where the name
 // resolves to no generic Choice, which is every non-generic one.
 function declaredChoiceGenerics(
@@ -2425,13 +2425,13 @@ function declaredChoiceGenerics(
 ): Array<common.GenericDeclaration> {
 	let declared = findTypeInScope(displayChoiceName(choiceName), scope)
 
-	// NOTE: A generic Choice's name is a GenericAlias, whose own `generics` ARE
+	// A generic Choice's name is a GenericAlias, whose own `generics` ARE
 	// the declaration's Parameters, bounds and all. A non-generic one resolves
 	// to the Union of its Cases and has none.
 	return declared?.type === "GenericAlias" ? declared.generics : []
 }
 
-// NOTE: The bounds a Namespace's Type Parameters carry because its TARGET Type
+// The bounds a Namespace's Type Parameters carry because its TARGET Type
 // demands them. `choice SortedBox<Item is Comparable>` can not be built out of
 // anything else, so every `SortedBox<X>` there can ever be is a proof that `X`
 // is Comparable — and a `namespace Boxes<infer Item> for SortedBox<Item>` is
@@ -2453,7 +2453,7 @@ export function impliedTargetBounds(
 ): Map<string, string> {
 	let bounds = new Map<string, string>()
 
-	// NOTE: A target written out as a Record or as a Signature is the common
+	// A target written out as a Record or as a Signature is the common
 	// shape, and neither can resolve to a Case however its members read — so the
 	// resolution below is skipped for it. It is not a cheap question: the target
 	// is resolved a SECOND time here, silently, to break the circularity between
@@ -2476,7 +2476,7 @@ export function impliedTargetBounds(
 		resolveType(node.targetType!, scopeWithGenerics(node.generics, scope)),
 	).result
 
-	// NOTE: Every Case of the applied Choice, which is what a generic Choice's
+	// Every Case of the applied Choice, which is what a generic Choice's
 	// name resolves to — each carrying the Choice's own declared Parameters
 	// beside the Arguments this application bound them to.
 	for (let candidate of target.type === "UnionType"
@@ -2486,7 +2486,7 @@ export function impliedTargetBounds(
 			continue
 		}
 
-		// NOTE: The Choice's DECLARED Parameters, read off the declaration
+		// The Choice's DECLARED Parameters, read off the declaration
 		// rather than off this application — instantiating a Case replaces
 		// `choiceGenerics` with the `typeArguments` it bound, so the bounds are
 		// only where the Choice was written down.
@@ -2512,7 +2512,7 @@ export function impliedTargetBounds(
 	return bounds
 }
 
-// NOTE: Only a Function literal in Argument position can omit an annotation,
+// Only a Function literal in Argument position can omit an annotation,
 // and it is resolved through the contextual path below. Every Declaration
 // still parses its annotations, so a null reaching a Declaration would mean
 // the Parser produced something it has no rule for.
@@ -2527,7 +2527,7 @@ export function resolveDeclaredType(
 	return resolveType(node, scope)
 }
 
-// NOTE: A fully annotated Function signature — every Parameter and the return
+// A fully annotated Function signature — every Parameter and the return
 // Type are written, so there is no body to walk. A literal that omitted an
 // annotation is resolved contextually on the enrichment side instead, which is
 // the only place a body can be enriched to infer what it leaves out.
@@ -2549,7 +2549,7 @@ export function resolveFunctionSignatureType(
 	}
 }
 
-// NOTE: One free-Function signature — a bodied Function literal or a body-less
+// One free-Function signature — a bodied Function literal or a body-less
 // native signature, read through the same `methodSignatureEntry` a Namespace
 // Method uses so the two forms never fork. Free Functions inject no receiver
 // and carry no Namespace Generics, so this is `resolveFunctionSignatureType`
@@ -2572,7 +2572,7 @@ function resolveFreeFunctionEntry(
 	}
 }
 
-// NOTE: An overloaded free Function resolves to an `OverloadedStaticMethod` — a
+// An overloaded free Function resolves to an `OverloadedStaticMethod` — a
 // free Function is static by nature (no receiver), and `resolveFunctionInvocation`
 // already resolves that callee Type by matching Arguments against each overload.
 // The overloads keep their written order, which is the `__overload$N` index.
@@ -2605,14 +2605,14 @@ export function resolveProtocolDeclarationStatementType(
 	node: parser.ProtocolDeclarationStatementNode,
 	scope: enricher.Scope,
 	options: {
-		// NOTE: The Protocol names still waiting to hoist. An extension naming
+		// The Protocol names still waiting to hoist. An extension naming
 		// one can not be read yet — the ancestor's Methods are part of THIS
 		// Protocol's surface, so resolving without it would put half a surface
 		// in Scope for every use site above the declaration to solve against.
 		// Thrown back to the hoist loop, which retries a round later, exactly
 		// as a Namespace conforming to a pending Protocol is.
 		deferOnPendingProtocols?: ReadonlySet<string>
-		// NOTE: Set for a Protocol the extension-cycle pre-pass named. Its
+		// Set for a Protocol the extension-cycle pre-pass named. Its
 		// ancestors are unreadable by construction — each waits on the next —
 		// so the list is skipped and the Protocol resolves to its OWN surface,
 		// which is enough for the rest of the Program to be read against. The
@@ -2620,7 +2620,7 @@ export function resolveProtocolDeclarationStatementType(
 		ignoreExtensions?: boolean
 	} = {},
 ): common.ProtocolType {
-	// NOTE: And a Protocol may not BE `Self`, which is the name it is reserved
+	// And a Protocol may not BE `Self`, which is the name it is reserved
 	// for: every signature inside one may say `Self`, meaning the Type
 	// conforming, and a Protocol of that name stands where that word resolves.
 	// Checked in the resolver rather than beside the Scope declaration for the
@@ -2630,7 +2630,7 @@ export function resolveProtocolDeclarationStatementType(
 		reportReservedTypeName(node.name.position)
 	}
 
-	// NOTE: `Self` stands for the conforming Namespace's target Type — inside
+	// `Self` stands for the conforming Namespace's target Type — inside
 	// the signatures it is an ordinary GenericUse, substituted wherever the
 	// Protocol is used against a concrete Type.
 	let selfType: common.GenericUse = { type: "GenericUse", name: "Self" }
@@ -2642,7 +2642,7 @@ export function resolveProtocolDeclarationStatementType(
 		node.name.content,
 		scope.programTop === true ? null : node.name.position,
 	)
-	// NOTE: Which Methods carry a body, and which Protocol wrote it. An
+	// Which Methods carry a body, and which Protocol wrote it. An
 	// ancestor's entries arrive naming the ancestor, so a provided Method is
 	// emitted once, under its writer, however far down the chain it is reached.
 	let providedMethods: Record<string, string> = {}
@@ -2650,7 +2650,7 @@ export function resolveProtocolDeclarationStatementType(
 	let ancestors: Array<DeclaredAncestor> = []
 	let inherited = new Map<string, Array<common.MethodType>>()
 
-	// NOTE: The ancestors first, so the Protocol's own entries below overwrite
+	// The ancestors first, so the Protocol's own entries below overwrite
 	// them — writing a Method of an inherited name replaces it here exactly as
 	// a Namespace writing one replaces a provided Method at a call site.
 	if (options.ignoreExtensions !== true) {
@@ -2702,7 +2702,7 @@ export function resolveProtocolDeclarationStatementType(
 		)
 
 		if (protocolMethodBody(methodValue) === null) {
-			// NOTE: A REQUIREMENT of this Protocol's own, standing where an
+			// A REQUIREMENT of this Protocol's own, standing where an
 			// ancestor provided a body — the body goes with the entry it
 			// belonged to, and conformers owe the Method again.
 			delete providedMethods[methodName]
@@ -2748,7 +2748,7 @@ type DeclaredAncestor = {
 	ancestor: common.ProtocolType
 }
 
-// NOTE: The Protocol each clause of a declaration extends, as the clause read
+// The Protocol each clause of a declaration extends, as the clause read
 // where it is written, since by the time anything asks the name may bind the
 // declaration itself.
 let declaredAncestors = new WeakMap<
@@ -2758,14 +2758,14 @@ let declaredAncestors = new WeakMap<
 
 export type IncompatibleRestatement = {
 	methodName: string
-	// NOTE: The clause whose Protocol declares the Method in a way the entry
+	// The clause whose Protocol declares the Method in a way the entry
 	// does not accept.
 	refused: DeclaredAncestor
-	// NOTE: The clause the entry came from, or null where the Protocol writes it.
+	// The clause the entry came from, or null where the Protocol writes it.
 	source: DeclaredAncestor | null
 }
 
-// NOTE: Of the entries the extensions hold under one name, the one each of the
+// Of the entries the extensions hold under one name, the one each of the
 // others accepts in its place, or the last where none is, which is refused.
 function inheritedEntry(
 	methodName: string,
@@ -2784,7 +2784,7 @@ function inheritedEntry(
 	)
 }
 
-// NOTE: The Protocol whose body goes with an inherited entry: the body of the
+// The Protocol whose body goes with an inherited entry: the body of the
 // extension the entry comes from, or else the last body that fulfils it, or null
 // where none does, which leaves the last extension's.
 function inheritedBodyWriter(
@@ -2818,7 +2818,7 @@ let restatementsOf = new WeakMap<
 	Array<IncompatibleRestatement>
 >()
 
-// NOTE: The entries a Protocol holds under an inherited name that do not take
+// The entries a Protocol holds under an inherited name that do not take
 // every call a bound granting the ancestor makes, refused where it is declared,
 // except one an extension is refused for itself, which is reported there.
 export function incompatibleRestatements(
@@ -2872,7 +2872,7 @@ export function incompatibleRestatements(
 	return found
 }
 
-// NOTE: A mismatch of a Method a Protocol the Namespace conforms to is refused
+// A mismatch of a Method a Protocol the Namespace conforms to is refused
 // for restating repeats that refusal: silent where this Module reports it, and
 // with a Note naming it where another does, as each Module is checked alone.
 function restatementEcho(
@@ -2920,7 +2920,7 @@ function identityModulePath(identity: string): string | null {
 	return separator === -1 ? null : identity.slice(0, separator)
 }
 
-// NOTE: One `is X` of a Protocol's extension list, resolved — or null where it
+// One `is X` of a Protocol's extension list, resolved — or null where it
 // names nothing, which is reported here. A `where` clause is refused rather
 // than read: a Protocol declares no Type Parameters, so there is nothing for a
 // condition to bound and nothing at a use site to prove it with.
@@ -2969,7 +2969,7 @@ function resolveExtendedProtocol(
 	return ancestor
 }
 
-// NOTE: The body a Protocol Method carries, or null for a requirement. A static
+// The body a Protocol Method carries, or null for a requirement. A static
 // or overloaded entry answers null whatever it was written with — both are
 // refused at the declaration, and reading them as requirements is what keeps
 // the refusal from breaking the surface as well.
@@ -3047,7 +3047,7 @@ function resolveProtocolMethodType(
 	}
 }
 
-// NOTE: A generic Namespace specialized against the bindings that unified its
+// A generic Namespace specialized against the bindings that unified its
 // target Type with a receiver — its target Type and every Method signature are
 // rewritten through those bindings so it reads as a concrete Namespace from the
 // selection point on. Fresh objects throughout: the builtin table singletons
@@ -3076,7 +3076,7 @@ function specializeNamespace(
 	}
 }
 
-// NOTE: The Namespaces that target a receiver, each SPECIALIZED against it —
+// The Namespaces that target a receiver, each SPECIALIZED against it —
 // `List<ItemType>` against a `List<Integer>` receiver comes back with `ItemType`
 // replaced by `Integer` throughout. Only a Diagnostic asks: selection re-binds
 // the Generics from the receiver Argument and has no use for this, but a Note
@@ -3108,13 +3108,13 @@ export function specializedNamespacesFor(
 	return specialized
 }
 
-// NOTE: The outcome of solving one (binding, Protocol) conformance. A success
+// The outcome of solving one (binding, Protocol) conformance. A success
 // carries the witness source (recursively including its own `where`
 // conditions); a failure carries the because-chain, outermost first, or an
 // empty chain when the failure was already reported (ambiguity, a
 // nonconforming Namespace) and must stay silent.
 //
-// NOTE: `culprit` is the LAST link of that chain — the Type that actually has no
+// `culprit` is the LAST link of that chain — the Type that actually has no
 // conforming Namespace, which for `Result<String, Problem>` is `Problem` and not
 // the Type the report is about. It rides up unchanged as each level prepends its
 // own sentence, because a reader asked to declare a Namespace has to be told the
@@ -3126,20 +3126,20 @@ type ConformanceSolveResult =
 			ok: false
 			chain: Array<string>
 			culprit?: { type: common.Type; protocolName: string }
-			// NOTE: The member of a RECORD the refusal is really about, dotted
+			// The member of a RECORD the refusal is really about, dotted
 			// through every Record it is nested inside. Absent for every other
 			// refusal, which is what tells a Record above this one whether the
 			// name it is about to write down is the whole path or only the last
 			// step of one.
 			memberPath?: string
-			// NOTE: Set where the refusal is the CYCLE GUARD's and not a real
+			// Set where the refusal is the CYCLE GUARD's and not a real
 			// answer — the question was already open further up the recursion.
 			// A composite asking about its own members has to tell the two
 			// apart: a member that truly has no conformance takes the
 			// composite's away, while one the guard closed the loop on is a
 			// RECURSIVE Type, which is a fine Program and must keep compiling.
 			cycle?: true
-			// NOTE: The Helps a refusal carries where no Namespace declared for
+			// The Helps a refusal carries where no Namespace declared for
 			// the culprit would answer it, in place of the one that says to
 			// declare it.
 			helps?: Array<string>
@@ -3148,12 +3148,12 @@ type ConformanceSolveResult =
 type ScopeConformanceState = {
 	memo: Map<string, ConformanceSolveResult>
 	inProgress: Set<string>
-	// NOTE: The Scope versions the memo was filled under — the same snapshot
+	// The Scope versions the memo was filled under — the same snapshot
 	// `getAllNamespacesInScope` validates its own answer against.
 	versions: Array<{ scope: enricher.Scope; version: number }>
 }
 
-// NOTE: Memoised per exact Scope, not per root Scope: `where` conditions are
+// Memoised per exact Scope, not per root Scope: `where` conditions are
 // solved against whatever Namespaces are visible, and `getAllNamespacesInScope`
 // walks the parent chain — a function-local Namespace is visible only in its
 // own subtree, so two Scopes can legitimately solve the same (Type, Protocol)
@@ -3161,7 +3161,7 @@ type ScopeConformanceState = {
 // `inProgress` set still guards cycles within it.
 let conformanceStates = new WeakMap<enricher.Scope, ScopeConformanceState>()
 
-// NOTE: One Scope's visible Namespaces change over the course of enrichment as
+// One Scope's visible Namespaces change over the course of enrichment as
 // its own Statements declare them — a Namespace written half way down a
 // Function body is not visible to the Statements above it and IS to the ones
 // below. The memo is therefore version-guarded exactly like the Namespace
@@ -3188,7 +3188,7 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 	return state
 }
 
-// NOTE: The three fabricated Namespace names live in `helpers/conformance.ts`,
+// The three fabricated Namespace names live in `helpers/conformance.ts`,
 // which the Rewriter imports as well, so the Rewriter's brand and the
 // Enricher's routing read one spelling and can not disagree about it. They are
 // re-exported under their own names, so every site that reaches them through
@@ -3199,12 +3199,12 @@ export {
 	derivedPrintableNamespaceName,
 }
 
-// NOTE: The Protocol printing is derived for. Named once and exported, because
+// The Protocol printing is derived for. Named once and exported, because
 // several places ask whether a conformance is that one, the Language Server
 // among them, and a typo in any of them would silently derive nothing.
 export const printableProtocolName = "Printable"
 
-// NOTE: The Protocol a Choice's own Cases are listed through, and the one
+// The Protocol a Choice's own Cases are listed through, and the one
 // Method it asks for. Both are named once for the reason the Protocol above is:
 // the derive is found by name in several places, and a typo in any of them
 // would leave a Choice quietly answering nothing.
@@ -3212,7 +3212,7 @@ export const enumerableProtocolName = "Enumerable"
 
 export const enumerableMethodName = "cases"
 
-// NOTE: The names this enrichment reached a conformance through without
+// The names this enrichment reached a conformance through without
 // writing them: the Choice a derived `is` finds by name, and every Namespace
 // that could conform to a bound, whether or not the call is refused.
 //
@@ -3244,7 +3244,7 @@ function noteReachedName(name: string): void {
 	reachedNames?.add(name)
 }
 
-// NOTE: The identity of the Choice a receiver belongs to, or null when it
+// The identity of the Choice a receiver belongs to, or null when it
 // belongs to none — a single Case names its own Choice, and a Union names one
 // only when every member is a Case of it. The IDENTITY rather than the written
 // name, so a Union built from two Modules' same-named Choices answers null the
@@ -3277,7 +3277,7 @@ function choiceIdentityOf(baseType: common.Type): string | null {
 	return null
 }
 
-// NOTE: The Type Arguments a receiver of a generic Choice was instantiated with
+// The Type Arguments a receiver of a generic Choice was instantiated with
 // — declaration order — read off the receiver itself (a single Case carries
 // them, a Union reads its first member's). Empty for a receiver that somehow
 // carries none, which reconstructs the Choice with its defaults.
@@ -3297,7 +3297,7 @@ function choiceTypeArgumentsOf(baseType: common.Type): Array<common.Type> {
 	return []
 }
 
-// NOTE: The whole applied Union of a generic Choice, rebuilt from its Generic
+// The whole applied Union of a generic Choice, rebuilt from its Generic
 // Alias and one receiver's Type Arguments — mirrors `applyGenericAlias`'s
 // substitution and display-alias stamping, but never reports (the Arguments
 // came from a receiver the Enricher already accepted).
@@ -3340,7 +3340,7 @@ function instantiateChoiceAlias(
 	return applied
 }
 
-// NOTE: The declared Generic Alias a generic Choice's name resolves to, once it
+// The declared Generic Alias a generic Choice's name resolves to, once it
 // is confirmed to name that Choice's own Cases — null for a name that no longer
 // resolves to the Choice (shadowed), or for a non-generic Choice.
 function declaredChoiceAliasOf(
@@ -3353,7 +3353,7 @@ function declaredChoiceAliasOf(
 		return null
 	}
 
-	// NOTE: Looked up under the name the Choice was DECLARED with, which is the
+	// Looked up under the name the Choice was DECLARED with, which is the
 	// key it occupies in the Type Scope — the identity in front of it is the
 	// Module's path, and no Scope is keyed by that. What the name answers with is
 	// then held to the identity below, so a name that resolves to another
@@ -3386,7 +3386,7 @@ function declaredChoiceAliasOf(
 	return declared
 }
 
-// NOTE: The Choice a receiver belongs to, or null when it belongs to none. A
+// The Choice a receiver belongs to, or null when it belongs to none. A
 // single Case (a receiver narrowed by a Handler) answers with its whole Choice,
 // so `is` reads the same inside a `case #Red` as outside it. A *generic*
 // Choice's name resolves to a Generic Alias rather than a Union, so the answer
@@ -3403,7 +3403,7 @@ function choiceTypeOf(
 		return null
 	}
 
-	// NOTE: The DECLARED Choice, not the receiver — a receiver narrowed to one
+	// The DECLARED Choice, not the receiver — a receiver narrowed to one
 	// Case still compares against the whole Choice, so `case #Red { @::is(c) }`
 	// takes any Colour rather than only another `#Red`. A Choice whose name no
 	// longer resolves to it has been shadowed; deriving off the wrong Type
@@ -3412,7 +3412,7 @@ function choiceTypeOf(
 	// `declaredChoiceAliasOf`.
 	let declared = findTypeInScope(displayChoiceName(identity), scope)
 
-	// NOTE: Recorded whatever the lookup answered. A name that resolves to
+	// Recorded whatever the lookup answered. A name that resolves to
 	// nothing here is a name this Module was reaching for, which is exactly what
 	// the unused-import check is asking about.
 	noteReachedName(displayChoiceName(identity))
@@ -3421,7 +3421,7 @@ function choiceTypeOf(
 		return null
 	}
 
-	// NOTE: A generic Choice resolves to a Generic Alias over the anonymous
+	// A generic Choice resolves to a Generic Alias over the anonymous
 	// Union of its Cases — the receiver names its Type Arguments, so the answer
 	// is that Alias applied to them.
 	if (declared.type === "GenericAlias") {
@@ -3452,7 +3452,7 @@ function choiceTypeOf(
 	return declared
 }
 
-// NOTE: Whether a Type mentions any of the named Type Parameters — a bare
+// Whether a Type mentions any of the named Type Parameters — a bare
 // GenericUse of one, or one buried in a List item, a Dictionary key or value,
 // a Record member, a Case payload or a Union arm. Decides whether a payload
 // member compares structurally or routes through a witness.
@@ -3465,12 +3465,12 @@ function typeMentionsGenerics(
 			return generics.has(type.name)
 		case "List":
 			return typeMentionsGenerics(type.itemType, generics)
-		// NOTE: The one slot each, asked exactly as a List's item Type is —
+		// The one slot each, asked exactly as a List's item Type is —
 		// what makes `Future<Value>` bind `Value` off a receiver.
 		case "Future":
 		case "Started":
 			return typeMentionsGenerics(type.valueType, generics)
-		// NOTE: Either slot on its own is enough — a `Dictionary<String, T>`
+		// Either slot on its own is enough — a `Dictionary<String, T>`
 		// mentions `T` as much as a `Dictionary<T, String>` does, and both have
 		// to be compared through a witness rather than structurally.
 		case "Dictionary":
@@ -3487,7 +3487,7 @@ function typeMentionsGenerics(
 			return type.types.some((member) =>
 				typeMentionsGenerics(member, generics),
 			)
-		// NOTE: Only the base can name a Type Parameter — a conjunct is a key
+		// Only the base can name a Type Parameter — a conjunct is a key
 		// over literals — and a List base carries item Types, which is where one
 		// would be.
 		case "Refinement":
@@ -3497,7 +3497,7 @@ function typeMentionsGenerics(
 	}
 }
 
-// NOTE: The Cases of a Choice's Generic Alias — its body is the anonymous
+// The Cases of a Choice's Generic Alias — its body is the anonymous
 // Union of them, so a non-Union body (never produced for a real Choice) simply
 // has none.
 function choiceAliasCases(alias: common.GenericAliasType): Array<common.Type> {
@@ -3506,7 +3506,7 @@ function choiceAliasCases(alias: common.GenericAliasType): Array<common.Type> {
 		: []
 }
 
-// NOTE: The Type Parameters some Case payload of the Choice actually mentions,
+// The Type Parameters some Case payload of the Choice actually mentions,
 // as a set — a Parameter no payload names needs neither a bound nor a witness.
 function mentionedGenerics(alias: common.GenericAliasType): Set<string> {
 	let genericNames = new Set(alias.generics.map((generic) => generic.name))
@@ -3529,7 +3529,7 @@ function mentionedGenerics(alias: common.GenericAliasType): Set<string> {
 	return mentioned
 }
 
-// NOTE: The Parameters some payload mentions, in Choice declaration order — the
+// The Parameters some payload mentions, in Choice declaration order — the
 // order the fabricated Methods take their bounds in and the order
 // `resolveConformances` hands the witnesses over, so a descriptor's `w` index
 // selects the right one.
@@ -3543,7 +3543,7 @@ function constrainedGenericOrder(
 		.filter((name) => mentioned.has(name))
 }
 
-// NOTE: The runtime `typeKeySymbol` tag a concrete Type's values carry, or null
+// The runtime `typeKeySymbol` tag a concrete Type's values carry, or null
 // for a Type with no single tag (a bare Union). Lets a `union` descriptor node
 // discriminate a Union payload's concrete arms at runtime.
 function runtimeTagOf(type: common.Type): string | null {
@@ -3567,7 +3567,7 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "List":
 		case "GenericList":
 			return "List"
-		// NOTE: Both spellings again, and for the reason the two List ones share
+		// Both spellings again, and for the reason the two List ones share
 		// a cell: the tag is what a VALUE carries, and a bare `Dictionary` and
 		// an applied one are carried by the same values.
 		case "Dictionary":
@@ -3575,7 +3575,7 @@ function runtimeTagOf(type: common.Type): string | null {
 			return "Dictionary"
 		case "Case":
 			return `${type.choice}#${type.name}`
-		// NOTE: A refinement's values ARE its base's values — nothing about the
+		// A refinement's values ARE its base's values — nothing about the
 		// evidence reaches run time, so the tag they carry is the base's.
 		case "Refinement":
 			return runtimeTagOf(type.base)
@@ -3584,13 +3584,13 @@ function runtimeTagOf(type: common.Type): string | null {
 	}
 }
 
-// NOTE: Which hidden conformance Argument a payload member's own witness arrives
+// Which hidden conformance Argument a payload member's own witness arrives
 // in, or null where the member is compared by the universal structural rule and
 // no witness is wanted. The slots the Type Parameters take are decided by
 // declaration order and come first; a routed member takes the next one free.
 type MemberRouter = (type: common.Type) => number | null
 
-// NOTE: How one payload member is compared — structurally when it names no Type
+// How one payload member is compared — structurally when it names no Type
 // Parameter, through the witness at its declaration-order index when it is a
 // bare Parameter, and recursively for the composites (a List itemwise, a Record
 // or Case member by member, a Union by claiming each arm's values and falling
@@ -3603,7 +3603,7 @@ function describeMember(
 	generics: Set<string>,
 	bindings: GenericBindings,
 	position: common.Position | null,
-	// NOTE: One rule for every derived composite: it asks its members. A member
+	// One rule for every derived composite: it asks its members. A member
 	// naming no Type Parameter is where the walk can begin again: a `tag: Tag`
 	// compares by whatever `Tags` writes, a `children: List<Tag>` itemwise
 	// through that same `is`, and a `price: Money` through the Record routing
@@ -3632,7 +3632,7 @@ function describeMember(
 					route,
 				),
 			}
-		// NOTE: Each slot described on its own, because each is decided on its
+		// Each slot described on its own, because each is decided on its
 		// own — a `Dictionary<T, Integer>` routes its keys through `T`'s witness
 		// and compares its values structurally, and the node that says so needs
 		// both halves. A slot naming no Type Parameter is described as `eq` by
@@ -3690,7 +3690,7 @@ function describeMember(
 				position,
 				route,
 			)
-		// NOTE: A refinement compares exactly as its base does — the evidence is
+		// A refinement compares exactly as its base does — the evidence is
 		// not a part the runtime ever hears of, which is what `runtimeShapeOf`
 		// below says in its own words. It reaches here only where the base names a
 		// Type Parameter (`Full { value: NonEmptyList<Item> }`), and reading it as a
@@ -3710,13 +3710,13 @@ function describeMember(
 	}
 }
 
-// NOTE: One arm of a `union` descriptor node while it is being built — the
+// One arm of a `union` descriptor node while it is being built — the
 // claim it makes at runtime, alongside the Type that claim is read off.
 type UnionArm = {
-	// NOTE: The arm as written. For a Parameter-naming arm this still mentions
+	// The arm as written. For a Parameter-naming arm this still mentions
 	// the Parameter; `applied` is what it stands for at this receiver.
 	type: common.Type
-	// NOTE: The Type a Parameter-naming arm stands for once the receiver's Type
+	// The Type a Parameter-naming arm stands for once the receiver's Type
 	// Arguments are substituted in, and null for every other arm — a concrete
 	// one, and one whose Parameters this receiver does not bind.
 	applied: common.Type | null
@@ -3727,12 +3727,12 @@ type UnionArm = {
 	} | null
 }
 
-// NOTE: A Union-typed payload member. Which arm a value belongs to is a runtime
+// A Union-typed payload member. Which arm a value belongs to is a runtime
 // question, and the descriptor answers it with the two checks the runtime has:
 // the value's `typeKeySymbol` tag, and — for the arms one tag can not tell apart
 // — the structural `isValueOfType` a Match narrows with.
 //
-// NOTE: A tag says which KIND a value is, not which Type: every Record carries
+// A tag says which KIND a value is, not which Type: every Record carries
 // "Record", every List "List". So a concrete `{ code: Integer }` arm and a `T`
 // bound to `{ name: String }` claim the same tag, and left at that the concrete
 // arm claims the Parameter's values too and compares them structurally,
@@ -3755,7 +3755,7 @@ function describeUnion(
 		claim: null,
 	}))
 
-	// NOTE: The arms that stand for a Type Parameter's values. ONE of them is
+	// The arms that stand for a Type Parameter's values. ONE of them is
 	// the fallback the rest of this function is written around; two of them
 	// are two fallbacks, and the runtime takes the first it finds — a
 	// `T | List<T>` payload compared every List through T's witness, so
@@ -3766,7 +3766,7 @@ function describeUnion(
 		typeMentionsGenerics(arm.type, generics),
 	)
 
-	// NOTE: And where the receiver is generic over the very Parameters its
+	// And where the receiver is generic over the very Parameters its
 	// payload names, there are no Type Arguments to shape them with and both
 	// arms are whatever the eventual Argument turns out to be. No descriptor
 	// can be right about that, so the comparison is refused instead of being
@@ -3800,7 +3800,7 @@ function describeUnion(
 		)
 	}
 
-	// NOTE: What the Parameter-naming arms' values look like at this receiver —
+	// What the Parameter-naming arms' values look like at this receiver —
 	// the values a concrete arm must not claim. A Union Argument is flattened:
 	// each of its members carries its own tag.
 	let witnessTypes = arms.flatMap((arm) =>
@@ -3821,7 +3821,7 @@ function describeUnion(
 			route,
 		)
 
-		// NOTE: An arm mentioning a Parameter is the fallback (`null`) — no
+		// An arm mentioning a Parameter is the fallback (`null`) — no
 		// fixed tag is its own, so everything no arm claims is compared through
 		// its witness. Where there are several, only the one the receiver could
 		// not apply stays the fallback; the rest take the shape their Type
@@ -3852,7 +3852,7 @@ function describeUnion(
 			continue
 		}
 
-		// NOTE: Mutually assignable — the arm and the Argument accept exactly
+		// Mutually assignable — the arm and the Argument accept exactly
 		// the same values, so no runtime check tells them apart. The witness is
 		// the more specific of the two answers, and it also answers for this
 		// arm's own values (they are values of its Type too), so the arm stops
@@ -3870,7 +3870,7 @@ function describeUnion(
 		arm.claim = { tag, shape: runtimeShapeOf(arm.type), node }
 	}
 
-	// NOTE: An Argument that is a strict REFINEMENT of a concrete arm — every
+	// An Argument that is a strict REFINEMENT of a concrete arm — every
 	// one of its values fits that arm's shape, while the arm has values it does
 	// not — is the one case where a shape alone still claims wrongly. The
 	// Parameter's arm takes a shape of its own, and the ordering below puts the
@@ -3903,7 +3903,7 @@ function describeUnion(
 	}
 }
 
-// NOTE: The Type a Parameter-naming arm stands for once the receiver's Type
+// The Type a Parameter-naming arm stands for once the receiver's Type
 // Arguments are substituted in — null for a concrete arm, for a descriptor built
 // without a receiver, and for an arm whose Parameters this receiver leaves
 // unbound: those values carry whatever tag the eventual Argument does, which is
@@ -3922,7 +3922,7 @@ function appliedArmType(
 	return typeMentionsGenerics(applied, generics) ? null : applied
 }
 
-// NOTE: Most specific claim first, so an arm whose values are all values of
+// Most specific claim first, so an arm whose values are all values of
 // another claims them before that other one does — Record shapes are OPEN, so
 // `{ code: Integer }` accepts a `{ name: String, code: Integer }` too, and only
 // the order keeps the more specific arm's values off it. Ties go to the
@@ -3951,7 +3951,7 @@ function orderClaims<Claim extends { tag: string | null; shape?: common.Type }>(
 			return leftFitsRight ? -1 : 1
 		}
 
-		// NOTE: Two shapes accepting exactly each other's values — only reached
+		// Two shapes accepting exactly each other's values — only reached
 		// between two concrete arms, since an arm tied with a Parameter's
 		// Argument stopped claiming above.
 		if (leftFitsRight) {
@@ -3974,24 +3974,24 @@ function orderClaims<Claim extends { tag: string | null; shape?: common.Type }>(
 	return claimed
 }
 
-// NOTE: The part of a Type the runtime can actually check — what `isValueOfType`
+// The part of a Type the runtime can actually check — what `isValueOfType`
 // consults and nothing more, which is why a descriptor carries a SHAPE rather
 // than a Type. A Union's alias spelling and Type Arguments say nothing about a
 // value, so they go. Every one of these is emitted into the Program that needs
 // it, so what is left out is bytes no Program pays for.
 //
-// NOTE: A Case keeps its payload — its tag is shared by every instantiation of
+// A Case keeps its payload — its tag is shared by every instantiation of
 // it, so `Box<Integer>#Full` and `Box<String>#Full` are told apart by their
 // members or not at all. The members are shaped in turn, and the ones that are
 // still Type Parameters answer true at runtime, which is the tag-only check
 // back again where nothing more is known.
 //
-// NOTE: A Case does NOT keep its `unitChoice`. It says how the Case is spelled
+// A Case does NOT keep its `unitChoice`. It says how the Case is spelled
 // on the far side of the EMBEDDING boundary, which `isValueOfType` has never
 // heard of, so it is no part of the shape — dropped for the same reason a
 // Union's alias is, and it buys the same bytes back.
 //
-// NOTE: What this does NOT claim is that the field never reaches an emitted
+// What this does NOT claim is that the field never reaches an emitted
 // Program. A Match Handler's Matcher is serialised from the DECLARED Type
 // rather than from a shape — `typeDescriptorExpression` in the Rewriter, which
 // carries a Union's alias too — so a Program matching on a unit Choice ships
@@ -4031,7 +4031,7 @@ function runtimeShapeOf(type: common.Type): common.Type {
 			}
 		case "UnionType":
 			return { type: "UnionType", types: type.types.map(runtimeShapeOf) }
-		// NOTE: The predicate is not a part the runtime can check — it is not a
+		// The predicate is not a part the runtime can check — it is not a
 		// part the runtime ever HEARS of — so a refinement shapes as its base
 		// does. This is the same erasure the Optimiser performs on the tree,
 		// stated where a descriptor is built.
@@ -4066,7 +4066,7 @@ function describeMembers(
 	return described
 }
 
-// NOTE: The SAME rule one level down from a Record's: a derived `is` asks the
+// The SAME rule one level down from a Record's: a derived `is` asks the
 // members its Cases declare. The Type Parameters keep the slots their
 // declaration order gives them, and every payload member that names none —
 // `tag: Tag`, `children: List<Tag>`, `price: Money` — takes the next slot free
@@ -4099,7 +4099,7 @@ function choiceMemberRouting(
 			)
 			let solved = asked.result
 
-			// NOTE: Forwarded exactly as `recordMemberRouting` forwards it, and
+			// Forwarded exactly as `recordMemberRouting` forwards it, and
 			// for the same reason: a payload member whose conformance can not be
 			// CHOSEN was left structural with nothing said anywhere. Without the
 			// sentence naming the member, which this rail has no name to write:
@@ -4111,7 +4111,7 @@ function choiceMemberRouting(
 				report(ambiguity)
 			}
 
-			// NOTE: A member with NO conformance takes a slot too, and that is
+			// A member with NO conformance takes a slot too, and that is
 			// how it is refused in the words the rest of the language already
 			// uses: the slot becomes a bounded Generic pinned to the member's
 			// Type, and the ordinary conformance rail reports
@@ -4120,7 +4120,7 @@ function choiceMemberRouting(
 			// done. The bounded rail refuses it one line later, where the
 			// condition fails to solve.
 			//
-			// NOTE: Two refusals are NOT that, and neither takes a slot. A
+			// Two refusals are NOT that, and neither takes a slot. A
 			// refusal the solve REPORTED rather than described arrives with an
 			// empty chain, and is left alone for the reason
 			// `recordMemberRouting` leaves it alone: the Diagnostic belongs
@@ -4155,7 +4155,7 @@ function choiceMemberRouting(
 	}
 }
 
-// NOTE: The compile-time plan the widened runtime helper follows for a generic
+// The compile-time plan the widened runtime helper follows for a generic
 // Choice — one entry per Case tag mapping each payload member to how it is
 // compared. Read off the DECLARED Alias (its Cases still carry GenericUse
 // members the applied form erases), so the same plan is reachable at every
@@ -4164,7 +4164,7 @@ function choiceMemberRouting(
 // apart from the Parameter's own values — how a member is compared is decided by
 // the Alias alone.
 //
-// NOTE: `position` is where a payload no descriptor can be right about is
+// `position` is where a payload no descriptor can be right about is
 // reported, and null says to build it silently. Only a settled call site passes
 // one: a conformance solve reaches here speculatively and memoised, and the
 // Diagnostic it would report belongs to whatever call the witness is for.
@@ -4205,7 +4205,7 @@ function derivedEquatableDescriptor(
 	return descriptor
 }
 
-// NOTE: The descriptor for a receiver's Choice, or null when the Choice is not
+// The descriptor for a receiver's Choice, or null when the Choice is not
 // generic (a non-generic Choice keeps emitting the plain `choiceIs`). The Scope
 // recovers the DECLARED Alias the applied receiver Type erased.
 export function derivedEquatableDescriptorFor(
@@ -4216,7 +4216,7 @@ export function derivedEquatableDescriptorFor(
 	return choiceRouting(baseType, scope, position)?.descriptor ?? null
 }
 
-// NOTE: A Choice's whole compile-time plan — the descriptor its runtime helper
+// A Choice's whole compile-time plan — the descriptor its runtime helper
 // follows and the Types whose witnesses fill the slots the descriptor names
 // beyond the Type Parameters. Null where no payload mentions a Type Parameter
 // and no payload member routes: such a Choice emits the flat `choiceIs` and its
@@ -4230,14 +4230,14 @@ function choiceRouting(
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
-	// NOTE: Where a payload no descriptor can be right about is reported, and
+	// Where a payload no descriptor can be right about is reported, and
 	// null says to build it silently — the same two readings `position` has had
 	// on the descriptor builder all along. A conformance solve reaches here
 	// speculatively and memoised, so it passes null and the settled call site
 	// passes its own.
 	descriptorPosition: common.Position | null = position,
 ): {
-	// NOTE: Null for a NON-generic Choice, which is a plain Union in the Type
+	// Null for a NON-generic Choice, which is a plain Union in the Type
 	// Scope and no Alias at all — `resolveChoiceDeclarationStatementType` only
 	// builds an Alias where there are Parameters to bind.
 	alias: common.GenericAliasType | null
@@ -4269,7 +4269,7 @@ function choiceRouting(
 	return { alias, descriptor, routedTypes: routing.types }
 }
 
-// NOTE: The Cases of a Choice with no Alias behind it — a non-generic one, whose
+// The Cases of a Choice with no Alias behind it — a non-generic one, whose
 // Type Scope entry is the Union of its Cases. A receiver narrowed to one Case
 // still asks about the WHOLE Choice, because that is what its equality is
 // derived for.
@@ -4288,7 +4288,7 @@ function choiceCasesOf(
 		: [choiceType]
 }
 
-// NOTE: The same plan for a Choice that takes no Type Parameters: one entry per
+// The same plan for a Choice that takes no Type Parameters: one entry per
 // Case tag, every member described with an empty Parameter set — so the only
 // node the walk can produce is `eq`, or the `w` the ROUTER puts in its place.
 // It is kept only where the router found a member to route.
@@ -4316,19 +4316,19 @@ function derivedEquatableDescriptorForCases(
 	return descriptor
 }
 
-// NOTE: Every Choice is Equatable without being written as such — a Case is
+// Every Choice is Equatable without being written as such — a Case is
 // decided by its tag, and its payload is a Record, which the language already
 // compares structurally. This is the Namespace that says so: fabricated on
 // demand for a Choice receiver, exactly like the `T__conformance` pseudo
 // Namespace below is fabricated for a Protocol-bounded one.
 //
-// NOTE: It is a FALLBACK, never an override. Both callers reach for it only
+// It is a FALLBACK, never an override. Both callers reach for it only
 // once no written Namespace has answered, so a Namespace with its own `is`
 // keeps deciding equality for its own Choice.
 export function derivedEquatableNamespace(
 	baseType: common.Type,
 	scope: enricher.Scope,
-	// NOTE: Where the routing question is asked. It is asked silently and
+	// Where the routing question is asked. It is asked silently and
 	// memoised, so every caller may pass its own — and the one funnel that does
 	// (`namespacesDeclaringMethod`) is the funnel Completion and Hover come
 	// through as well, which is what keeps what they list and what is emitted
@@ -4353,18 +4353,18 @@ export function derivedEquatableNamespace(
 	)
 }
 
-// NOTE: The same Namespace, built from a Choice that is already in hand. The
+// The same Namespace, built from a Choice that is already in hand. The
 // Language Server has the Choice but no Scope to look one up in, and building
 // the Methods twice is how the two would drift.
 //
-// NOTE: For a *generic* Choice the Methods are conditional: each takes the
+// For a *generic* Choice the Methods are conditional: each takes the
 // payload-mentioned Parameters as `infer … is Equatable` bounds and the
 // UNAPPLIED body Union as its Parameters, so invocation inference binds the
 // Parameters from the receiver and the existing conformance rail produces the
 // per-Parameter witnesses. A non-generic Choice (or a call with no Alias in
 // hand) keeps the flat Methods, whose emission never widens.
 //
-// NOTE: `typeArguments` are the receiver's own, when the caller has a receiver
+// `typeArguments` are the receiver's own, when the caller has a receiver
 // — they PIN the Parameters instead of leaving them to be inferred. A receiver
 // narrowed to one Case (`case #First { @::is(@) }`) only matches that Case's arm
 // of the body Union, which mentions the Parameters ITS payload names and no
@@ -4376,7 +4376,7 @@ export function derivedEquatableNamespaceForChoice(
 	choiceType: common.Type,
 	declaredAlias: common.GenericAliasType | null = null,
 	typeArguments: Array<common.Type> = [],
-	// NOTE: Member routing on the DIRECT rail. A payload member that routes
+	// Member routing on the DIRECT rail. A payload member that routes
 	// needs its witness at the call, and the rail that carries one is the same
 	// rail a Type Parameter's rides: a Generic the invocation can not infer,
 	// pinned to the member's Type by its default and bounded by the Protocol.
@@ -4387,7 +4387,7 @@ export function derivedEquatableNamespaceForChoice(
 ): common.NamespaceType {
 	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
 
-	// NOTE: The Methods borrow the Choice's Parameters under names no source can
+	// The Methods borrow the Choice's Parameters under names no source can
 	// spell, and the body Union below is rewritten to match. The Choice's own
 	// names would be the CALLER's too as soon as it declares one of the same
 	// spelling — `function same<infer T is Equatable>(_ a: Maybe<T>, …)` over a
@@ -4397,7 +4397,7 @@ export function derivedEquatableNamespaceForChoice(
 	// missing behind `no-matching-overload` for the one name a generic helper is
 	// likeliest to pick.
 	//
-	// NOTE: Only the BOUNDED Parameters are borrowed. A Parameter no payload
+	// Only the BOUNDED Parameters are borrowed. A Parameter no payload
 	// mentions is declared by none of the Methods, so a borrowed name for it
 	// would be one nothing can ever bind — and it still rides along in the Cases'
 	// own Type Arguments, where an unbindable name reads as a Parameter the
@@ -4413,13 +4413,13 @@ export function derivedEquatableNamespaceForChoice(
 		}
 	}
 
-	// NOTE: A fresh bound list per Method, never the singleton Alias'
+	// A fresh bound list per Method, never the singleton Alias'
 	// Declarations. Only the mentioned Parameters are bounded; an unmentioned
 	// one would stay unbound at inference and misreport as uninferable.
 	let boundGenerics: Array<common.GenericDeclaration> =
 		isGeneric && declaredAlias !== null
 			? constrainedGenericOrder(declaredAlias).map((name) => {
-					// NOTE: A Parameter the receiver spells out is declared as a
+					// A Parameter the receiver spells out is declared as a
 					// default rather than as `infer`, which is what pre-binds it
 					// — inference seeds the defaults of the Parameters it is not
 					// asked to infer, and checks the Arguments against them. The
@@ -4440,7 +4440,7 @@ export function derivedEquatableNamespaceForChoice(
 				})
 			: []
 
-	// NOTE: And one more per ROUTED payload member, after them. Never `infer`:
+	// And one more per ROUTED payload member, after them. Never `infer`:
 	// there is nothing at the call for it to be inferred FROM — the member's
 	// Type is written on the Case, not on the Arguments — so it is pinned
 	// outright and the pin is what the witness is solved for.
@@ -4454,7 +4454,7 @@ export function derivedEquatableNamespaceForChoice(
 		})),
 	]
 
-	// NOTE: The Parameters are the UNAPPLIED body Union for a generic Choice, so
+	// The Parameters are the UNAPPLIED body Union for a generic Choice, so
 	// its GenericUse members give inference something to bind the bounds to —
 	// under the borrowed names, which is what keeps them the Methods' own.
 	let parameterType =
@@ -4506,7 +4506,7 @@ export function derivedEquatableNamespaceForChoice(
 	}
 }
 
-// NOTE: Whether every Case of a Choice carries no payload. Such a Choice is
+// Whether every Case of a Choice carries no payload. Such a Choice is
 // its Case names and nothing else, so the name is the whole of what there is to
 // print — which is what makes printing derivable at all. A Case with a payload
 // has something more to say, and only the Namespace knows how it should read.
@@ -4526,12 +4526,12 @@ function choiceCasesArePayloadFree(choiceType: common.Type): boolean {
 	)
 }
 
-// NOTE: The Namespace a Choice of payload-free Cases prints through, or null
+// The Namespace a Choice of payload-free Cases prints through, or null
 // for one that carries a payload anywhere. Fabricated on demand exactly as the
 // derived equality above is, and holding the one Method the `Printable`
 // Protocol asks for.
 //
-// NOTE: The Generics are left out even for a generic Choice. No payload names a
+// The Generics are left out even for a generic Choice. No payload names a
 // Type Parameter — there are no payloads — so the answer is the Case name
 // whatever the Type Arguments are, and there is nothing for a witness to
 // decide.
@@ -4567,12 +4567,12 @@ export function derivedPrintableNamespaceForChoice(
 	}
 }
 
-// NOTE: The runtime tags of a payload-free Choice's Cases, in the order the
+// The runtime tags of a payload-free Choice's Cases, in the order the
 // Choice declares them — the whole of what a derived `cases()` needs to answer,
 // and the same string a Case value carries under `typeKeySymbol`. Null for a
 // Choice that carries a payload anywhere, which derives nothing.
 //
-// NOTE: The order is the Union's own member order, which is the declaration
+// The order is the Union's own member order, which is the declaration
 // order the Choice was read in — the same order the derived equality's
 // descriptor is keyed in, and what `cases()` promises its caller.
 export function derivedCaseTags(choiceType: common.Type): Array<string> | null {
@@ -4590,11 +4590,11 @@ export function derivedCaseTags(choiceType: common.Type): Array<string> | null {
 	)
 }
 
-// NOTE: The Namespace a Choice of payload-free Cases lists its Cases through,
+// The Namespace a Choice of payload-free Cases lists its Cases through,
 // or null for one that carries a payload anywhere. Fabricated on demand like
 // the two derives above it, and holding the one Method `Enumerable` asks for.
 //
-// NOTE: Its signature is the Protocol's own requirement with `Self` bound to
+// Its signature is the Protocol's own requirement with `Self` bound to
 // the Choice, rather than one built here. The answer's Type is `NonEmptyList`,
 // which this module has no way to spell — and reading it off the declaration
 // keeps the derive and the requirement one thing, so a change to the Protocol
@@ -4625,7 +4625,7 @@ export function derivedEnumerableNamespaceForChoice(
 	}
 }
 
-// NOTE: The derived Case listing a Namespace over a Choice reaches, or null
+// The derived Case listing a Namespace over a Choice reaches, or null
 // where it reaches none. Unlike printing it is DECLARED by nobody: what the
 // Cases of a Choice ARE is a fact about the declaration rather than a decision,
 // which is the rule equality follows — see `Enumerable.es`. A Namespace that
@@ -4633,7 +4633,7 @@ export function derivedEnumerableNamespaceForChoice(
 // the derived equality, and a GENERIC Namespace derives nothing, because its
 // target names a Type Parameter no call here binds.
 //
-// NOTE: The replacement holds on every rail only where the Namespace DECLARES
+// The replacement holds on every rail only where the Namespace DECLARES
 // the conformance, because the derive a bounded call reaches is built from the
 // Choice and consults no Namespace. Writing the Method undeclared is refused at
 // the declaration — see `reportUndeclaredDerivedConformance` — so this guard
@@ -4657,7 +4657,7 @@ export function derivedEnumerableNamespaceFor(
 		: derivedEnumerableNamespaceForChoice(namespace.targetType, protocol)
 }
 
-// NOTE: The derived printing a receiver can reach, or null when it reaches
+// The derived printing a receiver can reach, or null when it reaches
 // none. Printing is DECLARED where equality is not: a Choice compares by its
 // tags whatever anyone says, but how it READS is a decision, so this answers
 // only where a Namespace over the Choice has stated `is Printable`. The
@@ -4682,7 +4682,7 @@ export function derivedPrintableNamespace(
 			continue
 		}
 
-		// NOTE: A `toString` another of its Protocols provides fulfils the
+		// A `toString` another of its Protocols provides fulfils the
 		// requirement, so nothing is owed and no derive stands in: the bound
 		// runs that body, and so must a direct call.
 		let provider =
@@ -4729,13 +4729,13 @@ function derivesPrinting(binding: common.Type, scope: enricher.Scope): boolean {
 	)
 }
 
-// NOTE: Where a silent solve stands. Nothing it reports is kept.
+// Where a silent solve stands. Nothing it reports is kept.
 const unplacedPosition: common.Position = {
 	start: { line: 1, column: 1 },
 	end: { line: 1, column: 1 },
 }
 
-// NOTE: Whether a Namespace's conformance that brings `provider`'s body in
+// Whether a Namespace's conformance that brings `provider`'s body in
 // holds for this receiver, its `where` included. Where none does, the body
 // fulfils nothing here: the requirement is owed, and a Choice's derive stands
 // in for it. Asked silently, since the call site reports what it solves.
@@ -4772,7 +4772,7 @@ function providerConformanceHolds(
 	})
 }
 
-// NOTE: The witness a derive provides for a Choice, or null when none does.
+// The witness a derive provides for a Choice, or null when none does.
 // `written` is the Namespace that claimed the conformance, if one did — the
 // derive fills in for it only when it declares NONE of the Protocol's Methods.
 // All or nothing, because a witness names ONE Namespace: half-written equality
@@ -4793,13 +4793,13 @@ function derivedConformanceSource(
 		return null
 	}
 
-	// NOTE: One derived Namespace per Protocol a Choice answers without being
+	// One derived Namespace per Protocol a Choice answers without being
 	// written. Equality is derived for EVERY Choice; printing only where a
 	// Namespace has said `is Printable`, which is what `written` being a
 	// Namespace means here — both callers pass the Namespace that DECLARED the
 	// conformance, and pass null when none did.
 	//
-	// NOTE: The conformance is CHECKED against the flat Methods — their
+	// The conformance is CHECKED against the flat Methods — their
 	// Parameters are the applied Choice, so they line up with the Protocol's
 	// `Self` under plain assignability. The bounded Methods
 	// `derivedEquatableNamespace` builds are for the direct-call rail, where
@@ -4811,7 +4811,7 @@ function derivedConformanceSource(
 		return null
 	}
 
-	// NOTE: Listing the Cases is derived like equality rather than like
+	// Listing the Cases is derived like equality rather than like
 	// printing: a Choice of payload-free Cases IS its Case names, so the answer
 	// is a fact about the declaration and nobody has to declare it. A Choice
 	// with a payload anywhere derives nothing here and conforms by writing the
@@ -4857,7 +4857,7 @@ function derivedConformanceSource(
 		return null
 	}
 
-	// NOTE: Printing needs no witness and no descriptor, whether the Choice is
+	// Printing needs no witness and no descriptor, whether the Choice is
 	// generic or not: a payload-free Case names itself, and a Type Parameter no
 	// payload mentions decides nothing about how it reads.
 	if (derived.name === derivedPrintableNamespaceName) {
@@ -4870,7 +4870,7 @@ function derivedConformanceSource(
 		}
 	}
 
-	// NOTE: And the Case listing needs no witness either, for the same reason
+	// And the Case listing needs no witness either, for the same reason
 	// and one more: its Method takes no value at all. What it does need is the
 	// tags, because the answer is built rather than read off anything — a
 	// static has no receiver to recover the Choice from at run time.
@@ -4885,7 +4885,7 @@ function derivedConformanceSource(
 		}
 	}
 
-	// NOTE: A Choice that neither takes Type Parameters nor routes a payload
+	// A Choice that neither takes Type Parameters nor routes a payload
 	// member derives unconditionally — no witnesses, no descriptor — so its
 	// witness emission stays byte-identical to what it was before any of this.
 	// That is every Choice whose payloads are Strings, Integers, Records of
@@ -4902,7 +4902,7 @@ function derivedConformanceSource(
 		}
 	}
 
-	// NOTE: A generic Choice conforms only where each payload-mentioned
+	// A generic Choice conforms only where each payload-mentioned
 	// Parameter's Type Argument does — solved recursively, in declaration order
 	// so the witnesses line up with the descriptor's `w` indices. Any failure
 	// withholds the derive, and the caller surfaces the because-chain.
@@ -4937,7 +4937,7 @@ function derivedConformanceSource(
 		})
 	}
 
-	// NOTE: Then the routed payload members, in the order the descriptor walk
+	// Then the routed payload members, in the order the descriptor walk
 	// met them — which is the order their slots were handed out, and therefore
 	// the order the hidden Arguments have to arrive in. They stand AFTER the
 	// Parameters for the same reason: a Parameter's slot is its declaration
@@ -4966,7 +4966,7 @@ function derivedConformanceSource(
 	}
 }
 
-// NOTE: The name a routed payload member's witness is bound under. It is
+// The name a routed payload member's witness is bound under. It is
 // bookkeeping and nothing else — the slot is decided by position, and no source
 // spells this — but a `Conformance` carries a name, and one that says what it
 // stands for is worth more than an empty string. `borrowedGenericName` keeps it
@@ -4976,7 +4976,7 @@ function routedMemberGenericName(index: number): string {
 	return borrowedGenericName(`Member${index}`)
 }
 
-// NOTE: What a Record's DECLARED members say about the Record's own conformance
+// What a Record's DECLARED members say about the Record's own conformance
 // — "structural" where every one of them compares (or prints) exactly the way
 // the universal structural walk does, "routed" where at least one of them does
 // not and hands its own witness over, and "refused" where one of them has no
@@ -5003,7 +5003,7 @@ type RecordMemberRouting =
 			culprit?: { type: common.Type; protocolName: string }
 	  }
 
-// NOTE: The members a Record Type declares, in declaration order, or null where
+// The members a Record Type declares, in declaration order, or null where
 // the Type is not a Record carrying any. Refinements are erased first: a
 // refinement declares no members of its own and its conformance resolves to the
 // base Namespace's, so a refined Record is asked the question its base is.
@@ -5021,7 +5021,7 @@ function declaredRecordMembers(
 	return members.length === 0 ? null : members
 }
 
-// NOTE: Asked of every member, and asked QUIETLY. `solveConformance` reports
+// Asked of every member, and asked QUIETLY. `solveConformance` reports
 // `ambiguous-conformance` and `nonconforming-namespace` itself, and this is a
 // speculative question about a MEMBER — a Diagnostic it raised would land on
 // whatever Statement happened to print the Record, about a Type that Statement
@@ -5030,7 +5030,7 @@ function declaredRecordMembers(
 // that is what the language did before any of this, so the mistake it stands
 // for keeps exactly the Diagnostic it has always had, at the site that makes it.
 //
-// NOTE: With ONE exception, and the caller below is what makes it — an
+// With ONE exception, and the caller below is what makes it — an
 // AMBIGUITY. `nonconforming-namespace` is a mistake in a Namespace DECLARATION
 // and is reported where that declaration is, so raising it again here would be
 // one mistake told twice. An ambiguity is not: nothing is wrong with either
@@ -5051,7 +5051,7 @@ function memberConformance(
 		solveConformance(memberType, protocolName, scope, position),
 	)
 
-	// NOTE: A member whose Type holds an Error is reported where the Error
+	// A member whose Type holds an Error is reported where the Error
 	// arises, and an ambiguity about it would only repeat that Error.
 	return {
 		result: collected.result,
@@ -5082,13 +5082,13 @@ function recordMemberRouting(
 		let asked = memberConformance(memberType, protocolName, scope, position)
 		let solved = asked.result
 
-		// NOTE: Forwarded whatever the member ANSWERED, because a member that
+		// Forwarded whatever the member ANSWERED, because a member that
 		// merely HOLDS the ambiguous Type answers a silent failure of its own: a
 		// `List<Tag>` whose item conformance can not be chosen is refused with
 		// an empty chain, and `{ tags: List<Tag> }` would otherwise read that as
 		// "leave this member alone" as well.
 		//
-		// NOTE: One sentence added and nothing else touched, so a reader is told
+		// One sentence added and nothing else touched, so a reader is told
 		// about `Tag` exactly what `[tag]::contains(other)` tells them, plus
 		// which member of which Type reaches it. A Record inside a Record adds
 		// one sentence per level, innermost first, because the inner level's
@@ -5110,7 +5110,7 @@ function recordMemberRouting(
 				continue
 			}
 
-			// NOTE: The dotted path a reader can follow, built as the refusal
+			// The dotted path a reader can follow, built as the refusal
 			// travels up: a nested Record answers with its own member's path and
 			// this level writes its name in front of it, so `{ inner: { run: … } }`
 			// names `inner.run` rather than leaving a reader to open two Types to
@@ -5152,7 +5152,7 @@ function recordMemberRouting(
 		: { kind: "routed", members: routed, conditions }
 }
 
-// NOTE: Whether this candidate is the standard library's blanket Record
+// Whether this candidate is the standard library's blanket Record
 // Namespace. The name alone will not do: a Program may declare
 // `namespace Record for { x: Integer }`, which shadows the library's in the
 // Scope's Namespace table and is a written `is` that has to keep deciding for
@@ -5173,7 +5173,7 @@ function isBuiltinRecordNamespace(
 	)
 }
 
-// NOTE: The witness a Record gets when its members decide its conformance, or
+// The witness a Record gets when its members decide its conformance, or
 // null where they leave it exactly as it was. The Namespace stays `Record`,
 // because it IS `Record`: a Record conforms conditionally on its members the way
 // a List conforms conditionally on its items, and the member names beside the
@@ -5198,7 +5198,7 @@ function routedRecordSource(
 		return {
 			ok: false,
 			memberPath: routing.memberPath,
-			// NOTE: The same shape `solveNamespaceConformance` builds for a
+			// The same shape `solveNamespaceConformance` builds for a
 			// failed `where` condition — this level says what was asked, the
 			// member says which one could not answer, and the levels below it
 			// say why. Three sentences means the caller reaches for
@@ -5228,7 +5228,7 @@ function routedRecordSource(
 	}
 }
 
-// NOTE: The other half of the rail, and it is a different half. A BOUNDED call
+// The other half of the rail, and it is a different half. A BOUNDED call
 // (`Terminal.print(r)`, `same<infer T is Equatable>(…)`, a Dictionary key, a
 // String hole) reaches the routing through `solveConformance` and carries the
 // witness it answers with. A DIRECT one — `r::is(other)`, `::isNot`,
@@ -5250,13 +5250,13 @@ export function routedRecordCall(
 	members: Array<string>
 	conformances: Array<common.Conformance>
 } | null {
-	// NOTE: The name as written. Neither is overloaded on the builtin Record
+	// The name as written. Neither is overloaded on the builtin Record
 	// Namespace, so there is no mangled spelling to see through here.
 	let protocolName = recordRoutedMethods[methodName]
 
 	if (
 		protocolName === undefined ||
-		// NOTE: A Method the Protocol PROVIDED is not this rail's business, and
+		// A Method the Protocol PROVIDED is not this rail's business, and
 		// `isNot` is exactly that one: `Record.es` declares `is` and not its
 		// negation, so `record::isNot(other)` runs `Equatable`'s own body over
 		// the RECORD's witness — which the bounded rail has already routed. Its
@@ -5272,7 +5272,7 @@ export function routedRecordCall(
 		return null
 	}
 
-	// NOTE: Asked LOUDLY, unlike the member solves inside it: this is the call
+	// Asked LOUDLY, unlike the member solves inside it: this is the call
 	// the reader wrote, and a member of its receiver that can not compare is the
 	// reason it can not run. The refusal is `unsatisfied-conformance-condition`
 	// whatever the chain's length, because the chain a Record builds is never
@@ -5307,7 +5307,7 @@ export function routedRecordCall(
 					...withoutRepeatedHead(solved.chain, message),
 					...missing.notes,
 				],
-				// NOTE: No escape Help here, and the rail is the reason: this is
+				// No escape Help here, and the rail is the reason: this is
 				// `value::toString()`, where a reader asked for a String.
 				// `Terminal.inspect` answers none, so offering it would name an
 				// edit that does not compile — see `printingEscapeHelps`.
@@ -5332,7 +5332,7 @@ export function routedRecordCall(
 	}
 }
 
-// NOTE: A because-chain's first sentence says what was ASKED, which is what the
+// A because-chain's first sentence says what was ASKED, which is what the
 // message above it already says — so a reader was told the same thing twice
 // before being told anything new. Dropped where the two really are one sentence,
 // and kept wherever they differ, because a chain whose head names a different
@@ -5348,7 +5348,7 @@ function withoutRepeatedHead(
 	return chain[0] === `${message}.` ? chain.slice(1) : chain
 }
 
-// NOTE: The Protocol each Method the builtin Record Namespace WRITES belongs
+// The Protocol each Method the builtin Record Namespace WRITES belongs
 // to. `keys` is on neither, which keeps it out of the routing entirely; and
 // `isNot` is not here because the Namespace does not write one — `Equatable`
 // provides it, over the Record's own witness, so it negates whatever `is` that
@@ -5358,12 +5358,12 @@ const recordRoutedMethods: Record<string, string> = {
 	toString: printableProtocolName,
 }
 
-// NOTE: The Help that comes FIRST when a value can not be printed, because it is
+// The Help that comes FIRST when a value can not be printed, because it is
 // the one edit that always works THERE: `inspect` takes any value at all and
 // needs no conformance, and is what an author reaching for `print` on a Record
 // of their own usually wanted. Withheld for equality, which has no such escape.
 //
-// NOTE: It follows the CALL and not the Type, which is the difference between a
+// It follows the CALL and not the Type, which is the difference between a
 // Help and a sentence. `Terminal.print(value)` becomes `Terminal.inspect(value)`
 // whatever the value is — a Record whose member can not print, or a List or a
 // Dictionary or an Optional HOLDING one, which is the shape that was refused
@@ -5382,7 +5382,7 @@ function printingEscapeHelps(
 		: []
 }
 
-// NOTE: The provided half of a conformance, left OUT entirely where the Protocol
+// The provided half of a conformance, left OUT entirely where the Protocol
 // provides nothing or the conformer overrides everything it provides — so a
 // witness with none emits the plain object literal it always did, byte for byte.
 function providedMethodsOf(result: {
@@ -5393,7 +5393,7 @@ function providedMethodsOf(result: {
 		: { providedMethods: result.providedMethods }
 }
 
-// NOTE: Does conforming to `declared` also make a value conform to `wanted`?
+// Does conforming to `declared` also make a value conform to `wanted`?
 // A Protocol extension is a promise about its conformers, so `is Orderable`
 // answers an `is Comparable` bound — the transitive ancestor list a Protocol
 // carries is exactly this question, written flat.
@@ -5409,7 +5409,7 @@ function protocolGrants(
 	return protocolOf(declared, scope).conformsTo?.includes(wanted) === true
 }
 
-// NOTE: The `grants` question `computeConformanceMethodMap` asks about a
+// The `grants` question `computeConformanceMethodMap` asks about a
 // fulfilling Method's own bound, bound to a Scope. The helper is Scope-free by
 // design, so the one place that knows how Protocols extend each other hands the
 // answer in rather than the helper reaching for it.
@@ -5419,13 +5419,13 @@ function conformanceGrantsIn(
 	return (declared, wanted) => protocolGrants(declared, wanted, scope)
 }
 
-// NOTE: Whose body answers a name `solving` requires, of everything the
+// Whose body answers a name `solving` requires, of everything the
 // conformer conforms to: one that fulfils the requirement, the more derived of
 // two related Protocols', and of two unrelated ones the first the clauses reach.
 function conformanceProvidersIn(
 	identities: Iterable<string>,
 	solving: common.ProtocolType,
-	// NOTE: The conformer's declared target, never a narrower value, so every
+	// The conformer's declared target, never a narrower value, so every
 	// call runs the body the declaration chose.
 	target: common.Type,
 	scope: enricher.Scope,
@@ -5461,7 +5461,7 @@ function conformanceProvidersIn(
 	}
 }
 
-// NOTE: What a call says of a requirement the Namespace does not answer: that
+// What a call says of a requirement the Namespace does not answer: that
 // it writes none, and whose body of the name does not fulfil it where one does.
 function missingRequirementNotes(
 	namespaceName: string,
@@ -5487,7 +5487,7 @@ function missingRequirementNotes(
 	]
 }
 
-// NOTE: A body chosen at the declared target runs with `Self` bound to the
+// A body chosen at the declared target runs with `Self` bound to the
 // binding, so it has to fulfil its requirement there as well.
 function fulfilledAt(
 	result: ConformanceCheckResult,
@@ -5514,7 +5514,7 @@ function fulfilledAt(
 	return result
 }
 
-// NOTE: What a report says of a body that fulfils its requirement at the
+// What a report says of a body that fulfils its requirement at the
 // Namespace's target and not at the narrower binding: the first Parameter it
 // takes narrower than the requirement accepts, or else its answer.
 function narrowedBodyReport(
@@ -5523,7 +5523,7 @@ function narrowedBodyReport(
 	provider: string,
 	binding: common.Type,
 	scope: enricher.Scope,
-	// NOTE: The Protocol the call asks for, where a body of another reads this.
+	// The Protocol the call asks for, where a body of another reads this.
 	askedFor: string = protocol.identity,
 ): { notes: Array<string>; helps: Array<string> } {
 	let requirement = protocol.methods[methodName] as common.SimpleMethodType
@@ -5547,7 +5547,7 @@ function narrowedBodyReport(
 			? `or annotate the value at '${displayChoiceName(binding.choice)}', since a bare Case binds the Case, not the Choice.`
 			: `or declare a Namespace for ${at} that conforms to '${describeProtocol(askedFor, scope)}'.`
 
-	// NOTE: The first Parameter is `Self`, the receiver, which both take.
+	// The first Parameter is `Self`, the receiver, which both take.
 	for (let index = 1; index < required.parameterTypes.length; index++) {
 		let accepted = required.parameterTypes[index]!
 		let taken = narrowed.parameterTypes[index]!
@@ -5576,7 +5576,7 @@ function narrowedBodyReport(
 	}
 }
 
-// NOTE: One place a receiver's conformance to a Protocol comes from — a
+// One place a receiver's conformance to a Protocol comes from — a
 // Namespace targeting it that declares the conformance, or a derive that grants
 // it without a Namespace saying so. A provided Method is a candidate of the
 // SOURCE, ranked by the source's own target Type, which is what puts it on the
@@ -5585,14 +5585,14 @@ function narrowedBodyReport(
 // Integer's rejected, exactly as `Number::compare` answers what
 // `Integer::compare` rejects.
 type ConformanceSourceNamespace = {
-	// NOTE: What the source is CALLED — the Namespace's name, or the Protocol's
+	// What the source is CALLED — the Namespace's name, or the Protocol's
 	// where a derive is the evidence and no Namespace is.
 	name: string
-	// NOTE: What `Self` binds to for this source. The Namespace's target Type,
+	// What `Self` binds to for this source. The Namespace's target Type,
 	// specialized against the receiver, so a covering Namespace answers for its
 	// whole Union and a generic one for the receiver's own item Type.
 	selfType: common.Type
-	// NOTE: What the source's WITNESS is solved for, where that is not the same
+	// What the source's WITNESS is solved for, where that is not the same
 	// Type. It is the same for every Namespace but one: the library's blanket
 	// Record Namespace conforms `for Record` and is CONDITIONAL on the receiver's
 	// own members, which the top Record declares none of — so solving its witness
@@ -5602,15 +5602,15 @@ type ConformanceSourceNamespace = {
 	// `Self` stands nowhere in the signature this builds, so what a reader is
 	// shown, and what the Parameter accepts, are exactly what they were.
 	witnessType?: common.Type
-	// NOTE: The target and Generics the specificity order compares — the
+	// The target and Generics the specificity order compares — the
 	// Namespace's own, unspecialized, exactly as a written Method's are.
 	targetType: common.Type
 	generics: Array<common.GenericDeclaration>
-	// NOTE: The names this source's Namespace WRITES. A written Method replaces
+	// The names this source's Namespace WRITES. A written Method replaces
 	// the provided one FOR THIS SOURCE and for no other: it is this Namespace's
 	// answer to the name, and it takes this Namespace's place on the ladder.
 	writes: ReadonlySet<string>
-	// NOTE: The Type Parameters `selfType` still MENTIONS, which the call has to
+	// The Type Parameters `selfType` still MENTIONS, which the call has to
 	// bind. Empty at a `::` call, where the receiver already specialized the
 	// target — and the generic Namespace's own, spelled `infer`, where the
 	// Namespace is NAMED and there is no receiver yet to specialize it with.
@@ -5620,7 +5620,7 @@ type ConformanceSourceNamespace = {
 	openGenerics: Array<common.GenericDeclaration>
 }
 
-// NOTE: The Protocols in scope that WROTE a body for this name. Asked first and
+// The Protocols in scope that WROTE a body for this name. Asked first and
 // asked by name alone, because it runs for every Method Invocation now that a
 // provided Method is a candidate beside the written ones — and a name no
 // Protocol provides has to cost a `hasOwn` per Protocol and nothing more.
@@ -5631,7 +5631,7 @@ function protocolsProviding(
 	let providers: Array<common.ProtocolType> = []
 
 	for (let protocol of allProtocolsInScope(scope)) {
-		// NOTE: A Protocol that INHERITED the name offers nothing here — it is
+		// A Protocol that INHERITED the name offers nothing here — it is
 		// offered by the Protocol that wrote it, which this same walk reaches.
 		if (
 			providedMethodProtocol(protocol, methodName) === protocol.identity
@@ -5643,7 +5643,7 @@ function protocolsProviding(
 	return providers
 }
 
-// NOTE: The Namespace's target as it covers THIS receiver — the Union a
+// The Namespace's target as it covers THIS receiver — the Union a
 // covering Namespace targets stays the Union (which is how `3::isLessThan(π)`
 // finds a Parameter Type both kinds fit), and a generic Namespace's target
 // binds against the receiver so a `List<Integer>` is told `List<Integer>`.
@@ -5662,7 +5662,7 @@ function specializedTargetFor(
 	let bindings = bindNamespaceTarget(namespace, baseType)
 	let targetType = namespace.targetType
 
-	// NOTE: A Generic the receiver leaves open would stand in the target under
+	// A Generic the receiver leaves open would stand in the target under
 	// the Namespace's own name, which no caller wrote and a later solve would
 	// read as a Type Parameter in scope, so the receiver stands in instead.
 	return bindings === null ||
@@ -5675,7 +5675,7 @@ function specializedTargetFor(
 		: applyGenericBindings(targetType, bindings)
 }
 
-// NOTE: Where a receiver's conformance to one Protocol comes from. Every
+// Where a receiver's conformance to one Protocol comes from. Every
 // Namespace targeting the receiver that declares it is a source; the derive is
 // consulted only where none does, which is the order the witness itself is
 // solved in.
@@ -5711,7 +5711,7 @@ function conformanceSourcesFor(
 			targetType: namespace.targetType ?? baseType,
 			generics: namespace.generics,
 			writes: new Set(Object.keys(namespace.methods)),
-			// NOTE: `specializedTargetFor` bound them against the receiver, so
+			// `specializedTargetFor` bound them against the receiver, so
 			// the pin below names concrete Types and the call binds nothing.
 			openGenerics: [],
 		})
@@ -5735,7 +5735,7 @@ function conformanceSourcesFor(
 		return []
 	}
 
-	// NOTE: A derive is the Choice's, not the Case's — `Colour#Red` conforms
+	// A derive is the Choice's, not the Case's — `Colour#Red` conforms
 	// because `Colour` does — so `Self` is the whole Choice, exactly as the
 	// derived Namespace's own `is` takes it. Binding it to the Case would leave
 	// no sibling Case assignable to the Parameter.
@@ -5753,7 +5753,7 @@ function conformanceSourcesFor(
 	]
 }
 
-// NOTE: The pseudo Namespace ONE of a Protocol's own provided Methods is
+// The pseudo Namespace ONE of a Protocol's own provided Methods is
 // reached through, for one conformance source. `Self` is PINNED to the source's
 // target Type rather than inferred from the receiver: the Method belongs to the
 // Namespace that declared the conformance, so the covering `Number`'s
@@ -5793,7 +5793,7 @@ function providedMethodNamespaceFor(
 					method,
 					bindings,
 				) as common.SimpleMethodType),
-				// NOTE: A fresh Declaration per Method rather than one shared
+				// A fresh Declaration per Method rather than one shared
 				// object, the same rule the derived equality's bounds follow.
 				//
 				// The source's OPEN Parameters stand before the pin, so that a
@@ -5818,7 +5818,7 @@ function providedMethodNamespaceFor(
 	}
 }
 
-// NOTE: Every candidate a Protocol's provided Methods offer this receiver for
+// Every candidate a Protocol's provided Methods offer this receiver for
 // this name — one per conformance source, keyed so that two can not collide,
 // and each carrying the source's own target so the ladder can rank it.
 //
@@ -5839,7 +5839,7 @@ export function providedMethodNamespaces(
 	}
 
 	let listed = [...namespaces]
-	// NOTE: Which Protocols each source reaches, gathered before any is turned
+	// Which Protocols each source reaches, gathered before any is turned
 	// into a candidate — a Method a DESCENDANT Protocol re-provided is answered
 	// by the descendant alone, and that can only be decided once the whole set
 	// one source reaches is known.
@@ -5878,7 +5878,7 @@ export function providedMethodNamespaces(
 
 	for (let { source, protocols } of reached.values()) {
 		for (let protocol of protocols) {
-			// NOTE: `other` extends `protocol`, so it is the more derived of the
+			// `other` extends `protocol`, so it is the more derived of the
 			// two, and the body it provides under this name is the one that
 			// stands. The declaration already reads it that way — a Protocol's
 			// own entries overwrite an ancestor's — and without the same rule
@@ -5903,7 +5903,7 @@ export function providedMethodNamespaces(
 				continue
 			}
 
-			// NOTE: The source's name is the key a single candidate takes, so a
+			// The source's name is the key a single candidate takes, so a
 			// Diagnostic and a `::<Name>` specifier both read what a writer
 			// would write. Two Protocols providing one name through one source
 			// are the ambiguity `ambiguous-namespace` reports, and they need two
@@ -5920,7 +5920,7 @@ export function providedMethodNamespaces(
 	return found
 }
 
-// NOTE: A Protocol's provided Method read off the NAMESPACE it is in reach
+// A Protocol's provided Method read off the NAMESPACE it is in reach
 // through — the `Number.isLessThan(a, b)` spelling, which a written instance
 // Method already answers and which a provided one has to answer the same way.
 // `Self` is pinned to the Namespace's own target, so the signature is the one
@@ -5939,7 +5939,7 @@ export function providedNamespaceMember(
 	)
 
 	for (let protocol of reached) {
-		// NOTE: A Method a DESCENDANT Protocol re-provided is the descendant's
+		// A Method a DESCENDANT Protocol re-provided is the descendant's
 		// to answer, exactly as it is at a `::` call.
 		if (
 			reached.some(
@@ -5956,11 +5956,11 @@ export function providedNamespaceMember(
 			selfType: namespace.targetType ?? { type: "Unknown" },
 			targetType: namespace.targetType ?? { type: "Unknown" },
 			generics: namespace.generics,
-			// NOTE: Empty rather than the Namespace's own names — the caller
+			// Empty rather than the Namespace's own names — the caller
 			// asks only for a name the Namespace does NOT declare, so there is
 			// nothing here for an override to take away.
 			writes: new Set(),
-			// NOTE: A generic Namespace NAMED at the call has no receiver to
+			// A generic Namespace NAMED at the call has no receiver to
 			// specialize its target with — `List.isNot(a, b)` pins `Self` to
 			// `List<ItemType>`, and what the items are is the first Argument's
 			// to say. Declared `infer` here, and unbounded whatever the
@@ -5985,7 +5985,7 @@ export function providedNamespaceMember(
 	return null
 }
 
-// NOTE: Solves whether `binding` conforms to `protocolName` in `scope`,
+// Solves whether `binding` conforms to `protocolName` in `scope`,
 // producing the witness the codegen needs. A GenericUse forwards the enclosing
 // bounded Function's own conformance parameter; a concrete Type selects the one
 // conforming Namespace and recursively solves that Namespace's `where`
@@ -5997,7 +5997,7 @@ export function solveConformance(
 	position: common.Position,
 ): ConformanceSolveResult {
 	if (binding.type === "GenericUse") {
-		// NOTE: The bound answers for every Protocol it EXTENDS as well as for
+		// The bound answers for every Protocol it EXTENDS as well as for
 		// itself — one witness serves both, because a descendant's method map
 		// holds the ancestor's requirements too. That is what lets a body
 		// bounded by `Orderable` hand its own conformance Argument on to
@@ -6026,7 +6026,7 @@ export function solveConformance(
 		}
 	}
 
-	// NOTE: An Error binding was already diagnosed — stay silent.
+	// An Error binding was already diagnosed — stay silent.
 	if (binding.type === "Error") {
 		return { ok: false, chain: [] }
 	}
@@ -6061,7 +6061,7 @@ export function solveConformance(
 			position,
 		)
 
-		// NOTE: Only successes are memoised — a failure reached through a cycle
+		// Only successes are memoised — a failure reached through a cycle
 		// is tainted by whatever else was in progress, so caching it could
 		// poison an independent later query for the same key.
 		if (result.ok) {
@@ -6077,12 +6077,12 @@ export function solveConformance(
 type ConformanceCandidate = {
 	name: string
 	type: common.NamespaceType
-	// NOTE: The Namespace's target Type and Generics as DECLARED — `type` is
+	// The Namespace's target Type and Generics as DECLARED — `type` is
 	// specialized against the binding below, which erases exactly the
 	// difference the specificity order needs to see between a hand written
 	// `for List<Integer>` and `List<ItemType>` reached with an Integer item.
 	declaredTarget: NamespaceTarget & { targetType: common.Type }
-	// NOTE: The Namespace's own `where` conditions for this Protocol, and
+	// The Namespace's own `where` conditions for this Protocol, and
 	// the bindings that map each condition's Generic to a concrete Type, so
 	// the conditions can be solved recursively. Ordered by the Namespace's
 	// Generic declaration order to line the witnesses up with the hidden
@@ -6135,7 +6135,7 @@ function solveNamespaceConformance(
 
 		let targetBindings = bindNamespaceTarget(namespace, binding)
 
-		// NOTE: A generic Namespace (`List<Item>`) conforms to the binding
+		// A generic Namespace (`List<Item>`) conforms to the binding
 		// when its target Type unifies with it — `List<Item>` binds `Item`
 		// to `Integer` against a `List<Integer>` receiver. The Namespace is
 		// then specialized against those bindings, so its target Type and
@@ -6153,7 +6153,7 @@ function solveNamespaceConformance(
 		}
 	}
 
-	// NOTE: The same specificity order Method dispatch picks between overlapping
+	// The same specificity order Method dispatch picks between overlapping
 	// Namespaces with — a hand written `for List<Integer> is Equatable` beats
 	// `List<ItemType> is Equatable`, a Namespace for a concrete Record shape
 	// beats the builtin Record Namespace's blanket conformance, and an exact
@@ -6170,7 +6170,7 @@ function solveNamespaceConformance(
 	}
 
 	if (candidates.length === 0) {
-		// NOTE: No written Namespace conforms — a Choice still does, through
+		// No written Namespace conforms — a Choice still does, through
 		// the derived equality.
 		let derived = derivedConformanceSource(
 			binding,
@@ -6206,7 +6206,7 @@ function solveNamespaceConformance(
 					(candidate) =>
 						`'${candidate.name}' conforms to '${describeProtocol(protocolName, scope)}'.`,
 				),
-				// NOTE: The choice is made by SPECIFICITY, not at the call —
+				// The choice is made by SPECIFICITY, not at the call —
 				// nothing written here can pick between two Namespaces, which
 				// is what "can not be chosen here" says. So the edit is at one
 				// of the declarations, and there are exactly two of them.
@@ -6221,7 +6221,7 @@ function solveNamespaceConformance(
 
 	let candidate = candidates[0]
 
-	// NOTE: The candidate conforms only under its own `where` conditions — feed
+	// The candidate conforms only under its own `where` conditions — feed
 	// them in as assumptions so a fulfilling Method carrying that same bound
 	// (List's `compare`) is accepted here, then verify the assumptions hold
 	// by solving the conditions recursively below.
@@ -6239,7 +6239,7 @@ function solveNamespaceConformance(
 		scope,
 	)
 
-	// NOTE: As on the direct rail, a body whose own conformance does not hold
+	// As on the direct rail, a body whose own conformance does not hold
 	// for this binding fulfils nothing, and a Choice's derived printing is
 	// what answers instead. Only where there is one: a Choice with a payload
 	// derives none, and keeps the body.
@@ -6277,7 +6277,7 @@ function solveNamespaceConformance(
 	)
 
 	if (result.kind !== "conforms") {
-		// NOTE: The Namespace DECLARED the conformance and wrote none of it —
+		// The Namespace DECLARED the conformance and wrote none of it —
 		// for a Choice that is not a mistake, it is a statement of intent the
 		// derived equality fulfills. The declaration site accepts the same
 		// pairing, so the two agree on which Namespaces conform.
@@ -6302,7 +6302,7 @@ function solveNamespaceConformance(
 			return { ok: false, chain: [] }
 		}
 
-		// NOTE: Reachable when the Namespace covers the binding through a wider
+		// Reachable when the Namespace covers the binding through a wider
 		// target Type (a Union) but a `Self` position makes the signatures
 		// incompatible for this narrower binding, or a fulfilling Method still
 		// carries an unassumed bound. Reported here; the caller stays silent.
@@ -6347,7 +6347,7 @@ function solveNamespaceConformance(
 		return { ok: false, chain: [] }
 	}
 
-	// NOTE: Recursively solve the chosen Namespace's own `where` conditions —
+	// Recursively solve the chosen Namespace's own `where` conditions —
 	// their bindings come from the unification above. A failure bubbles up as
 	// a because-chain with this level prepended.
 	let solvedConditions = solveCandidateConditions(
@@ -6366,7 +6366,7 @@ function solveNamespaceConformance(
 
 	let conditions = solvedConditions.conditions
 
-	// NOTE: And the one candidate whose conditions are not written anywhere: the
+	// And the one candidate whose conditions are not written anywhere: the
 	// library's blanket Record Namespace conforms `for Record`, and which
 	// members a particular Record HAS is the only thing that can say whether its
 	// `is` — the universal structural comparison — is the answer its members
@@ -6426,7 +6426,7 @@ type SolvedConditions =
 	| { ok: true; conditions: Array<common.Conformance> }
 	| Extract<ConformanceSolveResult, { ok: false }>
 
-// NOTE: A candidate's `where` conditions for one of its Protocols, each solved
+// A candidate's `where` conditions for one of its Protocols, each solved
 // against the binding the unification gave its Generic.
 function solveCandidateConditions(
 	declared: Array<{ generic: string; protocol: string }>,
@@ -6435,7 +6435,7 @@ function solveCandidateConditions(
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
-	// NOTE: The candidate's declared target, where a Choice's Cases may carry
+	// The candidate's declared target, where a Choice's Cases may carry
 	// the Type Arguments that would have bound a condition's Generic.
 	target: common.Type | null = null,
 ): SolvedConditions {
@@ -6448,7 +6448,7 @@ function solveCandidateConditions(
 				? disagreeingTypeArguments(target, binding, condition.generic)
 				: null
 
-		// NOTE: Cases carrying different Type Arguments for the Generic, as a
+		// Cases carrying different Type Arguments for the Generic, as a
 		// List of `Tag<Integer>#A` and `Tag<String>#B` holds, leave it open, and
 		// no Namespace can be declared for such a value.
 		if (differing !== null) {
@@ -6467,13 +6467,13 @@ function solveCandidateConditions(
 			}
 		}
 
-		// NOTE: An empty List Literal reaches the candidate without pinning
+		// An empty List Literal reaches the candidate without pinning
 		// this condition's Generic, and a Method expecting its witness would
 		// read `compare` off `undefined`. Binding it to Unknown hides that.
 		if (conditionBinding === undefined) {
 			return {
 				ok: false,
-				// NOTE: An Error somewhere in the binding was reported where it
+				// An Error somewhere in the binding was reported where it
 				// went wrong — that is why nothing pinned the Generic, and a
 				// second Diagnostic about it would only repeat the first.
 				chain: typeContainsError(binding)
@@ -6502,7 +6502,7 @@ function solveCandidateConditions(
 								`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 								...solved.chain,
 							],
-				// NOTE: The level below names the Type to do something about,
+				// The level below names the Type to do something about,
 				// and this one only explains how the ask reached it.
 				...(solved.culprit === undefined
 					? {}
@@ -6521,7 +6521,7 @@ function solveCandidateConditions(
 	return { ok: true, conditions }
 }
 
-// NOTE: One witness of a conformer's group, and the member each of its provided
+// One witness of a conformer's group, and the member each of its provided
 // bodies is curried with where that is another. Its conditions are solved as it
 // joins, except the root's and those of a witness a Choice derives.
 type GroupWitness = {
@@ -6536,7 +6536,7 @@ type GroupWitness = {
 	curriedWith?: Record<string, number>
 }
 
-// NOTE: A body runs with the witness being solved where that answers each entry
+// A body runs with the witness being solved where that answers each entry
 // it reads as its own Protocol's witness does, or else with that witness. If
 // that fails, the call is refused unless those entries hold and answer alike.
 function providedWitnessGroup(
@@ -6560,7 +6560,7 @@ function providedWitnessGroup(
 	let solved = new Map<string, GroupWitness | null>([
 		[root.protocol.identity, root],
 	])
-	// NOTE: Every condition of the group once, the root's first. Members share
+	// Every condition of the group once, the root's first. Members share
 	// their Namespace's condition bindings, so a condition two of them take is
 	// one witness. A slot keeps its Generic where the Namespace declares it.
 	let slots: Array<
@@ -6597,7 +6597,7 @@ function providedWitnessGroup(
 		return witness
 	}
 
-	// NOTE: The witness of only the Methods a body reads of its Protocol.
+	// The witness of only the Methods a body reads of its Protocol.
 	let readWitness = (
 		identity: string,
 		reads: Array<string>,
@@ -6613,7 +6613,7 @@ function providedWitnessGroup(
 		)
 	}
 
-	// NOTE: The witness a condition asks for, where the group of a condition of
+	// The witness a condition asks for, where the group of a condition of
 	// the same Generic already builds it from the same Namespace. Taking it
 	// from there builds each witness once however deep the Type nests.
 	let sharedFor = (
@@ -6729,7 +6729,7 @@ function providedWitnessGroup(
 		for (let [methodName, provider] of Object.entries(
 			member.providedMethods,
 		)) {
-			// NOTE: A body of the member's own Protocol runs with the member. An
+			// A body of the member's own Protocol runs with the member. An
 			// ancestor's is asked like any other, since a descendant may restate
 			// what it reads.
 			if (provider === member.protocol.identity) {
@@ -6742,7 +6742,7 @@ function providedWitnessGroup(
 				continue
 			}
 
-			// NOTE: A read entry is solved alike in the whole witness and in the
+			// A read entry is solved alike in the whole witness and in the
 			// one of the entries read, so the whole one is solved only where the
 			// member answers some entry otherwise.
 			let restricted = readWitness(provider, reads)
@@ -6816,7 +6816,7 @@ function providedWitnessGroup(
 		}
 	}
 
-	// NOTE: The shared slots are emitted after every built one, so each slot's
+	// The shared slots are emitted after every built one, so each slot's
 	// index is renumbered: the built ones in order, then the shared ones.
 	let conditions: Array<common.Conformance> = []
 	let shared: Array<common.SharedCondition> = []
@@ -6880,7 +6880,7 @@ function providedWitnessGroup(
 	}
 }
 
-// NOTE: The conformer's witness at the binding for the Protocol that wrote a
+// The conformer's witness at the binding for the Protocol that wrote a
 // body, as a bound of that Protocol solves it, or the one a Choice derives.
 function bodyProtocolWitness(
 	protocol: common.ProtocolType,
@@ -6930,7 +6930,7 @@ function bodyProtocolWitness(
 			}
 }
 
-// NOTE: The conformer's conformance at the binding to the Protocol that wrote a
+// The conformer's conformance at the binding to the Protocol that wrote a
 // body, as the Namespace declares it, before a Choice's derive is asked.
 function bodyProtocolCheck(
 	protocol: common.ProtocolType,
@@ -6973,7 +6973,7 @@ function bodyProtocolCheck(
 	}
 }
 
-// NOTE: What a report says of a body whose own Protocol's witness fails at the
+// What a report says of a body whose own Protocol's witness fails at the
 // binding: the first entry it reads that the conformer does not answer there as
 // that Protocol declares it, or else that it needs the whole conformance.
 function unansweredReadReport(
@@ -6994,7 +6994,7 @@ function unansweredReadReport(
 	let at = describeType(binding)
 	let provides = `'${body.methodName}' runs the body '${describeProtocol(body.provider, scope)}' provides`
 	let target = candidate.declaredTarget.targetType
-	// NOTE: Only a value narrower than the Namespace's target has another
+	// Only a value narrower than the Namespace's target has another
 	// Namespace to reach; at the target the conformance itself is at fault.
 	let helps =
 		!matchesType(target, binding) || matchesType(binding, target)
@@ -7066,7 +7066,7 @@ function unansweredReadReport(
 	}
 }
 
-// NOTE: The first Parameter a written Method takes narrower than a requirement
+// The first Parameter a written Method takes narrower than a requirement
 // passes at the binding, or else its answer where that is wider, or null where
 // the two are not both Simple.
 function writtenMismatch(
@@ -7091,7 +7091,7 @@ function writtenMismatch(
 		new Map([["Self", binding]]),
 	) as common.SimpleMethodType
 
-	// NOTE: The first Parameter is `Self`, the receiver, which both take.
+	// The first Parameter is `Self`, the receiver, which both take.
 	for (let index = 1; index < required.parameterTypes.length; index++) {
 		let passed = required.parameterTypes[index]!
 		let taken = written.parameterTypes[index]!
@@ -7114,7 +7114,7 @@ function writtenMismatch(
 			}
 }
 
-// NOTE: The entries a provided body reads. A Protocol with no record of them
+// The entries a provided body reads. A Protocol with no record of them
 // is taken to read every Method it has.
 function providedReadsOf(
 	identity: string,
@@ -7126,7 +7126,7 @@ function providedReadsOf(
 	return protocol.providedReads?.[methodName] ?? Object.keys(protocol.methods)
 }
 
-// NOTE: What a witness answers for one of its entries: the Method it reads off
+// What a witness answers for one of its entries: the Method it reads off
 // its Namespace, or the Protocol whose body it runs.
 function witnessAnswer(
 	witness: GroupWitness,
@@ -7141,7 +7141,7 @@ function witnessAnswer(
 		: undefined
 }
 
-// NOTE: Orders a Protocol's `where` conditions by the Namespace's Generic
+// Orders a Protocol's `where` conditions by the Namespace's Generic
 // declaration order — the invariant that lines each witness up with its hidden
 // conformance Parameter, which the simplifier emits in that same order.
 function orderConditions(
@@ -7155,7 +7155,7 @@ function orderConditions(
 	)
 }
 
-// NOTE: What to say about a concrete Type with no conforming Namespace. Five
+// What to say about a concrete Type with no conforming Namespace. Five
 // answers, because five different things are actually wrong, and the plain
 // "declare a Namespace" is only the last of them:
 //
@@ -7180,7 +7180,7 @@ type ConformanceRemedy = {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
-	// NOTE: Set where the culprit is WORK rather than a value — a Future or a
+	// Set where the culprit is WORK rather than a value — a Future or a
 	// Started standing where its answer was wanted. It is what withholds the
 	// `Terminal.inspect` escape beside these: `inspect` takes work as happily as
 	// it takes anything, and printing a description of work instead of its
@@ -7188,13 +7188,13 @@ type ConformanceRemedy = {
 	describesWork?: true
 }
 
-// NOTE: The remedy, led by what a reader is told where the name the report
+// The remedy, led by what a reader is told where the name the report
 // spells binds another Protocol here.
 function missingConformance(
 	culprit: common.Type,
 	protocolName: string,
 	scope: enricher.Scope,
-	// NOTE: Where the refusal is being made, which only the bare-Case branch
+	// Where the refusal is being made, which only the bare-Case branch
 	// reads, for the conformance question it asks of its own.
 	position: common.Position,
 	asker: "bound" | "condition",
@@ -7219,7 +7219,7 @@ function conformanceRemedy(
 	let spelling = protocolSpelling(protocolName, scope)
 	let protocol = describeProtocol(protocolName, scope)
 
-	// NOTE: A bare Case is typed as the CASE and not as its Choice, and no
+	// A bare Case is typed as the CASE and not as its Choice, and no
 	// Namespace can target one — `namespace X for Colour#Red` does not parse —
 	// so the edit is one Type wider. WHICH edit depends on the Choice: where it
 	// already conforms, annotating the value is the whole of it and is what is
@@ -7269,7 +7269,7 @@ function conformanceRemedy(
 			helps: [
 				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocol}' is in scope.`,
 			],
-			// NOTE: The import a Quick Fix writes. The Module is named by its
+			// The import a Quick Fix writes. The Module is named by its
 			// canonical path rather than by a specifier, because the specifier
 			// is a question about the file being edited and the Language Server
 			// is the half that holds it.
@@ -7306,7 +7306,7 @@ function conformanceRemedy(
 		}
 	}
 
-	// NOTE: The Help is WITHHELD for the two Types a Namespace can not be
+	// The Help is WITHHELD for the two Types a Namespace can not be
 	// declared for as they are spelled. `namespace X for (_ Integer) -> Integer`
 	// and `namespace X for Future<Integer>` are both refused by the Parser — a
 	// Function Type reaches a `for` clause only through an Alias, and a reader
@@ -7354,7 +7354,7 @@ function conformanceRemedy(
 								? []
 								: [declaredInHelp(importing.name, importing)]),
 						],
-		// NOTE: No Parameter, because the Type that failed is a concrete one —
+		// No Parameter, because the Type that failed is a concrete one —
 		// what this asks for is a Namespace declaring the conformance, which is
 		// a Declaration rather than an edit to a span, and no fix answers it.
 		// The Protocol is carried all the same: it is the fact, and what is done
@@ -7379,7 +7379,7 @@ function conformanceRemedy(
 	}
 }
 
-// NOTE: Whether a Namespace declares this conformance for a Type, by the target
+// Whether a Namespace declares this conformance for a Type, by the target
 // test a solve puts each candidate to.
 function declaresConformanceFor(
 	namespace: common.NamespaceType,
@@ -7398,7 +7398,7 @@ function declaresConformanceFor(
 		: bindNamespaceTarget(namespace, type) !== null
 }
 
-// NOTE: Said where the name a report spells binds another Protocol in this
+// Said where the name a report spells binds another Protocol in this
 // Scope, or no Protocol at all, which is what a reader would otherwise take the
 // report to be about.
 function homonymNotes(
@@ -7432,7 +7432,7 @@ function homonymNotes(
 	]
 }
 
-// NOTE: What a name that is no Protocol's binds in this Scope, as a report
+// What a name that is no Protocol's binds in this Scope, as a report
 // names it, or null where it binds nothing.
 function bindingKindNamed(name: string, scope: enricher.Scope): string | null {
 	for (
@@ -7440,7 +7440,7 @@ function bindingKindNamed(name: string, scope: enricher.Scope): string | null {
 		current !== null;
 		current = current.parent
 	) {
-		// NOTE: A Type Parameter of the name can take the Protocol as its bound,
+		// A Type Parameter of the name can take the Protocol as its bound,
 		// as the Help says, so it is no misreading.
 		if (Object.hasOwn(current.types, name)) {
 			return current.types[name]!.type === "GenericUse" ? null : "a Type"
@@ -7460,7 +7460,7 @@ function bindingKindNamed(name: string, scope: enricher.Scope): string | null {
 	return null
 }
 
-// NOTE: The Namespaces in scope that make the Type conform to that other
+// The Namespaces in scope that make the Type conform to that other
 // Protocol, which is the conformance the reader meant to be used.
 function homonymConformerNotes(
 	identity: string,
@@ -7484,7 +7484,7 @@ function homonymConformerNotes(
 		)
 }
 
-// NOTE: Who declares a Protocol, as this Scope's reader says it: this file,
+// Who declares a Protocol, as this Scope's reader says it: this file,
 // another Module, or the standard library, with the line for a nested one, and
 // at its top level where this file declares `beside` as well.
 function declarationOf(
@@ -7504,7 +7504,7 @@ function declarationOf(
 		: `${declarer} declares`
 }
 
-// NOTE: Another Module is named by its file name, or by the specifier this
+// Another Module is named by its file name, or by the specifier this
 // file would import it by where the Module declaring `beside` has that name too.
 function declarerOf(
 	identity: string,
@@ -7549,7 +7549,7 @@ function preludeProtocolsOf(scope: enricher.Scope): ReadonlySet<string> | null {
 	return null
 }
 
-// NOTE: The Choice this Type is, when it was declared in a DIFFERENT Module of
+// The Choice this Type is, when it was declared in a DIFFERENT Module of
 // this graph — read off the nominal identity every Case carries, which is the
 // declaring Module's canonical path and the written name. A Choice reached
 // through an imported Function's return Type is in hand without its name ever
@@ -7583,7 +7583,7 @@ function foreignChoiceModule(
 	}
 }
 
-// NOTE: The Namespace whose OWN Type Parameters declare this name, or null where
+// The Namespace whose OWN Type Parameters declare this name, or null where
 // the name belongs to a Function or a Method. One walk answers both halves: a
 // Namespace's Generics live in a Scope that carries `namespace`, and a Method's
 // own `<infer T>` sits in a Scope of its own inside that one — so the nearest
@@ -7619,7 +7619,7 @@ function namespaceDeclaringGeneric(
 	return null
 }
 
-// NOTE: What to say about a Type PARAMETER that carries no bound, wherever the
+// What to say about a Type PARAMETER that carries no bound, wherever the
 // want of one is noticed — a call that binds it, a String's hole that has to
 // print it. WHOSE Parameter it is decides everything, and the two answers have
 // nothing in common, so this is the one place that chooses between them.
@@ -7633,11 +7633,11 @@ export function typeParameterBoundReport(
 	parameter: string,
 	protocolName: string,
 	scope: enricher.Scope,
-	// NOTE: The bound the Parameter already carries, where it carries one. A
+	// The bound the Parameter already carries, where it carries one. A
 	// Type Parameter takes ONE bound, so every edit that would write a second
 	// is refused wherever it is written — see `oneBoundOnly`.
 	carriedBound: string | null = null,
-	// NOTE: The name a bound is written with where this Scope binds the
+	// The name a bound is written with where this Scope binds the
 	// Protocol under none, which an import alongside it binds.
 	importedAs: string | null = null,
 ): {
@@ -7678,7 +7678,7 @@ export function typeParameterBoundReport(
 	)
 }
 
-// NOTE: What there is to say about a bound on a NAMESPACE's Type Parameter.
+// What there is to say about a bound on a NAMESPACE's Type Parameter.
 // `<infer Item is Comparable>` on the Namespace ITSELF stays refused — it would
 // bind every Method and every receiver — so the two places that carry one are
 // the Method's own `<…>`, which reaches that Method, and a `where` on one of the
@@ -7695,7 +7695,7 @@ export function typeParameterBoundReport(
 // answers. Which Method is asking is what tells them apart, and the body Scope
 // carries its name for exactly this.
 //
-// NOTE: This Diagnostic used to end in a dead end — `a Namespace's own Type
+// This Diagnostic used to end in a dead end — `a Namespace's own Type
 // Parameters take no bounds`, and no Help at all for a Method fulfilling
 // nothing. The Note that said so is gone rather than softened: it is no longer
 // true, and a Note that has to be read around is worse than none.
@@ -7725,7 +7725,7 @@ function namespaceParameterBound(
 		carrying[0] === undefined
 			? undefined
 			: describeProtocol(carrying[0], scope)
-	// NOTE: Whether the Method this is reported inside FULFILS a conformance —
+	// Whether the Method this is reported inside FULFILS a conformance —
 	// asked of the Protocol's surface, which is the same question the conformance
 	// check answers and the only half of it available from a body. A Protocol's
 	// ancestors are already flattened into `methods`, so one lookup covers the
@@ -7739,7 +7739,7 @@ function namespaceParameterBound(
 		)
 	}
 
-	// NOTE: The two edits are EXCLUSIVE, and which one works is decided by
+	// The two edits are EXCLUSIVE, and which one works is decided by
 	// whether this Method answers a requirement — ASKED FIRST, because it is the
 	// answer to "is the per-Method bound a thing this Method may write at all",
 	// and every branch below inherits it. A Method that fulfils a requirement is
@@ -7757,7 +7757,7 @@ function namespaceParameterBound(
 	let fulfilled = declared.filter(fulfils)
 
 	if (fulfilled.length > 0) {
-		// NOTE: A conformance that already binds this Parameter to something
+		// A conformance that already binds this Parameter to something
 		// else is no place for the condition either — `conflicting-where-condition`
 		// refuses a second bound on one Parameter, and says where the conformance
 		// belongs. Where every conformance this Method fulfils is closed that
@@ -7798,7 +7798,7 @@ function namespaceParameterBound(
 		}
 	}
 
-	// NOTE: Where the condition the reader needs is already written, saying so
+	// Where the condition the reader needs is already written, saying so
 	// is the whole of the explanation — the bound exists, and this Method is
 	// simply not one the `where` reaches. The edit is the same either way.
 	if (first !== undefined) {
@@ -7820,7 +7820,7 @@ function namespaceParameterBound(
 	}
 }
 
-// NOTE: The Namespace Method a Diagnostic is being reported from inside, read
+// The Namespace Method a Diagnostic is being reported from inside, read
 // through the Scope chain — see `Scope.methodName`.
 function enclosingMethodName(scope: enricher.Scope): string | null {
 	for (
@@ -7836,7 +7836,7 @@ function enclosingMethodName(scope: enricher.Scope): string | null {
 	return null
 }
 
-// NOTE: Resolves how each Protocol-bounded Type Parameter of an invocation's
+// Resolves how each Protocol-bounded Type Parameter of an invocation's
 // signature is fulfilled, given what the invocation bound it to. A binding
 // that is itself a bounded Type Parameter forwards the enclosing Function's
 // conformance parameter; a concrete binding requires exactly one conforming
@@ -7848,7 +7848,7 @@ export function resolveConformances(
 	bindings: GenericBindings,
 	scope: enricher.Scope,
 	position: common.Position,
-	// NOTE: Whether the call whose bounds these are is `Terminal.print`, which
+	// Whether the call whose bounds these are is `Terminal.print`, which
 	// only the site that read the callee's name can say. It decides ONE Help —
 	// the `Terminal.inspect` escape, which is an edit for a print and for
 	// nothing else. Defaulted, so every caller that is not resolving an
@@ -7872,7 +7872,7 @@ export function resolveConformances(
 
 		let bound = bindings.get(generic.name)
 
-		// NOTE: An unbound Type Parameter, a binding that names one (a pinned
+		// An unbound Type Parameter, a binding that names one (a pinned
 		// `Self` spelled `Tag<T>` where the call bound no `T`), or an Error
 		// binding has already been diagnosed — stay silent to avoid cascades.
 		if (
@@ -7883,7 +7883,7 @@ export function resolveConformances(
 			continue
 		}
 
-		// NOTE: Read as it stands. A PINNED Parameter's binding may name a
+		// Read as it stands. A PINNED Parameter's binding may name a
 		// sibling the Arguments bind — a generic Namespace's `Self` is pinned
 		// to `List<ItemType>` — and that is settled where this invocation's
 		// Generics still carry their FRESH names, in `settlePins`. Substituting
@@ -7894,16 +7894,16 @@ export function resolveConformances(
 		// caller Type Parameter spelled like a callee's was rewritten with it.
 		let binding = bound
 
-		// NOTE: The bound is the Protocol the callee's Module resolved, and the
+		// The bound is the Protocol the callee's Module resolved, and the
 		// caller needs no name for it. A bound refused where it is written is
 		// not carried, and asks nothing of the call.
 		let spelling = protocolSpelling(generic.constraint, scope)
 
-		// NOTE: A GenericUse binding keeps its own tailored Diagnostic — the
+		// A GenericUse binding keeps its own tailored Diagnostic — the
 		// bound was carried by an unbounded Type Parameter, which is a distinct
 		// mistake from a Type that simply has no conforming Namespace.
 		if (binding.type === "GenericUse") {
-			// NOTE: As in `solveConformance` — a bound Protocol answers for the
+			// As in `solveConformance` — a bound Protocol answers for the
 			// Protocols it extends, and the one witness serves them all.
 			if (
 				binding.constraint !== undefined &&
@@ -7918,7 +7918,7 @@ export function resolveConformances(
 					},
 				})
 			} else if (binding.refusedBound !== true) {
-				// NOTE: Under the name the SOURCE wrote. A callee's Generics
+				// Under the name the SOURCE wrote. A callee's Generics
 				// are alpha-renamed for the span of one invocation — `ItemType`
 				// becomes `ItemType`, a zero-width space and a counter — and a
 				// Parameter that never bound is still carrying the fresh name
@@ -7928,7 +7928,7 @@ export function resolveConformances(
 				// named a different Parameter each time. See
 				// `displayGenericName`.
 				//
-				// NOTE: The same name is what the rest of the report is built
+				// The same name is what the rest of the report is built
 				// from. `typeParameterBoundReport` looks the Parameter up in
 				// Scope, where a fresh name is not, and the Quick Fix behind
 				// `data` edits the DECLARATION — which is written under the name
@@ -7936,7 +7936,7 @@ export function resolveConformances(
 				let shown = displayGenericName(binding.name)
 				let carried = binding.constraint ?? null
 				let wanted = describeProtocol(generic.constraint, scope)
-				// NOTE: Where no name here binds the Protocol, the bound can be
+				// Where no name here binds the Protocol, the bound can be
 				// written only beside an import of it, which the fix writes too.
 				let importing =
 					spelling === null
@@ -7963,7 +7963,7 @@ export function resolveConformances(
 						labels: [
 							primary(
 								position,
-								// NOTE: A Parameter that carries a DIFFERENT
+								// A Parameter that carries a DIFFERENT
 								// bound is not unbounded, and a label that says
 								// it is sends the reader looking for a bound
 								// that is written right there.
@@ -8002,7 +8002,7 @@ export function resolveConformances(
 													importing,
 												),
 											],
-						// NOTE: The Type Parameter the bound has to be written
+						// The Type Parameter the bound has to be written
 						// on, beside the Protocol it has to be bound by — a
 						// Quick Fix writes it somewhere that is nowhere near the
 						// call this is reported at, and WHERE depends on whose
@@ -8060,13 +8060,13 @@ export function resolveConformances(
 			continue
 		}
 
-		// NOTE: An empty chain means the failure (ambiguity, a nonconforming
+		// An empty chain means the failure (ambiguity, a nonconforming
 		// Namespace) was already reported — stay silent.
 		if (result.chain.length === 0) {
 			continue
 		}
 
-		// NOTE: The Type the reader has to do something about is the LAST link
+		// The Type the reader has to do something about is the LAST link
 		// of the chain, not the one the bound was written on — for a
 		// `Result<String, Problem>` that is `Problem`, and a Namespace declared
 		// `for Result<String, Problem>` answers this one call while leaving
@@ -8084,7 +8084,7 @@ export function resolveConformances(
 		let wanted = describeProtocol(generic.constraint, scope)
 		let message = `${describeType(binding)} does not conform to '${wanted}'`
 
-		// NOTE: A single-level chain is the plain "no Namespace conforms" case
+		// A single-level chain is the plain "no Namespace conforms" case
 		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
 		// a conditional conformance whose `where` condition failed — its
 		// because-chain becomes the notes of `unsatisfied-conformance-condition`.
@@ -8144,7 +8144,7 @@ export function resolveConformances(
 	return conformances
 }
 
-// NOTE: An unknown Protocol name where it is written. The Helps name the Modules
+// An unknown Protocol name where it is written. The Helps name the Modules
 // this one reaches that declare it, then the near miss in scope; the import
 // itself is the Language Server's to offer, from the name under the cursor.
 export function reportUnknownProtocol(
@@ -8171,7 +8171,7 @@ export function reportUnknownProtocol(
 	})
 }
 
-// NOTE: How this file could come to name a Protocol it binds no name for: an
+// How this file could come to name a Protocol it binds no name for: an
 // import of it under the name its Module publishes it as, which needs a name of
 // its own where that one is `taken` here. Null where there is no such import to
 // write.
@@ -8213,7 +8213,7 @@ export function protocolImport(
 			}
 }
 
-// NOTE: `taken` where this Module binds the name an import of it would, so that
+// `taken` where this Module binds the name an import of it would, so that
 // the import needs a name of its own, and `writing` says where the name the
 // import binds goes where no other Help writes it already.
 function declaredInHelp(
@@ -8239,18 +8239,18 @@ function declaredInHelp(
 				: `'${protocolName}' is declared in ${fileName}, which exports it as '${imported}' — ${importing}.`
 }
 
-// NOTE: The result of checking one conformance clause that holds — its
+// The result of checking one conformance clause that holds — its
 // Protocol, the validated `where` conditions, and the map from each Protocol
 // Method to the fulfilling Namespace Method. Handed back to the Enricher so it
 // can thread each conditional clause's bounds into the fulfilling Methods.
 export type CheckedConformance = {
-	// NOTE: Identities, as the conditions' Protocols are.
+	// Identities, as the conditions' Protocols are.
 	protocolName: string
 	conditions: Array<{ generic: string; protocol: string }>
 	methodMap: Record<string, string>
 }
 
-// NOTE: Why a `where` condition can not become an assumption, or null when it
+// Why a `where` condition can not become an assumption, or null when it
 // can. The two conformance checks — the reporting one below and the silent twin
 // hoisting runs — share this so they can not drift into disagreeing about which
 // conditions a clause carries: the bounds woven into the fulfilling Methods are
@@ -8273,7 +8273,7 @@ function whereConditionRejection(
 		return { kind: "unknown-generic" }
 	}
 
-	// NOTE: A condition is proven at the use site by unifying the target Type
+	// A condition is proven at the use site by unifying the target Type
 	// against the receiver — a Generic the target never mentions can never be
 	// bound there, so its witness could never be produced and the hidden
 	// conformance Parameter would arrive as `undefined` at runtime.
@@ -8294,7 +8294,7 @@ function whereConditionRejection(
 	return null
 }
 
-// NOTE: The Protocol that wrote a body of the name for one of a Namespace's
+// The Protocol that wrote a body of the name for one of a Namespace's
 // clauses, where one did. Asked of a requirement no body answered.
 function clauseBodyWriter(
 	node: parser.NamespaceDefinitionStatementNode,
@@ -8316,7 +8316,7 @@ function clauseBodyWriter(
 	return null
 }
 
-// NOTE: The first requirement a Namespace owes that a Method written as declared
+// The first requirement a Namespace owes that a Method written as declared
 // would not answer for another clause's Protocol, whose body it replaces. Where
 // there is one, no stub is offered and the conformance moves to its own Namespace.
 function clauseRefusingRequirement(
@@ -8348,7 +8348,7 @@ function clauseRefusingRequirement(
 	return null
 }
 
-// NOTE: `conformanceProvidersIn` over the Protocols a Namespace's clauses name
+// `conformanceProvidersIn` over the Protocols a Namespace's clauses name
 // where they are written, leaving out any that names none.
 function clauseProvidersIn(
 	node: parser.NamespaceDefinitionStatementNode,
@@ -8368,7 +8368,7 @@ function clauseProvidersIn(
 	)
 }
 
-// NOTE: A value bounded by a Protocol can be handed to a bound on one it
+// A value bounded by a Protocol can be handed to a bound on one it
 // extends, which then reads its witness, so a Namespace conforming to both has
 // to answer each provided name of the extended one with the same body.
 function reportSplitProvidedBodies(
@@ -8453,7 +8453,7 @@ function reportSplitProvidedBodies(
 				let spelled = describeProtocol(extending, scope)
 				let ancestor = describeProtocol(extended, scope)
 				let entry = protocolOf(extending, scope).methods[methodName]!
-				// NOTE: The clauses whose Protocols declare the name apart, so a
+				// The clauses whose Protocols declare the name apart, so a
 				// Method written as `extending` declares it does not answer them,
 				// and they move to a Namespace of their own before it is written.
 				let refusing = clauses
@@ -8514,7 +8514,7 @@ function reportSplitProvidedBodies(
 	}
 }
 
-// NOTE: What `checkProtocolConformance` would find, with nothing reported and
+// What `checkProtocolConformance` would find, with nothing reported and
 // nothing derived. Hoisting needs the clauses that HOLD — they are what says
 // which Methods carry a conditional conformance's bound — and can not report
 // while it looks: a Diagnostic during speculative resolution keeps the whole
@@ -8525,7 +8525,7 @@ export function silentCheckedConformances(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
 	scope: enricher.Scope,
-	// NOTE: The Protocol names still waiting to hoist. A clause naming one can
+	// The Protocol names still waiting to hoist. A clause naming one can
 	// not be checked yet, and checking it anyway would silently drop its bounds
 	// — so the Namespace is thrown back to the hoist loop, which retries it a
 	// round later, the same way a Type Alias naming a later declaration waits.
@@ -8592,7 +8592,7 @@ export function silentCheckedConformances(
 			namespaceType.targetType,
 			assumptions,
 			conformanceGrantsIn(scope),
-			// NOTE: The providers of every clause: a Method this clause's
+			// The providers of every clause: a Method this clause's
 			// Protocol only requires may be provided by another's, and then the
 			// Namespace owes nothing for it.
 			clauseProvidersIn(node, protocol, namespaceType.targetType, scope),
@@ -8610,7 +8610,7 @@ export function silentCheckedConformances(
 	return checked
 }
 
-// NOTE: The reporting check, called from the Enricher and never from
+// The reporting check, called from the Enricher and never from
 // speculative hoisting — a Namespace with a broken conformance clause is still a
 // perfectly usable Namespace and must hoist, so hoisting reads the silent twin
 // above and leaves every Diagnostic to this pass. The Namespace Type checked
@@ -8651,7 +8651,7 @@ export function checkProtocolConformance(
 					notes: [
 						"A conformance says what a Type can do, so there has to be a Type.",
 					],
-					// NOTE: The head is the edit, and which Type goes in it is
+					// The head is the edit, and which Type goes in it is
 					// the reader's — every Method here is written for one, so
 					// the name is in front of them and not in front of this.
 					helps: [
@@ -8663,7 +8663,7 @@ export function checkProtocolConformance(
 			continue
 		}
 
-		// NOTE: Validate each `where` condition before it becomes an
+		// Validate each `where` condition before it becomes an
 		// assumption — the LHS has to name one of this Namespace's own Type
 		// Parameters, the RHS a real Protocol, and no Generic may be bound
 		// twice in one clause.
@@ -8695,7 +8695,7 @@ export function checkProtocolConformance(
 							helps: [
 								`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
 							],
-							// NOTE: The name as the condition wrote it — what a
+							// The name as the condition wrote it — what a
 							// fix inserts into the Generic list is the very name
 							// the condition reads, or the two go on disagreeing.
 							data: {
@@ -8727,7 +8727,7 @@ export function checkProtocolConformance(
 				} else if (rejection.kind === "unknown-protocol") {
 					reportUnknownProtocol(condition.protocol, scope)
 				} else {
-					// NOTE: One bound per Type Parameter per conformance,
+					// One bound per Type Parameter per conformance,
 					// because a conformance threads ONE hidden witness per
 					// Parameter into the Methods that fulfil it and one witness
 					// can not be two Protocols. So the second bound is not an
@@ -8772,7 +8772,7 @@ export function checkProtocolConformance(
 			})
 		}
 
-		// NOTE: As in the silent twin, a name this clause's Protocol requires may
+		// As in the silent twin, a name this clause's Protocol requires may
 		// be provided by another clause's, and the Namespace owes nothing for it
 		// then.
 		let providers = clauseProvidersIn(
@@ -8790,7 +8790,7 @@ export function checkProtocolConformance(
 			providers,
 		)
 
-		// NOTE: `namespace Colour for Colour is Equatable { }` writes no `is`
+		// `namespace Colour for Colour is Equatable { }` writes no `is`
 		// and is still right — the Choice derives one. Accepted here rather
 		// than diagnosed, with the same all-or-nothing rule the use site
 		// applies, so declaring the conformance a Choice already has is a way
@@ -8827,7 +8827,7 @@ export function checkProtocolConformance(
 		let spelled = describeProtocol(protocol.identity, scope)
 
 		if (result.kind === "needs-condition") {
-			// NOTE: The condition this clause already carries for the same Type
+			// The condition this clause already carries for the same Type
 			// Parameter, which is what decides whether "add it here" is an edit
 			// at all: a second bound on one Parameter is refused by
 			// `conflicting-where-condition`, so writing it leaves this report
@@ -8891,7 +8891,7 @@ export function checkProtocolConformance(
 								]),
 						...echo.notes,
 					],
-					// NOTE: The whole list, named rather than left to the Quick
+					// The whole list, named rather than left to the Quick
 					// Fix alone — a reader reading the report in a terminal has
 					// no fix to apply, and what a conformance OWES is the one
 					// thing this report knows and never said.
@@ -8908,7 +8908,7 @@ export function checkProtocolConformance(
 									),
 								)}, or drop the 'is ${spelled}'.`,
 					],
-					// NOTE: The whole list, where the Label names the one the
+					// The whole list, where the Label names the one the
 					// check stopped at — a fix that writes the stubs writes
 					// them all at once, and a Namespace that declares a
 					// conformance and writes nothing owes every requirement.
@@ -8940,7 +8940,7 @@ export function checkProtocolConformance(
 						),
 					],
 					notes: echo.notes,
-					// NOTE: A Method to CORRECT rather than one to write, so no
+					// A Method to CORRECT rather than one to write, so no
 					// stub is offered and the Help says where the shape it has
 					// to take is written down. Which part of the signature
 					// differs is a comparison this site does not make — it knows
@@ -8965,7 +8965,7 @@ export function checkProtocolConformance(
 	return checked
 }
 
-// NOTE: The Protocols a Choice answers WITHOUT anybody declaring them.
+// The Protocols a Choice answers WITHOUT anybody declaring them.
 // `Printable` is deliberately not among them: its derive answers only where a
 // Namespace has said `is Printable`, so writing `toString` without the clause
 // leaves nothing to disagree with.
@@ -8974,7 +8974,7 @@ const undeclaredDerivedProtocolNames: ReadonlyArray<string> = [
 	enumerableProtocolName,
 ]
 
-// NOTE: A Namespace over a Choice that WRITES one of a derived Protocol's
+// A Namespace over a Choice that WRITES one of a derived Protocol's
 // Methods and does not DECLARE the conformance is refused, because the two
 // rails would answer one question two ways: a call naming the Namespace reads
 // the written Method, while a call through a bound reaches the derive — which
@@ -8982,7 +8982,7 @@ const undeclaredDerivedProtocolNames: ReadonlyArray<string> = [
 // clause on. Which of the two a Program got even depended on whether the
 // Namespace happened to share the Choice's name.
 //
-// NOTE: Asked of the derive itself rather than of the target's shape, so this
+// Asked of the derive itself rather than of the target's shape, so this
 // and `derivedConformanceSource` can not drift apart: where the derive answers
 // null nothing is replaced and nothing is reported. Collected, because solving
 // a generic Choice's conformance reports about its payloads, and this question
@@ -9019,7 +9019,7 @@ function reportUndeclaredDerivedConformance(
 		let spelling = protocolSpelling(protocolName, scope)
 		let spelled = spelling ?? displayProtocolName(protocolName)
 
-		// NOTE: The Protocol's REQUIREMENTS, and not the Methods it PROVIDES.
+		// The Protocol's REQUIREMENTS, and not the Methods it PROVIDES.
 		// A requirement is what the derive answers, so a Namespace writing that
 		// name takes the derive's place on the direct rail while the bound rail
 		// goes on reaching it — the split. A provided Method is answered by the
@@ -9077,7 +9077,7 @@ function reportUndeclaredDerivedConformance(
 				helps: [
 					`Declare the conformance: 'is ${spelled}' on this Namespace.`,
 				],
-				// NOTE: No Parameter — what carries a conformance here is the
+				// No Parameter — what carries a conformance here is the
 				// Namespace's own head, which is the Node the fix writes into.
 				...(spelling === null
 					? {}
@@ -9093,7 +9093,7 @@ function reportUndeclaredDerivedConformance(
 	}
 }
 
-// NOTE: What a Type Alias means WITHOUT its `where` clause — the Type its body
+// What a Type Alias means WITHOUT its `where` clause — the Type its body
 // resolves to, which is also the base a checked refinement refines. A refined
 // Alias needs Expressions enriched, and enrichment imports the Resolver rather
 // than the other way round, so the clause is read by
@@ -9103,7 +9103,7 @@ export function resolveAliasedType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 ): common.Type {
-	// NOTE: Checked here as well as in declareTypeInScope — hoisting resolves
+	// Checked here as well as in declareTypeInScope — hoisting resolves
 	// speculatively and would otherwise register the reserved name without
 	// ever reaching the declaration check.
 	if (node.name.content === "Self") {
@@ -9113,13 +9113,13 @@ export function resolveAliasedType(
 	if (node.generics.length === 0) {
 		let resolvedType = resolveType(node.type, scope)
 
-		// NOTE: An anonymous Union takes the Alias's name, so Hovers and
+		// An anonymous Union takes the Alias's name, so Hovers and
 		// Diagnostics print `Coordinate` rather than spelling the members out.
 		// A copy, not a mutation — the resolved Type may be a shared Scope
 		// object. An already named or aliased Union (a Choice, `Number`,
 		// `Optional<Integer>`, another Alias) keeps its original spelling.
 		//
-		// NOTE: And an anonymous RECORD takes it for the same reason and under
+		// And an anonymous RECORD takes it for the same reason and under
 		// the same rule — `Standing` rather than nine members spelled out at
 		// every mention of it. `type Score = Standing` keeps printing
 		// `Standing`, the way `type Sure = Number` keeps printing `Number`:
@@ -9137,7 +9137,7 @@ export function resolveAliasedType(
 		return resolvedType
 	}
 
-	// NOTE: Generic Type Aliases keep their body unapplied — the Generics
+	// Generic Type Aliases keep their body unapplied — the Generics
 	// stay GenericUses until a use site applies Type Arguments, which
 	// substitutes them into the body.
 	let genericScope = scopeWithGenerics(node.generics, scope)
@@ -9150,7 +9150,7 @@ export function resolveAliasedType(
 	}
 }
 
-// NOTE: Applies Type Arguments to a Generic Type Alias by substituting them
+// Applies Type Arguments to a Generic Type Alias by substituting them
 // into the alias body — missing Arguments fall back to the Generic's default
 // Type, and to an Error Type (after a Diagnostic) without one.
 function applyGenericAlias(
@@ -9182,7 +9182,7 @@ function applyGenericAlias(
 				notes: [
 					`'${aliasType.name}' takes ${countOf(aliasType.generics.length, "Type Parameter")}.`,
 				],
-				// NOTE: The shape to write, with a blank per Parameter. The Note
+				// The shape to write, with a blank per Parameter. The Note
 				// says how MANY there are and leaves the reader to work out what
 				// that looks like — which is the whole of the edit for the bare
 				// spelling, where no brackets were written to correct.
@@ -9203,7 +9203,7 @@ function applyGenericAlias(
 		bindings.set(generic.name, argument)
 	}
 
-	// NOTE: A bound is a promise the APPLICATION has to keep — nothing below
+	// A bound is a promise the APPLICATION has to keep — nothing below
 	// this point ever asks again, so `Box<Function>` used to substitute a Type
 	// with no equality into a payload declared Equatable and only fall over when
 	// something reached for the witness. Solved for the Diagnostic alone: the
@@ -9215,7 +9215,7 @@ function applyGenericAlias(
 
 	let appliedType = applyGenericBindings(aliasType.aliasedType, bindings)
 
-	// NOTE: An applied alias whose body is an anonymous Union or Record carries
+	// An applied alias whose body is an anonymous Union or Record carries
 	// the applied spelling as its display alias, so `Optional<Integer>` and
 	// `Pair<Integer>` print as written rather than as their targets' members.
 	// The Type Arguments are kept as Types — a later substitution rewrites them
@@ -9239,7 +9239,7 @@ function applyGenericAlias(
 		}
 	}
 
-	// NOTE: An applied refinement carries the applied spelling for the same
+	// An applied refinement carries the applied spelling for the same
 	// reason, so `NonEmptyList<String>` prints as written rather than as the bare
 	// Alias name every instantiation would otherwise share. An application that
 	// changed nothing at all keeps the DECLARED object — nothing to spell
@@ -9248,7 +9248,7 @@ function applyGenericAlias(
 	// (`namespace NonEmptyList<infer Item> for NonEmptyList<Item>`) is stamped and reads
 	// terse anyway, the way an unbound Case does.
 	//
-	// NOTE: The stamp is a COPY, and a copy of a predicate still being written
+	// The stamp is a COPY, and a copy of a predicate still being written
 	// down has to be registered or the fill will finish everything except the very
 	// object the signature ended up holding — which is why it goes through
 	// `refinementWithTypeArguments` rather than being spread here.
@@ -9275,7 +9275,7 @@ function resolveIdentifierTypeDeclarationType(
 	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
-		// NOTE: Silent for a Type whose Declaration the Parser dropped, for the
+		// Silent for a Type whose Declaration the Parser dropped, for the
 		// reason a value name is — see `declarationWasAbandoned`.
 		if (declarationWasAbandoned(scope, name, node.position)) {
 			return { type: "Error" }
@@ -9291,7 +9291,7 @@ function resolveIdentifierTypeDeclarationType(
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
 					],
-					// NOTE: A Protocol in a Type position is nearly always a
+					// A Protocol in a Type position is nearly always a
 					// Parameter that meant to be bounded by it — the Type is
 					// then the Parameter, and the Protocol moves to the bound.
 					helps: [
@@ -9311,13 +9311,13 @@ function resolveIdentifierTypeDeclarationType(
 		return { type: "Error" }
 	}
 
-	// NOTE: A bare use of a Generic Type Alias applies the defaults — without
+	// A bare use of a Generic Type Alias applies the defaults — without
 	// a full set of defaults it is missing Type Arguments.
 	if (result.type === "GenericAlias") {
 		return applyGenericAlias(result, [], scope, node.position)
 	}
 
-	// NOTE: The two asynchronous containers take their one Type Argument the way
+	// The two asynchronous containers take their one Type Argument the way
 	// `Optional` and every generic Choice take theirs, and a bare spelling of one
 	// is refused the way a bare `Optional` is. What `primitiveTypes` hands out for
 	// the name is the applied shape with its slot left Unknown — there is no
@@ -9361,7 +9361,7 @@ function resolveIdentifierTypeDeclarationType(
 	return result
 }
 
-// NOTE: Members that subsume one another collapse and anonymous nested Unions
+// Members that subsume one another collapse and anonymous nested Unions
 // flatten in; a named one keeps its name. See `buildUnion`.
 function resolveUnionTypeDeclarationType(
 	node: parser.UnionTypeDeclarationNode,
@@ -9396,7 +9396,7 @@ export function resolveGenericTypeDeclarationType(
 ): common.Type {
 	let baseType: common.Type
 
-	// NOTE: The base Type is looked up raw — `resolveIdentifierTypeDeclarationType`
+	// The base Type is looked up raw — `resolveIdentifierTypeDeclarationType`
 	// would already apply a Generic Alias' defaults before the Type Arguments
 	// get a chance to.
 	if (node.baseType.nodeType === "IdentifierTypeDeclaration") {
@@ -9404,7 +9404,7 @@ export function resolveGenericTypeDeclarationType(
 		let result = findTypeInScope(name, scope)
 
 		if (result === null) {
-			// NOTE: Silent for a Type whose Declaration the Parser dropped — see
+			// Silent for a Type whose Declaration the Parser dropped — see
 			// `declarationWasAbandoned`.
 			if (!declarationWasAbandoned(scope, name, node.baseType.position)) {
 				reportError(
@@ -9434,7 +9434,7 @@ export function resolveGenericTypeDeclarationType(
 	return applyTypeArguments(baseType, node.generics, scope, node.position)
 }
 
-// NOTE: The whole of what applying Type Arguments to a base Type means — the
+// The whole of what applying Type Arguments to a base Type means — the
 // arity check, the bounds, the builtin containers' normalisation and the
 // refusal of a Type that takes none. An annotation's `Holder<Integer>` and a value's
 // `Holder<Integer>#Full` are the same application, and reaching this from both
@@ -9450,7 +9450,7 @@ export function applyTypeArguments(
 		return baseType
 	}
 
-	// NOTE: Applied Lists are normalized into plain List Types right away, so
+	// Applied Lists are normalized into plain List Types right away, so
 	// that inferred and declared List Types share a single representation.
 	if (baseType.type === "GenericList") {
 		if (typeArguments.length !== 1) {
@@ -9480,7 +9480,7 @@ export function applyTypeArguments(
 		}
 	}
 
-	// NOTE: The two asynchronous containers, applied the way a List is. There is
+	// The two asynchronous containers, applied the way a List is. There is
 	// no unapplied Type to normalise FROM — what `primitiveTypes` hands out for
 	// the name is the applied shape with its slot left Unknown — so the base this
 	// reads is that shape, and the application decides the slot. It is the only
@@ -9513,7 +9513,7 @@ export function applyTypeArguments(
 			: { type: "Started", valueType }
 	}
 
-	// NOTE: The same normalisation for the two-slot container, and the same
+	// The same normalisation for the two-slot container, and the same
 	// recovery: a wrong count is reported and then a Dictionary is built out of
 	// whatever WAS written, so the Declaration underneath it still resolves
 	// against something rather than cascading Errors out of one miscount. Each
@@ -9564,7 +9564,7 @@ export function applyTypeArguments(
 	reportError("This Type takes no Type Arguments", position, {
 		code: "type-not-generic",
 		labels: [primary(position, "the Type Arguments have nowhere to go")],
-		// NOTE: The Type without them, which is the whole edit — this Type is
+		// The Type without them, which is the whole edit — this Type is
 		// already as applied as it gets, and the brackets are what has to go.
 		helps: [
 			`Remove the Type Arguments — '${describeType(baseType)}' stands on its own.`,
@@ -9574,7 +9574,7 @@ export function applyTypeArguments(
 	return { type: "Error" }
 }
 
-// NOTE: The application a Type wants, with a blank per Type Parameter. Written
+// The application a Type wants, with a blank per Type Parameter. Written
 // from the Type's own name and its own arity, so `Optional` reads back as
 // `Optional<…>` and `Dictionary` as `Dictionary<…, …>` — a count in a Note leaves
 // the reader to work the shape out, and the bare spelling that raises this wrote
@@ -9589,16 +9589,16 @@ function typeApplicationHelp(name: string, parameterCount: number): string {
 /* Helpers */
 /***********/
 
-// NOTE: `Self` is what a Protocol calls its conforming Type; the two other
+// `Self` is what a Protocol calls its conforming Type; the two other
 // places that reject the name report it identically, so they share this.
 export function reportReservedTypeName(position: common.Position | null): void {
-	// NOTE: A reserved TYPE name, and the Note says which. "No declaration may
+	// A reserved TYPE name, and the Note says which. "No declaration may
 	// take it" was wider than the rule: a constant, a Function, a Case and a
 	// member called `Self` all compile, because none of them is a Type.
 	let notes = [
 		"'Self' is what a Protocol calls the Type conforming to it, so no Type may be declared under it.",
 	]
-	// NOTE: One Help, and it names no replacement: which name the declaration
+	// One Help, and it names no replacement: which name the declaration
 	// should have is the one thing this knows nothing about. It said nothing at
 	// all before, and the edit is worth saying even where the word is not.
 	let helps = ["Choose another name."]
@@ -9622,7 +9622,7 @@ export function reportReservedTypeName(position: common.Position | null): void {
 	})
 }
 
-// NOTE: The members the base actually has are listed rather than left for the
+// The members the base actually has are listed rather than left for the
 // reader to go and look up — a Lookup fails most often because the member is
 // spelled differently, not because it is absent.
 function reportUnknownMember(
@@ -9632,7 +9632,7 @@ function reportUnknownMember(
 	memberNames: Array<string>,
 	access: MemberAccessContext | null = null,
 ): void {
-	// NOTE: `box.hits++` is a Lookup whose MEMBER is `hits++` — a `.` ends a
+	// `box.hits++` is a Lookup whose MEMBER is `hits++` — a `.` ends a
 	// name and a `+` does not — so the increment arrives inside the member name
 	// and the Record has no such member. Answered as the operator it is, the
 	// way the bare `hits++` already was: "Did you mean 'hits'?" was a Help that
@@ -9669,7 +9669,7 @@ function reportUnknownMember(
 	)
 }
 
-// NOTE: The operator hiding at the end of a member name, answered as the
+// The operator hiding at the end of a member name, answered as the
 // foreign syntax it is rather than as a member nothing declares. True where it
 // reported, so the caller says nothing further.
 //
@@ -9698,7 +9698,7 @@ function reportMemberOperator(
 		return false
 	}
 
-	// NOTE: And the edit is a REBUILD rather than an assignment: a Record's
+	// And the edit is a REBUILD rather than an assignment: a Record's
 	// member can not be assigned — `box.hits = …` is its own refusal — so what
 	// goes back into the binding is the Record that differs from it, which is
 	// the sentence `foreign-syntax` writes about the same line. Spelled only
@@ -9712,7 +9712,7 @@ function reportMemberOperator(
 		return true
 	}
 
-	// NOTE: The counting half of the table's own sentence, read back out of it
+	// The counting half of the table's own sentence, read back out of it
 	// rather than spelled a second time here: `compoundAssignmentHelps` answers
 	// "Write 'x = x::add(1)'." and what this needs is the `x::add(1)`, which is
 	// what stands between the ` = ` and the closing quote. One table, one
@@ -9733,7 +9733,7 @@ function reportMemberOperator(
 	return true
 }
 
-// NOTE: Every name of one kind that is visible from `scope`, innermost first
+// Every name of one kind that is visible from `scope`, innermost first
 // — what a "did you mean" is drawn from, so that a suggestion is always a
 // name the reader could actually have written here.
 function namesInScope(
@@ -9761,7 +9761,7 @@ export function suggestionInScope(
 	return suggestion === null || suggestion === name ? null : suggestion
 }
 
-// NOTE: A near miss is a Help rather than part of the message — it is a
+// A near miss is a Help rather than part of the message — it is a
 // suggestion, and a message that states one as fact reads as though the
 // Compiler knows something it does not.
 export function suggestionHelps(
@@ -9774,7 +9774,7 @@ export function suggestionHelps(
 	return suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
 }
 
-// NOTE: The same near miss again, for the Quick Fix that applies it. Spread
+// The same near miss again, for the Quick Fix that applies it. Spread
 // rather than assigned, so a Diagnostic that has no suggestion carries no
 // `data` key at all rather than one holding `undefined`.
 export function suggestionData(suggestion: string | null): {
@@ -9823,7 +9823,7 @@ function protocolNamed(
 	}
 }
 
-// NOTE: The Protocol a name written in this Scope refers to. Only a written
+// The Protocol a name written in this Scope refers to. Only a written
 // name is read this way: whatever is stored is an identity, read through
 // `protocolOf`.
 export function resolveWrittenProtocol(
@@ -9833,7 +9833,7 @@ export function resolveWrittenProtocol(
 	return protocolNamed(identifier.content, scope)
 }
 
-// NOTE: The Protocol a stored identity names. The nearest Protocol of its name
+// The Protocol a stored identity names. The nearest Protocol of its name
 // answers where it is the one, and the registry answers everywhere else; an
 // identity neither knows is an Internal Compiler Error.
 export function protocolOf(
@@ -9849,7 +9849,7 @@ export function protocolOf(
 	return protocol
 }
 
-// NOTE: The same, for a standard library Protocol asked for by its identity,
+// The same, for a standard library Protocol asked for by its identity,
 // which a load that has not declared it yet does not know.
 export function knownProtocol(
 	identity: string,
@@ -9864,7 +9864,7 @@ export function knownProtocol(
 	return protocolRegistryOf(scope)?.get(identity) ?? null
 }
 
-// NOTE: The name this Scope reads a Protocol under: its declared name where
+// The name this Scope reads a Protocol under: its declared name where
 // that binds it, otherwise the nearest name that does, such as an import alias,
 // and null where no name here binds it.
 export function protocolSpelling(
@@ -9895,7 +9895,7 @@ export function protocolSpelling(
 	return null
 }
 
-// NOTE: What holds a name here that an import of a Protocol would bind, its
+// What holds a name here that an import of a Protocol would bind, its
 // declared one unless told another, so that the import would collide or name
 // something else: another Protocol, or a Type or member of this Module. Null
 // where the name is free.
@@ -9913,7 +9913,7 @@ export function protocolNameTaken(
 	return moduleBindsName(scope, name) ? "other" : null
 }
 
-// NOTE: How a message names a Protocol: as this Scope reads it, or by its
+// How a message names a Protocol: as this Scope reads it, or by its
 // declared name where nothing here binds it.
 export function describeProtocol(
 	identity: string,
@@ -9922,7 +9922,7 @@ export function describeProtocol(
 	return protocolSpelling(identity, scope) ?? displayProtocolName(identity)
 }
 
-// NOTE: The Protocols in scope that declare a Method of this name, alphabetically
+// The Protocols in scope that declare a Method of this name, alphabetically
 // — the bounds a Type Parameter could be given so that the call resolves at all.
 // An unbounded Parameter reaches no Namespace whatsoever, and a bound is the only
 // thing that gives it one, so this is the half of that refusal a reader can act
@@ -9937,7 +9937,7 @@ export function protocolsDeclaringMethod(
 		.sort()
 }
 
-// NOTE: Every Protocol a Scope can see, once however many names bind it, the
+// Every Protocol a Scope can see, once however many names bind it, the
 // nearest declaration of a name winning. Asked where a Method call found nothing
 // written, so a Protocol's provided Methods can answer it.
 function allProtocolsInScope(
@@ -9966,7 +9966,7 @@ function allProtocolsInScope(
 	]
 }
 
-// NOTE: Method resolution asks which Namespaces a Scope can see once per
+// Method resolution asks which Namespaces a Scope can see once per
 // Method invocation, and the answer only changes when a name is declared into
 // one of the Scopes on the chain. Each Scope therefore carries a version that
 // its own declarations bump, and the memoised answer records the versions it
@@ -9981,7 +9981,7 @@ let namespacesInScopeCache = new WeakMap<
 	}
 >()
 
-// NOTE: Every name ever declared as a Namespace. A declaration only changes
+// Every name ever declared as a Namespace. A declaration only changes
 // what `getAllNamespacesInScope` answers if it declares a Namespace or
 // shadows one — declaring an ordinary Constant leaves every cached answer
 // intact, and Constants are the overwhelming majority of declarations.
@@ -10001,13 +10001,13 @@ export function invalidateNamespacesInScope(
 	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
 }
 
-// NOTE: Drops what this Scope and every Scope nested in it memoised about the
+// Drops what this Scope and every Scope nested in it memoised about the
 // Namespaces they see and the witnesses those build.
 export function invalidateConformancesInScope(scope: enricher.Scope): void {
 	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
 }
 
-// NOTE: The version of every Scope on the chain, innermost first — what a
+// The version of every Scope on the chain, innermost first — what a
 // memoised answer records so that `namespaceCacheIsCurrent` can revalidate it
 // by comparing numbers instead of enumerating members.
 function scopeVersionSnapshot(
@@ -10053,7 +10053,7 @@ function namespaceCacheIsCurrent(
 	return index === cached.versions.length
 }
 
-// NOTE: The specifiers `reportSpecifierIsNotANamespace` has refused. A
+// The specifiers `reportSpecifierIsNotANamespace` has refused. A
 // `::<total>append("!")` whose `total` names an Integer is one mistake, and the
 // lookup behind it comes back empty, which would read as "no Namespace targets
 // this value" and print a second report about a receiver whose Namespace is
@@ -10068,7 +10068,7 @@ export function specifierWasRefused(
 	return identifier != null && refusedSpecifiers.has(identifier)
 }
 
-// NOTE: `::<Name>method()` where `Name` means something other than a Namespace
+// `::<Name>method()` where `Name` means something other than a Namespace
 // here. Reported rather than skipped past: the call site named ONE Namespace,
 // and answering with a Namespace of that name from further out would type-check
 // the call against something the emitted code can not reach — the nearer
@@ -10108,7 +10108,7 @@ export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
 ): Map<string, common.NamespaceType> {
-	// NOTE: A named lookup only ever wants one Namespace, so it walks the
+	// A named lookup only ever wants one Namespace, so it walks the
 	// Scope chain asking for that one name instead of enumerating members.
 	// It stops at the NEAREST binding of the name, whatever that binding is —
 	// the same shadowing rule the enumeration below implements ("a member that
@@ -10151,7 +10151,7 @@ export function getAllNamespacesInScope(
 		return cached.namespaces
 	}
 
-	// NOTE: What a Scope can see is what its parent can see, amended by its
+	// What a Scope can see is what its parent can see, amended by its
 	// own members: a member that is a Namespace adds one, and a member that
 	// is anything else shadows one away. Asking the parent — whose answer is
 	// itself memoised — costs a walk of this Scope's own members instead of
@@ -10174,7 +10174,7 @@ export function getAllNamespacesInScope(
 		}
 	}
 
-	// NOTE: Most Scopes declare no Namespace and shadow none, so they share
+	// Most Scopes declare no Namespace and shadow none, so they share
 	// their parent's answer *by identity* — which is what lets everything
 	// derived from it, the candidate index below above all, be computed once
 	// for a whole subtree instead of once per Scope.
@@ -10200,11 +10200,11 @@ export function getAllNamespacesInScope(
 	return result
 }
 
-// NOTE: The answer for a rootless Scope — shared so that it, too, is one
+// The answer for a rootless Scope — shared so that it, too, is one
 // identity rather than one per Scope.
 const EMPTY_NAMESPACES: Map<string, common.NamespaceType> = new Map()
 
-// NOTE: Method resolution asks "which of the visible Namespaces target this
+// Method resolution asks "which of the visible Namespaces target this
 // receiver?" once per invocation, and answered it by matching the receiver
 // against every Namespace in Scope — linear in the size of the program, on
 // every Method call in the program. `matchTypes` can only ever say yes to a
@@ -10219,16 +10219,16 @@ type IndexedNamespace = {
 }
 
 type NamespaceIndex = {
-	// NOTE: Targets that can match a receiver of any kind, so every lookup
+	// Targets that can match a receiver of any kind, so every lookup
 	// pays for them.
 	always: Array<IndexedNamespace>
 	byKind: Map<common.Type["type"], Array<IndexedNamespace>>
-	// NOTE: A Record target matches only a receiver carrying every one of its
+	// A Record target matches only a receiver carrying every one of its
 	// members, so it is filed under whichever of its member names is rarest
 	// among the Record targets — the name that rules out the most Namespaces
 	// for the fewest lookups.
 	recordsByMember: Map<string, Array<IndexedNamespace>>
-	// NOTE: `for {}` targets every Record, so no member name can file them.
+	// `for {}` targets every Record, so no member name can file them.
 	recordsWithoutMembers: Array<IndexedNamespace>
 }
 
@@ -10283,7 +10283,7 @@ function buildNamespaceIndex(
 	for (let entry of entries) {
 		let targetType = entry.namespace.targetType
 
-		// NOTE: A Namespace with no target Type is a Namespace of Static
+		// A Namespace with no target Type is a Namespace of Static
 		// Methods — never a Method receiver, so it is indexed nowhere.
 		if (targetType === null || targetType === undefined) {
 			continue
@@ -10299,14 +10299,14 @@ function buildNamespaceIndex(
 			targetType.type === "List" ||
 			targetType.type === "GenericList"
 		) {
-			// NOTE: The two List spellings match each other, so they share a
+			// The two List spellings match each other, so they share a
 			// bucket rather than being told apart here.
 			pushInto(index.byKind, "List", entry)
 		} else if (
 			targetType.type === "Dictionary" ||
 			targetType.type === "GenericDictionary"
 		) {
-			// NOTE: And the two Dictionary spellings, for the same reason.
+			// And the two Dictionary spellings, for the same reason.
 			pushInto(index.byKind, "Dictionary", entry)
 		} else if (targetType.type === "Record") {
 			let rarest: string | null = null
@@ -10334,18 +10334,18 @@ function buildNamespaceIndex(
 	return index
 }
 
-// NOTE: The Namespaces worth matching against `baseType`, in the order they
+// The Namespaces worth matching against `baseType`, in the order they
 // are visible in — a superset of those that can match, never a subset, so the
 // matching below decides exactly what it decided when it saw all of them.
 //
-// NOTE: Visible order is not restored by a sort here, it is never lost:
+// Visible order is not restored by a sort here, it is never lost:
 // `buildNamespaceIndex` fills every bucket in `order` order, so each bucket is
 // already ascending and the buckets a receiver reads are MERGED rather than
 // concatenated and re-sorted. Order is not cosmetic — the ambiguity Diagnostic
 // names the Namespaces in the order they are visible in, so a merge that got
 // this wrong would rewrite Diagnostics rather than just reorder work.
 //
-// NOTE: The returned Array is READ-ONLY to its caller: when a receiver reads
+// The returned Array is READ-ONLY to its caller: when a receiver reads
 // exactly one bucket, that bucket IS the return value rather than a copy of it.
 function namespaceCandidatesFor(
 	namespaces: Map<string, common.NamespaceType>,
@@ -10379,12 +10379,12 @@ function namespaceCandidatesFor(
 
 const EMPTY_CANDIDATES: Array<IndexedNamespace> = []
 
-// NOTE: The sorted buckets a receiver of this KIND can be answered by —
+// The sorted buckets a receiver of this KIND can be answered by —
 // everything but the blanket ones every lookup pays for, which the caller has
 // already put in. Empty buckets are left out so the merge below never walks
 // one.
 //
-// NOTE: A refined receiver reads two of them. Evidence adds Methods to a Type
+// A refined receiver reads two of them. Evidence adds Methods to a Type
 // and never takes any away, so a `NonZeroInteger` keeps every Method an Integer
 // has — and a Namespace written `for NonZeroInteger` is the one place a `divide`
 // that can not fail may live. Left out, the first half would leave a refined
@@ -10415,7 +10415,7 @@ function collectKindCandidates(
 	}
 
 	if (baseType.type === "List" || baseType.type === "GenericList") {
-		// NOTE: The two List spellings share one bucket — see
+		// The two List spellings share one bucket — see
 		// `buildNamespaceIndex`.
 		pushBucket(buckets, index.byKind.get("List"))
 
@@ -10426,7 +10426,7 @@ function collectKindCandidates(
 		baseType.type === "Dictionary" ||
 		baseType.type === "GenericDictionary"
 	) {
-		// NOTE: And the two Dictionary spellings, for the same reason.
+		// And the two Dictionary spellings, for the same reason.
 		pushBucket(buckets, index.byKind.get("Dictionary"))
 
 		return
@@ -10444,7 +10444,7 @@ function pushBucket(
 	}
 }
 
-// NOTE: A k-way merge of buckets that are each already ascending by `order`,
+// A k-way merge of buckets that are each already ascending by `order`,
 // which reproduces exactly what sorting their concatenation produced —
 // `order` is unique per Namespace, so there are no ties for a merge rule to
 // decide differently from a sort. `k` is one or two for every receiver but a
@@ -10489,7 +10489,7 @@ function mergeCandidateBuckets(
 	return merged
 }
 
-// NOTE: The answer `namespacesTargeting` gave for one (namespaces, receiver)
+// The answer `namespacesTargeting` gave for one (namespaces, receiver)
 // pair. Sound to keep because that answer is a PURE function of the two: the
 // only state the matching below touches is a `createInferenceContext` made
 // fresh per Namespace and thrown away with the loop — what it binds decides
@@ -10498,7 +10498,7 @@ function mergeCandidateBuckets(
 // invocation. So what is remembered here is the candidate SET and nothing that
 // carries per-call inference state.
 //
-// NOTE: Keyed by identity twice over, which is what makes it hit. The outer
+// Keyed by identity twice over, which is what makes it hit. The outer
 // key is the namespaces Map, which `getAllNamespacesInScope` shares across a
 // subtree; the inner key is the receiver Type, where a fresh structural Type
 // is a miss that recomputes. A receiver or a Namespace target changes in place
@@ -10506,19 +10506,19 @@ function mergeCandidateBuckets(
 // have read because reading one throws, and poisoning turns a refinement into
 // its base, which calls `forgetNamespaceTargets`.
 type TargetingAnswers = {
-	// NOTE: A Type whose whole identity is its tag can not be told apart from
+	// A Type whose whole identity is its tag can not be told apart from
 	// another of the same tag, so all of them share one answer — which is what
 	// makes the everyday receiver (`1::add(2)`) a hit even though the literal
 	// Enricher builds it a fresh `{ type: "Integer" }` every time.
 	byTag: Map<string, Map<string, common.NamespaceType>>
-	// NOTE: Everything with structure is keyed by identity instead, in a
+	// Everything with structure is keyed by identity instead, in a
 	// WeakMap so that per-compile Types do not pin the answers for them alive:
 	// the entry dies with the Type it is about, and the whole memo dies with
 	// the namespaces Map it hangs off.
 	byType: WeakMap<common.Type, Map<string, common.NamespaceType>>
 }
 
-// NOTE: The Types with no fields but `type` — see `common.Type`. `List` is NOT
+// The Types with no fields but `type` — see `common.Type`. `List` is NOT
 // here (its `itemType` is part of it), and neither is `GenericList`, whose
 // `generics` is fixed today but is a field a receiver could come to differ in.
 // `Dictionary` and `GenericDictionary` are out for exactly those two reasons,
@@ -10539,7 +10539,7 @@ let namespacesTargetingMemos = new WeakMap<
 	TargetingAnswers
 >()
 
-// NOTE: Drops every candidate index and remembered answer. The index files a
+// Drops every candidate index and remembered answer. The index files a
 // Namespace by the kind of its target, so a target rewritten in place leaves
 // it in the wrong bucket as well as leaving the answers stale.
 export function forgetNamespaceTargets(): void {
@@ -10547,14 +10547,14 @@ export function forgetNamespaceTargets(): void {
 	namespacesTargetingMemos = new WeakMap()
 }
 
-// NOTE: Which of the given Namespaces target `baseType`, in the order they were
+// Which of the given Namespaces target `baseType`, in the order they were
 // given in. Separated from the Scope walk above because the graph-aware half of
 // "no such Method" asks the same question of Namespaces that are NOT in Scope —
 // the ones a dependency exports and this Module never imported — and the answer
 // has to be decided by exactly the rule dispatch is decided by, or the help
 // would name a Namespace that would not have resolved anyway.
 //
-// NOTE: The returned Map is SHARED with every other caller that asked the same
+// The returned Map is SHARED with every other caller that asked the same
 // question, so it is read-only to all of them. Nothing mutates it today —
 // `namespacesDeclaringMethod`, `partitionInstanceMethodNamespaces` and
 // `methodNamesOf` all build their own — and a caller that needs to must copy it
@@ -10596,7 +10596,7 @@ function computeNamespacesTargeting(
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
-	// NOTE: Generic Namespaces match their target Type by binding the
+	// Generic Namespaces match their target Type by binding the
 	// Namespace's Generics against the receiver — the bindings are only used
 	// for the selection here, Method resolution re-binds them from the
 	// receiver Argument. `bindNamespaceTarget` alpha-renames those Generics
@@ -10608,7 +10608,7 @@ function computeNamespacesTargeting(
 	)) {
 		if (namespace.targetType) {
 			if (namespace.targetType.type === "UnionType") {
-				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
+				// A Union-typed receiver (`Ordering`, `Number`) matches
 				// the Union target as a whole — the per-member loop below only
 				// covers receivers of a single member Type.
 				if (bindNamespaceTarget(namespace, baseType) !== null) {
@@ -10639,12 +10639,12 @@ function computeNamespacesTargeting(
 	return matchingNamespaces
 }
 
-// NOTE: The pseudo-Namespace a Protocol-bounded Type Parameter's Methods are
+// The pseudo-Namespace a Protocol-bounded Type Parameter's Methods are
 // reached through — named after the hidden conformance parameter the call is
 // emitted against, with `Self` substituted by the Type Parameter itself. Null
 // for an unbounded one.
 //
-// NOTE: The whole Protocol surface, requirements and PROVIDED Methods alike — a
+// The whole Protocol surface, requirements and PROVIDED Methods alike — a
 // witness carries an entry for every one of them, which is what makes a bounded
 // call reach the conformer's override where it wrote one and the shared const
 // where it did not. A Protocol's ancestors are in `protocol.methods` already,
@@ -10693,18 +10693,18 @@ export function conformanceNamespaceFor(
 	}
 }
 
-// NOTE: The Namespace a Lookup reads its member off where the base names no
+// The Namespace a Lookup reads its member off where the base names no
 // VALUE — `Colour.cases()` on a Choice nobody wrote a Namespace for, and
 // `T.cases()` inside a `<T is Enumerable>` body. Both are Namespaces nobody
 // declared: a Choice's derived `Enumerable`, and a bounded Type Parameter's
 // conformance.
 //
-// NOTE: Answered only for a member that Namespace offers. A name neither
+// Answered only for a member that Namespace offers. A name neither
 // offers is left to report `unknown-name` on the base exactly as it did, which
 // is what keeps `Colour.spelledWrong` from answering with a Namespace whose
 // name no source can write.
 //
-// NOTE: A value of the name WINS. The question is asked of a base that resolves
+// A value of the name WINS. The question is asked of a base that resolves
 // to nothing, so a Constant named after a Choice shadows the Choice here as it
 // shadows it everywhere else.
 export function namespaceNamedByType(
@@ -10735,12 +10735,12 @@ export function namespaceNamedByType(
 		: null
 }
 
-// NOTE: The Case listing for a Type NAMED in a Lookup's base, or null where the
+// The Case listing for a Type NAMED in a Lookup's base, or null where the
 // name is no Choice of payload-free Cases. A generic Choice's name resolves to a
 // Generic Alias and answers null: the spelling has no Type Arguments to apply,
 // and the answer's item Type is the Choice.
 //
-// NOTE: A Namespace WRITING `cases` over the Choice is the answer, and the
+// A Namespace WRITING `cases` over the Choice is the answer, and the
 // derive fills in only where none does — the same order every other rail reads
 // them in. Without this, `Colour.cases()` derived while a bounded call read the
 // written Method, and which of the two a Program got turned on whether the
@@ -10762,7 +10762,7 @@ function derivedEnumerableNamespaceForNamedChoice(
 	)
 }
 
-// NOTE: The Namespace over a Choice that writes `cases`, narrowed to that one
+// The Namespace over a Choice that writes `cases`, narrowed to that one
 // Method — the base names a TYPE, so the only member this rail may answer is
 // the one the derive would have answered. Everything else the Namespace holds
 // stays reachable through its own name and nowhere else.
@@ -10791,14 +10791,14 @@ export function resolveMethodLookupNamespacesForReceiverType(
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
-	// NOTE: Error Types match any targetType — instead of every Namespace,
+	// Error Types match any targetType — instead of every Namespace,
 	// they match none, so that a broken base expression does not produce
 	// follow-up Diagnostics.
 	if (baseType.type === "Error") {
 		return matchingNamespaces
 	}
 
-	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
+	// A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves ONLY through its Protocol — the pseudo-Namespace below, named
 	// after the hidden conformance parameter. The Simplifier emits the
 	// Namespace name as the call base, so bodies compile to
@@ -10813,7 +10813,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	// NOTE: An unbounded Type Parameter has no Methods — it resolves only
+	// An unbounded Type Parameter has no Methods — it resolves only
 	// through a Protocol bound, handled above. The cut says that outright
 	// rather than relying on no Namespace happening to match: a Namespace whose
 	// target Union carries a bindable Generic member binds the bare Parameter
@@ -10826,7 +10826,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	// NOTE: Returned as it comes back rather than copied into the Map above.
+	// Returned as it comes back rather than copied into the Map above.
 	// The copy this replaces protected nothing: every caller
 	// (`resolveMethodInvocation`, `resolveUnionMethodDispatch`, the near-miss
 	// lookup) only ever iterates the answer or reads names off it, and the
@@ -10840,7 +10840,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	)
 }
 
-// NOTE: Which of the Namespaces declaring the Method can answer an INSTANCE
+// Which of the Namespaces declaring the Method can answer an INSTANCE
 // call, and which only declare it as static. Every Method Invocation is an
 // instance call — the receiver written left of the `::` is the first Argument —
 // so a static declaration is not a candidate at all. Keeping the static ones
@@ -10867,7 +10867,7 @@ export function partitionInstanceMethodNamespaces(
 	return { instanceNamespaces, staticNamespaces }
 }
 
-// NOTE: A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
+// A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
 // `ambiguous-namespace` report is answered when the two candidates are two
 // Protocols providing one name — `Name the Namespace` has to name something a
 // call can write, and a written Namespace is not what either of them is.
@@ -10919,7 +10919,7 @@ function providedMethodNamespacesNamed(
 	return named
 }
 
-// NOTE: Which of the Namespaces found for a receiver actually declare the
+// Which of the Namespaces found for a receiver actually declare the
 // Method — the written ones, a Protocol's PROVIDED ones beside them, and the
 // ONE door the derived Namespaces come through, for both the whole-Union lookup
 // and the per-member one. The derives are consulted only when the written
@@ -10932,7 +10932,7 @@ export function namespacesDeclaringMethod(
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
-	// NOTE: The name a `value::<Name>method()` wrote, when it wrote one. Only
+	// The name a `value::<Name>method()` wrote, when it wrote one. Only
 	// the provided-Method door reads it: `namespaces` is already the answer to
 	// the specifier for every WRITTEN Namespace, and comes back empty where the
 	// name is a Protocol's, which lives in another table entirely.
@@ -10956,7 +10956,7 @@ export function namespacesDeclaringMethod(
 		}
 	}
 
-	// NOTE: The derives are asked only where nothing WRITTEN answered, and a
+	// The derives are asked only where nothing WRITTEN answered, and a
 	// derive that answers answers alone. A derive is fabricated FOR this
 	// receiver — its `isNot` takes the whole Choice, so
 	// `Ordering#Less::isNot(#Equal)` answers — while a provided Method is one
@@ -10971,7 +10971,7 @@ export function namespacesDeclaringMethod(
 			matchingNamespaces.set(derivedEquatableNamespaceName, derived)
 		}
 
-		// NOTE: The printing derive reads the Namespaces already found for the
+		// The printing derive reads the Namespaces already found for the
 		// receiver, because it answers only where one of them declared
 		// `is Printable` — which is the difference between the two derives, and
 		// the reason this one takes them and the one above does not.
@@ -10993,7 +10993,7 @@ export function namespacesDeclaringMethod(
 		}
 	}
 
-	// NOTE: A Protocol's PROVIDED Methods stand on the specificity ladder
+	// A Protocol's PROVIDED Methods stand on the specificity ladder
 	// BESIDE the written ones, one rung per Namespace that declares the
 	// conformance. That is the override rule as it really is: a Namespace
 	// writing the name replaces the provided Method on ITS OWN rung — the walk
@@ -11015,7 +11015,7 @@ export function namespacesDeclaringMethod(
 	return matchingNamespaces
 }
 
-// NOTE: The Parameter Types of a signature, carrying whatever documents each
+// The Parameter Types of a signature, carrying whatever documents each
 // Parameter. A Parameter is described either by a `§§` block of its own or by
 // the `@param` line standing at its position in the Declaration's.
 function resolveParameterTypes(
@@ -11030,7 +11030,7 @@ function resolveParameterTypes(
 	])
 	refuseIndistinguishableDefaults(definition.parameters)
 
-	// NOTE: The single choke point through which every `common.Parameter` is
+	// The single choke point through which every `common.Parameter` is
 	// built — the free-Function, Protocol-signature and Namespace-Method paths
 	// all route through here — which is why `hasDefault` and `defaultMembers`
 	// are set only here. The expression itself stays on the Parameter Node; a
@@ -11038,10 +11038,10 @@ function resolveParameterTypes(
 	return definition.parameters.map((parameter, index) => {
 		let type = resolveDeclaredType(parameter.type, scope)
 		let defaultMembers = recordDefaultMembers(type, parameter.defaultValue)
-		// NOTE: Left off entirely where nothing nests, so a signature whose
+		// Left off entirely where nothing nests, so a signature whose
 		// default reaches into nothing stays structurally the Type it was.
 		let defaultNesting = recordDefaultNesting(type, parameter.defaultValue)
-		// NOTE: A PARTIAL Record default fills in some of its Parameter's
+		// A PARTIAL Record default fills in some of its Parameter's
 		// members and leaves the rest to every caller, so the Argument is still
 		// required — which is exactly `hasDefault` being unset, and is why
 		// `pairArguments` needs no change at all: it reads labels and
@@ -11072,7 +11072,7 @@ function resolveParameterTypes(
 	})
 }
 
-// NOTE: Two entries of one `overload` block that accept the same call. An
+// Two entries of one `overload` block that accept the same call. An
 // entry's accepted shapes are the label sequences left when any subset of its
 // defaulted Parameters is dropped, and the clash is refused when a shape
 // reachable ONLY by omitting a default equals ANY shape of another entry.
@@ -11097,7 +11097,7 @@ function refuseAmbiguousOverloadDefaults(
 		position: common.Position
 	}>,
 ): void {
-	// NOTE: The hazard is a shape reachable ONLY by leaving something out, so an
+	// The hazard is a shape reachable ONLY by leaving something out, so an
 	// Overload block with no default anywhere has none — which is most of the
 	// standard library's blocks and every block anybody wrote before this
 	// existed. Asked first, because everything below enumerates subsets.
@@ -11113,7 +11113,7 @@ function refuseAmbiguousOverloadDefaults(
 	}
 
 	let shapes = entries.map((entry) => acceptedShapes(entry.parameters))
-	// NOTE: Which entries accept each shape, built once — the search below is
+	// Which entries accept each shape, built once — the search below is
 	// "does any OTHER entry accept this shape", and asking it by scanning every
 	// other entry's shapes made the whole check quadratic in the number of
 	// shapes, which is itself exponential in the number of defaults.
@@ -11191,7 +11191,7 @@ function refuseAmbiguousOverloadDefaults(
 	}
 }
 
-// NOTE: The other half of the same hazard, and the one a PARTIAL Record default
+// The other half of the same hazard, and the one a PARTIAL Record default
 // opens. A partial default adds no accepted SHAPE — its Argument is still
 // written, so the label sequence is unchanged — but it widens the set of
 // Argument VALUES an entry accepts, because a Record written without the
@@ -11199,12 +11199,12 @@ function refuseAmbiguousOverloadDefaults(
 // entries of one shape that resolved by the Types of their Records can
 // therefore both come to accept one call.
 //
-// NOTE: Refused on the same terms as the shape clash above: only where a value
+// Refused on the same terms as the shape clash above: only where a value
 // is reachable ONLY by leaving a member out. Entries that already overlapped by
 // Type stay exactly as they were, which is what keeps `Integer.add`'s four
 // same-shaped entries legal — none of them carries a Record default at all.
 //
-// NOTE: Asked of the RESOLVED signatures rather than of the Parameter Nodes,
+// Asked of the RESOLVED signatures rather than of the Parameter Nodes,
 // because what a Record Parameter accepts is a question about Types. The two
 // lists are aligned from the END: a non-static Method's resolved signature is
 // prefixed with the receiver, which the source did not write.
@@ -11277,7 +11277,7 @@ function refuseAmbiguousPartialDefaults(
 	}
 }
 
-// NOTE: The Parameter position at which `left` accepts a Record it could only
+// The Parameter position at which `left` accepts a Record it could only
 // accept through its default and `right` accepts the same one — null where no
 // single Argument list satisfies both, which is every pair that was already
 // telling itself apart.
@@ -11310,7 +11310,7 @@ function partialDefaultClash(
 	return needsDefault === null ? null : { index: needsDefault }
 }
 
-// NOTE: Whether one Argument can answer both Parameters, and whether the LEFT
+// Whether one Argument can answer both Parameters, and whether the LEFT
 // one needs its own default to take it.
 //
 // The candidate is the union of what each side REQUIRES — every member of a
@@ -11323,7 +11323,7 @@ function parameterOverlap(
 	right: common.Parameter,
 ): { leftNeedsDefault: boolean } | null {
 	if (left.type.type !== "Record" || right.type.type !== "Record") {
-		// NOTE: Anything else is the type dispatch an `overload` block is FOR,
+		// Anything else is the type dispatch an `overload` block is FOR,
 		// and is weighed only for whether some value fits both — which is what
 		// makes this pair of entries reachable by one call at all.
 		return matchesType(left.type, right.type) ||
@@ -11343,7 +11343,7 @@ function parameterOverlap(
 		let inLeft = Object.hasOwn(leftMembers, member)
 		let inRight = Object.hasOwn(rightMembers, member)
 
-		// NOTE: A member one side declares and the other reads partially can
+		// A member one side declares and the other reads partially can
 		// not be written at all — a partial Argument may only name members its
 		// Parameter declares — so there is no candidate and no clash.
 		if (
@@ -11370,7 +11370,7 @@ function parameterOverlap(
 	}
 }
 
-// NOTE: The members a call has to write into a Record Argument — every one
+// The members a call has to write into a Record Argument — every one
 // where the Parameter has no Record default, and the ones the default does not
 // fill in where it has.
 function requiredRecordMembers(parameter: common.Parameter): Array<string> {
@@ -11385,13 +11385,13 @@ function requiredRecordMembers(parameter: common.Parameter): Array<string> {
 	return members.filter((member) => !filled.has(member))
 }
 
-// NOTE: "'host', 'retries'" — the spelling every Diagnostic that lists members
+// "'host', 'retries'" — the spelling every Diagnostic that lists members
 // uses.
 function quotedMemberNames(names: ReadonlyArray<string>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
-// NOTE: Every label sequence a Parameter list accepts, keyed by the labels an
+// Every label sequence a Parameter list accepts, keyed by the labels an
 // Argument list would carry, with the Parameters that had to be left out to
 // reach it. `2 ** defaults` sequences, which is a handful for anything anybody
 // writes; a signature carrying more defaults than the cap is left alone rather
@@ -11419,7 +11419,7 @@ function acceptedShapes(
 		let omitted = defaults.filter(
 			(_, index) => (subset & (1 << index)) !== 0,
 		)
-		// NOTE: A Set, because `kept` is asked once per Parameter and the
+		// A Set, because `kept` is asked once per Parameter and the
 		// enumeration already costs `2 ** defaults` — an `includes` over the
 		// omitted list on top of that is the one part of this that grows with
 		// the signature for no reason.
@@ -11450,7 +11450,7 @@ function describeAcceptedShape(key: string): string {
 		.join(" then ")}`
 }
 
-// NOTE: An Argument is paired with a Parameter by its LABEL, before any Type
+// An Argument is paired with a Parameter by its LABEL, before any Type
 // is read — that is what lets a call's shape be worked out for every Overload
 // candidate before paying for Argument typing, and what keeps Completion able
 // to offer labels for a call that is still half written. Defaults turn that
@@ -11508,7 +11508,7 @@ function refuseIndistinguishableDefaults(
 	}
 }
 
-// NOTE: A `@param` line documents the Parameter at its OWN POSITION: the first
+// A `@param` line documents the Parameter at its OWN POSITION: the first
 // line documents the first Parameter, the second the second, and the name it
 // writes is the name the signature writes for that Parameter — its label, or
 // `_` where it carries none. A line that names something else describes a
@@ -11533,7 +11533,7 @@ export function reportDocumentationParameters(
 ): void {
 	let tags = documentation?.parameters ?? []
 
-	// NOTE: Nothing to point at: a block that writes no `@param`, a builtin
+	// Nothing to point at: a block that writes no `@param`, a builtin
 	// Namespace that documents itself in TypeScript, or a Documentation already
 	// attached to a resolved signature, whose tag Positions are gone.
 	if (!tags.some((tag) => tag.tag !== undefined)) {
@@ -11549,7 +11549,7 @@ export function reportDocumentationParameters(
 	reportUnknownDocumentationNames(tags, signatures)
 }
 
-// NOTE: How closely a `§§` block's `@param` lines are held to the signature.
+// How closely a `§§` block's `@param` lines are held to the signature.
 //
 // `"strict"` is the rule as written: one line per Parameter, in order, each
 // naming its Parameter the way the signature writes it. `"lenient"` accepts two
@@ -11569,7 +11569,7 @@ type DocumentationStrictness = "lenient" | "strict"
 
 export const documentationStrictness: DocumentationStrictness = "strict"
 
-// NOTE: The two names a Parameter can be written under, as the rule sees them:
+// The two names a Parameter can be written under, as the rule sees them:
 // the label a call site writes, and the name the body reads it under. Either
 // can be absent — a positional Parameter has no label, and a Parameter taken
 // apart by a Pattern has no single internal name.
@@ -11579,14 +11579,14 @@ export type DocumentedParameter = {
 }
 
 type DocumentationParameterProblem =
-	// NOTE: A line past the end of the Parameter list.
+	// A line past the end of the Parameter list.
 	| { kind: "unknown"; index: number }
-	// NOTE: A line naming something other than the Parameter at its position.
+	// A line naming something other than the Parameter at its position.
 	| { kind: "misnamed"; index: number }
-	// NOTE: A Parameter no line reached. Strict only.
+	// A Parameter no line reached. Strict only.
 	| { kind: "undocumented"; index: number }
 
-// NOTE: The rule itself, as a pure function of the two lists, so that both
+// The rule itself, as a pure function of the two lists, so that both
 // strictnesses can be read and tested without a Program around them.
 export function documentationParameterProblems(
 	tags: Array<string>,
@@ -11630,13 +11630,13 @@ function namesParameter(
 	)
 }
 
-// NOTE: What the signature writes for a Parameter, which is what its `@param`
+// What the signature writes for a Parameter, which is what its `@param`
 // writes too — the label, or `_` where there is none.
 function writtenParameterName(parameter: DocumentedParameter): string {
 	return parameter.label ?? "_"
 }
 
-// NOTE: What a reader is shown in place of a bare `_`: the name the body reads
+// What a reader is shown in place of a bare `_`: the name the body reads
 // the Parameter under, which is the only name a positional Parameter has.
 function displayParameterName(parameter: DocumentedParameter): string {
 	return parameter.label ?? parameter.internalName ?? "_"
@@ -11654,7 +11654,7 @@ function documentedParameter(
 const positionalRule =
 	"A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none."
 
-// NOTE: The line a Quick Fix would write, for the ONE Parameter that has a
+// The line a Quick Fix would write, for the ONE Parameter that has a
 // place to write it: the first the run falls short of. The lines document
 // Parameters by position, so a line for the Parameter below that one would
 // leave a hole above it — and writing the one above puts it back in reach on
@@ -11694,7 +11694,7 @@ function reportPositionalDocumentation(
 	for (let problem of problems) {
 		if (problem.kind === "undocumented") {
 			let parameter = signature[problem.index]!
-			// NOTE: Where this Parameter's name is ALREADY written on the run,
+			// Where this Parameter's name is ALREADY written on the run,
 			// at a line that documents another Parameter, the two reports on
 			// this block are one missing line seen from both ends — and the
 			// order they are answered in shows. Writing this line first leaves
@@ -11741,7 +11741,7 @@ function reportPositionalDocumentation(
 
 		let tag = tags[problem.index]
 
-		// NOTE: A tag Position is what these two underline, so a block whose
+		// A tag Position is what these two underline, so a block whose
 		// Positions were stripped is skipped rather than reported against the
 		// Declaration it documents.
 		if (tag?.tag === undefined) {
@@ -11783,7 +11783,7 @@ function reportPositionalDocumentation(
 		let elsewhere = written.indexOf(tag.name)
 		let notes = [positionalRule, ...order]
 
-		// NOTE: The common shape of the mistake is a line left out rather than
+		// The common shape of the mistake is a line left out rather than
 		// a name misspelled: the lines describe the second Parameter first,
 		// because the first one was never written about.
 		if (elsewhere !== -1 && elsewhere !== problem.index) {
@@ -11797,7 +11797,7 @@ function reportPositionalDocumentation(
 			tag.tag.position,
 			{
 				code: "misnamed-documentation-parameter",
-				// NOTE: What the signature WRITES for the Parameter rather than
+				// What the signature WRITES for the Parameter rather than
 				// what a reader is shown for it — the fix rewrites the tag, and
 				// a tag names a Parameter by its label or by `_`.
 				...suggestionData(written[problem.index]!),
@@ -11818,7 +11818,7 @@ function reportPositionalDocumentation(
 	}
 }
 
-// NOTE: A `§§` block above an `overload` keyword, where position says nothing.
+// A `§§` block above an `overload` keyword, where position says nothing.
 // A name any Overload of the set takes is a name that exists; anything else is
 // a description of a Parameter no entry has.
 function reportUnknownDocumentationNames(
@@ -11880,7 +11880,7 @@ function reportUnknownDocumentationNames(
 	}
 }
 
-// NOTE: What documents ONE Parameter: its own `§§` block where it carries one,
+// What documents ONE Parameter: its own `§§` block where it carries one,
 // and otherwise the `@param` line standing at its position in the enclosing
 // block.
 export function parameterDocumentation(
@@ -11895,7 +11895,7 @@ export function parameterDocumentation(
 	return documentation?.parameters[index]?.text
 }
 
-// NOTE: The Documentation a resolved signature hands out. Each `@param` is
+// The Documentation a resolved signature hands out. Each `@param` is
 // renamed to what the signature shows for the Parameter it stands at — the
 // label, or the internal name where the Parameter is positional — so that a
 // Hover reads `**other** — …` rather than the bare `_` the line was written
@@ -11930,7 +11930,7 @@ export function resolvedDocumentation(
 	}
 }
 
-// NOTE: One Method form's `<…>` read apart: the Type Parameters it declares for
+// One Method form's `<…>` read apart: the Type Parameters it declares for
 // ITSELF, and the BOUNDS it puts on Parameters the Namespace already declared.
 //
 // `differing<Item is Equatable>()` inside a `namespace Pairing<infer Item>` does
@@ -11985,7 +11985,7 @@ export function splitMethodGenerics(
 
 		let protocol = resolveWrittenProtocol(generic.constraint, scope)
 
-		// NOTE: Refused as a Method's own bound is, and not carried either.
+		// Refused as a Method's own bound is, and not carried either.
 		if (protocol === null) {
 			reportUnknownProtocol(generic.constraint, scope)
 		} else {
@@ -11996,7 +11996,7 @@ export function splitMethodGenerics(
 	return { own, bounds }
 }
 
-// NOTE: Which Namespace Generics belong on one Method signature, ahead of the
+// Which Namespace Generics belong on one Method signature, ahead of the
 // Method's own, so that the signature is self-contained for inference and the
 // receiver Argument re-binds them at every invocation. A Namespace Generic is
 // merged in when the resolved signature — the injected `self` Parameter, the
@@ -12056,7 +12056,7 @@ function mergeNamespaceGenerics(
 	return [...used, ...methodGenerics]
 }
 
-// NOTE: One signature of a Namespace Method, in the shape resolution actually
+// One signature of a Namespace Method, in the shape resolution actually
 // reads. A bodied Method and a body-less native signature differ only in
 // whether a block follows — everything the Method's *Type* is made of
 // (Generics, Parameters, return Type, documentation) is written the same way
@@ -12090,23 +12090,23 @@ function methodSignatureEntry(
 		parameters: node.value.parameters,
 		returnType: node.value.returnType,
 		documentation: node.value.documentation,
-		// NOTE: The FunctionValue's Position, not the Definition's — it is what
+		// The FunctionValue's Position, not the Definition's — it is what
 		// the bodied path has always pointed its Diagnostics at.
 		position: node.position,
 		native: false,
 	}
 }
 
-// NOTE: A Namespace Method reduced to the four shapes resolution
+// A Namespace Method reduced to the four shapes resolution
 // distinguishes, with bodied and native entries already flattened into one
 // list. An Overload block may MIX the two, so the list is per entry and keeps
 // the WRITTEN ORDER — the index of an Overload is load-bearing, it picks the
 // `__overload$N` name the Simplifier emits and the runtime export it binds to.
 type NormalizedMethod = {
 	kind: common.MethodType["type"]
-	// NOTE: Exactly one entry for the two non-overloaded forms.
+	// Exactly one entry for the two non-overloaded forms.
 	entries: Array<MethodSignatureEntry>
-	// NOTE: The `overload` block's own documentation, which the entries'
+	// The `overload` block's own documentation, which the entries'
 	// individual ones sit under. Always null for a non-overloaded Method.
 	documentation: common.Documentation | null
 }
@@ -12155,7 +12155,7 @@ function normalizeMethod(
 	}
 }
 
-// NOTE: Every form of one Namespace Method read apart, in WRITTEN ORDER — one
+// Every form of one Namespace Method read apart, in WRITTEN ORDER — one
 // entry for a non-overloaded Method, one per Overload otherwise. The index is
 // load-bearing everywhere the three views of a Method's Type Parameters are
 // kept in step, so the splits are produced once, here, from the same
@@ -12170,7 +12170,7 @@ export function methodGenericSplits(
 	)
 }
 
-// NOTE: Which entries of a Namespace Method are bound to the runtime rather
+// Which entries of a Namespace Method are bound to the runtime rather
 // than implemented in Essence, in written order — one flag for a
 // non-overloaded Method, one per Overload otherwise. The standard library
 // loader records these so that the runtime-export check knows which Methods it
@@ -12235,17 +12235,17 @@ export function resolveMethodType(
 		selfType = { type: "Error" }
 	}
 
-	// NOTE: The receiver Parameter every non-static signature is prefixed with.
+	// The receiver Parameter every non-static signature is prefixed with.
 	// Null exactly when the Method is static, which is when it is not injected.
 	const receiverType: common.Type | null = isStatic ? null : selfType
 
-	// NOTE: Resolved per entry — Overloads differ in what they mention, so each
+	// Resolved per entry — Overloads differ in what they mention, so each
 	// gets the Namespace Generics its own signature actually uses. The Generics
 	// are resolved BEFORE the signature, as the object literal this replaced
 	// did: both report Diagnostics, and they are reported in the order the
 	// Method reads.
 	let resolveEntry = (entry: MethodSignatureEntry) => {
-		// NOTE: The entries that BOUND one of the Namespace's own Parameters are
+		// The entries that BOUND one of the Namespace's own Parameters are
 		// not Type Parameters of this Method and must not be registered as such:
 		// registered, the name would be a fresh opaque Generic in the signature's
 		// Scope, and the receiver Type — written in the Namespace's `Item` —

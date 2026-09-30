@@ -1,6 +1,6 @@
 import { setDefaultTimeout } from "bun:test"
 
-// NOTE: One budget for every spec in the repository, preloaded by `bunfig.toml`
+// One budget for every spec in the repository, preloaded by `bunfig.toml`
 // into each test process — the parallel runner's workers included. Most of what
 // this suite does is COMPILE a Program and often run it, and how long that takes
 // is a property of the host rather than of the code: Bun's default of five
@@ -14,7 +14,7 @@ import { setDefaultTimeout } from "bun:test"
 // later. A spec that CLAIMS a speed says so with a growth ratio or a count of
 // the work done, never with this number.
 //
-// NOTE: A preload rather than `[test] timeout` in `bunfig.toml`, which Bun 1.4
+// A preload rather than `[test] timeout` in `bunfig.toml`, which Bun 1.4
 // reads and then ignores — a test waiting 5.5 s under `timeout = 20000` still
 // failed at 5,002 ms — and rather than `--timeout` on the `test` script, which
 // would leave `bun test <one spec>` on the default. `setDefaultTimeout` covers

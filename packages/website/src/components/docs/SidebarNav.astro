@@ -51,7 +51,7 @@ let overviewActive = activeId === undefined
 					/>
 				) : (
 					section.groups.map((group, index) => {
-						// NOTE: The tree is drawn twice on every page — the
+						// The tree is drawn twice on every page — the
 						// rail and the mobile menu — so the variant is part
 						// of the id, or the two runs' labels would collide.
 						let labelId = `sidebar-${variant}-${section.id}-${index + 1}`

@@ -101,7 +101,7 @@ describe("Documentation Comments", () => {
 	})
 
 	it("should show a positional Parameter under the name its body reads", () => {
-		// NOTE: The line is written `_`, the way the signature writes the
+		// The line is written `_`, the way the signature writes the
 		// Parameter. What a reader is shown is the name the signature shows
 		// next to it, since `_` names nothing on its own.
 		let source = [
@@ -120,7 +120,7 @@ describe("Documentation Comments", () => {
 	})
 
 	it("should render a positionally matched Parameter under its label", () => {
-		// NOTE: The line names the internal name, which the strict rule reports
+		// The line names the internal name, which the strict rule reports
 		// as `misnamed-documentation-parameter`. Rendering is the separate
 		// question asked here: a tag documents the Parameter at its position
 		// whatever it names, and what a Hover shows is the label a call site
@@ -179,7 +179,7 @@ describe("Documentation Comments", () => {
 		let signature = findSignatureHelp(source, { line: 7, column: 8 })
 			?.signatures[0]
 
-		// NOTE: The tagged sections are lifted out of the description — the
+		// The tagged sections are lifted out of the description — the
 		// Parameter's text belongs next to the Parameter, not underneath the
 		// signature where it would be said twice.
 		expect(signature?.documentation).toBe("Greets a subject.")
@@ -245,7 +245,7 @@ describe("Documentation Comments", () => {
 		let help = findSignatureHelp(source, { line: 14, column: 13 })
 
 		expect(help?.signatures[0].documentation).toBe("Adds an Integer.")
-		// NOTE: The second Overload says nothing of its own, so what documents
+		// The second Overload says nothing of its own, so what documents
 		// the whole `overload` block applies to it.
 		expect(help?.signatures[1].documentation).toBe(
 			"Combines with another value.",
@@ -295,7 +295,7 @@ describe("Documentation Comments", () => {
 			"Joins another String onto the end of this one.",
 		)
 
-		// NOTE: The Documentation offered is the one the entry the call would
+		// The Documentation offered is the one the entry the call would
 		// REACH carries: a written `1` proves it is above zero, and
 		// `namespace PositiveInteger` declares a sum of its own.
 		let entry = findCompletions(

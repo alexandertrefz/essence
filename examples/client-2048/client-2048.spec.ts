@@ -24,7 +24,7 @@ const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
-// NOTE: A bundle cache of this run's own, so that a spec compiling the example
+// A bundle cache of this run's own, so that a spec compiling the example
 // neither answers out of the user's cache nor fills it — and a result cache
 // beside it, for the same reason and one more: this spec runs `essence test` in
 // the example's OWN directory, so an answer left in the user's store would be
@@ -37,7 +37,7 @@ afterAll(() => {
 	rmSync(results, { recursive: true, force: true })
 })
 
-// NOTE: The rules, checked through the same boundary the page calls them
+// The rules, checked through the same boundary the page calls them
 // through — `loadModule` hands over the marshalled exports, typed here by the
 // declarations the plugin generates for the page.
 async function rules(): Promise<typeof Rules> {
@@ -47,7 +47,7 @@ async function rules(): Promise<typeof Rules> {
 }
 
 describe("examples/client-2048", () => {
-	// NOTE: The rules' own tests are Essence — `Game.es` and `Board.es` each
+	// The rules' own tests are Essence — `Game.es` and `Board.es` each
 	// write a `tests { … }` section — and nothing below reaches them: the specs
 	// here call the exports through the client boundary. This is the one thing
 	// a bun spec can say that they can not, and what CI runs is `bun test`.
@@ -193,7 +193,7 @@ describe("examples/client-2048", () => {
 			rmSync(directory, { recursive: true, force: true })
 		}
 
-		// NOTE: The dev server writes `Game.d.es.ts` beside the source as it
+		// The dev server writes `Game.d.es.ts` beside the source as it
 		// serves; a build does not, so the same declarations are generated here
 		// from the same Descriptor, and `tsc` reads the page against them.
 		let module = await loadModule(path.join(EXAMPLE, "src", "Game.es"))

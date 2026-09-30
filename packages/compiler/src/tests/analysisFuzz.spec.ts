@@ -10,7 +10,7 @@ import { analyseSource } from "../analysis"
 import { Lexer } from "../lexer/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// NOTE: The guard that makes running every stage over a broken Program safe.
+// The guard that makes running every stage over a broken Program safe.
 //
 // The Validator used to see only Programs the two stages in front of it had
 // nothing to say about, so every Type it read was one the Enricher had
@@ -20,7 +20,7 @@ import { parseWithDiagnostics } from "../parser/index"
 // is the hole. A spec written by hand can only cover the holes somebody thought
 // of; this one breaks real sources at every site there is.
 //
-// NOTE: Deterministic, and no timing assertion anywhere. Every mutant is a
+// Deterministic, and no timing assertion anywhere. Every mutant is a
 // function of the corpus text and an index into it: the same files produce the
 // same mutants in the same order on every machine, so a failure names a mutant
 // anybody can rebuild. It is a SPEC, so it takes a few hundred sites — the
@@ -29,7 +29,7 @@ import { parseWithDiagnostics } from "../parser/index"
 const TokenType = lexerTypes.TokenType
 type Token = lexerTypes.Token
 
-// NOTE: Whole, valid sources — the mutants have to start from a Program with
+// Whole, valid sources — the mutants have to start from a Program with
 // nothing wrong with it, or what they measure is the file rather than the
 // mutation. A standard library source is left out: it is one shared declaration
 // space whose names are already builtins, and analysing it as an ordinary
@@ -77,7 +77,7 @@ function tokensOf(source: string): Array<Token> {
 			token = lexer.next()
 		}
 	} catch {
-		// NOTE: An unterminated String is the Lexer's one fatal error. The
+		// An unterminated String is the Lexer's one fatal error. The
 		// Tokens in front of it are still mutation sites.
 	}
 
@@ -94,7 +94,7 @@ const CLOSERS = new Set([
 
 const NAMES = new Set([TokenType.Identifier])
 
-// NOTE: One mutation per mutant, at a site the Token stream names — a deleted
+// One mutation per mutant, at a site the Token stream names — a deleted
 // Token, a name nothing declares, a Number written as a String, a dropped `<-`,
 // a dropped closing bracket. Each is a mistake a reader really makes, and each
 // lands in a different stage: a dropped bracket is the Parser's, an undeclared
@@ -151,7 +151,7 @@ function mutationsOf(source: string): Array<Mutation> {
 	return mutations
 }
 
-// NOTE: A fixed number of sites per file, spread across the whole file rather
+// A fixed number of sites per file, spread across the whole file rather
 // than taken off its head — a stride, so that a file's last Statement is
 // mutated as often as its first. Adding a file to the corpus changes which
 // sites are picked in that file and in no other.
@@ -164,7 +164,7 @@ function mutantsOf(file: { name: string; text: string }): Array<Mutation> {
 	return mutations.filter((_, index) => index % stride === 0)
 }
 
-// NOTE: Every Position the Enricher wrote an Error onto — the holes a Validator
+// Every Position the Enricher wrote an Error onto — the holes a Validator
 // Diagnostic may not point into. Read off the typed tree by walking every
 // field, for the reason `eraseRefinements` walks one: a hole in a Node kind
 // this did not name by hand would be a hole nothing checks.
@@ -230,7 +230,7 @@ function positionKey(diagnostic: common.Diagnostic): string {
 		: `${position.start.line}:${position.start.column}`
 }
 
-// NOTE: Which stage a Diagnostic came from, by its code — the Validator's own
+// Which stage a Diagnostic came from, by its code — the Validator's own
 // codes are the ones this spec has anything to say about, since it is the
 // Validator that now reads a Program it never used to see. A code both stages
 // can report is not in the set: the question asked of it would be about which
@@ -254,7 +254,7 @@ const VALIDATOR_ONLY_CODES = new Set([
 	"unobserved-started",
 ])
 
-// NOTE: ONE corpus and ONE set of mutants for every `describe` below. They are
+// ONE corpus and ONE set of mutants for every `describe` below. They are
 // a pure function of the checked-in sources, so a second copy was the same list
 // built from the same files a second time — and the blocks asking different
 // questions of the SAME mutants is the point: a mutant that throws in one of
@@ -264,7 +264,7 @@ const mutants = files.flatMap((file) =>
 	mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
 )
 
-// NOTE: The sweeps write out the budget `scripts/testBudget.ts` gives every
+// The sweeps write out the budget `scripts/testBudget.ts` gives every
 // spec. None of them is a performance assertion: each walks a fixed set of a
 // few hundred mutants and stops.
 
@@ -274,7 +274,7 @@ describe("analysing a broken Program", () => {
 		expect(mutants.length).toBeGreaterThan(200)
 	})
 
-	// NOTE: The corpus itself has to be clean, or every verdict below is about
+	// The corpus itself has to be clean, or every verdict below is about
 	// a file rather than about a mutation.
 	it("starts from Programs with nothing wrong with them", () => {
 		for (let file of files) {
@@ -300,7 +300,7 @@ describe("analysing a broken Program", () => {
 				)
 			}).not.toThrow()
 
-			// NOTE: An `internal-error` out of a Program that has a genuine
+			// An `internal-error` out of a Program that has a genuine
 			// mistake in it is the Compiler blaming itself for the recovery.
 			expect([
 				name,
@@ -309,7 +309,7 @@ describe("analysing a broken Program", () => {
 		}
 	}, 60_000)
 
-	// NOTE: The no-cascade rule, measured two ways. A Validator Diagnostic
+	// The no-cascade rule, measured two ways. A Validator Diagnostic
 	// standing INSIDE the span of something the Enricher typed Error is a
 	// verdict about a hole; and two Diagnostics sharing one Position are two
 	// stages answering the same mistake in different words.
@@ -329,7 +329,7 @@ describe("analysing a broken Program", () => {
 				[name, []],
 			)
 
-			// NOTE: And no Validator Diagnostic standing where another stage has
+			// And no Validator Diagnostic standing where another stage has
 			// already put one. Two verdicts at one Position are two answers to
 			// one mistake, and the Validator's is the one that is new here —
 			// the Parser's own double reports are its business and are as old
@@ -356,7 +356,7 @@ describe("analysing a broken Program", () => {
 	}, 60_000)
 })
 
-// NOTE: Two things the same Compiler must say the same way twice, measured over
+// Two things the same Compiler must say the same way twice, measured over
 // the same mutants.
 //
 // A Diagnostic is TEXT a reader compares against what they remember, a Snapshot
@@ -365,7 +365,7 @@ describe("analysing a broken Program", () => {
 // process did before this analysis may either, or the same file analysed twice
 // in one session says two different things and neither of them is wrong.
 describe("the same broken Program, analysed twice", () => {
-	// NOTE: A callee's Type Parameters are alpha-renamed for the span of one
+	// A callee's Type Parameters are alpha-renamed for the span of one
 	// invocation — `ItemType` becomes `ItemType`, a ZERO-WIDTH SPACE and a
 	// counter — and a Parameter that never binds is still carrying that name
 	// where a report picks it up. Only the separator is invisible, so the
@@ -391,7 +391,7 @@ describe("the same broken Program, analysed twice", () => {
 		}
 	}, 60_000)
 
-	// NOTE: And the whole report, three times over, in ONE process. A counter,
+	// And the whole report, three times over, in ONE process. A counter,
 	// a cache keyed on something it should not be, a Map iterated in insertion
 	// order that another run filled differently — each of them shows up here and
 	// nowhere else, because every other spec analyses each source once.
@@ -406,7 +406,7 @@ describe("the same broken Program, analysed twice", () => {
 	}, 60_000)
 })
 
-// NOTE: Everything a reader sees, in the order they see it — the message, where
+// Everything a reader sees, in the order they see it — the message, where
 // it points, and every line under it. A determinism check written over the codes
 // alone passes through a counter that only ever reaches a Note.
 function fingerprints(source: string): Array<string> {
@@ -423,7 +423,7 @@ function fingerprints(source: string): Array<string> {
 	)
 }
 
-// NOTE: The keywords a name is DECLARED after. A mutant that renames a
+// The keywords a name is DECLARED after. A mutant that renames a
 // declaration renames one end of a binding and leaves the other alone, so what
 // reports is the READ somewhere else in the file — or nothing at all, where
 // nothing reads it. Those are not the sites this measures.
@@ -442,7 +442,7 @@ const DECLARING_TOKEN_TYPES = new Set([
 	TokenType.KeywordCase,
 ])
 
-// NOTE: Whether the Identifier at `index` stands where the Program READS a
+// Whether the Identifier at `index` stands where the Program READS a
 // name, rather than where it binds one. A binder is not a read: renaming
 // `constant total` leaves every `total` below it reporting instead, and
 // renaming a Parameter or a Record key reports nothing anywhere, because
@@ -498,7 +498,7 @@ function insideFunctionLiteralParameters(
 	return false
 }
 
-// NOTE: The check that a genuine mistake is never SILENCED — the one every
+// The check that a genuine mistake is never SILENCED — the one every
 // stand-down in the recovery has to survive. Replacing a name a Program reads
 // with one nothing declares is a mistake by construction, so the analysis owes
 // a report about it: at the mutation site, under whichever "no such name" code
@@ -521,7 +521,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	it("is reported where it is written", () => {
 		for (let file of files) {
 			let tokens = tokensOf(file.text)
-			// NOTE: The implementation only. A `tests { … }` block is left
+			// The implementation only. A `tests { … }` block is left
 			// parsed and never enriched unless the compile ASKED for the tests,
 			// so a name broken in one is a name nothing looked at.
 			let testsLine =
@@ -548,7 +548,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 					"zqNotDeclared" +
 					file.text.slice(token.end)
 
-				// NOTE: A mutation that broke the parse is excused — and only
+				// A mutation that broke the parse is excused — and only
 				// that. Every other one has to be answered.
 				if (
 					(parseWithDiagnostics(source).program.recovery?.lines
@@ -570,7 +570,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 							token.position.start.column,
 				)
 
-				// NOTE: At the mutation site where the site READS the name, and
+				// At the mutation site where the site READS the name, and
 				// somewhere otherwise — a site this could not tell from a
 				// binder renames one end of a binding, and what answers is the
 				// read at the other end. Either way the mistake is ANSWERED,
@@ -584,7 +584,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	}, 60_000)
 })
 
-// NOTE: The mutant that found this, written down whole rather than left to a
+// The mutant that found this, written down whole rather than left to a
 // sweep to rediscover. A Type Alias the file never declared leaves `Seat` an
 // Error, the Dictionary keyed by it never binds `List.of`'s `ItemType`, and the
 // bound the key position carries is checked against a Type Parameter still

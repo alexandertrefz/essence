@@ -14,10 +14,10 @@ import type {
 	TestWorkerResponse,
 } from "../testProtocol"
 
-// NOTE: The Worker driven over its own messages without a session, so a spec
+// The Worker driven over its own messages without a session, so a spec
 // can hand it more cycles than a debounced session would start in a test's time.
 
-// NOTE: The Worker's `BUNDLE_LIMIT`.
+// The Worker's `BUNDLE_LIMIT`.
 const bundleLimit = 128
 
 const workerPath = fileURLToPath(new URL("../testWorker.ts", import.meta.url))
@@ -56,7 +56,7 @@ function runRequest(run: number, text: string): TestWorkerRequest {
 	}
 }
 
-// NOTE: Under `root`, which this spec removes. A session names one per Worker
+// Under `root`, which this spec removes. A session names one per Worker
 // the same way.
 function stagingDirectory(): string {
 	workers += 1
@@ -77,7 +77,7 @@ afterAll(() => {
 
 type Cycle = { exhausted: boolean; passed: number }
 
-// NOTE: One run per source, each handing the Worker the whole buffer of the
+// One run per source, each handing the Worker the whole buffer of the
 // same file. The Worker answers them in the order they were sent.
 async function runEach(sources: Array<string>): Promise<Array<Cycle>> {
 	let worker = new Worker(workerPath, {
@@ -173,7 +173,7 @@ describe("The test Worker's staging directory", () => {
 	})
 })
 
-// NOTE: In a child of its own, because a process's input is the one thing a
+// In a child of its own, because a process's input is the one thing a
 // spec can not choose for itself. Over stdio it is the Server's LSP stream.
 describe("The test Worker's input", () => {
 	const readsAtLoad = [

@@ -14,7 +14,7 @@ import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, createCase, typeKeySymbol } from "../type"
 
-// NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — its
+// `CaseInstanceType` is deliberately kept out of `AnyType` — its
 // `[typeKeySymbol]: string` would defeat the tag narrowing every runtime helper
 // relies on — so a Case value is cast on the way in here exactly as the helpers
 // cast it internally.
@@ -29,7 +29,7 @@ describe("interned Booleans", () => {
 		expect(createBoolean(true)).not.toBe(createBoolean(false))
 	})
 
-	// NOTE: The instances are what the Methods answer with too — a shared value
+	// The instances are what the Methods answer with too — a shared value
 	// is only a saving if the Methods reach it, and `negate` returning a fresh
 	// object would leave every `not()` allocating.
 	test("the Methods answer with the shared instances", () => {
@@ -39,7 +39,7 @@ describe("interned Booleans", () => {
 		expect(booleanIs(trueInstance, falseInstance)).toBe(falseInstance)
 	})
 
-	// NOTE: Sharing is invisible: equality still goes by the value carried, so
+	// Sharing is invisible: equality still goes by the value carried, so
 	// a Boolean answers exactly what it answered when every call built its own.
 	test("equality is unchanged by the sharing", () => {
 		expect(createBoolean(true).value).toBe(true)
@@ -61,14 +61,14 @@ describe("interned unit Cases", () => {
 		expect(createCase("Colour#Red")).toBe(createCase("Colour#Red"))
 		expect(createCase("Colour#Red")).not.toBe(createCase("Colour#Green"))
 
-		// NOTE: Module-qualified tags are distinct Cases — two Modules may each
+		// Module-qualified tags are distinct Cases — two Modules may each
 		// declare a `Colour` with a `Red`, and they are not the same Case.
 		expect(createCase("./Main.es#Colour#Red")).not.toBe(
 			createCase("Colour#Red"),
 		)
 	})
 
-	// NOTE: A Case WITH a payload is not a candidate — two values of it carry
+	// A Case WITH a payload is not a candidate — two values of it carry
 	// different members, so each one is its own value and has to be built.
 	test("a Case carrying a payload is built fresh every time", () => {
 		let first = createCase("Wrapper#Text", { item: createString("a") })
@@ -78,7 +78,7 @@ describe("interned unit Cases", () => {
 		expect(anyIs(asValue(first), asValue(second))).toBeTrue()
 	})
 
-	// NOTE: The shared instance carries the tag and nothing else, which is what
+	// The shared instance carries the tag and nothing else, which is what
 	// keeps it indistinguishable — the tag lives on a Symbol key, so Record
 	// equality, the printer and the runtime Type checks, which all read string
 	// keys, see an empty payload exactly as they did before.
@@ -99,7 +99,7 @@ describe("interned unit Cases", () => {
 		expect(anyIs(red, green)).toBeFalse()
 	})
 
-	// NOTE: The builtin Choices keep their own Module consts, so a value built
+	// The builtin Choices keep their own Module consts, so a value built
 	// through `createCase` and one of those is a DIFFERENT instance of the same
 	// Case. That is exactly what tag equality is for: the two are equal, which
 	// is the only question the language can ask about them.

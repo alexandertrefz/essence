@@ -2,7 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { CodeActionEdit } from "./index"
 
-// NOTE: The buffer read as characters rather than as Nodes — a column, a
+// The buffer read as characters rather than as Nodes — a column, a
 // slice, the comma beside an Argument, the brace a body ends on. Every edit a
 // Code Action offers is measured against the LIVE text the request handed in,
 // and this is what does the measuring: nothing here knows what a Node is.
@@ -17,7 +17,7 @@ export function overlaps(
 	)
 }
 
-// NOTE: The other reading of the same pair — `range` lies INSIDE `position`,
+// The other reading of the same pair — `range` lies INSIDE `position`,
 // both edges included. What a Diagnostic's span asks of a request is whether
 // the two touch at all; what a selection asks of a Node is which Nodes hold
 // it, and a cursor resting on a Node's first or last character is held by it.
@@ -35,7 +35,7 @@ export function isBefore(a: common.Cursor, b: common.Cursor): boolean {
 	return a.line < b.line || (a.line === b.line && a.column < b.column)
 }
 
-// NOTE: The range with the whitespace at either end left out — what a reader
+// The range with the whitespace at either end left out — what a reader
 // DRAGGED over rather than what the Editor sent. A selection made by dragging
 // down the left margin starts in the indentation in front of a Statement and
 // ends on the line break after it, and neither is part of what a refactoring
@@ -58,7 +58,7 @@ export function trimmedRange(
 			break
 		}
 
-		// NOTE: Past the last character of a line is the line break, which is
+		// Past the last character of a line is the line break, which is
 		// the one blank that moves the Cursor to another line.
 		start =
 			character === undefined
@@ -92,7 +92,7 @@ function isBlank(character: string): boolean {
 	return character === " " || character === "\t"
 }
 
-// NOTE: Whether nothing but indentation stands in front of a Cursor. A
+// Whether nothing but indentation stands in front of a Cursor. A
 // Statement written on a line of its own can have another one inserted above it
 // by writing whole lines; one sharing its line with a `case` head or with the
 // Statement before it can not, and the refactorings that write a Statement turn
@@ -108,7 +108,7 @@ export function opensItsLine(
 	)
 }
 
-// NOTE: The mirror — whether nothing but whitespace follows. A Statement that is
+// The mirror — whether nothing but whitespace follows. A Statement that is
 // DELETED whole takes its line with it, and a line carrying a trailing Comment
 // carries something a deletion has no business taking.
 export function closesItsLine(
@@ -130,7 +130,7 @@ export function indentationOf(lines: Array<string>, line: number): string {
 	return lineAt(lines, line).match(/^[ \t]*/)?.[0] ?? ""
 }
 
-// NOTE: Where a block that has to MOVE really begins: a Comment written
+// Where a block that has to MOVE really begins: a Comment written
 // directly above it travels with it, since a note about a block that stays
 // behind is a note about whatever ends up in its place. A blank line ends the
 // run — a Comment held off from what is below it is about the file rather than
@@ -150,7 +150,7 @@ export function commentRunAbove(lines: Array<string>, line: number): number {
 	return first
 }
 
-// NOTE: `first` through `last` as a range that covers WHOLE lines — the break
+// `first` through `last` as a range that covers WHOLE lines — the break
 // that ends the last of them included, so what a deletion leaves behind is the
 // lines around it rather than the blank line these stood on.
 //
@@ -207,13 +207,13 @@ export function sliceOf(
 	return collected.join("\n")
 }
 
-// NOTE: Where the closing `}` of a construct that ends at `end` sits — the
+// Where the closing `}` of a construct that ends at `end` sits — the
 // Position runs one past it, as every Position does.
 export function closingBraceOf(end: common.Cursor): common.Cursor {
 	return { line: end.line, column: end.column - 1 }
 }
 
-// NOTE: Whole lines are the unit an inserted Handler is written in, so the
+// Whole lines are the unit an inserted Handler is written in, so the
 // insertion goes at the start of the closing brace's line whenever nothing
 // but indentation precedes it. A Match written on one line has no such point,
 // and takes a line break with the arms instead.
@@ -232,7 +232,7 @@ export function insertBeforeClosingBrace(
 		return { range: { start, end: start }, newText: text }
 	}
 
-	// NOTE: Replacing the whitespace that ran up to the brace rather than
+	// Replacing the whitespace that ran up to the brace rather than
 	// inserting before it — the line break makes that whitespace trailing, and
 	// no fix should leave any behind.
 	let start = {
@@ -246,7 +246,7 @@ export function insertBeforeClosingBrace(
 	}
 }
 
-// NOTE: The column the keyword before `cursor` starts at, 1-based, or null
+// The column the keyword before `cursor` starts at, 1-based, or null
 // when the line does not read the way the Node says it does.
 export function keywordBefore(
 	lines: Array<string>,
@@ -259,7 +259,7 @@ export function keywordBefore(
 	return index === -1 ? null : index + 1
 }
 
-// NOTE: The Cursor one past the last character of a line — where an insertion
+// The Cursor one past the last character of a line — where an insertion
 // that belongs at the END of what was written on it goes.
 //
 // A buffer saved with CRLF line endings is split on the `\n` alone, so each
@@ -276,7 +276,7 @@ export function endOfLine(lines: Array<string>, line: number): common.Cursor {
 	}
 }
 
-// NOTE: Whether a span reads as a WHOLE written value: every bracket it opens
+// Whether a span reads as a WHOLE written value: every bracket it opens
 // it closes, every String it opens it ends, and neither edge cuts a name in
 // half. What this is for is the fixes that DELETE what a span covers. A span a
 // column off still reads as something, `{ a = 1 ` out of `Red = { a = 1 },
@@ -331,7 +331,7 @@ export function readsAsWrittenValue(
 
 const closerOf: Record<string, string> = { "(": ")", "[": "]", "{": "}" }
 
-// NOTE: Whether NEITHER edge of a span stands in the middle of a name. A span
+// Whether NEITHER edge of a span stands in the middle of a name. A span
 // that has slid a column since it was reported reads as a word all the same —
 // `ocused` out of `focused focused`, `firstNme` out of `person.firstNme` — and
 // a fix that rewrites or deletes what a span covers has no other way of telling
@@ -356,7 +356,7 @@ function isNameCharacter(character: string | undefined): boolean {
 	return character !== undefined && /[A-Za-z0-9_]/.test(character)
 }
 
-// NOTE: Where the `=` that introduces a default stands, with the whitespace in
+// Where the `=` that introduces a default stands, with the whitespace in
 // front of it, or null where the text does not read that way. A Diagnostic
 // about a default underlines the VALUE, and deleting that alone would leave
 // `side: Integer =` behind — what has to go is the `=` and the space that
@@ -393,7 +393,7 @@ export function defaultEqualsBefore(
 	}
 }
 
-// NOTE: The WHOLE LINES a Node stands on, deleted — what a list with no
+// The WHOLE LINES a Node stands on, deleted — what a list with no
 // delimiters is removed by. Deleting the Node alone would leave the blank line
 // it sat on behind, so the deletion runs from the start of its first line to
 // the start of the line below its last.
@@ -433,7 +433,7 @@ export function removeLinesEdit(
 	return { range: { start, end }, newText: "" }
 }
 
-// NOTE: One member of a list written BESIDE its neighbours, taken with the
+// One member of a list written BESIDE its neighbours, taken with the
 // blanks that separated it from them: the ones in FRONT where something was
 // written before it on the line, and the ones BEHIND where it opened the line
 // and something else closes it. One side each way, so that the member that is
@@ -468,7 +468,7 @@ function removeFromItsLineEdit(
 	}
 }
 
-// NOTE: Whether the keyword is written AT `cursor` — the other half of
+// Whether the keyword is written AT `cursor` — the other half of
 // `keywordBefore`, for an edit that starts where a Node says a block opens and
 // has to read the buffer back before cutting it out.
 export function keywordAt(
@@ -481,7 +481,7 @@ export function keywordAt(
 	return sliceOf(lines, { start: cursor, end }) === keyword
 }
 
-// NOTE: A deletion that starts at the first non-whitespace of its line takes
+// A deletion that starts at the first non-whitespace of its line takes
 // the preceding line break and the indentation with it; one that does not
 // (`case Integer { … } case String { … }` on one line) stays where it is.
 export function extendOverLeadingBreak(
@@ -500,7 +500,7 @@ export function extendOverLeadingBreak(
 	}
 }
 
-// NOTE: The smaller sibling of the deletion above: the blanks in FRONT of
+// The smaller sibling of the deletion above: the blanks in FRONT of
 // `cursor` on its own line, taken with whatever starts there. `test "a"
 // focused {` becomes `test "a" {` rather than `test "a"  {`. Where nothing but
 // whitespace precedes it, that whitespace is the line's indentation and stays
@@ -518,7 +518,7 @@ export function extendOverLeadingSpace(
 		: { line: cursor.line, column: trimmed.length + 1 }
 }
 
-// NOTE: One member of a Module block deleted with the whitespace that carried
+// One member of a Module block deleted with the whitespace that carried
 // it: the line break above it where it stands on a line of its own, and the
 // blanks in front of it where it shares its line with the brace that opened the
 // block. Nothing else goes with it — a member list has no delimiters, so what
@@ -544,7 +544,7 @@ export function removeMemberEdit(
 	return { range: { start, end: position.end }, newText: "" }
 }
 
-// NOTE: The first `}` at or after `cursor`, one past it — the Handler's own
+// The first `}` at or after `cursor`, one past it — the Handler's own
 // closing brace, since everything its body opened is already closed by the
 // time its last Node ends.
 export function closingBraceAfter(
@@ -554,7 +554,7 @@ export function closingBraceAfter(
 	return characterAfter(lines, cursor, "}")
 }
 
-// NOTE: And the `(` an Argument list opens on, which is the one thing between a
+// And the `(` an Argument list opens on, which is the one thing between a
 // Method's name and the Arguments it was called with — a call rewritten to
 // reach its Namespace has to know where that bracket stands.
 export function openingParenthesisAfter(
@@ -564,7 +564,7 @@ export function openingParenthesisAfter(
 	return characterAfter(lines, cursor, "(")
 }
 
-// NOTE: The first `character` at or after `cursor`, one past it. Text inside a
+// The first `character` at or after `cursor`, one past it. Text inside a
 // `§` comment is skipped, which is the one place a bracket can appear that no
 // Node accounts for.
 function characterAfter(
@@ -587,7 +587,7 @@ function characterAfter(
 	return null
 }
 
-// NOTE: Where the comma separating this Argument from the one before it stands,
+// Where the comma separating this Argument from the one before it stands,
 // or null where nothing but the opening bracket does. Whitespace and line breaks
 // are walked through, and nothing else is: the first thing that is neither is
 // either that comma or the bracket.
@@ -616,7 +616,7 @@ export function commaBefore(
 	}
 }
 
-// NOTE: Where the contents of a braced Literal END — the cursor just past the
+// Where the contents of a braced Literal END — the cursor just past the
 // last thing written inside it, whitespace and line breaks walked back over,
 // and just past the opening brace where nothing is written at all. What a
 // member scaffolded into a Record Literal is written after, so that the
@@ -669,7 +669,7 @@ export function endOfContents(
 		}
 	}
 
-	// NOTE: Back on the opening brace's own line, where everything to its left
+	// Back on the opening brace's own line, where everything to its left
 	// belongs to the Expression the Literal is written in — so the walk stops
 	// at the brace rather than at the first thing it finds.
 	let written = writtenBefore(lines, {
@@ -683,7 +683,7 @@ export function endOfContents(
 	})
 }
 
-// NOTE: What was written on a line in front of a Cursor, with the trailing
+// What was written on a line in front of a Cursor, with the trailing
 // whitespace and any `§` comment left off — the text an edit is allowed to
 // measure itself against.
 function writtenBefore(lines: Array<string>, cursor: common.Cursor): string {
@@ -692,7 +692,7 @@ function writtenBefore(lines: Array<string>, cursor: common.Cursor): string {
 	return before.slice(0, commentStart(before)).replace(/[ \t]+$/, "")
 }
 
-// NOTE: The Cursor, or null where a comment opened in front of it on its own
+// The Cursor, or null where a comment opened in front of it on its own
 // line. The walk above already stops short of a comment, so this only ever
 // answers null for a Position that no longer reads as the Node that reported it
 // — a `{` the buffer now has inside a comment, say — and that is exactly the
@@ -706,7 +706,7 @@ function outsideComments(
 	return commentStart(before) < before.length ? null : cursor
 }
 
-// NOTE: Where the `§` that opens a comment stands on a line, or the line's
+// Where the `§` that opens a comment stands on a line, or the line's
 // length where none does. A `§` written inside a String is a character of the
 // String rather than the start of a comment, so quoted runs are stepped over —
 // `label = "a § b",` ends on the comma rather than in the middle of the String.
@@ -728,7 +728,7 @@ function commentStart(text: string): number {
 	return text.length
 }
 
-// NOTE: Where the label written immediately in front of a value stands, or null
+// Where the label written immediately in front of a value stands, or null
 // where the text does not read as that label. Whitespace and line breaks are
 // walked through and nothing else is — a Comment between the two, a name the
 // label is only the tail of — because what is measured here is rewritten next,
@@ -771,7 +771,7 @@ export function labelBefore(
 	}
 }
 
-// NOTE: The mirror of `commaBefore`, for a fallback somebody wrote ahead of
+// The mirror of `commaBefore`, for a fallback somebody wrote ahead of
 // another Argument. The comma after it is what separates the two, and a `)`
 // says this Argument was last. The blanks on the far side of the comma go with
 // it here, so the Argument that follows keeps the one space in front of it that
@@ -803,7 +803,7 @@ export function commaAfter(
 	}
 }
 
-// NOTE: The opening bracket and the horizontal space beside it. The PADDING is
+// The opening bracket and the horizontal space beside it. The PADDING is
 // part of each spelling — `{ config with port = 1 }` pads and `[ages with "kim"
 // = 7]` does not, which is the rule a Literal of each is printed by — so it is
 // swapped along with the bracket rather than left standing beside the other one.
@@ -836,7 +836,7 @@ export function openingBracketEdit(
 	}
 }
 
-// NOTE: And the other end. `end` runs one past the bracket, as every Position
+// And the other end. `end` runs one past the bracket, as every Position
 // does — and where nothing but space stands before it on its line, that space is
 // the INDENTATION of a closing line rather than the padding, so it is left where
 // it is and no padding is written back.

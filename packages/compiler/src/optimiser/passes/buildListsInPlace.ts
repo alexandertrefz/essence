@@ -3,14 +3,14 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
-// NOTE: A walk that BUILDS a List rebuilds it every turn. `inline-loops` writes
+// A walk that BUILDS a List rebuilds it every turn. `inline-loops` writes
 // the driver out, but what it writes into the body is still the call the Program
 // wrote — `$loop_0_state = append__overload$1(list, index)` — and that call
 // copies everything the turns before it added. Tail sharing took the copy away;
 // what is left is a box and a native call per turn, and both of them are there
 // only because the emission does not know the List is the walk's own.
 //
-// NOTE: It already knows for its OWN walks. `map` and `everyItem` declare an
+// It already knows for its OWN walks. `map` and `everyItem` declare an
 // empty Array, push each answer onto it and box it once at the end — the
 // `pushed` and `createdList` helpers in the Rewriter — because the Array they
 // build is the Compiler's, and nothing else can reach it. This pass extends
@@ -18,7 +18,7 @@ import { rewriteNodes } from "../walk"
 // that thread a State: the counted walk, the two condition walks, the general
 // `Step` walk and both folds.
 //
-// NOTE: What it costs is a proof, and the proof is what this file is. Pushing
+// What it costs is a proof, and the proof is what this file is. Pushing
 // onto an Array is invisible only while no one else can see the Array, so the
 // previous State has to be dead the moment it is rebuilt — and the
 // counter-example is easy to write:
@@ -33,7 +33,7 @@ import { rewriteNodes } from "../walk"
 // visible in the body: `current` is mentioned twice, once as the receiver being
 // replaced and once as a value handed somewhere else.
 //
-// NOTE: So the fence is drawn tight, in the spirit of `residual.ts`, and
+// So the fence is drawn tight, in the spirit of `residual.ts`, and
 // deliberately narrower than a fuller analysis could admit. The State's name may
 // stand as the receiver at the ROOT of the rebuilding chain, and nowhere else —
 // a branch that changes nothing answers it bare, which is the chain with no
@@ -41,7 +41,7 @@ import { rewriteNodes } from "../walk"
 // built, a name a closure captured, a read as innocent as `length`. Declining is
 // always correct, which is what makes a tight fence safe to widen later.
 //
-// NOTE: So two shapes decline that a wider fence could admit: a fold that reads
+// So two shapes decline that a wider fence could admit: a fold that reads
 // its accumulator through one of the prelude's own Functions, such as
 // `contains`, because nothing summarises what those Functions retain; and an
 // accumulator one Record member deep.
@@ -49,7 +49,7 @@ import { rewriteNodes } from "../walk"
 export const buildListsInPlace: OptimiserPass = {
 	name: "build-lists-in-place",
 	run: (program, namespaces) => {
-		// NOTE: `List` is a name a Program may take for itself, nested, and a
+		// `List` is a name a Program may take for itself, nested, and a
 		// `namespace List for List` writing its own `append` answers under
 		// exactly the name and shape the chain below is read for. So is
 		// `NonEmptyList`, which the chain reads for its own `append`. The same
@@ -76,7 +76,7 @@ export const buildListsInPlace: OptimiserPass = {
 	},
 }
 
-// NOTE: Both forms of the intrinsic carry the same `InlineLoop`, so both are
+// Both forms of the intrinsic carry the same `InlineLoop`, so both are
 // offered here and the answer rebuilds whichever one it was given. A walk the
 // fence declines is handed back AS ITSELF, which is what the shared walk's
 // structural sharing rests on.
@@ -95,19 +95,19 @@ type RebuiltDriver = {
 	build: common.typedSimple.ListBuild
 }
 
-// NOTE: WHICH Parameter the State arrives under, per driver, and the answer for
+// WHICH Parameter the State arrives under, per driver, and the answer for
 // the two walks that thread none. The counted walk hands the counter first and
 // the State second, exactly as its Essence body does; every other walk hands the
 // State first.
 //
-// NOTE: `map` and `keep` build an Array already — that emission is what this
+// `map` and `keep` build an Array already — that emission is what this
 // pass extends, and there is nothing of theirs to extend it to.
 function rebuiltDriver(
 	driver: common.typedSimple.InlineLoopDriver,
 ): RebuiltDriver | null {
 	switch (driver.kind) {
 		case "condition": {
-			// NOTE: ONE State handed to TWO bodies. The predicate answers a
+			// ONE State handed to TWO bodies. The predicate answers a
 			// Boolean rather than the State, so it has no rebuilding chain to
 			// stand in — every mention it makes of the State is a read, and a
 			// read is what the fence declines. A `while` walk whose predicate
@@ -168,13 +168,13 @@ function rebuiltDriver(
 	}
 }
 
-// NOTE: The State has to be EXACTLY a List — not a Union it is a member of, not
+// The State has to be EXACTLY a List — not a Union it is a member of, not
 // a Type Parameter that could be one — because the whole rewrite is that the
 // slot holds what a List holds, and only a List is known to hold that. It is the
 // same exactness `unboxed-loop-state` rests on for an Integer, and it is what
 // leaves a Record, a String or an Optional State untouched.
 //
-// NOTE: A refinement over List IS accumulated, and there is nothing here that
+// A refinement over List IS accumulated, and there is nothing here that
 // says so because there is nothing here that could see one: `eraseRefinements`
 // runs at the head of the stage, before any pass, so a `NonEmptyList` State
 // reaches this as the List it is.
@@ -185,7 +185,7 @@ function accumulates(
 	return callback.parameters[parameter]?.type.type === "List"
 }
 
-// NOTE: The step body with every answer that writes the State rewritten into the
+// The step body with every answer that writes the State rewritten into the
 // build it performs, and null where any of them is a shape the emission could
 // not write. The fence is the LAST line: once the chains are gone, a mention of
 // the State that survives is a use this pass does not understand, and one is
@@ -205,7 +205,7 @@ function rebuiltCallback(
 	return { ...callback, body }
 }
 
-// NOTE: The descent is the Rewriter's own — the three Statement kinds that can
+// The descent is the Rewriter's own — the three Statement kinds that can
 // hold a walk's answer, which is what `redirectedStatements` writes and
 // therefore the whole of what an answer can be written in. Everything else is
 // handed back untouched and answers to the mention count instead.
@@ -249,7 +249,7 @@ function rebuiltStatement(
 				: { ...node, trueBody, falseBody }
 		}
 		case "IntrinsicStatement":
-			// NOTE: A lowered Statement answering with a Return of its own is
+			// A lowered Statement answering with a Return of its own is
 			// answering the WALK. One that answers a name of its own is
 			// answering that name, and holds no answer of the walk's at all.
 			return node.result.kind === "return"
@@ -286,7 +286,7 @@ function rebuiltIntrinsic(
 
 			return expression === null ? null : { ...node, expression }
 		}
-		// NOTE: A walk nested inside this one, answering it. What the outer walk
+		// A walk nested inside this one, answering it. What the outer walk
 		// is handed is the name the inner one settled in rather than a Node, so
 		// there is nothing to read a chain out of — and a State written from a
 		// name is a State written whole, which this pass has no slot for.
@@ -295,12 +295,12 @@ function rebuiltIntrinsic(
 	}
 }
 
-// NOTE: One answer. A walk that threads its State plainly writes the State at
+// One answer. A walk that threads its State plainly writes the State at
 // every answer, so every answer has to BE a build; a walk whose body answers
 // with a `Step` writes it only through `#Continue`, and a `#Done` carrying
 // anything else is the walk leaving with a value of its own.
 //
-// NOTE: The `Step` is read as the Case it is written as, and not also as the
+// The `Step` is read as the Case it is written as, and not also as the
 // `direct-case` `collapse-construction` makes of one — that pass runs AFTER this
 // one, in the fixed order, so no Program can reach here with a collapsed
 // construction. The Rewriter, which runs after both, reads both.
@@ -322,7 +322,7 @@ function rebuiltAnswer(
 	let build = listBuild(step.value, name)
 
 	if (build === null) {
-		// NOTE: `#Done(<anything else>)` is admitted and left exactly as it is:
+		// `#Done(<anything else>)` is admitted and left exactly as it is:
 		// the walk leaves with a value that is not the State, and the Array it
 		// built is simply dropped. `#Continue(<anything else>)` is not — it
 		// would put a List the walk does not own where the accumulator was.
@@ -341,7 +341,7 @@ function rebuiltAnswer(
 const doneTag = "Step#Done"
 const continueTag = "Step#Continue"
 
-// NOTE: A `Step` this pass can read: the Case as it is written, its Record
+// A `Step` this pass can read: the Case as it is written, its Record
 // payload, and which member of it carries the value. A payload holding anything
 // MORE than that one member is refused rather than read, for the reason the
 // Rewriter refuses one — `Step` declares exactly one member per Case today, and
@@ -382,7 +382,7 @@ function stepPayload(node: common.typedSimple.ExpressionNode): {
 	return null
 }
 
-// NOTE: The rebuilding chain, read from the outside in — `state::append(a)
+// The rebuilding chain, read from the outside in — `state::append(a)
 // ::append(contentsOf b)` unwinds to `b`, then `a`, then the name, and the
 // additions come back in the order the turn performs them. Null the moment
 // anything else stands in the chain, which includes the whole of what the fence
@@ -413,20 +413,20 @@ function listBuild(
 		nodeType: "Intrinsic",
 		kind: "list-build",
 		additions,
-		// NOTE: The Type and the Position of the chain it replaces, as every
+		// The Type and the Position of the chain it replaces, as every
 		// intrinsic carries the ones of the Node it stands in for.
 		type: node.type,
 		position: node.position,
 	}
 }
 
-// NOTE: One link. Both `append` Overloads bind by position — `$1` adds an item
+// One link. Both `append` Overloads bind by position — `$1` adds an item
 // under no label, `$2` adds a List under `contentsOf` — and a call labelled any
 // other way is not one of them. `prepend` is not one of them either, deliberately
 // and for a reason the emission states: what a build pushes onto is the BACK of
 // the Array it owns.
 //
-// NOTE: THREE spellings, not two, because the second `append` in a chain has a
+// THREE spellings, not two, because the second `append` in a chain has a
 // receiver the first one PROVED something about. `append(_:)` answers a
 // `NonEmptyList` whatever it was handed, and `NonEmptyList` re-declares
 // `append(contentsOf:)` so that it may promise the same — one entry, so no
@@ -469,7 +469,7 @@ function appendCall(node: common.typedSimple.ExpressionNode): {
 	}
 }
 
-// NOTE: Whether a name is mentioned anywhere at all in what it is given. Every
+// Whether a name is mentioned anywhere at all in what it is given. Every
 // position is read — a Parameter's own binding, a Namespace's name, a Method's
 // member name, a Function declared inside the body and everything it closes over
 // — so the answer is conservative in the one direction that matters: a name this
@@ -477,7 +477,7 @@ function appendCall(node: common.typedSimple.ExpressionNode): {
 // the State's name declines for the same reason, because the declaration is a
 // mention like any other.
 //
-// NOTE: A Type is walked like everything else. Types are shared between Nodes,
+// A Type is walked like everything else. Types are shared between Nodes,
 // and the `seen` set walks an object reached twice only once. Nothing in a Type
 // is an Identifier Node, so walking one only ever costs time.
 function mentions(root: unknown, name: string): boolean {

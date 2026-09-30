@@ -1,24 +1,24 @@
-// NOTE: A "probe" turns an in-progress edit into a syntactically valid
+// A "probe" turns an in-progress edit into a syntactically valid
 // Program by appending a suffix and enough closing brackets to balance
 // whatever was left open — Completion and Signature Help both need to
 // resolve Types at a cursor position that, as typed, does not parse on its
 // own (`person.`, `greet(`, …).
 
-// NOTE: Blanks String text and Comments out, one space per UTF-16 unit, so the
+// Blanks String text and Comments out, one space per UTF-16 unit, so the
 // brackets and commas inside them go uncounted and offsets still line up. An
 // interpolation hole is code and stays; only its braces are blanked.
 export function stripNoise(text: string): string {
 	return scanNoise(text).stripped
 }
 
-// NOTE: `openHoles` holds the offset of the `{` of every interpolation hole
+// `openHoles` holds the offset of the `{` of every interpolation hole
 // still open at the end of the text, outermost first.
 type Noise = {
 	stripped: string
 	openHoles: Array<number>
 }
 
-// NOTE: `hole` is the offset of the `{` of the hole the scan is in, or -1 while
+// `hole` is the offset of the `{` of the hole the scan is in, or -1 while
 // it is in the String's text; `depth` counts the braces open inside that hole.
 type OpenString = {
 	hole: number
@@ -48,7 +48,7 @@ function scanNoise(text: string): Noise {
 			} else if (character === "{") {
 				innermost.hole = index
 			} else if (character === "\\" && index + 1 < text.length) {
-				// NOTE: The brace of a `\u{…}` escape opens no hole.
+				// The brace of a `\u{…}` escape opens no hole.
 				let escaped =
 					text[index + 1] === "u" && text[index + 2] === "{" ? 2 : 1
 
@@ -60,7 +60,7 @@ function scanNoise(text: string): Noise {
 			continue
 		}
 
-		// NOTE: From here on the scan is in code: at the top level, or in the
+		// From here on the scan is in code: at the top level, or in the
 		// hole of `innermost`. The Lexer ends a Comment in a hole at a `}`.
 		if (inComment && !(character === "}" && innermost !== undefined)) {
 			stripped += " "
@@ -99,7 +99,7 @@ function scanNoise(text: string): Noise {
 	}
 }
 
-// NOTE: An open interpolation hole is closed by its `}` and then by the `"` of
+// An open interpolation hole is closed by its `}` and then by the `"` of
 // the String it stands in.
 const closers: Record<string, string> = {
 	"{": "}",
@@ -108,7 +108,7 @@ const closers: Record<string, string> = {
 	'"{': '}"',
 }
 
-// NOTE: `opensDefine` says this `{` is a `define`'s own block rather than any
+// `opensDefine` says this `{` is a `define`'s own block rather than any
 // other kind — a Record Literal, a Function body, a block an arm's VALUE opened.
 // The arm tails belong at the end of that block and nowhere else, and the
 // innermost `{` is only the same brace while an arm holds none of its own.
@@ -117,7 +117,7 @@ type OpenBracket = {
 	opensDefine: boolean
 }
 
-// NOTE: The Keyword is read as a whole word, so `redefine` opens no `define`,
+// The Keyword is read as a whole word, so `redefine` opens no `define`,
 // off text `stripNoise` has blanked String text and Comments out of. As in the
 // Parser, its block is the first `{` at its own depth past its return Type: a
 // `{` where that Type still expects a Type opens a Record Type instead.
@@ -127,9 +127,9 @@ function openBrackets(
 ): Array<OpenBracket> {
 	let stack: Array<OpenBracket> = []
 	let word = ""
-	// NOTE: The depth of the `define` whose block has not opened yet, or -1.
+	// The depth of the `define` whose block has not opened yet, or -1.
 	let pendingDefine = -1
-	// NOTE: The last two characters read that are not blank.
+	// The last two characters read that are not blank.
 	let previous = ""
 	let holes = new Set(openHoles)
 
@@ -186,11 +186,11 @@ function openBrackets(
 	return stack
 }
 
-// NOTE: A Type is still expected after an arrow, a Union's `|`, or the `<` or
+// A Type is still expected after an arrow, a Union's `|`, or the `<` or
 // `,` of a Type Argument list.
 const expectsType = /(->|[|<,])$/
 
-// NOTE: `declarationIndex` names the one open `(` to close as a Declaration's
+// `declarationIndex` names the one open `(` to close as a Declaration's
 // parameter list rather than as a call's Argument list — see `probeSourcesFor`.
 function closingSuffixFor(
 	stack: Array<OpenBracket>,
@@ -208,7 +208,7 @@ function closingSuffixFor(
 	return suffix
 }
 
-// NOTE: Closing brackets alone are not enough when one of the open ones is a
+// Closing brackets alone are not enough when one of the open ones is a
 // DECLARATION's parameter list, which is where a `= expression` default is
 // written: `function greet(_ name: String = person` closed with `)}` is a
 // `function` with no return Type and no body, and the Parser drops the whole
@@ -251,19 +251,19 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 		}
 	}
 
-	// NOTE: Two readings can spell the same source — a declaration reading of
+	// Two readings can spell the same source — a declaration reading of
 	// the outermost `(` and the `match` reading of a head that opened one —
 	// and a reading costs a parse and an enrichment; the same one twice is
 	// the same answer twice.
 	return [...new Set(sources)]
 }
 
-// NOTE: The tails a Statement's HEAD can be waiting for: an `if` wants a block,
+// The tails a Statement's HEAD can be waiting for: an `if` wants a block,
 // a `match` wants its return Type and then one — `-> {} {}`, the shortest
 // complete tail there is.
 const STATEMENT_TAILS = [" {}", " -> {} {}"]
 
-// NOTE: The tails that finish the `define` a head stands INSIDE. An arm is
+// The tails that finish the `define` a head stands INSIDE. An arm is
 // written `as VALUE if CONDITION` and the block has to end in an `otherwise`
 // arm, so a cursor in a value is one word short of an arm that closes the
 // block, and a cursor in a Condition is one whole arm short of it — `as {}
@@ -273,12 +273,12 @@ const STATEMENT_TAILS = [" {}", " -> {} {}"]
 // with it the member access being written.
 const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
 
-// NOTE: What says the arm readings are worth building. `define` is a reserved
+// What says the arm readings are worth building. `define` is a reserved
 // Keyword and `stripNoise` has blanked String text and Comments, so the word
 // anywhere before the cursor means a `define` was opened, perhaps closed again.
 const definePattern = /\bdefine\b/
 
-// NOTE: A tail is written immediately before the closer of the `{` whose block
+// A tail is written immediately before the closer of the `{` whose block
 // it finishes. For a Statement waiting for a block that is the innermost open
 // one — `if greet(` closes to `if greet() {}` and not to `if greet( {})`, and
 // such a head can hold no unclosed `{` of its own, since a block is exactly what
@@ -316,7 +316,7 @@ function tailSuffixFor(
 			index < target &&
 			stack[index]!.opensDefine
 		) {
-			// NOTE: A `define` the target one is written INSIDE is one word
+			// A `define` the target one is written INSIDE is one word
 			// short of closing too — its own arm's value is the `define` below
 			// it, which has just been finished, so `otherwise` is all it wants.
 			suffix += ENCLOSING_DEFINE_TAIL

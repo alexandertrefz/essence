@@ -1,9 +1,9 @@
-// NOTE: The runtime module of the `NonEmptyDictionary` Namespace — the
+// The runtime module of the `NonEmptyDictionary` Namespace — the
 // Dictionaries a Program has proven hold something. The Simplifier emits
 // `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
 // this is it.
 //
-// NOTE: Every export here but one is `Dictionary`'s own native, re-exported
+// Every export here but one is `Dictionary`'s own native, re-exported
 // straight through, so the two entries are one Function under two names and can
 // not come apart. A refinement erases before anything runs: what arrives is an
 // ordinary `DictionaryType` and the evidence the Type carried was spent while
@@ -14,12 +14,12 @@
 // below: it UNWRAPS what `Dictionary`'s own entry answers, which is a different
 // operation rather than the same one under another name.
 //
-// NOTE: The module exists at all because an Essence body could not write these.
+// The module exists at all because an Essence body could not write these.
 // `<- @::length()` on a proven receiver is this very Method rather than
 // `Dictionary`'s, and the Validator refuses it as `infinite-recursion`; see
 // `packages/standard-library/DEVELOPMENT.md`, A receiver narrowed by EVIDENCE.
 //
-// NOTE: `set` is not here. It answers a `NonEmptyDictionary` on `Dictionary`
+// `set` is not here. It answers a `NonEmptyDictionary` on `Dictionary`
 // itself, whatever it was handed, exactly as `List::append(_:)` answers a
 // `NonEmptyList` — so a proven receiver reaches that entry and there is nothing
 // for this Namespace to declare.
@@ -37,7 +37,7 @@ export {
 	values,
 } from "./Dictionary"
 
-// NOTE: The one export here that is not `Dictionary`'s own Function under
+// The one export here that is not `Dictionary`'s own Function under
 // another name. `Dictionary.firstEntry` answers an Optional and this answers
 // the entry, which is a different operation rather than the same one written
 // twice — the same relation `NonEmptyList.firstItem` has to `List`'s. The

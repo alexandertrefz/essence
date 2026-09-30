@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { PUBLISHED_PACKAGES, stageDirectory } from "./packages"
 import { stagePackages } from "./stage"
 
-// NOTE: Publishing re-stages rather than trusting whatever a previous run
+// Publishing re-stages rather than trusting whatever a previous run
 // left behind — staging is seconds, and what goes to the registry should be
 // what the tree says right now. The smoke test is NOT run here, because it
 // wants the network and a couple of minutes; `bun run publish:smoke` is the

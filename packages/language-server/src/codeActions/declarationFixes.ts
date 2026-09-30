@@ -10,7 +10,7 @@ import {
 	readsNamespaceMember,
 } from "./lookups"
 
-// NOTE: The Diagnostics a DECLARATION'S HEAD carries — the Type Parameter list,
+// The Diagnostics a DECLARATION'S HEAD carries — the Type Parameter list,
 // the `static` a Method opens with, the `where` on a Protocol's extension list.
 // What they share is that the fix is an edit to the line the declaration is
 // announced on, never to the body under it, which is why they are read together
@@ -19,7 +19,7 @@ import {
 const inferKeyword = /^infer[ \t]+$/
 const staticKeyword = "static"
 
-// NOTE: What goes is the marker and the blanks behind it, which is the span
+// What goes is the marker and the blanks behind it, which is the span
 // between where the Type Parameter starts and where its NAME does — the
 // Parameter's own Position opens on `infer` wherever one was written. Measured
 // from the Node rather than from the Diagnostic's span, and then read back off
@@ -59,7 +59,7 @@ export function removeInferAction(
 	}
 }
 
-// NOTE: The mirror, and the mirror of the span too: a Parameter written without
+// The mirror, and the mirror of the span too: a Parameter written without
 // the marker opens on its own name, so the marker goes in front of that name.
 // The name is read back off the buffer first — an insertion can not be checked
 // after the fact, so what has to be checked is that the Node and the text still
@@ -97,7 +97,7 @@ export function inferParameterAction(
 	}
 }
 
-// NOTE: The Diagnostic points at the `@`, which is inside the body — so the
+// The Diagnostic points at the `@`, which is inside the body — so the
 // Method it belongs to is what the fix starts from, and the Keyword is the one
 // written in front of that Method's name. `overload static make` reads the same
 // way as `static make`, since the Keyword sits directly against the name in both.
@@ -118,7 +118,7 @@ export function dropStaticAction(
 		return null
 	}
 
-	// NOTE: And withheld altogether where this file CALLS the Method. Dropping
+	// And withheld altogether where this file CALLS the Method. Dropping
 	// the Keyword changes how every call is written — `Namespace.name(…)`
 	// becomes `value::name(…)` — so a file calling it once is refused once more
 	// than it was, and one calling it five times five times more, each at a
@@ -146,7 +146,7 @@ export function dropStaticAction(
 		end: name.position.start,
 	}
 
-	// NOTE: The Keyword and the blanks between it and the name, and nothing
+	// The Keyword and the blanks between it and the name, and nothing
 	// else — a `static` the Parser read from another line, or a name that
 	// merely ENDS in one, would otherwise have text deleted around it.
 	if (!/^static[ \t]+$/.test(sliceOf(lines, range))) {
@@ -163,7 +163,7 @@ export function dropStaticAction(
 	}
 }
 
-// NOTE: The whole clause goes, from the Protocol's name to the last condition —
+// The whole clause goes, from the Protocol's name to the last condition —
 // a `where` with one condition left is the same refusal, so taking them out one
 // at a time would only report again. Every condition of one clause therefore
 // answers with this same edit, and the registry drops the repeats: two
@@ -184,7 +184,7 @@ export function dropWhereClauseAction(
 		end: clause.position.end,
 	}
 
-	// NOTE: A clause written over two lines is deleted whole, break and all —
+	// A clause written over two lines is deleted whole, break and all —
 	// `where` is contextual, so what says the span is a clause is that the
 	// Keyword opens it.
 	if (!/^\s*where\b/.test(sliceOf(lines, range))) {

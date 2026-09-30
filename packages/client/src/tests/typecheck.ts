@@ -6,20 +6,20 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 export const REPOSITORY = path.join(import.meta.dirname, "..", "..", "..", "..")
 
-// NOTE: The real class rather than a copy of its shape. A consumer of a
+// The real class rather than a copy of its shape. A consumer of a
 // generated file imports `EssenceRational` from this package, and a stub
 // declaring what it is thought to be would typecheck a Module against a Rational
 // that does not exist. A path, because a temporary directory has no
 // `node_modules` above it to find the package name in.
 export const BORROWED_MODULE = path.join(import.meta.dirname, "..", "borrowed")
 
-// NOTE: `tsc` over a directory of its own, extending the repository's own
+// `tsc` over a directory of its own, extending the repository's own
 // TypeScript settings — the point of the exercise is that a generated file
 // compiles where its reader's code compiles, and a laxer configuration invented
 // for the test would answer a question nobody asked. `typeRoots` is absolute
 // because a temporary directory has no `node_modules` above it.
 //
-// NOTE: Shared by the two specs that ask the question — the declarations as
+// Shared by the two specs that ask the question — the declarations as
 // `generateDeclarations` writes them, and the declarations as a PLUGIN writes
 // them beside a source. Both are the same claim: a reader's code compiles
 // against what was generated for it.
@@ -39,7 +39,7 @@ export async function typecheck(files: Record<string, string>): Promise<{
 			JSON.stringify({
 				extends: path.join(REPOSITORY, "tsconfig.base.json"),
 				compilerOptions: {
-					// NOTE: What makes `./Math.es` resolve to `Math.d.es.ts`.
+					// What makes `./Math.es` resolve to `Math.d.es.ts`.
 					allowArbitraryExtensions: true,
 					types: ["bun"],
 					typeRoots: [
@@ -50,7 +50,7 @@ export async function typecheck(files: Record<string, string>): Promise<{
 			}),
 		)
 
-		// NOTE: The repository's own `tsc`, by path. `bun x tsc` from a directory
+		// The repository's own `tsc`, by path. `bun x tsc` from a directory
 		// with no `node_modules` above it goes to the network for one, which
 		// makes the test both slow and a liar about which compiler it ran.
 		let run = await spawnAndWait(

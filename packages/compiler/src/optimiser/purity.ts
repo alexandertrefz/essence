@@ -1,18 +1,18 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: Whether an Expression can be left UNEVALUATED without the Program
+// Whether an Expression can be left UNEVALUATED without the Program
 // noticing. It is asked wherever a lowering would move an Expression out of the
 // order Essence evaluates it in — `a::and(b)` evaluates `b` before the call and
 // JavaScript's `&&` does not — and it is the one question in the Optimiser
 // whose wrong answer is silent: an effect that stops happening leaves no
 // Diagnostic and no crash, only a Program that prints less than it printed.
 //
-// NOTE: So it is conservative to the point of dullness. `true` means the
+// So it is conservative to the point of dullness. `true` means the
 // Compiler can NAME every reason this Expression could matter and there is
 // none; everything it can not name is `false`. A missing rule costs an
 // optimisation, and a wrong one costs a `Terminal.print`.
 //
-// NOTE: What "matters" means, exactly, in the language as it stands:
+// What "matters" means, exactly, in the language as it stands:
 //   - it PRINTS or STARTS. `Terminal` writes and reads the host's streams, and
 //     `print` is written on `write`. Work that is started, an `Http.send`
 //     among it, reaches the host as well.
@@ -24,11 +24,11 @@ import type { common } from "@essence-lang/interfaces"
 //     optimisation. A Function call may reach any of the three, and recursion
 //     may reach none of them and still never come back.
 //
-// NOTE: Which is why a CALL is impure unless it is one of the shapes named
+// Which is why a CALL is impure unless it is one of the shapes named
 // below. Everything else — a literal, a name, a member read, a value built out
 // of pure parts — reaches nothing at all.
 //
-// NOTE: `shadowed` is the set of Namespace names the Program declares below its
+// `shadowed` is the set of Namespace names the Program declares below its
 // own top level, which is `declaredNamespaces(program).nested`. It is a REQUIRED
 // Argument rather than a courtesy the callers extend, because the enumeration
 // below reads a Namespace by NAME and a Program may declare a Namespace of its
@@ -47,7 +47,7 @@ export function isPureExpression(
 		isPureExpression(child, shadowed)
 
 	switch (node.nodeType) {
-		// NOTE: The leaves. A literal holds its own value; an Identifier is a
+		// The leaves. A literal holds its own value; an Identifier is a
 		// binding read, and no Essence value has a getter for the read to run.
 		case "StringValue":
 		case "IntegerValue":
@@ -55,11 +55,11 @@ export function isPureExpression(
 		case "BooleanValue":
 		case "Identifier":
 			return true
-		// NOTE: A Function literal is a value, not a call — building the
+		// A Function literal is a value, not a call — building the
 		// closure runs none of its body.
 		case "FunctionValue":
 			return true
-		// NOTE: A member read off a Record, a Case payload or a Namespace.
+		// A member read off a Record, a Case payload or a Namespace.
 		// Every member the Type says is there IS there, so the read can not
 		// fail, and it can not run anything either.
 		case "Lookup":
@@ -68,7 +68,7 @@ export function isPureExpression(
 			return Object.values(node.members).every(isPure)
 		case "ListValue":
 			return node.values.every(isPure)
-		// NOTE: A Dictionary is pure exactly when everything written inside it
+		// A Dictionary is pure exactly when everything written inside it
 		// is. Building one compares the keys — through the witness, which is a
 		// method map and runs nothing — and stores them, so the construction
 		// itself has nothing to it.
@@ -80,7 +80,7 @@ export function isPureExpression(
 			return node.value === null || isPure(node.value)
 		case "Combination":
 			return isPure(node.lhs) && isPure(node.rhs)
-		// NOTE: A witness is a method map — references to Methods, never calls
+		// A witness is a method map — references to Methods, never calls
 		// of them — and a conditional one curries the witnesses below it onto
 		// those references. Nothing in either runs.
 		case "ConformanceValue":
@@ -88,7 +88,7 @@ export function isPureExpression(
 				node.conditions.every(isPure) &&
 				(node.groupConditions ?? []).every(isPure)
 			)
-		// NOTE: A call, and the whole of what this function refuses. A
+		// A call, and the whole of what this function refuses. A
 		// Function-valued Expression is whatever was bound to it — a native free
 		// Function such as `loop`, which runs the callbacks it is handed, among
 		// them — and a Union dispatch is a Method call with a search in front of
@@ -98,25 +98,25 @@ export function isPureExpression(
 			return false
 		case "MethodInvocation":
 			return isPureMethodInvocation(node, shadowed)
-		// NOTE: An interpolated String CALLS `toString` on each hole, through a
+		// An interpolated String CALLS `toString` on each hole, through a
 		// witness — so it is weighed as the calls it is, against the same
 		// enumeration a written call is weighed against.
 		case "InterpolatedStringValue":
 			return node.segments.every((segment) =>
 				isPureSegment(segment, shadowed),
 			)
-		// NOTE: A Match runs a Handler's BODY, which is Statements — an
+		// A Match runs a Handler's BODY, which is Statements — an
 		// assignment among them is exactly the effect this is asked about, and
 		// Statements are not what this function reads. Refused whole rather
 		// than half-read.
 		case "Match":
 			return false
-		// NOTE: A `define` is arms and nothing else, and every half of every arm
+		// A `define` is arms and nothing else, and every half of every arm
 		// is an Expression — there is no body of Statements for an assignment to
 		// hide in, which is the whole of what a Match is refused for. So it is
 		// exactly as pure as what was written into it.
 		//
-		// NOTE: Every part is weighed, the Conditions below the one that holds
+		// Every part is weighed, the Conditions below the one that holds
 		// among them, even though those never run. The question asked here is
 		// whether the WHOLE Expression may be left unevaluated, and a Condition
 		// that would have printed on the way to deciding is a reason it may not.
@@ -126,27 +126,27 @@ export function isPureExpression(
 					(arm) => isPure(arm.condition) && isPure(arm.value),
 				) && isPure(node.otherwise)
 			)
-		// NOTE: An instrumented point WRITES — into the trace buffer of the
+		// An instrumented point WRITES — into the trace buffer of the
 		// context the test is running under — so it is never pure, whatever
 		// stands inside it. Answering otherwise would let a pass pool one,
 		// hoist it out of the assertion it belongs to, or drop it where its
 		// value is unread, and the recording is the whole point of it.
 		case "TestTrace":
 			return false
-		// NOTE: And a counter WRITES too — into the Module's coverage table —
+		// And a counter WRITES too — into the Module's coverage table —
 		// so nothing may pool one, hoist it out of the branch it belongs to or
 		// drop it where the value it answers with is unread. Counting is the
 		// whole point of it.
 		case "CoverageCounter":
 			return false
-		// NOTE: Putting work in flight RUNS it — a future with nothing to wait
+		// Putting work in flight RUNS it — a future with nothing to wait
 		// for inside runs to its end the moment it is started — so nothing may
 		// pool a `start`, hoist it out of the branch it was written in, or drop
 		// one whose `Started` nobody reads. Starting is the whole point of it,
 		// exactly as recording is a trace's.
 		case "Start":
 			return false
-		// NOTE: And `complete` waits for what a `start` set going, which is an
+		// And `complete` waits for what a `start` set going, which is an
 		// observation of everything that ran in between: moving one moves every
 		// effect the awaited work had past the Statements around it. Refused for
 		// the reason a Match is refused whole — what it is about happens
@@ -158,7 +158,7 @@ export function isPureExpression(
 	}
 }
 
-// NOTE: One hole of an interpolated String, and the argument for admitting one
+// One hole of an interpolated String, and the argument for admitting one
 // at all. A hole is a call, but it is a call the tree NAMES: the Namespace and
 // the member are written down where a written Invocation writes them, so the
 // same question can be asked of it. `devirtualise-witnesses` leaves a
@@ -171,7 +171,7 @@ export function isPureExpression(
 // taken the name, the value must be of that Namespace's own Type, and the value
 // itself must be pure.
 //
-// NOTE: What this buys is a Constant nobody reads that holds a greeting, and a
+// What this buys is a Constant nobody reads that holds a greeting, and a
 // Match Handler answering one — `eliminate-dead-code` and
 // `lower-matches-to-statements` both refused those on the strength of a call
 // that can not do anything. What it does NOT do is let a hole be evaluated
@@ -202,7 +202,7 @@ function isPureSegment(
 	return isPureExpression(segment.expression, shadowed)
 }
 
-// NOTE: The Namespace whose `toString` a hole's witness names — and only where
+// The Namespace whose `toString` a hole's witness names — and only where
 // the witness says so outright. `devirtualise-witnesses` runs first and leaves a
 // `direct-method` at every hole it could name a Function for; a witness that is
 // still a `ConformanceValue` is one that pass refused, or one it never saw
@@ -210,7 +210,7 @@ function isPureSegment(
 // conformance is refused by both: the Function behind its `toString` is one the
 // call curries rather than one anybody declared.
 //
-// NOTE: The name is the standard library's only where the Program has not taken
+// The name is the standard library's only where the Program has not taken
 // it, which is the caller's question — and it is a Namespace's own name rather
 // than the conforming Type's, so a `namespace Loud for Integer is Printable`
 // answers `"Loud"` here and is left alone.
@@ -235,7 +235,7 @@ export function printingNamespaceOf(
 		return null
 	}
 
-	// NOTE: `Object.hasOwn`, never a plain index: a witness whose `toString` a
+	// `Object.hasOwn`, never a plain index: a witness whose `toString` a
 	// Protocol provides has no own entry, and the map would answer
 	// `Object.prototype.toString`.
 	let memberName = Object.hasOwn(witness.methodMap, "toString")
@@ -263,26 +263,26 @@ function isPureIntrinsic(
 		case "essence-boolean":
 		case "raw-boolean":
 			return isPure(node.value)
-		// NOTE: The value it reads is hoisted into a const band and the site
+		// The value it reads is hoisted into a const band and the site
 		// holds a NAME. Whether the value itself is pure is `pool-constants`'
 		// question, and its answer is stricter than this one.
 		case "pooled-reference":
 			return true
 		case "type-test":
 			return isPure(node.value) && isPure(node.descriptor)
-		// NOTE: A descriptor is data, and a `direct-method` is a reference to a
+		// A descriptor is data, and a `direct-method` is a reference to a
 		// Function rather than a call of one. An omitted Argument is the
 		// JavaScript literal `undefined`, which is as pure as a value gets.
 		case "type-descriptor":
 		case "direct-method":
 		case "omitted-argument":
 			return true
-		// NOTE: A Method call with the search in front of it taken out, which is
+		// A Method call with the search in front of it taken out, which is
 		// a Method call — refused exactly as the `UnionMethodInvocation` it was
 		// compiled from is.
 		case "dispatch-chain":
 			return false
-		// NOTE: A loop runs its callbacks' bodies, which are Statements — an
+		// A loop runs its callbacks' bodies, which are Statements — an
 		// assignment among them is exactly the effect this is asked about, and a
 		// walk may not come back at all. Refused whole, for the same reason a
 		// Match is: this function reads Expressions, and what a loop holds is a
@@ -298,7 +298,7 @@ function isPureIntrinsic(
 		case "raw-equals":
 		case "raw-arithmetic":
 			return isPure(node.left) && isPure(node.right)
-		// NOTE: A member read and a `??`, over two Expressions. The read
+		// A member read and a `??`, over two Expressions. The read
 		// observes nothing — a Record is a value — so this is as pure as the
 		// two it holds, and the fallback's purity counts even though it may not
 		// be evaluated: what is asked here is whether MOVING this observes
@@ -314,7 +314,7 @@ function isPureIntrinsic(
 			)
 		case "direct-list":
 			return node.values.every(isPure)
-		// NOTE: A build stands only where an inlined walk's answer is written,
+		// A build stands only where an inlined walk's answer is written,
 		// and a walk is refused whole above — so nothing can ask this. It
 		// answers for what the Node MEANS anyway: the items are Expressions like
 		// any other, and adding them to an Array the walk owns observes nothing.
@@ -329,11 +329,11 @@ function isPureIntrinsic(
 	}
 }
 
-// NOTE: THE ENUMERATION. A Method call is impure unless it is a call of one of
+// THE ENUMERATION. A Method call is impure unless it is a call of one of
 // these, on one of these Namespaces, with every Argument — the receiver
 // included — of exactly that Namespace's own Type, and every Argument pure too.
 //
-// NOTE: The Namespace name is the Type name on purpose: `Integer`'s entry is the
+// The Namespace name is the Type name on purpose: `Integer`'s entry is the
 // Method called on an Integer and GIVEN an Integer, which is the shape whose
 // body is exact integer arithmetic and nothing else. `add` and the comparisons
 // are Overloads that also take a Rational, an Algebraic and a Transcendental,
@@ -342,14 +342,14 @@ function isPureIntrinsic(
 // Requiring the Types closes the enumeration over the bodies it was read against
 // instead of over every Overload that happens to share a name.
 //
-// NOTE: It is short on purpose, and every entry is here for the same three
+// It is short on purpose, and every entry is here for the same three
 // reasons: the Method prints nothing and assigns nothing, it answers for EVERY
 // value of its Parameter Types rather than throwing for some of them, and it
 // terminates in a bounded number of steps. `Integer`'s entries are exact integer
 // arithmetic and the Essence one-liners written on them; `Boolean`'s are the
 // two interned instances and the logic over them.
 //
-// NOTE: `String`'s entries are the comparisons and `toString`, and they earn
+// `String`'s entries are the comparisons and `toString`, and they earn
 // their place on the same three counts. `compare` normalises both sides to NFC
 // and walks the code points, which is bounded by the two lengths and answers
 // for every pair; `is` and `isNot` are written on it; `toString` answers the
@@ -358,7 +358,7 @@ function isPureIntrinsic(
 // `compare` take a `Case` rather than a String and are refused by the Type rule
 // above without needing a word here.
 //
-// NOTE: `toString` is on every entry that has one, because a hole of an
+// `toString` is on every entry that has one, because a hole of an
 // interpolated String is a call of exactly that Method and is weighed here.
 // `Integer`'s is its value's decimal spelling, `Boolean`'s is the Conditional
 // that answers one of two literals, `Rational`'s is its numerator and
@@ -368,14 +368,14 @@ function isPureIntrinsic(
 // which is a decision somebody should take on its own merits rather than get for
 // free here.
 //
-// NOTE: What is deliberately absent, so that adding one is a decision rather
+// What is deliberately absent, so that adding one is a decision rather
 // than an oversight. `Number`'s covering comparison reaches π's interval
 // arithmetic, which narrows until it can decide a sign and is not obviously
 // bounded for every pair. `Integer.raise` is `a ** b`, which is bounded only by
 // how much memory the answer needs. `List` and `Optional` take Function
 // Arguments and run them, so their purity is the caller's Function's.
 //
-// NOTE: And the asynchronous Namespaces — `Async`, `Http`, `Future` and
+// And the asynchronous Namespaces — `Async`, `Http`, `Future` and
 // `Started` — are absent for a reason of their own, which is why they are named
 // here rather than left to the rule that a Namespace with no entry is refused.
 // A Future is a DESCRIPTION, so building one runs nothing and half of what they
@@ -387,7 +387,7 @@ function isPureIntrinsic(
 // this list would have to know which side of it each entry falls on. So none of
 // them is here, and a `start` and a `complete` are refused outright above.
 //
-// NOTE: And `Terminal` above all, whose absence is the one this table can least
+// And `Terminal` above all, whose absence is the one this table can least
 // afford to lose. It is named here rather than left to be inferred because the
 // table is an ALLOWLIST — a Namespace with no entry has every Method refused —
 // and the next reader adding one should not have to wonder whether the
@@ -425,7 +425,7 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 	]),
 	String: new Set(["is", "isNot", "compare", "toString"]),
 	Rational: new Set(["toString"]),
-	// NOTE: The refinements of `Integer`, which is where a WRITTEN operand's
+	// The refinements of `Integer`, which is where a WRITTEN operand's
 	// arithmetic goes: `1::add(2)` is `PositiveInteger`'s sum and
 	// `2::multiply(with 3)` is its product, because a refined target beats the
 	// base target for a Method both declare. Each entry is `Integer`'s own
@@ -433,7 +433,7 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 	// whose proof was spent while compiling — so each earns its place on the
 	// three counts `Integer`'s entries earn theirs on.
 	//
-	// NOTE: What is deliberately absent here. `NonZeroInteger::divide` answers
+	// What is deliberately absent here. `NonZeroInteger::divide` answers
 	// an exact Rational, whose gcd is what keeps `Rational`'s arithmetic off
 	// this table at all; `raise` is `a ** b`, refused for `Integer` already;
 	// and `squareRoot` is a trial division whose cost is the receiver's size.
@@ -442,7 +442,7 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 	PositiveInteger: new Set(["add", "multiply"]),
 }
 
-// NOTE: The Type a Namespace's values carry, where that is not the Namespace's
+// The Type a Namespace's values carry, where that is not the Namespace's
 // own name. A checked refinement erases before the first pass runs, so a call
 // that reached a refined Namespace holds Arguments of the BASE Type — every
 // operand of `PositiveInteger`'s sum IS an Integer by the time the Optimiser
@@ -458,7 +458,7 @@ function isPureMethodInvocation(
 	node: common.typedSimple.MethodInvocationNode,
 	shadowed: ReadonlySet<string>,
 ): boolean {
-	// NOTE: The Namespace is read by NAME, and a name is only the standard
+	// The Namespace is read by NAME, and a name is only the standard
 	// library's where the Program has not taken it. A Program can not take one
 	// at its top level — `Integer` is already declared in that Scope — but a
 	// Namespace declared inside a block REPLACES the builtin for the rest of it,
@@ -492,7 +492,7 @@ function isPureMethodInvocation(
 	)
 }
 
-// NOTE: `isLessThan__overload$1` and `isLessThan` are one Method written with
+// `isLessThan__overload$1` and `isLessThan` are one Method written with
 // and without its entries; which entry a call reached is decided by the Types
 // it was given, and every entry of the Methods named above is as pure as its
 // siblings.

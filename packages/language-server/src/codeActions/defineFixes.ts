@@ -10,7 +10,7 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findInnermostNodeContaining, findNodeAt } from "./lookups"
 
-// NOTE: The three things a `define` can be wrong about: an arm below the one
+// The three things a `define` can be wrong about: an arm below the one
 // that always holds, no arm that always holds, and nothing but the one that
 // always holds. Each of the three is answered from the arms themselves — the
 // `otherwise` arm's own line, its value's text — which is why they share a file
@@ -18,7 +18,7 @@ import { findInnermostNodeContaining, findNodeAt } from "./lookups"
 
 const armPattern = /^as\b/
 
-// NOTE: An arm below the `otherwise` one has TWO answers and the Diagnostic's
+// An arm below the `otherwise` one has TWO answers and the Diagnostic's
 // Help gives both: it is dead where it stands, so either it goes or it belongs
 // higher up. Deleting is preferred because the arm is unreachable — removing it
 // provably leaves the Program answering exactly what it answered before, which
@@ -43,7 +43,7 @@ export function unreachableDefineArmActions(
 		return []
 	}
 
-	// NOTE: The arm's own line where it stands on one, and the arm with the
+	// The arm's own line where it stands on one, and the arm with the
 	// blank in front of it where it shares a line — `as 0 otherwise as 2 if
 	// other` deleted without that blank leaves `otherwise  }` behind.
 	let removal = removeLinesEdit(lines, diagnostic.position)
@@ -62,7 +62,7 @@ export function unreachableDefineArmActions(
 	let otherwise = define.otherwise.position.start
 	let before = lineAt(lines, otherwise.line).slice(0, otherwise.column - 1)
 
-	// NOTE: The move writes whole LINES, so it is offered only where the
+	// The move writes whole LINES, so it is offered only where the
 	// `otherwise` arm opens one. A `define` written on a single line has no line
 	// above its `otherwise` to write into — the start of that line is the start
 	// of the Statement the `define` stands in — and deleting the arm is the
@@ -94,7 +94,7 @@ export function unreachableDefineArmActions(
 
 const defineKeyword = "define"
 
-// NOTE: A `define` whose only arm is the `otherwise` one IS the value it answers
+// A `define` whose only arm is the `otherwise` one IS the value it answers
 // with, written the long way round — so the fix is that value, in place of the
 // whole `define`. The Warning spans the `define` exactly, which is the Node this
 // finds it by; the value's text is copied rather than retyped, since a fix that
@@ -129,7 +129,7 @@ export function inlineDefineValueAction(
 	}
 }
 
-// NOTE: A `define` short of its `otherwise` arm is refused, so there is no Node
+// A `define` short of its `otherwise` arm is refused, so there is no Node
 // to read — the Diagnostic spans the `define` keyword through its closing brace,
 // and the buffer is what says the two are still there.
 //

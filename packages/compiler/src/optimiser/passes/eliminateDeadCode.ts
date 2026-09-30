@@ -4,14 +4,14 @@ import type { OptimiserPass } from "../index"
 import { isPureExpression } from "../purity"
 import { rewriteNodes } from "../walk"
 
-// NOTE: A Constant nothing reads is a value the Program builds and drops. It is
+// A Constant nothing reads is a value the Program builds and drops. It is
 // rarely written that way on purpose — what leaves them behind is the passes
 // ahead of this one, which fold an operation into its answer and inline a walk
 // where it stood — and a name nobody reads costs an allocation at the Statement
 // it stands on, plus, at a Program's top level, a `const` that is never
 // collected.
 //
-// NOTE: What may go is decided by one question asked twice: is this name READ
+// What may go is decided by one question asked twice: is this name READ
 // anywhere in the Program, and is what it is bound to something the Program can
 // tell the absence of. The first is answered by the whole Program rather than by
 // the Scope the Constant stands in — a name read in a Function three blocks away
@@ -21,11 +21,11 @@ import { rewriteNodes } from "../walk"
 // of an Argument it would skip: a Declaration whose value PRINTS is a Statement
 // with an effect, and dropping it drops the effect.
 //
-// NOTE: Constants alone. A `variable` can be assigned after it is declared, and
+// Constants alone. A `variable` can be assigned after it is declared, and
 // an assignment is a Statement this does not read — so a Program that declares
 // one and writes to it keeps both.
 //
-// NOTE: One reading, not a fixed point. A Constant read only by another
+// One reading, not a fixed point. A Constant read only by another
 // Constant that is itself dropped stays, because the reference was counted
 // before either went. Running this to exhaustion would take a pass that is
 // allowed to loop, and what it would buy is the second link of a chain nobody
@@ -63,7 +63,7 @@ function withoutUnreadConstants(
 	return kept.length === nodes.length ? nodes : kept
 }
 
-// NOTE: Every name the Program READS, which is every Identifier standing in an
+// Every name the Program READS, which is every Identifier standing in an
 // Expression position — and only those. The walk is what makes that exact: a
 // Declaration's own name, a Parameter's, a Method's and a Namespace's are
 // bindings rather than values and are not offered to it, while the Namespace a
@@ -75,7 +75,7 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 	let read = new Set<string>()
 
 	rewriteNodes(program, {
-		// NOTE: A Parameter's `= expression` default is a READ like any other:
+		// A Parameter's `= expression` default is a READ like any other:
 		// `constant fallback = "world"` above `function greet(_ name: String =
 		// fallback)` is read exactly once in the Program, and the read is in the
 		// Parameter list. Missed, the Constant was dropped and the emitted
@@ -88,7 +88,7 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 
 			return node
 		},
-		// NOTE: The lowered Statements hold a name where an Expression would
+		// The lowered Statements hold a name where an Expression would
 		// have held an Identifier: the temporary a compiled dispatch binds its
 		// operands to, the name a lowered Match writes its answer into, the one
 		// a lowered walk does. None of them can be a Constant this pass would
@@ -105,7 +105,7 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 		},
 	})
 
-	// NOTE: What a Module PUBLISHES is read by Modules this compilation may
+	// What a Module PUBLISHES is read by Modules this compilation may
 	// never see, so every exported name is a root. The alias as well as the
 	// name: an entry may publish a binding under another spelling, and which of
 	// the two is the local one is a distinction not worth making where being

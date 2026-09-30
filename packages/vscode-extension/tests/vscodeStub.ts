@@ -1,11 +1,11 @@
-// NOTE: Enough of VS Code's API for the parts of this extension that only ever
+// Enough of VS Code's API for the parts of this extension that only ever
 // call it to run outside an extension host, and no more: a TestController and
 // its items, runs and profiles, the decoration types, the output channel, the
 // editor `renameAt.js` opens and the handful of value classes both construct.
 // Every call is recorded, so a spec asserts what the extension DID rather than
 // what it holds.
 //
-// NOTE: A stand-in is not the product. What this pins is the bookkeeping —
+// A stand-in is not the product. What this pins is the bookkeeping —
 // which item was created, which run was ended, what was drawn where — none of
 // which an Extension Development Host makes easy to see, and all of which is
 // wrong in ways nobody notices until a tree stops updating. Whether the real
@@ -30,7 +30,7 @@ export class StubPositionValue {
 	}
 }
 
-// NOTE: The value class the extension builds ranges with, flattened to four
+// The value class the extension builds ranges with, flattened to four
 // numbers so a spec asserts on a record rather than on two more objects. Both
 // of VS Code's constructors are accepted, because both are written here: the
 // test view spells the four numbers out, and a cursor is a Position twice.
@@ -125,7 +125,7 @@ export class StubTestItemCollection {
 
 export type StubCount = { covered: number; total: number }
 
-// NOTE: What `run.addCoverage` was handed, flattened — the counts a coverage
+// What `run.addCoverage` was handed, flattened — the counts a coverage
 // view draws per file. The DETAIL is asked for separately, through the
 // profile's `loadDetailedCoverage`, which a spec calls itself.
 export type StubFileCoverage = {
@@ -142,7 +142,7 @@ export type StubMessage = {
 	location: { uri: StubUri; range: StubRange } | null
 }
 
-// NOTE: The methods are VS Code's; the arrays beside them are what a spec
+// The methods are VS Code's; the arrays beside them are what a spec
 // reads. They are named apart because `run.passed(item)` and "which tests
 // passed" are two different things, and the API owns the first name.
 export class StubTestRun {
@@ -225,7 +225,7 @@ export type StubEditor = {
 	selection: StubRange | undefined
 }
 
-// NOTE: What `window.showTextDocument` was asked to open, and under which
+// What `window.showTextDocument` was asked to open, and under which
 // options — the whole of what putting a cursor somewhere looks like from
 // outside, since the selection travels as one of them.
 export type StubShownDocument = {
@@ -248,7 +248,7 @@ export type Stub = {
 	channel: { lines: Array<string>; shown: number; disposals: number }
 	messages: Array<{ text: string; actions: Array<string> }>
 	clipboard: Array<string>
-	// NOTE: What `vscode.debug.startDebugging` was handed, in order. A Debug
+	// What `vscode.debug.startDebugging` was handed, in order. A Debug
 	// gesture is a launch configuration and nothing else, so this is the whole
 	// of what a spec has to read.
 	debugSessions: Array<{
@@ -258,12 +258,12 @@ export type Stub = {
 	refuseDebugStart: () => void
 	editors: Array<StubEditor>
 	shownDocuments: Array<StubShownDocument>
-	// NOTE: What `commands.executeCommand` was asked to run, in order — an
+	// What `commands.executeCommand` was asked to run, in order — an
 	// extension that drives one of the Editor's own commands has nothing else
 	// to show for it.
 	executedCommands: Array<{ command: string; arguments: Array<unknown> }>
 	deletions: Array<(uri: StubUri) => void>
-	// NOTE: The client's own settings, so a spec can read back a setting the
+	// The client's own settings, so a spec can read back a setting the
 	// view WROTE — running with coverage turns `essence.tests.coverage` on.
 	settings: Record<string, unknown>
 	updates: Array<{
@@ -274,7 +274,7 @@ export type Stub = {
 	}>
 	answerMessageWith: (action: string | undefined) => void
 	editor: (filePath: string, languageId?: string) => StubEditor
-	// NOTE: The module object is registered once for the whole spec file — a
+	// The module object is registered once for the whole spec file — a
 	// module can not be re-registered under an import that already happened —
 	// so what a spec gets between tests is this, rather than a new stub.
 	reset: () => void
@@ -311,7 +311,7 @@ export function createStub(): Stub {
 	}> = []
 	let deletions: Array<(uri: StubUri) => void> = []
 	let answer: string | undefined = undefined
-	// NOTE: The client's own settings, so that a gesture which WRITES one — the
+	// The client's own settings, so that a gesture which WRITES one — the
 	// coverage profile turning `essence.tests.coverage` on — can be read back.
 	let settings: Record<string, unknown> = {}
 	let updates: Array<{
@@ -364,7 +364,7 @@ export function createStub(): Stub {
 		},
 	}
 
-	// NOTE: The classes the view constructs, flattened into plain records — a
+	// The classes the view constructs, flattened into plain records — a
 	// spec reading `message.expected` should not have to know which of VS
 	// Code's two constructors made it.
 	let module: Record<string, unknown> = {
@@ -412,7 +412,7 @@ export function createStub(): Stub {
 
 				return Promise.resolve(answer)
 			},
-			// NOTE: The editor for a URI, opened if this is the first time it
+			// The editor for a URI, opened if this is the first time it
 			// was asked for — which is what the real one does, and what makes
 			// the selection an OPTION rather than something written afterwards.
 			showTextDocument: (
@@ -439,7 +439,7 @@ export function createStub(): Stub {
 				return Promise.resolve(undefined)
 			},
 		},
-		// NOTE: A debug session that starts and ends at once. What a spec reads
+		// A debug session that starts and ends at once. What a spec reads
 		// back is the configuration — which file, which ids — and the loop that
 		// waits for one session before starting the next needs the terminate
 		// listener to be called, or a selection covering two files would hang.
@@ -451,7 +451,7 @@ export function createStub(): Stub {
 				debugSessions.push({ folder, configuration })
 
 				queueMicrotask(() => {
-					// NOTE: A copy, because a listener disposes itself as it
+					// A copy, because a listener disposes itself as it
 					// runs and would otherwise be spliced out from under the
 					// walk.
 					let listeners = debugTerminations.slice()
@@ -518,7 +518,7 @@ export function createStub(): Stub {
 		},
 		Uri: {
 			file: uriOf,
-			// NOTE: A URI taken apart the way the real one does, because what a
+			// A URI taken apart the way the real one does, because what a
 			// spec asserts on is `fsPath` — and a stub answering the raw string
 			// there lets an assertion hold for a value VS Code could never
 			// produce. `file:///repo/Season.es` has an `fsPath` of

@@ -11,13 +11,13 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The Methods the completeness wave added to `Dictionary` — the rest of
+// The Methods the completeness wave added to `Dictionary` — the rest of
 // the `where` family, the question about a value, an ordering, the plural
 // removal, the second `of` and the first entry. `dictionaries.spec.ts` drives
 // the container itself; this file drives what was added to it, and both ask
 // through the only door a Program has by compiling and RUNNING each claim.
 //
-// NOTE: Order is what most of these are about — which entry comes out first,
+// Order is what most of these are about — which entry comes out first,
 // which order a sort leaves, where a key that is set again lands — and none of
 // it is visible from a Type. So every test here runs its Program and reads what
 // it printed.
@@ -58,7 +58,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: The receiver most of the groups below read. Three entries, two of them
+// The receiver most of the groups below read. Three entries, two of them
 // sharing a value, so a count and a quantifier each have something to answer
 // about. The empty one is annotated where it stands, because an empty literal
 // carries neither Type Argument.
@@ -86,7 +86,7 @@ describe("Dictionary additions", () => {
 			).toEqual(["2", "0", "0"])
 		})
 
-		// NOTE: The empty Dictionary answers `true` to both quantifiers, which
+		// The empty Dictionary answers `true` to both quantifiers, which
 		// is what makes each name read true in English: it has no entry to fail
 		// the universal check and none to accept the empty one.
 		it("answers the universal quantifier, and true for the empty one", async () => {
@@ -127,7 +127,7 @@ describe("Dictionary additions", () => {
 			).toEqual(["true", "false", "true"])
 		})
 
-		// NOTE: The three quantifiers and the count are one family, so the
+		// The three quantifiers and the count are one family, so the
 		// answers they give about one receiver have to line up: an accepted
 		// entry means the universal complement is refused, and the count of
 		// what a check accepts is zero exactly when no entry accepts it.
@@ -188,7 +188,7 @@ describe("Dictionary additions", () => {
 			).toEqual(["true", "true", "false", "false"])
 		})
 
-		// NOTE: Equality is the values' own `is`, so a value with a structure
+		// Equality is the values' own `is`, so a value with a structure
 		// is compared by it rather than by identity. A Record value is the
 		// shape that says so: the one asked about is written afresh at the
 		// call and is never the value the Dictionary holds.
@@ -206,7 +206,7 @@ describe("Dictionary additions", () => {
 			).toEqual(["true", "false"])
 		})
 
-		// NOTE: `hasKey` and `hasValue` are the two halves of the same
+		// `hasKey` and `hasValue` are the two halves of the same
 		// question, and a Dictionary whose keys and values are the same List
 		// is what makes that visible: every key is a value and nothing else
 		// is.
@@ -239,7 +239,7 @@ describe("Dictionary additions", () => {
 	})
 
 	describe("Ordering", () => {
-		// NOTE: The receiver is written out of order, so an answer in order is
+		// The receiver is written out of order, so an answer in order is
 		// something the sort did rather than something the literal already was.
 		it("orders by the keys, in either direction", async () => {
 			expect(
@@ -260,7 +260,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: `sam` and `kim` hold the same value and `sam` stands first in
+		// `sam` and `kim` hold the same value and `sam` stands first in
 		// the receiver, so a stable sort leaves `sam` first in BOTH
 		// directions. Descending turns the comparison around rather than
 		// reversing the answer, which is the whole of what that costs.
@@ -280,7 +280,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: A reordering answers the entries it was handed, and equality
+		// A reordering answers the entries it was handed, and equality
 		// ignores order — so a sorted Dictionary is equal to the one it was
 		// read off, whatever it did to the order.
 		it("keeps every entry it was handed", async () => {
@@ -295,7 +295,7 @@ describe("Dictionary additions", () => {
 			).toEqual(["true", "true", "3"])
 		})
 
-		// NOTE: The answer carries each slot's ENCODING over rather than
+		// The answer carries each slot's ENCODING over rather than
 		// spelling it again, and a Record key is where a mistake there would
 		// show: a key found in one step before the sort has to be found in one
 		// step after it.
@@ -323,7 +323,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: A key of a kind with no canonical encoding takes the SCAN
+		// A key of a kind with no canonical encoding takes the SCAN
 		// path, and the count of such slots is what a lookup falls through to
 		// it on. A sorted answer has to carry that count over with the slots,
 		// or a lookup would answer nothing for a key standing right there.
@@ -344,7 +344,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: A reordering answers the entries it was handed, so a proven
+		// A reordering answers the entries it was handed, so a proven
 		// receiver comes out proven and the total answers are in reach with no
 		// `if` in front of them.
 		it("carries the proof of a non-empty receiver", async () => {
@@ -364,7 +364,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"alex"', "2", "39"])
 		})
 
-		// NOTE: The two claims a sort makes, over a receiver built out of
+		// The two claims a sort makes, over a receiver built out of
 		// order: the keys come out in order, and no entry is lost or gained.
 		it("leaves the keys in order over a generated receiver", async () => {
 			expect(
@@ -412,7 +412,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: A key nothing holds changes nothing and a key named twice is
+		// A key nothing holds changes nothing and a key named twice is
 		// removed once, which is `remove(at:)`'s own rule folded over a List.
 		it("is lenient about a repeated key and an absent one", async () => {
 			expect(
@@ -427,7 +427,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"[\\"alex\\" = 39, \\"kim\\" = 25]"', "true"])
 		})
 
-		// NOTE: Every Method here is a Query, and a fold of removals is where
+		// Every Method here is a Query, and a fold of removals is where
 		// that is easiest to get wrong: the receiver has to answer what it
 		// answered before, whatever the answer holds.
 		it("leaves the receiver holding what it held", async () => {
@@ -447,7 +447,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: The claim the fold rests on, over a receiver big enough for
+		// The claim the fold rests on, over a receiver big enough for
 		// the store to repack under it: what is left is exactly the keys the
 		// caller did not name, in the order they had.
 		it("leaves exactly the keys it was not handed", async () => {
@@ -495,7 +495,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"', '"[=]"'])
 		})
 
-		// NOTE: The rule the entry it is written on already has: the key keeps
+		// The rule the entry it is written on already has: the key keeps
 		// the place of its first occurrence and holds what the LATER value
 		// answered. The Function is asked once for each occurrence, which is
 		// what makes the two answers differ where it reads something other
@@ -514,7 +514,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"', "2"])
 		})
 
-		// NOTE: A named Function value rather than a literal, because the two
+		// A named Function value rather than a literal, because the two
 		// reach inference differently: the value Type is read off what the
 		// Function answers, and a named one carries its Type rather than
 		// taking it from the position it stands in.
@@ -532,7 +532,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"'])
 		})
 
-		// NOTE: The two entries are one Dictionary under two spellings, which
+		// The two entries are one Dictionary under two spellings, which
 		// is the whole of what writing the second on the first buys.
 		it("answers what the entries entry answers for the same keys", async () => {
 			expect(
@@ -577,7 +577,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: A removed key leaves a tombstoned slot standing where it was,
+		// A removed key leaves a tombstoned slot standing where it was,
 		// so the first entry is the first LIVE slot rather than the first
 		// slot. A key set again after a removal lands at the END, so it is not
 		// the first entry either. The middle answer is BARE rather than an
@@ -602,7 +602,7 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// NOTE: The proof spends the Optional, so a proven receiver reads the
+		// The proof spends the Optional, so a proven receiver reads the
 		// entry itself and a Pattern takes it apart where it stands.
 		it("answers the entry itself on a proven receiver", async () => {
 			expect(
@@ -620,7 +620,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"alex"', "39", '"sam"'])
 		})
 
-		// NOTE: A Dictionary a Program is handed carries no proof, so it goes
+		// A Dictionary a Program is handed carries no proof, so it goes
 		// through an `if` to reach the total answer — the same door every
 		// other proven Method is behind.
 		it("is reached bare through an if asking hasEntries", async () => {
@@ -638,7 +638,7 @@ describe("Dictionary additions", () => {
 			).toEqual(['"alex"'])
 		})
 
-		// NOTE: The claim the native rests on: it answers what
+		// The claim the native rests on: it answers what
 		// `entries()::firstItem()` answers, for a receiver built any way at
 		// all.
 		it("answers what the first of the entries answers", async () => {

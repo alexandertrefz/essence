@@ -457,7 +457,7 @@ function current(href: string): "page" | undefined {
 </style>
 
 <script>
-	// NOTE: Delegated rather than bound per-button — the header renders its
+	// Delegated rather than bound per-button — the header renders its
 	// hamburger twice (desktop row and mobile row are the same markup at
 	// different breakpoints), and a page may mount more than one trigger.
 	let panel = document.getElementById("mobile-menu")
@@ -502,7 +502,7 @@ function current(href: string): "page" | undefined {
 		})
 
 		document.addEventListener("keydown", (event) => {
-			// NOTE: The search palette sets `data-search-open` and owns Escape
+			// The search palette sets `data-search-open` and owns Escape
 			// while it is up, so the menu underneath must not also swallow it.
 			if (
 				event.key === "Escape" &&

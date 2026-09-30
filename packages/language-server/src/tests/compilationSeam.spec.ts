@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-// NOTE: Two invariants this package leans on that are otherwise written down
+// Two invariants this package leans on that are otherwise written down
 // only in a comment, and both are the kind a future edit breaks silently:
 // nothing fails, nothing is slower to the eye, and what stops being true is a
 // guarantee something else was built on.
@@ -23,7 +23,7 @@ function productionSources(): Array<{ name: string; text: string }> {
 }
 
 describe("the compilation seam", () => {
-	// NOTE: `compilation.ts` wraps the four Compiler entry points this Server runs
+	// `compilation.ts` wraps the four Compiler entry points this Server runs
 	// so that "how many times did answering this request compile something" can be
 	// asked at all. Every cost test in this package is an assertion about those
 	// counters, so an import that goes around them does not fail — it makes the
@@ -60,7 +60,7 @@ describe("the compilation seam", () => {
 		expect(offenders).toEqual([])
 	})
 
-	// NOTE: Every stage of the Compiler collects its Diagnostics into module level
+	// Every stage of the Compiler collects its Diagnostics into module level
 	// state, and `collectDiagnostics` nests deliberately — a save and a restore
 	// around a synchronous call. That is safe exactly as long as no two collections
 	// interleave, which holds because a handler may suspend BEFORE it compiles and
@@ -79,7 +79,7 @@ describe("the compilation seam", () => {
 		expect(new Set(suspensions)).toEqual(
 			new Set(["isCurrent", "yieldToConnection"]),
 		)
-		// NOTE: The one inside `isCurrent` itself, which is what every other
+		// The one inside `isCurrent` itself, which is what every other
 		// suspension goes through.
 		expect(
 			suspensions.filter((name) => name === "yieldToConnection"),

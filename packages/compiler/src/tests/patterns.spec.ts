@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The full pipeline minus bundling, mirroring choices.spec — a Pattern
+// The full pipeline minus bundling, mirroring choices.spec — a Pattern
 // is only implemented once every stage agrees on it.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -97,7 +97,7 @@ describe("Patterns", () => {
 			).toEqual([`"y axis at 7"`])
 		})
 
-		// NOTE: The value is written right there, so there is nothing for a name
+		// The value is written right there, so there is nothing for a name
 		// to say that the Matcher has not said already.
 		it("binds nothing for a member constrained by value", () => {
 			expect(
@@ -128,7 +128,7 @@ describe("Patterns", () => {
 			).toEqual([`"diagonal at 3"`])
 		})
 
-		// NOTE: `@` is the scrutinee narrowed to what the Matcher established,
+		// `@` is the scrutinee narrowed to what the Matcher established,
 		// which is exactly what a whole-value binder would name a second time.
 		it("refuses a whole-value binder, naming '@'", () => {
 			let source = `implementation {
@@ -141,14 +141,14 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("redundant-pattern-binder")
-			// NOTE: Both edits. Rewriting the body alone leaves the binder
+			// Both edits. Rewriting the body alone leaves the binder
 			// standing, which is what is refused.
 			expect(helpsOf(source)).toContain(
 				"Drop the 'as whole' and write '@' where 'whole' was meant.",
 			)
 		})
 
-		// NOTE: Regression test — the same annotated-plus-nested-binder hole in
+		// Regression test — the same annotated-plus-nested-binder hole in
 		// plain Matcher position: the requirement vanished, the Match passed as
 		// exhaustive without a wildcard, and the arm ran for a value without
 		// the member it bound.
@@ -244,7 +244,7 @@ describe("Patterns", () => {
 			).toEqual(["10"])
 		})
 
-		// NOTE: Regression test — the `as` binder was typed as only the members
+		// Regression test — the `as` binder was typed as only the members
 		// the Pattern named, so `box.height` was refused though the tag test
 		// proves the value is a #Rectangle, which declares it.
 		it("gives the 'as' binder every member the Case declares", async () => {
@@ -284,7 +284,7 @@ describe("Patterns", () => {
 			).toEqual(["8"])
 		})
 
-		// NOTE: Construction answers the same fork by trying the payload
+		// Construction answers the same fork by trying the payload
 		// Record first, and the Matcher mirrors it, so a reader who knows how a
 		// value is built knows how it comes apart.
 		it("reads a one-member payload as the Record where that fits", async () => {
@@ -301,7 +301,7 @@ describe("Patterns", () => {
 			).toEqual(["7"])
 		})
 
-		// NOTE: …and falls back to the shorthand reading only where the Record
+		// …and falls back to the shorthand reading only where the Record
 		// one does not fit, which is what makes the nested spelling worth
 		// having at all.
 		it("falls back to the shorthand reading when the Record one does not fit", async () => {
@@ -332,7 +332,7 @@ describe("Patterns", () => {
 			).toEqual(["8", "6"])
 		})
 
-		// NOTE: The Rewriter keys a member comparison by the DOTTED spine that
+		// The Rewriter keys a member comparison by the DOTTED spine that
 		// reaches it, which is what lets a nested member constrain by value.
 		// Both arms are asked: a constraint that is written and then ignored
 		// would take the FIRST arm for both values, which is what this once did.
@@ -414,7 +414,7 @@ describe("Patterns", () => {
 			).toEqual(['[ "a1", "b2" ]'])
 		})
 
-		// NOTE: A `loop` callback's return Type is inferred from its body, and
+		// A `loop` callback's return Type is inferred from its body, and
 		// that pass declares the Parameters itself — a Pattern there has to
 		// reach it, or a perfectly well-typed body reports no return Type.
 		it("reaches a callback whose return Type is inferred from its body", async () => {
@@ -450,7 +450,7 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("refutable-pattern")
-			// NOTE: …and the refused member still BINDS, so the body reading it
+			// …and the refused member still BINDS, so the body reading it
 			// is not told a second time that the name does not exist.
 			expect(codesOf(source)).not.toContain("unknown-name")
 		})
@@ -470,7 +470,7 @@ describe("Patterns", () => {
 			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
 		})
 
-		// NOTE: The Declaration holds ONE Expression, so it runs once — an
+		// The Declaration holds ONE Expression, so it runs once — an
 		// author reading `partition(…)` twice is not what was written. This is
 		// the property the synthesized base Constant exists for.
 		it("evaluates the value exactly once", async () => {
@@ -504,7 +504,7 @@ describe("Patterns", () => {
 			).toEqual(["12"])
 		})
 
-		// NOTE: Only the bindings follow the Declaration's own keyword — the
+		// Only the bindings follow the Declaration's own keyword — the
 		// value itself is held once whatever it was written as.
 		it("gives a 'variable' Pattern reassignable names", async () => {
 			expect(
@@ -542,7 +542,7 @@ describe("Patterns", () => {
 			).toContain("refutable-pattern")
 		})
 
-		// NOTE: A Matcher naming a member no arm carries merely writes an arm
+		// A Matcher naming a member no arm carries merely writes an arm
 		// nothing takes; a Declaration naming one has bound a name to nothing.
 		it("reports a member the value has not got", () => {
 			let source = `implementation {
@@ -568,7 +568,7 @@ describe("Patterns", () => {
 			).toContain("duplicate-variable")
 		})
 
-		// NOTE: The base is synthesized in that no source wrote its NAME, but
+		// The base is synthesized in that no source wrote its NAME, but
 		// what it holds is the Declaration's own value Expression — so it keeps
 		// its Position like any other Statement. Dropping it was tried and is
 		// wrong: an unmapped statement is how the debug adapter recognises
@@ -585,7 +585,7 @@ describe("Patterns", () => {
 				(node) => node.nodeType === "VariableDeclarationStatement",
 			)
 
-			// NOTE: The base, then one Constant per bound name.
+			// The base, then one Constant per bound name.
 			expect(declarations).toHaveLength(3)
 
 			for (let binding of declarations) {
@@ -594,7 +594,7 @@ describe("Patterns", () => {
 		})
 	})
 
-	// NOTE: A Pattern PROMISES to be the Constants an author could have written,
+	// A Pattern PROMISES to be the Constants an author could have written,
 	// so it may not admit what those are refused for. Every one of these
 	// compiled clean and crashed at runtime before the Diagnostic each names
 	// was wired up.
@@ -641,7 +641,7 @@ describe("Patterns", () => {
 		})
 	})
 
-	// NOTE: A payload Pattern has to say what must BE there, not only where to
+	// A payload Pattern has to say what must BE there, not only where to
 	// read — otherwise the arm accepts every value of its Case and reads
 	// members off a payload that has none.
 	describe("a payload Pattern's requirements", () => {
@@ -669,7 +669,7 @@ describe("Patterns", () => {
 			).toEqual([`"key a"`])
 		})
 
-		// NOTE: The requirement has to be tested BEFORE any value comparison,
+		// The requirement has to be tested BEFORE any value comparison,
 		// because a comparison may read down the very spine it establishes.
 		it("are tested before a nested value comparison reads down them", async () => {
 			expect(
@@ -691,7 +691,7 @@ describe("Patterns", () => {
 			).toEqual([`"other"`])
 		})
 
-		// NOTE: A requirement is a NARROWING, so the arm binds what it proved
+		// A requirement is a NARROWING, so the arm binds what it proved
 		// and not what the Case declared — the same answer the equivalent
 		// Record Matcher gives, which is the point of the two spellings meaning
 		// one thing. The arm below could not use the value it had just narrowed.
@@ -713,7 +713,7 @@ describe("Patterns", () => {
 			).toEqual(["8"])
 		})
 
-		// NOTE: The Validator reads only `matcher` for a Case Matcher, which is
+		// The Validator reads only `matcher` for a Case Matcher, which is
 		// the tag — so a member nothing carries is invisible to it, and the
 		// emitted test demanded a member nothing has: the arm never ran, and
 		// nothing was said.
@@ -738,7 +738,7 @@ describe("Patterns", () => {
 			expect(codesOf(source)).toContain("unknown-member")
 		})
 
-		// NOTE: Regression test — a member with BOTH an annotation and a nested
+		// Regression test — a member with BOTH an annotation and a nested
 		// binder kept only the annotation, so the nested Pattern's requirements
 		// were dropped: the arm ran for a payload without the members it read,
 		// bound them as nothing, and retired its Case as if nothing could
@@ -776,7 +776,7 @@ describe("Patterns", () => {
 			).toEqual([`"declined"`])
 		})
 
-		// NOTE: …and a Pattern naming only what the Case already declares asks
+		// …and a Pattern naming only what the Case already declares asks
 		// nothing new, so the arm stays UNCONDITIONAL and a Match over a Choice
 		// is still exhaustive without a 'case _'.
 		it("do not make an ordinary payload Pattern conditional", () => {
@@ -798,7 +798,7 @@ describe("Patterns", () => {
 		})
 	})
 
-	// NOTE: `as` is a Keyword only where a binder can follow it, which the
+	// `as` is a Keyword only where a binder can follow it, which the
 	// Module grammar already established for its own use of the word.
 	it("lets a member be called 'as'", async () => {
 		expect(

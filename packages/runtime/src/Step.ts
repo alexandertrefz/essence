@@ -1,6 +1,6 @@
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: `Step` is the builtin generic Choice — its values carry Case tags
+// `Step` is the builtin generic Choice — its values carry Case tags
 // (`"Step#Continue"`, `"Step#Done"`) exactly like user-declared Cases do, and,
 // because it is generic, a payload alongside the tag. Unlike `Ordering` or
 // `Side`, nothing here is a singleton: a `Step` is CONSTRUCTED at the call site

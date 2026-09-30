@@ -1,6 +1,6 @@
 import type { Scope } from "../rename"
 
-// NOTE: The name an extraction gives what it lifted out, with a number after it
+// The name an extraction gives what it lifted out, with a number after it
 // where the Scope already has one. The whole chain is walked rather than the one
 // Scope: a name that shadows one read further down the same body would rebind it
 // silently, and an extraction that renames somebody's code by accident is worse

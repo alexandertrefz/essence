@@ -70,7 +70,7 @@ function printUsageError(context: CLIContext, error: UsageError): void {
 }
 
 function showHelp(context: CLIContext, invocation: Invocation): number {
-	// NOTE: `esc help build` and `esc build --help` are the same request, and
+	// `esc help build` and `esc build --help` are the same request, and
 	// both land here. The command whose help to show is the explicit one when
 	// there is one, and the argument to `help` otherwise.
 	if (invocation.command.name === "help") {
@@ -110,7 +110,7 @@ function showHelp(context: CLIContext, invocation: Invocation): number {
 	return EXIT_SUCCESS
 }
 
-// NOTE: The Formatter and the Language Server are imported where they are used
+// The Formatter and the Language Server are imported where they are used
 // and nowhere else. `essence check` must not pay for a Formatter it never calls
 // — a static import at the top of this module would load both packages, and
 // every module they import, before the first argument is even read.
@@ -128,7 +128,7 @@ async function runFormat(
 async function runLanguageServer(): Promise<number> {
 	let { startServer } = await import("@essence-lang/language-server")
 
-	// NOTE: The Server does not return: it holds stdio open and answers
+	// The Server does not return: it holds stdio open and answers
 	// requests until the Editor closes the connection, which ends the process.
 	// The exit code is what a clean start reports, not what a session did.
 	startServer()
@@ -136,11 +136,11 @@ async function runLanguageServer(): Promise<number> {
 	return EXIT_SUCCESS
 }
 
-// NOTE: How `essence dap` compiles — this CLI's own in-process pipeline,
+// How `essence dap` compiles — this CLI's own in-process pipeline,
 // answering in the Adapter's report shape. Exported so that WHAT a debug
 // session builds can be asked of the same function the command hands over.
 //
-// NOTE: The Optimiser is OFF, and that is the whole reason this is not simply
+// The Optimiser is OFF, and that is the whole reason this is not simply
 // what `build` does. A debug session steps through Statements, stops on
 // bindings and reads their values back, and half the registry exists to take
 // exactly those things away: a Constant nothing reads is dropped, a Match
@@ -178,7 +178,7 @@ export function debugAdapterCompile(): (
 			minify: false,
 			sourcemap: true,
 			optimisation: unoptimisedOptions,
-			// NOTE: A session debugging one test steps through the
+			// A session debugging one test steps through the
 			// `tests { … }` block, which a build drops — so the block is
 			// compiled when, and only when, the launch asked for a test.
 			tests: options.tests,
@@ -206,7 +206,7 @@ export function debugAdapterCompile(): (
 async function runDebugAdapter(): Promise<number> {
 	let { startAdapter } = await import("@essence-lang/debug-adapter")
 
-	// NOTE: The Adapter does not know how to compile — it is handed what
+	// The Adapter does not know how to compile — it is handed what
 	// compiling MEANS. stdout belongs to the protocol from this point on, which
 	// is why the command is a passthrough that prints nothing.
 	startAdapter({ compile: debugAdapterCompile() })
@@ -237,10 +237,10 @@ async function dispatch(
 			return runWatch(context, command, files, { emit: true })
 
 		case "test": {
-			// NOTE: Imported where it is used, like the Formatter and the
+			// Imported where it is used, like the Formatter and the
 			// Language Server. It reaches the test runtime and the emitter, and
 			// `esc check` must not pay for either.
-			// NOTE: Ahead of `--watch`, because `--mutate` refuses it: the two
+			// Ahead of `--watch`, because `--mutate` refuses it: the two
 			// are one refusal spelled in one place rather than a branch here
 			// and a message over there. Every contradiction `--mutate` has is
 			// answered by `runMutation`.
@@ -279,7 +279,7 @@ async function dispatch(
 	}
 }
 
-// NOTE: Returns an exit code instead of calling `process.exit`, so that the
+// Returns an exit code instead of calling `process.exit`, so that the
 // whole CLI can be driven from a test without ending the test runner along with
 // it. The executables in bin/ set `process.exitCode` from what it answers.
 export async function run(
@@ -292,7 +292,7 @@ export async function run(
 	try {
 		invocation = parseArguments(argv, programName)
 
-		// NOTE: The project file is read HERE, once, before a command has run
+		// The project file is read HERE, once, before a command has run
 		// anything — every setting it holds is either a flag the command line
 		// could have written or a fact about where the project is, and both are
 		// answers a command wants in hand rather than a file it goes looking
@@ -300,7 +300,7 @@ export async function run(
 		// `readsProjectConfiguration`.
 		let configuration = projectConfigurationFor(invocation.command)
 
-		// NOTE: And the flags are resolved against it here as well, so that
+		// And the flags are resolved against it here as well, so that
 		// what a command reads off its context is the effective answer — the
 		// flag where one was given, the setting where the project said so, and
 		// the default where neither did.
@@ -315,7 +315,7 @@ export async function run(
 			configuration,
 		)
 	} catch (error) {
-		// NOTE: The arguments could not be read, so there are no resolved
+		// The arguments could not be read, so there are no resolved
 		// options to build a context from — a default one is used purely to
 		// render the error. `--json` is read straight from the raw arguments,
 		// because a caller that asked for JSON needs the failure in JSON too.
@@ -339,7 +339,7 @@ export async function run(
 		return EXIT_SUCCESS
 	}
 
-	// NOTE: A bare `esc` has nothing to compile and no command to run, so it
+	// A bare `esc` has nothing to compile and no command to run, so it
 	// shows what it can do rather than an error — the arguments are not wrong,
 	// they are missing.
 	if (
@@ -349,7 +349,7 @@ export async function run(
 		return showHelp(context, invocation)
 	}
 
-	// NOTE: After the two ways out that print instead of running — a version and
+	// After the two ways out that print instead of running — a version and
 	// a help screen are not a run, and neither is answered out of a project.
 	reportProjectSettings(context, invocation.command)
 

@@ -6,7 +6,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { COMPILE_CHECKED_HELP_CODES } from "./followedHelps"
 
-// NOTE: The second guard the Help audit left behind, and the smaller one. A Help
+// The second guard the Help audit left behind, and the smaller one. A Help
 // that tells the reader to WRITE a spelling is a promise about that spelling, and
 // the audit found the promise broken a dozen ways — a Type nothing declares, a
 // Method with no such name, a Case with no payload where one was written. The
@@ -25,7 +25,7 @@ const DOCS = path.join(
 	"../../../website/src/content/docs/reference/diagnostics.mdx",
 )
 
-// NOTE: What a Help that SPELLS something looks like on the page. It used to be
+// What a Help that SPELLS something looks like on the page. It used to be
 // the word "Write" followed by a quote, which is one of the shapes a Help takes
 // and not the one most of them take: the audit's review counted 39 codes that
 // print code inside a Help this could not see — "Add 'case Colour#Blue'", "Take
@@ -47,7 +47,7 @@ const DOCS = path.join(
 const SPELLS_SOMETHING =
 	/Help[ 0-9]*: .*(?:[Ww]rite '|'[^']*(?:::|->|<-|[#(){}[\]=@.\\/<>]|[0-9])[^']*')/
 
-// NOTE: Read off the captured reports rather than off the prose around them —
+// Read off the captured reports rather than off the prose around them —
 // a `### \`code\`` heading opens an entry, and every `Help:` line under it until
 // the next heading belongs to that code.
 function codesPromisingASpelling(): Array<common.DiagnosticCode> {
@@ -75,7 +75,7 @@ function codesPromisingASpelling(): Array<common.DiagnosticCode> {
 	return codes
 }
 
-// NOTE: The specs that compile what a Help spells — the ones importing
+// The specs that compile what a Help spells — the ones importing
 // `compiles` from the shared harness. The registry is a list of codes and
 // nothing holds a list of codes to anything, so what is checked is that each
 // entry is WRITTEN DOWN in one of these: delete the spec that earned an entry
@@ -114,7 +114,7 @@ describe("Helps that spell something to write", () => {
 		expect(promising.length).toBeGreaterThan(20)
 	})
 
-	// NOTE: An entry whose code no longer prints a spelling to write is an entry
+	// An entry whose code no longer prints a spelling to write is an entry
 	// about a Help that is gone — the registry would go on claiming a promise
 	// nobody is making, which is the way a list like this rots.
 	it("has a registry with nothing stale in it", () => {
@@ -125,7 +125,7 @@ describe("Helps that spell something to write", () => {
 		).toEqual([])
 	})
 
-	// NOTE: An entry whose code is written down in no spec that compiles a Help
+	// An entry whose code is written down in no spec that compiles a Help
 	// is an entry with nothing behind it — the registry would go on saying a
 	// Help is compiled somewhere after the spec that compiled it was deleted or
 	// renamed, which is the one thing a registry maintained by hand does on its
@@ -142,7 +142,7 @@ describe("Helps that spell something to write", () => {
 		).toEqual([])
 	})
 
-	// NOTE: Printed rather than failed, deliberately. The uncovered codes are
+	// Printed rather than failed, deliberately. The uncovered codes are
 	// work, not breakage: each is a Help that WORKS as far as anybody has
 	// checked and that nothing compiles, and turning the list red would only
 	// mean deleting it. The Compiler's own behaviour is guarded above.

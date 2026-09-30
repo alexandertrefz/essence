@@ -1,6 +1,6 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-// NOTE: A typed Match Handler holds Expressions outside its body — the value a
+// A typed Match Handler holds Expressions outside its body — the value a
 // literal Matcher compares against, one per by-value member of a Record
 // Matcher, and the Guard. They are ordinary Expressions with ordinary
 // Positions, so every walker that descends into `body` has to descend into
@@ -23,7 +23,7 @@ export function typedHandlerExpressions(
 	].filter((expression) => expression !== null)
 }
 
-// NOTE: The same question asked of a PARSED Matcher: the written values its
+// The same question asked of a PARSED Matcher: the written values its
 // Pattern constrains members against, in source order, however deeply nested
 // and whether the Pattern stands in the Matcher itself or in a Case payload.
 // They are the only part of a Matcher smaller than the Matcher — a literal

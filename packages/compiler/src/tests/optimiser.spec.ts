@@ -39,7 +39,7 @@ import { stdlibPrelude, withOptimiserOptions } from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The Optimiser's own gates: that the registry says what the command line
+// The Optimiser's own gates: that the registry says what the command line
 // and the documentation read off it, that the shared walk reaches every
 // Expression a Program holds, that each pass emits what it says it emits, and —
 // the contract that matters most — that a Program prints the same thing with a
@@ -62,7 +62,7 @@ function simplifiedSource(source: string): common.typedSimple.Program {
 	return simplify(enriched.program)
 }
 
-// NOTE: What the Validator says about a source, which for a Program that
+// What the Validator says about a source, which for a Program that
 // compiles is Warnings — `unreachable-case` above all, which is the Diagnostic
 // `prune-dead-match-arms` acts on. Asked here rather than assumed, so that the
 // pass and the Warning can be held to each other.
@@ -78,7 +78,7 @@ function validatedDiagnostics(source: string): Array<common.Diagnostic> {
 	return validate(enriched.program)
 }
 
-// NOTE: Every Match's Matchers, in the order the walk reaches the Matches and
+// Every Match's Matchers, in the order the walk reaches the Matches and
 // each chain is written — the shape of a Program's Matches, read off the Nodes
 // rather than off the emission, so that what a pass does to a chain can be
 // stated as what it does to a chain.
@@ -98,7 +98,7 @@ function matchMatchers(
 	return matchers
 }
 
-// NOTE: The Constants a Program declares at its top level, by name — what
+// The Constants a Program declares at its top level, by name — what
 // `eliminate-dead-code` either leaves standing or takes away.
 function declaredConstantNames(
 	program: common.typedSimple.Program,
@@ -117,7 +117,7 @@ function matchHandlerCount(program: common.typedSimple.Program): number {
 	)
 }
 
-// NOTE: The Options reach the Rewriter as well as the Optimiser — the standard
+// The Options reach the Rewriter as well as the Optimiser — the standard
 // library's own bodies are optimised inside the prelude the Rewriter builds, so
 // a Program compiled with a pass off would otherwise import one compiled with it
 // on.
@@ -128,7 +128,7 @@ function generate(
 	return rewrite(optimise(simplifiedSource(source), options), options)
 }
 
-// NOTE: The other half of every toggle: not what the two builds LOOK like but
+// The other half of every toggle: not what the two builds LOOK like but
 // what they DO. The emitted module is written to a throwaway file and imported
 // so its top-level `Terminal.inspect` calls run.
 async function outputOf(javaScript: string): Promise<Array<string>> {
@@ -137,7 +137,7 @@ async function outputOf(javaScript: string): Promise<Array<string>> {
 
 	writeFileSync(file, javaScript)
 
-	// NOTE: Both doors, into one buffer in writing order. `Terminal.inspect`
+	// Both doors, into one buffer in writing order. `Terminal.inspect`
 	// goes through `console.log` and `Terminal.print` through the stream, so a
 	// harness holding only `console.log` would read a printing Program as
 	// silent — and two silences compare equal, which is the one answer this
@@ -167,7 +167,7 @@ async function outputOf(javaScript: string): Promise<Array<string>> {
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
-// NOTE: One emitted top-level const, read out by the name it starts with — the
+// One emitted top-level const, read out by the name it starts with — the
 // standard library's Methods are `$es_<Namespace>_<member>` consts, and an
 // Overload's mangled number is nobody's business here. It is what lets a
 // question be asked of ONE prelude body rather than of the whole emission.
@@ -182,7 +182,7 @@ function bodyOf(generated: string, name: string): string {
 	return end === -1 ? rest : rest.slice(0, end)
 }
 
-// NOTE: The pass contract, as one function: a Program compiled with the named
+// The pass contract, as one function: a Program compiled with the named
 // pass turned off prints exactly what it prints with the pass on. Every pass
 // registers a case of this, over a Program that exercises what it rewrites.
 async function expectSamePrintedOutput(
@@ -202,7 +202,7 @@ async function expectSamePrintedOutput(
 	return withPass
 }
 
-// NOTE: One Match per rule `compile-type-tests` decides by: a scalar Matcher, a
+// One Match per rule `compile-type-tests` decides by: a scalar Matcher, a
 // Case Matcher, a List Matcher the scrutinee has one List member for, two List
 // members sharing the one tag, a Record Matcher beside a String, and a Type
 // Parameter standing where anything at all could arrive. The two List members
@@ -260,7 +260,7 @@ const typeTests = `implementation {
 	Terminal.inspect(label(["a"], or "b"))
 }`
 
-// NOTE: One Match per rule `compile-record-members` decides by, over Records
+// One Match per rule `compile-record-members` decides by, over Records
 // only their MEMBERS tell apart: two Records naming one member under two Types,
 // two naming different members (so a read may find nothing), the same two beside
 // a String (so the Record tag has to be asked first), a member that is a Type
@@ -323,19 +323,19 @@ const recordMembers = `implementation {
 	Terminal.inspect(labelled("t"))
 }`
 
-// NOTE: One of each thing `pool-constants` declares once — a literal written
+// One of each thing `pool-constants` declares once — a literal written
 // twice, a Rational, a payload-less Case, a Record Matcher's descriptor, a
 // conformance witness the standard library answers for, and a witness for a
 // Namespace this Program DECLARES, which is the one that must stay where it was
 // written. The Boolean is here to be left alone.
 //
-// NOTE: The Match is written over TWO Record members, and the second Handler
+// The Match is written over TWO Record members, and the second Handler
 // names a member only one of them declares whose Type is a Record — which is
 // where `compile-record-members` declines, so a descriptor is still there to
 // pool. A Record beside a String would not be: one claimant for the Record tag
 // makes the whole Matcher a tag test.
 //
-// NOTE: The witness that gets pooled is the one `sort` is PASSED, rather than
+// The witness that gets pooled is the one `sort` is PASSED, rather than
 // the one an interpolated hole reads: a hole's witness is consumed on the spot
 // and `devirtualise-witnesses` takes it away before the pool sees it, which is
 // the coordination between the two written as a Program.
@@ -371,7 +371,7 @@ const constants = `implementation {
 	})
 }`
 
-// NOTE: A payload-less Case on either side of the comparison, both spellings of
+// A payload-less Case on either side of the comparison, both spellings of
 // the question, a Case that DOES carry a payload, and a generic Choice of each
 // — the shapes `lower-unit-case-equality` must rewrite beside the ones it must
 // leave alone. `1::isLessThan(2)` is here because the Method it reaches is in
@@ -409,7 +409,7 @@ const unitCaseEquality = `implementation {
 	Terminal.inspect(1::isLessThan(2))
 }`
 
-// NOTE: Every operation `lower-scalar-operations` writes out, beside the ones
+// Every operation `lower-scalar-operations` writes out, beside the ones
 // it must refuse: a mixed-kind comparison and a mixed-kind sum, where the
 // widening the covering Namespace decides is not a bigint operation; the
 // three-Argument `is`, which is a different Method; and an `and` whose Argument
@@ -417,7 +417,7 @@ const unitCaseEquality = `implementation {
 // runs in a Program that is right and does not run in one that lowered it to
 // `&&`.
 //
-// NOTE: The product of two PROVEN Integers is here as an operation of its own,
+// The product of two PROVEN Integers is here as an operation of its own,
 // because the Namespace name is the only thing telling it from the one above it:
 // `NonZeroInteger.multiply` is Integer's own product re-exported, reached because
 // both operands were proven not to be zero, and the evidence that reached it was
@@ -468,7 +468,7 @@ const scalarOperations = `implementation {
 	Terminal.inspect(a::add(1/2))
 }`
 
-// NOTE: A shadowed Namespace standing where an `and` would skip it. `Integer`
+// A shadowed Namespace standing where an `and` would skip it. `Integer`
 // is a Program's own Namespace inside this block and `Boolean` is not, so the
 // Invocation being LOWERED is not the one that is shadowed — the shadowed one
 // is its Argument, which JavaScript's `&&` would not evaluate because the
@@ -503,7 +503,7 @@ const shadowedArgument = `implementation {
 	Terminal.inspect(ran)
 }`
 
-// NOTE: One dispatch of each shape `compile-union-dispatch` has to answer for:
+// One dispatch of each shape `compile-union-dispatch` has to answer for:
 // a Union two tags tell apart, one where two members share a tag and the
 // descriptors stay, a call whose Arguments are compiled per branch (`map`), one
 // whose branches need a conformance witness each (`sort`), a Union of a Record
@@ -580,7 +580,7 @@ const unionDispatch = `implementation {
 	Terminal.inspect(number::multiply(with 2)::toString())
 }`
 
-// NOTE: The dispatch whose ANSWER depends on the order the operands are
+// The dispatch whose ANSWER depends on the order the operands are
 // evaluated in: `flip` assigns the very variable the dispatch is reading, so a
 // chain that read the receiver where the branch uses it — after the Argument —
 // would call the other Namespace's Method and print `"flag!"`. The dispatch
@@ -622,7 +622,7 @@ const dispatchOrder = `implementation {
 	Terminal.inspect(either::tagged(with flip()))
 }`
 
-// NOTE: A witness of each kind a hole can be given — a standard library
+// A witness of each kind a hole can be given — a standard library
 // Namespace's, a Namespace this Program DECLARES, and a CONDITIONAL one, which
 // is the one that must stay an object because the Function behind its Method is
 // curried rather than named. The `sort` at the end is the other half of the
@@ -658,7 +658,7 @@ const witnesses = `implementation {
 	Terminal.inspect([2, 1]::sort()::toString())
 }`
 
-// NOTE: A hole whose witness writes no `toString`: another Protocol the
+// A hole whose witness writes no `toString`: another Protocol the
 // Namespace conforms to provides the body `Printable` requires.
 const providedToString = `implementation {
 	protocol Named {
@@ -676,7 +676,7 @@ const providedToString = `implementation {
 	Terminal.print("a {box}")
 }`
 
-// NOTE: Records, Lists, Cases with a payload and without, a payload that is a
+// Records, Lists, Cases with a payload and without, a payload that is a
 // Record the Program is holding elsewhere, a member name JavaScript can not
 // spell, and a Match reading it all back — the shapes `collapse-construction`
 // rewrites, in one Program that prints what it built.
@@ -713,7 +713,7 @@ const constructions = `implementation {
 	})
 }`
 
-// NOTE: The witnesses a CONDITIONAL conformance is built from — `List` is
+// The witnesses a CONDITIONAL conformance is built from — `List` is
 // Comparable where its Item is, so sorting a List of Lists curries a witness
 // onto a witness, and sorting a List of Lists of Lists curries that onto
 // another. Two things are asked of this Program: that the
@@ -728,7 +728,7 @@ const conditionalConformances = `implementation {
 	Terminal.inspect([1, 2]::compare(to [1, 2, 3])::toString())
 }`
 
-// NOTE: Two Choices reaching one bounded Function, and one of them twice. Every
+// Two Choices reaching one bounded Function, and one of them twice. Every
 // Choice's derived `Enumerable` witness is the same one-entry map — what tells
 // two of them apart is the tags the helper is curried with, which is why they
 // are in `pool-constants`' key.
@@ -756,7 +756,7 @@ const derivedCaseListings = `implementation {
 	Terminal.inspect(count(red))
 }`
 
-// NOTE: A Combination whose right-hand side is a literal, one whose right-hand
+// A Combination whose right-hand side is a literal, one whose right-hand
 // side is a Record the Program is holding, one member overridden and both — the
 // shapes `collapse-combinations` rewrites. A right-hand side may only be a
 // Partial of what it updates, so there is no member here the left-hand side
@@ -776,7 +776,7 @@ const combinations = `implementation {
 	Terminal.inspect(base::is({ x = 1, y = 2 }))
 }`
 
-// NOTE: A Match in each position `lower-matches-to-statements` writes out,
+// A Match in each position `lower-matches-to-statements` writes out,
 // beside the ones it must leave alone. `radius` answers with `match @ ->`, whose
 // value is `_self` already; `holding` answers with `match @.held ->`, which
 // READS `_self` and may not bind it in the same Scope; `sized` answers before
@@ -861,7 +861,7 @@ const statementMatches = `implementation {
 	})
 }`
 
-// NOTE: A Match nested inside another's Handler, in the position whose answer is
+// A Match nested inside another's Handler, in the position whose answer is
 // the OUTER Match's — so the inner Handlers answer the outer Declaration's name
 // and break out of the outer Match's label, and the inner one declares none of
 // its own.
@@ -895,7 +895,7 @@ const nestedStatementMatches = `implementation {
 	Terminal.inspect(named("x"))
 }`
 
-// NOTE: A Handler binding the very name the lowered Match writes its answer to,
+// A Handler binding the very name the lowered Match writes its answer to,
 // in each shape a name can be bound in a Scope the answer is written from: a
 // Constant, a Function, a Namespace, a Conditional branch inside a Handler, a
 // Handler of a Match nested in Return position, and an assignment rather than a
@@ -996,7 +996,7 @@ const shadowedAnswerNames = `implementation {
 	Terminal.inspect(answerF)
 }`
 
-// NOTE: A Match written for its effects whose Handler answers a call that only
+// A Match written for its effects whose Handler answers a call that only
 // LOOKS like arithmetic — the `Integer` it is answered by is the Program's own,
 // and it prints. Whether `"the shadow ran"` is printed is the whole of the
 // difference between a Handler whose Return may be dropped and one whose may
@@ -1032,7 +1032,7 @@ const shadowedDiscardedAnswer = `implementation {
 	Terminal.inspect(trick())
 }`
 
-// NOTE: The same shadow, standing where a Constant nobody reads is bound to it.
+// The same shadow, standing where a Constant nobody reads is bound to it.
 // Dropping the Declaration would drop the only thing the call does.
 const shadowedDeadCode = `implementation {
 	§§ Binds a name nothing reads, and answers zero.
@@ -1060,7 +1060,7 @@ const shadowedDeadCode = `implementation {
 	Terminal.inspect(trick())
 }`
 
-// NOTE: A compiled Union dispatch that HOLDS operands, in each Statement
+// A compiled Union dispatch that HOLDS operands, in each Statement
 // position the wrapper can be taken off in — a Return, a Declaration and a
 // Statement written for its effects — beside `either::tagged(with flip())`,
 // whose two held operands must stay in the order they were written.
@@ -1122,7 +1122,7 @@ const heldDispatches = `implementation {
 	Terminal.inspect(either)
 }`
 
-// NOTE: A Conditional whose question an earlier pass already asked in
+// A Conditional whose question an earlier pass already asked in
 // JavaScript's own terms, beside one whose question is a Boolean the Program
 // computed — a Method a Namespace wrote, which answers an Essence Boolean and
 // has to be read.
@@ -1153,7 +1153,7 @@ const conditions = `implementation {
 	}
 }`
 
-// NOTE: One Program per driver `inline-loops` knows, because each is a
+// One Program per driver `inline-loops` knows, because each is a
 // different walk and each is emitted from its own reading of the driver it
 // replaces. The counted one first: up, down, and the Statement position that
 // takes it without a closure.
@@ -1178,7 +1178,7 @@ const countedLoop = `implementation {
 	Terminal.inspect(once)
 }`
 
-// NOTE: The two condition-driven entries, which are one driver read two ways.
+// The two condition-driven entries, which are one driver read two ways.
 const conditionLoops = `implementation {
 	constant doubled = loop(startingWith 1, while (n) {
 		<- n::isLessThan(100)
@@ -1192,7 +1192,7 @@ const conditionLoops = `implementation {
 	Terminal.inspect(same)
 }`
 
-// NOTE: The general entry, whose body answers with a \`Step\` built at the
+// The general entry, whose body answers with a \`Step\` built at the
 // answering position — which is what a body written for it looks like, and what
 // this pass reads rather than allocates.
 const generalLoop = `implementation {
@@ -1210,7 +1210,7 @@ const generalLoop = `implementation {
 	Terminal.inspect(result)
 }`
 
-// NOTE: And the same entry answering with a \`Step\` the Compiler can NOT see
+// And the same entry answering with a \`Step\` the Compiler can NOT see
 // built — held under a name first, which is every other way one can arrive.
 const heldStep = `implementation {
 	constant stopped = loop(startingWith 0, step (n) {
@@ -1222,7 +1222,7 @@ const heldStep = `implementation {
 	Terminal.inspect(stopped)
 }`
 
-// NOTE: List's four walking Methods, and the one call that must stay a call:
+// List's four walking Methods, and the one call that must stay a call:
 // \`map\` given a Function-valued name rather than a literal.
 const listWalks = `implementation {
 	constant items = [1, 2, 3]
@@ -1249,7 +1249,7 @@ const listWalks = `implementation {
 	Terminal.inspect(items::map(double)::length())
 }`
 
-// NOTE: The same four walks over a receiver a Program has PROVEN something
+// The same four walks over a receiver a Program has PROVEN something
 // about, beside the twin written the ordinary way — the same three Integers, the
 // same callbacks, the same answers. A refinement is erased before the first pass
 // runs, so what both hold is one \`List\`; what differs is the Namespace the
@@ -1259,7 +1259,7 @@ const listWalks = `implementation {
 // arrive as \`List\`'s own and were never affected — which is why the gate is
 // per-Method rather than per-Namespace.
 //
-// NOTE: The two transforms after them are what the gate must NOT open.
+// The two transforms after them are what the gate must NOT open.
 // \`reverse\` is \`List\`'s own native re-exported like \`map\` and is still not a
 // walk this pass knows; \`prepend(contentsOf:)\` is not \`List\`'s Function at all
 // but a wrapper calling \`append\` with the two Lists the other way round.
@@ -1290,7 +1290,7 @@ const provenWalks = `implementation {
 	Terminal.inspect(proven::prepend(contentsOf [0])::firstItem())
 }`
 
-// NOTE: The same claim for the second name, and the difference the second name
+// The same claim for the second name, and the difference the second name
 // makes: a Program declaring its own \`NonEmptyList\` takes THAT name and no
 // other, so its proven walks are left alone and the ones written the ordinary
 // way are inlined as they always were.
@@ -1321,11 +1321,11 @@ const shadowedNonEmptyList = `implementation {
 	Terminal.inspect(written::map((item) { <- item::add(1) })::length())
 }`
 
-// NOTE: A Program that declares a Namespace named \`List\`, which stands in front
+// A Program that declares a Namespace named \`List\`, which stands in front
 // of the builtin for the rest of its block — so a \`map\` written in it may be a
 // Method the Program wrote, and every walk in the Program is left alone.
 //
-// NOTE: The ordinary walk reads a BOUND List. A written one proves it holds
+// The ordinary walk reads a BOUND List. A written one proves it holds
 // items, which sends it to \`NonEmptyList\` — a name this Program did not take —
 // and there would be nothing here for the gate to refuse.
 const shadowedList = `implementation {
@@ -1352,7 +1352,7 @@ const shadowedList = `implementation {
 	Terminal.inspect(written::map((item) { <- item::add(1) })::length())
 }`
 
-// NOTE: A walk standing in an Argument, where there is nowhere to write a
+// A walk standing in an Argument, where there is nowhere to write a
 // \`while\` and the arrow stays.
 const argumentLoop = `implementation {
 	Terminal.inspect(loop(startingWith 1, while (n) {
@@ -1360,7 +1360,7 @@ const argumentLoop = `implementation {
 	}, (n) { <- n::multiply(with 2) }))
 }`
 
-// NOTE: A walk inside a walk's body, which is what numbers the names apart.
+// A walk inside a walk's body, which is what numbers the names apart.
 const nestedLoops = `implementation {
 	Terminal.inspect(loop(from 1, through 3, startingWith 0, (index, total) {
 		<- total::add(loop(from 1, through index, startingWith 0, (
@@ -1370,7 +1370,7 @@ const nestedLoops = `implementation {
 	}))
 }`
 
-// NOTE: THE Program a rename would answer wrongly. The predicate's Parameter is
+// THE Program a rename would answer wrongly. The predicate's Parameter is
 // named after a Constant around the call, and the step's body reads THAT
 // Constant — so the two must not meet, which they do not when each Parameter is
 // bound in a Scope of its own.
@@ -1391,7 +1391,7 @@ const shadowedParameter = `implementation {
 	Terminal.inspect(items::map((total) { <- total::add(1) })::length())
 }`
 
-// NOTE: What the call evaluated, in the order it evaluated it — printed,
+// What the call evaluated, in the order it evaluated it — printed,
 // because printing is the only way a Program can tell.
 const orderedLoops = `implementation {
 	Terminal.inspect(loop(from Terminal.inspect(1), through Terminal.inspect(3), startingWith Terminal.inspect(0),
@@ -1402,14 +1402,14 @@ const orderedLoops = `implementation {
 	}))
 }`
 
-// NOTE: A List grown at BOTH ends and read every way there is, which is the one
+// A List grown at BOTH ends and read every way there is, which is the one
 // Program shape the runtime's two representations can be told apart by if
 // anything can tell them apart. `prepend` gives a List a second run of items,
 // `append` may hand its answer the very Array its receiver holds, and `both` is
 // branched twice — so by the time it is printed, two other Lists have grown out
 // of the Array it holds and it has to answer its own six items regardless.
 //
-// NOTE: The Match is here because a Type test WALKS: `List<Integer>` beside
+// The Match is here because a Type test WALKS: `List<Integer>` beside
 // `List<String>` is the one Matcher pair `compile-type-tests` may not compile
 // to a tag, so the check falls to `isValueOfType`, which asks every item — of a
 // List carrying them in two runs.
@@ -1443,7 +1443,7 @@ const bothEnds = `implementation {
 	})
 }`
 
-// NOTE: The same List EDITED every way there is, which is the other shape the
+// The same List EDITED every way there is, which is the other shape the
 // two representations could be told apart by. `slice`, `remove(at:)` and
 // `replace(_:at:)` may each answer with a box over the runs their receiver
 // holds, viewing less of them, and `insert(_:at:)` hands its ends to the two
@@ -1512,7 +1512,7 @@ const bothEndsEdited = `implementation {
 	Terminal.inspect(window)
 }`
 
-// NOTE: The shape `build-lists-in-place` is FOR: a counted walk whose State is a
+// The shape `build-lists-in-place` is FOR: a counted walk whose State is a
 // List and whose body only ever appends to it. Both `append` entries are here
 // and so is a chain of them, because a turn may add more than one thing, and the
 // second link of a chain resolves on `NonEmptyList` rather than on `List` — the
@@ -1538,7 +1538,7 @@ const builtList = `implementation {
 	Terminal.inspect(joined)
 }`
 
-// NOTE: The other three walks that thread a State, each writing its accumulator
+// The other three walks that thread a State, each writing its accumulator
 // a different way: a fold's plain entry, a fold that leaves early through
 // `#Done`, and the general `Step` walk — which is driven by a `variable` here
 // because a walk that read its own accumulator to decide when to stop would be
@@ -1575,7 +1575,7 @@ const builtStates = `implementation {
 	Terminal.inspect(stepped)
 }`
 
-// NOTE: A branch that changes nothing answers the accumulator BARE, which is the
+// A branch that changes nothing answers the accumulator BARE, which is the
 // rebuilding chain with no appends on it — and a `#Done` that answers something
 // else entirely leaves with that value while the Array the walk built goes
 // nowhere.
@@ -1603,7 +1603,7 @@ const builtBranches = `implementation {
 	Terminal.inspect(elsewhere)
 }`
 
-// NOTE: The two walks the elisions meet on. `paced` is a `while` walk that
+// The two walks the elisions meet on. `paced` is a `while` walk that
 // qualifies — its predicate decides by a `variable` around the call rather than
 // by the accumulator — which is the one walk whose State Parameter is elided in
 // TWO callbacks. `doubled` takes both elisions at once: its body only ever reads
@@ -1630,7 +1630,7 @@ const builtBesideElisions = `implementation {
 	Terminal.inspect(doubled)
 }`
 
-// NOTE: THE counter-example the fence is drawn for. The old `current` survives
+// THE counter-example the fence is drawn for. The old `current` survives
 // inside `snapshots`, so pushing onto its Array would rewrite history the
 // Program already recorded — and what says so is visible in the body: `current`
 // is read twice, once as the receiver being replaced and once as a value handed
@@ -1651,7 +1651,7 @@ const retainedAccumulator = `implementation {
 	Terminal.inspect(walked.snapshots)
 }`
 
-// NOTE: One Program per way of mentioning the accumulator that is not a
+// One Program per way of mentioning the accumulator that is not a
 // rebuilding chain: a read as innocent as `length`, a name a closure captured, a
 // nested walk over it, the accumulator added to ITSELF, and a `prepend`, which
 // grows the end a build does not push onto. Every one of them keeps the walk it
@@ -1700,7 +1700,7 @@ const declinedAccumulators = `implementation {
 	Terminal.inspect(fronted)
 }`
 
-// NOTE: THE seed rule, both halves. A seed the Program was holding before the
+// THE seed rule, both halves. A seed the Program was holding before the
 // walk is COPIED at entry, so appending to it afterwards must answer the seed's
 // own items and the walk's answer must not have grown one — and a walk of no
 // turns at all must answer exactly what it was seeded with. The fold over the
@@ -1734,7 +1734,7 @@ const seededBuilds = `implementation {
 	Terminal.inspect(seed)
 }`
 
-// NOTE: One of everything `fold-constants` works out, beside the operands it
+// One of everything `fold-constants` works out, beside the operands it
 // must refuse: an Argument that PRINTS, which is the whole of what folding
 // through a call would cost, and a mixed-kind sum, which reaches a Method whose
 // body is not the one being reproduced. The Rationals are the ones that matter
@@ -1773,7 +1773,7 @@ const constantFolding = `implementation {
 	Terminal.inspect(1::add(1/2))
 }`
 
-// NOTE: The whole-Rational rule, on the one path that reproduces `toString`
+// The whole-Rational rule, on the one path that reproduces `toString`
 // without calling it: a hole renders through `Printable`, and
 // `Rational::toString` answers the numerator alone where the lowest-terms
 // denominator is one. `4/2` is stored as it was written and reduces to the same
@@ -1782,7 +1782,7 @@ const wholeRationalHoles = `implementation {
 	Terminal.inspect("{2/1}, {4/2}, {1/2}")
 }`
 
-// NOTE: A Program that declares a Namespace named after a builtin, whose
+// A Program that declares a Namespace named after a builtin, whose
 // `subtract` answers something no arithmetic would — the shape that decides
 // whether the enumeration a fold rests on may be read by NAME. A difference,
 // here and in the two fixtures above, because a refined Namespace beats the
@@ -1813,7 +1813,7 @@ const shadowedArithmetic = `implementation {
 	Terminal.inspect(trick())
 }`
 
-// NOTE: A Handler of each shape `prune-dead-match-arms` decides by. Two that
+// A Handler of each shape `prune-dead-match-arms` decides by. Two that
 // can never run — a scalar Matcher naming a Type the Union does not have, and
 // one naming a Type that is not a member of the Choice being matched — beside
 // the ones that must stay: two List members sharing the one runtime tag, where
@@ -1861,7 +1861,7 @@ const deadMatchArms = `implementation {
 	})
 }`
 
-// NOTE: A Constant of each kind `eliminate-dead-code` decides by, at a
+// A Constant of each kind `eliminate-dead-code` decides by, at a
 // Program's top level and inside a Function: one nothing reads, one read only
 // from inside a Function, one whose value PRINTS, and a `variable` — which is
 // refused whatever is done with it, because an assignment is a Statement this
@@ -1901,7 +1901,7 @@ const deadCode = `implementation {
 	Terminal.inspect(counted)
 }`
 
-// NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
+// The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The two Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on and the member a Lookup reads —
 // hold nothing else and are nothing the Program computes, so counting
@@ -1924,7 +1924,7 @@ const expressionKinds = new Set([
 	"Match",
 	"ConformanceValue",
 	"CaseValue",
-	// NOTE: The Simplifier produces exactly one intrinsic of its own, before
+	// The Simplifier produces exactly one intrinsic of its own, before
 	// any pass has run — the `omitted-argument` hole a call leaves where a
 	// Parameter took its default and something after it still has to be
 	// passed. Every other intrinsic is a pass's output and can not be in a
@@ -1932,7 +1932,7 @@ const expressionKinds = new Set([
 	"Intrinsic",
 ])
 
-// NOTE: Every Expression the Program holds, found by reading the tree as plain
+// Every Expression the Program holds, found by reading the tree as plain
 // data rather than by asking the walk — which is the whole point: a position
 // the walk forgot to descend into is a position only an INDEPENDENT reading can
 // name. Gathered by object identity, because the same Node kind occurs
@@ -1960,7 +1960,7 @@ function everyExpressionIn(program: common.typedSimple.Program): Set<unknown> {
 		}
 
 		for (let [key, entry] of Object.entries(node)) {
-			// NOTE: A Namespace Method's Function literal is not a value the
+			// A Namespace Method's Function literal is not a value the
 			// Program evaluates — the Rewriter emits it as a class member — so
 			// the walk offers the body inside it and not the literal itself.
 			// `isStatic` is the Method wrapper's own field and nothing else's.
@@ -1979,13 +1979,13 @@ function everyExpressionIn(program: common.typedSimple.Program): Set<unknown> {
 	return found
 }
 
-// NOTE: The four fields a Statement POSITION can stand in — a Program's own
+// The four fields a Statement POSITION can stand in — a Program's own
 // nodes, a Function or Handler body, and a Conditional's two. Read as plain data
 // like the Expressions above, and for the same reason: a position the walk
 // forgot is one only an independent reading can name.
 const statementFields = new Set(["nodes", "body", "trueBody", "falseBody"])
 
-// NOTE: The ARRAYS themselves rather than what is in them — every run of
+// The ARRAYS themselves rather than what is in them — every run of
 // Statements a body hook has to be offered, gathered by identity from the same
 // independent reading.
 function everyBodyIn(program: common.typedSimple.Program): Set<unknown> {
@@ -2079,13 +2079,13 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: The one transform the stage performs that is NOT a pass. Erasing
+	// The one transform the stage performs that is NOT a pass. Erasing
 	// checked refinements is what makes a Program emittable rather than better,
 	// so it has no name to be turned off under and runs whether the phase is on
 	// or off — `--no-optimise` compiles the Program as it was written, and a
 	// Program as it was written still has no run-time notion of a predicate.
 	//
-	// NOTE: A refinement is written into a simplified Program by hand, which is
+	// A refinement is written into a simplified Program by hand, which is
 	// the only way the Rewriter's refusal can be asked at all: every route
 	// through the stage takes it away first.
 	describe("erasing checked refinements", () => {
@@ -2105,7 +2105,7 @@ describe("Optimiser", () => {
 			],
 		}
 
-		// NOTE: A Match over a bare Integer, whose one Handler's Matcher is then
+		// A Match over a bare Integer, whose one Handler's Matcher is then
 		// refined — the Matcher is the field the Rewriter serializes, so it is
 		// the field both halves of this turn on.
 		function withRefinedMatcher(): common.typedSimple.Program {
@@ -2141,7 +2141,7 @@ describe("Optimiser", () => {
 			return refined
 		}
 
-		// NOTE: Asked of the whole Program rather than of the Matcher, because
+		// Asked of the whole Program rather than of the Matcher, because
 		// with the phase on the Match is lowered to Statements and compiled to a
 		// tag test on its way through — so what is asserted is that nothing
 		// anywhere in what comes out is a refinement, which is the claim.
@@ -2175,7 +2175,7 @@ describe("Optimiser", () => {
 			).toBe(program)
 		})
 
-		// NOTE: The second half of the claim, and the reason the first can be
+		// The second half of the claim, and the reason the first can be
 		// trusted: a refinement that DID reach emission fails the compile by
 		// name instead of emitting a descriptor `isValueOfType` has no answer to.
 		it("refuses to emit one that reached the Rewriter", () => {
@@ -2218,7 +2218,7 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: The prelude is the standard library's own bodies, optimised once per
+	// The prelude is the standard library's own bodies, optimised once per
 	// process and shared by every file compiled in it. It is the one cache the
 	// Options have to reach: built under one set and handed to a compilation
 	// under another, it would put passes into a Program that asked for them to
@@ -2248,7 +2248,7 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: `Everyday.es` and `Match.es` between them hold every Expression
+	// `Everyday.es` and `Match.es` between them hold every Expression
 	// shape a Program can carry — Records, Lists, Cases, Combinations, Matches
 	// with guards and literal Matchers, interpolation, Namespaces with static
 	// Properties, conformance witnesses and a Union-typed receiver.
@@ -2268,12 +2268,12 @@ describe("Optimiser", () => {
 				let expected = everyExpressionIn(program)
 
 				expect(offered.length).toBeGreaterThan(50)
-				// NOTE: Once, not merely at least once — a position walked twice
+				// Once, not merely at least once — a position walked twice
 				// would let a pass rewrite its own output, which is the one
 				// thing a bottom-up walk promises not to do.
 				expect(offered.length).toBe(new Set(offered).size)
 				expect(new Set(offered)).toEqual(expected)
-				// NOTE: A walk that changed nothing hands back what it was
+				// A walk that changed nothing hands back what it was
 				// given, whole. Passes are pure functions of their input, and
 				// the standard library's Programs are optimised once and read
 				// many times.
@@ -2282,7 +2282,7 @@ describe("Optimiser", () => {
 		}
 
 		it("leaves the Program it was given untouched", () => {
-			// NOTE: A value no fixture writes, so counting it counts the
+			// A value no fixture writes, so counting it counts the
 			// rewrite and nothing else.
 			const marker = "987654321"
 
@@ -2305,12 +2305,12 @@ describe("Optimiser", () => {
 
 			expect(rewritten).not.toBe(program)
 			expect(markers(rewritten)).toBeGreaterThan(0)
-			// NOTE: A pass that wrote into its input would corrupt the standard
+			// A pass that wrote into its input would corrupt the standard
 			// library for every later compilation in the process.
 			expect(markers(program)).toBe(0)
 		})
 
-		// NOTE: The Statement hook, held to the same three promises the
+		// The Statement hook, held to the same three promises the
 		// Expression one is: every position, exactly once, and the Program
 		// handed back as itself where nothing changed.
 		for (let fileName of ["Everyday.es", "Match.es", "Loops.es"]) {
@@ -2330,7 +2330,7 @@ describe("Optimiser", () => {
 			})
 		}
 
-		// NOTE: The body hook, held to the same three promises: every run of
+		// The body hook, held to the same three promises: every run of
 		// Statements, exactly once, and the Program handed back as itself where
 		// nothing changed. It is the one hook that may answer with a different
 		// NUMBER of Statements, so a body it never reaches is a body
@@ -2347,7 +2347,7 @@ describe("Optimiser", () => {
 					},
 				})
 
-				// NOTE: A Program's own nodes are one body and everything else
+				// A Program's own nodes are one body and everything else
 				// is a Function, a Handler or a Conditional — Everyday.es is
 				// flat and has two, where Match.es has seventeen. What carries
 				// the weight is the set below.
@@ -2359,7 +2359,7 @@ describe("Optimiser", () => {
 		}
 
 		it("offers a Statement after the Expressions below it", () => {
-			// NOTE: An Expression written for its effects is BOTH, and the order
+			// An Expression written for its effects is BOTH, and the order
 			// is what lets a pass reading Statements read what the Expression
 			// hook left — `lower-matches-to-statements` reads a compiled
 			// dispatch, which `compile-union-dispatch` writes as an Expression.
@@ -2381,7 +2381,7 @@ describe("Optimiser", () => {
 				},
 			})
 
-			// NOTE: The callee is walked too — `Terminal.inspect` is a Lookup
+			// The callee is walked too — `Terminal.inspect` is a Lookup
 			// off an Identifier — because a static Method call is an ordinary
 			// `FunctionInvocation` whose name is an Expression like any other.
 			expect(order).toEqual([
@@ -2401,13 +2401,13 @@ describe("Optimiser", () => {
 			expect(generated).toContain(
 				'_self[$type.typeKeySymbol] === "Shape#Circle"',
 			)
-			// NOTE: The whole Choice, gone from the emission — a Case Matcher
+			// The whole Choice, gone from the emission — a Case Matcher
 			// is the tag it names and nothing else here.
 			expect(generated).not.toContain('choice: "Shape"')
 		})
 
 		it("compiles a scalar Matcher to its tag", () => {
-			// NOTE: A scalar's descriptor check IS one key comparison, whatever
+			// A scalar's descriptor check IS one key comparison, whatever
 			// it is asked about, so this one needs no argument about what can
 			// arrive.
 			expect(generate(typeTests)).toContain(
@@ -2416,7 +2416,7 @@ describe("Optimiser", () => {
 		})
 
 		it("stops walking a List to find out that it is one", () => {
-			// NOTE: The change of complexity. `{ type: "List", itemType: {
+			// The change of complexity. `{ type: "List", itemType: {
 			// type: "Integer" } }` means "a List, every item of which is an
 			// Integer", so the runtime check walked every item; the scrutinee
 			// has one List member, so the tag says which member arrived and
@@ -2427,7 +2427,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the full check where two Types share a tag", () => {
-			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, and
+			// `List<Integer>` and `List<String>` are both `"List"`, and
 			// what tells them apart is the items — which is exactly what the
 			// full check walks.
 			expect(generate(typeTests)).toContain(
@@ -2436,7 +2436,7 @@ describe("Optimiser", () => {
 		})
 
 		it("compiles a Record Matcher to its tag where one Record can arrive", () => {
-			// NOTE: A Record's tag says only that it is a Record, so this needs
+			// A Record's tag says only that it is a Record, so this needs
 			// the argument about what can arrive that a scalar does not: ONE
 			// member of `{ x: Integer, y: Integer } | String` carries the Record
 			// tag and it implies the Matcher, so a value carrying that tag
@@ -2449,7 +2449,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the full check where two Records can arrive", () => {
-			// NOTE: Both members claim the one tag, so the tag says nothing —
+			// Both members claim the one tag, so the tag says nothing —
 			// what tells them apart is their members, which is
 			// `compile-record-members`' business and is turned off here so that
 			// what THIS pass leaves can be read.
@@ -2473,7 +2473,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the full check where a Type Parameter could carry the tag", () => {
-			// NOTE: `List<Integer> | Item` — a value of `Item` can be anything
+			// `List<Integer> | Item` — a value of `Item` can be anything
 			// at all, including a List, so the tag does not say which member
 			// arrived and the item walk is what decides.
 			let generated = generate(`implementation {
@@ -2494,7 +2494,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain('itemType: { type: "Integer" }')
 		})
 
-		// NOTE: The standard library's Matches go through the pass as well,
+		// The standard library's Matches go through the pass as well,
 		// inside the prelude the Rewriter builds — `Optional` is a Choice, so
 		// every fallible answer in the library is read back by one of these.
 		it("compiles the standard library's own Matches", () => {
@@ -2508,7 +2508,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain('choice: "Optional"')
 		})
 
-		// NOTE: The fixture that is nothing but Matches — every Matcher kind
+		// The fixture that is nothing but Matches — every Matcher kind
 		// the language has, including the Record ones this pass leaves alone.
 		it("leaves no Case descriptor in a compiled Match.es", () => {
 			let generated = generate(
@@ -2521,7 +2521,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: A Case Matcher's payload Pattern requires something of a member,
+		// A Case Matcher's payload Pattern requires something of a member,
 		// and that requirement is a Type check like the Matcher's own — so it
 		// goes through this pass too. Left out, it was the one check still
 		// asking the runtime the general question with a descriptor rebuilt at
@@ -2545,7 +2545,7 @@ describe("Optimiser", () => {
 			}`
 
 			it("puts the descriptor where it can be pooled", () => {
-				// NOTE: The requirement reads the MEMBER, not `_self`, and the
+				// The requirement reads the MEMBER, not `_self`, and the
 				// descriptor it is asked against is a pooled Constant rather
 				// than an object literal rebuilt on every turn.
 				// `compile-record-members` is off, because it takes the
@@ -2560,7 +2560,7 @@ describe("Optimiser", () => {
 			})
 
 			it("hands the requirement on to the decision tree", () => {
-				// NOTE: A requirement that is a Record Matcher goes through the
+				// A requirement that is a Record Matcher goes through the
 				// same rules the Matcher's own check does, one level further
 				// down: the payload is `Click | KeyPress`, only `KeyPress`
 				// declares `key`, and a member one arriving Record does not
@@ -2636,7 +2636,7 @@ describe("Optimiser", () => {
 		})
 
 		it("asks the opposite question for isNot", () => {
-			// NOTE: `!==`, not a negation of the answer — `isNot` costs what
+			// `!==`, not a negation of the answer — `isNot` costs what
 			// `is` costs.
 			expect(generate(unitCaseEquality)).toContain(
 				'red[$type.typeKeySymbol] !== "Colour#Green"',
@@ -2650,7 +2650,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads the value's tag with the Case on the receiver side", () => {
-			// NOTE: `#Red::is(red)` asks the same question of the same two
+			// `#Red::is(red)` asks the same question of the same two
 			// values, and the Case that is dropped holds no Expression to
 			// evaluate — so there is no work and no order to preserve.
 			expect(generate(unitCaseEquality)).toContain(
@@ -2659,7 +2659,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a Case carrying a payload to the runtime", () => {
-			// NOTE: The tag does not decide this one — two Circles differ by
+			// The tag does not decide this one — two Circles differ by
 			// their radius — so the comparison stays the call it was.
 			expect(generate(unitCaseEquality)).toContain(
 				"$helpers.choiceIs(circle,",
@@ -2667,7 +2667,7 @@ describe("Optimiser", () => {
 		})
 
 		it("lowers a generic Choice's payload-less Case", () => {
-			// NOTE: A generic Choice compares through a descriptor, which names
+			// A generic Choice compares through a descriptor, which names
 			// the payload members each tag carries. `#Void` carries none, so the
 			// descriptor would have read the tags and stopped.
 			let generated = generate(unitCaseEquality)
@@ -2678,7 +2678,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain(
 				'held[$type.typeKeySymbol] === "Box#Void"',
 			)
-			// NOTE: The one descriptor left is the payload comparison below —
+			// The one descriptor left is the payload comparison below —
 			// the only one of the three that needs it, and the only one carrying
 			// the witness that is the whole reason a payload can not be answered
 			// by a tag.
@@ -2686,7 +2686,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a generic Choice's payload-carrying Case to its descriptor", () => {
-			// NOTE: `#Holding` holds an `Item`, which compares through the
+			// `#Holding` holds an `Item`, which compares through the
 			// witness the caller passed rather than structurally — the one thing
 			// a tag can not answer.
 			expect(generate(unitCaseEquality)).toContain(
@@ -2695,7 +2695,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves an equality a Namespace writes alone", () => {
-			// NOTE: Only equality a Choice DERIVES is a question about tags. A
+			// Only equality a Choice DERIVES is a question about tags. A
 			// written `is` is a Method, and is called.
 			let generated = generate(`implementation {
 				choice Colour { Red, Green }
@@ -2729,18 +2729,18 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The lever this pass was written for. `isLessThan` is
+		// The lever this pass was written for. `isLessThan` is
 		// `@::compare(to other)::is(#Less)`, `isGreaterThan` is the same against
 		// `#Greater`, and the other two inequalities are written on those, so
 		// every comparison in every Program ends in this shape — inside the
 		// standard library, which is optimised with the Program that reaches it.
-		// NOTE: Asked with `lower-scalar-operations` off, because that pass
+		// Asked with `lower-scalar-operations` off, because that pass
 		// takes the same body further — a comparison of two Integers becomes
 		// one bigint comparison and the body stops being emitted at all. What
 		// is being asked here is what THIS pass does to it, so the pass that
 		// runs after it is turned off; the two together are covered where that
 		// one is.
-		// NOTE: And `fold-constants` with it, for the same reason once removed —
+		// And `fold-constants` with it, for the same reason once removed —
 		// `1::isLessThan(2)` is two literals, so the answer is written out and
 		// the body is not reached at all.
 		it("lowers the standard library's own comparisons", () => {
@@ -2762,7 +2762,7 @@ describe("Optimiser", () => {
 		})
 
 		it("calls the runtime's equality again when it is turned off", () => {
-			// NOTE: And with the pool off as well, so the Case the helper is
+			// And with the pool off as well, so the Case the helper is
 			// handed is written where it is passed rather than read out of the
 			// band — which is not what this asks about. The scalar lowering is
 			// off for the same reason it is off above: it would take the
@@ -2835,7 +2835,7 @@ describe("Optimiser", () => {
 		})
 
 		it("asks the opposite question rather than negating the answer", () => {
-			// NOTE: `isLessThanOrEqualTo` is `@::isGreaterThan(other)::negate()`
+			// `isLessThanOrEqualTo` is `@::isGreaterThan(other)::negate()`
 			// — so what a `!` would have stood in front of is a comparison with
 			// an opposite to ask, and bigints are totally ordered, with no value
 			// unequal to itself the way a floating-point NaN is.
@@ -2860,7 +2860,7 @@ describe("Optimiser", () => {
 		})
 
 		it("builds an Integer answer in one allocation", () => {
-			// NOTE: `subtract` is `@::add(other::negate())`, which was two
+			// `subtract` is `@::add(other::negate())`, which was two
 			// allocations and two calls.
 			let generated = generate(scalarOperations)
 
@@ -2870,7 +2870,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Integer.add__overload$1(a,")
 		})
 
-		// NOTE: The refinement erases before the first pass runs, so the operands
+		// The refinement erases before the first pass runs, so the operands
 		// this reads are Integers holding bigints — but the Method the Simplifier
 		// emitted is still the refined Namespace's, and a Namespace name is all
 		// this pass has to go by. `NonZeroInteger` answers `multiply` by
@@ -2885,7 +2885,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("NonZeroInteger.multiply")
 		})
 
-		// NOTE: And the other two entries of that same name are left where they
+		// And the other two entries of that same name are left where they
 		// stand. `multiply` on a proven Integer covers three entries now, and only
 		// the first is two bigints: the operand Types are what tell them apart,
 		// not the overload index, which this pass strips before it reads the name.
@@ -2898,7 +2898,7 @@ describe("Optimiser", () => {
 		})
 
 		it("compares two Strings through the runtime's own comparison", () => {
-			// NOTE: NOT `===`. Two Strings are equal when their characters are,
+			// NOT `===`. Two Strings are equal when their characters are,
 			// and the same accent written as one code point and as two is one
 			// String — so the normalising comparison decides it, in the one
 			// place that has always performed it.
@@ -2909,7 +2909,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the String comparison that takes a Case alone", () => {
-			// NOTE: `is(_ other, comparing sensitivity)` is a different Method,
+			// `is(_ other, comparing sensitivity)` is a different Method,
 			// and what it means is whatever the case-insensitive `compare`
 			// means.
 			expect(generate(scalarOperations)).toContain(
@@ -2925,7 +2925,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain("yes.value || no.value")
 		})
 
-		// NOTE: THE invariant. `a::and(b)` evaluates `b` and then calls; `a &&
+		// THE invariant. `a::and(b)` evaluates `b` and then calls; `a &&
 		// b` does not evaluate `b` when `a` is false. Here `b` PRINTS, so the
 		// two are different Programs — and the printed output below is what
 		// says which one was emitted.
@@ -2936,7 +2936,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a mixed-kind operation to the Namespace that widens it", () => {
-			// NOTE: An Integer beside a Rational compares by cross-multiplying
+			// An Integer beside a Rational compares by cross-multiplying
 			// and adds by widening — neither is a bigint operation.
 			let generated = generate(scalarOperations)
 
@@ -2945,7 +2945,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a Namespace the Program declares of its own alone", () => {
-			// NOTE: `Integer` is free inside a block, and a Namespace declared
+			// `Integer` is free inside a block, and a Namespace declared
 			// there REPLACES the builtin for the rest of it — so `isLessThan`
 			// here is a Method somebody wrote, and it answers what it was
 			// written to answer.
@@ -2976,7 +2976,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the call where the Argument reaches a Namespace the Program declares", () => {
-			// NOTE: The refusal above is about the Invocation being LOWERED, and
+			// The refusal above is about the Invocation being LOWERED, and
 			// says nothing about whether that Invocation may be SKIPPED. Here
 			// the shadowed Method stands as the Argument of an `and`, whose
 			// receiver decides the answer without it — so lowering the `and`
@@ -3001,7 +3001,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the call where the Argument is a mixed-kind comparison", () => {
-			// NOTE: `isLessThan` reads as one of the Methods the purity
+			// `isLessThan` reads as one of the Methods the purity
 			// enumeration names, and the entry it names is the one written on
 			// the bigint comparison. GIVEN A RATIONAL it is a different entry,
 			// written on the covering `Number` Namespace — an Overload that
@@ -3017,12 +3017,12 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain(".value && ")
 		})
 
-		// NOTE: The standard library is optimised with the Program that reaches
+		// The standard library is optimised with the Program that reaches
 		// it, and its own bodies are written on the Methods this pass lowers:
 		// the counted loop driver asks `index::isLessThanOrEqualTo(end)` each
 		// turn, and `isEven` asks `rest::is(0)`.
 		//
-		// NOTE: The step callback is a VALUE rather than a literal, which is
+		// The step callback is a VALUE rather than a literal, which is
 		// what keeps the driver in the emission at all — `inline-loops` writes
 		// the walk out where every callback is written at the call, and the
 		// driver whose body this reads is then reached by nobody. Bound to a
@@ -3036,7 +3036,7 @@ describe("Optimiser", () => {
 				Terminal.inspect(4::isEven())
 			}`)
 
-			// NOTE: `index` rather than `current.index` because the driver's
+			// `index` rather than `current.index` because the driver's
 			// `while` predicate takes its State apart with a Pattern — the
 			// binding is what the lowered comparison reads.
 			expect(generated).toContain("index.value <= end.value")
@@ -3045,7 +3045,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: What lowering the standard library's comparison family COSTS a
+		// What lowering the standard library's comparison family COSTS a
 		// Program: the bodies stop being reached, so they stop being emitted.
 		it("takes the comparison bodies out of the emission", () => {
 			let source = `implementation {
@@ -3058,7 +3058,7 @@ describe("Optimiser", () => {
 			expect(
 				generate(source, {
 					enabled: true,
-					// NOTE: And `fold-constants` off with it, because two literals
+					// And `fold-constants` off with it, because two literals
 					// compared are an answer it writes out — which takes the body
 					// out of the emission for a reason that is not this pass's.
 					disabledPasses: new Set([
@@ -3070,7 +3070,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads the operands the passes after it rewrote", () => {
-			// NOTE: The walk descends into a lowered operation like anything
+			// The walk descends into a lowered operation like anything
 			// else, so `pool-constants` — which runs last — finds the literal
 			// standing in one and hoists it.
 			expect(
@@ -3102,7 +3102,7 @@ describe("Optimiser", () => {
 		})
 
 		it("prints the same thing with the pass off", async () => {
-			// NOTE: `"evaluated"` is in there once, in the middle, which is the
+			// `"evaluated"` is in there once, in the middle, which is the
 			// eager-evaluation invariant stated as an output: an `and` lowered
 			// to `&&` over a printing Argument would print it zero times.
 			expect(
@@ -3120,11 +3120,11 @@ describe("Optimiser", () => {
 				"8",
 				"-2",
 				"15",
-				// NOTE: The proven product, which is the same fifteen — the two
+				// The proven product, which is the same fifteen — the two
 				// Namespaces multiply the same two bigints and one of them was
 				// entitled to say the answer is not zero.
 				"15",
-				// NOTE: And the entry beside it, which this pass leaves as the
+				// And the entry beside it, which this pass leaves as the
 				// call it was, whether the pass runs or not.
 				"3·π",
 				"false",
@@ -3171,7 +3171,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves no dispatch search in a dispatch-heavy Program", () => {
-			// NOTE: The array per call, the tuple per case and the copy of the
+			// The array per call, the tuple per case and the copy of the
 			// Argument list go with it — they were the search's Arguments and
 			// nothing else's.
 			expect(generate(unionDispatch)).not.toContain("dispatchMethod")
@@ -3184,7 +3184,7 @@ describe("Optimiser", () => {
 		})
 
 		it("takes the last case as the else, and the throw with it", () => {
-			// NOTE: Two members, one test — the Enricher gave every member of
+			// Two members, one test — the Enricher gave every member of
 			// the Union a case, so a value that declined the first has nowhere
 			// else to go, and there is nothing left for a fall-through to
 			// answer for.
@@ -3202,7 +3202,7 @@ describe("Optimiser", () => {
 		})
 
 		it("takes a Record case as the else where one member claims the tag", () => {
-			// NOTE: What the Record residual unlocked here: one member of the
+			// What the Record residual unlocked here: one member of the
 			// receiver's Union carries the Record tag and satisfies the case, so
 			// the last case's check IS the Integer comparison in front of it and
 			// there is nothing for a fall-through to answer for.
@@ -3227,7 +3227,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the throw where two Record cases both claim the tag", () => {
-			// NOTE: The other side of the same rule. Two Records claim the tag,
+			// The other side of the same rule. Two Records claim the tag,
 			// so what tells them apart is a member test — which is exactly where
 			// a runtime answer and a static Type can part company — and the
 			// throw that would name it stays, whether the test is the walk or
@@ -3253,7 +3253,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the full check where two member Types share a tag", () => {
-			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, so the
+			// `List<Integer>` and `List<String>` are both `"List"`, so the
 			// tag says nothing about which case is meant and the item walk is
 			// what decides — the same rule a Match Handler is decided by, asked
 			// of the same residual.
@@ -3264,7 +3264,7 @@ describe("Optimiser", () => {
 		})
 
 		it("writes one call where every case answers with the same Method", () => {
-			// NOTE: `List<Integer>` and `List<String>` both resolve `length` to
+			// `List<Integer>` and `List<String>` both resolve `length` to
 			// `List.length`, so the two checks in front of the two identical
 			// calls decide nothing — and the descriptor walk each of them costs
 			// goes with them, along with the throw the chain ended in.
@@ -3280,7 +3280,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the tests where one case answers with another Method", () => {
-			// NOTE: The rule is that the branches are the SAME call, not that
+			// The rule is that the branches are the SAME call, not that
 			// they share a receiver — two Methods behind two checks is what the
 			// checks are for.
 			let generated = generate(`implementation {
@@ -3310,7 +3310,7 @@ describe("Optimiser", () => {
 		})
 
 		it("ends the chain in a throw where the last case still asks something", () => {
-			// NOTE: The counterpart to a Match's fall-through, and the same
+			// The counterpart to a Match's fall-through, and the same
 			// trade: a check that could not be reduced to a tag is one where a
 			// runtime answer and a static Type can part company, so the throw
 			// that names it stays.
@@ -3320,7 +3320,7 @@ describe("Optimiser", () => {
 		})
 
 		it("builds a branch's own Arguments only in that branch", () => {
-			// NOTE: The Function literal `map` is given is compiled once per
+			// The Function literal `map` is given is compiled once per
 			// branch, because what `item` means comes from the branch. The
 			// dispatch built the shared one AND both copies at every call and
 			// used one; the chain builds the one the branch it takes needs.
@@ -3339,11 +3339,11 @@ describe("Optimiser", () => {
 		})
 
 		it("gives each branch the conformance witness its Method requires", () => {
-			// NOTE: `sort` is bounded by `Comparable`, so each branch carries the
+			// `sort` is bounded by `Comparable`, so each branch carries the
 			// witness for ITS item Type — two witnesses, one per branch, each
 			// built once by the pool rather than per call by the dispatch.
 			//
-			// NOTE: `sort` also declares a defaulted direction, so each branch
+			// `sort` also declares a defaulted direction, so each branch
 			// reaches the shim holding that default rather than the native, and
 			// the hole the call left for the direction stands between the
 			// receiver and the witness.
@@ -3353,7 +3353,7 @@ describe("Optimiser", () => {
 		})
 
 		it("writes a name and a literal where the branches use them", () => {
-			// NOTE: Nothing is held here: the receiver is a name and the
+			// Nothing is held here: the receiver is a name and the
 			// Argument a literal, so each branch reads what the call would have
 			// read and there is no wrapper at all.
 			let generated = generate(unionDispatch)
@@ -3364,7 +3364,7 @@ describe("Optimiser", () => {
 		})
 
 		it("holds an operand that can not be read again", () => {
-			// NOTE: A receiver that is a CALL is evaluated once, before any
+			// A receiver that is a CALL is evaluated once, before any
 			// test, and read from a name after that — the chain reads it three
 			// times over, and calling `identity` three times is not what the
 			// Program says.
@@ -3374,7 +3374,7 @@ describe("Optimiser", () => {
 		})
 
 		it("holds the receiver where an Argument could change it", async () => {
-			// NOTE: THE order invariant. `flip` assigns `either`, and the
+			// THE order invariant. `flip` assigns `either`, and the
 			// dispatch read the receiver BEFORE evaluating the Argument — so a
 			// chain that left the receiver where the branches use it would
 			// answer for the value after the assignment. Both are held, in the
@@ -3392,7 +3392,7 @@ describe("Optimiser", () => {
 		})
 
 		it("evaluates an Argument that can be observed exactly once", async () => {
-			// NOTE: One `"evaluated"`, wherever the chain goes — the Argument is
+			// One `"evaluated"`, wherever the chain goes — the Argument is
 			// evaluated before any test, as the dispatch's Argument array was
 			// built before any case was tried, and no branch evaluates it again.
 			let output = await outputOf(generate(unionDispatch))
@@ -3403,7 +3403,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the cases in the order the Enricher put them", () => {
-			// NOTE: A four member Union, tested in declaration order with the
+			// A four member Union, tested in declaration order with the
 			// last case's test elided — and the overload-mangled name each
 			// member resolved to carried through per branch. The Argument is a
 			// written `2`, which is its own proof that it is not zero, so the
@@ -3418,7 +3418,7 @@ describe("Optimiser", () => {
 		})
 
 		it("puts a catch-all branch last and asks nothing of it", () => {
-			// NOTE: A bounded Type Parameter accepts every value there is, so
+			// A bounded Type Parameter accepts every value there is, so
 			// its case can only be tried once everything else has declined —
 			// and once it is reached there is nothing left to ask.
 			expect(generate(unionDispatch)).toContain(
@@ -3437,7 +3437,7 @@ describe("Optimiser", () => {
 		})
 
 		it("compiles the chain with the Match tests uncompiled", () => {
-			// NOTE: Neither pass depends on the other having run: this one asks
+			// Neither pass depends on the other having run: this one asks
 			// `residual.ts` itself rather than reading what `compile-type-tests`
 			// left behind, so a dispatch is compiled the same either way.
 			expect(
@@ -3449,7 +3449,7 @@ describe("Optimiser", () => {
 		})
 
 		it("compiles the chain with the pool turned off", () => {
-			// NOTE: With nothing pooled, the descriptor a case still checks
+			// With nothing pooled, the descriptor a case still checks
 			// against is written at the test, exactly as the search's own tuple
 			// carried it.
 			expect(
@@ -3504,7 +3504,7 @@ describe("Optimiser", () => {
 		})
 
 		it("builds no witness for a hole at all", () => {
-			// NOTE: This Program interpolates and passes no witness anywhere,
+			// This Program interpolates and passes no witness anywhere,
 			// so the map it used to build is nowhere — pooled or not.
 			expect(
 				generate(`implementation {
@@ -3516,7 +3516,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reaches a Method a Namespace of the Program's own writes", () => {
-			// NOTE: Through the same reference every other emission site uses,
+			// Through the same reference every other emission site uses,
 			// so a Namespace the Program declares is named as it is named
 			// everywhere else. Nothing MOVES: the call stands where the witness
 			// stood, so a class that is not hoisted is no more of a problem
@@ -3539,7 +3539,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a conditional conformance's witness alone", () => {
-			// NOTE: `boundConformance` curries witnesses onto every Method in
+			// `boundConformance` curries witnesses onto every Method in
 			// the map, so what stands behind `toString` is a Function the call
 			// BUILDS. There is no name to put in its place.
 			let generated = generate(witnesses)
@@ -3549,7 +3549,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a witness the Program forwards alone", () => {
-			// NOTE: A conformance Argument of the enclosing Function is a
+			// A conformance Argument of the enclosing Function is a
 			// different value per call, and which Method it holds is the
 			// caller's business. The hole INSIDE `show` therefore keeps its
 			// property read; the hole at the call site, whose witness the
@@ -3580,7 +3580,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the witnesses that are passed to the pool", () => {
-			// NOTE: The two passes divide the witnesses between them rather
+			// The two passes divide the witnesses between them rather
 			// than competing for one: `sort` is HANDED its witness, so the
 			// object has to exist and the pool builds it once.
 			let generated = generate(witnesses)
@@ -3590,7 +3590,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The map names no `toString` of its own where a Protocol provides
+		// The map names no `toString` of its own where a Protocol provides
 		// it, and a plain index would answer `Object.prototype.toString`.
 		// `fold-constants` is off so that this pass is the one asked.
 		it("leaves a witness whose `toString` a Protocol provides", async () => {
@@ -3614,7 +3614,7 @@ describe("Optimiser", () => {
 		})
 
 		it("devirtualises with the pool turned off", () => {
-			// NOTE: Neither pass depends on the other having run. With the pool
+			// Neither pass depends on the other having run. With the pool
 			// off there is no const to read the witness out of, and the hole
 			// still calls the Method directly.
 			expect(
@@ -3666,7 +3666,7 @@ describe("Optimiser", () => {
 		})
 
 		it("binds nothing where the matched value is already _self", () => {
-			// NOTE: `match @ -> …` matches the receiver, which the Handlers read
+			// `match @ -> …` matches the receiver, which the Handlers read
 			// under the name it is already bound to — and `const _self = _self`
 			// would read the name being declared rather than the receiver.
 			let generated = generate(statementMatches)
@@ -3676,7 +3676,7 @@ describe("Optimiser", () => {
 		})
 
 		it("binds the matched value in a block of its own", () => {
-			// NOTE: The block is what shadows an enclosing `_self` for exactly
+			// The block is what shadows an enclosing `_self` for exactly
 			// the length of the chain, as the wrapper's Parameter did.
 			expect(generate(statementMatches)).toContain(
 				"{\n\tconst _self = circle;\n\tif (",
@@ -3684,7 +3684,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads a scrutinee that mentions _self in a Scope of its own", () => {
-			// NOTE: `match @.held -> …` READS `_self`, and a `const _self` is
+			// `match @.held -> …` READS `_self`, and a `const _self` is
 			// hoisted over its own initialiser — so reading the enclosing one
 			// from the same block is a `ReferenceError` rather than the value.
 			let generated = generate(statementMatches)
@@ -3704,7 +3704,7 @@ describe("Optimiser", () => {
 		})
 
 		it("drops the answer of a Match written for its effects", () => {
-			// NOTE: The Simplifier gives every Handler body a Return, appending
+			// The Simplifier gives every Handler body a Return, appending
 			// `<- {}` where it has none — so without this every Handler would
 			// end in an empty Record built, bound to a name and never read.
 			let generated = generate(statementMatches)
@@ -3716,7 +3716,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the answer of a Handler answered by a Namespace the Program declares", async () => {
-			// NOTE: Whether answering can be OBSERVED is the question, and a
+			// Whether answering can be OBSERVED is the question, and a
 			// Namespace named after a builtin answers it: `1::subtract(2)`
 			// under one is a Method the Program wrote, and it prints. Asked of
 			// the Program's own Namespaces rather than of the name alone.
@@ -3726,7 +3726,7 @@ describe("Optimiser", () => {
 		})
 
 		it("breaks out of the chain where a Handler answers early", () => {
-			// NOTE: A Return in the middle of a Handler body says the rest of the
+			// A Return in the middle of a Handler body says the rest of the
 			// body does not run, which an assignment does not — so the labelled
 			// block is what carries that half of what a Return meant.
 			let generated = generate(statementMatches)
@@ -3738,7 +3738,7 @@ describe("Optimiser", () => {
 		})
 
 		it("labels nothing where every Handler answers last", () => {
-			// NOTE: A Handler whose last Statement is its answer has nothing
+			// A Handler whose last Statement is its answer has nothing
 			// after it to skip, so there is nothing to break out of.
 			let generated = generate(nestedStatementMatches)
 			let labels = [...generated.matchAll(/\$match_\d+:/g)]
@@ -3748,7 +3748,7 @@ describe("Optimiser", () => {
 		})
 
 		it("answers the outer Match from a Match nested in a Handler", () => {
-			// NOTE: The inner Match stands in the Return position of the outer
+			// The inner Match stands in the Return position of the outer
 			// Handler, so what its Handlers answer is the outer Declaration's
 			// name — and neither of them builds a wrapper.
 			let generated = generate(nestedStatementMatches)
@@ -3759,7 +3759,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the wrapper where a Match stands mid-Expression", () => {
-			// NOTE: An Argument is not a place a Statement may be written, so
+			// An Argument is not a place a Statement may be written, so
 			// the one Expression JavaScript has that holds Statements is still
 			// what a Match there compiles to.
 			expect(generate(statementMatches)).toContain(
@@ -3767,7 +3767,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The lever this pass was written for. The standard library reads
+		// The lever this pass was written for. The standard library reads
 		// every fallible answer back through `<- match @ -> …`, which is the one
 		// shape that costs nothing at all to write out: the value is `_self`
 		// already and the Handlers' Returns are the Method's own.
@@ -3794,7 +3794,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("let described;")
 		})
 
-		// NOTE: The two Match passes meet on every Handler and this one runs
+		// The two Match passes meet on every Handler and this one runs
 		// FIRST, so what `elide-final-match-test` reads is what this one left —
 		// and it reads a lowered Match exactly as it reads one that was not.
 		it("elides the last test of a lowered Match too", () => {
@@ -3837,7 +3837,7 @@ describe("Optimiser", () => {
 			).toEqual(['"a positive Integer"', '"an Integer"', '"a String"'])
 		})
 
-		// NOTE: Regression tests — the answer used to be written into the
+		// Regression tests — the answer used to be written into the
 		// Program's own name from INSIDE the Handler's block, which is a Scope
 		// the Program writes Statements into. A Handler declaring that name
 		// stood in front of the Declaration: the assignment landed on the
@@ -3866,7 +3866,7 @@ describe("Optimiser", () => {
 			})
 
 			it("assigns after the label a Handler leaves the chain through", () => {
-				// NOTE: A `break` past the chain lands after the label, so the
+				// A `break` past the chain lands after the label, so the
 				// one assignment has to stand outside it — inside, and a
 				// Handler that answered early would answer nothing at all.
 				let generated = generate(shadowedAnswerNames)
@@ -3880,7 +3880,7 @@ describe("Optimiser", () => {
 			})
 
 			it("holds nothing where no Handler binds the name", () => {
-				// NOTE: Which is every Match anyone writes on purpose — the
+				// Which is every Match anyone writes on purpose — the
 				// answer goes straight to the name it was always written to.
 				expect(generate(statementMatches)).not.toContain("$held_answer")
 			})
@@ -3928,7 +3928,7 @@ describe("Optimiser", () => {
 			})
 
 			it("holds the receiver where an Argument could change it", async () => {
-				// NOTE: THE order invariant, asked of the lifted form. `flip`
+				// THE order invariant, asked of the lifted form. `flip`
 				// assigns `either`, and the dispatch reads the receiver BEFORE
 				// the Argument is evaluated — so the consts stand in the order
 				// the Argument array was built in.
@@ -3952,7 +3952,7 @@ describe("Optimiser", () => {
 			})
 
 			it("leaves a chain holding nothing where it stands", () => {
-				// NOTE: There is no wrapper to take away — the chain is the
+				// There is no wrapper to take away — the chain is the
 				// conditional Expression itself, which stands in a Statement
 				// position as happily as in any other.
 				let generated = generate(`implementation {
@@ -3976,7 +3976,7 @@ describe("Optimiser", () => {
 			})
 
 			it("reads the value of a condition the Program computes", () => {
-				// NOTE: A Method a Namespace wrote answers an Essence Boolean,
+				// A Method a Namespace wrote answers an Essence Boolean,
 				// which is an object — and every object is true, so the `value`
 				// it holds is what JavaScript has to be asked.
 				expect(generate(conditions)).toContain(
@@ -4005,7 +4005,7 @@ describe("Optimiser", () => {
 			})
 		})
 
-		// NOTE: The whole registry over the shape that reaches the most of it:
+		// The whole registry over the shape that reaches the most of it:
 		// Integer arms inside an Integer operation. `lower-scalar-operations`
 		// leaves each arm a GUARDED arithmetic — a Conditional whose consequent
 		// is a written-out Integer — and the Rewriter's `unboxedInteger` reads a
@@ -4045,7 +4045,7 @@ describe("Optimiser", () => {
 			})
 
 			it("reads the chain as the Integer it answers with", () => {
-				// NOTE: The whole chain PARENTHESISED and read through one
+				// The whole chain PARENTHESISED and read through one
 				// `.value`, which is exactly what says it was read as a value
 				// rather than mistaken for a guarded arithmetic and rewritten
 				// arm by arm — that reading would have written the first arm's
@@ -4063,7 +4063,7 @@ describe("Optimiser", () => {
 			})
 		})
 
-		// NOTE: The other half of the same rewrite. An arm's Condition is a
+		// The other half of the same rewrite. An arm's Condition is a
 		// Boolean read exactly as an `if`'s is, and before this pass reached one
 		// a `define` paid for a Boolean built and taken apart on every arm it
 		// tested — which is the one shape the Node exists to avoid.
@@ -4081,7 +4081,7 @@ describe("Optimiser", () => {
 			it("asks the test rather than the Boolean it built", () => {
 				let generated = generate(ladder)
 
-				// NOTE: The whole chain, in one match: two raw comparisons and
+				// The whole chain, in one match: two raw comparisons and
 				// three answers, with nothing between a test and the `?` that
 				// reads it. `pool-constants` has put every literal behind a
 				// reference by the time this is emitted, so the names are read
@@ -4093,7 +4093,7 @@ describe("Optimiser", () => {
 			})
 
 			it("reads the value of a Condition the Program computes", () => {
-				// NOTE: A Condition nothing lowered stays a value, and its
+				// A Condition nothing lowered stays a value, and its
 				// `value` is what the ternary has to be asked — reading `.value`
 				// off a raw boolean would answer `undefined`, and every arm
 				// would decline.
@@ -4137,7 +4137,7 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: `= expression` defaults, against the Optimiser's own contract — any
+	// `= expression` defaults, against the Optimiser's own contract — any
 	// subset of the passes is a correct Program, and a pass never changes what
 	// one does. A default is an Expression standing where no pass can lift work
 	// in front of it, so `walkFunctionDefinition` offers one only to the passes
@@ -4200,7 +4200,7 @@ describe("Optimiser", () => {
 			expect(none).toEqual(all)
 		})
 
-		// NOTE: One case per pass, which is the shape every other pass here is
+		// One case per pass, which is the shape every other pass here is
 		// held to — a Program full of defaulted calls, with each pass turned off
 		// on its own.
 		for (let passName of optimiserPassNames) {
@@ -4209,7 +4209,7 @@ describe("Optimiser", () => {
 			})
 		}
 
-		// NOTE: `pool-constants` is the reason a default is walked at all. A
+		// `pool-constants` is the reason a default is walked at all. A
 		// unit-Case default is built by a `createCase` call otherwise — at every
 		// call that leaves the Argument out, which is every call of `trim`,
 		// `print`, `round` and `normalize` in every Program — where the
@@ -4228,7 +4228,7 @@ describe("Optimiser", () => {
 				Terminal.inspect(edge())
 			}`
 
-			// NOTE: The `createCase` call moves OUT of the parameter list and
+			// The `createCase` call moves OUT of the parameter list and
 			// into the band, which is the whole of what pooling buys here: a
 			// default is worked out per CALL, so a call left inside is a call
 			// per call.
@@ -4243,7 +4243,7 @@ describe("Optimiser", () => {
 			).toContain('function edge(side = $type.createCase("Edge#Front"))')
 		})
 
-		// NOTE: And a literal one is pooled the same way — the Integer `1` of
+		// And a literal one is pooled the same way — the Integer `1` of
 		// `removeFirst` was `createInteger(1n)` at every call.
 		it("pools a literal default", () => {
 			expect(
@@ -4257,7 +4257,7 @@ describe("Optimiser", () => {
 			).toContain("function f(count = $pool_0)")
 		})
 
-		// NOTE: `eliminate-dead-code` drops a Constant nothing READS, and a
+		// `eliminate-dead-code` drops a Constant nothing READS, and a
 		// default is a read — the only one, for a Constant a Declaration names
 		// and no body does. Missed, the Constant went and the emitted default
 		// named nothing.
@@ -4276,14 +4276,14 @@ describe("Optimiser", () => {
 			expect(await outputOf(generate(source))).toEqual(['"world"'])
 		})
 
-		// NOTE: `inline-loops` writes a callee's BODY out where the call stands,
+		// `inline-loops` writes a callee's BODY out where the call stands,
 		// and the callee's own default parameters are what would have filled the
 		// missing Argument in — there is no binding at the call site for them to
 		// fill. None of the callees it inlines carries a default, so the guard
 		// is asserted against a Namespace that shadows one of them: with the
 		// guard, the call keeps its frame and answers correctly.
 		describe("a walk this pass inlines, given a default", () => {
-			// NOTE: The filter is an Overload entry, so what stands in the
+			// The filter is an Overload entry, so what stands in the
 			// source is the entry's own signature with no name on it. The
 			// `@returns` line above it is what tells this one from the
 			// `removeEvery(where:)` entry, whose signature is identical.
@@ -4297,7 +4297,7 @@ describe("Optimiser", () => {
 			beforeAll(() => {
 				let sources = readStdlibFiles().map(
 					({ filePath, sourceText }) => {
-						// NOTE: The separator is part of the suffix, because
+						// The separator is part of the suffix, because
 						// `NumberList.es` ends with `List.es` too and is not
 						// the file this shadows.
 						if (!filePath.endsWith("/List.es")) {
@@ -4334,7 +4334,7 @@ describe("Optimiser", () => {
 				expect(await outputOf(generate(folded))).toEqual(["[ 2, 3 ]"])
 			})
 
-			// NOTE: The pass writes the CALLEE'S BODY out where the call stands,
+			// The pass writes the CALLEE'S BODY out where the call stands,
 			// and the callee's own default parameter is what would have filled
 			// the missing Argument in — there is no binding at the call site for
 			// it to fill. So the call keeps its frame, which is a missed
@@ -4347,7 +4347,7 @@ describe("Optimiser", () => {
 			})
 		})
 
-		// NOTE: A defaulted Integer Parameter is an ordinary binding by the time
+		// A defaulted Integer Parameter is an ordinary binding by the time
 		// any Statement runs, so the arithmetic over it lowers exactly as it
 		// always did — the default changes the parameter list and nothing about
 		// the body.
@@ -4358,17 +4358,17 @@ describe("Optimiser", () => {
 
 	describe("inline-loops", () => {
 		it("writes the counted loop as a for over what the bounds hold", () => {
-			// NOTE: The whole of what the counted entry costs, gone: the
+			// The whole of what the counted entry costs, gone: the
 			// counter IS what its bounds hold, and the `{ index, carried }`
 			// Record its Essence body threads through the `while` driver is
 			// never built.
 			//
-			// NOTE: The direction is which ENTRY was called, so nothing asks at
+			// The direction is which ENTRY was called, so nothing asks at
 			// run time and neither walk carries the other's test. Only the
 			// down-counting one declares anything besides its bounds, and what
 			// it declares is the clamp that makes its first turn certain.
 			//
-			// NOTE: And the KIND of counter is decided while COMPILING, because
+			// And the KIND of counter is decided while COMPILING, because
 			// both bounds are written as Integers a double holds exactly. None
 			// of what asks at run time is emitted at all.
 			let generated = generate(countedLoop)
@@ -4393,7 +4393,7 @@ describe("Optimiser", () => {
 		})
 
 		it("decides the counter's kind at run time for a bound it can not read", () => {
-			// NOTE: A bound that is not a Literal is a value nothing is known
+			// A bound that is not a Literal is a value nothing is known
 			// about, so the walk asks which representation the two are holding
 			// — and a bigint counter is canonicalised per turn, because the kind
 			// is decided from the bounds and canonicality belongs to the value.
@@ -4423,7 +4423,7 @@ describe("Optimiser", () => {
 		})
 
 		it("hands the body the counter raw where no Integer is needed", () => {
-			// NOTE: The driver built that Integer out of a pooled `1` and an
+			// The driver built that Integer out of a pooled `1` and an
 			// `add`, inside a Record, behind two closure calls. Now it is not
 			// built at all: a counting body reads through to the value at every
 			// mention of the counter, so the counter itself is what it is
@@ -4441,12 +4441,12 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the counter's Integer where the body needs one", () => {
-			// NOTE: A body that hands the counter on rather than reading
+			// A body that hands the counter on rather than reading
 			// through it needs the Integer, and the swap has to see that. The
 			// mention here is an Argument, which is every position that is not
 			// a read of the value.
 			//
-			// NOTE: The Integer is built where it is handed on rather than
+			// The Integer is built where it is handed on rather than
 			// bound first, because this walk builds its List in place and its
 			// whole turn is that one push. What matters here is that the
 			// Integer is BUILT — `$loop_0_index` alone would be the swap taken
@@ -4472,7 +4472,7 @@ describe("Optimiser", () => {
 		})
 
 		it("carries the State as the value its Integer boxes", () => {
-			// NOTE: The other allocation a turn, and the one that pays: the
+			// The other allocation a turn, and the one that pays: the
 			// State is the walk's OWN Integer — nobody outside the walk can hold
 			// one — so a walk whose bodies only read what it holds carries the
 			// value and builds the Integer once, where the walk answers. It only
@@ -4487,7 +4487,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain(
 				"sum = Integer.createInteger($loop_0_state);",
 			)
-			// NOTE: The Parameter's `const` STAYS. The slot is one binding for
+			// The Parameter's `const` STAYS. The slot is one binding for
 			// the whole walk and the Parameter is bound per turn, so a closure
 			// the body builds captures the turn it was built in — exactly as
 			// capturing the Integer gave it.
@@ -4495,7 +4495,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the State's Integer where a body needs one", () => {
-			// NOTE: The same refusal the counter's swap makes, asked of the
+			// The same refusal the counter's swap makes, asked of the
 			// State: a body that hands it on keeps the box, and so does one
 			// whose State is not exactly an Integer. The Record walk is the
 			// second — `state.total` is a member read off a Record, and there is
@@ -4530,7 +4530,7 @@ describe("Optimiser", () => {
 		})
 
 		it("carries a State alike with any pass turned off", async () => {
-			// NOTE: The emission is a decision the Rewriter makes about what
+			// The emission is a decision the Rewriter makes about what
 			// reached it, so a pass that leaves a different shape leaves one it
 			// simply does not act on. `inline-loops` off is the whole shape
 			// gone, and `lower-scalar-operations` off is the arithmetic still a
@@ -4570,7 +4570,7 @@ describe("Optimiser", () => {
 		})
 
 		it("checks a while predicate before each step", () => {
-			// NOTE: The predicate is asked first and the walk is left where it
+			// The predicate is asked first and the walk is left where it
 			// answers false, which is the order and the meaning
 			// `loop__overload$1` has — a predicate false on the seed answers the
 			// seed and the body never runs.
@@ -4583,7 +4583,7 @@ describe("Optimiser", () => {
 		})
 
 		it("asks an until predicate the opposite question", () => {
-			// NOTE: `until` IS `while` with the predicate negated, and its
+			// `until` IS `while` with the predicate negated, and its
 			// Essence body says so by calling `negate` on the Boolean the
 			// predicate answered. Inlined, the question is simply asked the
 			// other way round and no Boolean is built to be flipped.
@@ -4597,7 +4597,7 @@ describe("Optimiser", () => {
 		})
 
 		it("assigns a Step's payload rather than building the Step", () => {
-			// NOTE: `#Done(x)` at the answering position is the walk's answer
+			// `#Done(x)` at the answering position is the walk's answer
 			// and the end of it; `#Continue(x)` is the next State. Both are
 			// written where the Case would have been built.
 			let generated = generate(generalLoop)
@@ -4612,7 +4612,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads the tag where the Step is not built at the answer", () => {
-			// NOTE: A `Step` held under a name is a value this Compiler can not
+			// A `Step` held under a name is a value this Compiler can not
 			// see the construction of, so the tag is read exactly as the driver
 			// read it — at that one answering position, in a block of its own.
 			let generated = generate(heldStep)
@@ -4634,7 +4634,7 @@ describe("Optimiser", () => {
 		})
 
 		it("holds the items and their count before the first turn", () => {
-			// NOTE: `List.materialise` rather than `.value` because a List that
+			// `List.materialise` rather than `.value` because a List that
 			// has been prepended to carries its items in two runs, and the
 			// count under a name of its own because the Array a List holds can
 			// GROW under the walk — an append to a List sitting at its Array's
@@ -4643,7 +4643,7 @@ describe("Optimiser", () => {
 			// covers the items its receiver held when it began.
 			let generated = generate(listWalks)
 
-			// NOTE: The count stands between the receiver and the seed, which is
+			// The count stands between the receiver and the seed, which is
 			// where a fold's seed can not lengthen the walk it seeds — the walk
 			// covers what the receiver held when the call began, and
 			// `reduce(startingWith list::append(x), …)` is written with the
@@ -4651,18 +4651,18 @@ describe("Optimiser", () => {
 			expect(generated).toContain(
 				"const $loop_0_items = List.materialise(items);\n\tconst $loop_0_count = $loop_0_items.length;\n\tlet $loop_0_state =",
 			)
-			// NOTE: And nowhere does a walk read the Array's own length again.
+			// And nowhere does a walk read the Array's own length again.
 			expect(generated).not.toMatch(
 				/\$loop_\d+_position < \$loop_\d+_items/,
 			)
 		})
 
 		it("answers the accumulator where an early fold runs to the end", () => {
-			// NOTE: The two ways `reduce`'s early-stopping entry can finish, and
+			// The two ways `reduce`'s early-stopping entry can finish, and
 			// the labelled block is what tells them apart: a `#Done` leaves
 			// through it, and falling out of the walk takes the accumulator.
 			//
-			// NOTE: The accumulator is an Integer here and the walk carries it
+			// The accumulator is an Integer here and the walk carries it
 			// raw, so the tail is where its Integer is built —
 			// `unboxed-loop-state`, whose exit this is.
 			let generated = generate(listWalks)
@@ -4686,7 +4686,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the call where a callback is a value", () => {
-			// NOTE: The whole of what decides whether a walk is inlined. A
+			// The whole of what decides whether a walk is inlined. A
 			// Function-valued name is whatever was bound to it, which is not
 			// something a Compiler can read — so the same Program holds four
 			// walks written out and one call, and the call is the one whose
@@ -4698,7 +4698,7 @@ describe("Optimiser", () => {
 		})
 
 		it("walks a proven List's own positions too", () => {
-			// NOTE: THE Program the gate was answering wrongly. A refinement is
+			// THE Program the gate was answering wrongly. A refinement is
 			// erased before the first pass runs, so `proven` and `written` hold
 			// one List and the two walks below are the same walk — but the
 			// Simplifier named `NonEmptyList` for the first of them, because
@@ -4717,7 +4717,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reaches a proven receiver's other walks by widening", () => {
-			// NOTE: `everyItem` and both `reduce` entries were never affected,
+			// `everyItem` and both `reduce` entries were never affected,
 			// and it is worth saying why rather than assuming it: none of the
 			// three is declared on `NonEmptyList` — each can answer with fewer
 			// items than it was handed, or with no List at all — so a proven
@@ -4734,7 +4734,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a proven receiver's other Methods alone", () => {
-			// NOTE: What the gate opened is one Method, not a Namespace.
+			// What the gate opened is one Method, not a Namespace.
 			// `reverse` is `List`'s own native re-exported exactly as `map` is
 			// and is still left alone, because this pass walks four Methods and
 			// that is not one of them; `prepend(contentsOf:)` is not `List`'s
@@ -4765,7 +4765,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the call where the Program declares its own List", () => {
-			// NOTE: A Namespace named after a builtin is nested — the name is
+			// A Namespace named after a builtin is nested — the name is
 			// taken at the top level — and it REPLACES the builtin for the rest
 			// of its block. So a `map` written anywhere in such a Program may be
 			// a Method the Program wrote, and the whole Program is refused
@@ -4777,7 +4777,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the proven call where the Program declares its own", () => {
-			// NOTE: The second name is a name a Program may take too, and taking
+			// The second name is a name a Program may take too, and taking
 			// it refuses the Program's proven walks for the reason taking `List`
 			// refuses its ordinary ones. It refuses THOSE and nothing else: the
 			// walk written the ordinary way below is still written out, because
@@ -4797,7 +4797,7 @@ describe("Optimiser", () => {
 		})
 
 		it("wraps a walk in an arrow where it stands in an Expression", () => {
-			// NOTE: ONE closure for the whole walk, where the driver built two
+			// ONE closure for the whole walk, where the driver built two
 			// per turn of it — and nothing in an Expression position can hold a
 			// `while` any other way.
 			let generated = generate(argumentLoop)
@@ -4811,7 +4811,7 @@ describe("Optimiser", () => {
 		})
 
 		it("numbers a loop inside a loop apart from the one holding it", () => {
-			// NOTE: The names an inlined walk binds stand in the Scope the walk
+			// The names an inlined walk binds stand in the Scope the walk
 			// holding it threads its own State in, so two walks numbered from
 			// zero would declare one name twice.
 			let generated = generate(nestedLoops)
@@ -4821,7 +4821,7 @@ describe("Optimiser", () => {
 		})
 
 		it("binds a Parameter where the closure bound it", async () => {
-			// NOTE: THE question a rename would answer wrongly. One callback's
+			// THE question a rename would answer wrongly. One callback's
 			// Parameter is named after a binding around the call, and the OTHER
 			// callback's body reads that outer binding — so a Parameter bound
 			// anywhere but in a Scope of its own would answer 11 rather than
@@ -4835,7 +4835,7 @@ describe("Optimiser", () => {
 		})
 
 		it("evaluates what the call was given before the walk", async () => {
-			// NOTE: The bounds, the seed and the receiver are evaluated in the
+			// The bounds, the seed and the receiver are evaluated in the
 			// order the call passed them, which is the order the driver's own
 			// Arguments were evaluated in — printed here, because printing is
 			// the only way a Program can tell.
@@ -4854,7 +4854,7 @@ describe("Optimiser", () => {
 		})
 
 		it("prints the same thing with the pass off over a List Program", async () => {
-			// NOTE: The fixture that reaches every walking Method there is, and
+			// The fixture that reaches every walking Method there is, and
 			// the standard library's own — which are written on `reduce` and
 			// `everyItem` with literal callbacks, so this is where the prelude's
 			// own inlining is exercised.
@@ -4867,7 +4867,7 @@ describe("Optimiser", () => {
 
 	describe("build-lists-in-place", () => {
 		it("pushes into one Array where the walk rebuilt a List per turn", () => {
-			// NOTE: The emission `map` and `everyItem` already trust, written
+			// The emission `map` and `everyItem` already trust, written
 			// for an accumulator the Program declared: one Array, a `push` a
 			// turn, and the box built once at the exit. There is no State slot
 			// at all — the Array IS the State — so the `const` the turn bound
@@ -4886,7 +4886,7 @@ describe("Optimiser", () => {
 		})
 
 		it("pushes the Argument where the const binding it stood", () => {
-			// NOTE: A turn whose whole body is that one push writes the
+			// A turn whose whole body is that one push writes the
 			// Argument there. Nothing stands between the binding and the read,
 			// so the only reads the substitution moves ahead of the Argument
 			// are the Array the walk owns and `push` on it. A turn that does
@@ -4894,7 +4894,7 @@ describe("Optimiser", () => {
 			// because then there IS something in between and this does not try
 			// to say what.
 			//
-			// NOTE: It is worth a turn's allocation: V8 stops keeping the loop
+			// It is worth a turn's allocation: V8 stops keeping the loop
 			// in optimised code once the item is bound before it is stored, and
 			// a million-turn build measures 76 ms bound against 30 ms pushed
 			// where it stands.
@@ -4912,7 +4912,7 @@ describe("Optimiser", () => {
 		})
 
 		it("adds a whole List through the runtime's own two-run walk", () => {
-			// NOTE: `append(contentsOf:)` pushes the other List's logical items
+			// `append(contentsOf:)` pushes the other List's logical items
 			// onto the Array being built, which is what the native did with the
 			// Array it was rebuilding. It can not reach for `materialise`: that
 			// answers the OTHER List's own Array.
@@ -4923,7 +4923,7 @@ describe("Optimiser", () => {
 		})
 
 		it("adds a whole List written as a literal as its items", () => {
-			// NOTE: The same licence the seed reads a literal under: it is
+			// The same licence the seed reads a literal under: it is
 			// built where it stands, so the walk pushes what it holds rather
 			// than boxing it and walking the box straight back out.
 			let generated = generate(builtList)
@@ -4934,7 +4934,7 @@ describe("Optimiser", () => {
 		})
 
 		it("builds the box at every edge the State leaves through", () => {
-			// NOTE: A `#Done` that answers the accumulator is an exit like the
+			// A `#Done` that answers the accumulator is an exit like the
 			// walk's own end, and each one boxes the Array where it stands.
 			let generated = generate(builtStates)
 
@@ -4947,7 +4947,7 @@ describe("Optimiser", () => {
 		})
 
 		it("writes nothing at all for a branch that changes nothing", () => {
-			// NOTE: A bare answer is the rebuilding chain with no appends on it,
+			// A bare answer is the rebuilding chain with no appends on it,
 			// so there is nothing to push and nothing to assign — where the
 			// copying emission wrote `$loop_0_state = list`.
 			let generated = generate(builtBranches)
@@ -4969,13 +4969,13 @@ describe("Optimiser", () => {
 		})
 
 		it("copies a seed the Program was holding, once, at entry", () => {
-			// NOTE: The other direction of the same rule: a List the Program
+			// The other direction of the same rule: a List the Program
 			// held before the walk is never pushed onto, so any seed that is not
 			// a literal is copied into an Array of the walk's own. A literal
 			// hands its Array over outright, which is what the first test above
 			// reads.
 			//
-			// NOTE: `ownItemsOf` and not `pushItemsOf(seed, [])` — the copy a
+			// `ownItemsOf` and not `pushItemsOf(seed, [])` — the copy a
 			// short walk over a long seed pays in full is the copy `append`
 			// performed, and an element-wise loop is not it.
 			expect(generate(seededBuilds)).toContain(
@@ -4984,7 +4984,7 @@ describe("Optimiser", () => {
 		})
 
 		it("binds the State in neither body of a condition walk", () => {
-			// NOTE: A `while` walk hands ONE State to TWO callbacks, so the
+			// A `while` walk hands ONE State to TWO callbacks, so the
 			// Parameter is elided in both or the walk is declined for both.
 			let generated = generate(builtBesideElisions)
 
@@ -4995,7 +4995,7 @@ describe("Optimiser", () => {
 		})
 
 		it("elides the counter's Integer and the accumulator at once", () => {
-			// NOTE: The two elisions on one callback, which is the only place
+			// The two elisions on one callback, which is the only place
 			// they meet: the counter is Parameter one and the accumulator is
 			// Parameter two, so each is written where its own `const` stood.
 			let generated = generate(builtBesideElisions)
@@ -5017,7 +5017,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines a walk that retains what it replaced", () => {
-			// NOTE: THE counter-example. `current` stands as the receiver being
+			// THE counter-example. `current` stands as the receiver being
 			// replaced AND as a value written into `snapshots`, so the walk it
 			// is written in keeps the emission it always had.
 			let generated = generate(retainedAccumulator)
@@ -5027,14 +5027,14 @@ describe("Optimiser", () => {
 		})
 
 		it("declines every mention that is not a rebuilding chain", () => {
-			// NOTE: A read, a capture, a nested walk over the accumulator, the
+			// A read, a capture, a nested walk over the accumulator, the
 			// accumulator added to itself, and a `prepend`, which grows the end
 			// a build does not push onto.
 			expect(generate(declinedAccumulators)).not.toContain("_built")
 		})
 
 		it("declines a condition walk whose predicate reads the State", () => {
-			// NOTE: ONE State handed to TWO bodies, and the predicate has no
+			// ONE State handed to TWO bodies, and the predicate has no
 			// rebuilding chain to stand in — so every mention it makes is a
 			// read. A `while` walk over a List accumulator is declined by that
 			// alone unless its predicate reads something else entirely.
@@ -5101,7 +5101,7 @@ describe("Optimiser", () => {
 		})
 
 		it("never mutates a seed the Program keeps reading", async () => {
-			// NOTE: The whole of the sharing question, printed. `seed` is read
+			// The whole of the sharing question, printed. `seed` is read
 			// after two walks have been seeded with it — one that ran turns and
 			// one that ran none — and appended to afterwards, and each walk's
 			// answer is appended to as well. Every one of those has to answer
@@ -5125,7 +5125,7 @@ describe("Optimiser", () => {
 		})
 
 		it("prints the same thing with the pass off over a List Program", async () => {
-			// NOTE: The fixture that reaches every walking Method there is —
+			// The fixture that reaches every walking Method there is —
 			// nothing in it is a walk this pass admits, and the point of asking
 			// is that a pass which changed a Program it declines would be
 			// wrong twice over.
@@ -5148,7 +5148,7 @@ describe("Optimiser", () => {
 		})
 
 		it("stores a folded Rational as the operation would", () => {
-			// NOTE: THE Rational question — what a fold has to reproduce is
+			// THE Rational question — what a fold has to reproduce is
 			// what the operation STORES, not only what it is worth. The four
 			// same-kind arithmetic entries are natives on the bigint-rational
 			// core, which answers in lowest terms, so `1/2 + 1/4` stores 3 over
@@ -5159,17 +5159,17 @@ describe("Optimiser", () => {
 			expect(generated).toContain("Rational.createRational(3n, 4n)")
 			expect(generated).toContain("Rational.createRational(1n, 4n)")
 			expect(generated).toContain("Rational.createRational(1n, 3n)")
-			// NOTE: CONSTRUCTION is the other half, and it is untouched: a
+			// CONSTRUCTION is the other half, and it is untouched: a
 			// Rational holds the parts it was BUILT with, and `absolute` on a
 			// value that is not negative answers the Rational ITSELF — so `4/2`
 			// stays four over two.
 			expect(generated).toContain("Rational.createRational(4n, 2n)")
 			expect(generated).toContain("Rational.createRational(-1n, 2n)")
-			// NOTE: The Rational-beside-Rational entries, which are the ones
+			// The Rational-beside-Rational entries, which are the ones
 			// folded. The entry taking an Integer is still emitted — the mixed
 			// sum at the end of the Program reaches it, and is left alone.
 			expect(generated).not.toContain("Rational.add__overload$1")
-			// NOTE: A written `1/2` proves it is not zero, so the product of
+			// A written `1/2` proves it is not zero, so the product of
 			// two of them is `NonZeroRational`'s entry rather than
 			// `Rational`'s. The fold reads the Namespace by name and has to
 			// know that one too, so BOTH names are asked for here.
@@ -5178,7 +5178,7 @@ describe("Optimiser", () => {
 		})
 
 		it("renders an interpolation hole whose value is written out", () => {
-			// NOTE: Every hole folds, so the interpolation is a String literal
+			// Every hole folds, so the interpolation is a String literal
 			// — no witness, no `toString`, no pieces concatenated at run time.
 			let generated = generate(constantFolding)
 
@@ -5190,7 +5190,7 @@ describe("Optimiser", () => {
 		})
 
 		it("renders a whole Rational hole as its numerator alone", () => {
-			// NOTE: The rule `Rational::toString` is written by, reproduced
+			// The rule `Rational::toString` is written by, reproduced
 			// here rather than called. A hole whose value is whole renders the
 			// numerator alone, so the folded text and the text the unfolded
 			// Program builds are the same one.
@@ -5216,11 +5216,11 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves an operation whose operand is a call", () => {
-			// NOTE: The whole of what folding through a call would cost: the
+			// The whole of what folding through a call would cost: the
 			// print inside `noisy` is the answer's own evaluation, and a fold
 			// that took it would be a Program that says less.
 			//
-			// NOTE: It is the runtime entry rather than an inlined guard
+			// It is the runtime entry rather than an inlined guard
 			// because the guard reads its operands more than once and a call
 			// may only be evaluated once — which is exactly the operand that
 			// stopped the fold.
@@ -5228,7 +5228,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a mixed-kind operation to the Namespace that widens it", () => {
-			// NOTE: `1::add(1/2)` reaches the widening entry, whose body is the
+			// `1::add(1/2)` reaches the widening entry, whose body is the
 			// Rational addition rather than the bigint one this pass
 			// reproduces — so the call stays and the Rational entry behind it
 			// is still emitted.
@@ -5238,7 +5238,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the arithmetic of a Namespace the Program declares", async () => {
-			// NOTE: A Namespace named after a builtin stands in front of it for
+			// A Namespace named after a builtin stands in front of it for
 			// the rest of its block, so `1::subtract(2)` there is a Method the
 			// Program wrote — and it prints. A difference and not a sum: the
 			// refined Namespaces beat a shadow on every name they declare.
@@ -5249,7 +5249,7 @@ describe("Optimiser", () => {
 		})
 
 		it("refuses a fold larger than the cap", () => {
-			// NOTE: 4,096 digits is the ceiling, and no operation folded here
+			// 4,096 digits is the ceiling, and no operation folded here
 			// can reach it from a Program that fits in memory — this one is
 			// written to. What a refused fold costs is the optimisation and
 			// nothing else: the Program multiplies where it always did.
@@ -5275,7 +5275,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain("Integer.createInteger(60)")
-			// NOTE: `PositiveRational`'s rather than `Rational`'s: both
+			// `PositiveRational`'s rather than `Rational`'s: both
 			// operands are written above zero, and the refined Namespace beats
 			// the base one for a name both declare. It is the same sum either
 			// way — that entry re-exports this one.
@@ -5333,7 +5333,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The pass before it takes every Integer operation this one would
+		// The pass before it takes every Integer operation this one would
 		// otherwise find, so neither may assume the other ran — with the
 		// lowering off, the Invocation is still there and is still folded.
 		it("folds the Invocation with the lowering off", () => {
@@ -5346,7 +5346,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Integer.createInteger(60)")
 		})
 
-		// NOTE: And the same on the other side of the hole. A witness is a
+		// And the same on the other side of the hole. A witness is a
 		// `direct-method` by the time this pass sees one, because
 		// `devirtualise-witnesses` runs first — but it is a `ConformanceValue`
 		// with that pass off, and the Method it names is read out of either.
@@ -5381,7 +5381,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: THE correspondence this pass rests on. What it drops is a
+		// THE correspondence this pass rests on. What it drops is a
 		// Handler the Validator has already told the author can never match, so
 		// the two are held to each other here rather than each to its own
 		// reading: the count of Warnings is the count of Handlers dropped.
@@ -5412,7 +5412,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Handler two Types share a tag with", () => {
-			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, and
+			// `List<Integer>` and `List<String>` are both `"List"`, and
 			// the empty List passes either — so neither Handler is refuted by
 			// what the Compiler knows, and the item walk is what decides.
 			let generated = generate(deadMatchArms)
@@ -5422,7 +5422,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Record Handler beside a Record scrutinee", () => {
-			// NOTE: Every Record carries the one tag, so a Record Matcher is
+			// Every Record carries the one tag, so a Record Matcher is
 			// never refuted by a Record member of the scrutinee's Union —
 			// whatever their members say, which is a question about the value
 			// rather than about its Type. Read off the Handlers rather than the
@@ -5447,7 +5447,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves the survivors in the order they were written", () => {
-			// NOTE: A Match is first-match-wins, so the order the survivors are
+			// A Match is first-match-wins, so the order the survivors are
 			// written in is the whole of what decides which one answers. Read
 			// off the Matchers themselves, by identity: every survivor is the
 			// Handler that was there, and their positions in the original chain
@@ -5484,7 +5484,7 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain('"never"')
-			// NOTE: The tag comparison, not the read in front of it — a chain
+			// The tag comparison, not the read in front of it — a chain
 			// asking about the matched value's tag more than once binds it to a
 			// name first, and which side of that the arm is emitted on is not
 			// what this test is about.
@@ -5517,7 +5517,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The Match passes meet on every Handler and none of them may
+		// The Match passes meet on every Handler and none of them may
 		// assume another ran. With the tests uncompiled the same Handlers go,
 		// and the descriptor that was built to decline them goes with them.
 		it("drops the same Handlers with the tests uncompiled", () => {
@@ -5535,7 +5535,7 @@ describe("Optimiser", () => {
 		it("emits the last Handler as the else of the chain", () => {
 			let generated = generate(typeTests)
 
-			// NOTE: Two Handlers, one test — and no fall-through, because
+			// Two Handlers, one test — and no fall-through, because
 			// there is nowhere left for a value to fall.
 			expect(generated).toContain(
 				'if (_self[$type.typeKeySymbol] === "Integer") {',
@@ -5546,7 +5546,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the fall-through where the last Handler is Guarded", () => {
-			// NOTE: A Guard is the Program's own Boolean, and a Guarded
+			// A Guard is the Program's own Boolean, and a Guarded
 			// Handler counts toward no exhaustiveness argument — so this one is
 			// tested, and something has to answer for a value it declines.
 			let generated = generate(`implementation {
@@ -5589,7 +5589,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the fall-through where no tag decides the last Handler", () => {
-			// NOTE: TWO Record members, so the Record tag is claimed by both and
+			// TWO Record members, so the Record tag is claimed by both and
 			// says nothing — what tells them apart is their members, which is
 			// exactly where a runtime check and a static Type can part company,
 			// so the throw that names it stays. A Record beside a String would
@@ -5608,7 +5608,7 @@ describe("Optimiser", () => {
 		})
 
 		it("elides a last Record Handler one member of the Union claims", () => {
-			// NOTE: The other side of the rule above, and the one this pass
+			// The other side of the rule above, and the one this pass
 			// gained when `residual.ts` stopped refusing a Record Matcher
 			// outright: `{ x: Integer } | String` has one Record member, so the
 			// last Handler's check IS the tag comparison and the fall-through
@@ -5625,7 +5625,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("$type.noCaseMatched(_self)")
 		})
 
-		// NOTE: The standard library reads every fallible answer back through
+		// The standard library reads every fallible answer back through
 		// a two-Handler Match on `Optional`, so this is most of the prelude's
 		// Matches.
 		it("elides the standard library's own final tests", () => {
@@ -5649,7 +5649,7 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(["elide-final-match-test"]),
 			})
 
-			// NOTE: Read off the BOUND tag: the Record Matcher compiles to a
+			// Read off the BOUND tag: the Record Matcher compiles to a
 			// tag comparison as well now, so that chain asks about the matched
 			// value's tag twice and binds it once — which is the emitted shape
 			// `tag-binding` describes, working on a chain it could not reach
@@ -5682,7 +5682,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The two Match passes meet on every Handler, and neither may
+		// The two Match passes meet on every Handler, and neither may
 		// assume the other ran: with the tests uncompiled, what is dropped
 		// here is the descriptor check instead.
 		it("drops the descriptor check with the other Match pass off", () => {
@@ -5702,7 +5702,7 @@ describe("Optimiser", () => {
 
 	describe("compile-record-members", () => {
 		it("reads the member that discriminates instead of walking a descriptor", () => {
-			// NOTE: Two Records in one Union both carry the Record tag, so the
+			// Two Records in one Union both carry the Record tag, so the
 			// tag says nothing and the members are what decide. One property
 			// read and one comparison per member, in place of a call that
 			// walked a descriptor tree, asked `Object.entries` of it and asked
@@ -5718,7 +5718,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads a member that may not be there through an optional chain", () => {
-			// NOTE: A Record Matcher is OPEN, so a value whose Type does not
+			// A Record Matcher is OPEN, so a value whose Type does not
 			// declare `radius` may reach the test carrying one, or not carrying
 			// it — which is the `Object.hasOwn` the walk asks first. `?.`
 			// answers `undefined` for a member that is absent, and `undefined`
@@ -5729,7 +5729,7 @@ describe("Optimiser", () => {
 		})
 
 		it("drops a member the static Type already decides", () => {
-			// NOTE: `held` is a Type Parameter on both sides, so the runtime
+			// `held` is a Type Parameter on both sides, so the runtime
 			// answers true for it without reading the value — the tree tests
 			// `mark`, which is what tells the two apart, and nothing else.
 			let generated = generate(recordMembers)
@@ -5747,7 +5747,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps the Record tag test where something else can arrive", () => {
-			// NOTE: Two Records AND a String, so no member can be read until
+			// Two Records AND a String, so no member can be read until
 			// the value is known to be a Record at all — and the `&&` is what
 			// makes the reads after it safe rather than merely tidy.
 			expect(generate(recordMembers)).toContain(
@@ -5756,7 +5756,7 @@ describe("Optimiser", () => {
 		})
 
 		it("reads a member found on Object.prototype through the optional chain too", () => {
-			// NOTE: A Matcher may name `toString`, and a members map is an
+			// A Matcher may name `toString`, and a members map is an
 			// ordinary JavaScript object — so the Compiler asks `Object.hasOwn`
 			// of it rather than reading it, and the emitted read goes through
 			// `?.` because no arriving Record declares the member. What the
@@ -5779,7 +5779,7 @@ describe("Optimiser", () => {
 		})
 
 		it("orders a tag comparison ahead of a walk", () => {
-			// NOTE: The Matcher writes the List member FIRST and the tree reads
+			// The Matcher writes the List member FIRST and the tree reads
 			// it LAST: a tag comparison goes ahead of a walk, so the one test
 			// that can still cost a call is reached only where the cheap tests
 			// have not already declined.
@@ -5803,7 +5803,7 @@ describe("Optimiser", () => {
 		})
 
 		it("orders a comparison BELOW a walk ahead of it too", () => {
-			// NOTE: The comparison that decides is one level DOWN from the walk,
+			// The comparison that decides is one level DOWN from the walk,
 			// and cost is what orders them — not depth, which would put the walk
 			// of a two-thousand-item List ahead of the read that declines in one
 			// comparison and lose to the check the tree replaced. It is safe
@@ -5829,7 +5829,7 @@ describe("Optimiser", () => {
 		})
 
 		it("compiles a Union dispatch's case check", () => {
-			// NOTE: The same Node stands in three places by the time this runs,
+			// The same Node stands in three places by the time this runs,
 			// and a dispatch case is one of them — so the descriptor walk is
 			// retired there by the same rule, without this pass knowing a
 			// dispatch from a Match.
@@ -5854,7 +5854,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines where a value of any kind at all can arrive", () => {
-			// NOTE: A Type Parameter stands beside the Record, so a value
+			// A Type Parameter stands beside the Record, so a value
 			// reaching the test may be anything — including a Record carrying
 			// none of the members. Neither its tag nor what it declares can be
 			// named, so the walk, which asks `hasOwn` before every read, stays.
@@ -5876,7 +5876,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines where a member that may be absent needs a walk", () => {
-			// NOTE: Nothing is known about a member one arriving Record does not
+			// Nothing is known about a member one arriving Record does not
 			// declare — not that it is absent, and not what it holds if it is
 			// there — so a requirement that is not answered by ONE tag
 			// comparison has nothing to be measured against, and the walk stays.
@@ -5898,7 +5898,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines a tree larger than it is worth writing out", () => {
-			// NOTE: A size rule rather than a soundness one — the walk is one
+			// A size rule rather than a soundness one — the walk is one
 			// call against one pooled descriptor shared by every site naming the
 			// same Matcher, and a tree is written out at each of them. A plan is
 			// refused whole or taken whole; a truncated one would ask less than
@@ -5921,7 +5921,7 @@ describe("Optimiser", () => {
 		})
 
 		it("refuses a plan where all that is left is whether a member is there", () => {
-			// NOTE: A Type Parameter as the REQUIREMENT is implied by
+			// A Type Parameter as the REQUIREMENT is implied by
 			// everything, so nothing about what the member holds is left to
 			// ask — but one arriving Record does not declare it, so whether it
 			// is THERE is still a question, and it is the whole of the test.
@@ -5946,7 +5946,7 @@ describe("Optimiser", () => {
 				),
 			).toBeNull()
 
-			// NOTE: The same shape with a requirement one comparison answers —
+			// The same shape with a requirement one comparison answers —
 			// which is what the refusal above is NOT, rather than the member
 			// being undeclared being refused on its own.
 			expect(
@@ -5971,7 +5971,7 @@ describe("Optimiser", () => {
 			])
 		})
 
-		// NOTE: A Type graph that leads back into itself. No source-level
+		// A Type graph that leads back into itself. No source-level
 		// Program builds one, since recursive Type declarations are refused, so
 		// the pass is asked directly, exactly as `pool-constants`' key
 		// serialiser is.
@@ -6054,7 +6054,7 @@ describe("Optimiser", () => {
 	})
 
 	describe("loop-self-tail-calls", () => {
-		// NOTE: The walk the language teaches, and the one the previous campaign
+		// The walk the language teaches, and the one the previous campaign
 		// made linear without making it portable: on V8 it was a frame per item.
 		const walk = `implementation {
 	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
@@ -6073,7 +6073,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain("$tail_0:")
 			expect(generated).toContain("while (true)")
 			expect(generated).toContain("continue $tail_0")
-			// NOTE: The claim the portability rests on, asked of the emitted
+			// The claim the portability rests on, asked of the emitted
 			// text: the Function does not call itself where its answer goes.
 			// This is what holds on an engine the suite never runs.
 			expect(generated).not.toContain("return total(")
@@ -6081,7 +6081,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves a non-tail self call a call", async () => {
-			// NOTE: `fib` calls itself twice and neither answer is the
+			// `fib` calls itself twice and neither answer is the
 			// Function's — both are Arguments of an addition. Nothing is looped.
 			let source = `implementation {
 	function fib(_ n: Integer) -> Integer {
@@ -6101,7 +6101,7 @@ describe("Optimiser", () => {
 		})
 
 		it("loops the tail call of a body that also recurses", async () => {
-			// NOTE: One body, both kinds. The second call is the answer, so it
+			// One body, both kinds. The second call is the answer, so it
 			// becomes a turn; the first is an Argument and stays a call.
 			let source = `implementation {
 	function counted(_ n: Integer, _ seen: Integer) -> Integer {
@@ -6133,7 +6133,7 @@ describe("Optimiser", () => {
 		})
 
 		it("rebinds every Parameter at once", async () => {
-			// NOTE: `<- swap(b, a)` swaps. Written as two assignments in order
+			// `<- swap(b, a)` swaps. Written as two assignments in order
 			// it would write `b` over `a` and then read the value it just wrote,
 			// so both names would end up holding what `b` held.
 			let source = `implementation {
@@ -6155,7 +6155,7 @@ describe("Optimiser", () => {
 		})
 
 		it("holds nothing where no Argument can read what a turn assigns", () => {
-			// NOTE: The other half of the rule. A turn whose Arguments read
+			// The other half of the rule. A turn whose Arguments read
 			// nothing it rebinds needs no name of the Compiler's at all, which
 			// is what keeps a counted walk to two assignments and a `continue`.
 			let source = `implementation {
@@ -6174,7 +6174,7 @@ describe("Optimiser", () => {
 		})
 
 		it("evaluates every Argument of a turn before it assigns any", async () => {
-			// NOTE: Not the values this time but the ORDER, which only an
+			// Not the values this time but the ORDER, which only an
 			// Argument that DOES something can show. A call evaluates what it
 			// wrote, left to right, and fires the defaults of the Parameters it
 			// left out only afterwards — so a turn that assigned as it went, or
@@ -6223,7 +6223,7 @@ describe("Optimiser", () => {
 		})
 
 		it("rebinds each labelled Argument's own Parameter", async () => {
-			// NOTE: Essence calls are labelled, and the Enricher requires the
+			// Essence calls are labelled, and the Enricher requires the
 			// labels in DECLARATION order — `span(…, to 11, from 3)` is refused
 			// with "This Argument is not labelled 'from'". So by the time the
 			// Optimiser reads a call the position of an Argument IS its
@@ -6247,7 +6247,7 @@ describe("Optimiser", () => {
 		})
 
 		it("takes a default again in the turn that left it out", async () => {
-			// NOTE: `by` defaults to `n`, and a turn that leaves it out takes
+			// `by` defaults to `n`, and a turn that leaves it out takes
 			// that default afresh — reading the `n` THAT turn bound, which is
 			// what a real call does. A loop that carried the first turn's `step`
 			// would print 4 and 40.
@@ -6265,7 +6265,7 @@ describe("Optimiser", () => {
 }`
 			let generated = generate(source)
 
-			// NOTE: The default is assigned AFTER the Parameter it reads, which
+			// The default is assigned AFTER the Parameter it reads, which
 			// is the order a call binds them in.
 			expect(generated).toContain("step = n")
 			expect(
@@ -6274,7 +6274,7 @@ describe("Optimiser", () => {
 		})
 
 		it("holds a written Argument that stands after one a turn left out", async () => {
-			// NOTE: `first` is left out and `second` is written, and at a real
+			// `first` is left out and `second` is written, and at a real
 			// call every Argument is evaluated before any default fires — so the
 			// turn has to hold `arg-b` and take the default only afterwards. The
 			// counter is captured by the closure in the answer, so it is rebound
@@ -6324,7 +6324,7 @@ describe("Optimiser", () => {
 		})
 
 		it("renames the Parameter a default reads and not the member", async () => {
-			// NOTE: `opts.n` reads a member of a Record that is spelled like the
+			// `opts.n` reads a member of a Record that is spelled like the
 			// Parameter `n`, which the closure in the answer captures and the
 			// loop therefore rebinds through a slot. What slotting renames is the
 			// names the body READS — and a member name is not one of them: it is
@@ -6358,7 +6358,7 @@ describe("Optimiser", () => {
 		})
 
 		it("rebuilds a Record-defaulted Parameter per turn", async () => {
-			// NOTE: A RECORD default is not a value the Parameter list can hold
+			// A RECORD default is not a value the Parameter list can hold
 			// — it means member by member — so the Simplifier rebuilds the
 			// Parameter in a prologue. A turn that leaves it out hands it the
 			// same hole a call does, and the prologue, which the loop runs
@@ -6384,7 +6384,7 @@ describe("Optimiser", () => {
 		})
 
 		it("binds a Parameter Pattern again per turn", async () => {
-			// NOTE: A Pattern in a Parameter is bound by Statements at the head
+			// A Pattern in a Parameter is bound by Statements at the head
 			// of the body, and the loop goes around the WHOLE body — so a turn
 			// binds them again from what it rebound.
 			let source = `implementation {
@@ -6409,7 +6409,7 @@ describe("Optimiser", () => {
 		})
 
 		it("carries the hidden conformance Argument", async () => {
-			// NOTE: A bounded Type Parameter arrives as a Parameter of its own at
+			// A bounded Type Parameter arrives as a Parameter of its own at
 			// the end of the list, and a turn rebinds it like any other — so a
 			// call that passed a DIFFERENT witness would be right as well,
 			// because the loop assigns what the call wrote rather than keeping
@@ -6444,11 +6444,11 @@ describe("Optimiser", () => {
 		})
 
 		it("is not a self call to another Overload of the same name", async () => {
-			// NOTE: An Overload is a member of its own by the time the Optimiser
+			// An Overload is a member of its own by the time the Optimiser
 			// reads it, so the call below names a different Method and the
 			// Function that makes it is left alone.
 			//
-			// NOTE: The two entries take the SAME NUMBER of Arguments, and that
+			// The two entries take the SAME NUMBER of Arguments, and that
 			// is the point. A pair of different arities is told apart by the
 			// Argument count as well as by the member name, so it would go on
 			// declining even if the name comparison stopped working — which a
@@ -6475,7 +6475,7 @@ describe("Optimiser", () => {
 		})
 
 		it("rebinds a Parameter a Handler shadows", async () => {
-			// NOTE: The Handler binds `sum`, so the `sum` the tail call hands
+			// The Handler binds `sum`, so the `sum` the tail call hands
 			// over is the ITEM, not the Parameter of the same name. A turn that
 			// read it as the Parameter would see `sum = sum`, call it a change
 			// of nothing and assign nothing — and the walk would answer 0.
@@ -6502,7 +6502,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines a Function whose name a Constant shadows", async () => {
-			// NOTE: `total` inside the body is the Constant, not the Function.
+			// `total` inside the body is the Constant, not the Function.
 			// Reading it as a self call would turn an answer into a turn that
 			// never ends.
 			let source = `implementation {
@@ -6525,7 +6525,7 @@ describe("Optimiser", () => {
 		})
 
 		it("gives a captured Parameter a binding per turn", async () => {
-			// NOTE: A JavaScript closure captures the VARIABLE. The three
+			// A JavaScript closure captures the VARIABLE. The three
 			// closures below are built in three different turns, and each has to
 			// answer with the `n` of the turn that built it — so the Parameter is
 			// rebound through a slot and the body's name is a `const` of the
@@ -6550,7 +6550,7 @@ describe("Optimiser", () => {
 		})
 
 		it("gives EVERY captured Parameter a binding per turn", async () => {
-			// NOTE: One closure over two Parameters, both of them rebound. The
+			// One closure over two Parameters, both of them rebound. The
 			// rule is per Parameter and not per Function, so slotting the first
 			// one the walk meets and assigning the second where it stands would
 			// answer `[ 33, 32, 31 ]` — every closure reading the last turn's
@@ -6580,7 +6580,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines a default that builds a closure over a rebound Parameter", async () => {
-			// NOTE: A default is taken again at the head of every turn, but it is
+			// A default is taken again at the head of every turn, but it is
 			// evaluated where the turn ASSIGNS — it IS what the turn assigns — so
 			// there is no `const` of the turn for a closure standing in one to
 			// capture, the way a closure in the BODY captures one. It would close
@@ -6611,7 +6611,7 @@ describe("Optimiser", () => {
 		})
 
 		it("loops a Function whose default builds a closure over nothing", async () => {
-			// NOTE: The other half of that rule, and the reason it is asked about
+			// The other half of that rule, and the reason it is asked about
 			// the names the literal MENTIONS rather than about the literal. This
 			// default closes over no Parameter at all, so a fresh closure per
 			// turn is the same closure a call would build, and the walk is looped
@@ -6640,7 +6640,7 @@ describe("Optimiser", () => {
 		})
 
 		it("walks on the same receiver and on another", async () => {
-			// NOTE: Two Methods of one Namespace. `sameReceiver` hands `@` on
+			// Two Methods of one Namespace. `sameReceiver` hands `@` on
 			// unchanged, so `_self` is not assigned at all; `total`
 			// walks a different value of the same Namespace, which is a self
 			// call with a new `@` — and inside a Match Handler `@` is the
@@ -6670,7 +6670,7 @@ describe("Optimiser", () => {
 }`
 			let generated = generate(source)
 
-			// NOTE: The receiver the walk hands on unchanged is neither slotted
+			// The receiver the walk hands on unchanged is neither slotted
 			// nor assigned — it is still the Parameter the Method declares. The
 			// one that walks another value of the same Namespace is rebound
 			// through a slot, because `@` inside the Handler is the matched
@@ -6684,7 +6684,7 @@ describe("Optimiser", () => {
 		})
 
 		it("writes a define's arms out as a ladder", async () => {
-			// NOTE: A `define` stays one Expression everywhere else, because
+			// A `define` stays one Expression everywhere else, because
 			// every arm IS an Expression. In Return position its arms answer
 			// where it stands, so the ones that answer with a tail call become
 			// turns — and the ladder is what gives each of them somewhere to be
@@ -6709,7 +6709,7 @@ describe("Optimiser", () => {
 		})
 
 		it("never sees a Function that recurses on every path", () => {
-			// NOTE: `infinite-recursion` is a Validator rule and reasons about
+			// `infinite-recursion` is a Validator rule and reasons about
 			// the SOURCE, so it is decided long before this pass runs and the
 			// pass changes nothing about it. It is asked here because the
 			// question a reader has is exactly whether a loop hid it: a Method
@@ -6729,7 +6729,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declines a completing body", async () => {
-			// NOTE: `complete self(…)` puts the call inside the wait, so it is
+			// `complete self(…)` puts the call inside the wait, so it is
 			// an Argument and never an answer — a completing body holds no tail
 			// call to find. The refusal is written down anyway: a turn taken
 			// inside the current run would inherit that run's cancellation
@@ -6754,7 +6754,7 @@ describe("Optimiser", () => {
 		})
 
 		it("counts every turn it takes under coverage", async () => {
-			// NOTE: `instrument-coverage` runs first, so the counters are inside
+			// `instrument-coverage` runs first, so the counters are inside
 			// the body the loop wraps and every turn runs them again. A pass
 			// that lifted the body out of the loop, or that dropped a counter
 			// standing in front of a tail call, would report a site no test
@@ -6802,7 +6802,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Constant whose value PRINTS", () => {
-			// NOTE: The Declaration is what runs it, so dropping the name would
+			// The Declaration is what runs it, so dropping the name would
 			// drop the Program's only way of saying it happened. Purity is the
 			// same question `lower-scalar-operations` asks of an Argument it
 			// would skip.
@@ -6810,7 +6810,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Constant answered by a Namespace the Program declares", async () => {
-			// NOTE: The same question, asked of a Program that answers it the
+			// The same question, asked of a Program that answers it the
 			// other way: `1::subtract(2)` under a Namespace named after the
 			// builtin is a Method the Program wrote, and it prints — so the
 			// Declaration nothing reads is the only thing running it, and it
@@ -6822,13 +6822,13 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a variable, whatever is done with it", () => {
-			// NOTE: An assignment is a Statement this pass does not read, so a
+			// An assignment is a Statement this pass does not read, so a
 			// `variable` is refused outright rather than reasoned about.
 			expect(generate(deadCode)).toContain("let counted")
 		})
 
 		it("drops a Constant holding an interpolated String nobody reads", () => {
-			// NOTE: A hole CALLS `toString` through its witness, and the witness
+			// A hole CALLS `toString` through its witness, and the witness
 			// names which Method — so the call is weighed by the enumeration
 			// that weighs a written one. `Integer.toString` is a bigint's
 			// decimal spelling and can not be told it did not happen.
@@ -6843,7 +6843,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps one whose hole is answered by a Namespace with no entry", async () => {
-			// NOTE: A Namespace the Program wrote can print, so its `toString`
+			// A Namespace the Program wrote can print, so its `toString`
 			// is refused exactly as every other Method of it is — the table is
 			// an allowlist and this Namespace is not on it.
 			let generated = generate(`implementation {
@@ -6868,7 +6868,7 @@ describe("Optimiser", () => {
 		})
 
 		it("keeps a Constant its Module exports", () => {
-			// NOTE: What a Module publishes is read by Modules this compilation
+			// What a Module publishes is read by Modules this compilation
 			// may never see, so every exported name is a root — asked here of
 			// the pass directly, because a Program written as one file has no
 			// export block to write.
@@ -6962,11 +6962,11 @@ describe("Optimiser", () => {
 			let generated = generate(constructions)
 
 			expect(generated).toContain('[$type.typeKeySymbol]: "Shape#Circle"')
-			// NOTE: A payload the Program holds elsewhere is SPREAD rather than
+			// A payload the Program holds elsewhere is SPREAD rather than
 			// shared, which is what `createCase` does with it — the members are
 			// copied onto a value of the Case's own.
 			expect(generated).toContain("...payload")
-			// NOTE: A unit Case keeps its constructor, which hands out one
+			// A unit Case keeps its constructor, which hands out one
 			// instance per tag rather than a literal per construction.
 			expect(generated).toContain('$type.createCase("Shape#Blank")')
 		})
@@ -6975,10 +6975,10 @@ describe("Optimiser", () => {
 			expect(generate(constructions)).toContain('"ok?": ')
 		})
 
-		// NOTE: The standard library's own bodies go through the same pass, in
+		// The standard library's own bodies go through the same pass, in
 		// the prelude the Rewriter builds — which is where most of a Program's
 		// Record and List construction actually happens.
-		// NOTE: The List is BOUND. A written one proves it holds items, and a
+		// The List is BOUND. A written one proves it holds items, and a
 		// count past the length is what makes `removeLast` answer the `[]` it
 		// writes — the body this reads for is the one `List` writes in Essence.
 		it("collapses the standard library's bodies too", () => {
@@ -6990,7 +6990,7 @@ describe("Optimiser", () => {
 
 			let generated = generate(source)
 
-			// NOTE: `removeLast` answers a `[]` it writes for a count past the
+			// `removeLast` answers a `[]` it writes for a count past the
 			// length — an Essence body, emitted as a prelude const.
 			expect(generated).toContain("$es_List_removeLast")
 			expect(generated).not.toContain("List.createList(")
@@ -7047,7 +7047,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The prologue a Record default puts at the head of a callee is a
+		// The prologue a Record default puts at the head of a callee is a
 		// `RecordValue` like any other, so it collapses like any other — there
 		// is no pass for the merge itself, and no need of one: it allocates the
 		// very Record a caller writing every member would have allocated.
@@ -7088,7 +7088,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declares one constant for a value written many times", () => {
-			// NOTE: `1::add(1)` writes it twice and the standard library writes
+			// `1::add(1)` writes it twice and the standard library writes
 			// it many times over; one const answers for all of them.
 			let generated = generate(constants)
 			let declarations = [
@@ -7101,7 +7101,7 @@ describe("Optimiser", () => {
 		})
 
 		it("pools the descriptor a Match still checks against", () => {
-			// NOTE: The one that costs most: this object was REBUILT at every
+			// The one that costs most: this object was REBUILT at every
 			// test, of every turn of whatever loop the Match sits in.
 			let generated = generate(constants)
 
@@ -7109,7 +7109,7 @@ describe("Optimiser", () => {
 			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "Record"/)
 		})
 
-		// NOTE: A descriptor whose graph leads back into itself, built by hand:
+		// A descriptor whose graph leads back into itself, built by hand:
 		// the Enricher refuses a Type declaration that names itself, so no
 		// Program builds one and the pass is asked directly. `serializeKey`
 		// answers the back-edge with a `<cycle:N>` marker.
@@ -7170,7 +7170,7 @@ describe("Optimiser", () => {
 		})
 
 		it("pools a conformance witness", () => {
-			// NOTE: `Comparable` provides the four inequalities, so a witness
+			// `Comparable` provides the four inequalities, so a witness
 			// for it names Integer's own overrides beside its `compare`.
 			expect(generate(constants)).toMatch(
 				/const \$pool_\d+ = \{\n\tcompare: Integer\.compare,\n/,
@@ -7178,7 +7178,7 @@ describe("Optimiser", () => {
 		})
 
 		it("pools the call a conditional witness is bound by", () => {
-			// NOTE: `boundConformance` curries witnesses onto Methods and reads
+			// `boundConformance` curries witnesses onto Methods and reads
 			// nothing else, so the call is as constant as the map it is given —
 			// and it was being made at every site and on every turn of the loop
 			// that reached one.
@@ -7188,7 +7188,7 @@ describe("Optimiser", () => {
 		})
 
 		it("tells two depths of curried witness apart", () => {
-			// NOTE: The witness for a List of Lists and the witness for a List of
+			// The witness for a List of Lists and the witness for a List of
 			// Lists of Lists are the same map with a different witness curried
 			// onto it. Two constants, and the deeper one reads the shallower.
 			let declarations = [
@@ -7205,7 +7205,7 @@ describe("Optimiser", () => {
 		})
 
 		it("sorts by the witness each depth was given", async () => {
-			// NOTE: What a shared constant would answer instead: the inner Lists
+			// What a shared constant would answer instead: the inner Lists
 			// compared by the comparison written for their items, which orders
 			// `[[[2]], [[1]]]` the wrong way round.
 			expect(await outputOf(generate(conditionalConformances))).toEqual([
@@ -7216,7 +7216,7 @@ describe("Optimiser", () => {
 		})
 
 		it("tells two Choices' Case listings apart", () => {
-			// NOTE: One const per Choice, and the Choice met twice reads its own
+			// One const per Choice, and the Choice met twice reads its own
 			// again. A key that dropped the tags would declare one const for
 			// both and hand the second Choice the first one's Cases.
 			let generated = generate(derivedCaseListings)
@@ -7233,7 +7233,7 @@ describe("Optimiser", () => {
 		})
 
 		it("lists the Cases of the Choice each witness was given", async () => {
-			// NOTE: What a shared constant would answer instead: the second
+			// What a shared constant would answer instead: the second
 			// Choice counted as the first, which is three Cases read as two.
 			expect(await outputOf(generate(derivedCaseListings))).toEqual([
 				"2",
@@ -7243,7 +7243,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declares a witness naming a Namespace below that Namespace", () => {
-			// NOTE: `class Boxes` is emitted below the band and a class is not
+			// `class Boxes` is emitted below the band and a class is not
 			// hoisted, so a const IN the band reading one would be a
 			// `ReferenceError` at import. The const stands below the class
 			// instead — one witness for however many sites read it, where the
@@ -7254,7 +7254,7 @@ describe("Optimiser", () => {
 		})
 
 		it("refuses a witness naming a Namespace declared in a block", () => {
-			// NOTE: Two blocks may each declare a Namespace of the same name.
+			// Two blocks may each declare a Namespace of the same name.
 			// Their witnesses emit byte-identical text and so key alike, while
 			// meaning two different classes — and neither class is in scope
 			// where a const of the band would stand. Both stay where they were
@@ -7303,7 +7303,7 @@ describe("Optimiser", () => {
 		})
 
 		it("leaves Booleans alone", () => {
-			// NOTE: There are exactly two Boolean objects in a running Program
+			// There are exactly two Boolean objects in a running Program
 			// already — pooling one would name what it already has.
 			let generated = generate(constants)
 
@@ -7314,7 +7314,7 @@ describe("Optimiser", () => {
 		})
 
 		it("declares the band between the standard library and the Program", () => {
-			// NOTE: The one place it can stand: a pooled witness reads the
+			// The one place it can stand: a pooled witness reads the
 			// Function-valued consts above it, and a static Property's value —
 			// which runs where its const is emitted — may read a pooled
 			// constant.
@@ -7328,12 +7328,12 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: The counted loop adds ONE to its index on every turn, and the
+		// The counted loop adds ONE to its index on every turn, and the
 		// standard library's driver is where that literal is written — so
 		// before this pass a ten thousand turn loop allocated ten thousand
 		// Integers to count with.
 		//
-		// NOTE: With `inline-loops` on there is one `createInteger` left inside
+		// With `inline-loops` on there is one `createInteger` left inside
 		// a walk, and it is not a literal: the counted loop counts with the
 		// bigint its bounds hold and builds the Integer its body is HANDED, once
 		// a turn, where the driver built that Integer out of a pooled `1` and an
@@ -7401,7 +7401,7 @@ describe("Optimiser", () => {
 			)
 		})
 
-		// NOTE: A pooled constant may only be built where a Program can read
+		// A pooled constant may only be built where a Program can read
 		// it, and the descriptors are only in reach at all because
 		// `compile-type-tests` put them in an Expression position — so with
 		// that pass off there is less to pool and nothing to go wrong.
@@ -7431,7 +7431,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Object.assign(")
 		})
 
-		// NOTE: `changes` is typed `{ x: Integer }`, so `x` is the one member
+		// `changes` is typed `{ x: Integer }`, so `x` is the one member
 		// the update carries and the one member that is read. Spread whole it
 		// would also have copied whatever else the value happened to hold,
 		// which is what `codeGeneration.spec.ts` pins as a soundness hole
@@ -7443,7 +7443,7 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("...changes")
 		})
 
-		// NOTE: `Object.assign` comes back for the LITERAL right-hand sides,
+		// `Object.assign` comes back for the LITERAL right-hand sides,
 		// which is all the pass took away: writing a literal out member by
 		// member is the optimisation. The projection is not, so it stays.
 		it("assigns again when it is turned off", () => {
@@ -7456,7 +7456,7 @@ describe("Optimiser", () => {
 			expect(generated).toContain("x: changes.x")
 		})
 
-		// NOTE: The two collapses meet on `{ base with x = 1 }`, whose
+		// The two collapses meet on `{ base with x = 1 }`, whose
 		// right-hand side is a Record literal — and neither may assume the
 		// other ran. With construction off the literal is still written out
 		// member by member rather than built and copied.
@@ -7508,7 +7508,7 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: Not a pass, but a claim only this file can make: what a List
+	// Not a pass, but a claim only this file can make: what a List
 	// answers may not depend on which of its representations the Optimiser
 	// happened to leave it in. With the registry on, a List literal is a
 	// branded object `collapse-construction` wrote out and a walk is a `for`
@@ -7517,7 +7517,7 @@ describe("Optimiser", () => {
 	// List grown at both ends holds its items in two runs either way, and both
 	// builds have to print the same items in the same order.
 	//
-	// NOTE: The two Lists branched off `both` are what a shared Array can get
+	// The two Lists branched off `both` are what a shared Array can get
 	// wrong, and the expectation below is where that is asserted: `more` takes
 	// the tip and grows the Array `both` holds, `other` finds that tip taken
 	// and copies, and `both` — printed after both of them exist — still answers
@@ -7555,7 +7555,7 @@ describe("Optimiser", () => {
 		})
 	})
 
-	// NOTE: The sibling claim for the edits — what an edited List answers may
+	// The sibling claim for the edits — what an edited List answers may
 	// not depend on which representation it was edited in, nor on whether the
 	// Optimiser wrote its literals and its walks out. `both` and `window` are
 	// printed LAST as well as first: everything between them lives on the
@@ -7602,7 +7602,7 @@ describe("Optimiser", () => {
 			expect(none).toEqual(all)
 		})
 	})
-	// NOTE: What every pass has to leave alone. `start` and `complete` are the
+	// What every pass has to leave alone. `start` and `complete` are the
 	// two Expressions in the language with an effect the Optimiser can not see
 	// — one puts work in flight and the other suspends — so a pass that treats
 	// either as a value would move work to another turn of the event loop, or
@@ -7621,7 +7621,7 @@ describe("Optimiser", () => {
 }`
 
 		it("pools no start and no complete", () => {
-			// NOTE: Two `complete twice(21)` Statements written identically.
+			// Two `complete twice(21)` Statements written identically.
 			// `pool-constants` declares a value written twice once, and these
 			// are two runs of the same description rather than one value.
 			let generated = generate(waiting)
@@ -7634,7 +7634,7 @@ describe("Optimiser", () => {
 		})
 
 		it("inlines no walk whose body waits", () => {
-			// NOTE: `inline-loops` writes a counted walk as a `for`, and a body
+			// `inline-loops` writes a counted walk as a `for`, and a body
 			// that waits can not be one: the wait belongs to the enclosing
 			// Function, and the inlined block is not one. The walk that carries
 			// a Future is the shape that reaches this — a callback completing
@@ -7665,14 +7665,14 @@ describe("Optimiser", () => {
 		})
 
 		it("reads an Integer through a wait without losing its parentheses", () => {
-			// NOTE: An Integer is HYBRID — a small one holds a number and a
+			// An Integer is HYBRID — a small one holds a number and a
 			// large one a bigint — and every arithmetic site reads the value off
 			// the box rather than the box. Where the box arrives through an
 			// `await`, the read is `(await …).value`, and the parentheses are
 			// the whole of what makes it one: `await x.value` waits for the
 			// member of a promise, which is `undefined`.
 			//
-			// NOTE: An operand rather than a Constant, because a `complete`
+			// An operand rather than a Constant, because a `complete`
 			// bound to a name is read through the name — which is most of them,
 			// and none of them asks this question.
 			let generated = generate(`implementation {

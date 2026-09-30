@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import { createStub, type StubRange } from "./vscodeStub.js"
 
-// NOTE: The command an extraction ends on. Everything it DECIDES is one line —
+// The command an extraction ends on. Everything it DECIDES is one line —
 // where the cursor goes — and everything else about it is the API: which
 // document was opened, which selection it was opened at, and that rename was
 // asked for afterwards. None of that is visible in an Extension Development
@@ -13,7 +13,7 @@ const stub = createStub()
 
 mock.module("vscode", () => stub.module)
 
-// NOTE: After the mock, because a static import would evaluate `renameAt.js` —
+// After the mock, because a static import would evaluate `renameAt.js` —
 // and its `import * as vscode` — before the registration ran.
 const { revealForRename } = await import("../renameAt.js")
 
@@ -33,7 +33,7 @@ describe("revealForRename", () => {
 
 		let selection = stub.shownDocuments[0]!.options?.selection as StubRange
 
-		// NOTE: An empty selection — a cursor is a selection of no width, and
+		// An empty selection — a cursor is a selection of no width, and
 		// rename reads the word it stands in rather than the text it covers.
 		expect(selection).toEqual({
 			startLine: 4,
@@ -59,7 +59,7 @@ describe("revealForRename", () => {
 		})
 	})
 
-	// NOTE: The command is not in `contributes.commands`, so nothing offers it
+	// The command is not in `contributes.commands`, so nothing offers it
 	// from the palette — but a command is callable by anything that knows its
 	// name, and one called with the wrong shape must do nothing rather than
 	// open rename wherever the cursor happens to be.

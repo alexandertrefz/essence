@@ -43,7 +43,7 @@ import { simplify } from "../simplifier/index"
 import { renderNativesModule } from "../tools/generateNatives"
 import { validate } from "../validator/index"
 
-// NOTE: A Protocol Method written with a block is PROVIDED: every conformer
+// A Protocol Method written with a block is PROVIDED: every conformer
 // answers it without writing anything, and ONE const answers for all of them.
 // The whole feature rides the bounded-Generic rail — a provided Method is a
 // Function over `Self is <Protocol>` — so what is asked here is that the rail
@@ -110,7 +110,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `Terminal.inspect` calls run — the counterpart of `generate`,
 // mirroring `choices.spec`'s own.
 async function run(source: string): Promise<Array<string>> {
@@ -137,7 +137,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: How many times a name is DECLARED in the emitted text — the question
+// How many times a name is DECLARED in the emitted text — the question
 // behind "one const per provided Method", which no amount of running the
 // Program would answer.
 function declarationsOf(javaScript: string, name: string): number {
@@ -190,7 +190,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["unknown-method"])
 		})
 
-		// NOTE: A provided Method is reached through the PROTOCOL, exactly as a
+		// A provided Method is reached through the PROTOCOL, exactly as a
 		// written one is reached through its Namespace — so a Module holding the
 		// conforming Namespace and not the Protocol sees the written Methods and
 		// none of the provided ones. The report has to say which name is
@@ -333,7 +333,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
-		// NOTE: No COVERING Namespace here, so the Union is resolved member by
+		// No COVERING Namespace here, so the Union is resolved member by
 		// member and each branch answers with the provided Method — the one
 		// dispatch shape whose emitted call names the provided const rather
 		// than a Namespace. A Protocol binds nothing at runtime, so a branch
@@ -453,7 +453,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
-		// NOTE: Two Protocols providing one name leave the call ambiguous, and
+		// Two Protocols providing one name leave the call ambiguous, and
 		// `ambiguous-namespace` answers it with "name it at the call" — so the
 		// specifier has to reach a Protocol, or the Help names a spelling the
 		// Program can not write and the only way out is a rename.
@@ -502,7 +502,7 @@ describe("Protocol-provided Methods", () => {
 			expect(helpsOf(source)).toEqual([
 				"Name it at the call, e.g. 'value::<Left>label(…)'.",
 			])
-			// NOTE: The Namespace alone is the same word twice here, and
+			// The Namespace alone is the same word twice here, and
 			// neither time true — `Boxes` declares no `label`. Each note names
 			// the Protocol that wrote the body, which is also what the
 			// specifier has to write, so `Right` is discoverable at all.
@@ -510,7 +510,7 @@ describe("Protocol-provided Methods", () => {
 				"'Left' provides 'label' for 'Boxes'.",
 				"'Right' provides 'label' for 'Boxes'.",
 			])
-			// NOTE: The Quick Fix writes what the notes named and not the
+			// The Quick Fix writes what the notes named and not the
 			// Namespace they were needed instead of — `box::<Boxes>label()`
 			// resolves nothing, and two actions spelling it would be the same
 			// wrong edit offered twice.
@@ -520,7 +520,7 @@ describe("Protocol-provided Methods", () => {
 			})
 		})
 
-		// NOTE: A Namespace declaring the name ties with the provided Method it
+		// A Namespace declaring the name ties with the provided Method it
 		// did not replace — its own rung is not the rung the provided one
 		// stands on. The note must not say `Integer` declares `isBetween`:
 		// nothing in `Integer.es` does, and a reader sent there finds nothing.
@@ -570,7 +570,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: A provided body calls the Methods of the Protocol that wrote it, so
+	// A provided body calls the Methods of the Protocol that wrote it, so
 	// a bound's witness curries it with the conformer's witness for that
 	// Protocol, whichever Protocol the bound names.
 	describe("the witness a provided body runs with", () => {
@@ -591,7 +591,7 @@ describe("Protocol-provided Methods", () => {
 			"\t}",
 		]
 
-		// NOTE: The declarations, then a bounded `gauge`, then the lines that
+		// The declarations, then a bounded `gauge`, then the lines that
 		// call it.
 		function gaugeProgram(
 			declarations: Array<string>,
@@ -707,7 +707,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"shown h3"'])
 		})
 
-		// NOTE: Of two Protocols that do not extend each other the first the
+		// Of two Protocols that do not extend each other the first the
 		// clauses reach provides the body, and of two that do the more derived.
 		it("should answer with the first of two unrelated bodies the clauses reach", async () => {
 			let shown = [
@@ -757,7 +757,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"bigger 3"', '"shown 2"'])
 		})
 
-		// NOTE: `Shown` comes first, and its body answers with an Integer where
+		// `Shown` comes first, and its body answers with an Integer where
 		// `Sized` asks for a String.
 		it("should pass over a body whose signature does not fulfil the requirement", async () => {
 			expect(
@@ -826,7 +826,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: A `describe` answering a String fulfils the one `Shown` provides
+		// A `describe` answering a String fulfils the one `Shown` provides
 		// as well, so writing it is the answer.
 		it("should ask for a requirement another conformance accepts written as declared", () => {
 			let source = gaugeProgram(
@@ -861,7 +861,7 @@ describe("Protocol-provided Methods", () => {
 			})
 		})
 
-		// NOTE: A body is Simple, so it answers no overloaded requirement.
+		// A body is Simple, so it answers no overloaded requirement.
 		it("should not answer an overloaded requirement with a provided body", () => {
 			let source = [
 				"implementation {",
@@ -893,7 +893,7 @@ describe("Protocol-provided Methods", () => {
 			expect(labelsOf(source)).toEqual(["Method 'describe' is missing"])
 		})
 
-		// NOTE: A body is chosen at the Namespace's declared target, as the
+		// A body is chosen at the Namespace's declared target, as the
 		// declaration judges it, and has to fulfil its requirement at the value's
 		// Type as well, so no value runs another body.
 		function describing(
@@ -952,7 +952,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"alpha 1"'])
 		})
 
-		// NOTE: The body takes as `Self` what the requirement takes as a Number,
+		// The body takes as `Self` what the requirement takes as a Number,
 		// so it would be handed a Rational as an Integer.
 		it("should refuse a narrower value the chosen body takes as `Self`", () => {
 			expect(
@@ -1145,7 +1145,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `Maker`'s body answers `Sized`'s requirement, and `Maker` is solved
+		// `Maker`'s body answers `Sized`'s requirement, and `Maker` is solved
 		// at the value's Type, where the Namespace's `make` answers too wide a Type.
 		function makerProgram(
 			requirement: string,
@@ -1299,7 +1299,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `Alpha`'s body answers `twin` with the target's Type, which is no
+		// `Alpha`'s body answers `twin` with the target's Type, which is no
 		// `Self` of a narrower value.
 		function alphaProgram(
 			target: string,
@@ -1431,7 +1431,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: The requirement takes any Number where the body takes `Self`, so
+		// The requirement takes any Number where the body takes `Self`, so
 		// the body would answer an Integer's `pick` with a Rational.
 		it("should refuse a narrower value a body takes a wider Argument for as `Self`", () => {
 			expect(
@@ -1473,7 +1473,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `Sized` requires the `make` `Maker`'s body reads, as the Type the
+		// `Sized` requires the `make` `Maker`'s body reads, as the Type the
 		// Namespace answers it with, so the witness being solved answers it too.
 		function madeProgram(made: string, ...lines: Array<string>): string {
 			return [
@@ -1665,7 +1665,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `Sized` does not require the `twin` the body reads, so only the
+		// `Sized` does not require the `twin` the body reads, so only the
 		// body's own Protocol holds it.
 		it("should say which entry a body reads where the bound does not require it", () => {
 			let source = [
@@ -1771,7 +1771,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: Each Protocol provides what the other requires, so each body is
+		// Each Protocol provides what the other requires, so each body is
 		// curried with the other's witness.
 		it("should build the witnesses of two Protocols that provide for each other", async () => {
 			expect(
@@ -1853,7 +1853,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"big 7 labelled n"'])
 		})
 
-		// NOTE: The body's Protocol is conformed to under a condition the one
+		// The body's Protocol is conformed to under a condition the one
 		// being solved does not carry, and the witness still needs it.
 		const SHOWN_LISTS = [
 			"\tprotocol Shown {",
@@ -1903,7 +1903,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: Where the witness being solved holds every Method the body's
+		// Where the witness being solved holds every Method the body's
 		// Protocol has, and the same answer for each, the body is curried with
 		// it.
 		it("should curry a body with the witness being solved where that holds its Protocol", () => {
@@ -1950,7 +1950,7 @@ describe("Protocol-provided Methods", () => {
 			expect(emitted).toContain("$type.providedConformances(")
 		})
 
-		// NOTE: The witness being solved holds everything the body reads, so it is
+		// The witness being solved holds everything the body reads, so it is
 		// the witness the body is curried with, whatever else its Protocol asks
 		// for and under whichever conditions.
 		function expectOneWitness(emitted: string): void {
@@ -1958,7 +1958,7 @@ describe("Protocol-provided Methods", () => {
 			expect(emitted).not.toContain("$type.providedConformances(")
 		}
 
-		// NOTE: `Big`'s body hands `@` on as another Protocol, which reads only
+		// `Big`'s body hands `@` on as another Protocol, which reads only
 		// that Protocol's Methods off the witness.
 		function handingOnProgram(
 			sizedIs: string,
@@ -2165,7 +2165,7 @@ describe("Protocol-provided Methods", () => {
 			expectOneWitness(generate(source))
 		})
 
-		// NOTE: `Coded` restates the `tag` that `Labelled`'s body reads.
+		// `Coded` restates the `tag` that `Labelled`'s body reads.
 		function restatingProgram(
 			tagged: string,
 			restated: string,
@@ -2329,7 +2329,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `merge` answers `Self` with the Namespace's target, which a value
+		// `merge` answers `Self` with the Namespace's target, which a value
 		// narrower than the target does not; the body reads only `size`.
 		it("should curry a body with the witness a narrower value is solved for", async () => {
 			let source = gaugeProgram(
@@ -2383,7 +2383,7 @@ describe("Protocol-provided Methods", () => {
 			expectOneWitness(generate(source))
 		})
 
-		// NOTE: `Equatable`'s `isNot` reads `is`, which the Choices derive.
+		// `Equatable`'s `isNot` reads `is`, which the Choices derive.
 		it("should curry a body with the equality a Choice derives", async () => {
 			expect(
 				await run(
@@ -2461,7 +2461,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["recursive-type-declaration", "nonconforming-namespace"])
 		})
 
-		// NOTE: A body that hands `@` on reads its witness whole.
+		// A body that hands `@` on reads its witness whole.
 		it("should curry a body that hands its value on with its own Protocol's witness", async () => {
 			expect(
 				await run(
@@ -2498,7 +2498,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"shown box 3"'])
 		})
 
-		// NOTE: The literal's Parameter is a `Self`, from the requirement it is
+		// The literal's Parameter is a `Self`, from the requirement it is
 		// handed to, and sorting or searching a List of it hands the witness on.
 		// `Walker` holds `visit` too, so its witness holds all the body names.
 		function visiting(
@@ -2580,7 +2580,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"found true"', '"found true"'])
 		})
 
-		// NOTE: `Shown`'s body builds a List of `@` and only counts it, so it
+		// `Shown`'s body builds a List of `@` and only counts it, so it
 		// reads nothing of its witness and its Protocol's condition is not asked
 		// for. Sorting the List instead hands the witness on.
 		function counting(item: string, ...body: Array<string>): string {
@@ -2665,7 +2665,7 @@ describe("Protocol-provided Methods", () => {
 			expect(generate(source)).toContain("$type.providedConformances(")
 		})
 
-		// NOTE: A provided `toString` stands in the group beside a body curried
+		// A provided `toString` stands in the group beside a body curried
 		// with another witness, and is curried with its own.
 		it("should curry a provided toString in a group with its own witness", async () => {
 			expect(
@@ -2711,7 +2711,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"big enamed"'])
 		})
 
-		// NOTE: Both of the Namespace's clauses carry `where Item is Sized`, so
+		// Both of the Namespace's clauses carry `where Item is Sized`, so
 		// the group for a nested List builds that condition once, not once per
 		// member, and its size grows with the nesting rather than doubling.
 		function nestedProgram(depth: number, ...lines: Array<string>): string {
@@ -2780,7 +2780,7 @@ describe("Protocol-provided Methods", () => {
 			).toBeLessThanOrEqual(6)
 		})
 
-		// NOTE: Each Protocol's body reads what only the other's witness holds,
+		// Each Protocol's body reads what only the other's witness holds,
 		// so a nested List's group holds both, and each is built once however
 		// deep the List. `deep` is declared only where it is called.
 		function answeringProgram(depth: number, caller: string): string {
@@ -2843,7 +2843,7 @@ describe("Protocol-provided Methods", () => {
 			].join("\n")
 		}
 
-		// NOTE: An Integer's witnesses are a group of their own, and `deep`
+		// An Integer's witnesses are a group of their own, and `deep`
 		// hands its Element's witness in whole.
 		it("should build each witness of a nested List's groups once", async () => {
 			for (let [caller, groups] of [
@@ -2860,7 +2860,7 @@ describe("Protocol-provided Methods", () => {
 			}
 		})
 
-		// NOTE: A chain of Protocols whose bodies each read their own requirement,
+		// A chain of Protocols whose bodies each read their own requirement,
 		// with a call bounded by each. The entries solved grow with the cube of
 		// the depth where every inherited body's whole witness is solved.
 		it("should solve a chain of bounds in work that grows with the square of its depth", () => {
@@ -2921,7 +2921,7 @@ describe("Protocol-provided Methods", () => {
 			expect(solved(32) / solved(16)).toBeLessThan(5)
 		})
 
-		// NOTE: Two Protocols providing `describe` beside `Sized`, and which of
+		// Two Protocols providing `describe` beside `Sized`, and which of
 		// them answers `gauge`'s bound. Whichever body runs can call every
 		// Method of its own Protocol.
 		describe("the body each conformer's bound runs", () => {
@@ -3206,7 +3206,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: What a body reads decides whether the witness being solved can be
+	// What a body reads decides whether the witness being solved can be
 	// curried onto it, so it is pinned on the standard library's bodies and on
 	// the shapes that hand `@` on.
 	describe("what a provided body reads", () => {
@@ -3291,7 +3291,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: The literal's Parameter is a `Self`, from the requirement it is
+		// The literal's Parameter is a `Self`, from the requirement it is
 		// handed to.
 		it("should read what a Function literal calls on the `Self` it is handed", () => {
 			expect(
@@ -3315,7 +3315,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["is", "isNot", "visit"])
 		})
 
-		// NOTE: The body is typed once before the Program is, to read it, and
+		// The body is typed once before the Program is, to read it, and
 		// that typing leaves nothing behind for the one reported.
 		it("should keep the report of a Function literal nothing types", () => {
 			let source = [
@@ -3331,7 +3331,7 @@ describe("Protocol-provided Methods", () => {
 			expect(codesOf(source)).toContain("uninferable-parameter-type")
 		})
 
-		// NOTE: Nothing the List is asked takes a witness for its items.
+		// Nothing the List is asked takes a witness for its items.
 		it("should read nothing where a List of `@` is only counted", () => {
 			expect(
 				readsOf(
@@ -3437,7 +3437,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual([])
 		})
 
-		// NOTE: One const above every Program, so the body's reach ends at the
+		// One const above every Program, so the body's reach ends at the
 		// prelude — the standard library and the builtins. Everything the
 		// Program declares is emitted BELOW it, under names the const can not
 		// see, which is a `ReferenceError` and not a Diagnostic without this.
@@ -3506,7 +3506,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["provided-method-out-of-reach"])
 		})
 
-		// NOTE: The body writes no name the Program declares, and its emission
+		// The body writes no name the Program declares, and its emission
 		// still reads `Helpers.shout`.
 		it("should refuse a call of a Method a Namespace the Program declares", () => {
 			let source = [
@@ -3634,7 +3634,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: `Boxes` writes nothing for Equatable, and the witness `contains`
+		// `Boxes` writes nothing for Equatable, and the witness `contains`
 		// needs is built together with its `Keyed` one, which reads `key` off it.
 		it("should refuse a witness a group builds from a Namespace the Program declares", () => {
 			let source = [
@@ -3673,7 +3673,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: A witness names its Namespace once for each Method in its map, and
+		// A witness names its Namespace once for each Method in its map, and
 		// `IntegerTagged` writes none.
 		it("should accept a witness whose Methods are all provided", async () => {
 			expect(
@@ -3737,7 +3737,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"inner"'])
 		})
 
-		// NOTE: The `Helpers` the `if` branch declares is a class of that branch,
+		// The `Helpers` the `if` branch declares is a class of that branch,
 		// so the `else` branch still reads the Program's.
 		it("should refuse a call beside a block declaring a Namespace of its name", () => {
 			let source = [
@@ -3937,7 +3937,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"a square"'])
 		})
 
-		// NOTE: A DECISION, pinned here so it can not drift by accident. An
+		// A DECISION, pinned here so it can not drift by accident. An
 		// override answers every call, written on the Namespace's own target
 		// Type or on a Protocol-bounded Type Parameter alike — the witness a
 		// bounded call reads carries the override where the conformer wrote one
@@ -3999,7 +3999,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"override"', '"override"', '"Bath"', '"Bath"'])
 		})
 
-		// NOTE: The standard library's own override, both ways round.
+		// The standard library's own override, both ways round.
 		// `Integer::isLessThan` is written for the performance stratification
 		// the library explains at length, and a `<Item is Orderable>` bound has
 		// to reach it — not the Protocol's body on `compare`.
@@ -4022,7 +4022,7 @@ describe("Protocol-provided Methods", () => {
 			).toContain("isLessThan: $es_Integer_isLessThan")
 		})
 
-		// NOTE: A conditional conformance carries its own `where` witnesses, and
+		// A conditional conformance carries its own `where` witnesses, and
 		// the provided half closes over the map those were curried onto — so a
 		// `<Item is Equatable>` bound over a List reaches `Equatable`'s `isNot`
 		// with the List's Equatable witness and the item's witness both in place.
@@ -4046,7 +4046,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true", "false"])
 		})
 
-		// NOTE: A derived conformance writes its own `isNot`, so the witness
+		// A derived conformance writes its own `isNot`, so the witness
 		// names the derive's helper rather than the Protocol's const — the same
 		// rule an override follows, applied to the Method a Choice derives.
 		it("should answer a bounded call with a Choice's derived equality", async () => {
@@ -4077,7 +4077,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true", "false"])
 		})
 
-		// NOTE: A requirement a provided body fulfils is not owed, so the
+		// A requirement a provided body fulfils is not owed, so the
 		// printing a Choice derives does not stand in for it on any path.
 		it("should run a provided `toString` on a Choice instead of the derived one", async () => {
 			expect(
@@ -4189,7 +4189,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"named"', '"named"', '"named"'])
 		})
 
-		// NOTE: The body answers `Printable` only where the conformance that
+		// The body answers `Printable` only where the conformance that
 		// brings it in holds for the receiver. `Integer` is not `Loud`, so for a
 		// `Tag<Integer>` the requirement is owed, and the derive stands in.
 		describe("where the provider's condition does not hold", () => {
@@ -4288,7 +4288,7 @@ describe("Protocol-provided Methods", () => {
 				].join("\n")
 			}
 
-			// NOTE: Nothing is derived for a Choice with a payload, so there is
+			// Nothing is derived for a Choice with a payload, so there is
 			// nothing to stand in for the body: the bound keeps it, and only the
 			// direct call, which asks for `Named` itself, is refused.
 			it("should keep the body for a Choice with a payload, which derives nothing", () => {
@@ -4329,7 +4329,7 @@ describe("Protocol-provided Methods", () => {
 			})
 		})
 
-		// NOTE: A body that does not fulfil `Printable`'s requirement leaves
+		// A body that does not fulfil `Printable`'s requirement leaves
 		// it owed, so the derive answers it on every path, and the body is
 		// still reached by naming its Protocol.
 		it("should keep a Choice's derived printing where the provided `toString` does not fulfil it", async () => {
@@ -4366,7 +4366,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"Red"', '"Red"', '"Red"', '"[Red, Green]"', "7"])
 		})
 
-		// NOTE: An extension chain through one bound — `Orderable` grants
+		// An extension chain through one bound — `Orderable` grants
 		// `Comparable`, so a body bounded by the descendant reaches the
 		// ancestor's requirement and the descendant's provided Method off the
 		// one witness it was handed.
@@ -4429,7 +4429,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: An override that carries a bound of its own MATCHES the
+		// An override that carries a bound of its own MATCHES the
 		// provided signature — what it lacks is the `where` clause letting the
 		// conformance assume the bound, which is the requirement path's own
 		// answer and its own actionable help. Reporting a signature mismatch
@@ -4468,7 +4468,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: The override rule is about the NAMESPACE, not about the name.
+		// The override rule is about the NAMESPACE, not about the name.
 		// `Extras` writes `isEmpty` for the same Type and declares no
 		// conformance at all — that replaces the provided Method on Extras' own
 		// rung of the ladder and on nobody else's, so `Bags`'s conformance still
@@ -4510,7 +4510,7 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(["true", '"tag"'])
 		})
 
-		// NOTE: A provided Method is named by the Namespace whose conformance
+		// A provided Method is named by the Namespace whose conformance
 		// put it in reach, with the Protocol that wrote the body said beside it
 		// — a reader who never wrote `isEmpty` anywhere needs both halves.
 		it("should name a provided candidate by its Namespace and its Protocol", () => {
@@ -4543,7 +4543,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: A DERIVE answers only where nothing WRITTEN does, and where it
+		// A DERIVE answers only where nothing WRITTEN does, and where it
 		// answers it answers alone — so the note names the derive and never a
 		// provided Method beside it. `Extras` takes the name from the derive,
 		// and the Argument here is of a Type nothing on the ladder accepts.
@@ -4611,7 +4611,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: `Namespace.method(receiver, …)` is how an instance Method is called
+	// `Namespace.method(receiver, …)` is how an instance Method is called
 	// on its Namespace — `Number.compare(3, to 4)` — and a provided Method is a
 	// Method of that Namespace, so it answers the same spelling. `Self` is the
 	// Namespace's own target, which is what the receiver Argument is held to.
@@ -4643,7 +4643,7 @@ describe("Protocol-provided Methods", () => {
 			).toContain("$es_Orderable__isBetween(")
 		})
 
-		// NOTE: The same spelling on a Protocol-bounded Type Parameter, which
+		// The same spelling on a Protocol-bounded Type Parameter, which
 		// is what the Parameter's conformance is FOR: `Item` is no Namespace,
 		// and the witness the call was handed is what answers. It is the only
 		// spelling a static requirement has, and it reaches the instance
@@ -4723,7 +4723,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
-		// NOTE: A GENERIC Namespace has no receiver to specialize its target
+		// A GENERIC Namespace has no receiver to specialize its target
 		// with when it is NAMED, so `Self` is pinned to `List<ItemType>` and
 		// the Arguments are what say what the items are. `List`'s conformance
 		// is conditional on top of that, so the witness this solves is the one
@@ -4772,12 +4772,12 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["false"])
 		})
 
-		// NOTE: The Arguments are matched against the Namespace's own rung, so
+		// The Arguments are matched against the Namespace's own rung, so
 		// a call that misses is the ordinary Argument mismatch the `::`
 		// spelling reports — never the Compiler's own bug channel, which is
 		// where a bounded Signature's missing witness used to send it.
 		//
-		// NOTE: `Boolean` rather than `Integer`, because `Integer` WRITES an
+		// `Boolean` rather than `Integer`, because `Integer` WRITES an
 		// `isNot` of its own now — a two entry Overload, whose misses are
 		// `no-matching-overload` and say nothing about a provided Method.
 		// Boolean's `isNot` is `Equatable`'s, which is what this asks about.
@@ -4813,7 +4813,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["argument-type-mismatch", "argument-type-mismatch"])
 		})
 
-		// NOTE: The same hole, on the shape it was always reachable through —
+		// The same hole, on the shape it was always reachable through —
 		// a bounded free Function nothing selected. A `<Item is Equatable>` is
 		// a Signature with a witness to solve like any other, and its Arguments
 		// missing is the Program's mistake, not the Compiler's.
@@ -4849,7 +4849,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: A provided Method is a candidate of EVERY Namespace that declares
+	// A provided Method is a candidate of EVERY Namespace that declares
 	// the conformance, ranked by that Namespace's target exactly as a written
 	// Method is — so a question the narrow Namespace's rung rejects falls to the
 	// covering one's, which is the continuation `5::compare(1/2)` has always
@@ -4872,7 +4872,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true", "true", "false", "true"])
 		})
 
-		// NOTE: The narrow rung still wins where it matches, and the emitted text
+		// The narrow rung still wins where it matches, and the emitted text
 		// is what says which rung answered: `Integer`'s own written entry is a
 		// Namespace Method the Optimiser knows how to lower, and the provided one
 		// would stand in the output as a const of its own.
@@ -4887,7 +4887,7 @@ describe("Protocol-provided Methods", () => {
 			expect(generate(source)).not.toContain("$es_Comparable__isLessThan")
 		})
 
-		// NOTE: `Integer` writes `isBetween` nowhere, so both rungs are provided
+		// `Integer` writes `isBetween` nowhere, so both rungs are provided
 		// — and the one that answers is Integer's, whose witness is Integer's own
 		// `compare` rather than the covering Namespace's sixteen-cell table.
 		it("should answer a same-kind question on the narrow rung's witness", () => {
@@ -4919,7 +4919,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
-		// NOTE: Naming the Protocol narrows the ladder to that Protocol's rungs
+		// Naming the Protocol narrows the ladder to that Protocol's rungs
 		// and leaves the ladder — the fall from Integer's rung to the covering
 		// Number's still happens.
 		it("should keep the ladder under a Protocol specifier", async () => {
@@ -4935,7 +4935,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["false", "true"])
 		})
 
-		// NOTE: A user's own Namespaces climb the same ladder. `Wide` covers both
+		// A user's own Namespaces climb the same ladder. `Wide` covers both
 		// Types and `Narrow` covers one, so the call `Narrow`'s rung rejects is
 		// answered by `Wide`'s — with `Self` bound to the Union `Wide` targets.
 		it("should rank a user's Namespaces by their own targets", async () => {
@@ -5069,7 +5069,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true"])
 		})
 
-		// NOTE: `List::sort()` asks for `ItemType is Comparable`, and the bound
+		// `List::sort()` asks for `ItemType is Comparable`, and the bound
 		// here names only the descendant — the one witness answers both, which
 		// is the whole point of an extension being a promise about conformers.
 		it("should satisfy a standard library bound through the extension", async () => {
@@ -5129,7 +5129,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["true", "true"])
 		})
 
-		// NOTE: The declaration reads a descendant's own entry as replacing the
+		// The declaration reads a descendant's own entry as replacing the
 		// ancestor's, and a call has to read it the same way — otherwise both
 		// answer and every call is ambiguous.
 		it("should let a descendant re-provide an ancestor's Method", async () => {
@@ -5170,7 +5170,7 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
 		})
 
-		// NOTE: The same Program, asked through the ANCESTOR bound. The witness
+		// The same Program, asked through the ANCESTOR bound. The witness
 		// is solved for `Named`, whose own table answers with `Named`'s body —
 		// and the descendant's is what a direct call runs, so both spellings
 		// have to name it or one expression means two things.
@@ -5212,7 +5212,7 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
 		})
 
-		// NOTE: An ancestor that only REQUIRES what a descendant provides is
+		// An ancestor that only REQUIRES what a descendant provides is
 		// owed nothing by the conformer — the descendant's body is what answers
 		// it, through either bound.
 		it("should let a descendant provide what its ancestor requires", async () => {
@@ -5250,7 +5250,7 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"*Ada*"', '"*Ada*"'])
 		})
 
-		// NOTE: The ancestor is still REACHED when it provides a second Method
+		// The ancestor is still REACHED when it provides a second Method
 		// the descendant did not re-provide — it answers that one and not this
 		// one, and only the per-name guard at the call keeps the two apart.
 		it("should keep an ancestor answering the Method it still provides", async () => {
@@ -5293,7 +5293,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"*Ada*"', '"Ada!"'])
 		})
 
-		// NOTE: Two clauses may reach one ancestor, and the WEAKEST grant wins:
+		// Two clauses may reach one ancestor, and the WEAKEST grant wins:
 		// a Protocol granted outright by one clause does not carry the other
 		// clause's `where`. What is left is the refusal that is TRUE — a Method
 		// fulfilling a conditional clause carries its bound, and an
@@ -5344,7 +5344,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: And with the condition written on both clauses the ancestor
+		// And with the condition written on both clauses the ancestor
 		// carries it once, and everything resolves.
 		it("should carry one condition onto an ancestor both clauses reach", async () => {
 			expect(
@@ -5472,7 +5472,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: A cycle is refused, and the Protocols keep their own surface —
+		// A cycle is refused, and the Protocols keep their own surface —
 		// which is what stops a broken extension from cascading a Diagnostic
 		// onto every Namespace that conforms.
 		it("should keep a Protocol in a cycle usable", () => {
@@ -5503,10 +5503,10 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: A descendant's witness answers every bound on its ancestors, so each
+	// A descendant's witness answers every bound on its ancestors, so each
 	// Method it restates keeps a signature the ancestor accepts under its key.
 	describe("a restated Method", () => {
-		// NOTE: `A` and a descendant `B`, a Namespace conforming to `B`, and a
+		// `A` and a descendant `B`, a Namespace conforming to `B`, and a
 		// Function bounded by `B` that hands its value on to one bounded by `A`.
 		function handedOnProgram(
 			ancestor: Array<string>,
@@ -5850,7 +5850,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"b l b r b"'])
 		})
 
-		// NOTE: `Narrow` restates `Base`'s `z` with a narrower answer and `Reader`
+		// `Narrow` restates `Base`'s `z` with a narrower answer and `Reader`
 		// inherits it as `Base` declares it, so `Both` takes `Narrow`'s whichever
 		// clause comes first.
 		function narrowedDiamond(clauses: string): string {
@@ -5904,7 +5904,7 @@ describe("Protocol-provided Methods", () => {
 			}
 		})
 
-		// NOTE: `Counted` provides a `z` answering an Integer and `Weighed` one
+		// `Counted` provides a `z` answering an Integer and `Weighed` one
 		// answering a Number, so `Both` takes `Counted`'s entry and its body.
 		it("should run the body of the extension whose entry it takes, in either clause order", async () => {
 			for (let clauses of [
@@ -5964,7 +5964,7 @@ describe("Protocol-provided Methods", () => {
 			}
 		})
 
-		// NOTE: `Halved` provides a `z` answering a Number and `Counted` one
+		// `Halved` provides a `z` answering a Number and `Counted` one
 		// answering an Integer, and a Function bounded by the extending Protocol
 		// hands its value on to one bounded by `Halved`.
 		function answeredApart(
@@ -6082,7 +6082,7 @@ describe("Protocol-provided Methods", () => {
 			})
 		}
 
-		// NOTE: `Named` declares a `z` answering a String, so no `z` the
+		// `Named` declares a `z` answering a String, so no `z` the
 		// Namespace writes answers both it and `Both`.
 		it("should ask a conformance declaring the Method apart to move before the Namespace writes it", async () => {
 			let named = [
@@ -6286,7 +6286,7 @@ describe("Protocol-provided Methods", () => {
 			expect(javaScript).not.toContain("$es_Shape")
 		})
 
-		// NOTE: A Protocol and a Namespace may be spelled exactly alike, and the
+		// A Protocol and a Namespace may be spelled exactly alike, and the
 		// emitted names must not be. The Namespace scheme joins with ONE `_`, a
 		// Protocol's with two, and no member name can begin with one — so
 		// nothing a user names a Protocol can reach a Namespace's const. Before
@@ -6327,7 +6327,7 @@ describe("Protocol-provided Methods", () => {
 			expect(await run(source)).toEqual(['"42"', '"hijacked"'])
 		})
 
-		// NOTE: A provided Method reached only from ANOTHER provided Method has
+		// A provided Method reached only from ANOTHER provided Method has
 		// to be pulled in by the reachability fixed point, not by the seed —
 		// the same edge a standard library Method calling another one draws.
 		it("should pull in a provided Method reached only through another", () => {
@@ -6365,7 +6365,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: Every JavaScript object answers `toString` and `constructor`, and
+	// Every JavaScript object answers `toString` and `constructor`, and
 	// a class refuses a member named `constructor` or `prototype`. A Method
 	// of any of these names is reached like any other.
 	describe("a Method named like an Object.prototype member", () => {
@@ -6650,7 +6650,7 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: A Choice's Type Parameter that no payload mentions is decided by
+	// A Choice's Type Parameter that no payload mentions is decided by
 	// the Type Arguments alone, and a `where` on it is solved against them.
 	describe("a condition on a Choice's Type Parameter no payload mentions", () => {
 		function tagProgram(
@@ -6803,7 +6803,7 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"hi str"', '"hi int"'])
 		})
 
-		// NOTE: The List holds `Tag#A | Tag#B`, each Case keeping its own Type
+		// The List holds `Tag#A | Tag#B`, each Case keeping its own Type
 		// Argument, and no one binding of `T` is true of both.
 		it("should refuse a List whose Cases carry different Type Arguments", () => {
 			expect(
@@ -6820,7 +6820,7 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
-		// NOTE: A `for` clause can not spell `Tag#A | Tag#B`, so the Help that
+		// A `for` clause can not spell `Tag#A | Tag#B`, so the Help that
 		// works is the one that gives the Cases one Type Argument.
 		it("should say which Type Arguments differ, and offer no Namespace for the Cases", () => {
 			let source = noisyProgram(
@@ -6838,7 +6838,7 @@ describe("Protocol-provided Methods", () => {
 	})
 })
 
-// NOTE: One const per Protocol and Method. Two Protocols of one name are two
+// One const per Protocol and Method. Two Protocols of one name are two
 // Protocols, so the second to provide a Method gets a numbered const of its
 // own; the emitter throws only where one identity provides a Method twice.
 describe("two Protocols of one name", () => {
@@ -6851,7 +6851,7 @@ describe("two Protocols of one name", () => {
 		return optimise(simplify(enriched.program))
 	}
 
-	// NOTE: A conformer and a call, because an unreached const is shaken away
+	// A conformer and a call, because an unreached const is shaken away
 	// and the question here is what the emitted text HOLDS.
 	function taggedProviding(memberName: string): string {
 		return [
@@ -6893,7 +6893,7 @@ describe("two Protocols of one name", () => {
 		).toThrow(/Two Protocols named 'Tagged'/)
 	})
 
-	// NOTE: Fed in reverse, because the names follow the declaring Module's path
+	// Fed in reverse, because the names follow the declaring Module's path
 	// rather than the order the entries arrive in.
 	it("should give each of two identities a const of its own", () => {
 		let entryFor = (identity: string): PreludeNamespace => {
@@ -6954,7 +6954,7 @@ describe("two Protocols of one name", () => {
 		])
 	})
 
-	// NOTE: Two nested Protocols of one name in one file are two Protocols, and
+	// Two nested Protocols of one name in one file are two Protocols, and
 	// each conformer runs its own Protocol's body.
 	it("should run the body each of two nested Protocols provides", async () => {
 		expect(
@@ -7005,7 +7005,7 @@ describe("two Protocols of one name", () => {
 		).toEqual(['"one"', '"two"'])
 	})
 
-	// NOTE: The nested `Printable` shadows the name and is a Protocol of its
+	// The nested `Printable` shadows the name and is a Protocol of its
 	// own, so a String hole still asks for the standard library's.
 	it("should keep a nested Protocol apart from the standard library's", async () => {
 		expect(
@@ -7050,7 +7050,7 @@ describe("two Protocols of one name", () => {
 		expect(emitted).toContain("$es_Tagged__announce")
 	})
 
-	// NOTE: Writes a Module graph into a directory of its own, and removes it
+	// Writes a Module graph into a directory of its own, and removes it
 	// whatever the spec asks of it.
 	async function withModules(
 		files: Record<string, string>,
@@ -7092,7 +7092,7 @@ describe("two Protocols of one name", () => {
 		)
 	}
 
-	// NOTE: A bundle file per name, since an imported file runs once.
+	// A bundle file per name, since an imported file runs once.
 	async function printedBy(
 		directory: string,
 		sources: ReturnType<typeof rewriteModules>,
@@ -7158,7 +7158,7 @@ describe("two Protocols of one name", () => {
 		].join("\n")
 	}
 
-	// NOTE: Each Module keeps its `Tagged` to itself, so neither can see the
+	// Each Module keeps its `Tagged` to itself, so neither can see the
 	// other's, and each provides a `describe` of its own.
 	it("should run each Module's own body for two Protocols of one name", async () => {
 		await withModules(
@@ -7190,7 +7190,7 @@ describe("two Protocols of one name", () => {
 		)
 	})
 
-	// NOTE: The const a Module's body is emitted under follows the Module's path,
+	// The const a Module's body is emitted under follows the Module's path,
 	// so a graph loaded from an entry in another directory names it alike.
 	it("should name each Module's const alike from any entry", async () => {
 		let main = (a: string, b: string) =>
@@ -7235,7 +7235,7 @@ describe("two Protocols of one name", () => {
 		)
 	})
 
-	// NOTE: One Namespace conforms to both, and neither extends the other, so
+	// One Namespace conforms to both, and neither extends the other, so
 	// both bounds run the first clause's body, with that Protocol's witness. A
 	// pick reaches either body.
 	it("should answer both bounds of one conformer with the first same-named body", async () => {
@@ -7306,7 +7306,7 @@ describe("two Protocols of one name", () => {
 		)
 	})
 
-	// NOTE: The same where one is imported under an alias, and a pick through
+	// The same where one is imported under an alias, and a pick through
 	// the alias reaches that Protocol's body.
 	it("should reach the body of a Protocol imported under an alias beside its namesake", async () => {
 		let tagged = (letter: string, show: string) =>
@@ -7372,7 +7372,7 @@ describe("two Protocols of one name", () => {
 	})
 })
 
-// NOTE: Two things can only be asked of the STANDARD LIBRARY's own Protocols.
+// Two things can only be asked of the STANDARD LIBRARY's own Protocols.
 // A Choice derives its printing from the builtin `Printable` and from nothing
 // else, so a provided Method reached through a derived conformance needs that
 // Protocol to have one; and a provided body inside a `declarations { … }`
@@ -7380,12 +7380,12 @@ describe("two Protocols of one name", () => {
 // the real sources with one provided Method added — the shape the standard
 // library is about to grow.
 //
-// NOTE: `Printable` rather than `Equatable`, because a body is Essence and
+// `Printable` rather than `Equatable`, because a body is Essence and
 // `Protocols.es` imports nothing: `@::toString()` is the Protocol's own
 // requirement and needs no Namespace in scope, where `@::is(other)::negate()`
 // would need `Boolean.es` imported and would change the library's import graph.
 //
-// NOTE: The library is put back afterwards rather than dropped: every consumer
+// The library is put back afterwards rather than dropped: every consumer
 // reads the one process-wide object, so a test that left its own in place would
 // compile every file after it against a library the repository does not have.
 describe("a provided Method in the standard library", () => {
@@ -7437,7 +7437,7 @@ describe("a provided Method in the standard library", () => {
 		useStdlib(replacedStdlib)
 	})
 
-	// NOTE: A Protocol body is Essence, and the generated native contract is
+	// A Protocol body is Essence, and the generated native contract is
 	// about the RUNTIME's exports — so a Protocol growing one moves exactly one
 	// line of it: the witness type gains the provided Method, because a witness
 	// carries one, and a native handed the witness may call it. Nothing else
@@ -7457,7 +7457,7 @@ describe("a provided Method in the standard library", () => {
 		)
 	})
 
-	// NOTE: `essenceMethodName` answers for a NAMESPACE member and must not
+	// `essenceMethodName` answers for a NAMESPACE member and must not
 	// answer for a Protocol's — a Namespace spelled like the Protocol would
 	// otherwise be routed to the Protocol's const. The provided Method is
 	// reached through the Invocation's `providedBy` instead, which the emission

@@ -38,7 +38,7 @@
 
 import { Code } from "astro:components"
 
-// NOTE: The same three files `astro.config.ts` loads for markdown fences. The
+// The same three files `astro.config.ts` loads for markdown fences. The
 // `Code` component carries its own highlighter config and cannot read the one
 // in `astro.config`, so the pairing is repeated rather than shared — if a theme
 // file or the grammar path moves, both places change.
@@ -103,7 +103,7 @@ function grammarFor(name: string | undefined) {
 	return resolved === "essence" || resolved === "es" ? essenceLang : resolved
 }
 
-// NOTE: A group matches tabs by name across windows, so the key has to be the
+// A group matches tabs by name across windows, so the key has to be the
 // same string in each of them — the file's `id` where the label is not it.
 function keyFor(file: CodeFile) {
 	return file.id ?? file.name

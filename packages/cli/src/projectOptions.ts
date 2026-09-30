@@ -16,13 +16,13 @@ import { type OptionValues, UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
 
-// NOTE: What a project's own `essence.json` means to a run, in one place: which
+// What a project's own `essence.json` means to a run, in one place: which
 // commands read it, how what it could not read is reported, and how every
 // setting it holds meets the flag that says the same thing. A command reads the
 // answer off its context and nothing else — a second place deriving "the flag
 // unless the project said otherwise" would be a second answer to give.
 
-// NOTE: The commands a project file has something to say to. A check is about
+// The commands a project file has something to say to. A check is about
 // the files it was handed, the two servers are handed a workspace by the editor,
 // which reads the file itself, and the Formatter reads only `exclude`, itself.
 const READING_COMMANDS = new Set(["build", "run", "watch", "test", "init"])
@@ -31,7 +31,7 @@ export function readsProjectConfiguration(command: CommandSpec): boolean {
 	return READING_COMMANDS.has(command.name)
 }
 
-// NOTE: Read from the working directory, once, for the whole invocation — the
+// Read from the working directory, once, for the whole invocation — the
 // nearest file at or above where the run was started. A command that walks a
 // project walks the directory this file sits in; a command handed file names
 // still reads it, because how a bundle is built is a fact about the project the
@@ -44,14 +44,14 @@ export function projectConfigurationFor(
 		: defaultConfiguration()
 }
 
-// NOTE: What the project file said that could not be read, rendered by the
+// What the project file said that could not be read, rendered by the
 // renderer every other Diagnostic goes through — one block per file, against
 // that file's own text, so a mistake in `essence.json` is underlined in
 // `essence.json` exactly as a mistake in a source is underlined in the source.
 // They are Warnings: the run carries on with the setting at its default, which
 // is what each of them says in its note.
 //
-// NOTE: Called once, from the entry point, rather than by each command. Every
+// Called once, from the entry point, rather than by each command. Every
 // command that reads the file reports the same thing at the same moment — ahead
 // of the work — and a command that grew a second copy of this loop would be a
 // command whose Warnings appeared somewhere else in the output.
@@ -59,7 +59,7 @@ export function reportProjectSettings(
 	context: CLIContext,
 	command: CommandSpec,
 ): void {
-	// NOTE: A command that reads no settings says nothing about them, `--verbose`
+	// A command that reads no settings says nothing about them, `--verbose`
 	// or not: "no essence.json governs the working directory" from a `check`
 	// that would not have read one is an answer to a question nobody asked.
 	if (!readsProjectConfiguration(command)) {
@@ -92,7 +92,7 @@ export function reportProjectSettings(
 	)
 }
 
-// NOTE: A configured `build.out` is a DIRECTORY, always: the setting says where
+// A configured `build.out` is a DIRECTORY, always: the setting says where
 // a project's bundles are written, and a project can not name one output file
 // for every source it builds. `--out` spells "a directory" with a trailing
 // separator, so that is what the configured path arrives with — without it, a
@@ -106,7 +106,7 @@ function asDirectory(out: string | null): string | undefined {
 	return out.endsWith(path.sep) ? out : `${out}${path.sep}`
 }
 
-// NOTE: Where a setting meets the flag that says the same thing, for every
+// Where a setting meets the flag that says the same thing, for every
 // setting that mirrors one — ONCE, so that no command derives "the flag unless
 // the project said otherwise" a second way. Three rules cover all of them:
 //
@@ -146,7 +146,7 @@ export function resolveProjectOptions(
 	}
 	let report = options.coverageReport ?? configuration.test.coverage.report
 
-	// NOTE: A place to write and nothing to write there is a mistake that costs
+	// A place to write and nothing to write there is a mistake that costs
 	// a whole run to discover — the table appears, the directory does not, and
 	// nothing says why. Refused rather than defaulted: which format was meant is
 	// not something to guess at. It asks about the FLAG, because a configured

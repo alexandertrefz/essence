@@ -2,7 +2,7 @@ import { watch as watchPath } from "node:fs"
 import { stat } from "node:fs/promises"
 import * as path from "node:path"
 
-// NOTE: The file watching every long-running command shares — `esc watch` and
+// The file watching every long-running command shares — `esc watch` and
 // `esc test --watch` differ in what they DO with a change and not at all in how
 // they notice one. The discipline is the client package's `watchModule`, which
 // learned it the hard way:
@@ -29,12 +29,12 @@ import * as path from "node:path"
 
 export const DEFAULT_DEBOUNCE = 60
 
-// NOTE: How often the signatures are read without an event prompting it. Half
+// How often the signatures are read without an event prompting it. Half
 // a second is long enough that a session of a few hundred files costs nothing
 // a reader notices, and short enough that a lost save is not a mystery.
 export const DEFAULT_POLL = 500
 
-// NOTE: Every file of every entry's graph, and which entries a change to it
+// Every file of every entry's graph, and which entries a change to it
 // reaches — a dependency is never rebuilt as an entry of its own, because what
 // it changes is the output of the Modules that import it. A file two entries
 // reach wakes both.
@@ -49,7 +49,7 @@ export function createDependentsIndex(): DependentsIndex {
 
 	return {
 		record(entry: string, fileNames: Array<string>): void {
-			// NOTE: The entry is taken out of every set first, so that a Module
+			// The entry is taken out of every set first, so that a Module
 			// an import was just deleted from stops waking it. A file nothing
 			// reaches any more leaves the map with the last entry that did.
 			for (let entries of dependents.values()) {
@@ -88,11 +88,11 @@ export function createDependentsIndex(): DependentsIndex {
 }
 
 type SourceWatcher = {
-	// NOTE: Adds files to the watched set — the graphs GROW, because an import
+	// Adds files to the watched set — the graphs GROW, because an import
 	// written during a session brings a directory with it and a session that
 	// never watched it would stop noticing saves there.
 	watch(fileNames: Array<string>): Promise<void>
-	// NOTE: What is being watched, for a caller that keeps its own map of what
+	// What is being watched, for a caller that keeps its own map of what
 	// a file affects.
 	files(): Array<string>
 	close(): void
@@ -100,7 +100,7 @@ type SourceWatcher = {
 
 type SourceWatcherOptions = {
 	onChange: (changed: Array<string>) => void
-	// NOTE: Something happened in a watched directory and no watched file
+	// Something happened in a watched directory and no watched file
 	// changed — which is what the CREATION of a file looks like from in here,
 	// since a file nobody is watching has no signature to differ from. A caller
 	// that has to notice a new source (a test session watching a project rather
@@ -109,9 +109,9 @@ type SourceWatcherOptions = {
 	onActivity?: () => void
 	onError?: (directory: string, error: unknown) => void
 	debounce?: number
-	// NOTE: The timer's interval; `DEFAULT_POLL` otherwise, and zero for none.
+	// The timer's interval; `DEFAULT_POLL` otherwise, and zero for none.
 	poll?: number
-	// NOTE: How a directory watcher is made — `fs.watch` otherwise. A spec
+	// How a directory watcher is made — `fs.watch` otherwise. A spec
 	// hands over one that reports nothing, to prove the timer on its own.
 	watchDirectory?: (
 		directory: string,
@@ -119,7 +119,7 @@ type SourceWatcherOptions = {
 	) => DirectoryWatcher
 }
 
-// NOTE: What `fs.watch` answers with, as far as this file reads it.
+// What `fs.watch` answers with, as far as this file reads it.
 type DirectoryWatcher = {
 	close(): void
 	on(event: "error", listener: (error: unknown) => void): unknown
@@ -181,7 +181,7 @@ export function createSourceWatcher(
 		}, debounce)
 	}
 
-	// NOTE: One read of every signature, prompted by a directory event or by
+	// One read of every signature, prompted by a directory event or by
 	// the timer. A prompt from an event is activity whatever the read finds,
 	// since something happened in a watched directory; the timer is activity
 	// only where a directory's own signature moved, which is what a file
@@ -228,7 +228,7 @@ export function createSourceWatcher(
 		}
 	}
 
-	// NOTE: The reads are queued behind one another rather than run at once.
+	// The reads are queued behind one another rather than run at once.
 	// An event and a tick landing together would otherwise both read the new
 	// signature before either had recorded it, and one save would be reported
 	// twice.
@@ -259,7 +259,7 @@ export function createSourceWatcher(
 					continue
 				}
 
-				// NOTE: The directory's signature is taken BEFORE its watcher
+				// The directory's signature is taken BEFORE its watcher
 				// is made, for the reason a file's is: whatever lands between
 				// the two is then a change the timer finds.
 				directorySignatures.set(directory, await signature(directory))
@@ -269,7 +269,7 @@ export function createSourceWatcher(
 						void checkForChanges(true)
 					})
 
-					// NOTE: A watcher can fail AFTER it was made — the
+					// A watcher can fail AFTER it was made — the
 					// directory goes away, or the platform runs out of
 					// handles — and it says so with an "error" event. An
 					// EventEmitter with no listener for that event throws it
@@ -287,7 +287,7 @@ export function createSourceWatcher(
 				}
 			}
 
-			// NOTE: The timer is a fallback and not a reason to stay alive:
+			// The timer is a fallback and not a reason to stay alive:
 			// the directory watchers hold the process open, and a session
 			// that closed them is one the timer must not keep running.
 			if (ticker === null && poll > 0 && watchers.size > 0) {

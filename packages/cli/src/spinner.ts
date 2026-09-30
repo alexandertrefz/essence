@@ -1,7 +1,7 @@
 import { LiveRegion, type Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"
 
-// NOTE: The spinner does not appear immediately. Most compilations finish in
+// The spinner does not appear immediately. Most compilations finish in
 // well under a tenth of a second, and a spinner that flashes for two frames
 // reads as a glitch rather than as progress — so rendering only starts once a
 // run has proven to be slow enough to be worth reporting on.
@@ -64,7 +64,7 @@ export class Progress {
 			this.visible = true
 			this.draw()
 
-			// NOTE: The interval is unref'd so a spinner can never be the
+			// The interval is unref'd so a spinner can never be the
 			// reason the process stays alive after the work is done.
 			this.timer = setInterval(() => {
 				this.frame += 1
@@ -93,7 +93,7 @@ export class Progress {
 		this.draw()
 	}
 
-	// NOTE: Called before any permanent output is printed. Progress lives in a
+	// Called before any permanent output is printed. Progress lives in a
 	// region that is erased on the way out, so nothing it drew survives in
 	// scrollback — the report is the only record of a finished run.
 	stop(): void {
@@ -172,7 +172,7 @@ export class Progress {
 		return line
 	}
 
-	// NOTE: Elapsed time only appears once a task has been running long enough
+	// Elapsed time only appears once a task has been running long enough
 	// that the user might wonder whether it is stuck.
 	private elapsedFor(task: Task): string | null {
 		if (task.status !== "active" || task.startedAt === undefined) {

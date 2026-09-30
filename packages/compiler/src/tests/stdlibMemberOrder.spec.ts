@@ -7,7 +7,7 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { loadStdlib, parseStdlibSource } from "../enricher/stdlib"
 
-// NOTE: One member order for every Namespace in the standard library, written
+// One member order for every Namespace in the standard library, written
 // down in `packages/standard-library/DEVELOPMENT.md` under "Member order" and
 // enforced here. A reader who has found their way around `String` has found
 // their way around `List`: the statics open the Namespace, the Protocol
@@ -31,16 +31,16 @@ const GROUP_NAMES: Record<number, string> = {
 	6: "transforms and everything else",
 }
 
-// NOTE: The Methods a Protocol asks for, in the order a reader meets the
+// The Methods a Protocol asks for, in the order a reader meets the
 // Protocols themselves: equality, then ordering, then printing.
 //
-// NOTE: A Method a Protocol PROVIDES never reaches this file, and can not: the
+// A Method a Protocol PROVIDES never reaches this file, and can not: the
 // order checked here is the order of the DECLARATIONS a Namespace body holds,
 // and a conformer declares nothing for a provided Method. `isNot` is still
 // listed because a Namespace may override one, and `Optional` does.
 const WITNESS_ORDER = ["is", "isNot", "compare", "toString"]
 
-// NOTE: The four operations in the order arithmetic is taught, then the four
+// The four operations in the order arithmetic is taught, then the four
 // that build on them.
 const ARITHMETIC_ORDER = [
 	"add",
@@ -53,7 +53,7 @@ const ARITHMETIC_ORDER = [
 	"squareRoot",
 ]
 
-// NOTE: Spelled out rather than derived, because an accessor is named for the
+// Spelled out rather than derived, because an accessor is named for the
 // part it answers and no signature says that. `reciprocal` is deliberately
 // absent: it BUILDS a Rational out of the receiver rather than reading a part
 // of it, which is a transform. `enumerate` is absent for the same reason: the
@@ -70,40 +70,40 @@ const ACCESSORS = new Set([
 	"firstIndex",
 	"lastIndex",
 	"indices",
-	// NOTE: The middle of `firstItem` and `lastItem`: the item of a List that
+	// The middle of `firstItem` and `lastItem`: the item of a List that
 	// holds exactly one. It reads a part of the receiver the way they do, and
 	// it stands where `List.es` declares it.
 	"onlyItem",
-	// NOTE: The plural of `firstIndex` and `lastIndex`, which names every
+	// The plural of `firstIndex` and `lastIndex`, which names every
 	// position an item stands at rather than one of them. `indices(where:)` is
 	// an entry on `indices` instead, because that Method already answers
 	// positions.
 	"everyIndex",
 	"keys",
-	// NOTE: A Dictionary's two other halves, beside the keys it shares
+	// A Dictionary's two other halves, beside the keys it shares
 	// with `Record`. An entry is the pair a Dictionary is written in terms
 	// of rather than a Record built out of one, which is what separates
 	// `entries` from `enumerate`.
 	"values",
 	"entries",
-	// NOTE: The first of them, read under the name a Dictionary gives the pair
+	// The first of them, read under the name a Dictionary gives the pair
 	// it is made of — what `firstItem` is to a List and `firstCharacter` to a
 	// String.
 	"firstEntry",
 	"characters",
-	// NOTE: The level below a character, read off the same String — a part of
+	// The level below a character, read off the same String — a part of
 	// the value under the name Unicode gives it, beside the characters it is
 	// grouped into.
 	"codePoints",
 	"words",
 	"lines",
 	"character",
-	// NOTE: A String's two ends, which `List` names `firstItem` and `lastItem`
+	// A String's two ends, which `List` names `firstItem` and `lastItem`
 	// — the same part of a value read under the name its own Type gives it.
 	"firstCharacter",
 	"lastCharacter",
 	"value",
-	// NOTE: A Result's two Cases read apart, and the List-side reading of the
+	// A Result's two Cases read apart, and the List-side reading of the
 	// second. `reason` stands beside `value`, and each pluralises to the
 	// List-side name — `values` and `reasons` — the way `character` pluralises
 	// to `characters`.
@@ -119,7 +119,7 @@ type Member = {
 	line: number
 }
 
-// NOTE: Every Namespace the sources declare, keyed by name — including any
+// Every Namespace the sources declare, keyed by name — including any
 // `Prelude.es` does not forward. `loadStdlib().members` holds the PUBLIC
 // surface, so an internal helper would quietly go unchecked; the typed
 // Programs carry each declaration's own complete Namespace Type instead. There
@@ -146,7 +146,7 @@ function isStatic(method: common.MethodType): boolean {
 	)
 }
 
-// NOTE: EVERY entry, so that an Overload counts as a predicate only when the
+// EVERY entry, so that an Overload counts as a predicate only when the
 // whole family answers a Boolean. `Optional::is` is one either way; a family
 // with one Boolean entry and one that answers a value is not a predicate.
 function answersBoolean(method: common.MethodType): boolean {
@@ -178,7 +178,7 @@ function groupOf(name: string, method: common.MethodType | null): number {
 	return ACCESSORS.has(name) ? 5 : 6
 }
 
-// NOTE: Read off the sources rather than off the loaded tables, because the
+// Read off the sources rather than off the loaded tables, because the
 // rule is about the order the `.es` file WRITES its members in and a Namespace
 // Type keeps its Properties and its Methods in two records. A Property and a
 // Method are ordered against each other by the Position of the name each was
@@ -206,7 +206,7 @@ function declaredMembers(): Array<Member> {
 
 			let declared: Array<Member> = []
 
-			// NOTE: A Namespace Property is always static — there is no
+			// A Namespace Property is always static — there is no
 			// per-value Property — so each one opens the Namespace with the
 			// static Methods.
 			for (let property of Object.values(node.properties)) {
@@ -244,7 +244,7 @@ function describeGroup(group: number): string {
 	return `group ${group} (${GROUP_NAMES[group]})`
 }
 
-// NOTE: One line per member that stands too late, naming the member it stands
+// One line per member that stands too late, naming the member it stands
 // after — which is the one an editor has to move it above.
 function outOfOrderMembers(): Array<string> {
 	let problems: Array<string> = []
@@ -271,7 +271,7 @@ function outOfOrderMembers(): Array<string> {
 	return problems
 }
 
-// NOTE: The order INSIDE one group, for the two groups that state one. Read off
+// The order INSIDE one group, for the two groups that state one. Read off
 // the members the group actually has, so a Namespace declaring three of the
 // four witnesses is held to the order of the three it declares.
 function outOfOrderWithin(group: number, order: Array<string>): Array<string> {
@@ -306,7 +306,7 @@ function outOfOrderWithin(group: number, order: Array<string>): Array<string> {
 
 describe("Standard Library Member Order", () => {
 	it("should find Namespaces to hold to the order", () => {
-		// NOTE: A guard on the reading above. Every check below passes on an
+		// A guard on the reading above. Every check below passes on an
 		// empty list, so a collector that found no Namespace, or that found no
 		// member in the ones it found, would make this file a no-op nobody
 		// notices. Seven of the Namespaces declare no member at all — a Choice
@@ -325,7 +325,7 @@ describe("Standard Library Member Order", () => {
 		expect(outOfOrderMembers().join("\n")).toBe("")
 	})
 
-	// NOTE: The rulebook a next editor reads and the set this file classifies
+	// The rulebook a next editor reads and the set this file classifies
 	// by are two spellings of one list, and only one of them fails a test when
 	// it goes stale. So the rulebook is held to the set: an accessor added here
 	// has to be written there too, or the next reader is given a list that has
@@ -357,7 +357,7 @@ describe("Standard Library Member Order", () => {
 		expect(outOfOrderWithin(3, ARITHMETIC_ORDER).join("\n")).toBe("")
 	})
 
-	// NOTE: The classifier is what the two checks above rest on, so the shapes
+	// The classifier is what the two checks above rest on, so the shapes
 	// it has to tell apart are pinned here rather than left to the sources
 	// happening to hold one of each.
 	describe("the classifier", () => {
@@ -387,7 +387,7 @@ describe("Standard Library Member Order", () => {
 		it("should read a Method answering a Boolean as a predicate", () => {
 			expect(group("List", "contains")).toBe(4)
 			expect(group("String", "starts")).toBe(4)
-			// NOTE: An Overload counts only when every entry answers a
+			// An Overload counts only when every entry answers a
 			// Boolean. All three `hasItems` entries do.
 			expect(group("List", "hasItems")).toBe(4)
 		})
@@ -401,7 +401,7 @@ describe("Standard Library Member Order", () => {
 		it("should read everything else as a transform", () => {
 			expect(group("List", "sort")).toBe(6)
 			expect(group("Integer", "negate")).toBe(6)
-			// NOTE: `reciprocal` builds a Rational rather than reading a part
+			// `reciprocal` builds a Rational rather than reading a part
 			// of one, so it is not an accessor.
 			expect(group("Rational", "reciprocal")).toBe(6)
 		})

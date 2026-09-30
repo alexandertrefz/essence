@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: A composite asks its members — checked against a MODEL of that sentence
+// A composite asks its members — checked against a MODEL of that sentence
 // rather than against the Compiler's own idea of it. The model below is written
 // from the rule and knows nothing about witnesses, slots, brands or pools: two
 // Records are equal when their member sets match and every member is equal by
@@ -20,7 +20,7 @@ import { validate } from "../validator/index"
 // invisible to it, which is the point — a test written from the implementation
 // agrees with the implementation.
 //
-// NOTE: SEVERAL Record Types per generated Program, which is the property the
+// SEVERAL Record Types per generated Program, which is the property the
 // hand-written tests did not have. Every one of them declares a single routed
 // Record, so no Program they compile can hold two witnesses that might be
 // confused for each other — and that is exactly the shape that found a witness
@@ -28,13 +28,13 @@ import { validate } from "../validator/index"
 // `{ zebra: Tag }` collapsed into one constant and the second Record was asked
 // about the first one's members. One Program here declares a dozen.
 //
-// NOTE: Fixed seeds and a generator written out here, so a failure is a file a
+// Fixed seeds and a generator written out here, so a failure is a file a
 // reader can open rather than a run they have to reproduce. The two seeds were
 // picked because they generate different shapes, not because they were the ones
 // that passed: the reviewer's own harness ran four over 2,400 assertions, and
 // these two carry the same shapes in a size the suite can afford.
 
-// NOTE: One Essence Type and the pairs that stand for it — each pair being two
+// One Essence Type and the pairs that stand for it — each pair being two
 // spellings and what the MODEL says about them. `Tag` is case-insensitive by
 // its own `is`, so "News" and "NEWS" are one Tag and two Strings; `Money`
 // compares on `cents` and ignores `note`. Both pairs differ structurally, so a
@@ -144,7 +144,7 @@ const universe: Record<string, Kind> = {
 	},
 }
 
-// NOTE: Out of alphabetical order on purpose. The witnesses are lined up with
+// Out of alphabetical order on purpose. The witnesses are lined up with
 // the routed names BY POSITION, so a Record whose routed members are written
 // out of order is the shape that can tell the two lists apart.
 const memberNames = ["zebra", "apple", "mango", "kiwi", "pear", "fig"]
@@ -173,7 +173,7 @@ const prelude = `type Tag = { text: String }
 		<- x::is(y)
 	}`
 
-// NOTE: Written out rather than reached for, so a seed means the same Program
+// Written out rather than reached for, so a seed means the same Program
 // on every machine and in every version of the runtime. Mulberry32: one
 // multiply-xor round over a 32-bit state, which is all that is wanted of it.
 function randomFrom(seed: number): () => number {
@@ -190,7 +190,7 @@ function randomFrom(seed: number): () => number {
 	}
 }
 
-// NOTE: The five questions, which are the five rails one answer has to travel:
+// The five questions, which are the five rails one answer has to travel:
 // the direct call, its complement, a bound solved at the call, a List's item
 // witness, and a Dictionary key — which is the one that also has to agree with
 // the key encoding. A Program batches all of them per pair, because what costs
@@ -228,7 +228,7 @@ function programFor(
 				name: member.name,
 				pair: pick(member.kind.pairs),
 			}))
-			// NOTE: THE MODEL. Every member decides for itself, by its own
+			// THE MODEL. Every member decides for itself, by its own
 			// Type's rule, and the Record is equal when all of them are.
 			let equal = chosen.every((member) => member.pair.equal)
 			let value = `${name}r${round}`
@@ -295,7 +295,7 @@ async function answersOf(source: string): Promise<Array<string>> {
 }
 
 describe("A generated Program agrees with the rule", () => {
-	// NOTE: The two seeds are run as separate tests so a failure names which
+	// The two seeds are run as separate tests so a failure names which
 	// one, and the Program is regenerated from the seed in the report — the
 	// generator is deterministic, so printing the seed is printing the Program.
 	for (let seed of [7, 23]) {
@@ -306,7 +306,7 @@ describe("A generated Program agrees with the rule", () => {
 		})
 	}
 
-	// NOTE: The generator itself, because a generator that quietly stopped
+	// The generator itself, because a generator that quietly stopped
 	// generating would make every test above pass. Twelve Types, two pairs each,
 	// five questions per pair.
 	it("generates the Program it says it does", () => {

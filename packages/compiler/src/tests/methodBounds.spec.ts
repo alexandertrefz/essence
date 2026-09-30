@@ -11,9 +11,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: A per-Method bound on a Namespace's own Type Parameter, end to end.
+// A per-Method bound on a Namespace's own Type Parameter, end to end.
 //
-// NOTE: EVERY Protocol these Programs bound by is written out by hand, with an
+// EVERY Protocol these Programs bound by is written out by hand, with an
 // answer no structural derive would give: `is` compares LENGTHS, `compare`
 // orders by length, `toString` SHOUTS. A missing witness, a witness for the
 // wrong Parameter, or a witness in the wrong slot is silent — the call still
@@ -47,7 +47,7 @@ function compile(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: Run in this process with `console.log` captured, the way the golden
+// Run in this process with `console.log` captured, the way the golden
 // harness runs — these Programs suspend nothing, but the `await import` keeps
 // them on the same rail as everything else that runs a compiled Program here.
 async function run(source: string): Promise<Array<string>> {
@@ -81,7 +81,7 @@ function diagnosticsOf(source: string): Array<string> {
 	)
 }
 
-// NOTE: A `Word` ordered and compared by the LENGTH of its text, and shouted by
+// A `Word` ordered and compared by the LENGTH of its text, and shouted by
 // its `toString`. Length order and alphabetical order disagree on the values
 // every Program below uses, so the structural answer and this one are different
 // Lists — which is what makes a wrong witness visible.
@@ -122,7 +122,7 @@ describe("A per-Method bound on a Namespace's Type Parameter", () => {
 		).toEqual(["true", "1"])
 	})
 
-	// NOTE: A Function value is not Equatable, so the unbounded `swapped` above
+	// A Function value is not Equatable, so the unbounded `swapped` above
 	// accepts a receiver `differing` refuses. The bound reaches one Method.
 	it("refuses the call whose receiver does not conform", () => {
 		expect(
@@ -140,7 +140,7 @@ describe("A per-Method bound on a Namespace's Type Parameter", () => {
 		).toEqual(["unsatisfied-bound"])
 	})
 
-	// NOTE: A generic Function whose Type Parameter is spelled like the
+	// A generic Function whose Type Parameter is spelled like the
 	// Namespace's, reached through a bounded Method. It must answer, and
 	// answer 2.
 	it("answers through a generic caller spelling its Parameter alike", async () => {
@@ -192,16 +192,16 @@ ${words}
 	Terminal.inspect({ items = [{ text = "pq" }, { text = "rs" }] }::sameEnds())
 }`),
 		).toEqual([
-			// NOTE: By LENGTH — alphabetically this is aaa, y, zz.
+			// By LENGTH — alphabetically this is aaa, y, zz.
 			'[ "y", "zz", "aaa" ]',
-			// NOTE: Shouted, and by the written `toString` of each item.
+			// Shouted, and by the written `toString` of each item.
 			'"[ZZ, AAA, Y]"',
-			// NOTE: Two different texts of the same length are EQUAL here.
+			// Two different texts of the same length are EQUAL here.
 			"true",
 		])
 	})
 
-	// NOTE: The witness is an Argument, and this is the assertion that says so
+	// The witness is an Argument, and this is the assertion that says so
 	// in the emitted JavaScript rather than only through an answer. The Method
 	// takes its receiver and one hidden conformance Argument, and the call site
 	// hands over the Namespace that wrote the conformance.
@@ -217,7 +217,7 @@ ${words}
 	Terminal.inspect({ items = [{ text = "zz" }, { text = "y" }] }::ordered())
 }`)
 
-		// NOTE: The Method takes its receiver and ONE hidden conformance
+		// The Method takes its receiver and ONE hidden conformance
 		// Argument, and the call site hands over the conformance value built
 		// from the Namespace that wrote `compare` — not a structural derive,
 		// and not nothing.
@@ -252,7 +252,7 @@ ${words}
 		).toEqual(['[ "y", "zz", "aaa" ]', "[ 5, 20 ]"])
 	})
 
-	// NOTE: A static Method has no receiver, so nothing binds the Namespace's
+	// A static Method has no receiver, so nothing binds the Namespace's
 	// Parameter at a call to one — the bound is retained all the same, and the
 	// call says the Parameter can not be worked out rather than dropping the
 	// requirement in silence.
@@ -270,7 +270,7 @@ ${words}
 		).toEqual(["uninferable-type-parameter"])
 	})
 
-	// NOTE: A Method calling another of its own Namespace on `@` must carry the
+	// A Method calling another of its own Namespace on `@` must carry the
 	// bound the callee asks for. The caller's own bound is what satisfies it.
 	it("threads the bound through a call on '@'", async () => {
 		expect(
@@ -339,7 +339,7 @@ ${words}
 		).toEqual(["restated-inferred-parameter"])
 	})
 
-	// NOTE: Refused where it is written, and not carried, so the call does not
+	// Refused where it is written, and not carried, so the call does not
 	// answer for it a second time.
 	it("refuses a bound that names no Protocol at the Method", () => {
 		expect(
@@ -355,7 +355,7 @@ ${words}
 		).toEqual(["unknown-protocol"])
 	})
 
-	// NOTE: A Method that fulfils a requirement is promised by the conformance
+	// A Method that fulfils a requirement is promised by the conformance
 	// unconditionally, so a bound of its own is a promise the Namespace can not
 	// keep — the condition belongs on the conformance, and that is what the
 	// report says.
@@ -373,7 +373,7 @@ ${words}
 		).toContain("nonconforming-namespace")
 	})
 
-	// NOTE: The conformance's `where` and the Method's own bound name the same
+	// The conformance's `where` and the Method's own bound name the same
 	// Parameter and disagree. The conformance check gets there first and says
 	// the Namespace does not conform — `show` fulfils `Shown`, so a bound of its
 	// own was already refused for that reason alone, and the conflict never
@@ -400,7 +400,7 @@ ${words}
 	})
 })
 
-// NOTE: A Namespace for a bounded generic Choice takes an unbounded Parameter
+// A Namespace for a bounded generic Choice takes an unbounded Parameter
 // on its `for` line and does not restate the bound. Every value of
 // `SortedBox<X>` that can exist is already a proof that `X` is Comparable, so
 // the bound is read off the target and holds for every Method, with the
@@ -443,7 +443,7 @@ ${sortedBox}
 		).toEqual(['[ "y", "zz", "aaa" ]'])
 	})
 
-	// NOTE: The Namespace's Parameters CROSSED against the Choice's, which is
+	// The Namespace's Parameters CROSSED against the Choice's, which is
 	// the only shape that can tell a bound read off the right position from one
 	// read off a mirrored index — `SortedBox<Item is Comparable>` has a single
 	// Parameter, so every spec above it is green either way. The bound belongs
@@ -500,7 +500,7 @@ ${crossed}
 		])
 	})
 
-	// NOTE: The Choice's own bound still holds where the Choice is USED — a
+	// The Choice's own bound still holds where the Choice is USED — a
 	// Namespace over it changes nothing about who may build one.
 	it("still refuses a Type Argument the Choice's own bound rejects", () => {
 		expect(

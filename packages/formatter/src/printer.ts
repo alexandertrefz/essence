@@ -30,7 +30,7 @@ import { compareEntries, compareGroups } from "./sections"
 import type { SourceText } from "./source"
 import type { Comment, TriviaCursor } from "./trivia"
 
-// NOTE: One thing to write, paired with where it was written. The line numbers
+// One thing to write, paired with where it was written. The line numbers
 // are the source's, never the output's — they are read only to decide whether
 // the author left a blank line between two things, which is the one piece of
 // vertical layout the formatter preserves rather than derives.
@@ -38,13 +38,13 @@ type Entry = {
 	startLine: number
 	endLine: number
 	doc: Doc
-	// NOTE: Whether the entry closes with a block of its own — a Function, a
+	// Whether the entry closes with a block of its own — a Function, a
 	// Namespace, a Method with a body, an `if`, a test. A blank line is written
 	// after one whether or not the author left it: the corpus writes one after
 	// every such block by hand, and a reader scanning for the next member
 	// looks for the gap before the name.
 	bodied?: boolean
-	// NOTE: Whether a blank line goes above the entry, where whoever built it
+	// Whether a blank line goes above the entry, where whoever built it
 	// decides that rather than the source: a sorted list's neighbours are not
 	// the ones the source has.
 	blankAbove?: boolean
@@ -52,7 +52,7 @@ type Entry = {
 
 const EMPTY = text("")
 
-// NOTE: The most padding an aligned assignment is worth carrying to reach its
+// The most padding an aligned assignment is worth carrying to reach its
 // block's `=` column. A run of assignments is split into blocks whose heads
 // span no more than this, so a head that would need more padding than this to
 // line up starts a new block rather than dragging every sibling's `=` right to
@@ -60,7 +60,7 @@ const EMPTY = text("")
 // case, and each lines up on its own.
 const MAX_ALIGNMENT_PADDING = 12
 
-// NOTE: A `match` puts every Handler of a run in one column however far apart
+// A `match` puts every Handler of a run in one column however far apart
 // their Matchers read. The blocking a run of Declarations gets is for the one
 // wide typed Declaration written among short ones — a shape a `match` does not
 // have, since every Matcher in one is a case of the same value, and a Handler
@@ -93,7 +93,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: Lays entries out one per line, keeping a single blank line wherever
+	// Lays entries out one per line, keeping a single blank line wherever
 	// the author left one or more. `openLine` seeds the check so that the blank
 	// line the corpus writes after `implementation {` survives; it is null for
 	// every nested block, which starts tight against its brace the way it
@@ -136,7 +136,7 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: Gathers the Comments written above each item into the entry list
+	// Gathers the Comments written above each item into the entry list
 	// alongside it, and folds a trailing Comment onto the item's own line. Any
 	// Comment nobody claimed is flushed before the closing brace, so a Comment
 	// can be moved but never dropped.
@@ -161,7 +161,7 @@ export class Printer {
 			let trailing = this.trivia.claimTrailingOn(endLine)
 			let doc = print(item)
 
-			// NOTE: The Comment runs to the end of its line, so a block holding
+			// The Comment runs to the end of its line, so a block holding
 			// this entry can never render flat — the `}` would land inside the
 			// Comment. `breakParent` is what says so without spending a line
 			// break of its own. And it is written as a line suffix, never
@@ -181,7 +181,7 @@ export class Printer {
 		return entries
 	}
 
-	// NOTE: The Statements of one block, with the `=` of a run of adjacent
+	// The Statements of one block, with the `=` of a run of adjacent
 	// assignments written in one column — the same alignment a `match` gives its
 	// Handlers' braces, and built the same way: each Statement is laid out in
 	// source order, because that is the order the trivia cursor is walked in,
@@ -249,7 +249,7 @@ export class Printer {
 				kind = assignmentKind(assignment)
 				joinAlignment(run, padding, {
 					headWidth: printed.headWidth,
-					// NOTE: The `=` is written after the head wherever the
+					// The `=` is written after the head wherever the
 					// head ends, and a value too wide for the line gives way
 					// inside itself rather than moving down — so an assignment
 					// holds its column however far its line runs on, and the
@@ -272,20 +272,20 @@ export class Printer {
 		}
 	}
 
-	// NOTE: A braced block breaks, with one exception: a `match` Handler
+	// A braced block breaks, with one exception: a `match` Handler
 	// holding a single short Statement is written on one line throughout the
 	// corpus — `case #Empty { <- fallback }` — and expanding all of those to
 	// three lines each would triple the size of every `match`. `allowFlat`
 	// offers that shape to the group, which takes it only if it fits.
-	// NOTE: `opening` is the Comment written after the `{` itself — `reduce(…,
+	// `opening` is the Comment written after the `{` itself — `reduce(…,
 	// (sum, n) {  § 11`. It belongs to no Statement inside the block and to no
 	// Statement outside it, so unless the block writes it, nothing does. It
 	// also runs to the end of its line, which is what rules the flat shape out.
-	// NOTE: `prefix` is written before the `{` but lives INSIDE the group, so
+	// `prefix` is written before the `{` but lives INSIDE the group, so
 	// it is measured with the block it opens — which is what a `match`
 	// Handler's alignment padding has to be, or a Handler would be offered a
 	// flat shape that its own padding then pushes past the width.
-	// NOTE: `expandable` marks the flat-shaped group as the one that gives way
+	// `expandable` marks the flat-shaped group as the one that gives way
 	// when the block is hugged as a call's last Argument — a Function
 	// literal's body. A Handler's body is never hugged and passes false, so
 	// that a measure in `expand` mode reads it flat where it fits.
@@ -330,7 +330,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: `closeLine` is where the body's own `}` is, which is NOT the end of
+	// `closeLine` is where the body's own `}` is, which is NOT the end of
 	// the Statement that owns it — an `if … else` Position runs past the true
 	// body's brace to the end of the false one, and flushing Comments against
 	// that would pull the `else` block's Comments into the `if`. `headLine` is
@@ -358,7 +358,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: The entries of a body, walked once — the trivia cursor moves as
+	// The entries of a body, walked once — the trivia cursor moves as
 	// they are built, so a body that is to be laid out two ways is built here
 	// and wrapped twice by `block`. `flatAllowed` is false where a Comment was
 	// claimed inside the body: there are then more entries than Statements,
@@ -386,7 +386,7 @@ export class Printer {
 		return { entries, opening, flatAllowed: entries.length === body.length }
 	}
 
-	// NOTE: The line a block's `{` is written on. It is looked for between the
+	// The line a block's `{` is written on. It is looked for between the
 	// owner's first line and the line above the first thing inside the block —
 	// or, for an empty block, the line above its `}` — because nothing in the
 	// AST records it: a Declaration's Position starts at its keyword, and a
@@ -420,7 +420,7 @@ export class Printer {
 
 	// #region Program
 
-	// NOTE: The whole file, in the order it is written: the `import { … }` block,
+	// The whole file, in the order it is written: the `import { … }` block,
 	// the implementation, the `export { … }` block. The trivia cursor walks the
 	// source, so every Comment has to be claimed in that same order — which is
 	// why each section is printed where it stands rather than assembled at the
@@ -448,11 +448,11 @@ export class Printer {
 			}
 		}
 
-		// NOTE: A file that is nothing but tests wrote no implementation block,
+		// A file that is nothing but tests wrote no implementation block,
 		// and one is not written for it — its Program Position IS the tests
 		// block's, so everything below reads the same either way.
 		if (program.kind !== "tests") {
-			// NOTE: A file may open with Comments above its `implementation {` —
+			// A file may open with Comments above its `implementation {` —
 			// they are outside the Program's own Position, so they have to be
 			// written before the keyword rather than flushed into the block.
 			let heading = this.headingComments(program.position)
@@ -477,7 +477,7 @@ export class Printer {
 				),
 			)
 
-			// NOTE: A Comment trailing the Program's own `}` stays on it.
+			// A Comment trailing the Program's own `}` stays on it.
 			let closing = this.trivia.claimTrailingOn(program.position.end.line)
 
 			if (closing !== null) {
@@ -504,7 +504,7 @@ export class Printer {
 		}
 
 		if (program.tests !== null) {
-			// NOTE: The block above wrote no separator of its own — except the
+			// The block above wrote no separator of its own — except the
 			// `import { … }` block, which does, and which is what stands above
 			// this one in a file that is nothing but tests.
 			if (program.kind !== "tests") {
@@ -531,7 +531,7 @@ export class Printer {
 			}
 		}
 
-		// NOTE: Whatever is left was written below the last block, and is
+		// Whatever is left was written below the last block, and is
 		// written back below it — never pulled inside the block above, which
 		// would move it across a brace and be refused.
 		let previousEnd = (program.tests ?? program.exports ?? program).position
@@ -555,7 +555,7 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: The `tests { … }` block, written exactly the way the implementation
+	// The `tests { … }` block, written exactly the way the implementation
 	// block is — the section is a block of Statements that happens to admit two
 	// more kinds of item.
 	private printTestsSection(node: parser.TestsSectionNode): Doc {
@@ -612,7 +612,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: `test "name" skipped "reason"` and the block that follows it. The
+	// `test "name" skipped "reason"` and the block that follows it. The
 	// Modifiers hang off the name one per line when the head stops fitting, and
 	// the `{` then goes back to the item's own column — which is why the space
 	// before it is part of THIS group rather than of the block: the block holds
@@ -630,13 +630,13 @@ export class Printer {
 			return concat([...head, text(" ")])
 		}
 
-		// NOTE: The table stands OUTSIDE the group the Modifiers break in: the
+		// The table stands OUTSIDE the group the Modifiers break in: the
 		// rows are a List that lays itself out over lines of its own, and a
 		// group holding those breaks could never be written flat — which would
 		// put every Modifier on a line of its own for a table test that has
 		// one. A property list stands there for the same reason, since its
 		// Parameters break the same way.
-		// NOTE: BOTH, where a test wrote both. It can not mean anything — the
+		// BOTH, where a test wrote both. It can not mean anything — the
 		// Enricher refuses it as `contradictory-test-forms` — but a printer
 		// that dropped one would be a formatter that changes what a file says,
 		// which is the one thing it may never do.
@@ -672,7 +672,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: `across [ … ] (row: Row)`, written between the Modifiers and the
+	// `across [ … ] (row: Row)`, written between the Modifiers and the
 	// body. The rows print as the List they are, so a table long enough to
 	// break breaks the way every other written List does.
 	private printTestTable(node: parser.TestTableNode): Doc {
@@ -688,7 +688,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: `for any (a: Integer, b: String)`, in the slot a table's rows stand
+	// `for any (a: Integer, b: String)`, in the slot a table's rows stand
 	// in. The Parameters print as a closure's, so a list long enough to break
 	// breaks the way every other Parameter list does.
 	private printTestProperties(node: parser.TestPropertiesNode): Doc {
@@ -720,7 +720,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: The Comments written above a block's own keyword. They sit outside
+	// The Comments written above a block's own keyword. They sit outside
 	// the block's Position, so they are written before it rather than flushed
 	// into it, and a blank line the author left between a Comment and the keyword
 	// it introduces is kept.
@@ -732,7 +732,7 @@ export class Printer {
 		for (let [index, comment] of comments.entries()) {
 			parts.push(verbatim(comment.text), hardline)
 
-			// NOTE: A blank line is judged against WHAT FOLLOWS this Comment —
+			// A blank line is judged against WHAT FOLLOWS this Comment —
 			// the next Comment of the run, or the keyword when this is the last
 			// of them. Judging every one against the keyword meant that the
 			// blank line separating the run from the keyword was found under
@@ -748,7 +748,7 @@ export class Printer {
 		return parts
 	}
 
-	// NOTE: One Module section, written in canonical order: an export block's
+	// One Module section, written in canonical order: an export block's
 	// bare names first, then the groups, and inside a group its names. The
 	// members are walked in WRITTEN order — that is the order the trivia
 	// cursor hands Comments out in — and only sorted afterwards, so a Comment
@@ -774,7 +774,7 @@ export class Printer {
 			}
 		}
 
-		// NOTE: A Comment written below the last member belongs to no member,
+		// A Comment written below the last member belongs to no member,
 		// so it is written where it stands, above the block's closing brace.
 		let loose = this.trivia.takeBefore(section.position.end.line)
 
@@ -803,7 +803,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: The lines of a sorted list, each member's Comments above it. A blank
+	// The lines of a sorted list, each member's Comments above it. A blank
 	// line the author wrote is kept where the sort leaves the lines either side
 	// of it together; anywhere else it would part two the author never parted.
 	private sectionLines(
@@ -811,7 +811,7 @@ export class Printer {
 		loose: Array<Comment>,
 	): Array<Entry> {
 		let lines: Array<Entry> = []
-		// NOTE: Where the line above ends in the source, or null when the line
+		// Where the line above ends in the source, or null when the line
 		// above is not the one written above.
 		let previousEnd: number | null = null
 
@@ -864,7 +864,7 @@ export class Printer {
 		return { node, leading, trailing, written }
 	}
 
-	// NOTE: The Comments of a group are claimed around its entries: what is
+	// The Comments of a group are claimed around its entries: what is
 	// above its `from` line before them, what is below its last entry after
 	// them, and the two that trail its own lines last of all — so that the
 	// note after a group written flat, whose one entry ends on the `from`
@@ -895,7 +895,7 @@ export class Printer {
 			: concat([doc, lineSuffix(" " + entry.trailing.text)])
 	}
 
-	// NOTE: `from "./Module.es" { … }`. A group of one name is written on one
+	// `from "./Module.es" { … }`. A group of one name is written on one
 	// line, the way a `case` with one short Statement is; two or more names
 	// stand one to a line, and a Comment inside the braces rules the flat
 	// shape out for the reason it does anywhere else.
@@ -965,7 +965,7 @@ export class Printer {
 					this.printAliasedType(node.type, head),
 				]
 
-				// NOTE: A checked refinement's `where` clause, on one line with
+				// A checked refinement's `where` clause, on one line with
 				// the Type it refines while it fits, and on the line under it
 				// — indented, whole — when it does not. The Parser reads a
 				// next-line `where` as the clause whenever what follows it on
@@ -1017,7 +1017,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: `expect value` and `require #Value(item) = value`. A Matcher is
+	// `expect value` and `require #Value(item) = value`. A Matcher is
 	// written on no assertion but a `require`, and it stands where a
 	// Declaration's name stands — and lays itself out as one does: a Pattern
 	// too wide for the line breaks one member per line, exactly as the same
@@ -1044,7 +1044,7 @@ export class Printer {
 			return concat([text(keyword), value])
 		}
 
-		// NOTE: `matches snapshot …` follows the value on its line, and moves
+		// `matches snapshot …` follows the value on its line, and moves
 		// to a line of its own when that is what lets the value stay whole —
 		// the middle layout is measured up to its break, so it is taken
 		// exactly when the value fits the first line. A value that has to
@@ -1061,7 +1061,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: `matches snapshot`, `matches snapshot "…"` — the recorded text a
+	// `matches snapshot`, `matches snapshot "…"` — the recorded text a
 	// run wrote back — and `matches snapshot from "name"`, which names an entry
 	// of the file's `__snapshots__` companion.
 	private printSnapshot(node: parser.SnapshotNode): Doc {
@@ -1082,7 +1082,7 @@ export class Printer {
 		return text("matches snapshot")
 	}
 
-	// NOTE: `padding` is written between the head and the `=`, and is the slot an
+	// `padding` is written between the head and the `=`, and is the slot an
 	// alignment run fills in once it knows its block's widest member — so the
 	// head's width is reported back alongside the Doc. It is null when the head
 	// cannot be written on one line at all, which leaves nothing to measure a
@@ -1118,7 +1118,7 @@ export class Printer {
 			}
 		}
 
-		// NOTE: A head that takes the value apart reports no width, which ends
+		// A head that takes the value apart reports no width, which ends
 		// its alignment run the way a value that cannot be written flat already
 		// does. A Pattern is the one head that lays ITSELF out: padded to a
 		// column it shares with a sibling of a similar width, both could then
@@ -1127,7 +1127,7 @@ export class Printer {
 		let written = takesApart ? null : renderFlat(concat(head))
 		let value = this.printExpression(node.value)
 
-		// NOTE: The `=` never breaks away from what it assigns. A value starts on
+		// The `=` never breaks away from what it assigns. A value starts on
 		// the line its name is written on and gives way inside itself — an
 		// Argument list at its commas, a String at one of its holes — which
 		// keeps the first thing a reader looks for, the beginning of the value,
@@ -1139,7 +1139,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: `else if` is one written form, not a block holding an `if`. The
+	// `else if` is one written form, not a block holding an `if`. The
 	// parser gives back a false body of exactly one `if`, and rebuilding it as
 	// a nested block would indent every arm of a guard cascade one level
 	// deeper than it was written.
@@ -1147,7 +1147,7 @@ export class Printer {
 		let first = node.falseBody[0]
 		let lastTrue = node.trueBody[node.trueBody.length - 1]
 
-		// NOTE: The `} else {` line, found in the source. Everything above it
+		// The `} else {` line, found in the source. Everything above it
 		// belongs to the true body and everything below it to the false one —
 		// including Comments, which is the whole reason this has to be exact.
 		let trueClose =
@@ -1167,7 +1167,7 @@ export class Printer {
 
 		let only = node.falseBody.length === 1 ? node.falseBody[0] : undefined
 
-		// NOTE: The Parser gives `else if …` and `else { if … }` the same
+		// The Parser gives `else if …` and `else { if … }` the same
 		// AST, so which one was written is asked of the source: nothing but
 		// whitespace between the `else` and the `if` means the chained form.
 		// Rewriting the braced form drops two braces — a change the token
@@ -1191,7 +1191,7 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: `if condition {` — and when the condition is a chain that has to
+	// `if condition {` — and when the condition is a chain that has to
 	// break, the `{` moves to a line of its own: the chain's links are indented
 	// one level, which is exactly where the body's Statements go, and a brace
 	// at the end of the last link would leave the two indistinguishable. The
@@ -1265,7 +1265,7 @@ export class Printer {
 			this.printGenericList(node.generics),
 		]
 
-		// NOTE: One written body reaches the AST as two Records — Properties
+		// One written body reaches the AST as two Records — Properties
 		// and Methods — so the order they were written in only survives in
 		// their names' Positions. Re-merging on those is what keeps a `static`
 		// declared between two Methods where the author put it.
@@ -1297,7 +1297,7 @@ export class Printer {
 			),
 		)
 
-		// NOTE: Adjacent `static` properties line their `=` up like a run of
+		// Adjacent `static` properties line their `=` up like a run of
 		// Declarations does, and the run ends where that one's does: at a
 		// Method, at a blank line, or at a value that can not be on one line.
 		let run = alignmentRun(MAX_ALIGNMENT_PADDING)
@@ -1346,7 +1346,7 @@ export class Printer {
 					return printed.doc
 				}
 
-				// NOTE: A width-free column, for the reason a Declaration's
+				// A width-free column, for the reason a Declaration's
 				// is: the `=` of a `static` property never moves off the line
 				// its head is written on either.
 				joinAlignment(run, padding, {
@@ -1374,7 +1374,7 @@ export class Printer {
 		return concat([headDoc, this.block(entries, null, false, opening)])
 	}
 
-	// NOTE: The head of a Namespace or a Protocol — the name, the `for` clause
+	// The head of a Namespace or a Protocol — the name, the `for` clause
 	// and the conformance list — and the space before its `{`. Too wide for
 	// its line, the head breaks in two steps: the `is` clauses go one to a
 	// line first, and the `for` clause moves down only if the name and it
@@ -1391,7 +1391,7 @@ export class Printer {
 		clauses: Array<Doc>,
 		emptyBody: boolean,
 	): Doc {
-		// NOTE: The `for` clause is a group of its own only when there are
+		// The `for` clause is a group of its own only when there are
 		// clauses to break first; with none, it IS the head, and a head that
 		// does not fit moves it down rather than leaving the `{` alone under
 		// a full line.
@@ -1474,7 +1474,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: A `static` property, with the same padding slot before its `=` a
+	// A `static` property, with the same padding slot before its `=` a
 	// Declaration carries, so that a run of them can line up.
 	private printProperty(
 		property: parser.NamespacePropertyNode,
@@ -1587,7 +1587,7 @@ export class Printer {
 
 		this.flushBefore(node.position.end.line, entries)
 
-		// NOTE: The extension list lays out exactly as a Namespace's
+		// The extension list lays out exactly as a Namespace's
 		// conformance list does, because it is the same list, printed by the
 		// same head printer.
 		let headDoc = this.printDeclarationHead(
@@ -1640,7 +1640,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: A PROVIDED Method prints as the Function Definition it is — the
+	// A PROVIDED Method prints as the Function Definition it is — the
 	// Parser built one over the very Parameter and return Type Nodes this
 	// signature holds, so the body, its Comments and its layout are all
 	// reached by the printer every other bodied Method goes through.
@@ -1672,7 +1672,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: An `overload` block's entries are written without a name — the
+	// An `overload` block's entries are written without a name — the
 	// block already carries it — and in a `declarations { … }` Program a single
 	// block may mix bodied entries with body-less native signatures.
 	private printOverloadEntries(
@@ -1710,7 +1710,7 @@ export class Printer {
 
 	// #region Functions
 
-	// NOTE: The name, and the `static`/`overload` keywords that can precede it,
+	// The name, and the `static`/`overload` keywords that can precede it,
 	// are written by the caller — an `overload` block's entries carry none of
 	// them, and a Function literal in Argument position has no name at all.
 	//
@@ -1747,7 +1747,7 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: A Parameter carrying its own `§§` block, or any Comment written
+	// A Parameter carrying its own `§§` block, or any Comment written
 	// among the Parameters, forces the list to break whatever the width.
 	// Collapsing it would put a Comment on the same line as the Parameter
 	// after it, and Documentation attaches by line adjacency — the docs would
@@ -1817,7 +1817,7 @@ export class Printer {
 				: this.trivia.takeBefore(listPosition.end.line)
 		let { interior, commented } = this.listInterior(items, loose)
 
-		// NOTE: A trailing default that lays itself out over lines of its own
+		// A trailing default that lays itself out over lines of its own
 		// brings hard breaks, which `propagateBreaks` would carry up through
 		// this group and use to shatter a header that otherwise fits on its
 		// line. Joined with plain commas instead, as `printArgumentList` does
@@ -1866,7 +1866,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: The items of a bracketed, comma-separated list — Arguments,
+	// The items of a bracketed, comma-separated list — Arguments,
 	// Parameters, List and Record members, the links of a chain — with the
 	// Comments written around each: the own-line ones above it and the one
 	// trailing it. Claimed here, in source order, before the item is printed,
@@ -1900,7 +1900,7 @@ export class Printer {
 		return code.trim() === "" || code.trim() === ","
 	}
 
-	// NOTE: The inside of the brackets: items separated by a comma and a
+	// The inside of the brackets: items separated by a comma and a
 	// `line`, a trailing comma when broken, and every Comment where it was
 	// written — an own-line Comment above its item, a trailing one after the
 	// comma, and `loose` ones (written below the last item) before the closing
@@ -1945,7 +1945,7 @@ export class Printer {
 	private printParameter(parameter: parser.ParameterNode): Doc {
 		let { externalName, internalName, type } = parameter
 
-		// NOTE: A Pattern stands where the internal name goes — `of { width,
+		// A Pattern stands where the internal name goes — `of { width,
 		// height }: Rectangle`. It is printed rather than sliced back out of
 		// the source the way the unannotated Parameter below is: a Pattern lays
 		// itself out, so slicing one would freeze the spacing it was typed with
@@ -1984,13 +1984,13 @@ export class Printer {
 			return concat(parts)
 		}
 
-		// NOTE: An unannotated Parameter of a contextually typed literal —
+		// An unannotated Parameter of a contextually typed literal —
 		// `(item) { … }` — takes both its Type and its label from the expected
 		// signature. `(_ item)` says the same thing and parses to the same
 		// node, so the written form is read back off the source rather than
 		// rebuilt, which would turn one spelling into the other.
 		if (type === null) {
-			// NOTE: A Parameter with no Type is a contextually typed literal's,
+			// A Parameter with no Type is a contextually typed literal's,
 			// and a Function literal is refused a default at the Parser
 			// (`default-on-function-literal`) — so there is never one to print
 			// here, and the verbatim slice, which stops at the Type, could not
@@ -2012,7 +2012,7 @@ export class Printer {
 		let name: string
 
 		if (externalName !== null && externalName === internalName) {
-			// NOTE: The parser reuses one IdentifierNode for both names when
+			// The parser reuses one IdentifierNode for both names when
 			// the internal name doubles as the label, so identity — not
 			// equality of content — is what tells `count: Integer` apart from
 			// `count count: Integer`.
@@ -2033,7 +2033,7 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: `= expression`, appended after the Type — or after the Pattern's
+	// `= expression`, appended after the Type — or after the Pattern's
 	// Type, or after a Case's payload shape, which are the only other places a
 	// default can sit.
 	private printDefaultValueInto(
@@ -2072,7 +2072,7 @@ export class Printer {
 			return concat(inner)
 		})
 
-		// NOTE: One Parameter per line when the list does not fit, with a
+		// One Parameter per line when the list does not fit, with a
 		// trailing comma, exactly as a Parameter list breaks — and measured
 		// before the Parameter list that follows, so that list gives way
 		// first and the generics only when the name and they alone overflow.
@@ -2119,12 +2119,12 @@ export class Printer {
 					this.printArgumentList(node.arguments),
 				])
 
-			// NOTE: One space and nothing else. Both Keywords take the whole
+			// One space and nothing else. Both Keywords take the whole
 			// postfix chain behind them, so what stands there is printed as it
 			// stands — and a chain that breaks over lines breaks under the
 			// Keyword exactly as it would anywhere.
 			//
-			// NOTE: No parentheses are ever needed around one, because neither
+			// No parentheses are ever needed around one, because neither
 			// can stand where a postfix form reads its base: the operand
 			// swallows the chain, and Essence has no grouping parentheses to
 			// stop it with — a `(` in Expression position opens a Function
@@ -2159,7 +2159,7 @@ export class Printer {
 					"." + node.steps.map((step) => step.content).join("."),
 				)
 
-			// NOTE: Never printed. A refused value only ever stands in a tree
+			// Never printed. A refused value only ever stands in a tree
 			// the Parser reported an error on, and the safety gate refuses to
 			// format a file with any Diagnostic in it — so this arm exists for
 			// the switch rather than for a reader. What it prints is the base
@@ -2173,7 +2173,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: `a::b()::c()` nests to the left, so a chain has to be flattened
+	// `a::b()::c()` nests to the left, so a chain has to be flattened
 	// before it can be laid out. Breaking is all-or-nothing: either the whole
 	// chain fits on its line, or every link gets one of its own — except the
 	// first, which stays on the head's line when the head is too short to hold
@@ -2195,7 +2195,7 @@ export class Printer {
 
 		let head = this.printExpression(current)
 
-		// NOTE: Each link's name and its Argument list's layouts, kept beside
+		// Each link's name and its Argument list's layouts, kept beside
 		// the printed link for the one-link chain below, which lays the link
 		// out itself. Built in the one walk over the links, since printing
 		// the Arguments moves the trivia cursor.
@@ -2228,7 +2228,7 @@ export class Printer {
 			(item) => item.leading.length > 0 || item.trailing !== null,
 		)
 
-		// NOTE: A chain of ONE link never broke: with nothing but the head
+		// A chain of ONE link never broke: with nothing but the head
 		// and the link, the link's Argument list was what gave way, and
 		// `expect shipping(to a, weighing b)::is(0)` put its `0` on a line of
 		// its own. On a head that is a call, a literal or a member read off
@@ -2254,7 +2254,7 @@ export class Printer {
 
 			let { name, arguments: listed } = linkParts[0]!
 
-			// NOTE: The fused layout is measured with the link's Arguments in
+			// The fused layout is measured with the link's Arguments in
 			// their hugged form where a callback or a `match` closes them —
 			// to the block's first line — because a nested `conditional` is
 			// measured flat from outside, and the hug would never be seen to
@@ -2270,7 +2270,7 @@ export class Printer {
 					? concat([head, name, listed.hugged, suffix])
 					: fused
 
-			// NOTE: A hard break inside a layout does not reach the groups
+			// A hard break inside a layout does not reach the groups
 			// around the chain — a `conditional` stops it — but a chain whose
 			// callback lays itself out over several lines is not one line of
 			// code, and whatever list holds THIS chain has to break around
@@ -2300,7 +2300,7 @@ export class Printer {
 
 		let headWidth = renderFlat(head)
 
-		// NOTE: Not when the first link itself lays out over several lines —
+		// Not when the first link itself lays out over several lines —
 		// a callback with a body — since then the head is not left dangling
 		// above a ladder of links but above a block, and the ladder reads
 		// better starting from the head's own line. A bare `@` fuses
@@ -2350,7 +2350,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: A call's Arguments, with one exception to breaking one per line: a
+	// A call's Arguments, with one exception to breaking one per line: a
 	// trailing `match`, Function literal, Record or List is hugged, so its
 	// own block gives way rather than the list around it. Hugging is offered as the first of two layouts and taken
 	// only when everything up to the block's opening brace fits: the head and
@@ -2362,7 +2362,7 @@ export class Printer {
 		return this.argumentList(argumentNodes).doc
 	}
 
-	// NOTE: The list's layouts, kept apart for a one-link chain that lays
+	// The list's layouts, kept apart for a one-link chain that lays
 	// the link out itself: `hugged` is the trailing block against its `(`,
 	// measured to the block's first line, and null where nothing hugs;
 	// `broken` is one Argument per line; `breaks` says an Argument holds a
@@ -2411,7 +2411,7 @@ export class Printer {
 
 		let docs = items.map((item) => item.doc)
 
-		// NOTE: A Record or List hugs after other Arguments only when every
+		// A Record or List hugs after other Arguments only when every
 		// one of those reads on one line: `place(value, at {` — but not
 		// `fallback {}` after a callback whose body already broke, where the
 		// hug would write `}, fallback {})` against the callback's brace.
@@ -2436,7 +2436,7 @@ export class Printer {
 			text(")"),
 		])
 
-		// NOTE: A hard break inside the hugged block does not reach the
+		// A hard break inside the hugged block does not reach the
 		// groups around this call on its own — a `conditional` stops it, so
 		// that the call is free to stay on its line. But a call whose Argument
 		// lays itself out over several lines is not one line of code, and
@@ -2455,13 +2455,13 @@ export class Printer {
 		}
 	}
 
-	// NOTE: The brackets are read off the NODE and never guessed at: `[d with
+	// The brackets are read off the NODE and never guessed at: `[d with
 	// other]` and `{ record with other }` are the same shape with different
 	// meanings, and printing one as the other would rewrite what the file says.
 	// See `parser.CombinationNode.brackets`.
 	private printCombination(node: parser.CombinationNode): Doc {
 		let brackets = node.brackets === true
-		// NOTE: Whether the right side is the update's OWN key list rather than
+		// Whether the right side is the update's OWN key list rather than
 		// a whole value merged into it. The two are the same Node kind — `[ages
 		// with "kim" = 7]` and `[ages with ["kim" = 7]]` both hold a Dictionary
 		// there, and the braced pair both hold a Record — and they differ by a
@@ -2476,7 +2476,7 @@ export class Printer {
 		// read as a whole value and printed as `[d with [[3, 4] = "b"]]`.
 		let bare = node.bare === true
 
-		// NOTE: A Combination too wide for its line opens like a Record: the
+		// A Combination too wide for its line opens like a Record: the
 		// base on a line of its own, the members it overrides indented below
 		// the `with`, and the `}` back at the start. A braced right side
 		// brings its own braces and lays itself out after the `with`.
@@ -2493,7 +2493,7 @@ export class Printer {
 				)
 			: concat([text(" "), this.printExpression(node.rhs)])
 
-		// NOTE: Brackets hold no padding and braces do — `[ages with "kim" = 7]`
+		// Brackets hold no padding and braces do — `[ages with "kim" = 7]`
 		// beside `{ config with port = 1 }` — which is the same rule a Literal
 		// of each is printed by: `["a", "b"]` and `{ a = 1, b = 2 }`.
 		let opening = brackets ? softline : line
@@ -2515,18 +2515,18 @@ export class Printer {
 		)
 	}
 
-	// NOTE: Handlers are built in source order, because that is the order the
+	// Handlers are built in source order, because that is the order the
 	// trivia cursor is walked in, and only then aligned — each carries a
 	// padding slot into the run, which the renderer fills.
 	//
-	// NOTE: A Handler that breaks opens a block, and the Handlers under that
+	// A Handler that breaks opens a block, and the Handlers under that
 	// block's closing brace start a run of their own — the run is parted at
 	// it, the way a Handler whose body could never be written flat ends it
 	// outright. Kept in the column instead, its `{` would line up with bodies
 	// it does not read as one of, and a short Handler below it would be padded
 	// out to a column that has nothing but that block's brace in it: `case _
 	// { <- game }`, the answer ten columns from the case it answers.
-	// NOTE: `hugged` is set where the `match` is written against something
+	// `hugged` is set where the `match` is written against something
 	// that holds it — an Argument, a Parameter's default, a Case payload — and
 	// keeps its head on one line however wide: the head's middle layout puts
 	// the `{` at the line's own indent, which is the right place under a
@@ -2535,7 +2535,7 @@ export class Printer {
 		let entries: Array<Entry> = []
 		let run = alignmentRun(UNBLOCKED_ALIGNMENT, { partedByBreaks: true })
 
-		// NOTE: A Comment trailing the `match`'s own `{` — claimed before the
+		// A Comment trailing the `match`'s own `{` — claimed before the
 		// Handlers are walked, or the first Handler's `takeBefore` would stall
 		// on it and it would be flushed out below the whole `match`.
 		let opening = this.trivia.claimTrailingOn(
@@ -2554,7 +2554,7 @@ export class Printer {
 			let startLine = handler.matcher.position.start.line
 			let endLine = handlerEndLine(handler)
 
-			// NOTE: The Handler's own `}` line, found in the source — a Handler
+			// The Handler's own `}` line, found in the source — a Handler
 			// node carries no Position of its own, and its last Statement's line
 			// is only the brace's when the Handler was written flat. A Comment
 			// trailing that brace belongs to this Handler, not to the Statement
@@ -2574,7 +2574,7 @@ export class Printer {
 			let trailing = this.trivia.claimTrailingOn(closeLine)
 
 			let matcher = this.printMatcher(handler.matcher)
-			// NOTE: Asked as a flat WIDTH rather than as a flat rendering
+			// Asked as a flat WIDTH rather than as a flat rendering
 			// measured afterwards, because a Matcher holding a String written
 			// across several lines has no width at all: the flat rendering
 			// hands that String back whole, newlines and all, and measuring it
@@ -2601,7 +2601,7 @@ export class Printer {
 				handler.matcher.position.end.line,
 				closeLine,
 			)
-			// NOTE: The padding is written inside the body's group, so the
+			// The padding is written inside the body's group, so the
 			// flat shape is measured with it — see `block`. A Handler the
 			// run takes out is written with none, and breaks as it would
 			// have anyway.
@@ -2614,7 +2614,7 @@ export class Printer {
 				false,
 			)
 
-			// NOTE: A Guard too wide for the Handler's line moves down a line
+			// A Guard too wide for the Handler's line moves down a line
 			// whole, since it is one unit and usually the widest thing in the
 			// `match`, and the `{` then goes on a line of its own with the
 			// body broken under it — see `headWithTail`.
@@ -2640,7 +2640,7 @@ export class Printer {
 
 			entries.push({ startLine, endLine: closeLine, doc })
 
-			// NOTE: A run is consecutive Handlers that all stay on one line,
+			// A run is consecutive Handlers that all stay on one line,
 			// none of which is guarded, and each of which has a width to line
 			// the run up on. A `where` clause is an arbitrary Expression —
 			// usually the longest thing in the `match` — and padding every
@@ -2675,7 +2675,7 @@ export class Printer {
 
 		this.flushBefore(node.position.end.line, entries)
 
-		// NOTE: A head too wide for its line breaks before the `->`, with the
+		// A head too wide for its line breaks before the `->`, with the
 		// return Type on a line of its own and the `{` on the one after — not
 		// inside the value, whose Argument list is the smallest thing on the
 		// line and used to be what gave way. Offered as the middle of three
@@ -2685,7 +2685,7 @@ export class Printer {
 		let head = concat([text("match "), this.printExpression(node.value)])
 		let tail = concat([text("-> "), this.printType(node.returnType)])
 
-		// NOTE: The block stays OUTSIDE the head's layouts: a `conditional`
+		// The block stays OUTSIDE the head's layouts: a `conditional`
 		// stops the hard breaks inside it from reaching the groups around it,
 		// and a `match` is one line of code to nothing — the callback or the
 		// Handler holding it has to break around it.
@@ -2697,7 +2697,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: An Expression written against something that holds it — see
+	// An Expression written against something that holds it — see
 	// `printMatch`'s `hugged`.
 	private printHeldExpression(node: parser.ExpressionNode): Doc {
 		return node.nodeType === "Match"
@@ -2705,7 +2705,7 @@ export class Printer {
 			: this.printExpression(node)
 	}
 
-	// NOTE: A head, the clause that closes it — `match value` and `-> Type`,
+	// A head, the clause that closes it — `match value` and `-> Type`,
 	// `case matcher` and `where guard` — and the block they open. The
 	// layouts, tried in order: head, clause and block on one line; head and
 	// clause on one line over a broken block; the clause on a line of its
@@ -2758,12 +2758,12 @@ export class Printer {
 		])
 	}
 
-	// NOTE: One arm to a line, always — a `define` is a table of cases, and one
+	// One arm to a line, always — a `define` is a table of cases, and one
 	// written flat would be a worse `if`. Every arm carries the Position it was
 	// written across, so the Comments around it are claimed from its own lines
 	// rather than looked for in the source the way a Match Handler's are.
 	//
-	// NOTE: The `if` of a run of adjacent arms is written in one column, the way
+	// The `if` of a run of adjacent arms is written in one column, the way
 	// a `match` lines its Handlers' braces up and for the same reason: an arm is
 	// a row of two cells — the answer, and the case that reaches it — and the
 	// second cell is the one a reader scans down. The `otherwise` arm is in the
@@ -2772,7 +2772,7 @@ export class Printer {
 	// of them, since it is the general one — as the one thing in the block that
 	// no column runs through.
 	//
-	// NOTE: A blank line between two arms does not end the run, the way it ends
+	// A blank line between two arms does not end the run, the way it ends
 	// a run of Declarations. Two Declarations separated by one are two groups
 	// the author kept apart; two arms of a `define` are two rows of one table,
 	// and no amount of space between them makes the table two tables.
@@ -2784,7 +2784,7 @@ export class Printer {
 			run = alignmentRun(MAX_ALIGNMENT_PADDING)
 		}
 
-		// NOTE: A Comment trailing the `define`'s own `{` — claimed before the
+		// A Comment trailing the `define`'s own `{` — claimed before the
 		// arms are walked, or the first arm's `takeBefore` would stall on it
 		// and it would be flushed out below the whole `define`.
 		let opening = this.trivia.claimTrailingOn(
@@ -2796,7 +2796,7 @@ export class Printer {
 			),
 		)
 
-		// NOTE: `write` is a thunk rather than a Doc, because the trivia cursor
+		// `write` is a thunk rather than a Doc, because the trivia cursor
 		// walks the source in order and the arm's own Expressions walk it too:
 		// the Comments written ABOVE an arm have to be claimed before anything
 		// inside it is printed, or a Method chain in the arm claims them and
@@ -2805,14 +2805,14 @@ export class Printer {
 		// states — the outermost node ending on a line is the one that keeps
 		// the note written at the end of it.
 		//
-		// NOTE: The padding an arm carries to its block's column is handed to
+		// The padding an arm carries to its block's column is handed to
 		// the thunk rather than taken back from it, because the arm decides
 		// where in itself it goes and the run only decides how wide it is.
 		let pushArm = (
 			position: common.Position,
 			write: (padding: AlignDoc) => {
 				doc: Doc
-				// NOTE: What this arm brings to the run — the width of the
+				// What this arm brings to the run — the width of the
 				// head its case is written after, and the width the whole arm
 				// reads flat, which is what the run takes an arm out on — or
 				// `"ends"` where the arm interrupts the table itself and the
@@ -2829,7 +2829,7 @@ export class Printer {
 			let written = write(padding)
 			let doc = written.doc
 
-			// NOTE: An arm ENDS the run where its answer opens a block: the
+			// An arm ENDS the run where its answer opens a block: the
 			// arms under that answer's closing brace start again below it, and
 			// one column carried across it would run through two tables. An
 			// arm that is merely too wide for the line it stands on is one row
@@ -2855,7 +2855,7 @@ export class Printer {
 				let headWidth = flatWidth(concat([text("as "), answer]))
 				let condition = this.printExpression(arm.condition)
 
-				// NOTE: An answer that lays itself out over several lines keeps
+				// An answer that lays itself out over several lines keeps
 				// its `if` against the brace it closes with — `} if …`, the way
 				// an `else` is written. Nothing is left of that brace for a
 				// break to buy room for, and the arm is out of the run anyway.
@@ -2871,7 +2871,7 @@ export class Printer {
 					}
 				}
 
-				// NOTE: A CONDITION that lays itself out over several lines
+				// A CONDITION that lays itself out over several lines
 				// keeps the `if` in front of it on the answer's line, for the
 				// reason the answer above has its own: `if match … {` opens its
 				// block right there, and nothing in front of that brace needs
@@ -2895,7 +2895,7 @@ export class Printer {
 							text(" if "),
 							condition,
 						]),
-						// NOTE: The width asked of this arm is its answer and
+						// The width asked of this arm is its answer and
 						// the `if` alone. A Condition that opens a block has
 						// no flat width to add — that is what put the arm on
 						// this path — but the answer in front of it can still
@@ -2913,7 +2913,7 @@ export class Printer {
 					}
 				}
 
-				// NOTE: An arm too long for the line breaks before its `if` —
+				// An arm too long for the line breaks before its `if` —
 				// the one seam in it that is not inside one of the two
 				// Expressions. The answer keeps the line it was introduced on,
 				// and the case gets the whole width of the next one. The
@@ -2921,7 +2921,7 @@ export class Printer {
 				// column open: an arm that breaks is one the run took out and
 				// left unpadded, and the line-end trimming stands behind that.
 				//
-				// NOTE: An arm that breaks stands apart from the run: its `if`
+				// An arm that breaks stands apart from the run: its `if`
 				// is on a line of its own, and the column its head would hold
 				// open is one that nothing occupies. WHICH arms those are is
 				// the run's own question rather than one answered here — an
@@ -2948,7 +2948,7 @@ export class Printer {
 			})
 		}
 
-		// NOTE: `otherwise` never breaks away from its answer, where an `if`
+		// `otherwise` never breaks away from its answer, where an `if`
 		// does. Breaking before `if` moves a whole Condition onto a line of its
 		// own and buys the room to write it; breaking before `otherwise` moves
 		// one bare Keyword down and buys nothing — the line is only long
@@ -2957,7 +2957,7 @@ export class Printer {
 			let answer = this.printExpression(node.otherwise.value)
 			let headWidth = flatWidth(concat([text("as "), answer]))
 
-			// NOTE: `otherwise` is written against the end of its answer
+			// `otherwise` is written against the end of its answer
 			// wherever that ends up, so an answer that gives way inside itself
 			// carries the keyword down with it — and the padding in front of it
 			// lands mid-line, at the end of a line no column runs through. That
@@ -2991,7 +2991,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: Never broken, for the same reason a Type application is not — a `<`
+	// Never broken, for the same reason a Type application is not — a `<`
 	// that opens the line after the Choice's name reads as a new declaration, and
 	// the `#` has to stay against the `>` for the construction to be recognised
 	// at all.
@@ -3017,7 +3017,7 @@ export class Printer {
 
 		parts.push(text("#" + node.caseName.content))
 
-		// NOTE: A payload with braces of its own hugs its parentheses, through
+		// A payload with braces of its own hugs its parentheses, through
 		// any Cases wrapping it, so `}))` closes the stack without a staircase;
 		// one that opens a block hugs only while its head fits, as a trailing
 		// Argument does. Anything else is one Argument, without the trailing
@@ -3057,7 +3057,7 @@ export class Printer {
 
 	private printValue(node: parser.ValueNode): Doc {
 		switch (node.nodeType) {
-			// NOTE: Reprinted from the source rather than the node. The AST
+			// Reprinted from the source rather than the node. The AST
 			// normalises `1_000` to `1000`, a Rational's parts must stay flush
 			// to keep parsing as one literal, and the Lexer decodes a String's
 			// escapes — so only the source still holds a String exactly as it
@@ -3092,7 +3092,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: Everything outside a hole is written back from the source and
+	// Everything outside a hole is written back from the source and
 	// everything inside one is printed like the Expression it is, so a `match`
 	// interpolated into a String has its Handlers laid out and aligned like any
 	// other instead of keeping the shape it was first typed with.
@@ -3134,7 +3134,7 @@ export class Printer {
 			let written = this.source.slice({ start: cursor, end: hole.start })
 			let before = holeText(written, closing, true)
 
-			// NOTE: Only whitespace can stand between a brace and what it holds,
+			// Only whitespace can stand between a brace and what it holds,
 			// so a slice that reads otherwise is not shaped the way this takes
 			// it to be — a Comment written inside a hole is the one way to get
 			// there. The whole String goes back verbatim rather than being taken
@@ -3164,17 +3164,17 @@ export class Printer {
 		return concat(parts)
 	}
 
-	// NOTE: The braces are written here rather than sliced with the text, so
+	// The braces are written here rather than sliced with the text, so
 	// they can be laid out with what they hold. An Expression that has to break
 	// is left against them — a `match` opens its own block on the same line, the
 	// way it would anywhere else — while one that fits on a line is offered a
 	// group, which spends the break only if the String around it has run out of
 	// room.
-	// NOTE: A hole is broken only when breaking it HELPS — when what follows
+	// A hole is broken only when breaking it HELPS — when what follows
 	// its closing brace then fits on the line the brace opens. A String too
 	// long for any hole to save is left long, rather than torn open at every
 	// hole for nothing.
-	// NOTE: A hole holding nothing but a name — `{@.played}`, `{count}` — is
+	// A hole holding nothing but a name — `{@.played}`, `{count}` — is
 	// never broken either: three lines around one word buy no room worth the
 	// tear, and the String is left to run long. A call in a hole has a shape
 	// of its own to stand on a line, and is still offered the break.
@@ -3204,7 +3204,7 @@ export class Printer {
 	private printRecord(node: parser.RecordValueNode): Doc {
 		let members = Object.values(node.members)
 
-		// NOTE: The `~>` is load-bearing, not decoration: `Type ~> { a = b }` is
+		// The `~>` is load-bearing, not decoration: `Type ~> { a = b }` is
 		// one typed Record value, while `Type { a = b }` re-parses as a constant
 		// bound to the Identifier `Type` followed by a bare untyped Record. The
 		// prefix has to stay outside the group so it never breaks away from the
@@ -3232,7 +3232,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: A member written as a bare name is printed as one, and a member
+	// A member written as a bare name is printed as one, and a member
 	// that spelled its value keeps the spelling — the Formatter never collapses
 	// `a = a` into `a` and never expands `a` into `a = a`. `{ base with a = a }`
 	// and `{ base with { a } }` are not even the same parse, so a rewrite
@@ -3261,7 +3261,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: A member of a Record Literal, in whichever of the three spellings it
+	// A member of a Record Literal, in whichever of the three spellings it
 	// was written in: a bare name, `key = value`, and a braced descend, whose
 	// interior lays itself out exactly as a Record's does — one member to a
 	// line once it is too wide, with the closing brace back at the key's
@@ -3297,7 +3297,7 @@ export class Printer {
 		])
 	}
 
-	// NOTE: A List of nothing but atoms — Numbers, Booleans, bare Cases — is
+	// A List of nothing but atoms — Numbers, Booleans, bare Cases — is
 	// FILLED, as many items to a line as fit, rather than broken one per
 	// line: twenty Numbers are twenty Numbers, not twenty lines, and `#Up,
 	// #Down` are as narrow and as scannable as they are. Anything else —
@@ -3341,7 +3341,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: A Dictionary is a list of THINGS and never fills the way a List of
+	// A Dictionary is a list of THINGS and never fills the way a List of
 	// Numbers does — `"alex" = 39` is two values and a `=`, which nobody reads
 	// four to a line — so it breaks one entry to a line like every other list.
 	// Everything else about the layout is a List's, down to the trailing comma
@@ -3368,7 +3368,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: The entries alone, without the brackets — which the Literal above
+	// The entries alone, without the brackets — which the Literal above
 	// writes and an update writes for itself, exactly as `recordInterior` serves
 	// both a Record Literal and the key list after a `with`.
 	private dictionaryInterior(node: parser.DictionaryValueNode): {
@@ -3387,7 +3387,7 @@ export class Printer {
 		)
 	}
 
-	// NOTE: `key = value`, the Record member's shape with an Expression where
+	// `key = value`, the Record member's shape with an Expression where
 	// the member's name stands. Both halves are printed rather than sliced: a
 	// key is an Expression like any other and lays itself out like one.
 	private printDictionaryEntry(entry: parser.DictionaryEntryNode): Doc {
@@ -3402,7 +3402,7 @@ export class Printer {
 
 	// #region Matchers
 
-	// NOTE: `breakable` is what `printPattern` takes: false where the Matcher
+	// `breakable` is what `printPattern` takes: false where the Matcher
 	// heads a Handler and its width holds a column open, true on a `require`.
 	printMatcher(node: parser.MatcherNode, breakable = false): Doc {
 		switch (node.nodeType) {
@@ -3413,7 +3413,7 @@ export class Printer {
 				return this.printValue(node.value)
 
 			case "CaseMatcher": {
-				// NOTE: The payload binder rides on the Matcher's own line
+				// The payload binder rides on the Matcher's own line
 				// whatever the arm does — `case #Value(item)` is one token to a
 				// reader, and the `match` case-brace alignment measures it as
 				// part of the Matcher's width. A Pattern taking the payload
@@ -3450,7 +3450,7 @@ export class Printer {
 
 	// #region Patterns
 
-	// NOTE: One Pattern, shared by every position that takes a value apart: a
+	// One Pattern, shared by every position that takes a value apart: a
 	// Matcher (in a `match` arm or a test's `require`), a Case payload, a
 	// Parameter and a Declaration.
 	//
@@ -3471,7 +3471,7 @@ export class Printer {
 	private printPattern(node: parser.PatternNode, breakable: boolean): Doc {
 		let members = Object.values(node.members)
 
-		// NOTE: `} as name`, outside the group, so that the name never breaks
+		// `} as name`, outside the group, so that the name never breaks
 		// away from the brace whose value it names.
 		let binder =
 			node.binder === null ? EMPTY : text(" as " + node.binder.content)
@@ -3504,7 +3504,7 @@ export class Printer {
 		return breakable ? doc : flattened(doc)
 	}
 
-	// NOTE: `name` binds under its own name; `name: Type` binds and constrains
+	// `name` binds under its own name; `name: Type` binds and constrains
 	// the Type as well; `name = literal` constrains the value and binds
 	// nothing; and `as` binds under another name or takes the member apart
 	// further, which is the whole of nesting. Each is printed from what the
@@ -3552,7 +3552,7 @@ export class Printer {
 			case "RecordTypeDeclaration":
 				return this.printRecordType(node)
 
-			// NOTE: A Union in a function header no longer breaks on its own —
+			// A Union in a function header no longer breaks on its own —
 			// the Parameter list gives way first — so this group is the last
 			// resort, for a Union too wide for a line of its own. The indent
 			// keeps that shape a continuation rather than a collision with
@@ -3567,7 +3567,7 @@ export class Printer {
 					),
 				)
 
-			// NOTE: Laid out like a Parameter list — one Parameter per line
+			// Laid out like a Parameter list — one Parameter per line
 			// when it does not fit, the `) -> Type` whole after the last.
 			case "FunctionTypeDeclaration":
 				return group(
@@ -3598,7 +3598,7 @@ export class Printer {
 					]),
 				)
 
-			// NOTE: Never broken. A `<` that opens the line after its base Type
+			// Never broken. A `<` that opens the line after its base Type
 			// begins a new declaration as far as the parser is concerned, so a
 			// Type application has to stay on one line.
 			case "GenericTypeDeclaration":
@@ -3614,7 +3614,7 @@ export class Printer {
 		}
 	}
 
-	// NOTE: Everything written before the `:`, verbatim — `_`, `_ rootTwo` or
+	// Everything written before the `:`, verbatim — `_`, `_ rootTwo` or
 	// `label`. FunctionTypeParameter keeps only the external name, so an
 	// internal one exists in the source and nowhere else.
 	private functionTypeParameterName(
@@ -3640,7 +3640,7 @@ export class Printer {
 		return written
 	}
 
-	// NOTE: A Union too wide for its alias's line keeps its first member on
+	// A Union too wide for its alias's line keeps its first member on
 	// the `=` line and writes every other under it, each `|` in the column
 	// of the `=` — the members are the rows of one alias, and one column
 	// runs through all of them:
@@ -3706,14 +3706,14 @@ export class Printer {
 	// #endregion
 }
 
-// NOTE: One item of a bracketed list with the Comments written around it.
+// One item of a bracketed list with the Comments written around it.
 type ListItem = {
 	doc: Doc
 	leading: Array<Comment>
 	trailing: Comment | null
 }
 
-// NOTE: The links of `a::b()::c()`, outermost last — the AST nests them the
+// The links of `a::b()::c()`, outermost last — the AST nests them the
 // other way round.
 function chainLinks(
 	node: parser.MethodInvocationNode,
@@ -3729,7 +3729,7 @@ function chainLinks(
 	return links
 }
 
-// NOTE: A signature carries no Position for its Parameter list; the `(` is
+// A signature carries no Position for its Parameter list; the `(` is
 // where the signature starts and the `)` is on the return Type's line.
 function signatureListPosition(
 	signature:
@@ -3746,7 +3746,7 @@ function isNumberLiteral(node: parser.ExpressionNode): boolean {
 	return node.nodeType === "IntegerValue" || node.nodeType === "RationalValue"
 }
 
-// NOTE: A bare name, or a path of member reads on one — `game.board.cells` —
+// A bare name, or a path of member reads on one — `game.board.cells` —
 // with no call anywhere in it.
 function isName(node: parser.ExpressionNode): boolean {
 	return (
@@ -3756,7 +3756,7 @@ function isName(node: parser.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: A value with nothing inside it to lay out — the items a List fills
+// A value with nothing inside it to lay out — the items a List fills
 // with. A Case carrying a payload is not one: `#Value(1)` reads as a thing.
 function isAtom(node: parser.ExpressionNode): boolean {
 	return (
@@ -3771,7 +3771,7 @@ type AssignmentNode =
 	| parser.VariableDeclarationStatementNode
 	| parser.VariableAssignmentStatementNode
 
-// NOTE: How wide a Doc reads on one line, or null when it has no such width —
+// How wide a Doc reads on one line, or null when it has no such width —
 // it can never be on one line at all, or it holds a multi-line String Literal,
 // which `renderFlat` hands back whole, newlines and all, and which would report
 // a column no line in the output ever reaches.
@@ -3783,7 +3783,7 @@ function flatWidth(doc: Doc): number | null {
 		: stringWidth(written)
 }
 
-// NOTE: The Statements written as `… = …`, which are the ones an alignment run
+// The Statements written as `… = …`, which are the ones an alignment run
 // is made of. A `type` alias carries an `=` too, but it is a Declaration of a
 // different kind written among Declarations of this one, and lining the two up
 // would put a Type's name in the same column as a value's.
@@ -3799,7 +3799,7 @@ function assignmentOf(node: parser.TestsNode): AssignmentNode | null {
 	}
 }
 
-// NOTE: The String's own text out of a slice that runs between two holes, with
+// The String's own text out of a slice that runs between two holes, with
 // the braces at either end and the padding they hold dropped — the printer
 // writes those itself. `closes` says the slice begins by closing a hole and
 // `opens` that it ends by opening the next one; the ends of the String are the
@@ -3843,7 +3843,7 @@ function holeText(
 
 type AssignmentKind = "declaration" | "assignment"
 
-// NOTE: A Declaration and a bare reassignment never share a run. `constant` and
+// A Declaration and a bare reassignment never share a run. `constant` and
 // `variable` are the same width, so Declarations line up on their names by
 // themselves — but a reassignment writes no keyword at all, and padding it out
 // to one would leave a keyword's worth of empty column in the middle of the run.
@@ -3853,7 +3853,7 @@ function assignmentKind(node: AssignmentNode): AssignmentKind {
 		: "declaration"
 }
 
-// NOTE: One name of a Module section with everything that rides along when the
+// One name of a Module section with everything that rides along when the
 // block is sorted: the Comments written above it and the one trailing it.
 // `written` is its place in the order its list was written in.
 type SectionEntry = {
@@ -3863,7 +3863,7 @@ type SectionEntry = {
 	written: number
 }
 
-// NOTE: One group with what rides along with it: the Comments above its
+// One group with what rides along with it: the Comments above its
 // `from` line, the one trailing its `{`, its names, the Comments below the
 // last of them, and the one trailing its `}`.
 type SectionGroup = {
@@ -3876,7 +3876,7 @@ type SectionGroup = {
 	written: number
 }
 
-// NOTE: A name or a group as its sorted list lays it out.
+// A name or a group as its sorted list lays it out.
 type SectionMember = {
 	node: { position: common.Position }
 	leading: Array<Comment>
@@ -3890,7 +3890,7 @@ function entryHead(entry: parser.ImportNode | parser.ExportNode): string {
 		: entry.name.content + " as " + entry.alias.content
 }
 
-// NOTE: The bare entries and the groups of a section in the order they were
+// The bare entries and the groups of a section in the order they were
 // written, which is the order their Comments have to be claimed in. An import
 // section has no bare entries, and its groups are already that order.
 function writtenMembers(
@@ -3912,7 +3912,7 @@ function writtenMembers(
 	)
 }
 
-// NOTE: What `compareGroups` orders a group by, read off the printer's own
+// What `compareGroups` orders a group by, read off the printer's own
 // group — whose entries are in order by the time it is asked.
 function groupHead(group: SectionGroup) {
 	return {
@@ -3935,7 +3935,7 @@ function protocolMethodEndLine(method: parser.ProtocolMethods[string]): number {
 	switch (method.nodeType) {
 		case "SimpleProtocolMethod":
 		case "StaticProtocolMethod":
-			// NOTE: A provided Method ends at its closing brace, not at its
+			// A provided Method ends at its closing brace, not at its
 			// return Type — the block is part of what was written, and the
 			// Comments inside it are claimed against these lines.
 			return protocolSignatureEndLine(method.signature)
@@ -3956,7 +3956,7 @@ function protocolSignatureEndLine(
 	return signature.body?.position.end.line ?? signature.position.end.line
 }
 
-// NOTE: An `overload` block carries no Position of its own — only its entries
+// An `overload` block carries no Position of its own — only its entries
 // do — so the braces are placed around the span the entries cover.
 function overloadPosition(
 	entries: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
@@ -3975,7 +3975,7 @@ function overloadPosition(
 	}
 }
 
-// NOTE: A Doc reduced to the single line it reads as, for a position with no
+// A Doc reduced to the single line it reads as, for a position with no
 // break to spend. Null — a Doc holding a hard break, or a group already
 // resolved to break — cannot arise from a Pattern, which is the only thing
 // this is used on; the Doc is handed back untouched rather than lost if that
@@ -3986,7 +3986,7 @@ function flattened(doc: Doc): Doc {
 	return written === null ? doc : text(written)
 }
 
-// NOTE: How a Record Literal's key was spelled — the dotted path where it is
+// How a Record Literal's key was spelled — the dotted path where it is
 // one, and the plain name everywhere else. A braced descend's key is its
 // steps: the braces come after it, printed as a Record of their own.
 function memberKey(member: parser.RecordValueMemberNode): string {
@@ -3995,7 +3995,7 @@ function memberKey(member: parser.RecordValueMemberNode): string {
 		: member.steps.map((step) => step.content).join(".")
 }
 
-// NOTE: An Expression that can open a block of its own to break inside —
+// An Expression that can open a block of its own to break inside —
 // the two kinds `printParameterList` hugs whatever width they print at.
 function opensBlock(node: parser.ExpressionNode): boolean {
 	return (
@@ -4005,7 +4005,7 @@ function opensBlock(node: parser.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: An Expression that lays itself out over several lines and closes with
+// An Expression that lays itself out over several lines and closes with
 // a brace of its own.
 function isBlockLike(node: parser.ExpressionNode): boolean {
 	return (
@@ -4019,7 +4019,7 @@ function isBlockLike(node: parser.ExpressionNode): boolean {
 	)
 }
 
-// NOTE: A Statement that closes with a block of its own — see `Entry.bodied`.
+// A Statement that closes with a block of its own — see `Entry.bodied`.
 // A `type` alias holding a Record Type closes with a brace too, but may as well
 // fit on one line, and a blank line after a one-line alias is not the shape.
 function isBodiedStatement(node: parser.TestsNode): boolean {
@@ -4040,7 +4040,7 @@ function isBodiedStatement(node: parser.TestsNode): boolean {
 	}
 }
 
-// NOTE: A bare signature is one line and closes with no brace; every other
+// A bare signature is one line and closes with no brace; every other
 // Method opens a block, an `overload` of signatures included.
 function isBodiedNamespaceMethod(
 	method: parser.NamespaceMethods[string],
@@ -4064,7 +4064,7 @@ function isBodiedProtocolMethod(
 	}
 }
 
-// NOTE: Whether a Case payload may be written against its parentheses: a value
+// Whether a Case payload may be written against its parentheses: a value
 // that closes with a brace of its own, or a Case wrapping one, however deep.
 function hugsPayload(value: parser.ExpressionNode): boolean {
 	return (

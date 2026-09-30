@@ -2,7 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { CodeActionEntry } from "./index"
 
-// NOTE: How an extraction hands the name it invented back to the reader. The
+// How an extraction hands the name it invented back to the reader. The
 // edits leave a derived placeholder — `total`, `extracted` — standing where a
 // name has to stand, and the one gesture that turns a placeholder into a
 // question is opening rename on it. No edit can put a cursor anywhere, so the
@@ -23,7 +23,7 @@ export function renameCommand(
 	return {
 		title: "Rename",
 		command: "essence.renameAt",
-		// NOTE: The protocol's Position — zero based on both axes — because
+		// The protocol's Position — zero based on both axes — because
 		// what reads it is the Editor rather than anything in this Server.
 		arguments: [
 			documentPath,

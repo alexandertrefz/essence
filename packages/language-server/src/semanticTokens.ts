@@ -11,7 +11,7 @@ import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 import { programBodies } from "./sections"
 
-// NOTE: Semantic Tokens classify Identifiers by what they actually resolve
+// Semantic Tokens classify Identifiers by what they actually resolve
 // to, which the TextMate grammar cannot do — it has no way to tell a
 // Namespace from a Type from a Constant. Every Occurrence the rename index
 // already collects carries its Declaration's kind, so this is mostly a
@@ -41,7 +41,7 @@ type SemanticTokenModifier =
 	| "static"
 	| "defaultLibrary"
 
-// NOTE: These two arrays ARE the legend the server hands the client — a Token
+// These two arrays ARE the legend the server hands the client — a Token
 // carries indices into them, never names. New entries therefore go at the END:
 // inserting one anywhere else silently recolours every Token past it in
 // editors that are still holding a response encoded against the old legend.
@@ -72,7 +72,7 @@ type SemanticToken = {
 	modifiers: Array<SemanticTokenModifier>
 }
 
-// NOTE: `import` carries no Token of its own. What an entry binds is whatever
+// `import` carries no Token of its own. What an entry binds is whatever
 // the exporting Module declared — a Type, a Namespace, a Function — and one
 // file's index can not say which, so colouring it as any one of them would be
 // wrong wherever the guess missed. Nothing is emitted instead, and the
@@ -95,7 +95,7 @@ const tokenTypes: Record<DeclarationKind, SemanticTokenType | null> = {
 	label: "parameter",
 }
 
-// NOTE: Everything that cannot be reassigned is `readonly` — the Enricher
+// Everything that cannot be reassigned is `readonly` — the Enricher
 // treats Constants, Functions, Namespaces, Parameters and `@` as constant.
 const readonlyKinds = new Set<DeclarationKind>([
 	"constant",
@@ -110,7 +110,7 @@ const readonlyKinds = new Set<DeclarationKind>([
 	"label",
 ])
 
-// NOTE: `programIndex` is the document's own index where the caller holds one.
+// `programIndex` is the document's own index where the caller holds one.
 // Building it rebuilds the whole builtin top level Scope — every builtin value
 // and Type as fresh Declarations, because the walk records occurrences onto
 // them — and this request fires on every keystroke over the whole file.
@@ -122,7 +122,7 @@ export function findSemanticTokens(
 	let { index } = programIndex ?? indexProgram(program, enrichedProgram)
 	let tokens: Array<SemanticToken> = []
 
-	// NOTE: Every body the Program holds, the tests section's included — a Case
+	// Every body the Program holds, the tests section's included — a Case
 	// written in a test body is as much a Case as one written above it.
 	for (let body of programBodies(program)) {
 		collectCases(body, tokens)
@@ -154,7 +154,7 @@ export function findSemanticTokens(
 			modifiers.push("static")
 		}
 
-		// NOTE: What separates a name the standard library gave the user from
+		// What separates a name the standard library gave the user from
 		// one the user wrote. Builtins reach here because the index has to hold
 		// them for shadowing to resolve, even though it rejects them as rename
 		// targets.
@@ -168,7 +168,7 @@ export function findSemanticTokens(
 	return sortTokens(tokens)
 }
 
-// NOTE: Identifiers never span lines — a multi-line Position would be a
+// Identifiers never span lines — a multi-line Position would be a
 // Parser bug, and encoding it would corrupt every following Token.
 function pushToken(
 	tokens: Array<SemanticToken>,
@@ -189,7 +189,7 @@ function pushToken(
 	})
 }
 
-// NOTE: The three places a Case is named: its declaration, the `#Case` value
+// The three places a Case is named: its declaration, the `#Case` value
 // that constructs it and the `case #Case` Matcher. The `#` sigil is not part
 // of the name's Position and deliberately keeps its grammar scope — a Case
 // reads the same at its declaration, where no sigil is written at all, and the
@@ -209,7 +209,7 @@ function collectCases(
 	}
 }
 
-// NOTE: A Parameter's `= expression` default holds Expressions like any body
+// A Parameter's `= expression` default holds Expressions like any body
 // does, and `= #None` is a Case that would otherwise go uncoloured — the walk
 // below descends into bodies, and a default is not one.
 function collectCasesFromDefinition(
@@ -241,7 +241,7 @@ function collectCasesFromNode(
 				])
 			}
 
-			// NOTE: A payload's `= { … }` holds Case values like any other
+			// A payload's `= { … }` holds Case values like any other
 			// Expression — `#Empty` written there colours as a Case, not as a
 			// name.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -278,7 +278,7 @@ function collectCasesFromNode(
 			}
 
 			return
-		// NOTE: An arm holds Case values like any other Expression — `as
+		// An arm holds Case values like any other Expression — `as
 		// #Empty if …` colours as a Case and not as a name.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
@@ -288,13 +288,13 @@ function collectCasesFromNode(
 			return
 		case "NamespaceDefinitionStatement":
 			for (let property of Object.values(node.properties)) {
-				// NOTE: A native static Property has no value.
+				// A native static Property has no value.
 				if (property.value !== null) {
 					collectCasesFromNode(property.value, tokens)
 				}
 			}
 
-			// NOTE: An `overload` block in declarations mode mixes bodied
+			// An `overload` block in declarations mode mixes bodied
 			// Methods with body-less native signatures, so both questions are
 			// asked of every member — see `namespaceMembers`.
 			for (let member of Object.values(node.methods)) {
@@ -413,7 +413,7 @@ function collectCasesFromNode(
 		case "RefusedValue":
 			collectCasesFromNode(node.base, tokens)
 			return
-		// NOTE: A path holds no Case; its steps colour as members through the
+		// A path holds no Case; its steps colour as members through the
 		// rename index, off the Lookups the Enricher synthesizes for them.
 		case "MemberPath":
 		case "TypeAliasStatement":
@@ -436,7 +436,7 @@ function collectCasesFromArguments(
 	}
 }
 
-// NOTE: The protocol forbids overlapping Tokens, and the index can hold the
+// The protocol forbids overlapping Tokens, and the index can hold the
 // same Identifier twice — a Parameter whose internal name doubles as its call
 // site label is one symbol recorded once, but a Namespace member declared in
 // two same-named Namespaces is not. Sorting then dropping repeats of a
@@ -457,7 +457,7 @@ function sortTokens(tokens: Array<SemanticToken>): Array<SemanticToken> {
 	})
 }
 
-// NOTE: The protocol encodes Tokens as flat quintuples relative to the
+// The protocol encodes Tokens as flat quintuples relative to the
 // previous Token: line delta, column delta (relative to the previous Token
 // only when on the same line), length, Type index, and a Modifier bit set.
 export function encodeSemanticTokens(

@@ -188,7 +188,7 @@ describe("Document Symbols", () => {
 		])
 	})
 
-	// NOTE: The label stays the bare name — a Type Alias's does the same, so a
+	// The label stays the bare name — a Type Alias's does the same, so a
 	// generic Choice's Type Parameters do not join its outline entry. What
 	// matters is that the generics clause does not break the Cases underneath.
 	it("should list a generic Choice with its Cases as children", () => {
@@ -253,7 +253,7 @@ describe("Document Symbols", () => {
 			).toEqual(["text"])
 		})
 
-		// NOTE: An `if` has no name of its own, so its body's declarations join
+		// An `if` has no name of its own, so its body's declarations join
 		// the Function around it rather than hiding under an unnameable entry.
 		it("should list a declaration made inside an `if` flat", () => {
 			let symbols = symbolsOf(
@@ -280,7 +280,7 @@ describe("Document Symbols", () => {
 			])
 		})
 
-		// NOTE: A Match arm is not an entry of its own either — one per arm
+		// A Match arm is not an entry of its own either — one per arm
 		// would outnumber everything the outline is actually for.
 		it("should list a declaration made inside a Match arm flat", () => {
 			let symbols = symbolsOf(
@@ -346,7 +346,7 @@ describe("Document Symbols", () => {
 			expect(detailOf(symbols, "label")).toBe("String")
 		})
 
-		// NOTE: Nameless — the name is right beside the detail in the outline.
+		// Nameless — the name is right beside the detail in the outline.
 		it("should summarise the signature of a Function and a Method", () => {
 			let symbols = detailedSymbolsOf(source)
 
@@ -383,7 +383,7 @@ describe("Document Symbols", () => {
 			expect(detailOf(symbols, "greeting")).toBe("String")
 		})
 
-		// NOTE: The Parser-only contract — an outline is still an outline while
+		// The Parser-only contract — an outline is still an outline while
 		// the Program does not type check, and that is when it is needed most.
 		it("should leave every detail null without an enriched Program", () => {
 			let symbols = flatten(symbolsOf(source))
@@ -392,7 +392,7 @@ describe("Document Symbols", () => {
 			expect(symbols.every((symbol) => symbol.detail === null)).toBe(true)
 		})
 
-		// NOTE: A Guard is walked for entries but sits outside the Handler's
+		// A Guard is walked for entries but sits outside the Handler's
 		// body, so it is the one place a detail can go missing while every
 		// other entry in the same outline has one.
 		it("should detail a declaration made inside a Match Guard", () => {
@@ -464,7 +464,7 @@ describe("The export block", () => {
 		).toEqual(["constant"])
 	})
 
-	// NOTE: The outline is built from the Parser alone, so the tests section is
+	// The outline is built from the Parser alone, so the tests section is
 	// in it whatever the compile mode was — a writer navigating a file sees
 	// what they PROVE below what they wrote, in a build that would strip the
 	// whole block.
@@ -513,7 +513,7 @@ describe("The export block", () => {
 	})
 })
 
-// NOTE: A `define` declares nothing itself, so what the outline has to reach
+// A `define` declares nothing itself, so what the outline has to reach
 // inside one is whatever a Function literal written as an arm's value declares.
 describe("Document Symbols inside a define", () => {
 	let source = [
@@ -539,7 +539,7 @@ describe("Document Symbols inside a define", () => {
 	})
 })
 
-// NOTE: A Function literal written under `start` is a body like any other, and
+// A Function literal written under `start` is a body like any other, and
 // what it declares belongs in the outline of the Constant holding the work —
 // which a walk with no case for the two Keywords reaches nothing of.
 describe("Document Symbols under start and complete", () => {

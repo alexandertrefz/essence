@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
-// NOTE: How a launch gets its bundle. The adapter does not depend on the CLI —
+// How a launch gets its bundle. The adapter does not depend on the CLI —
 // the CLI depends on the ADAPTER, and `essence dap` injects a compile built
 // from its own in-process pipeline — so what compiling MEANS is a capability
 // the host hands in, the same way the Language Server is handed
@@ -20,13 +20,13 @@ export type CompileDiagnostic = {
 
 export type CompileResult = {
 	ok: boolean
-	// NOTE: Absolute path of the emitted bundle, with its `.map` beside it —
+	// Absolute path of the emitted bundle, with its `.map` beside it —
 	// null exactly when `ok` is false.
 	bundlePath: string | null
 	diagnostics: Array<CompileDiagnostic>
 }
 
-// NOTE: What a launch asks of a compile beyond "compile this". One member, and
+// What a launch asks of a compile beyond "compile this". One member, and
 // it is the debugger's own: a session stepping through a test needs the
 // `tests { … }` block a build drops, because the block IS the code it steps
 // through.
@@ -40,7 +40,7 @@ export type CompileFunction = (
 	options?: CompileOptions,
 ) => Promise<CompileResult>
 
-// NOTE: The `--json` report, reduced to what a failed launch reports. The
+// The `--json` report, reduced to what a failed launch reports. The
 // shape mirrors `packages/cli/src/json.ts` — reproduced rather than imported,
 // for the same no-dependency reason as above.
 type JSONReport = {
@@ -53,7 +53,7 @@ type JSONReport = {
 	}>
 }
 
-// NOTE: Which `essence` compiles when none was injected: the CLI sitting
+// Which `essence` compiles when none was injected: the CLI sitting
 // beside this package first — `packages/cli/bin/essence` in a checkout, where
 // `bin/esdap` runs from, and `@essence-lang/cli/bin/essence.js` in a published
 // install, where the relative depth is the same — and PATH otherwise. Every
@@ -91,11 +91,11 @@ export function compileViaCli(): CompileFunction {
 					"--out",
 					outputFile,
 					"--sourcemap",
-					// NOTE: `--tests` compiles the block a build drops, so
+					// `--tests` compiles the block a build drops, so
 					// that the bundle holds the test the session was asked to
 					// step through. It still runs nothing on load.
 					...(options.tests === true ? ["--tests"] : []),
-					// NOTE: The Program as WRITTEN, which is what a debug
+					// The Program as WRITTEN, which is what a debug
 					// session steps through — the same choice `essence dap`
 					// makes when it injects its own compile, made here so that
 					// a host reaching the CLI this way debugs the same
@@ -115,7 +115,7 @@ export function compileViaCli(): CompileFunction {
 			child.stdout.on("data", (chunk) => {
 				stdout += chunk
 			})
-			// NOTE: stdout is the adapter's protocol channel, so the CLI's
+			// stdout is the adapter's protocol channel, so the CLI's
 			// own noise must go to stderr — where a DAP client shows it as
 			// adapter logging, if anywhere.
 			child.stderr.on("data", (chunk) => {
@@ -143,7 +143,7 @@ export function compileViaCli(): CompileFunction {
 				try {
 					report = JSON.parse(stdout) as JSONReport
 				} catch {
-					// NOTE: A CLI that died before printing leaves stdout
+					// A CLI that died before printing leaves stdout
 					// empty or partial; that is the placeless diagnostic
 					// below.
 				}

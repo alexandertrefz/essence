@@ -37,7 +37,7 @@ function keywordsOf(source: string, cursor: { line: number; column: number }) {
 }
 
 describe("Completion", () => {
-	// NOTE: A dotted key names members of the value being UPDATED, one level
+	// A dotted key names members of the value being UPDATED, one level
 	// at a time — which is a different question from what a name in Scope
 	// happens to hold, and has to be asked as its own reading.
 	describe("Path keys", () => {
@@ -76,7 +76,7 @@ describe("Completion", () => {
 			).toEqual(["host", "port", "tls"])
 		})
 
-		// NOTE: The reading that makes the key reading necessary rather than
+		// The reading that makes the key reading necessary rather than
 		// merely nicer — read as an ordinary member access, `server.` here
 		// answers the Constant's members, which have nothing to do with the
 		// update.
@@ -135,7 +135,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: An Argument and a Case payload are merged into a DEFAULT, so
+		// An Argument and a Case payload are merged into a DEFAULT, so
 		// what a path key inside one reaches into is the Parameter's Record or
 		// the Case's — there is no value written beside it to read them off.
 		describe("in a Literal merged into a default", () => {
@@ -266,7 +266,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: The head of an `if` closed with the brackets alone is an `if`
+		// The head of an `if` closed with the brackets alone is an `if`
 		// with no body, which the Parser drops whole — and the member access
 		// with it. A further reading gives it one.
 		it("should work in the head of an if", () => {
@@ -301,7 +301,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: A `match` wants its return Type before its block, so its head
+		// A `match` wants its return Type before its block, so its head
 		// is a reading of its own.
 		it("should work in the head of a match", () => {
 			let source = [
@@ -400,7 +400,7 @@ describe("Completion", () => {
 			expect(labels).toContain("add")
 		})
 
-		// NOTE: A Protocol's PROVIDED Methods are Methods of every conformer,
+		// A Protocol's PROVIDED Methods are Methods of every conformer,
 		// so they are offered beside the written ones — and withheld where the
 		// Namespace wrote one of the name, which is the override rule.
 		it("should list a Protocol's provided Methods beside the written ones", () => {
@@ -531,7 +531,7 @@ describe("Completion", () => {
 			expect(labels).toContain("describe")
 		})
 
-		// NOTE: The nested `Sized` shadows the top-level one and is another
+		// The nested `Sized` shadows the top-level one and is another
 		// Protocol, so its bound reaches its own Methods and none of the other's.
 		it("should list the Methods of a bound on a Protocol declared in a body", () => {
 			let source = [
@@ -559,7 +559,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: The builtin `for List<ItemType>` is listed first, but the call
+		// The builtin `for List<ItemType>` is listed first, but the call
 		// dispatches to the narrower `for List<Integer>` — so listing the
 		// builtin's `Optional<ItemType>` signature would describe a Method
 		// that is never the one invoked.
@@ -607,7 +607,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: The Enricher refuses this call — a `List<Unknown>` receiver is
+		// The Enricher refuses this call — a `List<Unknown>` receiver is
 		// matched by both Namespaces and nothing but the Unknown would pick
 		// between them. Completion is written while the receiver is still
 		// undecided, though, so it keeps offering what either Namespace has:
@@ -652,7 +652,7 @@ describe("Completion", () => {
 			expect(labelsOf(source, { line: 2, column: 6 })).toContain("string")
 		})
 
-		// NOTE: Nobody declares these — the Choice derives them — so without
+		// Nobody declares these — the Choice derives them — so without
 		// the Language Server mirroring that rule they would work at every call
 		// site and be offered at none.
 		it("should list a Choice's derived 'is' and 'isNot'", () => {
@@ -674,7 +674,7 @@ describe("Completion", () => {
 			expect(labels).toContain("isNot")
 		})
 
-		// NOTE: Printing is derived on narrower terms than equality — the
+		// Printing is derived on narrower terms than equality — the
 		// Namespace has to declare `is Printable` — so Completion has to mirror
 		// both halves of the rule or it offers a Method no call site can reach.
 		it("should list a Choice's derived 'toString' where a Namespace declares 'is Printable'", () => {
@@ -785,7 +785,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: A `::` cursor is a Method receiver, so the probe writes one — and
+		// A `::` cursor is a Method receiver, so the probe writes one — and
 		// a written value proves what it can about itself there. `4::` offers
 		// the Methods of every Namespace the proof reaches, and the entry a
 		// refined Namespace answers with is the one described.
@@ -831,7 +831,7 @@ describe("Completion", () => {
 				)
 			})
 
-			// NOTE: The signature offered is the one the call would reach — the
+			// The signature offered is the one the call would reach — the
 			// total entry `namespace PositiveInteger` writes, and not
 			// `Integer`'s, which answers an Optional for a receiver that might
 			// be negative.
@@ -844,7 +844,7 @@ describe("Completion", () => {
 				).toBe("() -> PositiveInteger | Algebraic")
 			})
 
-			// NOTE: The receiver is a DIFFERENCE, which is the arithmetic no
+			// The receiver is a DIFFERENCE, which is the arithmetic no
 			// refinement of Integer closes over: a sum of two written Integers
 			// answers a `PositiveInteger` and would carry the proof here.
 			it("should describe the base entry for a computed receiver", () => {
@@ -889,7 +889,7 @@ describe("Completion", () => {
 		})
 
 		it("should offer only dispatchable Methods on a Union-typed receiver", () => {
-			// NOTE: Both members are Printable and Equatable, so `toString` and
+			// Both members are Printable and Equatable, so `toString` and
 			// `is` dispatch across the Union; `add` belongs to Integer alone and
 			// a String receiver would find nothing to run.
 			let source = [
@@ -1024,7 +1024,7 @@ describe("Completion", () => {
 				"}",
 			].join("\n")
 
-			// NOTE: The inner `value` is not declared yet, so the outer one is
+			// The inner `value` is not declared yet, so the outer one is
 			// what resolves here.
 			expect(labelsOf(source, { line: 4, column: 3 })).toContain("value")
 		})
@@ -1072,7 +1072,7 @@ describe("Completion", () => {
 			).toBe("Box<Integer>#Holding { value: Integer }")
 		})
 
-		// NOTE: With no expectation the scan mirrors the Enricher's
+		// With no expectation the scan mirrors the Enricher's
 		// `findCaseTypesInScope` — a generic Choice (a Generic Alias) offers its
 		// declared Cases, their payloads still abstract (`value: Value`).
 		it("should offer a generic Choice's Cases for a bare # with no expectation", () => {
@@ -1125,7 +1125,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: A scan over every Choice in scope has no basis for a
+		// A scan over every Choice in scope has no basis for a
 		// preselection — the first entry is the first Choice's first Case,
 		// which is nothing but declaration order.
 		it("should preselect nothing for a bare # with no expectation", () => {
@@ -1180,7 +1180,7 @@ describe("Completion", () => {
 			).toEqual(["Red", "Green"])
 		})
 
-		// NOTE: A Guard is an ordinary Expression, so the Argument it is being
+		// A Guard is an ordinary Expression, so the Argument it is being
 		// written into pins the Choice down just as it would anywhere else —
 		// `Shape` is in scope and stays out of the list.
 		it("should narrow to the expected Choice inside a Match Guard", () => {
@@ -1335,7 +1335,7 @@ describe("Completion", () => {
 		})
 	})
 
-	// NOTE: A member and a binding of the same name are ONE offer, not two —
+	// A member and a binding of the same name are ONE offer, not two —
 	// both insert the same characters, because a bare name in a Record Literal
 	// is the whole member. What the shorthand adds is the sentence saying so.
 	describe("Record literal members that a binding can fill", () => {
@@ -1380,7 +1380,7 @@ describe("Completion", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: The braces of an update's key list are the one member list the
+		// The braces of an update's key list are the one member list the
 		// shorthand does not reach, so the sentence must not appear there —
 		// `{ base with firstName }` is refused outright. A key still being
 		// typed is exactly the shape the third reading recovers, which is what
@@ -1405,7 +1405,7 @@ describe("Completion", () => {
 			).toBe("String")
 		})
 
-		// NOTE: The braced right-hand side IS a Record Literal — it is the only
+		// The braced right-hand side IS a Record Literal — it is the only
 		// spelling the shorthand merge has — and its members come from the LEFT
 		// side's Type, which nothing else in the update supplies.
 		it("offers the left side's members inside a braced right-hand side", () => {
@@ -1528,11 +1528,11 @@ describe("Completion", () => {
 			)
 		})
 
-		// NOTE: `Number.compare(3, to Number.Pi)` — reached through the
+		// `Number.compare(3, to Number.Pi)` — reached through the
 		// Namespace the receiver rides along as the first Argument, so the
 		// Self Parameter a `::` call site never writes is written here.
 		//
-		// NOTE: A WRITTEN Method, deliberately. A Protocol's provided Method
+		// A WRITTEN Method, deliberately. A Protocol's provided Method
 		// is reached through the receiver and never through the Namespace
 		// spelling, so it is offered under neither name here.
 		it("should keep the receiver Parameter when a Method is reached through the Namespace", () => {
@@ -1572,7 +1572,7 @@ describe("Completion", () => {
 			})
 		})
 
-		// NOTE: A Constant may hold a Function Value, but its name is as often
+		// A Constant may hold a Function Value, but its name is as often
 		// passed on as it is called — nothing is inserted for it.
 		it("should not write a call for a Constant holding a Function", () => {
 			let source = [
@@ -1589,7 +1589,7 @@ describe("Completion", () => {
 			).toBe(null)
 		})
 
-		// NOTE: The shortest call a defaulted signature accepts is the one it
+		// The shortest call a defaulted signature accepts is the one it
 		// was given defaults for, so a TRAILING run of omittable Parameters is
 		// left out of the snippet entirely. One with a required Parameter after
 		// it stays: leaving it out there would put the tabstops in the wrong
@@ -1670,7 +1670,7 @@ describe("Completion", () => {
 				])
 			})
 
-			// NOTE: The label is the same on purpose — the Editor filters both
+			// The label is the same on purpose — the Editor filters both
 			// on what was typed — so the signature tail is the only thing that
 			// can tell them apart in the list.
 			it("should tell the Overloads apart by their signature tails", () => {
@@ -1720,7 +1720,7 @@ describe("Completion", () => {
 			])
 		})
 
-		// NOTE: A word the Lexer reads as a name is written as an unknown name
+		// A word the Lexer reads as a name is written as an unknown name
 		// when accepted, and a Keyword the Parser refuses is reported where the
 		// word stands.
 		it("should offer only Keywords the Parser starts an Expression with", () => {
@@ -1752,7 +1752,7 @@ describe("Completion", () => {
 			expect(unparsed).toEqual([])
 		})
 
-		// NOTE: Both asynchrony words are legal at the head of a Statement —
+		// Both asynchrony words are legal at the head of a Statement —
 		// `complete f()` there analyses clean and `start f()` is the deliberate
 		// Information — so they are offered there as well as inside an
 		// Expression, though neither is a Keyword the Statement parser
@@ -1766,7 +1766,7 @@ describe("Completion", () => {
 			expect(keywords).toContain("complete")
 		})
 
-		// NOTE: `as` and `otherwise` are the middle and the end of a `define`
+		// `as` and `otherwise` are the middle and the end of a `define`
 		// arm rather than the start of an Expression, and this list is the
 		// starts — see the NOTE on `expressionKeywords`.
 		it("should not offer the words a define arm is continued with", () => {
@@ -1817,7 +1817,7 @@ describe("Completion", () => {
 			)
 		})
 
-		// NOTE: No Keyword names a Type, so the Type space offers none.
+		// No Keyword names a Type, so the Type space offers none.
 		it("should not offer Keywords in the Type space", () => {
 			let source = ["implementation {", "\tconstant value: ", "}"].join(
 				"\n",
@@ -1854,7 +1854,7 @@ describe("Completion", () => {
 			)
 		})
 
-		// NOTE: `parseType` is the only place the Parser consumes a Pipe, so
+		// `parseType` is the only place the Parser consumes a Pipe, so
 		// one can never mean anything but a Union.
 		it("should switch after a Union's pipe", () => {
 			let source = [
@@ -1899,7 +1899,7 @@ describe("Completion", () => {
 			)
 		})
 
-		// NOTE: A Comment runs to the end of its line and a String may span
+		// A Comment runs to the end of its line and a String may span
 		// several, so both are blanked out before anything is read off the
 		// text — otherwise the `is` of a sentence would switch spaces.
 		it("should ignore an 'is' written inside a Comment", () => {
@@ -1958,7 +1958,7 @@ describe("Completion", () => {
 			expect(entry?.documentation).toBe("who to greet")
 		})
 
-		// NOTE: A Namespace prints as its own name, which the label already
+		// A Namespace prints as its own name, which the label already
 		// says — its target Type is what a single line can add instead.
 		it("should carry a Namespace's target Type", () => {
 			let source = [
@@ -1990,7 +1990,7 @@ describe("Completion", () => {
 			).toBe("String")
 		})
 
-		// NOTE: A Namespace Type keeps only each Property's Type, so a
+		// A Namespace Type keeps only each Property's Type, so a
 		// Property's `§§` block has to be read off the declaration itself.
 		it("should carry a Namespace Property's §§ description", () => {
 			let source = [
@@ -2042,7 +2042,7 @@ describe("Completion", () => {
 	})
 })
 
-// NOTE: What a converted Namespace must NOT change. The standard library is
+// What a converted Namespace must NOT change. The standard library is
 // moving out of TypeScript and into Essence one Namespace at a time, and a
 // source declaration is enriched INTO the builtin Scope rather than spread
 // into it — so without `builtinMemberOrder` a conversion moves its Namespace
@@ -2059,14 +2059,14 @@ describe("Completion of a converted standard library Namespace", () => {
 	it("should offer Boolean's own Methods in the order it declares them", () => {
 		let source = ["implementation {", "\ttrue::", "}"].join("\n")
 
-		// NOTE: The canonical member order — `packages/standard-library/DEVELOPMENT.md`,
+		// The canonical member order — `packages/standard-library/DEVELOPMENT.md`,
 		// Member order — puts the Protocol witnesses first and the Methods
 		// answering a Boolean after them, so this list is `is`, `compare`,
 		// `toString` and then the four operations.
 		// `packages/compiler/src/tests/stdlibMemberOrder.spec.ts`
 		// is what holds the sources to it.
 		//
-		// NOTE: And the PROVIDED Methods last, which is where they go. A
+		// And the PROVIDED Methods last, which is where they go. A
 		// Namespace declares the Methods it writes and says nothing about
 		// the ones a conformance hands it, so there is no position in the file to
 		// read one off — they are appended per Protocol, in
@@ -2098,7 +2098,7 @@ describe("Completion of a converted standard library Namespace", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: `flatten` sits after everything `Optional` declares because
+		// `flatten` sits after everything `Optional` declares because
 		// `NestedOptional` is listed after `Optional` — the extra a nested
 		// Optional has, offered as an extra. `is` and `isNot` sit among the
 		// declared Methods, in declaration order, because `Optional` writes
@@ -2128,7 +2128,7 @@ describe("Completion of a converted standard library Namespace", () => {
 	})
 })
 
-// NOTE: `cases` is declared by no Namespace — the Compiler derives it for a
+// `cases` is declared by no Namespace — the Compiler derives it for a
 // Choice whose Cases carry no payload — so a listing built from the written
 // members alone would offer less than `Side.` answers. It is a static, and
 // belongs in no `::` listing for that reason.
@@ -2174,7 +2174,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 		expect(labelsOf(source, { line: 3, column: 8 })).not.toContain("cases")
 	})
 
-	// NOTE: The two spellings the Protocol's own page headlines, and the two the
+	// The two spellings the Protocol's own page headlines, and the two the
 	// editor could not show: a Choice nobody wrote a Namespace for, and the Type
 	// Parameter inside a bounded body. Both compile, run and hover, and both
 	// read their member off a Namespace nobody declared — which the Enricher
@@ -2200,7 +2200,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 		)
 	})
 
-	// NOTE: The tests block is a CHILD Scope of the implementation, so the
+	// The tests block is a CHILD Scope of the implementation, so the
 	// Choice a file declares is named from inside a test exactly as it is
 	// beside it.
 	it("should offer it inside the tests block", () => {
@@ -2233,7 +2233,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: `NonEmptyList` bare rather than `NonEmptyList<Mode>`, because a
+		// `NonEmptyList` bare rather than `NonEmptyList<Mode>`, because a
 		// refinement whose Type Arguments are all Type Parameters prints
 		// unapplied — `displayedRefinementArguments`' own rule, and what the
 		// Hover on the same spelling reads.
@@ -2242,7 +2242,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 		)
 	})
 
-	// NOTE: A Namespace WRITING `cases` is the answer wherever it is reached,
+	// A Namespace WRITING `cases` is the answer wherever it is reached,
 	// so the listing offers that Method rather than the derive — the same
 	// order every other rail reads the two in.
 	it("should offer a written 'cases' through the Choice's own name", () => {
@@ -2268,7 +2268,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 		)
 	})
 
-	// NOTE: And not on a VALUE of the Choice. `cases` is a static, reached on the
+	// And not on a VALUE of the Choice. `cases` is a static, reached on the
 	// Type's own name and on a bounded Type Parameter — `red.cases()` is no
 	// spelling at all, and `red.` and `Colour.` carry the same Type here, so
 	// what tells them apart is which of them the Enricher could read a member
@@ -2307,7 +2307,7 @@ describe("Completion of a Choice's derived Case listing", () => {
 	})
 })
 
-// NOTE: The Editor asks "does this Namespace target that value" through the very
+// The Editor asks "does this Namespace target that value" through the very
 // door the Enricher does, and this is the guard on THAT — see `targetTypeMatches`
 // in `../namespaces`. The receiver below is written in a Function Parameter
 // spelled exactly as the Namespace's own, which is the collision the door
@@ -2342,7 +2342,7 @@ describe("Completion through a Parameter spelled like a Namespace's", () => {
 	})
 })
 
-// NOTE: A Protocol-bounded Type Parameter reads its members off the Namespace
+// A Protocol-bounded Type Parameter reads its members off the Namespace
 // the Enricher fabricates for the bound, so `Kind.label()` and `Item.is(a, b)`
 // compile and run. Completion reads the name in front of the dot, which asks
 // nothing of a member.
@@ -2368,7 +2368,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		})
 	})
 
-	// NOTE: An instance Method reached through the TYPE's name, which is a
+	// An instance Method reached through the TYPE's name, which is a
 	// spelling of its own: the receiver is written as the first Argument, and
 	// `Item.is(a, b)` is how a bounded body compares two of its values.
 	it("should offer the instance Methods of a builtin bound", () => {
@@ -2386,7 +2386,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
-	// NOTE: A Method the Protocol wrote a BODY for is a Method of every
+	// A Method the Protocol wrote a BODY for is a Method of every
 	// conformer, so it stands in this listing beside the requirements — the
 	// same terms a receiver's `::` listing offers it on.
 	it("should offer a Method the bound provides", () => {
@@ -2412,7 +2412,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
-	// NOTE: The other two places a bound is written. A Method of a Namespace
+	// The other two places a bound is written. A Method of a Namespace
 	// declares Type Parameters of its own, and a Namespace declares them for
 	// every Method it holds — both are Scopes the cursor stands in, and the
 	// name in front of the dot is read in the innermost one that declares it.
@@ -2454,7 +2454,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		expect(labelsOf(source, { line: 10, column: 12 })).toEqual(["label"])
 	})
 
-	// NOTE: Extending a Protocol is a promise to conform to it, so a bound
+	// Extending a Protocol is a promise to conform to it, so a bound
 	// carries what it extends — the members of both, under one name.
 	it("should offer what the bound extends as well", () => {
 		let source = [
@@ -2479,7 +2479,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
-	// NOTE: And the bound that was already answered, held to exactly what it
+	// And the bound that was already answered, held to exactly what it
 	// offers: `Enumerable` requires the Case listing and nothing else, so the
 	// listing that used to be the whole of this rail is still the whole of it
 	// there.
@@ -2495,7 +2495,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		expect(labelsOf(source, { line: 3, column: 11 })).toEqual(["cases"])
 	})
 
-	// NOTE: A Namespace is fabricated for a BOUND, so an unbounded Type
+	// A Namespace is fabricated for a BOUND, so an unbounded Type
 	// Parameter reaches nothing — which is what the Enricher answers for it
 	// too, and why it is still worth resolving the name: it SHADOWS, and a
 	// Choice of the same name further out must not answer in its place.
@@ -2511,7 +2511,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		expect(labelsOf(source, { line: 3, column: 11 })).toEqual([])
 	})
 
-	// NOTE: And the shadowing itself, the other way round: the Choice is in
+	// And the shadowing itself, the other way round: the Choice is in
 	// reach and the Type Parameter of that name is nearer, so the bound
 	// answers and the Case listing does not.
 	it("should read the innermost declaration of the name", () => {
@@ -2534,7 +2534,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
-	// NOTE: The bound is read where the Type Parameter is declared, so a
+	// The bound is read where the Type Parameter is declared, so a
 	// Protocol declared in the enclosing body shadows the top-level one of its
 	// name, which is another Protocol.
 	it("should offer the members of a bound declared in a body", () => {
@@ -2566,7 +2566,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		])
 	})
 
-	// NOTE: A Protocol the other arm of an `if` or a `match` declares is out of
+	// A Protocol the other arm of an `if` or a `match` declares is out of
 	// reach in this one, so the bound names the top-level Protocol.
 	it("should read a bound past a Protocol the other arm of an 'if' declares", () => {
 		let source = [
@@ -2627,7 +2627,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 		expect(labelsOf(source, { line: 10, column: 14 })).toEqual(["minimum"])
 	})
 
-	// NOTE: The two readings this must not turn into. A name that holds a
+	// The two readings this must not turn into. A name that holds a
 	// VALUE is answered by the value, and a name nothing declares is answered
 	// by nothing — the Type space is only read where the base named no value
 	// at all, which is the order the Enricher reads the two in.
@@ -2650,7 +2650,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 	})
 })
 
-// NOTE: An `if` arm and a `match` Handler are Scopes of their own, so a name
+// An `if` arm and a `match` Handler are Scopes of their own, so a name
 // one of them declares is out of reach in its sibling, and the name in front of
 // the `.` means the one declared further out.
 describe("Completion of a name a sibling arm declares", () => {
@@ -2704,7 +2704,7 @@ describe("Completion of a name a sibling arm declares", () => {
 	})
 })
 
-// NOTE: A label a call may leave out is still offered — the writer is being
+// A label a call may leave out is still offered — the writer is being
 // shown what CAN be written — but it says so, and it sorts below the labels the
 // call still has to write.
 describe("Completion of a label a call may leave out", () => {
@@ -2732,7 +2732,7 @@ describe("Completion of a label a call may leave out", () => {
 	})
 })
 
-// NOTE: The same thing one level down. A member the Parameter's own default
+// The same thing one level down. A member the Parameter's own default
 // fills in is offered like any other, says so, and ranks below the members the
 // Argument still has to write.
 describe("Completion of a member a default fills in", () => {
@@ -2769,7 +2769,7 @@ describe("Completion of a member a default fills in", () => {
 	})
 })
 
-// NOTE: A `= expression` default is an Expression position a writer types in
+// A `= expression` default is an Expression position a writer types in
 // like any other. The probe walkers reached bodies only, so completion inside a
 // default answered with nothing at all.
 describe("Completion inside a Parameter's default", () => {
@@ -2802,7 +2802,7 @@ describe("Completion inside a Parameter's default", () => {
 		expect(labelsOf(source, { line: 2, column: 39 })).toContain("trim")
 	})
 
-	// NOTE: A default is read against its own Parameter's Type, which is what
+	// A default is read against its own Parameter's Type, which is what
 	// makes a bare Case offer that Parameter's Choice.
 	it("should offer the Parameter's own Choice for a bare Case", () => {
 		let source = [
@@ -2825,7 +2825,7 @@ describe("Completion inside a Parameter's default", () => {
 	})
 })
 
-// NOTE: A call written inside a default is a call being written like any other,
+// A call written inside a default is a call being written like any other,
 // and the labels it may still be given are the same ones.
 describe("Completion of a label inside a Parameter's default", () => {
 	it("should offer the labels of a call written in a default", () => {
@@ -2895,11 +2895,11 @@ describe("Completion inside a Protocol-provided Method body", () => {
 	})
 })
 
-// NOTE: A `#` inside a Case payload's default has an expected Type just as one
+// A `#` inside a Case payload's default has an expected Type just as one
 // inside a Parameter's does — the member of the payload it is filling in — and
 // without the walk reaching there it has none at all.
 describe("Case completion inside a Case payload default", () => {
-	// NOTE: A default may name a Constant of this Module, so what is in Scope is
+	// A default may name a Constant of this Module, so what is in Scope is
 	// an answer here and not only what a `#` opens. Nothing in Completion knows
 	// that: the default is an Expression on the walk, and a name in one probes
 	// exactly as a name anywhere else does.
@@ -2939,7 +2939,7 @@ describe("Case completion inside a Case payload default", () => {
 		])
 	})
 
-	// NOTE: A leading dot needs nothing of Completion's own. It probes as
+	// A leading dot needs nothing of Completion's own. It probes as
 	// `.lspProbeMember` like every other dot, and the Enricher desugars the
 	// path into the Function it stands for — so the probe meets an ordinary
 	// member Lookup off the Parameter Type the position named. What each of
@@ -3027,7 +3027,7 @@ describe("Case completion inside a Case payload default", () => {
 	})
 })
 
-// NOTE: A cursor in an arm stands in a `define` that has not been written to its
+// A cursor in an arm stands in a `define` that has not been written to its
 // end, and a `define` with no `otherwise` arm is REFUSED rather than recovered
 // from — so every reading below rests on the arm tails `probe.ts` appends. Both
 // halves of an arm are covered: `as VALUE if CONDITION` is two Expression
@@ -3069,7 +3069,7 @@ describe("Completion inside a define arm", () => {
 		expect(labels).toContain("isNot")
 	})
 
-	// NOTE: The `otherwise` arm's own value is the LAST thing written, so the
+	// The `otherwise` arm's own value is the LAST thing written, so the
 	// head truncated at the cursor has lost the word that closes the block —
 	// which is the reading ` otherwise` is there for.
 	it("should complete a member in the otherwise arm's value", () => {
@@ -3091,7 +3091,7 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
-	// NOTE: An arm's own halves may open braces of their own, and then the
+	// An arm's own halves may open braces of their own, and then the
 	// innermost `{` is no longer the `define`'s — writing the tail there closes
 	// the Record Literal being typed with an arm inside it, which finishes
 	// nothing, so the Parser dropped the Statement and the cursor was answered
@@ -3115,7 +3115,7 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
-	// NOTE: The `define`'s block is the `{` after its return Type, however many
+	// The `define`'s block is the `{` after its return Type, however many
 	// brackets that Type writes of its own.
 	it("should complete inside an arm's brace under a Record return Type", () => {
 		let source = [
@@ -3171,7 +3171,7 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
-	// NOTE: And a `define` written inside an arm of another one wants both
+	// And a `define` written inside an arm of another one wants both
 	// blocks closed — the inner by the tail the cursor needs, the outer by the
 	// `otherwise` its own arm is one word short of.
 	it("should complete inside a define written inside an arm", () => {
@@ -3193,7 +3193,7 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 
-	// NOTE: A `#` keeps the whole document — the probe writes a stand-in Case
+	// A `#` keeps the whole document — the probe writes a stand-in Case
 	// where the sigil is rather than truncating — so this reads the expected
 	// Type off the arm, not off a padded tail.
 	it("should offer the expected Choice's Cases in an arm's value", () => {
@@ -3220,7 +3220,7 @@ describe("Completion inside a define arm", () => {
 	})
 })
 
-// NOTE: Everything a probe drops. The readings a cursor is explained by are
+// Everything a probe drops. The readings a cursor is explained by are
 // built from the text ABOVE it, closed back into a valid Program — so a
 // declaration written below the line being typed is in none of them, and the
 // document's own Program is no help either: the dangling `Colour.` is what the
@@ -3280,7 +3280,7 @@ describe("Completion of a declaration written below the cursor", () => {
 		])
 	})
 
-	// NOTE: A `::` receiver is answered from the same reading, and answered
+	// A `::` receiver is answered from the same reading, and answered
 	// with exactly what the same call written UNDER the declaration is: a
 	// Function hoists, so the two spellings reach one Type.
 	it("should read a receiver through a Function declared below", () => {
@@ -3309,7 +3309,7 @@ describe("Completion of a declaration written below the cursor", () => {
 		expect(labels).toContain("hasCharacters")
 	})
 
-	// NOTE: The tail is the rest of the FILE, so a document that does not
+	// The tail is the rest of the FILE, so a document that does not
 	// balance leaves this reading unparseable — and the readings that close the
 	// head for themselves are what still answer.
 	it("should still answer where the document does not balance", () => {
@@ -3325,7 +3325,7 @@ describe("Completion of a declaration written below the cursor", () => {
 	})
 })
 
-// NOTE: A Function LITERAL is a Scope, and the only one an Expression opens.
+// A Function LITERAL is a Scope, and the only one an Expression opens.
 // The name in front of a `.` used to be resolved by a walk of Statements alone,
 // so a literal's own Type Parameters and everything its body declares were
 // invisible — wherever the literal was written, and however shallow.
@@ -3365,7 +3365,7 @@ describe("Completion of a name a Function literal declares", () => {
 		)
 	})
 
-	// NOTE: A literal written as an ARGUMENT is the position they are written
+	// A literal written as an ARGUMENT is the position they are written
 	// in most, and the walk reaches it the same way it reaches every other
 	// Expression: blindly, rather than through a list of the Nodes that can
 	// hold one.
@@ -3390,7 +3390,7 @@ describe("Completion of a name a Function literal declares", () => {
 		expect(labelsOf(source, { line: 11, column: 28 })).toEqual(["cases"])
 	})
 
-	// NOTE: The reading that already worked, pinned: a Choice declared in the
+	// The reading that already worked, pinned: a Choice declared in the
 	// Function AROUND the literal is in reach inside it, and descending into
 	// the literal must not lose the Scopes it stands in.
 	it("should still offer a Choice the Function around the literal declares", () => {
@@ -3414,7 +3414,7 @@ describe("Completion of a name a Function literal declares", () => {
 		expect(labelsOf(source, { line: 8, column: 29 })).toEqual(["cases"])
 	})
 
-	// NOTE: And the shadowing, which is what the depth rule is for: the
+	// And the shadowing, which is what the depth rule is for: the
 	// literal's Type Parameter stands nearer than the Choice outside it.
 	it("should read the literal's Type Parameter over an outer Choice", () => {
 		let source = [
@@ -3435,7 +3435,7 @@ describe("Completion of a name a Function literal declares", () => {
 		])
 	})
 
-	// NOTE: A literal the cursor does NOT stand in declares nothing in reach,
+	// A literal the cursor does NOT stand in declares nothing in reach,
 	// exactly as a Function beside this one does.
 	it("should offer nothing a literal beside the cursor declares", () => {
 		let source = [
@@ -3456,7 +3456,7 @@ describe("Completion of a name a Function literal declares", () => {
 	})
 })
 
-// NOTE: A Module takes its names from other files, and a probe used to enrich
+// A Module takes its names from other files, and a probe used to enrich
 // ONE document: enrichment seeds a Scope from the builtins and the file's own
 // declarations, and linking is what seeds an import block. So every imported
 // name was unknown to every probe — `Colour.` offered nothing, and `red::`
@@ -3465,7 +3465,7 @@ describe("Completion of a name a Function literal declares", () => {
 // dependencies the document was linked against, which are read back rather than
 // re-read.
 //
-// NOTE: Against a real directory, for the reason `workspace.spec.ts` runs
+// Against a real directory, for the reason `workspace.spec.ts` runs
 // against one: an in-memory host exercises everything except which path a
 // specifier resolves to.
 describe("Completion in a Module", () => {
@@ -3546,7 +3546,7 @@ describe("Completion in a Module", () => {
 		"",
 	].join("\n")
 
-	// NOTE: The line under the Constant, which is inside the implementation and
+	// The line under the Constant, which is inside the implementation and
 	// below every declaration the readings need — the cursor is the last
 	// character of the line written there.
 	function writing(line: string): {
@@ -3592,7 +3592,7 @@ describe("Completion in a Module", () => {
 		})
 	})
 
-	// NOTE: The listing the every-Method fallback used to bury: an Error
+	// The listing the every-Method fallback used to bury: an Error
 	// receiver matches every Namespace there is, so `red::` answered with the
 	// whole standard library — `isEmpty`, `hasCharacters` and the rest of
 	// String's — instead of the three Methods a Colour reaches.
@@ -3617,7 +3617,7 @@ describe("Completion in a Module", () => {
 		])
 	})
 
-	// NOTE: A Protocol is imported to be USED, and a bound is where a Protocol
+	// A Protocol is imported to be USED, and a bound is where a Protocol
 	// this file never names again still has to resolve — the name in front of
 	// the dot reads its members off the Namespace fabricated for the bound.
 	it("should offer a static an imported Protocol requires as a bound", () => {
@@ -3641,7 +3641,7 @@ describe("Completion in a Module", () => {
 		).toEqual(["label"])
 	})
 
-	// NOTE: The same answers through the Workspace, which is what an Editor
+	// The same answers through the Workspace, which is what an Editor
 	// asks: the linked dependencies are read off the analysis it already holds
 	// rather than built here, and the two must not answer differently.
 	it("should answer the same from the analysis the Workspace holds", () => {
@@ -3667,7 +3667,7 @@ describe("Completion in a Module", () => {
 		).toEqual(["is", "isNot", "toString"])
 	})
 
-	// NOTE: A specifier naming a file nobody has written yet is the ordinary
+	// A specifier naming a file nobody has written yet is the ordinary
 	// state of a Module being built, and it must cost the answer nothing it
 	// used to give: the graph reports what it could not read, the rest of the
 	// block still binds, and the name that resolved to nothing is answered the
@@ -3699,7 +3699,7 @@ describe("Completion in a Module", () => {
 		).toEqual(["is", "isNot", "toString"])
 	})
 
-	// NOTE: And the reading this must not turn into: a name that holds a VALUE
+	// And the reading this must not turn into: a name that holds a VALUE
 	// is answered by the value, whatever a Type of the same name would offer.
 	// `red` is a Colour, and a Colour has no members at all.
 	it("should offer nothing on a value named after nothing it imports", () => {
@@ -3743,7 +3743,7 @@ describe("Completion inside an interpolation hole", () => {
 	})
 })
 
-// NOTE: An Argument written under one of the two Keywords is an Argument like
+// An Argument written under one of the two Keywords is an Argument like
 // any other, and the reading that says which Choice a bare `#` there belongs to
 // is a walk over the typed Program — one that answers nothing about anything
 // under a `complete` without a case for it.
@@ -3767,7 +3767,7 @@ describe("Completion under start and complete", () => {
 		])
 	})
 
-	// NOTE: What was waited FOR, rather than the future it came out of — the
+	// What was waited FOR, rather than the future it came out of — the
 	// receiver of a Method written behind a `complete` is the Value.
 	it("should offer the Methods of the value a complete answers with", () => {
 		let source = [
@@ -3784,10 +3784,10 @@ describe("Completion under start and complete", () => {
 		expect(labelsOf(source, { line: 7, column: 29 })).toContain("toString")
 	})
 
-	// NOTE: Both Types are builtins, so what this says is that they are in the
+	// Both Types are builtins, so what this says is that they are in the
 	// table the Type reading offers from — a Program can not declare either.
 	//
-	// NOTE: The NAME is what is offered, and the Type Argument is the writer's to
+	// The NAME is what is offered, and the Type Argument is the writer's to
 	// add — `Future` without one is refused as `wrong-type-argument-count`. That
 	// is how every generic Type is offered here, `Optional` and `Result`
 	// included, so the two of them stand in the list beside these to say it.

@@ -47,13 +47,13 @@ function clientFixture(name: string): string {
 	return path.join(import.meta.dirname, "files", name)
 }
 
-// NOTE: The pair, built the way anything that embeds the Compiler builds one:
+// The pair, built the way anything that embeds the Compiler builds one:
 // the bridge injected into the sources and the Surface described beside them,
 // both against the same entry, because a Case tag is spelled relative to it.
 // What `esc build --embed` does is exactly this, and the block below checks that
 // by loading what `esc` wrote rather than what this wrote.
 //
-// NOTE: Including the one question the bridge asks of the boundary — whether it
+// Including the one question the bridge asks of the boundary — whether it
 // names a Dictionary anywhere, and so whether the bundle carries the two
 // Functions one crosses through. Every injector asks it of the same Descriptor,
 // which is what keeps the answer a function of the sources rather than of who
@@ -86,7 +86,7 @@ async function build(entryPath: string, name: string): Promise<string> {
 }
 
 describe("A prebuilt Module", () => {
-	// NOTE: The whole claim in one call: a path to a bundle, and the Module as
+	// The whole claim in one call: a path to a bundle, and the Module as
 	// JavaScript — no entry to compile, no graph to link, no Compiler anywhere
 	// in the process that did it.
 	it("binds a bundle and the Descriptor beside it", () => {
@@ -100,7 +100,7 @@ describe("A prebuilt Module", () => {
 		).toBe(6n)
 	})
 
-	// NOTE: A call spelled by its labels rather than positionally is the
+	// A call spelled by its labels rather than positionally is the
 	// Descriptor's own doing — the labels are on it, and this path never had a
 	// Type to read them off.
 	it("keeps the labels the Descriptor carries", () => {
@@ -120,7 +120,7 @@ describe("A prebuilt Module", () => {
 			name: "teal",
 			$case: "Colour#Named",
 		})
-		// NOTE: Built here and read by the Module, which is what says the tag a
+		// Built here and read by the Module, which is what says the tag a
 		// constructor writes is the tag the bundle matches on.
 		expect(
 			(calls.exports.coloured as (name: string) => unknown)("teal"),
@@ -140,7 +140,7 @@ describe("A prebuilt Module", () => {
 		expect(makeAdder(5n)(3n)).toBe(8n)
 	})
 
-	// NOTE: Everything `loadModule` answers with except the two things that only
+	// Everything `loadModule` answers with except the two things that only
 	// a compile can produce — the Export Surface and a Marshaller over it.
 	it("answers with the raw door, the bridge and the boundary", () => {
 		let raw = calls.raw.labelled as (
@@ -157,7 +157,7 @@ describe("A prebuilt Module", () => {
 		expect(calls.interpreter.toJS(raw(ten, four))).toBe(6n)
 	})
 
-	// NOTE: The rule stated on this side. `esc`'s `descriptorFileName` states it
+	// The rule stated on this side. `esc`'s `descriptorFileName` states it
 	// on the other, and the block below is what keeps the two from drifting: it
 	// asks `esc` for a pair and then finds the sidecar with this.
 	it("looks for the sidecar beside the bundle", () => {
@@ -165,7 +165,7 @@ describe("A prebuilt Module", () => {
 		expect(descriptorPath("/build/app.mjs")).toBe(
 			"/build/app.descriptor.json",
 		)
-		// NOTE: A dot in a directory is not an extension, and a name that is
+		// A dot in a directory is not an extension, and a name that is
 		// nothing but one has nothing to replace.
 		expect(descriptorPath("/opt/v1.2/app")).toBe(
 			"/opt/v1.2/app.descriptor.json",
@@ -199,7 +199,7 @@ describe("A prebuilt Module", () => {
 		).toBe(6n)
 	})
 
-	// NOTE: Named by the file, because the thing that went wrong is which file
+	// Named by the file, because the thing that went wrong is which file
 	// was pointed at. Read one member deep and the message would be about a
 	// property of `undefined` from somewhere inside the binding.
 	it("refuses a sidecar that is not a Descriptor", async () => {
@@ -212,7 +212,7 @@ describe("A prebuilt Module", () => {
 		).rejects.toThrow("is not a Module Descriptor")
 	})
 
-	// NOTE: A bundle built to RUN rather than to be loaded carries no bridge,
+	// A bundle built to RUN rather than to be loaded carries no bridge,
 	// and every value the boundary would build needs one. Saying so beats a
 	// `TypeError` about `undefined` from whichever constructor was reached for
 	// first.
@@ -236,17 +236,17 @@ describe("A prebuilt Module", () => {
 	})
 })
 
-// NOTE: The pair as the toolchain actually writes it, loaded by the call that
+// The pair as the toolchain actually writes it, loaded by the call that
 // promises to read it. Everything above builds its own pair, which proves the
 // reading; this proves that what `esc build --embed` leaves on disk IS that
 // pair — the same bytes in the bundle, the same Descriptor beside it, under the
 // name the reader looks for.
 describe("`esc build --embed`", () => {
-	// NOTE: The repository's own `esc`, by path — the same reasoning `typecheck`
+	// The repository's own `esc`, by path — the same reasoning `typecheck`
 	// spawns the repository's own `tsc` under. A published binary from somewhere
 	// else would answer a question nobody asked.
 	//
-	// NOTE: With a bundle cache of this run's own, so that a spec building a
+	// With a bundle cache of this run's own, so that a spec building a
 	// fixture neither answers out of the user's store nor fills it — and so that
 	// the first build below is a miss and the second a hit, which is the whole
 	// point of building twice.
@@ -280,7 +280,7 @@ describe("`esc build --embed`", () => {
 		)
 
 		expect(run.code).toBe(0)
-		// NOTE: Two files and no more — the Descriptor is the only thing
+		// Two files and no more — the Descriptor is the only thing
 		// `--embed` adds, and it is beside the bundle rather than in it.
 		expect(readdirSync(built).sort()).toEqual([
 			"Calls.descriptor.json",
@@ -311,7 +311,7 @@ describe("`esc build --embed`", () => {
 		})
 	})
 
-	// NOTE: A Dictionary through the whole of the CLI path — `esc` decides
+	// A Dictionary through the whole of the CLI path — `esc` decides
 	// whether the bundle carries the Dictionary door out of the same Descriptor
 	// it writes beside it, so a pair whose boundary names one has to be a pair a
 	// host can actually hand a Map to.
@@ -351,7 +351,7 @@ export {
 		expect(readFileSync(bundle, "utf8")).toContain("createDictionaryFrom")
 	})
 
-	// NOTE: And the other direction of the same decision, which is the one that
+	// And the other direction of the same decision, which is the one that
 	// costs bytes rather than answers: `esc` leaves the door out of a bundle
 	// whose boundary names no Dictionary. Without this, a gate that stopped
 	// deciding anything would put 15,655 B of store and key encoding into every
@@ -390,7 +390,7 @@ export {
 		expect((module.exports.twice as (value: bigint) => bigint)(3n)).toBe(6n)
 	})
 
-	// NOTE: The asynchrony door, decided the same way and carried into the same
+	// The asynchrony door, decided the same way and carried into the same
 	// pair — so a bundle `esc` wrote and a sidecar beside it answer a call with
 	// a promise without a Compiler anywhere in reach. The host's own stop rides
 	// along: `loadPrebuilt` takes a signal for the reason `loadModule` does, and
@@ -434,7 +434,7 @@ export {
 			signal: stopping.signal,
 		})
 
-		// NOTE: A host that has already pulled its stop is a host that wants
+		// A host that has already pulled its stop is a host that wants
 		// nothing started, and a call only BUILDS the work — so nothing runs and
 		// the promise never settles, which is what a stopped run answers with
 		// everywhere. A deferred computation has nothing to stop PARTWAY, which
@@ -457,7 +457,7 @@ export {
 		expect(settled).toBe(false)
 	})
 
-	// NOTE: And the other direction of the same decision: `esc` leaves the whole
+	// And the other direction of the same decision: `esc` leaves the whole
 	// of `Future.ts` out of a bundle whose boundary names no work.
 	it("leaves the asynchrony door out of a pair that names none", async () => {
 		let built = path.join(directory, "sync")
@@ -489,7 +489,7 @@ export {
 		expect(code).not.toContain("futureAnswer")
 	})
 
-	// NOTE: The Descriptor `esc` wrote and the one an in-memory compile of the
+	// The Descriptor `esc` wrote and the one an in-memory compile of the
 	// same entry writes are the same boundary — which is what says the two
 	// writers of one are one writer. Indentation is the only difference allowed,
 	// so both are read back as JSON and compared as values.
@@ -511,7 +511,7 @@ export {
 		)
 	})
 
-	// NOTE: A build that FOUND its bundle still has to leave the pair behind
+	// A build that FOUND its bundle still has to leave the pair behind
 	// wherever it was asked to put it. The Descriptor is written on the cached
 	// path as well as the emitted one, and this is the build that only reaches
 	// the first of those: identical sources into a second place, with the store
@@ -528,7 +528,7 @@ export {
 		)
 
 		expect(run.code).toBe(0)
-		// NOTE: What says this build FOUND its bundle rather than emitting a
+		// What says this build FOUND its bundle rather than emitting a
 		// second identical one: the timeline it reports stops at validation and
 		// goes straight to the write. Byte-identical outputs alone would not
 		// tell the two apart.
@@ -550,7 +550,7 @@ export {
 		).toBe(6n)
 	})
 
-	// NOTE: Off by default, because everything else `esc build` writes is a
+	// Off by default, because everything else `esc build` writes is a
 	// program to run. A build that did not ask for the pair leaves no half of it
 	// behind — and is not the same bundle, which is what its own entry in the
 	// store has to be keyed apart by.
@@ -567,7 +567,7 @@ export {
 
 		expect(run.code).toBe(0)
 		expect(readdirSync(plain)).toEqual(["Calls.js"])
-		// NOTE: The store already holds the embedded build of these exact
+		// The store already holds the embedded build of these exact
 		// sources. Reading THAT back here would hand a plain build the bridge it
 		// never asked for, which is what joining `BRIDGE_KEY` to the emitter key
 		// prevents.
@@ -577,14 +577,14 @@ export {
 		expect(readFileSync(bundle, "utf8")).not.toContain("export default")
 	})
 
-	// NOTE: A unit Choice through the whole toolchain, because it is the one
+	// A unit Choice through the whole toolchain, because it is the one
 	// rule of the boundary that no value carries: whether a Case crosses as its
 	// bare name is a fact about the CHOICE, and by the time a prebuilt Module is
 	// loaded the only thing left that could know it is the JSON beside the
 	// bundle. Read off disk first, so that a failure says whether `esc` wrote
 	// the fact or the loader lost it, and then crossed, which is the claim.
 	//
-	// NOTE: `Marshal.es` rather than the `Calls.es` above, because a fixture
+	// `Marshal.es` rather than the `Calls.es` above, because a fixture
 	// keeps to what its header says it is for and this one is the table of
 	// shapes that cross.
 	it("bakes which Choices cross as bare names", async () => {
@@ -621,7 +621,7 @@ export {
 			["Up", true],
 			["Down", true],
 		])
-		// NOTE: The other half of the rule, in the same file and the same
+		// The other half of the rule, in the same file and the same
 		// Descriptor: one payload anywhere and every Case of that Choice keeps
 		// the object form, its payload-less `Blank` included.
 		expect(spellingOf("Shape")).toEqual([
@@ -640,7 +640,7 @@ export {
 		expect(called("marker", { direction: "Down" })).toEqual({
 			direction: "Down",
 		})
-		// NOTE: And the two doors a value that was never called for comes
+		// And the two doors a value that was never called for comes
 		// through — the constructors written out of the Descriptor, and a
 		// constant, which is marshalled when it is read.
 		expect(module.exports.Direction).toEqual({ Up: "Up", Down: "Down" })
@@ -652,7 +652,7 @@ export {
 	})
 })
 
-// NOTE: The rule this door exists for, checked as text because there is no other
+// The rule this door exists for, checked as text because there is no other
 // way to check it: a `bun test` run has the Compiler on disk either way, so an
 // accidental import would work perfectly here and cost a shipped application the
 // toolchain it was written to do without. What is asserted is what a bundler
@@ -665,7 +665,7 @@ describe("The prebuilt door", () => {
 			path.join(import.meta.dirname, "..", name),
 			"utf8",
 		)
-		// NOTE: `[^"']*?` spans lines, which is what a formatted import list
+		// `[^"']*?` spans lines, which is what a formatted import list
 		// needs, and can not run past the specifier of the import it is reading.
 		let imports = [
 			...source.matchAll(/^import\s+(type\s+)?[^"']*?from\s+"([^"]+)"/gm),
@@ -684,7 +684,7 @@ describe("The prebuilt door", () => {
 			}
 		})
 
-		// NOTE: And nothing reaches around the import list. `loadPrebuilt`'s own
+		// And nothing reaches around the import list. `loadPrebuilt`'s own
 		// `import()` of the bundle is the one exception, and it is a variable
 		// rather than a specifier — nothing a bundler follows.
 		it(`reaches for no Compiler at run time in ${name}`, () => {

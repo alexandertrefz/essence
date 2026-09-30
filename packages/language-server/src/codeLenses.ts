@@ -4,7 +4,7 @@ import {
 } from "@essence-lang/compiler/enricher/tests"
 import type { common, parser } from "@essence-lang/interfaces"
 
-// NOTE: An identity is spelled by the Enricher's own two functions rather than
+// An identity is spelled by the Enricher's own two functions rather than
 // by a second reading of them here. The Language Server holds the PARSER's tree,
 // where nothing has been enriched — but what a name TEMPLATE is and how the
 // steps of an id are escaped are one answer, and two spellings of one identity
@@ -18,7 +18,7 @@ function identityKey(
 	return testIdentityKey({ modulePath, suitePath, name }, row)
 }
 
-// NOTE: Every id one written test stands for — one for an ordinary test, and
+// Every id one written test stands for — one for an ordinary test, and
 // one per ROW of a table test, because a row is a test in its own right and
 // carries its row number as the last step of its identity. The rows are counted
 // off the written List, which is the only reason a table test's rows have to be
@@ -43,20 +43,20 @@ function identitiesOf(
 	)
 }
 
-// NOTE: The Run and Debug lenses above every `test` and every `suite`. The
+// The Run and Debug lenses above every `test` and every `suite`. The
 // Server produces the lens and the COMMAND it carries; what the command does is
 // the extension's, because running is an Editor gesture — a Test Explorer item,
 // a terminal, a debug session — and the Server has no idea which of them the
 // reader is looking at.
 //
-// NOTE: A lens sits on the KEYWORD's line, which is where the item begins and
+// A lens sits on the KEYWORD's line, which is where the item begins and
 // the only Position a reader can point at. A suite's lens runs everything under
 // it: the ids of every test it holds, gathered here rather than expanded by the
 // client, because the structural identity of a test is the Compiler's business
 // and no client should be spelling one.
 
 type TestLensCommand =
-	// NOTE: The three the extension must bind. `essence.test.run` runs the ids;
+	// The three the extension must bind. `essence.test.run` runs the ids;
 	// `essence.test.debug` runs them under the debug adapter;
 	// `essence.test.acceptSnapshot` re-runs them and RECORDS whatever they
 	// produce, which is `essence test --update` narrowed to what a reader is
@@ -66,19 +66,19 @@ type TestLensCommand =
 	"essence.test.run" | "essence.test.debug" | "essence.test.acceptSnapshot"
 
 type TestLensArguments = {
-	// NOTE: Structural ids, exactly as every event spells them. A suite carries
+	// Structural ids, exactly as every event spells them. A suite carries
 	// the ids of the tests under it; a test carries its own.
 	ids: Array<string>
-	// NOTE: The file the item was written in, so that a client which has no
+	// The file the item was written in, so that a client which has no
 	// results yet — nothing has run, so no id is known — can still run the file
 	// and narrow afterwards.
 	filePath: string
-	// NOTE: What to call the run in a progress message.
+	// What to call the run in a progress message.
 	title: string
 }
 
 type TestLens = {
-	// NOTE: The keyword's own span. A client renders the lens on the line it
+	// The keyword's own span. A client renders the lens on the line it
 	// starts on.
 	position: common.Position
 	title: string
@@ -89,7 +89,7 @@ type TestLens = {
 export function findTestLenses(
 	program: parser.Program,
 	filePath: string,
-	// NOTE: The tests whose last run left a snapshot to accept — one nothing
+	// The tests whose last run left a snapshot to accept — one nothing
 	// had recorded, or one that differs. A lens to accept a snapshot is offered
 	// only over those: an "Accept snapshot" above every test in the file would
 	// be a button that usually does nothing.
@@ -99,7 +99,7 @@ export function findTestLenses(
 	let accepting = (ids: Array<string>): boolean =>
 		ids.some((id) => pendingSnapshots.has(id))
 
-	// NOTE: The ids under a node, gathered as the walk unwinds, so that a suite
+	// The ids under a node, gathered as the walk unwinds, so that a suite
 	// carries what its tests carry and the walk is one pass.
 	let walk = (
 		nodes: Array<parser.TestsNode>,
@@ -147,7 +147,7 @@ export function findTestLenses(
 
 			gathered.push(...inside)
 
-			// NOTE: A suite holding no test at all gets no lens: there would be
+			// A suite holding no test at all gets no lens: there would be
 			// nothing for the command to run, and an Editor offering a button
 			// that does nothing is worse than offering none.
 			if (inside.length === 0) {

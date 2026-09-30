@@ -23,7 +23,7 @@ import {
 	TARBALL_DIRECTORY,
 } from "./packages"
 
-// NOTE: What staging is: the workspace never builds, so the publishable form
+// What staging is: the workspace never builds, so the publishable form
 // of each package — compiled JavaScript, declarations, a manifest whose
 // entries point at them — is assembled OUT of the tree, under
 // `build/publish/packages/`, and the repository's own manifests stay exactly
@@ -58,7 +58,7 @@ export function compilePackages(): void {
 	)
 }
 
-// NOTE: tsc emits the import specifiers exactly as written, and the sources
+// tsc emits the import specifiers exactly as written, and the sources
 // are written bundler-style — `./common/index`, no extension — which Node's
 // ESM loader refuses. Every relative specifier is resolved against the
 // compiled tree itself and given the extension it must carry: `.js` for a
@@ -125,7 +125,7 @@ export function fixRelativeSpecifiers(root: string): number {
 	return rewritten
 }
 
-// NOTE: `./src/<x>.ts` becomes the pair of files the consumer actually
+// `./src/<x>.ts` becomes the pair of files the consumer actually
 // resolves — the declaration first, the JavaScript as the answer. An entry
 // into `tests/` is not published at all.
 function publishedTarget(
@@ -197,7 +197,7 @@ function publishedManifest(
 	if (real.bin !== undefined) {
 		bin = {}
 
-		// NOTE: Spelled without `./` — npm 11 rejects a dot-slashed bin path
+		// Spelled without `./` — npm 11 rejects a dot-slashed bin path
 		// outright and publishes the package with no commands at all. The
 		// `--dry-run` in PUBLISHING.md's checklist is what catches this class
 		// of thing; the smoke test calls the bin files by path and cannot.
@@ -225,7 +225,7 @@ function publishedManifest(
 		repository: real.repository,
 		bugs: real.bugs,
 		keywords: real.keywords,
-		// NOTE: `import.meta.dirname` and `with { type: "json" }` set the
+		// `import.meta.dirname` and `with { type: "json" }` set the
 		// floor. The workspace runs on Bun either way; this is a claim about
 		// the compiled package.
 		engines: { node: ">=22" },
@@ -234,7 +234,7 @@ function publishedManifest(
 	}
 }
 
-// NOTE: The staged bin is the real one, translated rather than duplicated:
+// The staged bin is the real one, translated rather than duplicated:
 // Bun's shebang becomes Node's, and the source import becomes the compiled
 // one. Deriving it keeps the two from drifting apart.
 function stagedBin(realBinText: string): string {

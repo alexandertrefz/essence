@@ -32,7 +32,7 @@ import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { defaultOptimiserOptions, unoptimisedOptions } from "../optimiser/index"
 
-// NOTE: A project on disk, in a directory of its own that is removed again —
+// A project on disk, in a directory of its own that is removed again —
 // the same shape `modules.spec.ts` builds its graphs in, because what is under
 // test here also begins with a path somebody handed over.
 async function withProject<Result>(
@@ -49,7 +49,7 @@ async function withProject<Result>(
 			writeFileSync(filePath, source)
 		}
 
-		// NOTE: `mkdtempSync` answers under `/var/folders/…` on macOS, which is a
+		// `mkdtempSync` answers under `/var/folders/…` on macOS, which is a
 		// symlink to `/private/var/folders/…`, so the directory is canonicalised
 		// before anything is built out of it.
 		return await work(realpathSync.native(directory))
@@ -58,7 +58,7 @@ async function withProject<Result>(
 	}
 }
 
-// NOTE: The door question as every injector asks it — of the values AND of the
+// The door question as every injector asks it — of the values AND of the
 // declared Types, because both halves are the boundary. Written once here so a
 // module added below can not accidentally ask only half of it.
 async function carriesDictionaryFor(
@@ -76,7 +76,7 @@ async function carriesDictionaryFor(
 	)
 }
 
-// NOTE: The fixture Program prints three lines as it runs, and importing the
+// The fixture Program prints three lines as it runs, and importing the
 // bundle is what runs it. Both doors are held: `print` writes to the stream,
 // `inspect` ends its line through `console.log`, and a harness holding one of
 // the two reads half a Program as silent.
@@ -123,7 +123,7 @@ describe("Compiling To Memory", () => {
 
 		expect(result.diagnostics).toEqual([])
 		expect(result.code).not.toBe("")
-		// NOTE: The whole answer to "what does this Module offer", which is what
+		// The whole answer to "what does this Module offer", which is what
 		// a host binds its own names off. `Rectangle` is a Type Alias AND the
 		// Namespace of the same name, and one entry carries both — the kind is
 		// what it was DECLARED as, not a promise that nothing is emitted for it.
@@ -138,7 +138,7 @@ describe("Compiling To Memory", () => {
 		expect(Object.keys(result.surface.types)).toEqual(["Rectangle"])
 	})
 
-	// NOTE: The whole graph, so a host watching for a reason to compile again
+	// The whole graph, so a host watching for a reason to compile again
 	// watches all of it. The file that changed is rarely the file that was asked
 	// for — a bundler plugin registering only the entry would sit still through
 	// every edit to what the entry imports.
@@ -156,7 +156,7 @@ describe("Compiling To Memory", () => {
 		)
 	})
 
-	// NOTE: Present even where the compile stopped, because a host watching for
+	// Present even where the compile stopped, because a host watching for
 	// the edit that FIXES a broken Module needs the same list as one watching a
 	// working one.
 	it("says which sources it read of a Module that does not compile", async () => {
@@ -197,7 +197,7 @@ export {
 		)
 	})
 
-	// NOTE: The map rides inside the bundle rather than beside it, because a
+	// The map rides inside the bundle rather than beside it, because a
 	// host is handed one string and a map it can not reach is a stack trace it
 	// can not read.
 	it("carries its source map inside the bundle", async () => {
@@ -223,7 +223,7 @@ export {
 		})
 	})
 
-	// NOTE: The seam a host injects JavaScript of its own through. A bridge
+	// The seam a host injects JavaScript of its own through. A bridge
 	// Module re-exporting the real entry is what the client is going to need, so
 	// that is what is built here rather than a token nothing would do.
 	it("lets a caller rewrite the Modules before they are bundled", async () => {
@@ -256,7 +256,7 @@ export {
 		})
 	})
 
-	// NOTE: `Result` is a builtin generic Choice and crosses as an ORDINARY
+	// `Result` is a builtin generic Choice and crosses as an ORDINARY
 	// one — a Union of two `case` descriptors, each with its emitted tag and
 	// its payload. `Optional` is the single Choice this seam spells by absence,
 	// and it is spelled that way by whole identity rather than by shape, so a
@@ -328,7 +328,7 @@ export {
 					},
 				])
 
-				// NOTE: The other half of the claim: the Choice that IS spelled
+				// The other half of the claim: the Choice that IS spelled
 				// by absence still is, so this is a difference between the two
 				// Types rather than a rule that stopped applying.
 				expect(carriedBy("missing")?.kind).toBe("optional")
@@ -336,7 +336,7 @@ export {
 		)
 	})
 
-	// NOTE: A Dictionary is described as its two slots and nothing else — not the
+	// A Dictionary is described as its two slots and nothing else — not the
 	// store it is held in, not the generation a box reads it at, and not the key
 	// encoding that finds a slot. Building one and reading one are the runtime's,
 	// reached through the bridge, which is what `carriesDictionary` decides a
@@ -416,7 +416,7 @@ export {
 					),
 				).toBeTrue()
 
-				// NOTE: Asked of the whole boundary rather than of the exported
+				// Asked of the whole boundary rather than of the exported
 				// Types alone: this Module's only Dictionary is reached through
 				// a List, inside a Function's Parameter, which is a position no
 				// export names.
@@ -466,12 +466,12 @@ export {
 		)
 	})
 
-	// NOTE: One Module per arm of the walk, each with its ONLY Dictionary behind
+	// One Module per arm of the walk, each with its ONLY Dictionary behind
 	// that arm. A broken arm is not a smaller bundle: the door is missing for a
 	// boundary that needs it, and the marshaller refuses a legal value at run
 	// time with a sentence blaming a bundle from another compile.
 	//
-	// NOTE: The Case arm needs a Choice of TWO Cases. A one-Case Choice reaches
+	// The Case arm needs a Choice of TWO Cases. A one-Case Choice reaches
 	// its Case through `describeModule`'s own `choice` export arm, and a Union
 	// of Cases reaches it through `union`, so neither would isolate `case`.
 	it("finds a Dictionary behind every arm of the walk", async () => {
@@ -552,7 +552,7 @@ export {
 					await carriesDictionaryFor(directory, "ThroughUnion.es"),
 				).toBeTrue()
 
-				// NOTE: And the half the values alone can not see. Nothing this
+				// And the half the values alone can not see. Nothing this
 				// Module exports as a VALUE names a Dictionary — the door is
 				// owed to the declared Type, which the declaration file
 				// publishes as a `Map<string, bigint>` and a host marshals
@@ -630,7 +630,7 @@ export {
 				let first = await compileToMemory(entry)
 				let again = await compileToMemory(entry)
 
-				// NOTE: A DEPENDENCY's text counts as much as the entry's: the
+				// A DEPENDENCY's text counts as much as the entry's: the
 				// whole graph is what the bundle was derived from.
 				writeFileSync(
 					path.join(directory, "Dep.es"),
@@ -647,7 +647,7 @@ export {
 			expect(hashes.again).toBe(hashes.first)
 			expect(hashes.edited).not.toBe(hashes.first)
 
-			// NOTE: The same sources in another directory hash differently on
+			// The same sources in another directory hash differently on
 			// purpose — the paths are part of what was compiled, so a cache
 			// keyed by this is keyed to a place on disk rather than to a text.
 			let elsewhere = await withProject(sources, (directory) =>
@@ -668,7 +668,7 @@ export {
 			expect(plain.bundleHash).not.toBe(optimised.bundleHash)
 		})
 
-		// NOTE: The bundle holds more than the graph does — the standard library
+		// The bundle holds more than the graph does — the standard library
 		// is compiled into it, the runtime is inlined into it, and neither is a
 		// Module — so a key over the `.es` files alone names a file an older
 		// toolchain wrote, and a host caching by that name runs it forever.
@@ -690,7 +690,7 @@ export {
 			).not.toBe(hashGraph(parts))
 		})
 
-		// NOTE: A host that injects a Module of its own — the client's runtime
+		// A host that injects a Module of its own — the client's runtime
 		// bridge is one — changes the bytes without touching a source. Without
 		// this there would be two bundles under one name, and whichever was
 		// written first would answer for both.
@@ -706,7 +706,7 @@ export {
 		})
 	})
 
-	// NOTE: The front half on its own, which is what a host with a cache asks
+	// The front half on its own, which is what a host with a cache asks
 	// before it decides to emit at all.
 	describe("Linking To Memory", () => {
 		it("answers with the Export Surface and the same hash a compile would", async () => {
@@ -742,12 +742,12 @@ export {
 		})
 	})
 
-	// NOTE: The graph as Modules, which is what a host bundler embeds. Everything
+	// The graph as Modules, which is what a host bundler embeds. Everything
 	// here is about ONE property: a file's emitted text must be a function of the
 	// file and the root, and of nothing else — least of all of which entry the
 	// build happened to compile it under.
 	describe("Emitting To Memory", () => {
-		// NOTE: One file two entries share, reached from two different depths, so
+		// One file two entries share, reached from two different depths, so
 		// that the entry-relative spelling and the root-relative one can not
 		// coincide: `../lib/Shape.es` from the one, `./lib/Shape.es` from the
 		// other.
@@ -814,7 +814,7 @@ export {
 
 				expect(one.diagnostics).toEqual([])
 				expect(two.diagnostics).toEqual([])
-				// NOTE: Byte for byte, which is the whole claim — the host holds
+				// Byte for byte, which is the whole claim — the host holds
 				// ONE module per path, so the two compiles have to agree about
 				// every character of it. The Case tag inside is what makes this
 				// more than tidiness: `./lib/Shape.es#Shape#Circle` stamped by
@@ -825,7 +825,7 @@ export {
 				expect(
 					one.sources.sources.get("essence:./lib/Shape.es"),
 				).toContain('"./lib/Shape.es#Shape#Circle"')
-				// NOTE: And the prelude with it, which is a different claim: its
+				// And the prelude with it, which is a different claim: its
 				// contents are the whole standard library rather than what this
 				// graph reaches, so two graphs that reach different halves of it
 				// still write the same Module under the one name a host holds it
@@ -836,7 +836,7 @@ export {
 			})
 		})
 
-		// NOTE: The default emitting a bundle, where the same file is spelled
+		// The default emitting a bundle, where the same file is spelled
 		// against the entry — stated here because it is what the mode above exists
 		// to answer, and a change to it would otherwise only show up as a host
 		// build that silently takes the wrong arm.
@@ -854,7 +854,7 @@ export {
 			})
 		})
 
-		// NOTE: The map rides INSIDE each served Module, because a host bundler
+		// The map rides INSIDE each served Module, because a host bundler
 		// reads a `sourceMappingURL` comment off the text a plugin hands it and
 		// there is no file beside a module that never touches disk. Without it a
 		// host's own map still names the `.es` files — and shows the generated
@@ -878,7 +878,7 @@ export {
 				expect(map.sources).toEqual([
 					path.join(root, "lib", "Shape.es"),
 				])
-				// NOTE: The Essence source, not the JavaScript it emitted — the
+				// The Essence source, not the JavaScript it emitted — the
 				// one thing a map that names a `.es` file has to be showing.
 				expect(map.sourcesContent[0]).toContain("choice Shape {")
 			})
@@ -897,7 +897,7 @@ export {
 					'from "@essence-lang/runtime/Integer"',
 				)
 				expect(shape(hosted)).not.toContain(RUNTIME_DIRECTORY)
-				// NOTE: The other way round for a bundle, whose imports the
+				// The other way round for a bundle, whose imports the
 				// Bundler resolves and inlines itself — a package specifier there
 				// would have to resolve against wherever the emitted text was
 				// handed to esbuild from.
@@ -905,7 +905,7 @@ export {
 			})
 		})
 
-		// NOTE: What the runtime's own package promises, checked rather than
+		// What the runtime's own package promises, checked rather than
 		// assumed: the specifier the Rewriter now writes has to resolve, in a
 		// workspace and once published alike, or a host's build fails at a
 		// specifier no Essence source wrote.
@@ -918,7 +918,7 @@ export {
 			) as { name: string; exports: Record<string, string> }
 
 			expect(manifest.name).toBe("@essence-lang/runtime")
-			// NOTE: A `./src/*.ts` wildcard is BOTH halves of the promise. It is
+			// A `./src/*.ts` wildcard is BOTH halves of the promise. It is
 			// what resolves in a workspace — checked below by resolving one for
 			// real — and it is the one shape `scripts/publishing/stage.ts`
 			// rewrites, into `./dist/*.js` beside a `./dist/*.d.ts`, so the same
@@ -941,7 +941,7 @@ export {
 				})
 
 				expect(hosted.bundleHash).not.toBe(bundled.bundleHash)
-				// NOTE: The root is in the key because it is what the Modules are
+				// The root is in the key because it is what the Modules are
 				// spelled relative to — two roots are two different texts over one
 				// graph.
 				expect(elsewhere.bundleHash).not.toBe(hosted.bundleHash)

@@ -18,7 +18,7 @@ import { SECTIONS } from "../content.config.ts"
 
 type Section = (typeof SECTIONS)[number]
 
-// NOTE: The heading a result groups under: a second copy of the labels in
+// The heading a result groups under: a second copy of the labels in
 // `SECTIONS` of `lib/navigation.ts`, which this build-time route could import
 // instead. The order travels to the browser as `groupOrder` on every entry.
 const SECTION_LABELS: Record<Section, string> = {

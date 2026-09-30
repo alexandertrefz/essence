@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: A Documentation block is a run of `§§` Comments directly above a
+// A Documentation block is a run of `§§` Comments directly above a
 // Declaration. Ordinary `§` Comments stay private notes — doubling the sigil
 // is what makes a Comment part of the public description of the thing below
 // it, the same way `///` differs from `//` elsewhere.
@@ -34,12 +34,12 @@ const tagPattern = /^@(param|returns|example)\b[ \t]*(.*)$/
 
 const namePattern = /^([^ \t—]*)(.*)$/
 
-// NOTE: The one piece of Markdown the grammar has to know. A fenced block is
+// The one piece of Markdown the grammar has to know. A fenced block is
 // where an `@param` is being SHOWN rather than written, and lifting it out of
 // the prose leaves the fence unclosed and invents a Parameter nobody declared.
 const fencePattern = /^\s*(?:```|~~~)/
 
-// NOTE: A `§§` Comment paired with the span it occupies, so that a Diagnostic
+// A `§§` Comment paired with the span it occupies, so that a Diagnostic
 // about one tag can underline that tag rather than the whole block — and so
 // that an `@example` can be compiled at the lines it was written on.
 export type DocumentationLine = common.DocumentationLine
@@ -47,7 +47,7 @@ export type DocumentationLine = common.DocumentationLine
 export type DocumentationProblem = {
 	kind: "missing-separator"
 	tag: "param" | "returns"
-	// NOTE: Null for `@returns`, which names nothing.
+	// Null for `@returns`, which names nothing.
 	name: string | null
 	position: common.Position
 }
@@ -57,7 +57,7 @@ type ParsedDocumentation = {
 	problems: Array<DocumentationProblem>
 }
 
-// NOTE: One `@param` while it is being collected — its text arrives line by
+// One `@param` while it is being collected — its text arrives line by
 // line, and is joined once the block ends.
 type ParameterSection = {
 	name: string
@@ -65,7 +65,7 @@ type ParameterSection = {
 	position: common.Position
 }
 
-// NOTE: One `@example` while it is being collected. Unlike every other section
+// One `@example` while it is being collected. Unlike every other section
 // it keeps the LINES rather than their text: what is written under the tag is
 // Essence, and compiling it at the Positions it was written at is what makes
 // everything a run says about it point into the file.
@@ -85,10 +85,10 @@ export function parseDocumentation(
 	let returns: Array<string> | null = null
 	let problems: Array<DocumentationProblem> = []
 	let fenced = false
-	// NOTE: Lines following a tag continue it until the next tag starts, so a
+	// Lines following a tag continue it until the next tag starts, so a
 	// Parameter can be described across as many lines as it needs.
 	let section = description
-	// NOTE: The `@example` being collected, if any. It is kept apart from
+	// The `@example` being collected, if any. It is kept apart from
 	// `section` because what it collects is Lines rather than text — and
 	// because its lines are lifted OUT of the description: an example is code
 	// the run compiles, not prose the Editor renders.
@@ -131,7 +131,7 @@ export function parseDocumentation(
 		example = null
 
 		if (name === "example") {
-			// NOTE: A tag with nothing under it yet. The lines below it are
+			// A tag with nothing under it yet. The lines below it are
 			// what it holds, and a block that ends here holds an example of no
 			// lines — which is nothing to compile and is dropped below.
 			example = {
@@ -149,7 +149,7 @@ export function parseDocumentation(
 		if (name === "param") {
 			let [tagged, afterName] = splitLeadingName(rest)
 
-			// NOTE: A `@param` naming nothing documents nothing — it is left
+			// A `@param` naming nothing documents nothing — it is left
 			// in the prose rather than silently swallowed.
 			if (tagged === "") {
 				section.push(body)
@@ -200,7 +200,7 @@ export function parseDocumentation(
 				tag: { position: parameter.position },
 			})),
 			returns: returns === null ? null : joinSection(returns),
-			// NOTE: An `@example` with no lines under it is dropped: there is
+			// An `@example` with no lines under it is dropped: there is
 			// nothing to compile, and a test that runs no Statement would be a
 			// test that always passes.
 			examples: examples
@@ -216,14 +216,14 @@ export function parseDocumentation(
 	}
 }
 
-// NOTE: Whether a line of an example says anything. A blank one is kept — it is
+// Whether a line of an example says anything. A blank one is kept — it is
 // where the author put it and the compiled example is written at the very lines
 // it stands on — but a block of nothing but blanks holds no example.
 function holdsCode(line: common.DocumentationLine): boolean {
 	return stripPrefix(line.text).trim() !== ""
 }
 
-// NOTE: One leading space after the sigil is the separator rather than
+// One leading space after the sigil is the separator rather than
 // content — everything past it is kept, so indentation inside a Markdown list
 // or code block survives.
 function stripPrefix(line: string): string {
@@ -234,7 +234,7 @@ function stripPrefix(line: string): string {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// NOTE: The name a `@param` tags, which ends at the separator as readily as at
+// The name a `@param` tags, which ends at the separator as readily as at
 // a space — `@param other— the String` names `other`, not `other—`.
 function splitLeadingName(text: string): [string, string] {
 	let match = namePattern.exec(text)
@@ -242,7 +242,7 @@ function splitLeadingName(text: string): [string, string] {
 	return match === null ? ["", text] : [match[1], match[2]]
 }
 
-// NOTE: What a tag says on its own line, if anything. A tag head alone takes
+// What a tag says on its own line, if anything. A tag head alone takes
 // its text from the lines below it, so there is nothing here to separate and
 // nothing to report.
 function splitTagText(
@@ -262,7 +262,7 @@ function splitTagText(
 		: { content: text, separated: false }
 }
 
-// NOTE: The span of `length` characters at the head of `suffix`, which is what
+// The span of `length` characters at the head of `suffix`, which is what
 // lets a Diagnostic underline one tag rather than the whole Comment — the name
 // a `@param` writes, or the text an em-dash should have preceded. Every string
 // the parse works with is a suffix of the written line, so the column follows
@@ -280,7 +280,7 @@ function spanIn(
 	}
 }
 
-// NOTE: Blank lines inside a section are meaningful to Markdown, the ones
+// Blank lines inside a section are meaningful to Markdown, the ones
 // around it are not.
 function joinSection(lines: Array<string>): string {
 	return lines

@@ -6,7 +6,7 @@ import { analyseSource } from "../analysis"
 import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// NOTE: What the Parser abandoned, and what the stages behind it do about it.
+// What the Parser abandoned, and what the stages behind it do about it.
 // A Statement the Parser dropped is a Statement the reader WROTE — the file
 // declares what it declares — so every name it bound has to keep resolving, or
 // one syntax error is reported again at every line that reads one of them.
@@ -23,14 +23,14 @@ function recoveryOf(source: string): parser.Recovery {
 	)
 }
 
-// NOTE: The names alone, which is what most of this spec is about — WHERE each
+// The names alone, which is what most of this spec is about — WHERE each
 // one reaches is the subject of "Where a dropped Declaration's silence reaches"
 // below.
 function declaredNamesOf(source: string): Array<string> {
 	return recoveryOf(source).declarations.map((declared) => declared.name)
 }
 
-// NOTE: Every stage's verdict in one list, which is what the checks that STAND
+// Every stage's verdict in one list, which is what the checks that STAND
 // DOWN have to be read against: what they suppress only makes sense beside what
 // the stage above them already said.
 function analysisCodesOf(source: string): Array<string> {
@@ -83,7 +83,7 @@ describe("Parser recovery", () => {
 		).toEqual(["Point"])
 	})
 
-	// NOTE: A Namespace takes its Methods down with it, and the rest of the file
+	// A Namespace takes its Methods down with it, and the rest of the file
 	// calls them by name — so each is recorded beside the Namespace's own.
 	it("should record a dropped Namespace's Methods", () => {
 		expect(
@@ -96,7 +96,7 @@ describe("Parser recovery", () => {
 		).toEqual(["Boxes", "doubled", "origin"])
 	})
 
-	// NOTE: And no deeper than the body's own level. `multiplyWith` is a name
+	// And no deeper than the body's own level. `multiplyWith` is a name
 	// the Method CALLS, and a call says nothing about what this file declares —
 	// recording it would silence a genuine mistake anywhere else in the file.
 	it("should not record the names a dropped Namespace's bodies call", () => {
@@ -109,7 +109,7 @@ describe("Parser recovery", () => {
 		).not.toContain("multiplyWith")
 	})
 
-	// NOTE: A Parameter list goes down with the head it is written on, so its
+	// A Parameter list goes down with the head it is written on, so its
 	// names are as undeclared as the Function's own — and the body reading them
 	// is exactly what survives a dropped head.
 	it("should record a dropped Function's Parameters", () => {
@@ -122,7 +122,7 @@ describe("Parser recovery", () => {
 		).toEqual(["exclaimed", "text"])
 	})
 
-	// NOTE: And nothing a Type names. A `{ x: Integer }` declares members
+	// And nothing a Type names. A `{ x: Integer }` declares members
 	// rather than bindings, and a `type` Declaration has no Parameter list at
 	// all — recording either would silence a genuine mistake about a name
 	// spelled the same way somewhere else in the file.
@@ -142,7 +142,7 @@ describe("Parser recovery", () => {
 		).toEqual(["Colour", "Green", "Red"])
 	})
 
-	// NOTE: Up to where the recovery stopped, which is the `}` that closes the
+	// Up to where the recovery stopped, which is the `}` that closes the
 	// block the Statement was written in — a resynchronisation halts AT a
 	// closing brace rather than reading past it, so the brace's own line is the
 	// one line of the Declaration this does not claim.
@@ -202,7 +202,7 @@ describe("Reads of a dropped Declaration", () => {
 		).toEqual([])
 	})
 
-	// NOTE: The other half of the rule, and the one that decides whether this is
+	// The other half of the rule, and the one that decides whether this is
 	// worth having at all: a name nothing declared is still a name nothing
 	// declared. Silence is owed to what the recovery took away and to nothing
 	// else.
@@ -216,7 +216,7 @@ describe("Reads of a dropped Declaration", () => {
 	})
 })
 
-// NOTE: The two kinds of abandonment in ONE Program, because they are recorded
+// The two kinds of abandonment in ONE Program, because they are recorded
 // two different ways and were written in two different branches. A dropped
 // STATEMENT abandons text, which is what the lines are read off; a dropped
 // PATTERN BINDER abandons a name while the Matcher around it parses whole, so it
@@ -245,14 +245,14 @@ describe("A Program that abandoned a Statement and a binder", () => {
 		expect(recovery.lines).toEqual([2])
 	})
 
-	// NOTE: Two mistakes, two reports — and nothing about either name, though
+	// Two mistakes, two reports — and nothing about either name, though
 	// the body below reads both of them.
 	it("should say nothing about either name it took away", () => {
 		expect(enricherCodesOf(source)).toEqual([])
 	})
 })
 
-// NOTE: The other half of the rule, and the one this whole record exists to get
+// The other half of the rule, and the one this whole record exists to get
 // right: the silence is owed to the reads the dropped Declaration would have
 // ANSWERED, and to no others. A Constant dropped out of one Function's body was
 // never in scope in the next Function along, so a read of the same name there
@@ -299,7 +299,7 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual(["unknown-name"])
 	})
 
-	// NOTE: A `type` is hoistable by KEYWORD and hoisted by nobody when it is
+	// A `type` is hoistable by KEYWORD and hoisted by nobody when it is
 	// written inside a body — `hoistDeclarations` runs over a section's own
 	// Statements and nothing deeper. So a dropped one is in scope exactly where
 	// it was written, and the Parameter annotation below reads a Type this file
@@ -319,7 +319,7 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual(["unknown-type"])
 	})
 
-	// NOTE: And the hoisted case, which is why `hoistable` is recorded at all: a
+	// And the hoisted case, which is why `hoistable` is recorded at all: a
 	// top-level `choice` is in scope across the whole file and ABOVE its own
 	// line, so a dropped one silences every read of its name wherever it stands.
 	it("should stay silent file-wide for a dropped top-level Choice", () => {
@@ -336,7 +336,7 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual([])
 	})
 
-	// NOTE: `ChoiceName#CaseName` reads the Choice's name through a path of its
+	// `ChoiceName#CaseName` reads the Choice's name through a path of its
 	// own, which had no such question to ask — so a dropped `choice` answered
 	// its every qualified Case with "Type 'Signal' is not declared", the syntax
 	// error said again about a Type the file declares.
@@ -354,7 +354,7 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual([])
 	})
 
-	// NOTE: A Namespace's members are NOT lexical — a Method dropped out of a
+	// A Namespace's members are NOT lexical — a Method dropped out of a
 	// Namespace's body is called from outside that body, everywhere the
 	// Namespace reaches — so their silence stays file-wide. See
 	// `memberDeclarationWasAbandoned`.
@@ -373,7 +373,7 @@ describe("Where a dropped Declaration's silence reaches", () => {
 	})
 })
 
-// NOTE: `top-level-return` is the one check whose stand-down can not ask about
+// `top-level-return` is the one check whose stand-down can not ask about
 // its own lines: a `<-` stands outside a Function because the HEAD that would
 // have opened one is missing, and a head is dropped a line ABOVE the `<-` it
 // orphans. It used to answer that by standing down for the whole file, which
@@ -390,7 +390,7 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "unexpected-token"])
 	})
 
-	// NOTE: One dropped head, several orphaned Returns — the `{` it was missing
+	// One dropped head, several orphaned Returns — the `{` it was missing
 	// is ONE brace, so every Statement under it stands outside a Function for
 	// the same one reason. A Return that advanced the floor would report the
 	// second and every one after it.
@@ -405,7 +405,7 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "unexpected-token"])
 	})
 
-	// NOTE: A dropped Constant takes no body down with it, so the `<-` below it
+	// A dropped Constant takes no body down with it, so the `<-` below it
 	// is a `<-` the reader wrote at the top level and is owed its report. This
 	// is the discriminator the whole condition exists for.
 	it("should report under a dropped Constant", () => {
@@ -418,7 +418,7 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "top-level-return"])
 	})
 
-	// NOTE: And the head has to be abandoned BELOW everything the Parser read
+	// And the head has to be abandoned BELOW everything the Parser read
 	// whole at the top level. A Statement dropped inside a Function the Parser
 	// closed is a Statement whose body the Parser HAS — so what stands under
 	// that Function stands at the top level.
@@ -435,7 +435,7 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "top-level-return"])
 	})
 
-	// NOTE: And the head has to be abandoned ABOVE the `<-` it is supposed to
+	// And the head has to be abandoned ABOVE the `<-` it is supposed to
 	// have orphaned. Text dropped further down the file orphans nothing above
 	// it.
 	it("should report above the run that was abandoned", () => {

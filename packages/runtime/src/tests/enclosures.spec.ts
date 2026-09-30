@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { decimalExponentOnEnclosure, roundedOnDecimalGrid } from "../Algebraic"
 import { createCase } from "../type"
 
-// NOTE: The refinement both irrationals hand a reader digits through, driven
+// The refinement both irrationals hand a reader digits through, driven
 // over a SYNTHETIC enclosure rather than over π or √2. What is asserted here is
 // the contract of the refinement itself — when it decides, when it refuses, and
 // how many enclosures it asked for before either — and a synthetic one is the
@@ -12,7 +12,7 @@ import { createCase } from "../type"
 
 const nearest = createCase("Rounding#Nearest") as never
 
-// NOTE: An enclosure of `numerator / denominator` scaled by 10^digits, one unit
+// An enclosure of `numerator / denominator` scaled by 10^digits, one unit
 // of the last place loose on each side, which is the shape both real ones have.
 // The counter is what the refusal tests read: the point of an absolute cutoff is
 // that a width already past it costs no enclosure at all.
@@ -52,7 +52,7 @@ describe("rounding on a decimal grid", () => {
 		expect(third.taken()).toBe(1)
 	})
 
-	// NOTE: The limit is on the WIDTH of the enclosure, not on how far past the
+	// The limit is on the WIDTH of the enclosure, not on how far past the
 	// requested grid the refinement was pushed — which is what `Number.es`
 	// documents the cutoff as, and what the two sign decisions in
 	// `Transcendental.ts` test the same way. So a caller asking for a grid whose
@@ -66,7 +66,7 @@ describe("rounding on a decimal grid", () => {
 		expect(third.taken()).toBe(0)
 	})
 
-	// NOTE: A value sitting exactly on a step of the grid is what a refinement
+	// A value sitting exactly on a step of the grid is what a refinement
 	// can not decide — a half for the nearest rules — so this is the one shape
 	// that reaches the limit by refining rather than by asking for too much. A
 	// real irrational never takes this path, which is why every caller but the
@@ -102,7 +102,7 @@ describe("reading a decimal exponent", () => {
 		)
 	})
 
-	// NOTE: The sign is read off the far end of the interval, so a negative
+	// The sign is read off the far end of the interval, so a negative
 	// value answers the power its distance from zero falls on, exactly as the
 	// positive one does.
 	test("a negative value answers the power its magnitude falls on", () => {
@@ -114,7 +114,7 @@ describe("reading a decimal exponent", () => {
 		).toBe(-3n)
 	})
 
-	// NOTE: A value far below the first enclosure's width encloses zero at
+	// A value far below the first enclosure's width encloses zero at
 	// eight digits, and one just under a power of ten straddles the band, so
 	// both ask for more digits before they decide. Neither can loop forever on
 	// a real receiver: an irrational is neither zero nor a power of ten.
@@ -130,7 +130,7 @@ describe("reading a decimal exponent", () => {
 		expect(underOne.taken()).toBe(2)
 	})
 
-	// NOTE: The same absolute cutoff the grid reading takes, for the same
+	// The same absolute cutoff the grid reading takes, for the same
 	// caller — a Transcendental over several bases sitting exactly on a power
 	// of ten would settle the same open problem.
 	test("a value on a power of ten is refused at the limit", () => {

@@ -24,7 +24,7 @@ import { findSemanticTokens } from "../semanticTokens"
 import { findSignatureHelp } from "../signatureHelp"
 import { createWorkspace, type Workspace } from "../workspace"
 
-// NOTE: Everything the Language Server can say about a file used to stop at the
+// Everything the Language Server can say about a file used to stop at the
 // implementation. These are the answers inside the `tests { … }` block: the
 // same Hover, the same rename, the same Completion, plus the three binders only
 // a test has — a table's row, a property's generated Parameters, and the names
@@ -44,7 +44,7 @@ function compile(source: string) {
 	return { program, enrichedProgram, diagnostics, annotations }
 }
 
-// NOTE: A Cursor by what it points AT — the sources below are tab-indented, so
+// A Cursor by what it points AT — the sources below are tab-indented, so
 // a column counted by hand would be a fact about the whitespace.
 function cursorAt(
 	source: string,
@@ -69,7 +69,7 @@ function cursorAt(
 	throw new Error(`'${needle}' is not written ${occurrence} time(s) here`)
 }
 
-// NOTE: Directly BEHIND what was written, which is where an Editor asks a
+// Directly BEHIND what was written, which is where an Editor asks a
 // Completion from.
 function cursorPast(
 	source: string,
@@ -81,7 +81,7 @@ function cursorPast(
 	return { line: cursor.line, column: cursor.column + needle.length }
 }
 
-// NOTE: A name written INSIDE a longer piece of text — `row` of `(row: Row)` —
+// A name written INSIDE a longer piece of text — `row` of `(row: Row)` —
 // so that a cursor is stated by what it points at even where the name is
 // written many times over.
 function cursorWithin(
@@ -104,7 +104,7 @@ function hover(source: string, cursor: common.Cursor): string | null {
 	)
 }
 
-// NOTE: Applied textually, through `renameEdits`, so an expectation can state a
+// Applied textually, through `renameEdits`, so an expectation can state a
 // whole Program — the shape `rename.spec.ts` uses.
 function rename(source: string, cursor: common.Cursor, newName: string) {
 	let { program, enrichedProgram } = compile(source)
@@ -151,7 +151,7 @@ function labelsOf(source: string, cursor: common.Cursor) {
 	return findCompletions(source, cursor).map((entry) => entry.label)
 }
 
-// NOTE: One Program that carries every form the section has: setup beside the
+// One Program that carries every form the section has: setup beside the
 // tests, a suite with a Scope of its own, a `require` that takes a value apart,
 // a table test and a property test.
 const source = [
@@ -205,7 +205,7 @@ describe("The tests section", () => {
 			)
 		})
 
-		// NOTE: The Type the MATCHER proved, not the one the asserted
+		// The Type the MATCHER proved, not the one the asserted
 		// Expression had — a `require` only lets the lines below it run where
 		// the Matcher matched, so below it the value IS what the Case carried.
 		it("should answer a require-bound name with the Matcher's Type", () => {
@@ -257,7 +257,7 @@ describe("The tests section", () => {
 			expect(renamed).toBe(source.replace("blank", "empty"))
 		})
 
-		// NOTE: Started from the binder AND from a use of it, because the two
+		// Started from the binder AND from a use of it, because the two
 		// have to reach the same Declaration — the binder is written in the
 		// Matcher and the Constant the Enricher desugars it into stands at that
 		// very span.
@@ -280,7 +280,7 @@ describe("The tests section", () => {
 			).toContain(expected)
 		})
 
-		// NOTE: The name reads the row as well as the body does, which is what
+		// The name reads the row as well as the body does, which is what
 		// a table test's interpolated name is for — so renaming the Parameter
 		// has to reach into the String above it.
 		it("should rename a table test's row Parameter, its name included", () => {
@@ -295,7 +295,7 @@ describe("The tests section", () => {
 			expect(renamed).toContain(
 				"expect pointsFor(line.scored)::is(line.points)",
 			)
-			// NOTE: The OTHER test's `row` is a different Declaration entirely
+			// The OTHER test's `row` is a different Declaration entirely
 			// — a test's body is a Scope of its own.
 			expect(renamed).toContain("require #Value(row) = rows::item(at 0)")
 		})
@@ -382,7 +382,7 @@ describe("The tests section", () => {
 	})
 
 	describe("Completion", () => {
-		// NOTE: The Methods of what the MATCHER proved — a Record here, whose
+		// The Methods of what the MATCHER proved — a Record here, whose
 		// Namespace is what `::` offers.
 		it("should offer Methods on a require-bound name", () => {
 			let text = source.replace(
@@ -407,7 +407,7 @@ describe("The tests section", () => {
 			])
 		})
 
-		// NOTE: A `require` binds for the rest of the block BELOW it, exactly as
+		// A `require` binds for the rest of the block BELOW it, exactly as
 		// a Declaration does — offering the name above the line that binds it
 		// would offer a name the Enricher refuses.
 		it("should not offer a require-bound name above the line that binds it", () => {
@@ -482,7 +482,7 @@ describe("The tests section", () => {
 			).toBeDefined()
 		})
 
-		// NOTE: What a reader asks of a Function is whether the tests reach it,
+		// What a reader asks of a Function is whether the tests reach it,
 		// so a call written in an assertion has to be an incoming call — and it
 		// attributes to the `tests { … }` block, the way a top level Statement
 		// attributes to the implementation.
@@ -520,7 +520,7 @@ describe("The tests section", () => {
 			)
 		})
 
-		// NOTE: Outwards from a Statement to the test, the suite and the block —
+		// Outwards from a Statement to the test, the suite and the block —
 		// and never through the implementation, whose span the cursor is not in.
 		it("should expand a selection out through the test and the suite", () => {
 			let { program } = parseWithDiagnostics(source)
@@ -538,7 +538,7 @@ describe("The tests section", () => {
 		})
 	})
 
-	// NOTE: The section the Enricher hands back holds the `@example` blocks as
+	// The section the Enricher hands back holds the `@example` blocks as
 	// the tests they are, and those stand at Positions inside a Comment. The
 	// walk covers what the SOURCE wrote, so a rename never writes into a `§§`
 	// line and no Semantic Token is drawn over one.
@@ -588,7 +588,7 @@ describe("The tests section", () => {
 		})
 	})
 
-	// NOTE: The `contracts` suite is synthesized the same way and left out of
+	// The `contracts` suite is synthesized the same way and left out of
 	// the walk by the same rule — it stands at the section's own span, since no
 	// source wrote a span for it. The Editor never compiles with the goals on
 	// today, so this is the guarantee that turning them on would cost the walk
@@ -631,7 +631,7 @@ describe("The tests section", () => {
 	})
 })
 
-// NOTE: The cross-Module half. `examples/league` is the real thing this feature
+// The cross-Module half. `examples/league` is the real thing this feature
 // was written for: `Season.tests.es` is a file of nothing but imports and a
 // `tests { … }` block, and every name it proves something about is declared in
 // another file.
@@ -656,7 +656,7 @@ describe("The tests section across Modules", () => {
 		directories = []
 	})
 
-	// NOTE: Copied rather than indexed where they lie — a Workspace walks the
+	// Copied rather than indexed where they lie — a Workspace walks the
 	// directory it is given, and the example's own directory is not this spec's
 	// to hand out.
 	function leagueWorkspace(): {
@@ -678,7 +678,7 @@ describe("The tests section across Modules", () => {
 			copyFileSync(path.join(EXAMPLE, name), path.join(root, name))
 		}
 
-		// NOTE: With the tests ON, as the Server's own Workspace has them.
+		// With the tests ON, as the Server's own Workspace has them.
 		let workspace = createWorkspace({ tests: true })
 
 		workspace.setFolders([root])
@@ -708,7 +708,7 @@ describe("The tests section across Modules", () => {
 		let testsSource = workspace.sourceOf(pathOf("Season.tests.es")) ?? ""
 		let testsLines = testsSource.split("\n")
 
-		// NOTE: The import entry AND every reading of it inside the
+		// The import entry AND every reading of it inside the
 		// `tests { … }` block — before the section was walked, the entry was
 		// renamed on its own and every use of it was left behind, which is a
 		// rename that breaks the file it was asked for.

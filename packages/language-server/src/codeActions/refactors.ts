@@ -5,12 +5,12 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// NOTE: The Code Actions no Diagnostic asks for. Each is offered on code the
+// The Code Actions no Diagnostic asks for. Each is offered on code the
 // Compiler has nothing to say about, on the strength of where the cursor
 // stands — which is why every one of them reads the range it was given and
 // none of them is ever preferred.
 
-// NOTE: An Inlay Hint already IS this edit — it sits where the annotation
+// An Inlay Hint already IS this edit — it sits where the annotation
 // would be written and reads as the annotation would read. Offering it as a
 // refactor makes the hint applicable rather than only visible, and adds no
 // inference of its own.
@@ -21,7 +21,7 @@ import { walk } from "./lookups"
 // Unknown>` and `: NonEmptyList<Error>` added `unknown-type` on top of whatever
 // was already wrong, and a Function Type stopped the file parsing outright.
 //
-// NOTE: The EDIT's own text, in the title as well as in the edit. A hint's
+// The EDIT's own text, in the title as well as in the edit. A hint's
 // LABEL may name an Alias this position can not resolve — `: Result<Integer,
 // Problem>` in a file that imported no `Problem` — and the edit behind it
 // spells the shape instead, so a title quoting the label would promise one
@@ -47,7 +47,7 @@ export function annotationActions(
 		}))
 }
 
-// NOTE: The Formatter never rewrites between `{ x }` and `{ x = x }` — the
+// The Formatter never rewrites between `{ x }` and `{ x = x }` — the
 // spelling is the author's — so the rewrite is offered here instead, in both
 // directions, on a Record LITERAL's members only.
 //
@@ -95,7 +95,7 @@ export function shorthandActions(
 		}
 
 		for (let member of Object.values(literal.members)) {
-			// NOTE: A path key names no binding and a braced descend holds no
+			// A path key names no binding and a braced descend holds no
 			// value at all, so neither has a shorthand to offer or to expand.
 			if (member.value === null || member.steps !== undefined) {
 				continue

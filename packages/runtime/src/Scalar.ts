@@ -1,7 +1,7 @@
 import type { IntegerType } from "./Integer"
 import type { RationalType } from "./Rational"
 
-// NOTE: `Scalar` is the Union `Integer | Rational`, so it has no representation
+// `Scalar` is the Union `Integer | Rational`, so it has no representation
 // of its own — a Scalar value IS an Integer or a Rational, carrying that Type's
 // own tag. Both Methods of its Namespace
 // (`packages/standard-library/sources/Number.es`) are written in Essence, over

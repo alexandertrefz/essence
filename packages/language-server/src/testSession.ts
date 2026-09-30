@@ -33,23 +33,23 @@ import {
 	type TestWorkerResponse,
 } from "./testProtocol"
 
-// NOTE: One test session per workspace. It watches what the analysis already
+// One test session per workspace. It watches what the analysis already
 // watches — the files an Editor opens and the ones that change on disk — works
 // out which test files a change REACHED, and re-runs those and nothing else.
 //
-// NOTE: What it holds is one event stream per entry file, and a re-run replaces
+// What it holds is one event stream per entry file, and a re-run replaces
 // one of them. Everything a reader is shown — the Diagnostics, the Inlay Hints,
 // the notification — is the fold of all of them, so a file that has not been
 // touched keeps saying what it last said instead of going blank while its
 // neighbour is edited.
 
-// NOTE: Long enough that a burst of keystrokes is one run and short enough that
+// Long enough that a burst of keystrokes is one run and short enough that
 // stopping to think produces one. Deliberately behind the analysis debounce:
 // what a reader wants first is the squiggle, and a test run is the expensive
 // thing to be wrong about.
 const debounceInMilliseconds = 450
 
-// NOTE: How long one cycle — compile, load, run — is given before the Worker is
+// How long one cycle — compile, load, run — is given before the Worker is
 // taken away from it. A test can loop for ever, and this is the only thing that
 // ends one: the Worker exists so that a run CAN be stopped, and nothing stopped
 // it. Long enough that a cold compile of a large workspace is never mistaken
@@ -57,17 +57,17 @@ const debounceInMilliseconds = 450
 // their session back within a cup of coffee's inattention.
 const deadlineInMilliseconds = 60_000
 
-// NOTE: One staging directory per Worker, named for the Server's process.
+// One staging directory per Worker, named for the Server's process.
 const stagingPrefix = "essence-lsp-tests-"
 
 type TestSessionOptions = {
-	// NOTE: The workspace's test files, and every file a change to one file
+	// The workspace's test files, and every file a change to one file
 	// reaches. The session asks rather than searches: the Workspace already
 	// holds the parses and the edges, and a second walk would be a second
 	// answer to disagree with.
 	testFiles: () => Array<string>
 	dependentsOf: (filePath: string) => Array<string>
-	// NOTE: What the project governing one entry says about running it — the
+	// What the project governing one entry says about running it — the
 	// tags it skips and whether its declarations are tested. Asked per entry,
 	// and asked at the moment a run is built rather than held: a workspace is
 	// not one project, and the file that answers this is one the reader may
@@ -76,43 +76,43 @@ type TestSessionOptions = {
 		skipTags: Array<string>
 		contracts: boolean
 	}
-	// NOTE: The unsaved buffers, by absolute path.
+	// The unsaved buffers, by absolute path.
 	overlays: () => Record<string, string>
 	notify: (notification: TestRunNotification) => void
-	// NOTE: Which files have new results, so the Server can publish the
+	// Which files have new results, so the Server can publish the
 	// Diagnostics for them again — a failed `expect` is published beside the
 	// analysis's own Diagnostics for that file, and only the analysis knows
 	// what those are.
 	onResults: (filePaths: Array<string>) => void
-	// NOTE: An entry that could not be compiled or whose bundle would not
+	// An entry that could not be compiled or whose bundle would not
 	// load, rendered. It is not a Diagnostic — the analysis publishes those out
 	// of the same buffers — it is the session saying why it has nothing to
 	// report, which otherwise looks exactly like a file with no tests in it.
 	onProblem?: (filePath: string, problem: string) => void
-	// NOTE: The sources an accepted snapshot rewrote, and what each should
+	// The sources an accepted snapshot rewrote, and what each should
 	// become. The Server turns them into a workspace edit rather than writing
 	// them, because the buffer the run compiled may never have been saved.
 	onRewrites?: (rewrites: Array<SourceRewrite>) => void
-	// NOTE: Overridable so a spec can drive the Worker it wants — the real one
+	// Overridable so a spec can drive the Worker it wants — the real one
 	// is resolved beside this file, or beside the bundled Server.
 	workerPath?: string
 	debounce?: number
-	// NOTE: Overridable so a spec can wait a millisecond rather than a minute.
+	// Overridable so a spec can wait a millisecond rather than a minute.
 	deadline?: number
-	// NOTE: Where each Worker's staging directory goes. Overridable so a spec
+	// Where each Worker's staging directory goes. Overridable so a spec
 	// can watch them come and go.
 	stagingRoot?: string
 }
 
 export type TestSession = {
-	// NOTE: Files that changed. What re-runs is every test file the change
+	// Files that changed. What re-runs is every test file the change
 	// reached, which is the file itself when it wrote tests and every test file
 	// that imports it otherwise.
 	changed(filePaths: Array<string>): void
-	// NOTE: Everything, which is what a session start and a folder arriving
+	// Everything, which is what a session start and a folder arriving
 	// mean.
 	runAll(reason: TestRunNotification["reason"]): void
-	// NOTE: What `essence/runTests` asks for. Answers with the run number the
+	// What `essence/runTests` asks for. Answers with the run number the
 	// notifications will carry, or null where there was nothing to run.
 	run(request: {
 		ids?: Array<string>
@@ -121,33 +121,33 @@ export type TestSession = {
 	}): number | null
 	setEnabled(enabled: boolean): void
 	isEnabled(): boolean
-	// NOTE: How long a burst of edits is allowed to be before it costs a run.
+	// How long a burst of edits is allowed to be before it costs a run.
 	setDebounce(milliseconds: number): void
-	// NOTE: How long a run may take before it is stopped. Movable because a
+	// How long a run may take before it is stopped. Movable because a
 	// session that has just STOPPED a run owes the next one room: the deadline
 	// handler terminated the Worker, so the run after it pays a cold Worker
 	// start and a cold compile the stopped run had already paid.
 	setDeadline(milliseconds: number): void
-	// NOTE: Whether a run counts what it reached. Turning it on compiles every
+	// Whether a run counts what it reached. Turning it on compiles every
 	// entry again — an instrumented bundle is different bytes — so the answer
 	// arrives on the next cycle rather than at once.
 	setCoverage(coverage: boolean): void
-	// NOTE: What every cycle so far counted, laid over each other in the order
+	// What every cycle so far counted, laid over each other in the order
 	// they arrived. Empty where the session was never asked for coverage.
 	coverage(): CoverageSummary
-	// NOTE: The `test-failed` Diagnostics for one file, for the Server to
+	// The `test-failed` Diagnostics for one file, for the Server to
 	// publish beside the analysis's.
 	diagnosticsFor(filePath: string): Array<common.Diagnostic>
-	// NOTE: Every test the session holds a result for, in the order they ran.
+	// Every test the session holds a result for, in the order they ran.
 	records(): Array<TestRecord>
 	recordsFor(filePath: string): Array<TestRecord>
-	// NOTE: The events of one file, for a consumer that wants more than the
+	// The events of one file, for a consumer that wants more than the
 	// fold — the Inlay Hints read the `probe` and `expect` events directly.
 	eventsFor(filePath: string): Array<TestEvent>
 	dispose(): Promise<void>
 }
 
-// NOTE: The Worker lives beside this file as source in the repository, and
+// The Worker lives beside this file as source in the repository, and
 // beside the Server as a bundle in the extension. `buildServer.js` writes the
 // second; nothing writes the first, because Bun and Node both run the source.
 function defaultWorkerPath(): string {
@@ -158,7 +158,7 @@ function defaultWorkerPath(): string {
 		: fileURLToPath(new URL("./testWorker.ts", import.meta.url))
 }
 
-// NOTE: What a deferred request still asks for, folded across however many
+// What a deferred request still asks for, folded across however many
 // arrived while one run was in flight. `whole` outranks `ids`: a request for a
 // file and a request for one of its tests together are a request for the file.
 type PendingRequest = {
@@ -167,7 +167,7 @@ type PendingRequest = {
 	whole: boolean
 	update: boolean
 	requested: boolean
-	// NOTE: The number the cycle that takes all of this will carry, taken the
+	// The number the cycle that takes all of this will carry, taken the
 	// moment the first of them was deferred so that whoever asked can be
 	// answered with it. Null until something is waiting.
 	run: number | null
@@ -192,11 +192,11 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let sweeping = sweepStagingDirectories(stagingRoot, stagingPrefix)
 	let enabled = true
 	let coverageEnabled = false
-	// NOTE: Laid over cycle by cycle. A cycle covers what a change reached and
+	// Laid over cycle by cycle. A cycle covers what a change reached and
 	// says nothing about the rest, so what is held — and what is sent — is the
 	// project's picture rather than the save's.
 	let coverage: CoverageSummary = emptyCoverage
-	// NOTE: One entry's attribution — which of its tests reached which points —
+	// One entry's attribution — which of its tests reached which points —
 	// built from its last UNNARROWED cycle, so every index lines up with one
 	// compile's table. `freshEntries` is which of them are trustworthy for
 	// narrowing: an entry drops out the moment it runs narrowed or fails to
@@ -207,17 +207,17 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let disposed = false
 	let worker: Worker | null = null
 	let runCounter = 0
-	// NOTE: One stream per entry file, replaced whole when that entry runs
+	// One stream per entry file, replaced whole when that entry runs
 	// again.
 	let eventsByEntry = new Map<string, Array<TestEvent>>()
 	let focusedEntries = new Set<string>()
 	let dirty = new Set<string>()
-	// NOTE: The files that changed, kept RAW until the window fires. Working out
+	// The files that changed, kept RAW until the window fires. Working out
 	// which test files a change reached means reading the workspace's parses,
 	// and a keystroke may not pay for that — the whole point of the debounce is
 	// that a burst costs one answer rather than one per character.
 	let changedFiles = new Set<string>()
-	// NOTE: A REQUEST that arrived while a run was in flight, remembered whole.
+	// A REQUEST that arrived while a run was in flight, remembered whole.
 	// Folding one into `dirty` alone kept its entries and threw away everything
 	// else it said: which tests it named, whether it was an accept, and that it
 	// was a request at all. So a Run lens ran the whole file, an accepted
@@ -226,38 +226,38 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	// declines.
 	let pending = freshPending()
 	let timer: ReturnType<typeof setTimeout> | null = null
-	// NOTE: The run in flight's own clock. Armed with the run and cleared when
+	// The run in flight's own clock. Armed with the run and cleared when
 	// it answers, so that a cycle that never answers ends anyway.
 	let clock: ReturnType<typeof setTimeout> | null = null
 	let inFlight: {
 		run: number
 		reason: TestRunNotification["reason"]
 		entries: Array<string>
-		// NOTE: The tests this run was narrowed to, if any. What it decides is
+		// The tests this run was narrowed to, if any. What it decides is
 		// whether a batch REPLACES a file's results or is merged into them.
 		ids: Array<string>
 		started: number
 		events: Array<TestEvent>
-		// NOTE: Where every test of every entry of this cycle stands. It is
+		// Where every test of every entry of this cycle stands. It is
 		// accumulated rather than held between runs: nothing on this side reads
 		// it, and a client that draws a tree is the thing that has to remember
 		// one.
 		sites: Array<TestSite>
-		// NOTE: The sources this cycle would rewrite, where it was asked to
+		// The sources this cycle would rewrite, where it was asked to
 		// record what it found. Empty on every other cycle.
 		rewrites: Array<SourceRewrite>
-		// NOTE: Whether this cycle was asked to RECORD what it found. A cycle
+		// Whether this cycle was asked to RECORD what it found. A cycle
 		// that was runs again afterwards, so what it recorded is compared
 		// against rather than left standing as something to accept.
 		update: boolean
 		compiled: boolean
-		// NOTE: Whether THIS cycle was instrumented, captured at its start so a
+		// Whether THIS cycle was instrumented, captured at its start so a
 		// setting toggled mid-flight does not make the run look like something
 		// it was not — an uninstrumented run's entries must never be trusted as
 		// attribution just because coverage was turned on while they were in
 		// the air.
 		coverage: boolean
-		// NOTE: The open buffers as this cycle compiled them, kept so the next
+		// The open buffers as this cycle compiled them, kept so the next
 		// change can be measured against the text the attribution was built on
 		// — the coordinates its point Positions are in.
 		snapshot: Record<string, string>
@@ -267,7 +267,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		return options.testFiles()
 	}
 
-	// NOTE: The test files a change reached. A file that wrote tests reaches
+	// The test files a change reached. A file that wrote tests reaches
 	// itself; anything else reaches every test file that imports it, which is
 	// exactly what the Workspace's dependents answer.
 	function reached(filePaths: Array<string>): Array<string> {
@@ -292,7 +292,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 		let staging = stagingDirectoryIn(stagingRoot, stagingPrefix)
 		let started = new Worker(workerPath, {
-			// NOTE: The Worker's own stdout, kept out of the Server's. The
+			// The Worker's own stdout, kept out of the Server's. The
 			// Server speaks LSP over stdio, and one `Terminal.print` from a
 			// Program being tested would corrupt the connection.
 			stdout: true,
@@ -304,13 +304,13 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			receive(message)
 		})
 		started.on("error", () => {
-			// NOTE: A Worker that died takes the run with it. The session
+			// A Worker that died takes the run with it. The session
 			// starts another on the next request rather than at once: a Worker
 			// that fails to start would otherwise be started again forever.
 			worker = null
 			finish(false)
 		})
-		// NOTE: However it ended: closed, crashed, or terminated to cancel a
+		// However it ended: closed, crashed, or terminated to cancel a
 		// run, to replace it once exhausted, or to dispose of the session.
 		started.on("exit", () => {
 			removeStagingDirectory(staging)
@@ -331,12 +331,12 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				return
 			}
 
-			// NOTE: A run somebody NARROWED to a few tests replaces those tests
+			// A run somebody NARROWED to a few tests replaces those tests
 			// and leaves the rest of the file saying what it last said. The
 			// batch carries a deselection for every test that did not run, and
 			// adopting those would turn "run this one" into "forget the others"
 			// — which is not what a Run lens above one test means.
-			// NOTE: The attribution below reads the RAW batch (it wants the
+			// The attribution below reads the RAW batch (it wants the
 			// `test-coverage` events); everything the session STORES and sends
 			// on has them stripped. They are the session's own bookkeeping —
 			// the client folds them into nothing and the notification would only
@@ -366,7 +366,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			inFlight.events.push(...visible)
 			inFlight.sites.push(...message.sites)
 
-			// NOTE: An entry earns a fresh attribution only from an UNNARROWED
+			// An entry earns a fresh attribution only from an UNNARROWED
 			// clean cycle under coverage — one where all of its tests ran against
 			// one table. A narrowed cycle refreshes only some tests, and a failed
 			// one refreshes none, so either drops the entry out of `freshEntries`
@@ -453,7 +453,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		let folded = collectTestRun(run.events)
-		// NOTE: A NARROWED cycle counts only the tests it ran, so its coverage is
+		// A NARROWED cycle counts only the tests it ran, so its coverage is
 		// a partial picture of every Module it touched — adopting it would repaint
 		// a covered line grey on the very keystroke that was meant to be cheap. It
 		// is a change WITHIN existing lines that a cycle is narrowed for (a
@@ -491,20 +491,20 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			},
 			duration: Date.now() - run.started,
 			compiled: run.compiled,
-			// NOTE: This cycle's files, and the session's Choices. See the
+			// This cycle's files, and the session's Choices. See the
 			// field's own NOTE in `testProtocol.ts` for why the two halves
 			// travel differently.
 			coverage: { files: counted.files, choices: coverage.choices },
 		})
 		options.onResults(run.entries)
 
-		// NOTE: After the notification, so that the Editor has already drawn
+		// After the notification, so that the Editor has already drawn
 		// what the run found by the time it is asked to apply an edit.
 		if (run.rewrites.length > 0) {
 			options.onRewrites?.(run.rewrites)
 		}
 
-		// NOTE: A cycle that recorded something runs again. What it recorded is
+		// A cycle that recorded something runs again. What it recorded is
 		// on disk (a companion file) or on its way into a buffer (a source), and
 		// until something compares against it the results still say a snapshot
 		// is waiting to be accepted — which would leave the lens standing over
@@ -520,7 +520,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 	}
 
-	// NOTE: The number a cycle will carry. A cycle that was PROMISED one while it
+	// The number a cycle will carry. A cycle that was PROMISED one while it
 	// waited for the run in flight keeps it — answering a deferred request with
 	// the number of the run it landed behind is answering with somebody else's
 	// batch (see `start`).
@@ -534,7 +534,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		return runCounter
 	}
 
-	// NOTE: The end a promised cycle owes its number where it will never run.
+	// The end a promised cycle owes its number where it will never run.
 	// Nothing ran, so there is nothing to report — but a client that opened a
 	// run under the number it was answered with waits on it until something
 	// ends it, and every other cycle's end names a different number.
@@ -551,7 +551,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
 			duration: 0,
 			compiled: true,
-			// NOTE: No files, because nothing ran — and the session's Choices
+			// No files, because nothing ran — and the session's Choices
 			// all the same, because `choices` REPLACES what the client holds
 			// while `files` is laid over it. An empty summary here told the
 			// client that no Choice is reached anywhere, and the marks a real
@@ -566,7 +566,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		reason: TestRunNotification["reason"],
 		ids: Array<string>,
 		update = false,
-		// NOTE: The number this cycle was already promised, where it is the one
+		// The number this cycle was already promised, where it is the one
 		// a deferred request was answered with. Null everywhere else, which is
 		// every cycle nobody is waiting on by number.
 		reserved: number | null = null,
@@ -575,7 +575,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			return null
 		}
 
-		// NOTE: A session switched off stops running tests BY ITSELF. What the
+		// A session switched off stops running tests BY ITSELF. What the
 		// setting declines is the automatic half — compiling and running a
 		// project on every keystroke — and an Editor that asked for a run in so
 		// many words has asked for exactly the thing that is not automatic. A
@@ -586,7 +586,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		if (inFlight !== null) {
-			// NOTE: A run is already going. Cancelling it means terminating the
+			// A run is already going. Cancelling it means terminating the
 			// Worker, which throws away a compile that is nearly always about
 			// to answer the same question — so the request is remembered and
 			// taken as soon as it is done. WHOLE: its entries reach `dirty`,
@@ -607,7 +607,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			pending.update ||= update
 			pending.requested ||= reason === "request"
-			// NOTE: And the number of THAT cycle is what this is answered with,
+			// And the number of THAT cycle is what this is answered with,
 			// rather than the number of the run it landed behind. The number is
 			// the whole of what ties a gesture to what arrives — a Test
 			// Explorer registers the run it opened under it, and the Server
@@ -623,7 +623,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 
 		let run = numberFor(reserved)
-		// NOTE: One read of the open buffers, shared by the request the Worker
+		// One read of the open buffers, shared by the request the Worker
 		// compiles and the attribution built from what it answers — so the text
 		// an entry's table is measured in is exactly the text it ran.
 		let snapshot = options.overlays()
@@ -661,7 +661,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		let request: TestWorkerRequest = {
 			kind: "run",
 			run,
-			// NOTE: Each entry carries what the project governing IT says, read
+			// Each entry carries what the project governing IT says, read
 			// here rather than in the Worker: the Worker has a filesystem but no
 			// Workspace, and the settings are already answered per directory on
 			// this side.
@@ -670,7 +670,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				...options.settingsFor(entry),
 			})),
 			overlays: snapshot,
-			// NOTE: A focus anywhere in the workspace silences everything else,
+			// A focus anywhere in the workspace silences everything else,
 			// exactly as it does on the command line — and a Worker message
 			// knows one bundle, so what the LAST run found is what the next one
 			// is told. It converges after one cycle, which is one keystroke's
@@ -687,7 +687,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 		ensureWorker().postMessage(request)
 
-		// NOTE: A cycle that does not answer takes the Worker with it. Nothing
+		// A cycle that does not answer takes the Worker with it. Nothing
 		// else can end a test that loops for ever, and a session that waited on
 		// one would never run another test: the request that arrives while a
 		// run is in flight is remembered, not started, so ONE such test would
@@ -734,7 +734,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			changedFiles.clear()
 			pending = freshPending()
 
-			// NOTE: Whatever was already waiting — an update re-run, entries a
+			// Whatever was already waiting — an update re-run, entries a
 			// run in flight deferred — is NOT this window's change, and a cycle
 			// carrying any of it cannot be narrowed to this change's tests. Held
 			// apart so the narrowing below only runs when the whole cycle IS the
@@ -745,7 +745,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				dirty.add(entry)
 			}
 
-			// NOTE: A file that stopped existing, or stopped writing tests,
+			// A file that stopped existing, or stopped writing tests,
 			// stops being reported on.
 			for (let entry of eventsByEntry.keys()) {
 				if (!known.has(entry)) {
@@ -760,14 +760,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			dirty.clear()
 
-			// NOTE: The tests within those files the change actually reached, or
+			// The tests within those files the change actually reached, or
 			// null to run them whole — which is every case the attribution cannot
 			// speak for. Only when the cycle is exactly the reach of this change,
 			// so an unrelated deferred entry is never narrowed away.
 			let ids =
 				deferred.size === 0 ? narrowingFor(entries, changed) : null
 
-			// NOTE: The request's own narrowing, and only where this cycle is
+			// The request's own narrowing, and only where this cycle is
 			// exactly what the request asked for. An entry that joined for
 			// another reason would otherwise be run narrowed to tests that are
 			// not in it, which is an entry going untested.
@@ -780,7 +780,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 					? [...waiting.ids]
 					: null
 
-			// NOTE: As the number whoever was deferred was already answered
+			// As the number whoever was deferred was already answered
 			// with. This cycle IS that request, so it carries the number that
 			// request is being waited for under.
 			let started = start(
@@ -791,7 +791,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				waiting.run,
 			)
 
-			// NOTE: A promised cycle with nothing left to run still owes its
+			// A promised cycle with nothing left to run still owes its
 			// number an end — a file deleted, or its `tests` block taken out,
 			// while the run in front of it finished leaves the cycle with no
 			// entries at all.
@@ -801,7 +801,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}, debounce)
 	}
 
-	// NOTE: Which of a change's reached tests to re-run, or null for "run them
+	// Which of a change's reached tests to re-run, or null for "run them
 	// whole". Null whenever the attribution cannot be trusted to name the
 	// complete set: coverage off (nothing is attributed), any reached entry not
 	// freshly settled, or `affectedTests` refusing the change. Every rung that
@@ -809,7 +809,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	// change cannot change its verdict, which is the same ground a whole-file
 	// re-run already stands on.
 	//
-	// NOTE: The exception to that ground is a PROPERTY test, which draws fresh
+	// The exception to that ground is a PROPERTY test, which draws fresh
 	// values every run and reaches different lines each time — its attribution
 	// is one run's sample, not the whole of what it could touch. So a narrowed
 	// cycle re-runs every property of the reached entries regardless of where
@@ -854,7 +854,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			: [...new Set([...affected, ...properties])]
 	}
 
-	// NOTE: The property tests of some entries, read off the events they last
+	// The property tests of some entries, read off the events they last
 	// emitted — a `property` event carries the id of the test it is about. They
 	// re-run on every narrowed cycle, whatever the change, because their result
 	// is a fact about a sample of drawn values rather than about a fixed set of
@@ -897,7 +897,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			let files = request.files ?? []
 			let update = request.update ?? false
 
-			// NOTE: Asking for neither is asking for everything — which is what
+			// Asking for neither is asking for everything — which is what
 			// a Test Explorer's Run button and its Refresh send, neither of
 			// which is about a file. Naming the workspace's test files here
 			// rather than making the client name them is also what lets a run
@@ -912,7 +912,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 				files.filter((filePath) => known.has(filePath)),
 			)
 
-			// NOTE: An id spells the Module it belongs to as its first step,
+			// An id spells the Module it belongs to as its first step,
 			// escaped — so the file a test lives in is read off the results
 			// rather than out of the id, which is a name and not a path.
 			for (let id of ids) {
@@ -928,7 +928,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			return start(
 				[...entries],
 				"request",
-				// NOTE: Files without ids run whole.
+				// Files without ids run whole.
 				entries.size > 0 && ids.length === 0 ? [] : ids,
 				update,
 			)
@@ -941,7 +941,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			enabled = next
 
 			if (!enabled) {
-				// NOTE: Including the cycle a deferred request was promised.
+				// Including the cycle a deferred request was promised.
 				// A session switched off runs nothing by itself and nothing it
 				// was asked for either, so the number somebody was told to wait
 				// for is closed here or it is never spoken of again.
@@ -988,7 +988,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			}
 
 			coverageEnabled = next
-			// NOTE: What was counted under the old setting is thrown away
+			// What was counted under the old setting is thrown away
 			// rather than kept: an instrumented compile and a plain one are
 			// different bundles, and half a project's coverage laid under the
 			// other half's would be a picture of neither. The attribution goes
@@ -1047,7 +1047,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		},
 	}
 
-	// NOTE: A record belongs to the file its test was WRITTEN in, which is what
+	// A record belongs to the file its test was WRITTEN in, which is what
 	// the events carry as `module` — not to the entry that ran it. The two are
 	// the same file today and the distinction costs nothing to keep.
 	function recordsOf(filePath: string): Array<TestRecord> {

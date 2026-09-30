@@ -10,7 +10,7 @@ import { createString, quotedText, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The native half of `packages/standard-library/sources/Terminal.es` —
+// The native half of `packages/standard-library/sources/Terminal.es` —
 // everything a Program puts in front of a person, and everything a person hands
 // back. Five of the Namespace's entries are native: `write(_:to:)`, because a
 // stream has to be reached somehow, `inspect` and `describe`, because the
@@ -18,7 +18,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // because a descriptor has to be read somehow. `print` and `ask` are written in
 // Essence on top of those.
 //
-// NOTE: `getStringRepresentation` lives here rather than in `functions.ts`
+// `getStringRepresentation` lives here rather than in `functions.ts`
 // because `inspect` and `describe` are what the language reaches it through;
 // `functions.ts` keeps the `loop` drivers and nothing else. It is EXPORTED for
 // the runtime modules that render with it, `Record.toString`,
@@ -26,7 +26,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // Adapter's spec, which holds the variables pane to what `Terminal.inspect`
 // prints.
 
-// NOTE: What a rendering at indent zero becomes at a deeper one. Every arm of
+// What a rendering at indent zero becomes at a deeper one. Every arm of
 // the walk below writes its own newlines followed by four spaces per level and
 // nothing else — a String is quoted, so its own newlines and control characters
 // are escaped rather than written — which makes a rendering at any level the
@@ -39,7 +39,7 @@ function indented(text: string, indent: string): string {
 	return text.includes("\n") ? text.replaceAll("\n", `\n${indent}`) : text
 }
 
-// NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
+// Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
 // rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
 // one, since a Record conforms to `Printable` and `Terminal.print` goes through
 // it. The two differ in TWO pieces, and a caller hands in both: the Rational,
@@ -50,7 +50,7 @@ function indented(text: string, indent: string): string {
 // same for both, quoted Strings included, and `Record.es` says so at its own
 // `toString`.
 //
-// NOTE: A Function rather than a mode for the Rational, so that a Program which
+// A Function rather than a mode for the Rational, so that a Program which
 // never prints a Record never carries the second formatter. Naming
 // `formatAsFraction` inside this walk puts it in every Program that prints
 // anything at all, and measured 331 bytes of `Irrational.es` against the 139
@@ -61,7 +61,7 @@ export function getStringRepresentation(
 	indentLevel = 0,
 	rationalForm: (rational: RationalType) => string = formatAsRational,
 	listPadding = " ",
-	// NOTE: How to render the members a RECORD ROUTES — one entry per DECLARED
+	// How to render the members a RECORD ROUTES — one entry per DECLARED
 	// member whose own Namespace prints it differently from this walk, handed in
 	// by `boundRecordToString` and by nothing else. It is consulted in the Record
 	// arm alone, and it is NOT passed down: a routed member renders through its
@@ -75,7 +75,7 @@ export function getStringRepresentation(
 	// same sixty-character budget, the same `[` padding and the same nesting as
 	// every other Record.
 	//
-	// NOTE: `??` rather than a test for the entry, because a renderer answers a
+	// `??` rather than a test for the entry, because a renderer answers a
 	// String and never nothing — an EMPTY one is not nullish, so a member that
 	// prints as `` still takes its own answer. It is written this way because
 	// this walk is carried by every Program that prints anything at all, and the
@@ -85,13 +85,13 @@ export function getStringRepresentation(
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
-	// NOTE: A Function is the one runtime value carrying no Type key — it is
+	// A Function is the one runtime value carrying no Type key — it is
 	// emitted as a bare JavaScript function, not a tagged object — so it is
 	// answered before anything reads that key, exactly as `anyIs` answers it.
 	// Without this, printing a Function, or anything merely HOLDING one, read
 	// `undefined.includes` and threw.
 	//
-	// NOTE: One fixed word, and no more. A Function's Type is erased by the
+	// One fixed word, and no more. A Function's Type is erased by the
 	// time it reaches here, and its source text is a JavaScript rendering of a
 	// simplified body — neither is something a Program should print. The name
 	// stays stable so a Record holding a Function renders the same every time.
@@ -128,7 +128,7 @@ export function getStringRepresentation(
 			return "{}"
 		}
 	} else if (obj[typeKeySymbol] === "List") {
-		// NOTE: A List holds its items in two runs with a view into each — see
+		// A List holds its items in two runs with a view into each — see
 		// `List.ts` — so what is rendered is the LOGICAL items rather than
 		// whatever the backing Array happens to hold. `materialise` is what
 		// answers those, and the box it collapses reads the same afterwards.
@@ -151,7 +151,7 @@ export function getStringRepresentation(
 			return "[]"
 		}
 	} else if (obj[typeKeySymbol] === "Rational") {
-		// NOTE: The one value the two renderings disagree about. The
+		// The one value the two renderings disagree about. The
 		// structural one keeps the lowest-terms pair; the printable one
 		// answers what `Rational::toString` answers, where a whole Rational is
 		// its numerator alone.
@@ -163,22 +163,22 @@ export function getStringRepresentation(
 	} else if (obj[typeKeySymbol] === "Integer") {
 		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {
-		// NOTE: `Boolean.toString` is implemented in Essence now, so the
+		// `Boolean.toString` is implemented in Essence now, so the
 		// rendering it does is spelled out here rather than called.
 		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
-		// NOTE: The same quoting `List.toString` and `Optional.toString` reach
+		// The same quoting `List.toString` and `Optional.toString` reach
 		// for, out of `String.ts` — a String is quoted inside a structure
 		// wherever the structure is rendered, and this walk is one of the
 		// places that renders one.
 		return quotedText(obj.value)
 	} else if (obj[typeKeySymbol] === "Randomness") {
-		// NOTE: One fixed word, like a Function's. What a source holds is four
+		// One fixed word, like a Function's. What a source holds is four
 		// words of generator state, which say nothing to a reader and would
 		// differ between two runs of one Program.
 		return "Randomness"
 	} else if (obj[typeKeySymbol].includes("#")) {
-		// NOTE: Case values print as `Choice#Case`, with the payload spelled out
+		// Case values print as `Choice#Case`, with the payload spelled out
 		// like a Record when the Case carries one. The Module the tag also
 		// carries is cut off by `caseText`, which says why there.
 		let payloadEntries = Object.entries(obj)
@@ -188,7 +188,7 @@ export function getStringRepresentation(
 			return tag
 		}
 
-		// NOTE: A ONE-member Case prints its payload bare, in parentheses,
+		// A ONE-member Case prints its payload bare, in parentheses,
 		// because that is how the language already writes one: `#Value(5)`
 		// stands for `#Value({ item = 5 })`, and the member's name is decided
 		// by the Case rather than chosen at the construction. Spelling it as a
@@ -216,7 +216,7 @@ export function getStringRepresentation(
 			listPadding,
 		)}`
 	} else {
-		// NOTE: A kind the walk above does not know may still have said how it
+		// A kind the walk above does not know may still have said how it
 		// is rendered — the registry in `registry.ts` is where a container's
 		// own module leaves that, and probing it HERE is what keeps the arms
 		// above the whole cost of printing for a Program that holds none.
@@ -233,7 +233,7 @@ export function getStringRepresentation(
 			)
 		}
 
-		// NOTE: Unreachable for any value the Compiler emits — every Essence
+		// Unreachable for any value the Compiler emits — every Essence
 		// value carries one of the tags above. It answers rather than throws
 		// because a printer that crashes takes the Program with it, and what a
 		// reader needs then is the tag it did not recognise.
@@ -241,19 +241,19 @@ export function getStringRepresentation(
 	}
 }
 
-// NOTE: The unit value every writing entry answers with. `{}` is the language's
+// The unit value every writing entry answers with. `{}` is the language's
 // unit Type, and an empty Record is what one is at runtime — built here rather
 // than through `Record.createRecord`, because `Record.ts` reaches BACK into this
 // module for `getStringRepresentation` and a runtime cycle between the two would
 // be a cost paid on every Program for one object literal.
 const unit: RecordType = { [typeKeySymbol]: "Record" }
 
-// NOTE: Which of the two streams a piece of output was written to, as the one
+// Which of the two streams a piece of output was written to, as the one
 // word every reader outside this module names it by — the runtime's Stream
 // Cases are tags on a value, and a capture is not holding one.
 export type OutputStream = "output" | "error"
 
-// NOTE: Where a Program's output goes when something other than the terminal is
+// Where a Program's output goes when something other than the terminal is
 // asking for it. There is exactly one such caller today — the test runtime,
 // which shows what a test wrote WITH that test's report rather than
 // interleaved with the reporter's own lines — and this is the seam it reaches
@@ -261,7 +261,7 @@ export type OutputStream = "output" | "error"
 // writes anything.
 export type OutputSink = (text: string, stream: OutputStream) => void
 
-// NOTE: A dynamically scoped binding, installed for the length of ONE call and
+// A dynamically scoped binding, installed for the length of ONE call and
 // put back when that call is over, not a mode something switches on and leaves
 // on. That is what makes it safe to say a Program's output belongs to whatever
 // `withOutputSink` was wrapped around. The test runner runs one test at a time,
@@ -274,14 +274,14 @@ export type OutputSink = (text: string, stream: OutputStream) => void
 // realm and holds its own binding.
 let outputSink: OutputSink | null = null
 
-// NOTE: A run that WAITS keeps the sink for as long as it waits. The test
+// A run that WAITS keeps the sink for as long as it waits. The test
 // runner drives one test at a time, each awaited before the next is started, so
 // the dynamic extent of a sink is exactly the test it was installed for — and
 // putting it back when the Function RETURNED, rather than when the work it
 // describes is over, would attribute everything a test writes after its first
 // `complete` to whatever came next.
 //
-// NOTE: Which leaves work a test does NOT wait for, and the answer to that is
+// Which leaves work a test does NOT wait for, and the answer to that is
 // not here. A sink is installed for one test at a time, so anything printed
 // after that test is over is printed under whatever sink is installed then —
 // the next test's, or none. What makes that unreachable is the emission: a test
@@ -289,7 +289,7 @@ let outputSink: OutputSink | null = null
 // body settles, so a run a test walked away from is stopped with it and has
 // nothing left to print. See `testBody` in the Rewriter.
 //
-// NOTE: The promise is recognised rather than awaited, so the synchronous shape
+// The promise is recognised rather than awaited, so the synchronous shape
 // — every run that completes nothing — costs a `try` and one `then` test and
 // never a turn of the microtask queue.
 export function withOutputSink<Value>(
@@ -330,7 +330,7 @@ export function withOutputSink<Value>(
 	) as Value
 }
 
-// NOTE: A `then` is the whole test, which is what every consumer of a promise
+// A `then` is the whole test, which is what every consumer of a promise
 // in this runtime asks: what comes back is whatever the emitted Function
 // answered with, and an `async` one answers with a real promise.
 function isPending(value: unknown): value is Promise<unknown> {
@@ -340,7 +340,7 @@ function isPending(value: unknown): value is Promise<unknown> {
 	)
 }
 
-// NOTE: `write(_ text: String, to stream: Stream)` — one native, with the
+// `write(_ text: String, to stream: Stream)` — one native, with the
 // Stream DEFAULTED in `Terminal.es` to `#Output`, so a call that leaves it out
 // reaches this same export through the frame the Compiler synthesizes for the
 // default. It is the ONE primitive under everything a Program writes: no
@@ -348,12 +348,12 @@ function isPending(value: unknown): value is Promise<unknown> {
 // hands over, in Essence, which is what keeps this honest about writing exactly
 // what it was given.
 //
-// NOTE: `process.stdout.write`/`process.stderr.write` rather than
+// `process.stdout.write`/`process.stderr.write` rather than
 // `console.log`/`console.error`, which both append a newline of their own —
 // there is no way to spell "no newline" through them, and a `write` that added
 // one would not be the primitive `print` is built on.
 //
-// NOTE: But only where the host HAS those streams. Bun, Node and Deno do; a
+// But only where the host HAS those streams. Bun, Node and Deno do; a
 // browser has no `process` at all, and what it offers instead — the console —
 // is made of lines. So the stream is looked for first, and where there is none
 // the text goes to the console with the one newline `print` appended taken off
@@ -385,14 +385,14 @@ export function write(text: StringType, stream: StreamType): RecordType {
 	return unit
 }
 
-// NOTE: Looked up on every write rather than once at load, for two reasons. A
+// Looked up on every write rather than once at load, for two reasons. A
 // top-level read of `process.stdout` is a statement esbuild can not shake, so
 // it would sit in every bundle whether or not the Program writes; and the spec
 // harnesses swap `process.stdout.write` for the duration of a Program, which a
 // stream remembered at load time would never see. The lookup is a `typeof` and
 // two property reads, beside a write to a file descriptor.
 //
-// NOTE: `typeof process`, because a bare `process` in a host without one is a
+// `typeof process`, because a bare `process` in a host without one is a
 // ReferenceError, not `undefined`. And the stream's `write` is checked rather
 // than the stream's presence: a bundler's `process` shim tends to carry a
 // `stdout` that is an empty object, or null.
@@ -410,25 +410,25 @@ function hostStream(toError: boolean): HostStream | undefined {
 	return typeof candidate?.write === "function" ? candidate : undefined
 }
 
-// NOTE: Exactly one newline comes off, never all of them: `print("")` is a
+// Exactly one newline comes off, never all of them: `print("")` is a
 // blank line and has to stay one, and a text that ends in two is a line
 // followed by a blank one.
 function asConsoleLine(text: string): string {
 	return text.endsWith("\n") ? text.slice(0, -1) : text
 }
 
-// NOTE: `inspect` — the structural print, for the Program's AUTHOR. It answers
+// `inspect` — the structural print, for the Program's AUTHOR. It answers
 // with the very value it was handed, so it can be wrapped around any Expression
 // without changing what that Expression evaluates to, which is why the runtime
 // signature is generic. That, and the arity, are exactly what the generated
 // native contract (`natives.generated.ts`) asserts this export against.
 //
-// NOTE: `console.log`, not `process.stdout.write`. A structural rendering is a
+// `console.log`, not `process.stdout.write`. A structural rendering is a
 // whole line by construction — it is never continued — and going through
 // `console.log` is what a value inspected in a Program under test still arrives
 // through, which is how the golden and sweep harnesses capture it.
 //
-// NOTE: A sink is offered the newline `console.log` would have appended, so
+// A sink is offered the newline `console.log` would have appended, so
 // that a capture holds the bytes a terminal would have shown and a `write` and
 // an `inspect` compose into one text.
 export function inspect<Value extends AnyType>(value: Value): Value {
@@ -443,7 +443,7 @@ export function inspect<Value extends AnyType>(value: Value): Value {
 	return value
 }
 
-// NOTE: `describe` — the walk above, handed back rather than written, so that a
+// `describe` — the walk above, handed back rather than written, so that a
 // message can carry a value's structure. It is the whole of what `inspect`
 // renders and nothing of what `inspect` does, which is why the two are separate
 // exports over one Function rather than one export the other is written on: an
@@ -453,7 +453,7 @@ export function describe<Value extends AnyType>(value: Value): StringType {
 	return createString(getStringRepresentation(value))
 }
 
-// NOTE: The reading half. A Program reads its input a LINE at a time, and a
+// The reading half. A Program reads its input a LINE at a time, and a
 // descriptor answers bytes at whatever boundary the host happened to have them
 // — so what a read pulls and what a read hands out are two different amounts,
 // and the difference is held here. `pending` is text the host has already given
@@ -462,7 +462,7 @@ export function describe<Value extends AnyType>(value: Value): StringType {
 // over. One buffer and no more: the input is one stream, and a second buffer
 // over the same descriptor would take bytes the first one is about to need.
 //
-// NOTE: The decoder is the state that makes the buffer necessary in the first
+// The decoder is the state that makes the buffer necessary in the first
 // place. A character of three bytes can land across two reads, and a decoder
 // told `stream: true` holds the half it has until the rest arrives. Built on
 // the first read rather than at load, so that a Program which never reads
@@ -482,7 +482,7 @@ let input: InputState = {
 	decoder: null,
 }
 
-// NOTE: The reading half of `withOutputSink`, scoped the same way: for one
+// The reading half of `withOutputSink`, scoped the same way: for one
 // call, and until the promise it answers with settles. `text` is the whole of
 // the input for that call, and `null` is the host's own descriptor read from
 // the start. Either replaces `input`, which is what makes a staged read
@@ -530,19 +530,19 @@ export function withInputSource<Value>(
 	) as Value
 }
 
-// NOTE: What a host can be asked for: some bytes, into a buffer, answering how
+// What a host can be asked for: some bytes, into a buffer, answering how
 // many arrived and zero at the end of the input. Every host below is reduced to
 // this one Function, so that the buffering above is written once.
 type ByteReader = (into: Uint8Array) => number
 
-// NOTE: Deno first, because it is the one host that answers with a Method of
+// Deno first, because it is the one host that answers with a Method of
 // its own — `Deno.stdin.readSync` — rather than through the Node file system.
 // It answers `null` at the end of the input where the others answer zero.
 type DenoHost = {
 	stdin?: { readSync?: (into: Uint8Array) => number | null }
 }
 
-// NOTE: Bun and Node reach `readSync` through `process.getBuiltinModule`, which
+// Bun and Node reach `readSync` through `process.getBuiltinModule`, which
 // is the ONE door to a builtin that costs no import: a static `import "node:fs"`
 // here would be a specifier the bundler has to resolve, and every Program's
 // bundle is built for the browser, where it resolves to nothing at all. So the
@@ -562,7 +562,7 @@ type FileSystem = {
 	) => number
 }
 
-// NOTE: Looked up on every pull rather than once, for the reason `hostStream`
+// Looked up on every pull rather than once, for the reason `hostStream`
 // is: a lookup remembered at load would sit in every bundle whether or not the
 // Program reads, and the specs stage a host around a call.
 function hostReader(): ByteReader | undefined {
@@ -598,7 +598,7 @@ function hostReader(): ByteReader | undefined {
 	return (into) => readDescriptor(readSync, into)
 }
 
-// NOTE: Descriptor 0 is the Program's input on every host that has one, and it
+// Descriptor 0 is the Program's input on every host that has one, and it
 // is read rather than `process.stdin`, whose own reading is asynchronous —
 // there is nothing for a Method to answer while it waits. Two of the
 // descriptor's errors are answers rather than failures. EOF is how a console reports the end of its input on
@@ -629,7 +629,7 @@ function readDescriptor(
 	}
 }
 
-// NOTE: Ten milliseconds of nothing, so that waiting for a person to type is
+// Ten milliseconds of nothing, so that waiting for a person to type is
 // not a core at full tilt. `Atomics.wait` is the one synchronous wait a host
 // offers, and it is only reached from the EAGAIN arm above — a browser, where
 // the main thread is not allowed to wait, has no descriptor to read in the
@@ -647,7 +647,7 @@ function napBriefly(): void {
 	Atomics.wait(napBuffer, 0, 0, 10)
 }
 
-// NOTE: 64 KiB per crossing, allocated on the first read and kept: what a read
+// 64 KiB per crossing, allocated on the first read and kept: what a read
 // costs is the crossing into the host rather than the bytes, and a buffer built
 // per call would be 64 KiB of garbage per line. A read answers what the host
 // HAS rather than filling the buffer, so a large one does not make a Program
@@ -656,7 +656,7 @@ const INPUT_BUFFER_LENGTH = 65536
 
 let inputBuffer: Uint8Array | null = null
 
-// NOTE: Whether a read has reached the host's own input rather than a staged
+// Whether a read has reached the host's own input rather than a staged
 // one. A runner that remembers results asks it after a run, since the host's
 // input is in no key.
 let hostInputRead = false
@@ -665,7 +665,7 @@ export function hasReadHostInput(): boolean {
 	return hostInputRead
 }
 
-// NOTE: One crossing, and what it produced added to the buffer. A decode of a
+// One crossing, and what it produced added to the buffer. A decode of a
 // chunk ending mid-character adds nothing at all, which is why every caller
 // asks again rather than assuming a pull made progress.
 function pull(): void {
@@ -684,7 +684,7 @@ function pull(): void {
 	let count = reader(inputBuffer)
 
 	if (count <= 0) {
-		// NOTE: A decode with nothing to decode is what flushes a character the
+		// A decode with nothing to decode is what flushes a character the
 		// input ended in the middle of, as the replacement character.
 		input.pending += input.decoder.decode()
 		input.ended = true
@@ -697,10 +697,10 @@ function pull(): void {
 	})
 }
 
-// NOTE: The three breaks `String::lines` splits on, so that reading a text line
+// The three breaks `String::lines` splits on, so that reading a text line
 // by line and splitting the same text into lines answer the same lines.
 //
-// NOTE: The search starts where the last one stopped rather than at the
+// The search starts where the last one stopped rather than at the
 // beginning of the buffer. A line arrives in as many reads as it needs, and
 // searching all of what has arrived after each of them makes ONE long line
 // quadratic: a single twenty megabyte line measured 192 ms read with the
@@ -720,11 +720,11 @@ function firstBreakIn(text: string, from: number): number {
 	return feed < carriage ? feed : carriage
 }
 
-// NOTE: `readLine()` — the next line, without the break that ends it, and
+// `readLine()` — the next line, without the break that ends it, and
 // `#Empty` when there is no next line. The end of the input is not a failure
 // and not an empty line either, which is what the Optional is for.
 //
-// NOTE: A `\r` at the very end of what has been pulled is the one character
+// A `\r` at the very end of what has been pulled is the one character
 // that can not be read yet: it is a break on its own AND the first half of
 // `\r\n`, and which one it is is the next byte's to say. So the loop pulls
 // again rather than deciding, and decides once the input has ended.
@@ -774,7 +774,7 @@ export function readLine(): OptionalType<StringType> {
 	}
 }
 
-// NOTE: `readAll()` — everything left, unchanged. The break a text ends with is
+// `readAll()` — everything left, unchanged. The break a text ends with is
 // part of the answer, which is what makes this the reading side of `write`: a
 // Program that reads its input and writes it back writes what it was given.
 export function readAll(): StringType {

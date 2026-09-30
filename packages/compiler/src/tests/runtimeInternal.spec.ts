@@ -23,19 +23,19 @@ import {
 	typeKeySymbol,
 } from "@essence-lang/runtime/type"
 
-// NOTE: The runtime is handed values, never Types — so these are built the way
+// The runtime is handed values, never Types — so these are built the way
 // the emitted JavaScript builds them, with the `create…` constructors.
 const text = (value: string) => string.createString(value)
 const whole = (value: bigint) => integer.createInteger(value)
 const ratio = (numerator: bigint, denominator: bigint) =>
 	rational.createRational(numerator, denominator)
 
-// NOTE: A Function reaches the runtime as a bare JavaScript function carrying
+// A Function reaches the runtime as a bare JavaScript function carrying
 // no Type key at all — which is the whole reason printing and comparing one
 // need a guard of their own. `AnyType` deliberately does not describe it.
 const functionValue = () => ((value: never) => value) as unknown as AnyType
 
-// NOTE: √d as a value — `createAlgebraic` may legitimately answer a Rational,
+// √d as a value — `createAlgebraic` may legitimately answer a Rational,
 // so the tag is asserted on the way through, as `irrationals.spec.ts` does.
 const radical = (radicand: bigint): algebraic.AlgebraicType => {
 	const value = algebraic.createAlgebraic(
@@ -49,7 +49,7 @@ const radical = (radicand: bigint): algebraic.AlgebraicType => {
 	return value as algebraic.AlgebraicType
 }
 
-// NOTE: The same String twice — once composed (NFC, one code point for `é`),
+// The same String twice — once composed (NFC, one code point for `é`),
 // once decomposed (NFD, `e` followed by a combining acute). They are
 // canonically equivalent, which is what `String::is` decides by, and they are
 // genuinely different code points, which is what makes the test mean anything.
@@ -58,7 +58,7 @@ const decomposed = () => text("café")
 
 describe("Runtime Internals", () => {
 	describe("getStringRepresentation", () => {
-		// NOTE: The regression — the multi-line rebuild used to PUSH onto the
+		// The regression — the multi-line rebuild used to PUSH onto the
 		// array the single-line pass had already filled, so every member was
 		// printed twice: once at indent zero and once indented.
 		it("prints each member of a multi-line Record exactly once", () => {
@@ -91,7 +91,7 @@ describe("Runtime Internals", () => {
 			expect(getStringRepresentation(record.createRecord({}))).toBe("{}")
 		})
 
-		// NOTE: The duplicated members were rendered at TWO different indent
+		// The duplicated members were rendered at TWO different indent
 		// levels, so a nested Record came out with one copy of its members
 		// hanging outside the indentation of the other. One pass, one indent.
 		it("indents a nested multi-line Record inside its parent", () => {
@@ -120,7 +120,7 @@ describe("Runtime Internals", () => {
 			)
 		})
 
-		// NOTE: A Case payload is rendered through the Record branch, so it
+		// A Case payload is rendered through the Record branch, so it
 		// carried the same duplication.
 		it("prints each payload member of a multi-line Case exactly once", () => {
 			let rendered = getStringRepresentation(
@@ -142,7 +142,7 @@ describe("Runtime Internals", () => {
 			)
 		})
 
-		// NOTE: The List branch always built a fresh array, so it never
+		// The List branch always built a fresh array, so it never
 		// duplicated — this pins that the Record fix left it alone.
 		it("prints a multi-line List unchanged", () => {
 			let rendered = getStringRepresentation(
@@ -162,7 +162,7 @@ describe("Runtime Internals", () => {
 			)
 		})
 
-		// NOTE: The regression — a Function carries no Type key, so the tag
+		// The regression — a Function carries no Type key, so the tag
 		// cascade fell through to `obj[typeKeySymbol].includes("#")` and threw
 		// `undefined is not an object`. `Terminal.inspect(f)`, `Record::toString()` and
 		// `List::toString()` all reach here, so all three crashed.
@@ -186,7 +186,7 @@ describe("Runtime Internals", () => {
 		})
 
 		it("answers from Record.toString for a Function, bare or in a List", () => {
-			// NOTE: `List.toString` is bounded by `Printable`, so a List of
+			// `List.toString` is bounded by `Printable`, so a List of
 			// Functions has no `toString` of its own, but the universal
 			// printer still reaches one through a Record, and the gap fill is
 			// what keeps that from throwing.
@@ -207,7 +207,7 @@ describe("Runtime Internals", () => {
 	})
 
 	describe("anyIs", () => {
-		// NOTE: The regression — `String::is` is `compare(other)::is(#Equal)`
+		// The regression — `String::is` is `compare(other)::is(#Equal)`
 		// over the NFC-normalised String, so canonically equivalent Strings are
 		// equal. Comparing the raw representation here made the SAME pair
 		// unequal the moment either side was wrapped in a Record, a List or a
@@ -251,7 +251,7 @@ describe("Runtime Internals", () => {
 			})
 		})
 
-		// NOTE: The regression — every numeric cell demanded the SAME tag on
+		// The regression — every numeric cell demanded the SAME tag on
 		// both sides, so an Integer beside a numerically equal Rational matched
 		// no branch and fell through to `false`. `Number::is` says `1 is 1/1`,
 		// and deep equality has to say it too.
@@ -262,14 +262,14 @@ describe("Runtime Internals", () => {
 				expect(anyIs(whole(2n), ratio(4n, 2n))).toBeTrue()
 			})
 
-			// NOTE: The way an ordinary Program reaches the mixed pair —
+			// The way an ordinary Program reaches the mixed pair —
 			// `createRational` never reduces, so `(1/2)::add(1/2)` is the
 			// Rational 4/4 rather than the Integer 1.
 			it("answers equal for an unreduced Rational and an Integer", () => {
 				expect(anyIs(ratio(4n, 4n), whole(1n))).toBeTrue()
 			})
 
-			// NOTE: Cross-multiplication is what decides the mixed pair, so
+			// Cross-multiplication is what decides the mixed pair, so
 			// zero and the negatives are worth naming — a sign convention read
 			// wrongly would show up here first.
 			it("answers across the kinds for zero and for negatives", () => {
@@ -312,7 +312,7 @@ describe("Runtime Internals", () => {
 				expect(anyIs(ratio(1n, 2n), ratio(1n, 3n))).toBeFalse()
 			})
 
-			// NOTE: An Algebraic and a Transcendental are provably irrational,
+			// An Algebraic and a Transcendental are provably irrational,
 			// so no cross-kind pairing with them can ever be equal — which is
 			// what makes the covering `compare` total and keeps these cheap.
 			it("answers unequal for an irrational beside a rational value", () => {
@@ -330,7 +330,7 @@ describe("Runtime Internals", () => {
 				expect(anyIs(number.Pi, number.Tau)).toBeFalse()
 			})
 
-			// NOTE: A Number is still only equal to a Number — the numeric cell
+			// A Number is still only equal to a Number — the numeric cell
 			// must not swallow a value of some other Type. The empty Record is
 			// named among them on purpose: it is the unit value, it carries no
 			// members at all, and a numeric cell reading `numerator` off it
@@ -342,7 +342,7 @@ describe("Runtime Internals", () => {
 			})
 		})
 
-		// NOTE: A generic Choice's derived equality compares a payload member
+		// A generic Choice's derived equality compares a payload member
 		// that names no Type Parameter through the `eq` descriptor node, which
 		// is `anyIs` — so both fixes have to reach it too.
 		it("reaches the structural node of a derived generic Choice equality", () => {
@@ -373,13 +373,13 @@ describe("Runtime Internals", () => {
 			).toBeTrue()
 		})
 
-		// NOTE: The `dictionary` node, which is the first descriptor with TWO
+		// The `dictionary` node, which is the first descriptor with TWO
 		// children — a Dictionary's keys and its values are separate slots, and
 		// either may be the Type Parameter. What the node has to do is send each
 		// slot to its own child and compare the entries order-insensitively,
 		// which is what a Dictionary's equality is.
 		describe("the Dictionary node of a derived generic Choice equality", () => {
-			// NOTE: The witness a hand-built Dictionary is keyed by. It is the
+			// The witness a hand-built Dictionary is keyed by. It is the
 			// runtime's own comparison, so what the descriptor's `w` node does
 			// is visible against it rather than hidden behind it.
 			const anyEquatable = {
@@ -390,7 +390,7 @@ describe("Runtime Internals", () => {
 					v: createDictionary(entries, anyEquatable),
 				}) as unknown as AnyType
 
-			// NOTE: A witness that calls every pair of keys equal. Nothing a
+			// A witness that calls every pair of keys equal. Nothing a
 			// Program declares would, and that is the point: `anyIs` says these
 			// keys differ, so an answer of `true` can only have come THROUGH the
 			// witness the `key` child names.
@@ -417,7 +417,7 @@ describe("Runtime Internals", () => {
 					).value,
 				).toBeTrue()
 
-				// NOTE: And the VALUES still decide, through their own child.
+				// And the VALUES still decide, through their own child.
 				expect(
 					isEqual(
 						held([[text("alex"), whole(39n)]]),
@@ -470,7 +470,7 @@ describe("Runtime Internals", () => {
 			})
 		})
 
-		// NOTE: The Enricher shapes every Parameter-naming arm but one, so a
+		// The Enricher shapes every Parameter-naming arm but one, so a
 		// descriptor reaching the runtime with two arms carrying neither a tag
 		// nor a shape is a Compiler bug. It used to be a silent wrong answer:
 		// the first of the two answered for the other's values as well, which
@@ -501,7 +501,7 @@ describe("Runtime Internals", () => {
 					createCase("Wrapper#Val", {
 						v: list.createList([whole(10n)]),
 					}) as unknown as AnyType,
-					// NOTE: The witness the descriptor's `w` node would reach
+					// The witness the descriptor's `w` node would reach
 					// for — never consulted here, since the throw comes first.
 					{ is: (a, b) => createBoolean(anyIs(a, b)) },
 				),
@@ -509,7 +509,7 @@ describe("Runtime Internals", () => {
 		})
 	})
 
-	// NOTE: The runtime half of a Choice's derived `Printable` conformance.
+	// The runtime half of a Choice's derived `Printable` conformance.
 	// The Compiler emits exactly one reference to it per printed Case, so what
 	// it reads out of the tag is the whole of the derive's behaviour.
 	describe("choiceName", () => {
@@ -522,7 +522,7 @@ describe("Runtime Internals", () => {
 			)
 		})
 
-		// NOTE: A Choice a Program declares is identified by its Module as well
+		// A Choice a Program declares is identified by its Module as well
 		// as its name, so its tags carry two `#`s and only the last part is the
 		// Case. Reading from the FIRST one answered `Direction#Up`.
 		it("answers the Case's name for a Choice a Module declares", () => {
@@ -532,7 +532,7 @@ describe("Runtime Internals", () => {
 			).toBe("Up")
 		})
 
-		// NOTE: Only a Choice of payload-free Cases derives printing, so a
+		// Only a Choice of payload-free Cases derives printing, so a
 		// payload never reaches here — but the tag is all this reads, and it
 		// says so by answering the same name either way.
 		it("reads the tag alone, whatever the Case carries", () => {

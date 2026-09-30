@@ -19,19 +19,19 @@ export function createString(value: string): StringType {
 	return { [typeKeySymbol]: "String", value }
 }
 
-// NOTE: A code point in the spelling a String Literal reads back — upper case,
+// A code point in the spelling a String Literal reads back — upper case,
 // which is how the Unicode standard names one.
 function codePointEscape(code: number): string {
 	return `\\u{${code.toString(16).toUpperCase()}}`
 }
 
-// NOTE: THE ESCAPE SET, as one mark per code unit over the whole Basic
+// THE ESCAPE SET, as one mark per code unit over the whole Basic
 // Multilingual Plane — the C0 controls, DEL and the C1 controls; the four
 // characters a Literal has to escape for its own sake (`"`, `\`, `{` and `}`);
 // the bidi controls; the two line separators; the byte order mark; and the
 // surrogates, which `escapeOf` then judges as a pair or as half of one.
 //
-// NOTE: A TABLE OVER ALL OF IT rather than over the ASCII range with a ladder
+// A TABLE OVER ALL OF IT rather than over the ASCII range with a ladder
 // of ranges above, and the 64 KiB is bought deliberately. `charCodeAt` answers
 // nothing above U+FFFF, so a table this wide needs no range test at all and the
 // scan becomes ONE indexed load per code unit with no branch to predict. That
@@ -40,7 +40,7 @@ function codePointEscape(code: number): string {
 // 7.6 -> 3.9 ms over 200,000 Japanese names. It is allocated zeroed and filled
 // with about two thousand writes, once.
 //
-// NOTE: Built on FIRST USE and not when the module is loaded, the way
+// Built on FIRST USE and not when the module is loaded, the way
 // `graphemeSegmenter` below is. A table built at the top of this file was tried
 // and reverted: stopping a debug session on entry paused inside the table's own
 // loop, a frame no `.es` line maps to, so `stopOnEntry` landed on nothing and
@@ -60,13 +60,13 @@ function markedEscapes(): Uint8Array {
 	if (escapeMarks === null) {
 		let marks = new Uint8Array(0x10000)
 
-		// NOTE: The set as the ranges it is made of, in order: the C0
+		// The set as the ranges it is made of, in order: the C0
 		// controls; the quote; the backslash; the two braces; DEL and the C1
 		// controls; the Arabic letter mark; the two bidi marks; the line and
 		// paragraph separators with the embeddings and overrides behind them;
 		// the four isolates; the surrogates; and the byte order mark.
 		//
-		// NOTE: The INVISIBLE ones are here because they change how the text
+		// The INVISIBLE ones are here because they change how the text
 		// around them is READ. A value that reorders the line it is printed on
 		// can make a report say something other than what it holds, which is
 		// the source-spoofing trick pointed at a reader; a value carrying an
@@ -74,14 +74,14 @@ function markedEscapes(): Uint8Array {
 		// byte order mark earns its place by being invisible alone: it arrives
 		// on the front of pasted text often enough to be worth naming.
 		//
-		// NOTE: What is deliberately NOT here is the zero-width joiner U+200D
+		// What is deliberately NOT here is the zero-width joiner U+200D
 		// and the non-joiner beside it. They are invisible too, and they are
 		// what holds an emoji sequence together: escaping one would take a
 		// printed sequence apart into characters nobody wrote. An invisible
 		// character that changes how its neighbours READ is spelled; one that
 		// changes how they DRAW is left where it is.
 		//
-		// NOTE: Written inside this Function rather than beside it, so that a
+		// Written inside this Function rather than beside it, so that a
 		// module a Program merely prints a String through allocates nothing at
 		// all until something asks it to quote one.
 		for (let [first, last] of [
@@ -109,14 +109,14 @@ function markedEscapes(): Uint8Array {
 	return escapeMarks
 }
 
-// NOTE: HOW a marked code unit is written, asked only of the ones the scan
+// HOW a marked code unit is written, asked only of the ones the scan
 // below has already marked. It answers no question about WHICH ones those are
 // — that is the scan's, in one place — so nothing here re-tests a range and a
 // character that reaches it always has an answer, but for the one code unit
 // that does not: half of a well-formed surrogate pair, which is written as
 // itself so the character the pair spells prints as one.
 //
-// NOTE: The seven with a spelling of their own. `{` and `}` are among them
+// The seven with a spelling of their own. `{` and `}` are among them
 // because a bare `{` in quoted output OPENS AN INTERPOLATION HOLE when the text
 // is read back: `"a\{b\}"::quote()` printed `"a{b}"`, and pasting that into a
 // Program was a syntax error rather than the value it came from.
@@ -143,7 +143,7 @@ function escapeOf(value: string, index: number, code: number): string | null {
 		: codePointEscape(code)
 }
 
-// NOTE: A LONE SURROGATE — half of a character, which no String the language
+// A LONE SURROGATE — half of a character, which no String the language
 // can build holds: `String.of(codePoint:)` answers nothing for one, no Literal
 // can spell one, and segmenting never splits a pair. One can only have arrived
 // across the embedding boundary from a JavaScript host.
@@ -178,7 +178,7 @@ function surrogateEscapeAt(
 		: codePointEscape(replacementCharacter)
 }
 
-// NOTE: A String written the way a Program would write it down — the text in
+// A String written the way a Program would write it down — the text in
 // quotes, with everything a Literal has to escape escaped, and nothing else. It
 // is here rather than beside its callers because it is the one answer to one
 // question. The renderings that quote a String ask it: `itemText`, which
@@ -189,7 +189,7 @@ function surrogateEscapeAt(
 // draws a String through an inlined copy, `quoted` in
 // `packages/debug-adapter/src/render.ts`.
 //
-// NOTE: THE PROMISE IT MAKES is that its answer READS BACK. Whatever it prints,
+// THE PROMISE IT MAKES is that its answer READS BACK. Whatever it prints,
 // pasted into a source file as it stands, is a String Literal the Lexer accepts
 // and decodes to the very value it was handed. That is why the braces are
 // escaped, why a control character is named by its code point rather than
@@ -199,11 +199,11 @@ function surrogateEscapeAt(
 // in the Compiler holds it to that over generated text, with this Function and
 // the real Lexer standing in one process.
 //
-// NOTE: Named apart from the `quote` native because the two answer different
+// Named apart from the `quote` native because the two answer different
 // Types. This one takes and answers the JavaScript text, so a reader inside the
 // runtime puts it straight into a rendering it is already building.
 //
-// NOTE: Scanned rather than matched, and what the scan COSTS is worth saying
+// Scanned rather than matched, and what the scan COSTS is worth saying
 // plainly, because the first version of this NOTE said the opposite. The
 // regular expression it used to run could not see a lone surrogate or judge a
 // pair, so it had to go — but what replaced it READS EVERY CODE UNIT, and the
@@ -233,7 +233,7 @@ function surrogateEscapeAt(
 // under that by scanning inside the engine, which is the one thing a rule that
 // has to judge a surrogate PAIR can not do.
 //
-// NOTE: The set lives in that table and nowhere else — `escapeOf` is asked only
+// The set lives in that table and nowhere else — `escapeOf` is asked only
 // what a marked code unit is written as, never whether it is one. One
 // membership test in one place is what `escapeSet.spec.ts` pins against the
 // documented sentence.
@@ -262,7 +262,7 @@ export function quotedText(value: string): string {
 	return runStart < 0 ? `"${value}"` : `"${quoted}${value.slice(runStart)}"`
 }
 
-// NOTE: THE ONE RULE for a value rendered INSIDE a structure: a String is
+// THE ONE RULE for a value rendered INSIDE a structure: a String is
 // quoted there and bare on its own. `Terminal.print("x")` writes `x` and a hole
 // renders `x`, because there the String IS the whole of the text; inside a List
 // or a Case it is one piece beside others, and `["a", "", "b"]` has to be told
@@ -270,7 +270,7 @@ export function quotedText(value: string): string {
 // and this is the same rule where a List, an Optional, a Result and a
 // Dictionary read what they hold.
 //
-// NOTE: The tag is read rather than the conformance, because a `Printable`
+// The tag is read rather than the conformance, because a `Printable`
 // witness says how a value renders and not what kind it is: `String.toString`
 // is the identity, so a String item arrives already indistinguishable from the
 // text around it.
@@ -285,7 +285,7 @@ export function itemText<ItemType extends AnyType>(
 		: conformance.toString(value).value
 }
 
-// NOTE: The canonical grapheme view every position Method reads through: the
+// The canonical grapheme view every position Method reads through: the
 // String normalised to NFC and then segmented into grapheme clusters — what a
 // reader calls a "character". `Intl.Segmenter` groups a base and its combining
 // marks, a ZWJ emoji sequence and a flag's two regional indicators each into
@@ -294,7 +294,7 @@ export function itemText<ItemType extends AnyType>(
 // decomposed) have the SAME view, which is what makes `is`/`compare` agree.
 // The Segmenter is built once — constructing one per call is the expensive part.
 //
-// NOTE: Built on FIRST USE rather than when the module is loaded, and that is
+// Built on FIRST USE rather than when the module is loaded, and that is
 // worth a named variable. Constructing one costs about a millisecond of table
 // loading, which every Program used to pay before its first Statement ran —
 // including the many that never segment anything, because ASCII counts by code
@@ -302,7 +302,7 @@ export function itemText<ItemType extends AnyType>(
 // variable rather than rebuilt, so a Program that DOES segment pays that
 // millisecond once, exactly as it did before.
 //
-// NOTE: It also keeps this module free of a top-level side effect, which is why
+// It also keeps this module free of a top-level side effect, which is why
 // a Program can import `normalisedFormOf` — the answer `is` and `compare` are
 // decided by — without carrying the segmenter it does not reach.
 let graphemeSegmenter: Intl.Segmenter | null = null
@@ -317,7 +317,7 @@ function segmenter(): Intl.Segmenter {
 	return graphemeSegmenter
 }
 
-// NOTE: Takes the text ALREADY normalised, where it used to normalise the
+// Takes the text ALREADY normalised, where it used to normalise the
 // String's own text here. `normalisedFormOf` remembers that form, and `is`,
 // `compare` and every Dictionary key ask it of the same String — so segmenting
 // what it answered is one normalisation between the two questions rather than
@@ -332,7 +332,7 @@ function clustersOf(text: string): Array<string> {
 	return result
 }
 
-// NOTE: Segmenting is by far the most expensive thing a String Method does —
+// Segmenting is by far the most expensive thing a String Method does —
 // measured at some four microseconds for a short String, against nanoseconds
 // for everything built on it — and the position Methods ask for the SAME view
 // of the SAME String over and over: a loop reading `character(at:)` segments
@@ -340,13 +340,13 @@ function clustersOf(text: string): Array<string> {
 // and the count taken off it, are remembered on the String value itself, under
 // Symbol keys.
 //
-// NOTE: A Symbol key is why this is invisible. `Object.keys`, `Object.entries`
+// A Symbol key is why this is invisible. `Object.keys`, `Object.entries`
 // and `Object.hasOwn` — which is the whole of what Record equality, the printer
 // and the runtime Type checks read a value with — do not see one, so a String
 // that has been measured is indistinguishable from one that has not. And a
 // String is immutable, so a remembered answer can never go stale: the value the
 // answer was taken from is the value the wrapper still holds.
-// NOTE: The same remembering serves `is` and `compare`, which ask a different
+// The same remembering serves `is` and `compare`, which ask a different
 // question of the same String: what its NFC form is. Normalising allocates a
 // String per call and both sides of every comparison paid it, so sorting a
 // thousand names normalised twenty thousand times — for a thousand distinct
@@ -360,21 +360,21 @@ const graphemeCountKey = Symbol("$graphemeCount")
 const isAsciiKey = Symbol("$isAscii")
 const normalisedKey = Symbol("$normalised")
 
-// NOTE: A String's characters live in `graphemesKey`'s Array, and a WINDOW of a
+// A String's characters live in `graphemesKey`'s Array, and a WINDOW of a
 // String shares that Array rather than copying it — `viewStartKey` says where
 // its own characters begin in it and `graphemeCountKey` how many are its own.
 // Both are ABSENT on a String that is the whole of its Array, so a `split`
 // piece, a `reverse` and a copied window carry exactly the two keys they
 // carried before there were windows at all.
 //
-// NOTE: That absence is the design. A record holding the four parts together
+// That absence is the design. A record holding the four parts together
 // reads far better, and costs an OBJECT PER STRING: a tokenizer holding 250,000
 // six-character tokens cut out of a five-megabyte source measured 53.6 MB of
 // retained heap that way against 42.1 MB — an AST keeps its tokens for the life
 // of the Program, and eleven megabytes of record is what the reading would have
 // cost it.
 //
-// NOTE: The other two keys are what a window needs to cut its TEXT, and they
+// The other two keys are what a window needs to cut its TEXT, and they
 // are shared references rather than answers of their own. `viewTextKey` is the
 // text the clusters partition, carried only where it is not the String's own
 // `value`: the clusters are of the NFC form — `is`, `compare` and every
@@ -382,7 +382,7 @@ const normalisedKey = Symbol("$normalised")
 // in a text it does not itself spell. `viewOffsetsKey` is where each cluster
 // begins in that text.
 //
-// NOTE: No key says the Segmenter has RUN for an Array. Nothing in the runtime
+// No key says the Segmenter has RUN for an Array. Nothing in the runtime
 // would read one, and a flag written inside a reached Function can not be
 // shaken out of a bundle, so every Program would pay for it. The drain guard,
 // `whileCountingSegmentations` in `stringWindows.spec.ts`, counts calls to
@@ -397,7 +397,7 @@ type MeasuredString = StringType & {
 	[normalisedKey]?: string
 }
 
-// NOTE: The Array this String's characters live in, built at most once. A
+// The Array this String's characters live in, built at most once. A
 // String the ASCII scan accepted is split into its code units instead of being
 // segmented, for the reason `isSingleUnitAscii` gives: each unit IS a cluster,
 // and the text is its own NFC form. That is the same view the Segmenter
@@ -415,7 +415,7 @@ function clustersIn(string: StringType): Array<string> {
 		measured[graphemesKey] = clusters
 		measured[graphemeCountKey] = clusters.length
 
-		// NOTE: Carried only where the NFC form is not the text the String
+		// Carried only where the NFC form is not the text the String
 		// spells, which is the only case where the two differ — and only off
 		// the segmenting arm, because a String the scan accepted IS its own
 		// normal form.
@@ -427,13 +427,13 @@ function clustersIn(string: StringType): Array<string> {
 	return clusters
 }
 
-// NOTE: Where this String's first character stands in its Array — zero for
+// Where this String's first character stands in its Array — zero for
 // everything but a window, which is why the key is absent there.
 function startIn(string: StringType): number {
 	return (string as MeasuredString)[viewStartKey] ?? 0
 }
 
-// NOTE: The text this String's clusters were cut from and PARTITION, so that
+// The text this String's clusters were cut from and PARTITION, so that
 // cutting it between two of their offsets answers exactly the characters
 // between them joined. It is the String's own text wherever the two agree,
 // which is everything but a String written in a form that is not NFC and the
@@ -442,13 +442,13 @@ function clusterTextOf(string: StringType): string {
 	return (string as MeasuredString)[viewTextKey] ?? string.value
 }
 
-// NOTE: The segmented view of a String as a WHOLE Array, for the readers that
+// The segmented view of a String as a WHOLE Array, for the readers that
 // walk all of it — `split`, `reverse`, `separate`. A String that IS the whole
 // of its Array hands back the remembered one rather than a copy of it, so every
 // caller here only ever READS it: one that needs to change it has to copy
 // first.
 //
-// NOTE: A WINDOW is copied out of its parent's Array HERE, once, and keeps the
+// A WINDOW is copied out of its parent's Array HERE, once, and keeps the
 // copy as its own — which is both what these readers want (an Array they may
 // index from zero and measure with `.length`) and what lets the parent's Array,
 // text and offset table go once the window is all that is left of them. The
@@ -457,7 +457,7 @@ function clusterTextOf(string: StringType): string {
 // the offset instead and never come here, which is the whole of why a window
 // exists.
 //
-// NOTE: And neither do three that WALK the whole receiver, which is worth
+// And neither do three that WALK the whole receiver, which is worth
 // saying because it reads like an oversight and is not. The two replacements
 // walk the shared Array where it stands, through `viewOf`, and build their
 // answer out of the clusters they pass — they need no Array of their own, so
@@ -475,7 +475,7 @@ function graphemesIn(string: StringType): Array<string> {
 
 	let own = clusters.slice(start, start + count)
 
-	// NOTE: The window's own `value` IS these clusters joined — that is what
+	// The window's own `value` IS these clusters joined — that is what
 	// cutting the parent's text between their offsets produced — so what it
 	// borrowed is given up here rather than left to say something false about
 	// the Array it now has.
@@ -487,19 +487,19 @@ function graphemesIn(string: StringType): Array<string> {
 	return own
 }
 
-// NOTE: THE ONE VIEW READER, for everything that reads a String's characters
+// THE ONE VIEW READER, for everything that reads a String's characters
 // WHERE THEY STAND: the Array they live in, where this String's own begin in
 // it, and how many are its own. A window is searched, tested and read through
 // it rather than copied out first, which is what keeps a prefix test at the
 // cost of the prefix and a front drain linear.
 //
-// NOTE: The readers a DRAIN asks per turn — `length`, `character(at:)`,
+// The readers a DRAIN asks per turn — `length`, `character(at:)`,
 // `slice` and the prefix and suffix tests — read the three parts directly
 // instead, because this allocates a record per call and they do nothing else
 // big enough to hide it. A search is asked once per call and walks the receiver
 // afterwards, so there the record is nothing beside the walk.
 //
-// NOTE: Exported for the specs that assert WORK: which Array a window shares,
+// Exported for the specs that assert WORK: which Array a window shares,
 // and how much of it is its own.
 // `hasCharacterView` below answers the question this one can not, because this
 // one BUILDS the view it reports; and how often the Segmenter RAN is counted
@@ -522,7 +522,7 @@ export function viewOf(string: StringType): CharacterWindow {
 	}
 }
 
-// NOTE: Whether this String has had its character view BUILT — the one
+// Whether this String has had its character view BUILT — the one
 // question that tells the two paths of a position Method apart from outside.
 // An ASCII receiver is searched, split and cut by the JavaScript intrinsics
 // and leaves no view behind; every other receiver is segmented and remembers
@@ -531,14 +531,14 @@ export function viewOf(string: StringType): CharacterWindow {
 // it replaced had to sit several times above the fast figure and below the
 // slow one — and for `split` those two are only ten apart.
 //
-// NOTE: Nothing in the standard library calls it, so no Program's bundle
+// Nothing in the standard library calls it, so no Program's bundle
 // carries it: an export nothing reaches is shaken out exactly as an unreached
 // native is.
 export function hasCharacterView(string: StringType): boolean {
 	return (string as MeasuredString)[graphemesKey] !== undefined
 }
 
-// NOTE: A String assembled FROM a known character view keeps that view — the
+// A String assembled FROM a known character view keeps that view — the
 // clusters are remembered under the Symbol keys right away, so every Method
 // reading `graphemesIn` sees exactly the characters the assembly meant.
 // Segmenting the joined text afresh does not always answer the same view back:
@@ -554,19 +554,19 @@ function createSegmentedString(characters: Array<string>): StringType {
 	return string
 }
 
-// NOTE: Where each cluster begins in the text it partitions, counted in code
+// Where each cluster begins in the text it partitions, counted in code
 // units and cumulative, so that the text of ANY window of that Array is one
 // engine `slice` between two of them. Built on the FIRST cut and never rebuilt:
 // a drain that cuts a String twenty thousand times pays for it once, where the
 // cut it replaces joined the remaining clusters every turn — 556 ms of the
 // 20,000-character drain's 581, measured as the joins alone.
 //
-// NOTE: An `Int32Array` rather than an Array of numbers. It is one number per
+// An `Int32Array` rather than an Array of numbers. It is one number per
 // character of the String, it never grows, and no unit count can leave the
 // range — four bytes an entry against the eight a boxed element costs, and not
 // one element for the collector to walk.
 //
-// NOTE: Remembered on the String that was cut, and handed to every window cut
+// Remembered on the String that was cut, and handed to every window cut
 // from it, so that a window of a window is a read of the same table. Every
 // String that shares an Array therefore reaches the table without reaching the
 // String it was cut from.
@@ -585,7 +585,7 @@ function offsetsIn(string: StringType, clusters: Array<string>): Int32Array {
 			offsets[index + 1] = offset
 		}
 
-		// NOTE: The table is of the WHOLE Array, so a String that is a window
+		// The table is of the WHOLE Array, so a String that is a window
 		// of it must say which text it was built over — its own `value` is only
 		// the part it names.
 		measured[viewOffsetsKey] = offsets
@@ -595,21 +595,21 @@ function offsetsIn(string: StringType, clusters: Array<string>): Int32Array {
 	return offsets
 }
 
-// NOTE: A WINDOW: the same clusters read from an offset, with its text cut out
+// A WINDOW: the same clusters read from an offset, with its text cut out
 // of the text they partition in ONE engine call. This is what makes consuming a
 // String from the front linear. The cut it replaces copied n−1 cluster Strings
 // into a fresh Array and joined them back into a fresh text, which is O(n) per
 // turn and O(n²) over a drain — measured on the gap analysis's own Program at
 // 40,000 characters, 2,245 ms that way.
 //
-// NOTE: The text is the SAME String the joined clusters spelled, byte for byte,
+// The text is the SAME String the joined clusters spelled, byte for byte,
 // and that is not an approximation: the clusters PARTITION that text, so the
 // text between two of their offsets IS those clusters joined. Everything
 // downstream — `is`, `compare`, `normalisedFormOf`, printing, the Dictionary
 // key encoding — therefore answers what it answered before, because it is
 // handed the same text it was handed before.
 //
-// NOTE: The offset table arrives rather than being looked up here, because the
+// The offset table arrives rather than being looked up here, because the
 // rule below had to read it to decide this cut at all.
 function createWindowString(
 	original: StringType,
@@ -632,14 +632,14 @@ function createWindowString(
 	return string
 }
 
-// NOTE: THE HALF RULE, the same one `List.ts` applies to a shared suffix: a cut
+// THE HALF RULE, the same one `List.ts` applies to a shared suffix: a cut
 // SHARES its parent's Array only where it is at least half of it, and is copied
 // otherwise. What the rule bounds is RETENTION — a window holds the whole Array
 // of clusters, the offset table and the whole text they were cut from alive,
 // and a six-character token cut out of a five-megabyte source must not pin the
 // source for as long as the token is held.
 //
-// NOTE: IT IS ASKED IN BOTH UNITS, and it has to be. A window pins three things
+// IT IS ASKED IN BOTH UNITS, and it has to be. A window pins three things
 // and the character count bounds only two of them: the Array and the table hold
 // one entry per CHARACTER, and the text holds one entry per CODE UNIT — and
 // cluster widths are not uniform, so half the characters of a text can be a
@@ -654,13 +654,13 @@ function createWindowString(
 // sentence "a window pins at most twice its own characters AND twice its own
 // text" true.
 //
-// NOTE: The CHARACTER question is asked first, and that ordering is the cost
+// The CHARACTER question is asked first, and that ordering is the cost
 // argument. The unit question needs the offset table, which is O(n) to build on
 // an Array nothing has cut yet — and a cut the character rule already refuses
 // must not pay for a table to be refused twice. Where the character rule
 // passes, the table is what the window being made needs anyway.
 //
-// NOTE: The rule costs nothing asymptotically, and the HALF is why: a drain
+// The rule costs nothing asymptotically, and the HALF is why: a drain
 // from either end shares every step down to half, copies ONCE there, shares
 // down to half of that, and so on — so the copies over a whole drain add up to
 // 2n clusters against the n²/2 of copying at every step. A copy is exactly what
@@ -675,13 +675,13 @@ function createWindowString(
 // drains over accents, combining marks, CRLF, joined emoji and flags — copies
 // exactly what it copied before, because there the two questions are one.
 //
-// NOTE: The copy JOINS its clusters rather than cutting the text, and that is
+// The copy JOINS its clusters rather than cutting the text, and that is
 // the other half of the retention story: an engine's sliced String keeps the
 // String it was cut from alive, so a small window cut that way would pin the
 // whole source text even once its clusters were its own. The join costs what
 // the Array copy beside it costs, and both are what the cut cost before.
 //
-// NOTE: A copied cut carries the two keys a `split` piece carries and NOT ONE
+// A copied cut carries the two keys a `split` piece carries and NOT ONE
 // MORE, which is what keeps a tokenizer's retained heap where it was: 250,000
 // six-character tokens out of a five-megabyte source hold 42.1 MB, the figure
 // they held before there were windows.
@@ -694,7 +694,7 @@ function cutFromView(
 	if (count * 2 >= clusters.length) {
 		let offsets = offsetsIn(original, clusters)
 
-		// NOTE: The table's LAST entry is the whole text's length, because the
+		// The table's LAST entry is the whole text's length, because the
 		// clusters partition it — so the two numbers the unit question needs
 		// are both reads of the table the window would carry anyway.
 		if (
@@ -708,7 +708,7 @@ function cutFromView(
 	return createSegmentedString(clusters.slice(start, start + count))
 }
 
-// NOTE: Whether counting this String's characters can skip the Segmenter
+// Whether counting this String's characters can skip the Segmenter
 // entirely. ASCII is closed under NFC and carries no combining marks, so each
 // of its code units stands alone as a grapheme cluster and the count is simply
 // how many units there are. The one exception is a carriage return: Unicode
@@ -717,7 +717,7 @@ function cutFromView(
 // surrogate pair, so "every unit is ASCII" really does mean "every character
 // is one unit".
 //
-// NOTE: Measured on a short String: ~4,200ns to segment, ~44ns to scan,
+// Measured on a short String: ~4,200ns to segment, ~44ns to scan,
 // ~1ns to read the remembered count.
 function isSingleUnitAscii(value: string): boolean {
 	for (let index = 0; index < value.length; index++) {
@@ -731,13 +731,13 @@ function isSingleUnitAscii(value: string): boolean {
 	return true
 }
 
-// NOTE: The scan above, remembered — it is asked by the count, by `append` and
+// The scan above, remembered — it is asked by the count, by `append` and
 // by every comparison, and its answer can not change any more than the String
 // can. A remembered `true` is also what `append` PROPAGATES: joining two
 // carriage-return-free ASCII Strings can produce neither a non-ASCII unit nor a
 // carriage return, so the answer is known without scanning the join.
 //
-// NOTE: Asked through `readsByUnit` by every position Method — which is this
+// Asked through `readsByUnit` by every position Method — which is this
 // question with a window's view taken into account — and asked outright of a
 // PART, which is short and whose answer is remembered on it for every later
 // call.
@@ -753,7 +753,7 @@ function isAsciiIn(string: StringType): boolean {
 	return answer
 }
 
-// NOTE: A String its maker KNOWS the scan would accept, marked so without the
+// A String its maker KNOWS the scan would accept, marked so without the
 // scan and given the count that follows from the mark: its characters are its
 // units. Every Method that maps ASCII to ASCII answers through here —
 // `append`, `repeat`, the case mappings, `trim`, `slice`, `character(at:)`, and
@@ -769,18 +769,18 @@ function createAsciiString(value: string): StringType {
 	return string
 }
 
-// NOTE: The String's NFC form, normalised at most once — what `is` and
+// The String's NFC form, normalised at most once — what `is` and
 // `compare` decide over, so that an accent written as one code point and the
 // same accent written as two are one String. It is the whole of the comparison
 // for equality (two NFC Strings hold the same characters exactly when their
 // code points match) and the text `compare` walks.
 //
-// NOTE: ASCII is already NFC — it carries no combining marks and no
+// ASCII is already NFC — it carries no combining marks and no
 // decomposable character — so a String the scan above accepted IS its own
 // normal form and the JavaScript call is skipped outright. That is the common
 // case, and the one that used to allocate two Strings per unequal comparison.
 //
-// NOTE: A String THAT HAS A VIEW IS NEVER SCANNED HERE, which is the same
+// A String THAT HAS A VIEW IS NEVER SCANNED HERE, which is the same
 // addition `readsByUnit` makes and the reason is the same. This is the Function
 // `is`, `compare`, every Dictionary key, `codePoints`, `words` and the four
 // `hasOnly…` predicates reach, so the scan it used to ask was the one a
@@ -793,13 +793,13 @@ function createAsciiString(value: string): StringType {
 // stays O(window) a turn — 243 ms down to 103 — because there the answer has to
 // be computed and the only way not to pay is not to ask.
 //
-// NOTE: A window that happens to be pure ASCII is normalised rather than
+// A window that happens to be pure ASCII is normalised rather than
 // waved through, and that costs it nothing measurable: its text is ASCII, so
 // the engine's own check answers at once. It is the same trade `readsByUnit`
 // states — a window declines a fast path it might have passed, and what it
 // costs is the route it is already on.
 //
-// NOTE: The question is SPELLED OUT here, and narrower than `readsByUnit`'s by
+// The question is SPELLED OUT here, and narrower than `readsByUnit`'s by
 // one arm: a String carrying a TRUE mark AND a view is normalised where
 // `readsByUnit` would wave it through. That arm is reachable only by a window
 // something scanned for another Method, its answer is the same either way, and
@@ -823,11 +823,11 @@ export function normalisedFormOf(string: StringType): string {
 	return form
 }
 
-// NOTE: Whether this String takes the CODE-UNIT route — the JavaScript
+// Whether this String takes the CODE-UNIT route — the JavaScript
 // intrinsics — rather than the grapheme view. It is `isAsciiIn` with one thing
 // added: a String that already HAS a view is never scanned for the answer.
 //
-// NOTE: That addition is half of what made a front drain quadratic. The scan is
+// That addition is half of what made a front drain quadratic. The scan is
 // O(n), every turn of a drain is a NEW String, and `slice` and `character(at:)`
 // asked it before anything else — so a drain scanned the rest of its String
 // every turn, which is the same n² the copying was, from the other side. A
@@ -835,7 +835,7 @@ export function normalisedFormOf(string: StringType): string {
 // what that costs it is the view route, which is the route it is already on, and
 // its parent's own answer is what it would have had to scan to find.
 //
-// NOTE: WHAT THAT TRADE COSTS, measured. The shape it costs anything at all is
+// WHAT THAT TRADE COSTS, measured. The shape it costs anything at all is
 // a String whose non-ASCII characters all stand at the FRONT: once a drain has
 // consumed them the remainder is pure ASCII, and before this it was rescanned
 // every turn and found its way back to the intrinsic from there. One `é`
@@ -854,7 +854,7 @@ function readsByUnit(string: StringType): boolean {
 	return measured[graphemesKey] === undefined && isAsciiIn(string)
 }
 
-// NOTE: How many characters a String holds, counted at most once. A String
+// How many characters a String holds, counted at most once. A String
 // already segmented for some other Method is counted off that view rather than
 // scanned again, and a WINDOW was handed its count when it was cut — which is
 // what makes `length` on one O(1), and with it the `isEmpty` every drain asks
@@ -864,7 +864,7 @@ function graphemeCountIn(string: StringType): number {
 	let characterCount = measured[graphemeCountKey]
 
 	if (characterCount === undefined) {
-		// NOTE: `isAsciiIn` rather than `readsByUnit`, and the two are the SAME
+		// `isAsciiIn` rather than `readsByUnit`, and the two are the SAME
 		// question here: a String that has a view was given its count when the
 		// view was made, so a String with no count has no view either and there
 		// is nothing for the window rule to take into account. Asking the
@@ -882,14 +882,14 @@ function graphemeCountIn(string: StringType): number {
 	return characterCount
 }
 
-// NOTE: The joined String is a NEW String and remembers nothing of either
+// The joined String is a NEW String and remembers nothing of either
 // operand's character view — grapheme boundaries are decided by NEIGHBOURS, so
 // the last cluster of one and the first of the other may join across the seam
 // (a base and a following combining mark, two regional indicators, a carriage
 // return and a line feed) and neither operand's clusters survive the join
 // intact.
 //
-// NOTE: With ONE exception, which is the whole point: the join of two Strings
+// With ONE exception, which is the whole point: the join of two Strings
 // the ASCII scan accepted is itself such a String, and its characters are its
 // code units. Both facts follow from what the scan excludes — a unit at or
 // above 128 (so no combining mark, no surrogate, nothing decomposable) and a
@@ -903,7 +903,7 @@ export function append(
 ): StringType {
 	let joined = originalString.value + otherString.value
 
-	// NOTE: Through the same maker every other Method that answers an ASCII
+	// Through the same maker every other Method that answers an ASCII
 	// String uses, which gives the answer the joined text's own unit count —
 	// for two such operands exactly the two counts added, each of them counted
 	// by unit for the same reason. It was written out by hand here for 124
@@ -914,13 +914,13 @@ export function append(
 		return createAsciiString(joined)
 	}
 
-	// NOTE: The answer is marked NOT ASCII, which is the same argument in the
+	// The answer is marked NOT ASCII, which is the same argument in the
 	// other direction: a unit at or above 128, or a carriage return, is in one
 	// of the two operands and a join holds every unit of both. So the join is
 	// one the scan would refuse, and saying so costs nothing where scanning for
 	// it costs the whole String.
 	//
-	// NOTE: That is what keeps a token built one character at a time linear.
+	// That is what keeps a token built one character at a time linear.
 	// An engine joins two Strings into a rope and resolves it the first time
 	// anything READS a unit — so the ASCII scan of the growing token flattened
 	// the rope every turn, and a Program appending 80,000 non-ASCII characters
@@ -935,25 +935,25 @@ export function append(
 	return string
 }
 
-// NOTE: Whether a run of the part's characters stands at a position of the
+// Whether a run of the part's characters stands at a position of the
 // receiver's view — the one comparison every grapheme-view search below makes,
 // and `split` makes it once per position. A loop rather than `every` over the
 // part, because of the closure allocated per position: the walk over three
 // hundred lines of thirty-six characters measured 49 µs with `every` and 22 µs
 // with the loop.
 //
-// NOTE: The receiver is read WHERE IT STANDS — `at` is where the run being
+// The receiver is read WHERE IT STANDS — `at` is where the run being
 // tested begins in `clusters` and `remaining` is how many of the receiver's own
 // characters stand from there — so a window is searched inside its parent's
 // Array rather than copied out of it first.
 //
-// NOTE: The three arrive as plain arguments rather than as the window record
+// The three arrive as plain arguments rather than as the window record
 // `viewOf` answers. The record reads better and costs a property load PER
 // CHARACTER, because the pushes at the call sites could reach anything as far
 // as the engine knows: 200 `replaceEvery` over a 10,800-character String
 // measured 19.7 ms that way against 17.6 here, and `split` 37.8 against 33.1.
 //
-// NOTE: The part arrives folded where the call folds, and the receiver is
+// The part arrives folded where the call folds, and the receiver is
 // folded ONE CHARACTER AT A TIME here. Folding the whole receiver up front is
 // what made a prefix test cost the whole String: 2,000 `starts(with "CAF",
 // comparing #Insensitive)` on a 10,800-character String measured 70.6 ms that
@@ -977,7 +977,7 @@ function partMatchesAt(
 	return true
 }
 
-// NOTE: A run of the receiver's own characters, folded — as many as the part
+// A run of the receiver's own characters, folded — as many as the part
 // covers and NO MORE. It is what keeps a prefix or a suffix test at the cost of
 // the prefix: folding the whole receiver to compare two characters is what made
 // a drain asking `starts(with:, comparing #Insensitive)` per turn quadratic.
@@ -995,21 +995,21 @@ function foldedRun(
 	return run
 }
 
-// NOTE: The receiver's characters as the WHOLE-RECEIVER WALKS read them — its
+// The receiver's characters as the WHOLE-RECEIVER WALKS read them — its
 // own Array where the call folds nothing, and a folded copy of its own window
 // where it does. Those walks visit every character of the receiver anyway, so
 // folding it once costs what the walk costs; folding inside the comparison
 // instead costs a branch per character of every walk that never folds, and
 // `split` measured 36.2 ms that way against 33.1 here.
 //
-// NOTE: THE TWO FIRST-MATCH SEARCHES NO LONGER READ THIS, and that is the whole
+// THE TWO FIRST-MATCH SEARCHES NO LONGER READ THIS, and that is the whole
 // of what a folded `firstIndex` used to cost: they visit as far as the match
 // and this folds as far as the END, so asking one per turn of a drain was
 // quadratic where the case-sensitive twin beside it was linear. They fold a
 // chunk at a time through `foldedRun` instead, for the reason `FOLD_CHUNK`
 // gives.
 //
-// NOTE: A window is folded into a copy of ITS OWN characters, never its
+// A window is folded into a copy of ITS OWN characters, never its
 // parent's, which is why the answer carries the offset to read it from.
 function foldedWalk(
 	clusters: Array<string>,
@@ -1022,7 +1022,7 @@ function foldedWalk(
 		: { characters: clusters, at: start }
 }
 
-// NOTE: The first of two entries, and the two are the same Function. The
+// The first of two entries, and the two are the same Function. The
 // second declares a `NonEmptyString` separator and answers a `NonEmptyList` —
 // a promise the Types make and erase, so there is nothing here to do
 // differently. What makes it true is the unconditional `pieces.push(current)`
@@ -1032,7 +1032,7 @@ export function split__overload$1(
 	originalString: StringType,
 	splitterString: StringType,
 ): ListType<StringType> {
-	// NOTE: `characters()` is `split("")`, and `length`, `character(at:)`,
+	// `characters()` is `split("")`, and `length`, `character(at:)`,
 	// `slice`, `reverse` and the searches `firstIndex`, `lastIndex` and `count`
 	// read the character view `clustersIn` builds, as this does. Both sides are
 	// taken as grapheme clusters (see `clustersOf`), so the empty separator
@@ -1041,7 +1041,7 @@ export function split__overload$1(
 	// the pieces come back on cluster boundaries. NFC on both sides means the
 	// match is by canonical equivalence, like `is`.
 	//
-	// NOTE: Two Strings the ASCII scan accepted are split by the JavaScript
+	// Two Strings the ASCII scan accepted are split by the JavaScript
 	// intrinsic instead, and that IS the grapheme answer: each unit is a
 	// cluster and neither side has anything to normalise, so a run of the
 	// separator's units is a run of its characters, and `split` finds the
@@ -1052,7 +1052,7 @@ export function split__overload$1(
 	// the walk and 14 µs through the intrinsic; a twelve-character one at a
 	// comma, 2.1 µs against 0.05.
 	if (isAsciiIn(originalString) && isAsciiIn(splitterString)) {
-		// NOTE: The EMPTY separator is the one arm that goes through the
+		// The EMPTY separator is the one arm that goes through the
 		// view rather than the intrinsic, because for such a receiver the
 		// view IS `value.split("")` — and `graphemesIn` REMEMBERS it, where
 		// the intrinsic splits the whole String again per call. This arm is
@@ -1061,7 +1061,7 @@ export function split__overload$1(
 		// 17,209 µs through the intrinsic and 8,756 µs off the remembered
 		// view, best of ten.
 		//
-		// NOTE: The pieces are NOT marked, which the other arm's are. A
+		// The pieces are NOT marked, which the other arm's are. A
 		// piece here is ONE character, so the scan that would answer the mark
 		// is a single unit and the mark saves nothing worth having — where
 		// writing it costs two Symbol keys on every character of the
@@ -1110,7 +1110,7 @@ export function split__overload$1(
 
 	pieces.push(current)
 
-	// NOTE: Each piece is handed its own characters along with its text — the
+	// Each piece is handed its own characters along with its text — the
 	// clusters it was cut into ARE its character view, so `length` on a piece
 	// answers off them rather than segmenting the joined text afresh, which
 	// could pair the clusters differently (see `createSegmentedString`).
@@ -1119,7 +1119,7 @@ export function split__overload$1(
 
 export const split__overload$2 = split__overload$1
 
-// NOTE: The searches, native so that a question about a POSITION never builds
+// The searches, native so that a question about a POSITION never builds
 // the pieces `split` builds. An Essence `firstIndex` on `split(on part)` reads
 // the first piece's length, so `contains` — written on it — segments and copies
 // a whole String to answer a Boolean: measured on a 10,800-character ASCII
@@ -1129,15 +1129,15 @@ export const split__overload$2 = split__overload$1
 // takes the intrinsic when both sides pass the ASCII scan, for the reason
 // `split` gives.
 //
-// NOTE: The empty part matches nowhere, except as a position at either end.
+// The empty part matches nowhere, except as a position at either end.
 // The rule is stated ONCE, above `contains` in `String.es`, and the guards
 // below are its answers: 0, the length, 0 and no positions at all.
 //
-// NOTE: Every entry taking a `CaseSensitivity` reads the SAME walk with the
+// Every entry taking a `CaseSensitivity` reads the SAME walk with the
 // two sides folded, so one rule decides where an occurrence stands however the
 // call spells it.
 
-// NOTE: `#Insensitive` folds EACH CHARACTER on its own, where `is` and
+// `#Insensitive` folds EACH CHARACTER on its own, where `is` and
 // `compare` fold the whole String. A position Method answers a position of the
 // RECEIVER, and a folding that maps one character onto several code points
 // would move every position after it; folding per character keeps a match
@@ -1150,12 +1150,12 @@ function isInsensitive(sensitivity: CaseSensitivityType): boolean {
 	return sensitivity[typeKeySymbol] === "CaseSensitivity#Insensitive"
 }
 
-// NOTE: The ASCII route's text, folded where the call asks for it. Lower-casing
+// The ASCII route's text, folded where the call asks for it. Lower-casing
 // ASCII maps each unit to one unit, so a position in the folded text IS a
 // position in the original — which is what lets the intrinsic keep answering
 // for the receiver.
 //
-// NOTE: Read by the walks that visit the WHOLE receiver by nature — `count`,
+// Read by the walks that visit the WHOLE receiver by nature — `count`,
 // `everyIndex`, `split`'s two replacements — where folding it once per call is
 // what the walk costs anyway. The two FIRST-MATCH searches fold a chunk at a
 // time instead, for the reason `FOLD_CHUNK` gives.
@@ -1163,7 +1163,7 @@ function foldedText(string: StringType, insensitive: boolean): string {
 	return insensitive ? string.value.toLowerCase() : string.value
 }
 
-// NOTE: HOW MUCH OF THE RECEIVER A FOLDED FIRST-MATCH SEARCH READS AT A TIME.
+// HOW MUCH OF THE RECEIVER A FOLDED FIRST-MATCH SEARCH READS AT A TIME.
 // Folding the whole receiver to find a part near its front is what made a drain
 // asking `firstIndex(of:, comparing #Insensitive)` per turn quadratic in pure
 // ASCII, where the case-sensitive search beside it cost the DISTANCE to the
@@ -1172,14 +1172,14 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // the part was not in it — the answer is found at the cost of the distance, and
 // the engine's own search still does the searching.
 //
-// NOTE: The chunks DOUBLE, so a part standing late in a long receiver is reached
+// The chunks DOUBLE, so a part standing late in a long receiver is reached
 // in a logarithmic number of foldings, the chunks are DISJOINT bar their
 // overlap, and the whole receiver is therefore folded about once by a search
 // that has to read all of it. A fixed chunk would be a fold and a call per
 // chunk all the way down such a receiver, and a chunk that never grew could not
 // carry its per-call cost.
 //
-// NOTE: A CHUNK SWALLOWS A TAIL NO LONGER THAN ITSELF rather than leaving it to
+// A CHUNK SWALLOWS A TAIL NO LONGER THAN ITSELF rather than leaving it to
 // a chunk of its own. That bounds what the rule can waste — a chunk reads at
 // most twice its own width, so the text folded in all stays inside twice the
 // distance to the match — and, with the early return the same arithmetic gives,
@@ -1189,7 +1189,7 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // 50,000 searches of a 340-character receiver that does not hold the part:
 // 13.7 ms cut in two and 11.2 ms whole.
 //
-// NOTE: WHAT IT DOES NOT BUY is a longer receiver for nothing, and the floor
+// WHAT IT DOES NOT BUY is a longer receiver for nothing, and the floor
 // below is where that was measured. A receiver of 3,000 to 10,000 units
 // searched for a part that is NOT there is read in two or three calls where one
 // call read it before, and pays 1.04x to 1.09x for them; at 20,000 units and
@@ -1198,14 +1198,14 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // no longer reads. That is the price of the quadratic's removal and it is paid
 // only by the search that has to read everything anyway.
 //
-// NOTE: The floor is TWICE THE PART, and it has to be at least the part plus
+// The floor is TWICE THE PART, and it has to be at least the part plus
 // one: a chunk overlaps the one before it by `part.length - 1` units — the
 // width a match STRADDLING the boundary can hang over it by — so a chunk no
 // wider than the part would overlap the whole of itself and the walk would
 // stand still. Twice rather than one more keeps a long part from walking a unit
 // at a time before the doubling catches up.
 //
-// NOTE: TWO FLOORS, because a chunk costs the two routes different things. On
+// TWO FLOORS, because a chunk costs the two routes different things. On
 // the ASCII route a chunk is three ENGINE CALLS — a cut, a folding and a search
 // — and the cut COPIES the chunk where the folding copies it again, so a
 // receiver read in two calls pays for a second copy of itself and the floor has
@@ -1217,13 +1217,13 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // and most are 1.00x. 2,048 reads no better (1.06x) and doubles again what the
 // first chunk costs a match near the front.
 //
-// NOTE: WHAT THE FLOOR COSTS is the least a folded search can read, and that is
+// WHAT THE FLOOR COSTS is the least a folded search can read, and that is
 // the whole of what buying the band back cost: 4,000 searches of a long
 // receiver for a part at position 10 measured 0.71 ms at 256 and 2.15 ms at
 // 1,024 — against 85.8 ms over a 20,000-unit receiver, 356 ms over 80,000 and
 // 1,682 ms over 320,000 for the whole-receiver folding this replaced.
 //
-// NOTE: On the view route a chunk is a loop entry and an Array of its own,
+// On the view route a chunk is a loop entry and an Array of its own,
 // which is cheap enough that it can be small — and small is what makes a match
 // near the front cost the front: 16 characters.
 const FOLD_CHUNK = 1024
@@ -1233,7 +1233,7 @@ function foldedChunkWidth(partWidth: number, floor: number): number {
 	return partWidth * 2 < floor ? floor : partWidth * 2
 }
 
-// NOTE: The FIRST position the folded part stands at, read in growing chunks
+// The FIRST position the folded part stands at, read in growing chunks
 // from the front. The part arrives folded; the receiver's chunk is folded here,
 // and `indexOf` answers a position inside it that `from` carries back to the
 // receiver — which holds because lower-casing ASCII maps each unit to one unit,
@@ -1269,7 +1269,7 @@ function foldedFirstIndexOf(text: string, part: string): number {
 	}
 }
 
-// NOTE: The LAST position, read in growing chunks from the back, where the
+// The LAST position, read in growing chunks from the back, where the
 // overlap hangs the other way: a match the chunk cut off begins before its
 // first unit, so the next chunk ENDS `part.length - 1` units inside this one.
 function foldedLastIndexOf(text: string, part: string): number {
@@ -1298,7 +1298,7 @@ function foldedLastIndexOf(text: string, part: string): number {
 	}
 }
 
-// NOTE: The grapheme route's PART, folded per character for the reason above.
+// The grapheme route's PART, folded per character for the reason above.
 // A folding COPIES, because `graphemesIn` hands back the remembered view
 // itself and every caller here only ever reads it. Only the part is folded up
 // front: it is as long as it is whatever the receiver holds, where the
@@ -1311,10 +1311,10 @@ function foldedPart(string: StringType, insensitive: boolean): Array<string> {
 		: characters
 }
 
-// NOTE: Whether both sides take the intrinsic route. Folding does not change
+// Whether both sides take the intrinsic route. Folding does not change
 // the answer: lower-casing an ASCII String answers an ASCII String.
 //
-// NOTE: The RECEIVER is asked through `readsByUnit`, so a window is never
+// The RECEIVER is asked through `readsByUnit`, so a window is never
 // scanned for an answer its view already decides. The part is asked outright:
 // it is short, and its answer is remembered on it for every later call.
 function bothAscii(originalString: StringType, part: StringType): boolean {
@@ -1335,7 +1335,7 @@ function firstIndexIn(
 	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
 
-	// NOTE: A walk that folds NOTHING reads the receiver's own Array where it
+	// A walk that folds NOTHING reads the receiver's own Array where it
 	// stands, and is written out on its own because the folding walk below must
 	// not cost it anything. Sharing one loop between the two means a question
 	// per position — has the folding reached this far? — which the
@@ -1365,7 +1365,7 @@ function firstIndexIn(
 		return -1
 	}
 
-	// NOTE: Folded in growing chunks, the same shape `foldedFirstIndexOf` takes
+	// Folded in growing chunks, the same shape `foldedFirstIndexOf` takes
 	// on the ASCII route — a chunk is folded, walked, and the next one folded
 	// only if the part was not in it, so a match near the front is answered at
 	// the cost of the front. The chunk after this one begins
@@ -1399,7 +1399,7 @@ function firstIndexIn(
 	}
 }
 
-// NOTE: The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
+// The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
 // `"aa"` at 0 and at 1, and the answer is 1, as `lastIndexOf` answers. The
 // walk runs from the last position the part fits at down to the first, so it
 // stops at the first match it meets.
@@ -1438,14 +1438,14 @@ function lastIndexIn(
 		return -1
 	}
 
-	// NOTE: Folded in growing chunks from the BACK, where the forward search
+	// Folded in growing chunks from the BACK, where the forward search
 	// folds ahead of itself into one Array. An Array grows at its end for
 	// nothing and can not grow at its front for nothing — that is the `unshift`
 	// `separate` was quadratic on — so a backward walk re-folds a chunk twice
 	// the width of the last instead, which reads under twice the distance from
 	// the end in all and allocates only what it reads.
 	//
-	// NOTE: The chunk before this one ENDS `separator.length - 1` characters
+	// The chunk before this one ENDS `separator.length - 1` characters
 	// inside it, which is how far a match this chunk cut off can hang over its
 	// first character.
 	let width = foldedChunkWidth(separator.length, FOLD_RUN)
@@ -1476,7 +1476,7 @@ function lastIndexIn(
 	}
 }
 
-// NOTE: The occurrences that do NOT overlap — the ones `split` cuts at — so
+// The occurrences that do NOT overlap — the ones `split` cuts at — so
 // `"aaa"::count(of "aa")` is 1: after a match the walk steps over the whole
 // part, exactly as `split` does, and the count is one less than the pieces
 // `split` would answer. An Essence body on `firstIndex` and `slice` would cut
@@ -1484,7 +1484,7 @@ function lastIndexIn(
 // occurrences; this is one walk. Measured on a 10,800-character ASCII String
 // with 3,600 occurrences: 537 µs counting the pieces, 33 µs here.
 //
-// NOTE: `everyIndex` and `count` are this ONE walk, visited two ways, so the
+// `everyIndex` and `count` are this ONE walk, visited two ways, so the
 // two can not answer differently about one String. `count` visits without
 // collecting: a Program asking how many times a part occurs should not
 // allocate a position per occurrence to be told a number.
@@ -1566,7 +1566,7 @@ function startsIn(
 		let text = originalString.value
 		let needle = foldedText(prefix, insensitive)
 
-		// NOTE: Only the receiver's FIRST `needle.length` units are folded,
+		// Only the receiver's FIRST `needle.length` units are folded,
 		// where the whole receiver used to be. A prefix test must cost the
 		// prefix: a drain asking `starts(with:)` per turn folded the rest of
 		// its String every turn otherwise, which is the same n² the copying
@@ -1579,7 +1579,7 @@ function startsIn(
 			: text.startsWith(needle)
 	}
 
-	// NOTE: The three parts read directly rather than through `viewOf`, which
+	// The three parts read directly rather than through `viewOf`, which
 	// allocates a record per call — a drain asks this per turn, and the record
 	// measured 220 ns against 200 for 2,000 prefix tests of a held String.
 	let clusters = clustersIn(originalString)
@@ -1591,7 +1591,7 @@ function startsIn(
 		return false
 	}
 
-	// NOTE: Only the receiver's first `prefixCharacters.length` characters are
+	// Only the receiver's first `prefixCharacters.length` characters are
 	// folded, for the reason the ASCII route above gives — a prefix test costs
 	// the prefix, whichever route answers it.
 	return partMatchesAt(
@@ -1613,7 +1613,7 @@ function endsIn(
 		let text = originalString.value
 		let needle = foldedText(suffix, insensitive)
 
-		// NOTE: The receiver's LAST `needle.length` units, folded, for the
+		// The receiver's LAST `needle.length` units, folded, for the
 		// reason `starts` gives — a suffix test costs the suffix.
 		return insensitive
 			? needle.length <= text.length &&
@@ -1622,7 +1622,7 @@ function endsIn(
 			: text.endsWith(needle)
 	}
 
-	// NOTE: Read directly, for the reason `starts` gives.
+	// Read directly, for the reason `starts` gives.
 	let clusters = clustersIn(originalString)
 	let start = startIn(originalString)
 	let count = graphemeCountIn(originalString)
@@ -1634,7 +1634,7 @@ function endsIn(
 
 	let at = start + count - suffixCharacters.length
 
-	// NOTE: The receiver's LAST `suffixCharacters.length` characters, folded,
+	// The receiver's LAST `suffixCharacters.length` characters, folded,
 	// for the reason `starts` gives.
 	return partMatchesAt(
 		insensitive
@@ -1650,7 +1650,7 @@ function positionAnswer(index: number): OptionalType<IntegerType> {
 	return index < 0 ? createEmpty() : createValue(createInteger(index))
 }
 
-// NOTE: The first of three entries — the second takes a `defaultingTo:`
+// The first of three entries — the second takes a `defaultingTo:`
 // fallback and is written in Essence on this one, and the third folds the case.
 export function firstIndex__overload$1(
 	originalString: StringType,
@@ -1702,7 +1702,7 @@ export function lastIndex__overload$3(
 	)
 }
 
-// NOTE: The positions themselves, which a Program scanning a String reads
+// The positions themselves, which a Program scanning a String reads
 // where a hand-written walk would call `firstIndex` and `slice` per occurrence
 // — one pass here against a cut of the rest of the String per hit.
 export function everyIndex(
@@ -1745,7 +1745,7 @@ export function count__overload$2(
 	)
 }
 
-// NOTE: The reversed String REMEMBERS its character view — the original's
+// The reversed String REMEMBERS its character view — the original's
 // clusters in the opposite order — rather than letting the joined text be
 // segmented afresh. Re-segmenting would hand back characters the original
 // never had: `"🇦🇧🇨"` holds the characters `🇦🇧` and `🇨`, and its reversal
@@ -1757,7 +1757,7 @@ export function reverse(originalString: StringType): StringType {
 	return createSegmentedString([...graphemesIn(originalString)].reverse())
 }
 
-// NOTE: `starts(with:)` itself is Essence — its slice begins at zero and needs
+// `starts(with:)` itself is Essence — its slice begins at zero and needs
 // no length — and this entry is native because a folded prefix and a folded
 // receiver have to be compared character by character, which a slice of the
 // receiver can not do.
@@ -1771,12 +1771,12 @@ export function starts__overload$2(
 	)
 }
 
-// NOTE: Native — one grapheme pass, where the Essence body sliced the last
+// Native — one grapheme pass, where the Essence body sliced the last
 // characters and compared them (four traversals). Both sides are taken as the
 // canonical grapheme view, so the suffix matches only on a cluster boundary and
 // by canonical equivalence, exactly as `starts(with:)` does through `slice`.
 //
-// NOTE: Two ASCII Strings are compared by the intrinsic, for the reason
+// Two ASCII Strings are compared by the intrinsic, for the reason
 // `split` gives, so the Boolean allocates nothing.
 export function ends__overload$1(
 	originalString: StringType,
@@ -1795,13 +1795,13 @@ export function ends__overload$2(
 	)
 }
 
-// NOTE: A position as the grapheme view sees it — a negative one counts back
+// A position as the grapheme view sees it — a negative one counts back
 // from the end, so -1 is the last character and -length the first. This is
 // exactly what `List.positionFromEnd` does for a List, which is what these
 // Methods used to reach through, and it is spelled here rather than imported so
 // that a Program slicing Strings carries no List.
 function positionFromEnd(index: number | bigint, count: number): number {
-	// NOTE: A bigint index is past either end of any String, for the reason
+	// A bigint index is past either end of any String, for the reason
 	// `List.positionFromEnd` states.
 	if (typeof index !== "number") {
 		return index < 0n ? -1 : count
@@ -1810,18 +1810,18 @@ function positionFromEnd(index: number | bigint, count: number): number {
 	return index < 0 ? index + count : index
 }
 
-// NOTE: Native — one read out of the grapheme view, where the Essence body
+// Native — one read out of the grapheme view, where the Essence body
 // (`@::characters()::item(at index)`) built a String for every character of the
 // receiver and a List to hold them, to hand back one of them. Reading a
 // character of a ten thousand character String allocated ten thousand and one
 // values.
 //
-// NOTE: The answer is a plain String rather than a segmented one: a single
+// The answer is a plain String rather than a segmented one: a single
 // cluster taken out of the view segments to itself, so there is nothing for
 // remembering to protect. `split` hands its pieces their clusters because a
 // piece is SEVERAL of them and re-segmenting could pair them differently.
 //
-// NOTE: The first of two entries — the second takes a `defaultingTo:` fallback
+// The first of two entries — the second takes a `defaultingTo:` fallback
 // and is written in Essence on this one, so this export carries the Overload
 // suffix its position gives it.
 export function character__overload$1(
@@ -1833,18 +1833,18 @@ export function character__overload$1(
 	return character === undefined ? createEmpty() : createValue(character)
 }
 
-// NOTE: The character at a position, which is a read of ONE cluster and the
+// The character at a position, which is a read of ONE cluster and the
 // only thing a window ever needs its parent's Array for. A negative position
 // counts back from the end, as everywhere else, and `undefined` is what stands
 // past either end — which `character(at:)` above reads as its `Optional`, and
 // which the two proven ends in `NonEmptyString.ts` can not meet.
 //
-// NOTE: Exported for those two ends. Reading one of them off `graphemesIn`
+// Exported for those two ends. Reading one of them off `graphemesIn`
 // COPIES a window's characters to hand back one of them, which is O(n) per
 // call and O(n²) over the drain that asks for the front character every turn;
 // this reads the cluster where it stands.
 //
-// NOTE: WHAT THE ONE READER COSTS, both ends named. It is an O(n) removed and
+// WHAT THE ONE READER COSTS, both ends named. It is an O(n) removed and
 // a few nanoseconds paid, and the nanoseconds are paid on EVERY read, not only
 // on the window that needed them. Measured as 200,000 reads of one HELD String,
 // one runtime per process, alternated, the answer consumed — which is the only
@@ -1861,7 +1861,7 @@ export function character__overload$1(
 // Against which the same call over an 80,000-character non-ASCII front drain
 // went from 9,602 ms to 49, and `slice` earned that as much as this reader.
 //
-// NOTE: ONE case stayed dearer and it is worth saying which and why: the FIRST
+// ONE case stayed dearer and it is worth saying which and why: the FIRST
 // character of a held ASCII String. The specialised body it replaced indexed
 // the text at a CONSTANT zero, which an engine reads about as cheaply as a
 // field; here the position is a `number | bigint` parameter resolved at run
@@ -1874,26 +1874,26 @@ export function characterIn(
 	string: StringType,
 	index: number | bigint,
 ): StringType | undefined {
-	// NOTE: An ASCII String is read by unit rather than through the view, for
+	// An ASCII String is read by unit rather than through the view, for
 	// the reason `split` gives — so reading one character of it builds no
 	// Array of all of them, and the unit is marked ASCII as a piece of a
 	// `split` is. Measured on a 10,800-character ASCII String: 380 µs through
 	// the view, 8 µs here, most of which is the scan.
 	//
-	// NOTE: The two keys are read ONCE, here, rather than through `readsByUnit`
+	// The two keys are read ONCE, here, rather than through `readsByUnit`
 	// and `clustersIn` in turn — this is the read `NonEmptyString`'s two proven
 	// ends are, and a Program walking a String asks it per character. Reading
 	// them twice measured 15.0 ns against 11.8 for 200,000 reads of one held
 	// String. The question the two of them answer is `readsByUnit`'s, spelled
 	// out: the remembered mark decides where there is one, and a String with a
 	// view is never scanned for one.
-	// NOTE: The view's own key is read only where the MARK does not already
+	// The view's own key is read only where the MARK does not already
 	// decide, which the `||` sees to — reading a key a value does not carry is
 	// a miss, and this is the read `NonEmptyString`'s two proven ends are:
 	// 200,000 `firstCharacter` of one held ASCII String measured 11.4 ns
 	// apiece with both keys read and 8.6 with one.
 	//
-	// NOTE: The position is resolved INLINE for a `number`, where it went
+	// The position is resolved INLINE for a `number`, where it went
 	// through `positionFromEnd` — a call whose whole body, for the positions
 	// these two ends ask, is one `typeof` on a `number | bigint` and a compare.
 	// A bigint index still goes to the Function, because what it answers is a
@@ -1909,7 +1909,7 @@ export function characterIn(
 			measured[graphemesKey] === undefined &&
 			isAsciiIn(string))
 	) {
-		// NOTE: The bound is COMPARED rather than read off a missing unit, and
+		// The bound is COMPARED rather than read off a missing unit, and
 		// that was measured rather than assumed. Answering `undefined` by
 		// indexing past the end instead is CORRECT here — the text is the
 		// String's OWN `value`, so beyond its ends there is nothing to read —
@@ -1917,7 +1917,7 @@ export function characterIn(
 		// position is in range: 200,000 `lastCharacter` of one held ASCII
 		// String measured 1.324 ms that way against 0.590 with the compare.
 		//
-		// NOTE: The view arm below compares its bound for a second reason,
+		// The view arm below compares its bound for a second reason,
 		// which no measurement could have found. There the Array is the one the
 		// window BORROWS, so a position past the window's own count reads the
 		// character standing NEXT to it rather than nothing at all — a mutant
@@ -1939,7 +1939,7 @@ export function characterIn(
 		return createAsciiString(text[position]!)
 	}
 
-	// NOTE: The remembered Array is read where it stands rather than through
+	// The remembered Array is read where it stands rather than through
 	// `clustersIn`, which would read the same key inside a call to answer what
 	// the key already says — a String this far down either HAS a view or is
 	// about to be given one, and the one that has it is the drain's case and
@@ -1961,7 +1961,7 @@ export function characterIn(
 	return createString(clusters[(measured[viewStartKey] ?? 0) + position]!)
 }
 
-// NOTE: Native — the characters between two positions, where the Essence body
+// Native — the characters between two positions, where the Essence body
 // went through `characters()` and `List.slice` and `join`: a String per
 // character of the receiver, a List of them, a second List for the window and a
 // join to put the text back together. Half-open [from, to), a negative position
@@ -1969,11 +1969,11 @@ export function characterIn(
 // `List.slice` performs, and the reason it is written out is that this is now
 // the only place that needs it.
 //
-// NOTE: The answer carries the clusters it was cut into, exactly as a piece of
+// The answer carries the clusters it was cut into, exactly as a piece of
 // a `split` does — a window of a view is several clusters, and segmenting the
 // joined text afresh does not always read the same ones back.
 //
-// NOTE: An ASCII String is cut by the intrinsic instead, for the reason
+// An ASCII String is cut by the intrinsic instead, for the reason
 // `split` gives, and the window is marked ASCII: a window of such a String
 // is such a String. Measured on a 10,800-character ASCII String, one slice
 // of 4,990 characters: 394 µs through the view, 8 µs here.
@@ -1996,7 +1996,7 @@ export function slice(
 	return cutThroughView(originalString, from, to)
 }
 
-// NOTE: The view route of the cut above, in a Function of its own so that the
+// The view route of the cut above, in a Function of its own so that the
 // ASCII route stays SMALL. An engine inlines a hot callee by its size, and a
 // drain cuts once per turn: with both routes in one body, the ASCII drain of
 // 5,000 characters measured 9.7 ms against 5.0 with them apart — the cut
@@ -2027,11 +2027,11 @@ function cutThroughView(
 	)
 }
 
-// NOTE: Native — the String joined to itself, where the Essence body built a
+// Native — the String joined to itself, where the Essence body built a
 // List of `count` copies of it and joined them. A count below one repeats into
 // nothing, which is the empty String.
 //
-// NOTE: The ASCII marker rides along, and only then: joining ASCII copies of an
+// The ASCII marker rides along, and only then: joining ASCII copies of an
 // ASCII String gives an ASCII String, for the reason `append` gives — no unit
 // at or above 128 and no carriage return, so nothing can pair across a seam and
 // the characters are the units. Everything else is a plain String, because a
@@ -2040,7 +2040,7 @@ export function repeat(
 	originalString: StringType,
 	count: IntegerType,
 ): StringType {
-	// NOTE: `1` rather than `1n`, for the reason `List.split` gives.
+	// `1` rather than `1n`, for the reason `List.split` gives.
 	if (count.value < 1) {
 		return createString("")
 	}
@@ -2052,7 +2052,7 @@ export function repeat(
 		: createString(repeated)
 }
 
-// NOTE: The ASCII marker rides through both case mappings, and so does the
+// The ASCII marker rides through both case mappings, and so does the
 // count: every ASCII letter maps to one ASCII letter, so a String the scan
 // accepted maps to one it would accept, of the same length. Anything else is
 // a plain String — `ß` upper-cases to two characters, so neither the mark nor
@@ -2076,7 +2076,7 @@ export function lowercase(originalString: StringType): StringType {
 		: createString(mapped)
 }
 
-// NOTE: One native, and the `as:` Parameter is DEFAULTED in `String.es` to
+// One native, and the `as:` Parameter is DEFAULTED in `String.es` to
 // `#ComposedCanonical` — so `normalize()` with no Argument reaches this same
 // export through the frame the Compiler synthesizes for the default, and this
 // module never learns that a default exists. The four Cases are the four
@@ -2098,12 +2098,12 @@ export function normalize(
 	}
 }
 
-// NOTE: Words are the runs of non-whitespace, so the whitespace between them —
+// Words are the runs of non-whitespace, so the whitespace between them —
 // and the empty pieces a plain split would leave at the ends and between
 // adjacent separators — is dropped. `\s` with the `u` flag is Unicode
 // whitespace; a String of only whitespace has no words.
 //
-// NOTE: Read off the NFC form, as every position Method is, so that the words
+// Read off the NFC form, as every position Method is, so that the words
 // of a String and the pieces of its `split` are the same text in the same
 // bytes. A word of an ASCII receiver is a run of its units, so each is marked
 // ASCII as a piece of a `split` is.
@@ -2118,14 +2118,14 @@ export function words(originalString: StringType): ListType<StringType> {
 	)
 }
 
-// NOTE: The one native behind the whole trim family, where there used to be
+// The one native behind the whole trim family, where there used to be
 // two — it reads the `Side` Case and calls the matching JavaScript intrinsic.
 // `String::trim()` with no Argument reaches it through the frame the Compiler
 // synthesizes for the `at:` Parameter's default, which is `#BothEnds`; nothing
 // here has to know that. Whitespace is whatever JavaScript calls whitespace,
 // which is the Unicode definition.
 //
-// NOTE: Read off the RAW text, and neither of the two answers a String
+// Read off the RAW text, and neither of the two answers a String
 // remembers is FORCED to trim it — because both are answers about the WHOLE
 // String, and taking whitespace off the two ends should not cost a walk of
 // everything between them. Asking `normalisedFormOf` scanned for the ASCII
@@ -2134,7 +2134,7 @@ export function words(originalString: StringType): ListType<StringType> {
 // that way against 0.016 µs here, best of fifteen, and the cost grew by ten
 // for every ten times the length where this one does not move.
 //
-// NOTE: What makes the raw text the same answer is that trimming COMMUTES
+// What makes the raw text the same answer is that trimming COMMUTES
 // with normalising. No canonical decomposition or composition creates or
 // destroys a whitespace character — the space that a `<compat>` or `<noBreak>`
 // mapping would produce is not one NFC performs, and a space composes with
@@ -2144,7 +2144,7 @@ export function words(originalString: StringType): ListType<StringType> {
 // comparison, every position Method and every Dictionary key it becomes, is
 // what it was.
 //
-// NOTE: The ASCII mark is PROPAGATED where the receiver already carries one
+// The ASCII mark is PROPAGATED where the receiver already carries one
 // and never taken by scanning for it: taking units off either end of such a
 // String leaves such a String, so a Program that trims what it built keeps the
 // mark all the way down — 20,000 `trim()::length()` of one 11,000-character
@@ -2176,7 +2176,7 @@ export function compare__overload$1(
 	originalString: StringType,
 	otherString: StringType,
 ): OrderingType {
-	// NOTE: Identical text is identical text, whatever it holds — normalisation
+	// Identical text is identical text, whatever it holds — normalisation
 	// is a function of the String, so two Strings spelling the same units have
 	// the same normal form and nothing after this could answer anything but
 	// `Equal`. It is asked first because it is the case a sort spends most of
@@ -2186,14 +2186,14 @@ export function compare__overload$1(
 		return equal
 	}
 
-	// NOTE: Lexicographic by code point, over the NFC-normalised String — so a
+	// Lexicographic by code point, over the NFC-normalised String — so a
 	// canonically equivalent pair (an accent composed or decomposed) compares
 	// `Equal`, and the order agrees with the grapheme view the character
 	// Methods take rather than JS's UTF-16 `<`. This is also the whole of
 	// String equality: `String.is` is `compare(other)::is(Ordering#Equal)` in
 	// Essence, so equality is canonical equivalence too.
 	//
-	// NOTE: Walked in place rather than through two Arrays of one-character
+	// Walked in place rather than through two Arrays of one-character
 	// Strings. `codePointAt` reads the whole code point at a position and a
 	// point above the Basic Multilingual Plane occupies two units, so stepping
 	// by that width visits exactly the elements `Array.from` used to build —
@@ -2218,7 +2218,7 @@ export function compare__overload$1(
 		secondIndex += secondPoint > 0xffff ? 2 : 1
 	}
 
-	// NOTE: On an equal prefix the shorter String comes first, counted in code
+	// On an equal prefix the shorter String comes first, counted in code
 	// POINTS — which is what is left over here: every step above advanced both
 	// sides by one point, so whichever still has units has more points.
 	if (firstIndex < first.length) {
@@ -2230,7 +2230,7 @@ export function compare__overload$1(
 	}
 }
 
-// NOTE: `length` stays native deliberately. Writing it as
+// `length` stays native deliberately. Writing it as
 // `@::characters()::length()` is correct but makes counting characters build a
 // List of every one of them — turning the count into an O(n) allocation, and
 // pulling `List` and its whole import graph into any Program that so much as
@@ -2241,7 +2241,7 @@ export function length(originalString: StringType): IntegerType {
 	return createInteger(graphemeCountIn(originalString))
 }
 
-// NOTE: `@::split(on "")` is what a character IS here, so `characters` is that
+// `@::split(on "")` is what a character IS here, so `characters` is that
 // call rather than a second segmentation of its own. It is native because its
 // answer is a `List<Character>`, and a refinement erases before anything runs:
 // an Essence body could only hand back what `split` answers, which is a
@@ -2249,7 +2249,7 @@ export function length(originalString: StringType): IntegerType {
 // are one character each. `NonEmptyString::characters` is this same Function
 // under that Namespace's name.
 //
-// NOTE: The separator is built per call rather than held in a const of this
+// The separator is built per call rather than held in a const of this
 // module. A const would be a top-level `createString` the bundler can not
 // prove pure, so it would arrive in EVERY Program that reaches `String.ts`
 // at all — 36 bytes measured, in bundles that call none of this. One object
@@ -2258,7 +2258,7 @@ export function characters(originalString: StringType): ListType<StringType> {
 	return split__overload$1(originalString, createString(""))
 }
 
-// NOTE: The one escape to the level BELOW a character, and the reason it is
+// The one escape to the level BELOW a character, and the reason it is
 // worth having: nothing character-level could be computed in Essence at all
 // without it — no digit value, no checksum, no base, no escaping. The points
 // are read off the NFC form, as every position Method is, so a String and its
@@ -2267,7 +2267,7 @@ export function characters(originalString: StringType): ListType<StringType> {
 // visits each WHOLE point once; a lone surrogate is no whole point and is read
 // as the single unit it is.
 //
-// NOTE: A character is a grapheme cluster and a point is a code point, so the
+// A character is a grapheme cluster and a point is a code point, so the
 // two counts differ wherever a cluster is built out of several points: the
 // four-person emoji is one character and seven points. That is the level
 // difference, and it is what the `§§` block says.
@@ -2286,7 +2286,7 @@ export function codePoints(originalString: StringType): ListType<IntegerType> {
 	return createList(points)
 }
 
-// NOTE: The scalar values, which are the points a String can hold: below
+// The scalar values, which are the points a String can hold: below
 // 0x110000 and outside the surrogate range, since a surrogate is half of a
 // point rather than one. A proven receiver takes the sign away, and these two
 // are what is left of the question.
@@ -2303,7 +2303,7 @@ function isScalarValue(point: number | bigint): boolean {
 	)
 }
 
-// NOTE: A point below 128 that is no carriage return builds a String the ASCII
+// A point below 128 that is no carriage return builds a String the ASCII
 // scan would accept, so it is marked rather than scanned for, exactly as a
 // piece of a `split` is.
 function stringOfPoints(points: Array<number>): StringType {
@@ -2314,7 +2314,7 @@ function stringOfPoints(points: Array<number>): StringType {
 		: createString(text)
 }
 
-// NOTE: The first of two entries. The receiver's proof says the point is not
+// The first of two entries. The receiver's proof says the point is not
 // negative and this says the rest: a surrogate and a point past the last plane
 // are the two shapes left that name no character.
 export function of__overload$1(code: IntegerType): OptionalType<StringType> {
@@ -2325,7 +2325,7 @@ export function of__overload$1(code: IntegerType): OptionalType<StringType> {
 	return createValue(stringOfPoints([Number(code.value)]))
 }
 
-// NOTE: All or nothing, which is the answer a caller can act on: a String
+// All or nothing, which is the answer a caller can act on: a String
 // built out of the points it could read and quietly missing the rest is a
 // String nobody asked for. The `Optional` is the same shape the single-point
 // entry answers, and `Integer.parse` beside it.
@@ -2358,7 +2358,7 @@ export function of__overload$2(
 	return createValue(stringOfPoints(points))
 }
 
-// NOTE: Character CLASSIFICATION, and the one thing in the library that a host
+// Character CLASSIFICATION, and the one thing in the library that a host
 // property escape answers. This is not a pattern language reaching a Program:
 // each of the four asks one fixed question of every character and answers a
 // Boolean, and no part of the shape is anything a caller writes. The
@@ -2366,14 +2366,14 @@ export function of__overload$2(
 // different question per Unicode version than the host's own `is`, `compare`
 // and `normalize` do.
 //
-// NOTE: Read off the NFC form, as every other question about characters is, so
+// Read off the NFC form, as every other question about characters is, so
 // that a composed accent and a decomposed one are classified alike. A
 // combining mark counts as part of the letter or digit BEFORE it, which is why
 // the two letter patterns are written as a base followed by its marks rather
 // than as a class holding marks: a mark standing on its own belongs to no
 // letter and is not one.
 //
-// NOTE: All four accept the empty String, for the reason `hasOnlyItems(where:)`
+// All four accept the empty String, for the reason `hasOnlyItems(where:)`
 // answers `true` for an empty List: nothing in it breaks the rule.
 const digitsOnly = /^\p{Nd}*$/u
 const lettersOnly = /^(?:\p{L}\p{M}*)*$/u
@@ -2400,7 +2400,7 @@ export function hasOnlyWhitespace(originalString: StringType): BooleanType {
 	return createBoolean(whitespaceOnly.test(normalisedFormOf(originalString)))
 }
 
-// NOTE: The limited split, where the last piece keeps the separators the walk
+// The limited split, where the last piece keeps the separators the walk
 // stopped short of. A Program parsing `key=value=with=equals` wants exactly
 // that, and the Essence spelling — split the whole String and join the tail
 // back — builds every piece to throw most of them away. Both Arguments are
@@ -2465,7 +2465,7 @@ export function split__overload$5(
 	return createList(pieces.map((piece) => createSegmentedString(piece)))
 }
 
-// NOTE: The two replacements' folding entries, native for the reason the
+// The two replacements' folding entries, native for the reason the
 // searches are: a folded receiver is not the text to build the answer out of,
 // so the walk matches on the folded view and cuts on the ORIGINAL characters.
 // Folding per character is what makes the two views the same width, so a match
@@ -2571,18 +2571,18 @@ export function replaceFirst__overload$2(
 	)
 }
 
-// NOTE: Grouping, the piece a currency or a file size is missing — the counting
+// Grouping, the piece a currency or a file size is missing — the counting
 // is by character, so it belongs beside the other character walks rather than
 // on a number, and both a numeral and a card number reach it. The separator
 // goes between the groups and never at either end.
 //
-// NOTE: `from:` names the end the counting starts at, so `#End` puts the short
+// `from:` names the end the counting starts at, so `#End` puts the short
 // group at the FRONT, which is what "1,234,567" is. `#BothEnds` counts from the
 // end as well: grouping has a direction rather than two ends, and the Choice
 // `trim` and `pad` already read was taken over a two-Case Choice of its own,
 // which would have cost the six registration sites a Choice costs for one
 // Method.
-// NOTE: THE GROUPS ARE CUT FORWARD whichever end the counting starts at, and
+// THE GROUPS ARE CUT FORWARD whichever end the counting starts at, and
 // that is the whole of what made one call quadratic. Counting from the end used
 // to walk the characters backwards and `unshift` each group onto the front of
 // the answer, which moves every group already standing there — (n/w)² moves
@@ -2590,13 +2590,13 @@ export function replaceFirst__overload$2(
 // n/w. Measured on 20,000 characters in threes, best of five: 3.27 ms that way
 // against 0.25 for the forward arm beside it.
 //
-// NOTE: The end the counting starts at decides ONE thing, and once it is said
+// The end the counting starts at decides ONE thing, and once it is said
 // this way the two arms are one walk: which end the SHORT group lands at. Every
 // group after the first is a full one, so `#End` is the same forward walk with
 // a first group of `((count - 1) % width) + 1` characters — the remainder,
 // except that a count the width divides leaves a full group rather than none.
 //
-// NOTE: An ASCII receiver cuts its groups OUT OF ITS TEXT and never builds the
+// An ASCII receiver cuts its groups OUT OF ITS TEXT and never builds the
 // Array of units to slice and join them back out of: each of its units IS a
 // character, so a group is one engine cut between two positions. That is the
 // same answer the character walk gives, for the reason `isSingleUnitAscii`
@@ -2639,7 +2639,7 @@ export function separate(
 	return createString(groups.join(separator.value))
 }
 
-// NOTE: The quoted spelling a String already has inside a List, a Record or a
+// The quoted spelling a String already has inside a List, a Record or a
 // Case, handed to a Program that is building a message of its own. It is the
 // same Function those renderings call, so a value can not read one way in a
 // structure and another in a sentence about it.

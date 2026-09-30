@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url"
 import { essenceBun } from "../bun-plugin"
 import { REPOSITORY } from "./typecheck"
 
-// NOTE: The Bun plugin under both of its hosts. `Bun.build` is driven in this
+// The Bun plugin under both of its hosts. `Bun.build` is driven in this
 // process, the way the esbuild plugin's tests drive esbuild; the RUNTIME is a
 // process of its own — `bun` started on a project whose `bunfig.toml` preloads
 // the plugin — because a runtime plugin is registered for a whole process and
@@ -61,7 +61,7 @@ afterAll(() => {
 	rmSync(workspace, { recursive: true, force: true })
 })
 
-// NOTE: A project with this package installed in it — see `project` in
+// A project with this package installed in it — see `project` in
 // `plugin.spec.ts` for why — and, for the runtime, a `bunfig.toml` that
 // preloads the plugin, which is how a project uses it.
 function project(files: Record<string, string>): string {
@@ -130,7 +130,7 @@ async function built(
 	}
 }
 
-// NOTE: A Bun process on the project, its output read line by line as it
+// A Bun process on the project, its output read line by line as it
 // arrives — so that a test can wait for the line an edit should produce rather
 // than for a fixed time. Killed when the test is done with it.
 function running(
@@ -234,12 +234,12 @@ export const pi = PI.toString()
 
 		expect(module.squared).toBe(144n)
 		expect(module.pi).toBe("157/50")
-		// NOTE: A build carries no watch imports — those are the runtime's,
+		// A build carries no watch imports — those are the runtime's,
 		// and a bundle has no watcher to answer to.
 		expect(text).not.toContain("?source")
 	})
 
-	// NOTE: The plugin door builds its bridge out of IMPORTS rather than out of
+	// The plugin door builds its bridge out of IMPORTS rather than out of
 	// an injected Module, so this is where the two names a Dictionary crosses
 	// through are proven end to end: a `Map` built in the host's own realm goes
 	// in, the Module writes to what it was handed, and what comes back holds
@@ -270,7 +270,7 @@ export const entries = [...ages(new Map([["alex", 39n]]))]
 		])
 	})
 
-	// NOTE: And the asynchrony door end to end through the same plugin: the
+	// And the asynchrony door end to end through the same plugin: the
 	// entry awaits what a call answers with, which is a run the wrapper started
 	// under `Future.ts` — the very copy the built Module waits on, since both
 	// import it by name and the build resolves one.
@@ -297,7 +297,7 @@ export const doubling = doubled(21n)
 		expect(await (module.doubling as Promise<bigint>)).toBe(42n)
 	})
 
-	// NOTE: The raw door and the wrapper, in one build, holding one Module: a
+	// The raw door and the wrapper, in one build, holding one Module: a
 	// value built through the runtime the build resolved is a value the
 	// marshalled door's Functions were compiled against.
 	it("holds one Module behind the marshalled door and the raw one", async () => {
@@ -376,7 +376,7 @@ console.log("answer", answer, "square", square(4n))
 		}
 	})
 
-	// NOTE: THE reason for the runtime door: `bun --hot`. Bun reloads a module
+	// THE reason for the runtime door: `bun --hot`. Bun reloads a module
 	// when a file it read changes, and it read the `.es` sources because the
 	// plugin had it — so an edit to a sibling reloads the entry's Module, the
 	// wrapper and the script, and what the script prints is the edit. And a
@@ -411,7 +411,7 @@ console.log("answer", answer, "square", square(4n), "kept", rawSquare(globalThis
 				"answer 10n square 17n kept 17",
 			)
 
-			// NOTE: An edit that does not compile is reported and the process
+			// An edit that does not compile is reported and the process
 			// stays up; the edit that fixes it is the next thing it prints.
 			writeFileSync(
 				path.join(directory, "src", "Math.es"),

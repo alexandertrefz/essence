@@ -24,7 +24,7 @@ import { ROUTES } from "../../lib/site.ts"
 let entries = await getCollection("docs")
 let sections = getSidebar(entries)
 
-// NOTE: Ids, not paths — resolved below, so a slug that does not exist yet is
+// Ids, not paths — resolved below, so a slug that does not exist yet is
 // dropped rather than published as a link to nowhere.
 const CARDS = [
 	"getting-started/coming-from-javascript",

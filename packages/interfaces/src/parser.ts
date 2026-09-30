@@ -1,6 +1,6 @@
 import type { Documentation, Position } from "./common/index"
 
-// NOTE: One name an abandoned Statement declared, and WHERE it stood — because
+// One name an abandoned Statement declared, and WHERE it stood — because
 // the silence a dropped Declaration buys is owed to the reads that Declaration
 // would have answered and to no others. A `total` dropped out of one Function's
 // body says nothing about a `total` read in the next Function along: that read
@@ -9,21 +9,21 @@ import type { Documentation, Position } from "./common/index"
 // undeclared name in the file that happens to be spelled the same way.
 export type AbandonedDeclaration = {
 	name: string
-	// NOTE: Where the abandoned run begins. A Declaration is in scope from its
+	// Where the abandoned run begins. A Declaration is in scope from its
 	// own line downward, so a read ABOVE this one could never have seen it —
 	// unless it hoists, which is what `hoistable` is for.
 	position: Position
-	// NOTE: The span of the innermost block the run stands in, claimed by the
+	// The span of the innermost block the run stands in, claimed by the
 	// Parser as that block closes. A read outside it could not have seen the
 	// Declaration however the file had parsed.
 	enclosing: Position
-	// NOTE: Whether the run opened with one of the six keywords whose
+	// Whether the run opened with one of the six keywords whose
 	// Declaration is HOISTED — `function`, `overload function`, `type`,
 	// `choice`, `namespace`, `protocol`. Hoisting is what puts a Declaration in
 	// scope above its own line, so a hoisted one's silence can not be bounded
 	// from above.
 	hoistable: boolean
-	// NOTE: Whether the run stood at the top level of a section block, which is
+	// Whether the run stood at the top level of a section block, which is
 	// the only place hoisting happens — the Enricher hoists an implementation's
 	// and a tests block's own Statements and nothing deeper. A `type` written
 	// inside a body is hoistable by keyword and hoisted by nobody, so the two
@@ -31,7 +31,7 @@ export type AbandonedDeclaration = {
 	atSectionLevel: boolean
 }
 
-// NOTE: What the Parser could not read, kept so that no later stage reports the
+// What the Parser could not read, kept so that no later stage reports the
 // same mistake a second time in its own words. A dropped Statement leaves two
 // holes: the names it would have declared, which every read of them would
 // otherwise be answered as undeclared, and the LINES it was written across,
@@ -43,7 +43,7 @@ export type AbandonedDeclaration = {
 // graph to the Validator for the lines — and a second value threaded alongside
 // is a second thing every caller has to remember to carry.
 export type Recovery = {
-	// NOTE: The names an abandoned Statement declared, as far as its Tokens
+	// The names an abandoned Statement declared, as far as its Tokens
 	// say: the name behind a declaring Keyword, the `NAME(…)` a Method in a
 	// Namespace body opens with, the Parameters of a dropped head, and the
 	// members of a dropped `namespace`, `protocol` or `choice`. A Statement
@@ -51,13 +51,13 @@ export type Recovery = {
 	// whole of what this being incomplete costs: a read of such a name is
 	// answered exactly as it always was.
 	declarations: Array<AbandonedDeclaration>
-	// NOTE: Every line the Parser abandoned text on. A construct written
+	// Every line the Parser abandoned text on. A construct written
 	// across one of them is a construct it did not read whole, so what that
 	// construct LACKS says nothing: a Function missing the `<-` that was
 	// dropped out of it has not fallen off the end, and a `define` whose arms
 	// were dropped was not written without cases.
 	lines: Array<number>
-	// NOTE: The lines of the abandoned runs that could have OPENED A BODY — a
+	// The lines of the abandoned runs that could have OPENED A BODY — a
 	// run beginning `function`, `overload`, `static`, or the bare `NAME(` a
 	// Method in a Namespace body opens with. These are the only runs that can
 	// leave a `<-` standing outside a Function: `function f() -> Integer`
@@ -70,12 +70,12 @@ export type Recovery = {
 
 export type Program = {
 	nodeType: "Program"
-	// NOTE: `declarations { … }` is the standard library's opt-in program form —
+	// `declarations { … }` is the standard library's opt-in program form —
 	// its Namespace bodies may hold body-less native Method signatures and
 	// value-less static Properties. Every user Program is `implementation { … }`
 	// and can never declare a native.
 	//
-	// NOTE: `tests` is the form a file that is nothing but tests takes —
+	// `tests` is the form a file that is nothing but tests takes —
 	// `Season.tests.es`, imports and a `tests { … }` block and no
 	// implementation block at all. Such a Program still carries an
 	// `implementation` section, empty and spanning the `tests` block, so that
@@ -83,14 +83,14 @@ export type Program = {
 	// says the block was never written, and what keeps the Formatter from
 	// writing one.
 	kind: "implementation" | "declarations" | "tests"
-	// NOTE: The two Module sections framing the implementation, null when the
+	// The two Module sections framing the implementation, null when the
 	// file wrote neither — one file is one Module, and a Module with no imports
 	// and nothing exported is a complete Program. A `declarations { … }` Program
 	// never carries either: the standard library is one shared declaration
 	// space, not a graph of Modules.
 	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
-	// NOTE: `tests { … }`, written between the implementation and the
+	// `tests { … }`, written between the implementation and the
 	// `export { … }` block, and null in the files that write none — which is
 	// every file that ships. It is a section rather than a Statement because
 	// only a section can be dropped whole: `essence build` and `essence run`
@@ -98,7 +98,7 @@ export type Program = {
 	// Program nothing.
 	tests: TestsSectionNode | null
 	exports: ExportSectionNode | null
-	// NOTE: What the Parser abandoned on its way to this Program — see
+	// What the Parser abandoned on its way to this Program — see
 	// `Recovery`. ABSENT rather than empty for a Program that parsed, which is
 	// nearly every Program: a file with nothing wrong with it has the shape it
 	// has always had, and the record only turns up where there is something in
@@ -115,7 +115,7 @@ export type ImplementationSectionNode = {
 	position: Position
 }
 
-// NOTE: The `tests { … }` block. It holds the same Statements an
+// The `tests { … }` block. It holds the same Statements an
 // implementation block does — a `constant` written here is setup, and a
 // `function` written here is a helper — plus the two items only tests have.
 export type TestsSectionNode = {
@@ -124,7 +124,7 @@ export type TestsSectionNode = {
 	position: Position
 }
 
-// NOTE: What may stand in a tests section, or in a `suite`'s body: a test, a
+// What may stand in a tests section, or in a `suite`'s body: a test, a
 // nested suite, or any ordinary Statement. `TestNode` and `SuiteNode` are
 // deliberately NOT part of `StatementNode` — they can only ever be written
 // inside a tests section, and keeping them out of the Statement union is what
@@ -132,7 +132,7 @@ export type TestsSectionNode = {
 // can never meet.
 export type TestsNode = TestNode | SuiteNode | ImplementationNode
 
-// NOTE: `test "name" MODIFIER* { … }`. The name is a String so that it can say
+// `test "name" MODIFIER* { … }`. The name is a String so that it can say
 // what the test proves — and so that a table test can interpolate the row it
 // runs for.
 //
@@ -140,7 +140,7 @@ export type TestsNode = TestNode | SuiteNode | ImplementationNode
 // whole form, which is what a Diagnostic about the test underlines, while a
 // Code Lens ("Run · Debug") wants the one word to sit above.
 //
-// NOTE: `form` says which of the two sibling Keywords opened the item. A
+// `form` says which of the two sibling Keywords opened the item. A
 // `benchmark` is a test in every structural respect — a name, Modifiers, a
 // body, an identity — and what differs is what RUNNING it means: a test's body
 // is judged, a benchmark's body is timed. One Node keeps every stage that
@@ -150,12 +150,12 @@ export interface TestNode {
 	form: "test" | "benchmark"
 	name: StringValueNode | InterpolatedStringValueNode
 	modifiers: Array<TestModifierNode>
-	// NOTE: `across ROWS (row: Row)` — a table test, and null for the ordinary
+	// `across ROWS (row: Row)` — a table test, and null for the ordinary
 	// one. It is written between the Modifiers and the body because it is the
 	// last thing about the test that is not the test: what a reader reads is
 	// the name, then what it holds for, then what it does.
 	table: TestTableNode | null
-	// NOTE: `for any (a: T, b: U)` — a property test, and null for the ordinary
+	// `for any (a: T, b: U)` — a property test, and null for the ordinary
 	// one. It stands in the same slot a table's rows stand in, and for the same
 	// reason: it is the last thing about the test that is not the test. A test
 	// can not be both — one runs a written row at a time, the other runs a value
@@ -166,7 +166,7 @@ export interface TestNode {
 	position: Position
 }
 
-// NOTE: `across [ … ] (row: Row)`. The rows are a WRITTEN List so that each one
+// `across [ … ] (row: Row)`. The rows are a WRITTEN List so that each one
 // is a test of its own before anything runs — a test's identity carries the row
 // index, and a value worked out at run time could not be numbered at compile
 // time. `parameters` is a closure's parameter list, so a row can be taken apart
@@ -181,7 +181,7 @@ export interface TestTableNode {
 	position: Position
 }
 
-// NOTE: `for any (a: Integer, b: NonEmptyList<String>)`. Each Parameter names a
+// `for any (a: Integer, b: NonEmptyList<String>)`. Each Parameter names a
 // value the runner generates from its Type, once per case, and binds it in the
 // body. The Parameter list is a closure's, so the shape is the one a reader
 // already knows — but every Parameter must write a Type, since the Type is the
@@ -194,7 +194,7 @@ export interface TestPropertiesNode {
 	position: Position
 }
 
-// NOTE: `suite "name" MODIFIER* { … }` — a group of tests with a shared scope,
+// `suite "name" MODIFIER* { … }` — a group of tests with a shared scope,
 // nesting freely. Its Modifiers cover every test inside it.
 export interface SuiteNode {
 	nodeType: "Suite"
@@ -205,7 +205,7 @@ export interface SuiteNode {
 	position: Position
 }
 
-// NOTE: One Modifier of a test or a suite — `skipped "waiting on the redesign"`,
+// One Modifier of a test or a suite — `skipped "waiting on the redesign"`,
 // `focused`, `tagged slow, network`. The grammar is deliberately open: a name
 // and the arguments that follow it, with what each name MEANS left to the stage
 // that knows the vocabulary. That is what lets `within 2s` or `retries 3` be
@@ -217,7 +217,7 @@ export interface TestModifierNode {
 	position: Position
 }
 
-// NOTE: A Modifier argument is a literal or a bare name, and never a general
+// A Modifier argument is a literal or a bare name, and never a general
 // Expression: `{` opens the item's own block, and an Expression that may begin
 // with `{` would make `test "…" focused { … }` two readings with no lookahead
 // to settle them. A literal and a name are the two shapes the vocabulary needs
@@ -229,7 +229,7 @@ export type TestModifierArgumentNode =
 	| RationalValueNode
 	| BooleanValueNode
 
-// NOTE: `import { … }`, written above the implementation. Every name a Module
+// `import { … }`, written above the implementation. Every name a Module
 // uses from another one is listed here — including its Namespaces, since
 // importing a Type does not bring the Namespaces written for that Type along.
 //
@@ -244,7 +244,7 @@ export type ImportSectionNode = {
 	position: Position
 }
 
-// NOTE: `from "./Module.es" { … }` — every name taken from one dependency,
+// `from "./Module.es" { … }` — every name taken from one dependency,
 // written together. `source` is shared with each entry inside, so an entry
 // still says where it came from on its own.
 export type ImportGroupNode = {
@@ -254,7 +254,7 @@ export type ImportGroupNode = {
 	position: Position
 }
 
-// NOTE: `name as alias`, inside a group. `alias` is null when the entry binds
+// `name as alias`, inside a group. `alias` is null when the entry binds
 // the name the dependency exports it under; `name` always stays the exported
 // name, so the two sides of a rename are both still in hand.
 export type ImportNode = {
@@ -265,7 +265,7 @@ export type ImportNode = {
 	position: Position
 }
 
-// NOTE: `export { … }`, written below the implementation. A name is private
+// `export { … }`, written below the implementation. A name is private
 // unless it is listed here. What the Module declares is written bare; what it
 // forwards from a dependency is written in a group, the way an import is.
 // `entries` is both kinds flat, in written order, for the reason an import
@@ -277,7 +277,7 @@ export type ExportSectionNode = {
 	position: Position
 }
 
-// NOTE: `from "./Module.es" { … }` in an export block — names forwarded from
+// `from "./Module.es" { … }` in an export block — names forwarded from
 // one dependency, written together.
 export type ExportGroupNode = {
 	nodeType: "ExportGroup"
@@ -286,7 +286,7 @@ export type ExportGroupNode = {
 	position: Position
 }
 
-// NOTE: A `source` makes the entry a re-export — it forwards a dependency's
+// A `source` makes the entry a re-export — it forwards a dependency's
 // name without ever binding it locally, so the name it carries need not be
 // declared in this Program at all. Null is the ordinary form, which exports
 // something this Program declares.
@@ -298,7 +298,7 @@ export type ExportNode = {
 	position: Position
 }
 
-// NOTE: The String Literal a `from` clause carries, recorded exactly as it was
+// The String Literal a `from` clause carries, recorded exactly as it was
 // written — whether the path is relative, reachable, or names a file at all is
 // resolution's question, not the Parser's.
 export type ModuleSpecifierNode = {
@@ -329,7 +329,7 @@ export type ExpressionNode =
 	| CompleteNode
 	| RefusedValueNode
 
-// NOTE: What is left where an Expression was refused WHERE IT WAS WRITTEN —
+// What is left where an Expression was refused WHERE IT WAS WRITTEN —
 // `primes[0]`, which is how every other language reads an item and how none of
 // this one does. The habit is reported at its brackets and the brackets are
 // read past, and this Node is the hole they leave so that the Statement around
@@ -349,7 +349,7 @@ export type ExpressionNode =
 // Parser reported an error on, and no stage runs past a reported error.
 export interface RefusedValueNode {
 	nodeType: "RefusedValue"
-	// NOTE: What was written in FRONT of the refused text, kept whole. It is a
+	// What was written in FRONT of the refused text, kept whole. It is a
 	// value a reader wrote, and it is enriched exactly as it would have been —
 	// so a mistake inside it is still reported, and only the reading of the
 	// brackets is lost. What stood INSIDE them is not kept: `items[items.length
@@ -360,19 +360,19 @@ export interface RefusedValueNode {
 	position: Position
 }
 
-// NOTE: `start expr` and `complete expr` — the two prefix Keywords asynchrony
+// `start expr` and `complete expr` — the two prefix Keywords asynchrony
 // is written with. `start` puts a Future in flight and answers the `Started`
 // that stands for that one run; `complete` waits for what a Future or a
 // `Started` answers with.
 //
-// NOTE: The operand is the WHOLE postfix chain, which is what makes
+// The operand is the WHOLE postfix chain, which is what makes
 // `complete headline(url)::retried(times 3)` read as the retried future
 // completed rather than as `complete headline(url)` with a Method called on the
 // value. A Method call on what was waited for is written by binding first —
 // `constant answer = complete x`, then `answer::m()` — because Essence has no
 // grouping parentheses: `(complete x)` is a syntax error, not a group.
 //
-// NOTE: Both words are CONTEXTUAL Keywords, read as such only where an
+// Both words are CONTEXTUAL Keywords, read as such only where an
 // Expression follows them on the same line and nothing carries the word itself
 // on — `opensAsynchrony` in the Parser's `descent/parse.ts` is the whole rule,
 // and its NOTE says what that reading costs. So `constant start = 1` binds a
@@ -390,7 +390,7 @@ export interface CompleteNode {
 	position: Position
 }
 
-// NOTE: `ChoiceName#CaseName` with an optional payload —
+// `ChoiceName#CaseName` with an optional payload —
 // `CalculatorOperation#Add({ left = 1, right = 1 })` constructs a Case,
 // `CalculatorOperation#ClearAll` references a unit Case. The payload is any
 // Expression of the Case's Record shape, not only a literal. A null `choice`
@@ -399,7 +399,7 @@ export interface CompleteNode {
 export interface CaseValueNode {
 	nodeType: "CaseValue"
 	choice: IdentifierNode | null
-	// NOTE: The Type Arguments of a value-position application —
+	// The Type Arguments of a value-position application —
 	// `Holder<Integer>#Full({ … })`. A Choice's Type Parameters are applied,
 	// never inferred, and this is the spelling that applies them where the
 	// position the construction stands in does not. Null when none were written,
@@ -439,27 +439,27 @@ export type ValueNode =
 	| ListValueNode
 	| DictionaryValueNode
 
-// NOTE: Record members keep their name as a full IdentifierNode — the
+// Record members keep their name as a full IdentifierNode — the
 // Language Server needs the name's Position for renaming.
 export interface RecordValueMemberNode {
 	name: IdentifierNode
-	// NOTE: Null exactly where `group` is set — a braced descend writes a whole
+	// Null exactly where `group` is set — a braced descend writes a whole
 	// member list one level down instead of one value.
 	value: ExpressionNode | null
-	// NOTE: Set where the member was written as a bare name — `{ x }`, which
+	// Set where the member was written as a bare name — `{ x }`, which
 	// is `{ x = x }`. The name and the value are then two Nodes at ONE
 	// Position, which is what lets a rename of either one expand the member
 	// back to its written-out form. Absent rather than false on a member that
 	// spelled its value, so nothing that compares two ASTs — the Formatter's
 	// safety gate above all — sees a key appear where it was not written.
 	shorthand?: true
-	// NOTE: Every step of a dotted key — `server.tls.enabled = true` — INCLUDING
+	// Every step of a dotted key — `server.tls.enabled = true` — INCLUDING
 	// the first, which `name` also points at, so nothing that reads `name` moves
 	// for one. The member is keyed in `members` by its dotted spelling, because
 	// two paths sharing a prefix would otherwise collide under one name. Absent
 	// on an ordinary key, which is every key that is not a path.
 	steps?: Array<IdentifierNode>
-	// NOTE: A braced descend — `server.{ port = 1, host = "db" }` — which is a
+	// A braced descend — `server.{ port = 1, host = "db" }` — which is a
 	// whole member list written against the value `steps` reaches. Absent
 	// wherever the key spelled a value instead, which is everywhere else.
 	group?: RecordValueNode
@@ -478,7 +478,7 @@ export type StringValueNode = {
 	position: Position
 }
 
-// NOTE: A String Literal that carries `{ … }` holes. `segments` alternates a
+// A String Literal that carries `{ … }` holes. `segments` alternates a
 // (possibly empty) text run with the Expression of each hole, in written order,
 // starting and ending with a text run — so `"a{x}b"` is text-hole-text and
 // `"{x}"` is text(empty)-hole-text(empty). `text` values are already escape-
@@ -525,7 +525,7 @@ export type ListValueNode = {
 	position: Position
 }
 
-// NOTE: One `key = value` of a Dictionary Literal. Both halves are ordinary
+// One `key = value` of a Dictionary Literal. Both halves are ordinary
 // Expressions — a Dictionary's key is a VALUE, not a name, which is the whole
 // difference between `["a" = 1]` and `{ a = 1 }` — so neither is an Identifier
 // Node and neither is renamed with anything.
@@ -535,7 +535,7 @@ export type DictionaryEntryNode = {
 	position: Position
 }
 
-// NOTE: `["alex" = 39, "sam" = 25]` and `[=]`, the empty one. The entries are a
+// `["alex" = 39, "sam" = 25]` and `[=]`, the empty one. The entries are a
 // LIST rather than a name-keyed Record — two written keys may well be the same
 // value without being the same text, and the order they were written in is the
 // order the Dictionary holds them in, so nothing here may be keyed or sorted.
@@ -552,7 +552,7 @@ export interface LookupNode {
 	position: Position
 }
 
-// NOTE: `.price`, `.address.city` — a leading dot and the members that follow
+// `.price`, `.address.city` — a leading dot and the members that follow
 // it, written where a Function of one Parameter is expected. It stands for the
 // Function that reads those members off its Argument, and the Enricher is where
 // it becomes one: nothing downstream of enrichment ever sees a MemberPath.
@@ -581,7 +581,7 @@ export interface CombinationNode {
 	nodeType: "Combination"
 	lhs: ExpressionNode
 	rhs: ExpressionNode
-	// NOTE: Set where the update was written in BRACKETS — `[ages with "kim" =
+	// Set where the update was written in BRACKETS — `[ages with "kim" =
 	// 7]`, the Dictionary spelling — and absent where it was written in braces,
 	// which is every Record update and every Combination that existed before
 	// Dictionaries did. The two spellings mean different things and no Node
@@ -594,7 +594,7 @@ export interface CombinationNode {
 	// Formatter's safety gate above all — sees a key appear where none was
 	// written, which is the rule `shorthand` and `merged` are kept by.
 	brackets?: true
-	// NOTE: Set where the update's right side is its own BARE key list —
+	// Set where the update's right side is its own BARE key list —
 	// `[ages with "kim" = 7]` and `{ config with port = 1 }` — and absent where
 	// a whole value was written there, key list or not: `[ages with ["kim" =
 	// 7]]` brought brackets of its own and merges that Dictionary in.
@@ -614,7 +614,7 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: MatcherNode
-		// NOTE: A `where` Guard makes the Handler conditional — it can decline
+		// A `where` Guard makes the Handler conditional — it can decline
 		// a value its Matcher accepted, which is why a guarded Handler can
 		// never count towards exhaustiveness.
 		guard: ExpressionNode | null
@@ -623,7 +623,7 @@ export interface MatchNode {
 	position: Position
 }
 
-// NOTE: `define { as "A" if score::isGreaterThan(90) … as "F" otherwise }` — a
+// `define { as "A" if score::isGreaterThan(90) … as "F" otherwise }` — a
 // definition by cases. The arms are tried in the order they were written and
 // the Expression answers with the value of the first whose Condition holds, or
 // with the `otherwise` arm's value when none of them does.
@@ -636,7 +636,7 @@ export interface MatchNode {
 // `returnType` is the answer Type where `define -> Type { … }` wrote one, and
 // null where it is left to the arms to say.
 //
-// NOTE: The `otherwise` arm is a field of its own rather than an arm with no
+// The `otherwise` arm is a field of its own rather than an arm with no
 // Condition, so that "there is exactly one, and it is last" holds of every Node
 // that can be BUILT — rather than being a rule the Parser keeps and every
 // reader downstream has to trust it kept.
@@ -648,7 +648,7 @@ export interface DefineNode {
 	position: Position
 }
 
-// NOTE: Each arm carries the Position it was written across — `as` to the end
+// Each arm carries the Position it was written across — `as` to the end
 // of its Condition. A Match Handler carries none, and every reader of one pays
 // for that by going back to the source to find the lines it spans; an arm is
 // cheap to position and there is no reason to repeat that.
@@ -670,12 +670,12 @@ export type MatcherNode =
 	| PatternNode
 	| CaseMatcherNode
 
-// NOTE: `case #Add` — a bare Case Matcher resolves its name against the
+// `case #Add` — a bare Case Matcher resolves its name against the
 // matched value's own Union, so Cases match without their Choice's name in
 // scope. The prefixed form (`case CalculatorOperation#Add`) disambiguates
 // when two Choices in one Union share a Case name.
 //
-// NOTE: `binding` is the optional payload binder — `case #Value(item)` names
+// `binding` is the optional payload binder — `case #Value(item)` names
 // the payload for the span of the arm. It names exactly what the CONSTRUCTOR
 // takes, which is what makes `case #Value(item)` the mirror of `#Value(5)`: on
 // a one-member Case the constructor takes that member's value, through the
@@ -697,7 +697,7 @@ export interface CaseMatcherNode {
 	position: Position
 }
 
-// NOTE: A Pattern names the parts of a value. It is the Record Matcher
+// A Pattern names the parts of a value. It is the Record Matcher
 // grammar — `name: Type` constrains by Type, `name = value` by value —
 // generalised into the four positions that take a value apart: a Matcher, a
 // Case payload binder, a Parameter and a Declaration.
@@ -715,7 +715,7 @@ export interface CaseMatcherNode {
 export interface PatternNode {
 	nodeType: "Pattern"
 	members: Record<string, PatternMemberNode>
-	// NOTE: `} as name` — one name for the whole value, alongside the names its
+	// `} as name` — one name for the whole value, alongside the names its
 	// members bind. It is what lets a Function literal take a Record apart and
 	// still write `{ state with … }`. Refused at the top level of a Matcher,
 	// where `@` already means exactly that.
@@ -723,17 +723,17 @@ export interface PatternNode {
 	position: Position
 }
 
-// NOTE: `position` spans the member as written, which is what a Diagnostic
+// `position` spans the member as written, which is what a Diagnostic
 // about one member underlines — neither `name` nor `type`/`value` alone covers
 // `width: Integer as w`.
 export type PatternMemberNode =
 	| {
 			kind: "Type"
 			name: IdentifierNode
-			// NOTE: Null is the elided form, `{ x }`. The Type then comes from
+			// Null is the elided form, `{ x }`. The Type then comes from
 			// the value being taken apart rather than from the source.
 			type: TypeDeclarationNode | null
-			// NOTE: `as` — another name, or a nested Pattern. Null binds the
+			// `as` — another name, or a nested Pattern. Null binds the
 			// member under its own name.
 			binder: PatternBinderNode | null
 			position: Position
@@ -745,18 +745,18 @@ export type PatternMemberNode =
 			position: Position
 	  }
 
-// NOTE: A binder is a name or another Pattern. That one line is the whole of
+// A binder is a name or another Pattern. That one line is the whole of
 // nesting: `{ origin as { x, y } }` needs no syntax of its own.
 export type PatternBinderNode = IdentifierNode | PatternNode
 
-// NOTE: `case _` carries no Type of its own — the Enricher resolves it to
+// `case _` carries no Type of its own — the Enricher resolves it to
 // whatever the Handlers before it have not already caught.
 export interface WildcardMatcherNode {
 	nodeType: "WildcardMatcher"
 	position: Position
 }
 
-// NOTE: `case 0` matches one *value* rather than a Type, so — like a Guard —
+// `case 0` matches one *value* rather than a Type, so — like a Guard —
 // it only ever covers part of its own Type.
 export interface LiteralMatcherNode {
 	nodeType: "LiteralMatcher"
@@ -790,7 +790,7 @@ export type StatementNode =
 	| ExpectStatementNode
 	| RequireStatementNode
 
-// NOTE: `expect EXPR`. An assertion is a Statement rather than a Method call so
+// `expect EXPR`. An assertion is a Statement rather than a Method call so
 // that the Compiler can keep the value of every sub-expression of what was
 // asserted — which is what lets a plain Boolean Expression explain its own
 // failure without a vocabulary of matchers.
@@ -808,14 +808,14 @@ export interface ExpectStatementNode {
 	nodeType: "ExpectStatement"
 	value: ExpressionNode
 	matcher: MatcherNode | null
-	// NOTE: `matches snapshot`, and null for every other form. An assertion
+	// `matches snapshot`, and null for every other form. An assertion
 	// carries at most one of `matcher` and `snapshot` — the Parser writes the
 	// one that was written.
 	snapshot: SnapshotNode | null
 	position: Position
 }
 
-// NOTE: What `matches snapshot` compares against. `name` is written for a
+// What `matches snapshot` compares against. `name` is written for a
 // STORED snapshot — `matches snapshot from "season-report"`, kept in
 // `__snapshots__/<File>.es.snap` beside the file — and null for an inline one,
 // whose recorded text is the String Literal in the source. `value` is null
@@ -824,7 +824,7 @@ export interface SnapshotNode {
 	nodeType: "Snapshot"
 	name: StringValueNode | null
 	value: StringValueNode | null
-	// NOTE: Where a recorded value stands, or would stand — the `snapshot`
+	// Where a recorded value stands, or would stand — the `snapshot`
 	// Keyword's own span where none is written yet. It is the span
 	// `essence test --update` replaces, and the one the Editor's "Accept
 	// snapshot" writes into.
@@ -833,7 +833,7 @@ export interface SnapshotNode {
 	position: Position
 }
 
-// NOTE: What `expect` says, plus the one form only this Keyword has:
+// What `expect` says, plus the one form only this Keyword has:
 // `require MATCHER = EXPR`. What differs is what a failure does — an `expect`
 // records and the test carries on; a `require` ends the test where it stands,
 // which is what makes it the way a test takes an Optional or a Choice apart
@@ -851,7 +851,7 @@ export interface RequireStatementNode {
 	position: Position
 }
 
-// NOTE: `name` is a Pattern where the Declaration takes the value apart —
+// `name` is a Pattern where the Declaration takes the value apart —
 // `constant { accepted, refused } = list::partition(where …)`. A Declaration can
 // not decline a value, so the Pattern there must be irrefutable: a member
 // constrained by value is refused, and so is a Case. A member constrained by
@@ -893,7 +893,7 @@ export interface StaticMethod {
 	method: FunctionValueNode
 }
 
-// NOTE: The whole `overload name { … }` block, opening keyword through closing
+// The whole `overload name { … }` block, opening keyword through closing
 // brace. An overload group holds signatures and nothing else, so what a reader
 // may write between those braces is a question the Editor has to be able to
 // ask — and the entries alone can not answer it for a group that is still
@@ -914,7 +914,7 @@ export interface OverloadedStaticMethod {
 	documentation: Documentation | null
 }
 
-// NOTE: A body-less native Method signature — the `declarations { … }` form of
+// A body-less native Method signature — the `declarations { … }` form of
 // a Method. It carries the same shape as a bodied Method minus the block: an
 // optional Generic list, a Parameter list and a return Type. Only the standard
 // library's Namespace bodies produce these; a user Program never can.
@@ -939,7 +939,7 @@ export interface StaticMethodSignature {
 	signature: NativeMethodSignatureNode
 }
 
-// NOTE: An `overload` block in a `declarations { … }` Program may MIX bodied
+// An `overload` block in a `declarations { … }` Program may MIX bodied
 // and body-less entries — one overload implemented in Essence, another bound to
 // the runtime by name. Each entry is therefore either a Function literal or a
 // native signature.
@@ -971,7 +971,7 @@ export type NamespaceMethods = Record<
 	| OverloadedStaticMethodSignatures
 >
 
-// NOTE: `value` is null only for a native static Property in a
+// `value` is null only for a native static Property in a
 // `declarations { … }` Program — `static Pi: Transcendental` with no `=`. Every
 // static Property in a user Program still parses its `= value`.
 export interface NamespacePropertyNode {
@@ -993,7 +993,7 @@ export interface NamespaceDefinitionStatementNode {
 	documentation: Documentation | null
 }
 
-// NOTE: One `is Protocol where …` clause of a Namespace conformance list.
+// One `is Protocol where …` clause of a Namespace conformance list.
 // The `where` conditions are empty for an unconditional conformance.
 export interface ConformanceClauseNode {
 	nodeType: "ConformanceClause"
@@ -1002,7 +1002,7 @@ export interface ConformanceClauseNode {
 	position: Position
 }
 
-// NOTE: One `Generic is Protocol` condition of a `where` clause — the LHS
+// One `Generic is Protocol` condition of a `where` clause — the LHS
 // names one of the Namespace's own Type Parameters, the RHS the Protocol it
 // must satisfy for the conformance to hold.
 export interface WhereConditionNode {
@@ -1016,7 +1016,7 @@ export interface ProtocolMethodSignatureNode {
 	nodeType: "ProtocolMethodSignature"
 	parameters: Array<ParameterNode>
 	returnType: TypeDeclarationNode
-	// NOTE: The block a PROVIDED Method carries, and null for a requirement —
+	// The block a PROVIDED Method carries, and null for a requirement —
 	// which is the whole of the difference between the two. It holds the SAME
 	// Parameter and return Type Nodes this signature does, so the two views of
 	// one Method can not drift: the Enricher resolves the signature off the
@@ -1065,7 +1065,7 @@ export type ProtocolMethods = Record<
 export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
-	// NOTE: The Protocols this one EXTENDS, written in the `is A, is B` list a
+	// The Protocols this one EXTENDS, written in the `is A, is B` list a
 	// Namespace conformance uses — the same Node, so the two spellings can not
 	// drift. A `where` clause is refused at the Enricher: a Protocol has no
 	// Type Parameters for one to bound.
@@ -1075,19 +1075,19 @@ export interface ProtocolDeclarationStatementNode {
 	documentation: Documentation | null
 }
 
-// NOTE: A Case's payload is always declared as a Record shape (or nothing at
+// A Case's payload is always declared as a Record shape (or nothing at
 // all for a unit Case) — every payload member is named at the declaration, so
 // no wrapper property is ever needed to reach it.
 export interface ChoiceCaseNode {
 	name: IdentifierNode
 	type: RecordTypeDeclarationNode | null
-	// NOTE: The `= { … }` a payload shape may be followed by — the Record a
+	// The `= { … }` a payload shape may be followed by — the Record a
 	// construction's own payload is filled out of, which may name only some of
 	// the payload's members. Null where none was written, and null on a Case
 	// with no payload shape at all: there is nothing there to default, which
 	// the Parser refuses as `case-default-without-payload`.
 	//
-	// NOTE: An arbitrary Expression here, as a Parameter's default is, so that
+	// An arbitrary Expression here, as a Parameter's default is, so that
 	// what a default may SAY is one question the Enricher answers rather than
 	// two the grammar answers differently.
 	defaultValue: ExpressionNode | null
@@ -1107,7 +1107,7 @@ export interface TypeAliasStatementNode {
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	type: TypeDeclarationNode
-	// NOTE: The `where` clause of a checked refinement — `type NonZeroInteger =
+	// The `where` clause of a checked refinement — `type NonZeroInteger =
 	// Integer where @::isNot(0)` — where `@` stands for the value being refined.
 	// Null for an ordinary Alias, which is every Alias the language had before
 	// refinements. It is an arbitrary Expression here on purpose: what a
@@ -1146,7 +1146,7 @@ export interface FunctionStatementNode {
 	position: Position
 }
 
-// NOTE: An `overload function <name> { … }` block, mirroring an `overload`
+// An `overload function <name> { … }` block, mirroring an `overload`
 // Method block minus the Namespace. Entries MIX bodied Function literals and
 // body-less native signatures in written order — the index picks the
 // `__overload$N` name a call site resolves against. Declarations mode only.
@@ -1177,7 +1177,7 @@ export interface GenericDeclarationNode {
 	name: IdentifierNode
 	defaultType: TypeDeclarationNode | null
 	inferred: boolean
-	// NOTE: The Protocol bound of `<infer Item is Comparable>` — null when
+	// The Protocol bound of `<infer Item is Comparable>` — null when
 	// the Type Parameter is unbounded.
 	constraint: IdentifierNode | null
 	position: Position
@@ -1189,7 +1189,7 @@ export interface IdentifierTypeDeclarationNode {
 	position: Position
 }
 
-// NOTE: Record Type members keep their name as a full IdentifierNode — the
+// Record Type members keep their name as a full IdentifierNode — the
 // Language Server needs the name's Position for renaming.
 export interface RecordTypeMemberNode {
 	name: IdentifierNode
@@ -1229,7 +1229,7 @@ export interface GenericTypeDeclarationNode {
 	position: Position
 }
 
-// NOTE: `returnType` is null for a Function literal in Argument position that
+// `returnType` is null for a Function literal in Argument position that
 // omitted its `-> Type` — the Type comes from the expected signature, or from
 // the body when the expected signature leaves it Generic. Only
 // `parseFunctionLiteral` reached from expression position can produce a null;
@@ -1241,24 +1241,24 @@ export interface FunctionDefinitionNode {
 	returnType: TypeDeclarationNode | null
 	body: Array<ImplementationNode>
 	documentation: Documentation | null
-	// NOTE: Where an omitted `-> Type` would have been written — the end of
+	// Where an omitted `-> Type` would have been written — the end of
 	// the Parameter list. Carried so that an Inlay Hint for an inferred return
 	// Type has somewhere to sit.
 	parameterListPosition: Position
-	// NOTE: The span of the whole `<…>`, angle brackets included — absent where
+	// The span of the whole `<…>`, angle brackets included — absent where
 	// none is written. An entry's own Position says where the entry is; this is
 	// the only thing that says where the list AROUND it begins, which is what an
 	// edit removing the last entry has to take with it. Read off the Parser
 	// rather than worked out from a column, because `<` need not sit beside the
 	// entry: a list broken across lines puts it on the line before.
 	genericListPosition?: Position
-	// NOTE: Set where this body writes a `complete` of its OWN — one that is not
+	// Set where this body writes a `complete` of its OWN — one that is not
 	// inside a Function literal written in it, which has a body and a mark of its
 	// own. Such a body is a COMPLETING body: it suspends, so it has to declare
 	// `-> Future<T>`, its `<-` answers with the inner `T`, and the Rewriter wraps
 	// what it emits in the async closure that context flows through.
 	//
-	// NOTE: Read off the body by the PARSER, which is the one reader that has
+	// Read off the body by the PARSER, which is the one reader that has
 	// already seen it when the answer is needed. The Enricher has to know before
 	// it reads a single Statement — `<-` is checked against the inner Type and a
 	// bare Case resolves against it — so working it out there would mean walking
@@ -1266,13 +1266,13 @@ export interface FunctionDefinitionNode {
 	// Nothing about the mark is a judgement: it is "this body writes the word",
 	// which is exactly what the Parser was looking at.
 	//
-	// NOTE: Absent rather than `false`, like every other derived flag on a Node
+	// Absent rather than `false`, like every other derived flag on a Node
 	// here, so that the Formatter's safety gate sees no key appear on a body that
 	// completes nothing.
 	completing?: true
 }
 
-// NOTE: `internalName` is null for `_: Type`, which binds no name at all —
+// `internalName` is null for `_: Type`, which binds no name at all —
 // the Parameter is positional and unreferenceable. That is what Function Types
 // (where a name could never be referred to) and deliberately ignored
 // Parameters need. `_ name: Type` still binds `name`, it only drops the label.
@@ -1290,7 +1290,7 @@ export interface FunctionDefinitionNode {
 // are separate questions, and only the second one a Pattern answers.
 // `externalName` is never a Pattern, which is what lets the Parser keep
 // reusing ONE Identifier for both names in the `count: Integer` form.
-// NOTE: `defaultValue` is the `= expression` a caller may leave out, and is
+// `defaultValue` is the `= expression` a caller may leave out, and is
 // null for a Parameter that must be written at every call. It is deliberately
 // NOT covered by `position`, which keeps spanning name-through-Type: three
 // consumers anchor off `position.end` — the Language Server's inferred-Type

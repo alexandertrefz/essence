@@ -2,7 +2,7 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { modulePathOf } from "./scope"
 
-// NOTE: The Types written down in a source, paired with what each one resolved
+// The Types written down in a source, paired with what each one resolved
 // to. Module state, exactly as the Diagnostic list is — `resolveType` would
 // otherwise have to thread a collector through itself and its ~35 callers, for
 // something no stage of the Compiler reads.
@@ -24,7 +24,7 @@ let activeAnnotations: Map<
 	{ type: common.Type; modulePath: string | null }
 > | null = null
 
-// NOTE: The Scope is only consulted when a collector is open — the walk to its
+// The Scope is only consulted when a collector is open — the walk to its
 // Module path is not free, and a compile records nothing.
 export function recordAnnotation(
 	node: parser.TypeDeclarationNode,
@@ -38,13 +38,13 @@ export function recordAnnotation(
 	activeAnnotations.set(node, { type, modulePath: modulePathOf(scope) })
 }
 
-// NOTE: Opened ONCE, around a whole enrichment — NOT per speculative round the
+// Opened ONCE, around a whole enrichment — NOT per speculative round the
 // way `collectDiagnostics` is, and that is not a matter of taste. A hoisted
 // Type Alias, Choice, Protocol or Namespace target is never re-resolved
 // afterwards (`enrichStatement` reuses the hoisted Type), so its annotations
 // exist ONLY inside a speculation. Scoping the collector to a round would
 // discard precisely those, and the index would answer for almost nothing.
-// NOTE: `modulePath` filters the collection to the annotations recorded while
+// `modulePath` filters the collection to the annotations recorded while
 // enriching ONE Module — a group of Modules hoists every file's declarations
 // interleaved, so a collector spanning the group holds every file's
 // annotations, at Positions that mean nothing outside their own file. The

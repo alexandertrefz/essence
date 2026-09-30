@@ -1,6 +1,6 @@
 import { format } from "@essence-lang/formatter"
 
-// NOTE: The shape the LSP wants back, kept structural so this module needs
+// The shape the LSP wants back, kept structural so this module needs
 // nothing from `vscode-languageserver` and can be tested on its own.
 type FormattingEdit = {
 	range: {
@@ -10,7 +10,7 @@ type FormattingEdit = {
 	newText: string
 }
 
-// NOTE: `warning` carries an `unsafe` refusal's message — the formatter found
+// `warning` carries an `unsafe` refusal's message — the formatter found
 // its own output wanting and kept the file as it was, which is a formatter bug
 // and worth saying out loud. A syntax refusal stays silent: it is most
 // keystrokes and every format-on-save of a file caught mid-edit, and the
@@ -20,7 +20,7 @@ type FormattingResult = {
 	warning: string | null
 }
 
-// NOTE: In the 0-based line/character the protocol counts in — which is not
+// In the 0-based line/character the protocol counts in — which is not
 // the compiler's 1-based Cursor, and not a byte offset either, since neither
 // the protocol nor the compiler has one.
 function positionAt(
@@ -40,7 +40,7 @@ function positionAt(
 	return { line, character: offset - lineStart }
 }
 
-// NOTE: One edit covering the changed middle of the document — the untouched
+// One edit covering the changed middle of the document — the untouched
 // lead and tail are pared off by common prefix and suffix, so a format-on-save
 // that fixes one line does not replace the whole buffer under the cursor. Any
 // finer diff would be invented after the fact rather than produced by the
@@ -53,7 +53,7 @@ function narrowedEdit(source: string, formatted: string): FormattingEdit {
 		prefix++
 	}
 
-	// NOTE: The suffix must not reach back into the prefix — when one text is
+	// The suffix must not reach back into the prefix — when one text is
 	// a substring of the other, the same characters would otherwise be counted
 	// from both ends.
 	let suffix = 0
@@ -75,7 +75,7 @@ function narrowedEdit(source: string, formatted: string): FormattingEdit {
 	}
 }
 
-// NOTE: `edits` is `null` both while the document does not parse and when it
+// `edits` is `null` both while the document does not parse and when it
 // is already formatted, so that an editor's format-on-save neither reports a
 // failed request nor marks a clean buffer dirty.
 //

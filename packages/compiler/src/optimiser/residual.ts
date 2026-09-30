@@ -1,13 +1,13 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: What a Matcher's runtime Type check REDUCES TO once the Type of the
+// What a Matcher's runtime Type check REDUCES TO once the Type of the
 // value being tested is taken into account. `$type.isValueOfType(value,
 // <descriptor>)` is a general answer to a general question — it walks a
 // descriptor tree it was handed and asks about a value it knows nothing about —
 // and at almost every site the Compiler already knows which of its branches can
 // be taken. The residual is the part it does not know.
 //
-// NOTE: Asked by several passes and computed here, once, because what a Matcher
+// Asked by several passes and computed here, once, because what a Matcher
 // can and can not accept is one reading of `isValueOfType`, and two readings
 // would be two chances to disagree with it:
 //
@@ -27,7 +27,7 @@ import type { common } from "@essence-lang/interfaces"
 // `elide-final-match-test`, `compile-union-dispatch` and `prune-dead-match-arms`
 // each remove a check on the strength of these answers.
 //
-// NOTE: Conservative in one direction only. Every rule here narrows a check the
+// Conservative in one direction only. Every rule here narrows a check the
 // runtime would have performed to a cheaper one that answers the same, and where
 // the Compiler can not prove the two agree it says `descriptor` and the full
 // check stays. So a rule that is missing costs speed, and only a rule that is
@@ -35,19 +35,19 @@ import type { common } from "@essence-lang/interfaces"
 // rather than assumed away.
 
 export type MatcherResidual =
-	// NOTE: The value's hidden Type key decides it, on its own: every value that
+	// The value's hidden Type key decides it, on its own: every value that
 	// can reach this test and carries this tag passes the Matcher, and every
 	// value that does not carry it fails.
 	| { kind: "tag"; tag: string }
-	// NOTE: Nothing is left to test — the check the runtime would have run
+	// Nothing is left to test — the check the runtime would have run
 	// answers true for every value that can reach it. A wildcard Handler
 	// (`case _`) and a Matcher naming the scrutinee's only Type are both this.
 	| { kind: "always" }
-	// NOTE: The check stands as written. Either the Matcher asks something no
+	// The check stands as written. Either the Matcher asks something no
 	// tag can answer — a Record's members, a List's items — or erasure leaves
 	// two Types sharing one tag and the payload is what tells them apart.
 	//
-	// NOTE: This is the answer `recordMatcherTests` below tries to do better
+	// This is the answer `recordMatcherTests` below tries to do better
 	// than for a Record Matcher, and the one it falls back to.
 	| { kind: "descriptor" }
 
@@ -58,14 +58,14 @@ export function matcherResidual(
 	return matcherResidualOverMembers(matcher, unionMembersOf(valueType))
 }
 
-// NOTE: The same question asked of the MEMBERS themselves, for a caller holding
+// The same question asked of the MEMBERS themselves, for a caller holding
 // them rather than the Union they were read out of. A Union dispatch is that
 // caller: the Enricher built one case per member of the receiver's Union, so
 // the case list IS the set of values that can arrive, and reading the Union's
 // spelling a second time would be asking a second source for an answer the
 // cases already give.
 //
-// NOTE: `matcherResidual` is this function with the members flattened out of a
+// `matcherResidual` is this function with the members flattened out of a
 // Type, and the two therefore can not drift: what a Match Handler's check
 // reduces to and what a dispatch case's check reduces to are decided by the
 // same rules in the same order.
@@ -76,7 +76,7 @@ export function matcherResidualOverMembers(
 	let tag = lowerableTagOf(matcher)
 
 	if (tag !== null) {
-		// NOTE: Some Matchers ARE a tag test, whatever they are asked about —
+		// Some Matchers ARE a tag test, whatever they are asked about —
 		// there is nothing under the tag for the runtime to look at — so those
 		// need no argument about what can arrive.
 		if (checkIsTagAlone(matcher)) {
@@ -90,7 +90,7 @@ export function matcherResidualOverMembers(
 		}
 	}
 
-	// NOTE: Every member, because any of them may arrive — which is the arm
+	// Every member, because any of them may arrive — which is the arm
 	// `checkIsImplied` takes for a Union-typed value, with the members already
 	// in hand.
 	if (members.every((member) => checkIsImplied(matcher, member))) {
@@ -100,21 +100,21 @@ export function matcherResidualOverMembers(
 	return { kind: "descriptor" }
 }
 
-// NOTE: ONE test of the decision tree a Record Matcher's check becomes — the
+// ONE test of the decision tree a Record Matcher's check becomes — the
 // member spine it reads, and what it asks of what it finds there. A tree is a
 // run of these, ANDed in the order they are given, and each is a question the
 // runtime's own walk would have asked of the same value.
 export type MatcherMemberTest = {
-	// NOTE: The member names reaching the value this asks about, read from the
+	// The member names reaching the value this asks about, read from the
 	// matched value down. Empty is the matched value itself, which is where the
 	// "is it a Record at all" test stands.
 	path: ReadonlyArray<string>
-	// NOTE: A tag comparison, or the general check over this Type — the same
+	// A tag comparison, or the general check over this Type — the same
 	// two things `compile-type-tests` writes a Matcher's own check into, asked
 	// one level down. A `descriptor` here is the walk moved from the whole value
 	// onto the ONE member that still needed it.
 	//
-	// NOTE: `optional` is whether the value this reads may not be THERE — a
+	// `optional` is whether the value this reads may not be THERE — a
 	// member of a Record Matcher that the arriving Types do not all declare,
 	// which openness allows a value to reach the test without. The read is made
 	// through `?.` and the comparison answers false for a value that is absent,
@@ -128,12 +128,12 @@ export type MatcherMemberTest = {
 		| { kind: "descriptor"; matcher: common.Type }
 }
 
-// NOTE: What is left of `isValueOfType(value, <a Record Matcher>)` once the
+// What is left of `isValueOfType(value, <a Record Matcher>)` once the
 // static Type of the value is taken into account — the members that actually
 // DISCRIMINATE, and null where the argument below does not hold and the walk
 // has to stay.
 //
-// NOTE: THE ARGUMENT. `isValueOfType` against a Record descriptor is a
+// THE ARGUMENT. `isValueOfType` against a Record descriptor is a
 // conjunction of independent, total, side-effect-free questions: the value's tag
 // is `"Record"`, and then, per member the Matcher names, `Object.hasOwn(value,
 // name)` and `isValueOfType(value[name], <the member's Type>)`. A Record Matcher
@@ -143,7 +143,7 @@ export type MatcherMemberTest = {
 // that answers the same for every value that can arrive, and where a rule can
 // not be shown to hold the whole plan is refused rather than narrowed.
 //
-// NOTE: THE TAG. Dropped exactly where every member of what can arrive carries
+// THE TAG. Dropped exactly where every member of what can arrive carries
 // the Record tag, so that every value reaching the test is a Record already; kept
 // where some member carries another. A member whose tag can NOT be named — a
 // Type Parameter, an `Unknown` — refuses the plan outright rather than merely
@@ -151,7 +151,7 @@ export type MatcherMemberTest = {
 // none of the members below, and the rule that follows would then read a member
 // off a value that does not have one.
 //
-// NOTE: PRESENCE, which the runtime asks with `Object.hasOwn` before every read
+// PRESENCE, which the runtime asks with `Object.hasOwn` before every read
 // and which openness makes a real question: a Record Type's members are what a
 // value of it MUST carry, and a value may carry more, so a member some arriving
 // Record declares and another does not may or may not be there. Two cases, and
@@ -173,7 +173,7 @@ export type MatcherMemberTest = {
 // item Type — needs a walk of a value that may not be there, and the plan
 // declines instead.
 //
-// NOTE: WHICH MEMBERS ARE TESTED. A declared one is dropped where the
+// WHICH MEMBERS ARE TESTED. A declared one is dropped where the
 // requirement is implied by every Type the member can declare among the arriving
 // Records, which is `checkIsImplied` — the implication the Matcher's own check is
 // decided by, asked one level down. So the tree tests exactly the members the
@@ -189,7 +189,7 @@ export type MatcherMemberTest = {
 // that `Unknown` does not answer with one comparison — and the walk, which asks
 // `hasOwn` itself, is what keeps asking it.
 //
-// NOTE: ERASURE, case by case. A checked refinement is erased before any pass
+// ERASURE, case by case. A checked refinement is erased before any pass
 // runs, so a refined Type arrives here as the Type it refines and is tested as
 // that — there is no run-time notion of a predicate for either this or the walk
 // to ask about. A Type Parameter or an `Unknown` is answered from both sides: as
@@ -207,14 +207,14 @@ export type MatcherMemberTest = {
 // says exactly that: the requirement is implied, the member is dropped, and what
 // is left is what the walk would have concluded too.
 //
-// NOTE: NESTING, and the one ordering rule that is load-bearing. The descent is
+// NESTING, and the one ordering rule that is load-bearing. The descent is
 // this same argument applied to the value at a member, with that member's
 // presence established by the level above it — so a test is sound only when
 // every test on a PREFIX of its spine has already passed. The plan emits a
 // level's own tag test before descending into it, and `orderedTests` may not
 // move a test ahead of its prefix, which is what its order is arranged to keep.
 //
-// NOTE: The descent is bounded by IDENTITY — a Matcher already being planned is
+// The descent is bounded by IDENTITY — a Matcher already being planned is
 // not planned again, and the member keeps its walk instead — because this walks
 // a TYPE, which may hold a back edge, where the runtime's own walk terminates by
 // walking a VALUE, which is finite. It is insurance rather than a rule anything
@@ -240,7 +240,7 @@ export function recordMatcherTests(
 	return orderedTests(tests)
 }
 
-// NOTE: The plan for ONE level, appending its tests and answering whether it
+// The plan for ONE level, appending its tests and answering whether it
 // holds. It appends nothing a caller has to undo: a nested level plans into an
 // array of its own and is spliced in only once it has held, and a level that
 // refuses is refused all the way up, where the whole plan is thrown away.
@@ -282,7 +282,7 @@ function planRecordTests(
 	try {
 		for (let [name, required] of Object.entries(matcher.members)) {
 			let memberPath = [...path, name]
-			// NOTE: What the member DECLARES across every arriving Record,
+			// What the member DECLARES across every arriving Record,
 			// flattened, and whether they ALL declare it. Where they do not,
 			// what can stand there is unconstrained rather than the union of
 			// what some of them said — openness adds a member of any Type at
@@ -320,7 +320,7 @@ function planRecordTests(
 				continue
 			}
 
-			// NOTE: Vacuously true where no Record can arrive at all, which is
+			// Vacuously true where no Record can arrive at all, which is
 			// right: every value then fails at the tag test above, and that test
 			// is the whole tree. The walk fails at its own first comparison for
 			// the same reason.
@@ -368,7 +368,7 @@ function planRecordTests(
 	return true
 }
 
-// NOTE: The order the tree is read in, and the whole of what the Compiler
+// The order the tree is read in, and the whole of what the Compiler
 // chooses about it. COST first — every tag comparison, then every walk —
 // because the walk is the one test that can still cost a call, and a walk of a
 // List's items costs one per item, so a tree reaching it ahead of a comparison
@@ -377,7 +377,7 @@ function planRecordTests(
 // written and stops at the first that declines, so ordering by anything but
 // cost is a way to lose to it.
 //
-// NOTE: And cost is what keeps every test behind the tests that establish the
+// And cost is what keeps every test behind the tests that establish the
 // spine it reads, which is what the order has to guarantee. A `descriptor` test
 // is a LEAF: `planRecordTests` descends into a member or writes one for that
 // member, never both, so no test stands below one — and a test standing on a
@@ -388,7 +388,7 @@ function planRecordTests(
 // order among themselves is free; stable, so a Matcher's own member order
 // decides it, which is the order the walk would have asked them in.
 //
-// NOTE: The order is invisible except in time. Every test is a property read of
+// The order is invisible except in time. Every test is a property read of
 // an immutable value and a comparison, or a walk that reads only the value it is
 // handed: none can fail, allocate or observe anything, so a conjunction of them
 // answers the same however it is arranged.
@@ -410,14 +410,14 @@ function costOf(test: MatcherMemberTest): number {
 	return test.check.kind === "descriptor" ? 1 : 0
 }
 
-// NOTE: The question from the other side: whether `isValueOfType(value,
+// The question from the other side: whether `isValueOfType(value,
 // matcher)` answers FALSE for every value that can arrive — the Matcher not
 // merely failing to be implied, but unable to accept anything at all. A Match
 // Handler whose Matcher is refuted is one that can never run, which the
 // Validator has already reported as `unreachable-case`, and
 // `prune-dead-match-arms` is what takes it out of the chain.
 //
-// NOTE: It is asked separately from `matcherResidual` rather than added to it as
+// It is asked separately from `matcherResidual` rather than added to it as
 // a fourth answer, so that a refuted Matcher compiles to the same test as any
 // other and the arm is dropped only by the pass whose question this is.
 export function matcherIsRefuted(
@@ -426,7 +426,7 @@ export function matcherIsRefuted(
 ): boolean {
 	let members = unionMembersOf(valueType)
 
-	// NOTE: No members is no argument. A Union always has some, and a Type that
+	// No members is no argument. A Union always has some, and a Type that
 	// is not one is its own member, so this is unreachable — and answering
 	// `true` for it would be answering "nothing can arrive" for a value the
 	// Compiler simply could not enumerate.
@@ -436,18 +436,18 @@ export function matcherIsRefuted(
 	)
 }
 
-// NOTE: What refutation rests on, and the whole of it: `isValueOfType` compares
+// What refutation rests on, and the whole of it: `isValueOfType` compares
 // the value's hidden Type key FIRST in every arm it has, and a value of a Type
 // whose tag the Compiler can name carries that tag and no other. So two tags
 // that differ are a check that fails before it looks at anything else.
 //
-// NOTE: Everything the Compiler can not name a tag for answers `false` — not
+// Everything the Compiler can not name a tag for answers `false` — not
 // refuted — which is where erasure is answered from this side. A Type Parameter
 // or an `Unknown` stands for a value of any kind, and a Matcher that accepts
 // every value without looking (`case _`, a Generic Matcher) refutes nothing at
 // all.
 //
-// NOTE: Two Types SHARING a tag are not refuted either, and that is not a
+// Two Types SHARING a tag are not refuted either, and that is not a
 // conservatism this could be tightened out of: `List<Alpha>` and `List<Beta>`
 // are both `"List"` and the empty List passes both, `Box<Integer>#Holding` and
 // `Box<String>#Holding` are both `"Box#Holding"`, and two Records differing in
@@ -458,7 +458,7 @@ function checkIsRefuted(matcher: common.Type, valueType: common.Type): boolean {
 		return false
 	}
 
-	// NOTE: The value's own Union first, where EVERY member has to be refuted
+	// The value's own Union first, where EVERY member has to be refuted
 	// because any of them may arrive. The Matcher's Union after it, where every
 	// arm has to be — `isValueOfType` asks `some` of a Union descriptor, so one
 	// arm that could accept is the whole Matcher accepting.
@@ -474,7 +474,7 @@ function checkIsRefuted(matcher: common.Type, valueType: common.Type): boolean {
 		)
 	}
 
-	// NOTE: The tag a value of each Type CARRIES, on both sides — and not
+	// The tag a value of each Type CARRIES, on both sides — and not
 	// `lowerableTagOf`, which is a narrower question about what a Matcher may
 	// be REWRITTEN to. A Function Matcher is the difference: its check is
 	// `typeof`, so it may not be lowered to a key comparison, while a Function
@@ -487,13 +487,13 @@ function checkIsRefuted(matcher: common.Type, valueType: common.Type): boolean {
 	return matcherTag !== null && valueTag !== null && matcherTag !== valueTag
 }
 
-// NOTE: The hidden Type key a value of this Type carries — what
+// The hidden Type key a value of this Type carries — what
 // `value[$type.typeKeySymbol]` reads, and what `isValueOfType` compares first
 // for every Type that has one. `null` means the Compiler can not say: a Type
 // Parameter or an `Unknown` stands for a value of any kind at all, so nothing
 // may be concluded from a tag not matching OR from one matching.
 //
-// NOTE: A Function is the one value carrying no key at all, and it is given a
+// A Function is the one value carrying no key at all, and it is given a
 // name here regardless — `"Function"` is not a tag any value can hold (a real
 // one is a runtime kind or `<Choice>#<Case>`), so a Function member of a Union
 // answers no tag test, which is exactly right. `lowerableTagOf` is what refuses
@@ -507,7 +507,7 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "Algebraic":
 		case "Transcendental":
 		case "Randomness":
-		// NOTE: Both asynchronous kinds carry a key of their own, and
+		// Both asynchronous kinds carry a key of their own, and
 		// `isValueOfType` reads it and nothing else — what a Future will ANSWER
 		// is not there to look at. So the tag IS the whole check for either of
 		// them, at any Value Type.
@@ -530,13 +530,13 @@ function runtimeTagOf(type: common.Type): string | null {
 	}
 }
 
-// NOTE: The tag a MATCHER may be lowered to, which is a shorter list than the
+// The tag a MATCHER may be lowered to, which is a shorter list than the
 // one above.
 //
 // A Function Matcher is left alone because callability, not a key, is what the
 // runtime asks of one.
 //
-// NOTE: A Record Matcher IS offered here, and `checkIsTagAlone` and
+// A Record Matcher IS offered here, and `checkIsTagAlone` and
 // `soleClaimantOf` decide it the same way they decide anything else. Its tag
 // says only that the value is a Record, so `checkIsTagAlone` refuses one naming
 // any member at all and the tag stands alone only for `{}`, the unit Type. What
@@ -547,7 +547,7 @@ function runtimeTagOf(type: common.Type): string | null {
 // String` is that shape, and it is the common one — a Record beside Types of
 // other kinds.
 //
-// NOTE: Two Records in one Union are NOT that shape: both claim the tag, so
+// Two Records in one Union are NOT that shape: both claim the tag, so
 // there is no sole claimant, and what tells them apart is their members.
 // `compile-record-members` is what reads those, and `recordMatcherTests` is
 // what decides which of them it may read.
@@ -559,7 +559,7 @@ function lowerableTagOf(matcher: common.Type): string | null {
 	return runtimeTagOf(matcher)
 }
 
-// NOTE: Whether this Matcher's whole runtime check is the tag comparison —
+// Whether this Matcher's whole runtime check is the tag comparison —
 // whether `isValueOfType(value, matcher)` and `tagOf(value) === tag` are the
 // same expression for EVERY value, so that nothing needs to be known about what
 // can arrive.
@@ -585,7 +585,7 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 			return true
 		case "List":
 			return matcher.itemType.type === "Unknown"
-		// NOTE: BOTH slots, because either one that names a Type is a walk of
+		// BOTH slots, because either one that names a Type is a walk of
 		// the entries the runtime still has to make — a `Dictionary<String,
 		// Unknown>` Matcher checks every key, so the tag is not its whole check.
 		case "Dictionary":
@@ -593,7 +593,7 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 				matcher.keyType.type === "Unknown" &&
 				matcher.valueType.type === "Unknown"
 			)
-		// NOTE: A Record naming no member is the unit Type `{}`, which every
+		// A Record naming no member is the unit Type `{}`, which every
 		// Record satisfies — so the tag is the whole check, exactly as it is
 		// for a payload-less Case. A Record naming any member is not: its tag
 		// says only that the value is a Record.
@@ -605,14 +605,14 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 	}
 }
 
-// NOTE: The one member of the value's Type that could carry this tag — and null
+// The one member of the value's Type that could carry this tag — and null
 // unless there is EXACTLY one, which is where erasure is answered. Two members
 // sharing a tag means the tag does not say which of them arrived: `List<Alpha> |
 // List<Beta>` are both `"List"`, and `Box<Integer>#Holding` and
 // `Box<String>#Holding` are both `"Box#Holding"`, so what tells them apart is
 // the payload the full check walks.
 //
-// NOTE: A member whose tag can not be named at all — a Type Parameter, an
+// A member whose tag can not be named at all — a Type Parameter, an
 // `Unknown` — refuses the whole question rather than merely failing to claim the
 // tag. A value of it can be anything, including something carrying this very
 // tag and failing the Matcher's payload check.
@@ -643,7 +643,7 @@ function soleClaimantOf(
 	return claimant
 }
 
-// NOTE: What a Record or a Case DECLARES under a name, and `undefined` where it
+// What a Record or a Case DECLARES under a name, and `undefined` where it
 // declares nothing — `Object.hasOwn`, never a bare read, for exactly the reason
 // `isValueOfType` reads a value's members with it: a members map is an ordinary
 // JavaScript object, so `members["toString"]` finds a function on
@@ -658,7 +658,7 @@ export function declaredMemberOf(
 	return Object.hasOwn(members, name) ? members[name] : undefined
 }
 
-// NOTE: A Union's members, flattened — a Union of Unions is one set of values
+// A Union's members, flattened — a Union of Unions is one set of values
 // however it was spelled, and an alias (`Optional<Integer>`) is the Union it
 // stands for by the time a Type reaches here. Anything else is one member: its
 // own.
@@ -670,23 +670,23 @@ export function unionMembersOf(type: common.Type): Array<common.Type> {
 	return type.types.flatMap((member) => unionMembersOf(member))
 }
 
-// NOTE: Whether `isValueOfType(value, matcher)` answers TRUE for every value of
+// Whether `isValueOfType(value, matcher)` answers TRUE for every value of
 // `valueType` — the Matcher's check read against what the Compiler knows the
 // value to be, arm by arm, exactly as the runtime would walk it.
 //
-// NOTE: It follows `isValueOfType` clause for clause, which is what makes it
+// It follows `isValueOfType` clause for clause, which is what makes it
 // checkable against that function rather than against an intention. Where the
 // runtime answers true without looking (a Type Parameter, an `Unknown`, a List
 // whose item Type is erased) this answers true; where the runtime looks at
 // something this can not see, it answers false and the caller keeps the check.
 function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
-	// NOTE: Types erase, so the runtime answers true for both of these without
+	// Types erase, so the runtime answers true for both of these without
 	// reading the value at all — whatever it is.
 	if (matcher.type === "Unknown" || matcher.type === "GenericUse") {
 		return true
 	}
 
-	// NOTE: The value's own Union first: the Matcher has to accept EVERY member,
+	// The value's own Union first: the Matcher has to accept EVERY member,
 	// because any of them may arrive. The Matcher's Union after it, where any
 	// ONE accepting arm is enough — `isValueOfType` asks `some` of a Union
 	// descriptor.
@@ -708,7 +708,7 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 		case "Algebraic":
 		case "Transcendental":
 		case "Randomness":
-		// NOTE: By KIND alone, for both asynchronous Types, which is the whole
+		// By KIND alone, for both asynchronous Types, which is the whole
 		// of what `isValueOfType` asks of one — a `Future<String>` Matcher and
 		// a `Future<Integer>` value are the same question to the runtime.
 		case "Future":
@@ -716,7 +716,7 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 			return valueType.type === matcher.type
 		case "Function":
 			return valueType.type === "Function"
-		// NOTE: The unapplied `List` names no item Type, and a List Matcher
+		// The unapplied `List` names no item Type, and a List Matcher
 		// whose item Type is `Unknown` is the same question — the runtime stops
 		// at the kind for both, so any List passes.
 		case "GenericList":
@@ -729,14 +729,14 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				)
 			}
 
-			// NOTE: The other way round the item Type is NOT erased — the
+			// The other way round the item Type is NOT erased — the
 			// runtime walks every item — so a value whose items are unknown
 			// (`GenericList`) can not be promised to pass.
 			return (
 				valueType.type === "List" &&
 				checkIsImplied(matcher.itemType, valueType.itemType)
 			)
-		// NOTE: The unapplied `Dictionary` names neither slot, so any Dictionary
+		// The unapplied `Dictionary` names neither slot, so any Dictionary
 		// passes — the runtime stops at the kind, exactly as it does for a bare
 		// List.
 		case "GenericDictionary":
@@ -745,7 +745,7 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				valueType.type === "GenericDictionary"
 			)
 		case "Dictionary": {
-			// NOTE: Slot by slot, and an Unknown slot is the tag-only question
+			// Slot by slot, and an Unknown slot is the tag-only question
 			// again for that HALF: a `Dictionary<Unknown, Integer>` Matcher
 			// promises nothing about the keys and walks every value, so the keys
 			// pass for any Dictionary while the values have to be implied. A
@@ -767,14 +767,14 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				valuesImplied
 			)
 		}
-		// NOTE: A Record Matcher is structural and OPEN: the value has to carry
+		// A Record Matcher is structural and OPEN: the value has to carry
 		// every member the Matcher names, and may carry more.
 		case "Record":
 			return (
 				valueType.type === "Record" &&
 				membersAreImplied(matcher.members, valueType.members)
 			)
-		// NOTE: A Case Matcher is nominal first — the same Choice and the same
+		// A Case Matcher is nominal first — the same Choice and the same
 		// Case — and then structural over the payload, which is closed.
 		case "Case":
 			return (

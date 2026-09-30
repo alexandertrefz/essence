@@ -13,7 +13,7 @@ import { getStringRepresentation } from "../Terminal"
 
 const countOf = (value: string) => length(createString(value)).value
 
-// NOTE: The same text twice — once composed (NFC, one code point for `é`), once
+// The same text twice — once composed (NFC, one code point for `é`), once
 // decomposed (NFD, `e` followed by a combining acute). They are canonically
 // equivalent, so they hold the same characters, and they are genuinely
 // different code points, which is what makes the test mean anything. Normalised
@@ -23,7 +23,7 @@ const countOf = (value: string) => length(createString(value)).value
 const composed = "cafe\u0301".normalize("NFC")
 const decomposed = "cafe\u0301".normalize("NFD")
 
-// NOTE: A family emoji — four people joined by zero-width joiners, eleven code
+// A family emoji — four people joined by zero-width joiners, eleven code
 // units, ONE character to a reader — and Germany's flag, two regional
 // indicators making one.
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
@@ -37,7 +37,7 @@ describe("counting characters", () => {
 		expect(countOf("\t\n ~")).toBe(4)
 	})
 
-	// NOTE: The fast path's one exception. CR LF is a SINGLE grapheme cluster,
+	// The fast path's one exception. CR LF is a SINGLE grapheme cluster,
 	// so counting code units would answer one too many for every line break a
 	// Windows-authored text carries — the String has to be segmented properly.
 	test("a carriage return declines the fast path", () => {
@@ -60,12 +60,12 @@ describe("counting characters", () => {
 		expect(countOf(flag)).toBe(1)
 	})
 
-	// NOTE: The remembered count has to be the count, however the value was
+	// The remembered count has to be the count, however the value was
 	// first asked about — a String segmented by `split` is counted off that
 	// view, and one counted first is not counted again.
 	test("a String answers alike however often it is asked", () => {
 		for (let value of ["hello", composed, decomposed, family, "a\r\nb"]) {
-			// NOTE: Two wrappers over the same text, counted by the two routes
+			// Two wrappers over the same text, counted by the two routes
 			// there are: one is asked straight away, so its count comes off the
 			// scan where the text qualifies for it, and one is segmented first,
 			// so its count comes off the remembered view. The routes have to
@@ -86,7 +86,7 @@ describe("counting characters", () => {
 })
 
 describe("the remembered view", () => {
-	// NOTE: What every position Method rests on: splitting the same String twice
+	// What every position Method rests on: splitting the same String twice
 	// answers the same characters, and the second answer is not the first one's
 	// array handed out where a caller could change it.
 	test("splitting twice answers alike", () => {
@@ -129,7 +129,7 @@ describe("the remembered view", () => {
 		expect(ends(string, suffix).value).toBeTrue()
 		expect(ends(string, suffix).value).toBeTrue()
 		expect(ends(string, createString("stem")).value).toBeFalse()
-		// NOTE: A composed suffix inside a decomposed String — `ends` takes both
+		// A composed suffix inside a decomposed String — `ends` takes both
 		// sides as the canonical grapheme view, so it matches by canonical
 		// equivalence rather than by code unit.
 		expect(
@@ -138,7 +138,7 @@ describe("the remembered view", () => {
 		).toBeTrue()
 	})
 
-	// NOTE: The whole safety of remembering anything on the value: what is
+	// The whole safety of remembering anything on the value: what is
 	// remembered lives on a Symbol key, which nothing that reads a value can
 	// see. A String that has been measured is the same value as one that has
 	// not — to equality, to printing, and to whoever asks it for its keys.
@@ -174,7 +174,7 @@ describe("the remembered view", () => {
 })
 
 describe("reversing", () => {
-	// NOTE: Three regional indicators segment as a pair and a single —
+	// Three regional indicators segment as a pair and a single —
 	// `🇦🇧, 🇨` — and segmenting the reversed TEXT afresh would re-pair them
 	// as `🇨🇦, 🇧`: characters the original never had. The reversed String
 	// remembers its view instead, so its characters are the original's in the
@@ -198,7 +198,7 @@ describe("reversing", () => {
 		}
 	})
 
-	// NOTE: A piece cut from a reversed String carries the clusters it was cut
+	// A piece cut from a reversed String carries the clusters it was cut
 	// into, so its length is counted off them rather than off a fresh
 	// segmentation of the joined text.
 	test("a piece of a reversed String counts its own characters", () => {

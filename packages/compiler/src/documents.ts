@@ -9,7 +9,7 @@ import { enrich } from "./enricher/index"
 import { declaredNames } from "./enricher/stdlib"
 import { parseWithDiagnostics } from "./parser/index"
 
-// NOTE: A standard library source is an ordinary `.es` file that two rules do
+// A standard library source is an ordinary `.es` file that two rules do
 // not apply to, and the Language Server has to know which document it is
 // looking at to lift them:
 //
@@ -29,7 +29,7 @@ import { parseWithDiagnostics } from "./parser/index"
 // String, Integer and Rational conversions are hundreds of hand transcribed
 // Methods each, so the editor has to work inside these files.
 
-// NOTE: The one spelling of a path every other spelling of it agrees with.
+// The one spelling of a path every other spelling of it agrees with.
 // `path.resolve` is purely lexical — it flattens `.`/`..` and prefixes the
 // working directory and stops there — while `realpathSync` is the system
 // `realpath(3)`: it follows symlinks, and on a case-insensitive filesystem it
@@ -61,7 +61,7 @@ export function canonicalPath(filePath: string): string {
 
 		let parent = path.dirname(existing)
 
-		// NOTE: The filesystem root is its own parent — there is nothing left
+		// The filesystem root is its own parent — there is nothing left
 		// above it to resolve, so the lexical spelling is all there is.
 		if (parent === existing) {
 			return resolved
@@ -72,14 +72,14 @@ export function canonicalPath(filePath: string): string {
 	}
 }
 
-// NOTE: BOTH sides of the comparison are canonical. The module system handed
+// BOTH sides of the comparison are canonical. The module system handed
 // this compiler its own location with symlinks already resolved, so
 // `STDLIB_DIRECTORY` is canonical in practice — but nothing in its contract
 // says so, and one un-canonicalised side is enough to lose every match.
 // Resolved once: the standard library does not move while the process runs.
 const CANONICAL_STDLIB_DIRECTORY = canonicalPath(STDLIB_DIRECTORY)
 
-// NOTE: The Language Server is handed URIs
+// The Language Server is handed URIs
 // (`file:///…/packages/standard-library/sources/List.es`) and the tests plain
 // paths; both are matched, and a `%20` or the like is decoded first so a path
 // with a space is not missed.
@@ -111,7 +111,7 @@ export function isStdlibDocument(documentPath: string | undefined): boolean {
 	)
 }
 
-// NOTE: Whether a directory a walk starts in IS the standard library: the
+// Whether a directory a walk starts in IS the standard library: the
 // sources directory, anything under it, or the package that holds it. It is a
 // separate question from `isStdlibDocument`, which answers about a FILE and is
 // what keeps a project's own walk from picking the library up. A walk of the
@@ -139,7 +139,7 @@ export function parseDocument(
 	})
 }
 
-// NOTE: The compile MODE is what makes a `tests { … }` block anything but
+// The compile MODE is what makes a `tests { … }` block anything but
 // parsed text — see `CompileMode`. `essence build`, `essence run` and the
 // Editor's ordinary analysis leave it off, so the block is read — a syntax
 // error in it is still reported — and then dropped before enrichment, which is
@@ -149,7 +149,7 @@ export function enrichDocument(
 	documentPath?: string,
 	options: CompileMode & {
 		annotations?: boolean
-		// NOTE: The document's own text, which only a test compile reads — an
+		// The document's own text, which only a test compile reads — an
 		// `@example` block is compiled out of the file's own lines. See
 		// `enrich`'s own `source`.
 		source?: string
@@ -163,12 +163,12 @@ export function enrichDocument(
 		return enrich(program, options)
 	}
 
-	// NOTE: Only the names THIS document declares are subtracted. A Namespace
+	// Only the names THIS document declares are subtracted. A Namespace
 	// another standard library file declares is a genuine builtin as far as
 	// this one is concerned — the loader hoists them all into one Scope, and
 	// the editor's view of a single file should agree.
 	//
-	// NOTE: A standard library source is not a Module, so its Scope names none
+	// A standard library source is not a Module, so its Scope names none
 	// — and a test out of one still has to say which file it came from. The
 	// path is handed over for the identities alone; the Scope's own
 	// `modulePath` stays absent, which is what keeps the library's Choices

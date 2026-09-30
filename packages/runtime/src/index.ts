@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
-// NOTE: What the Compiler needs of this package is mostly its LOCATION, and
+// What the Compiler needs of this package is mostly its LOCATION, and
 // that is what this file exports. The other modules here are the language's
 // runtime, the native halves of the standard library, and they reach a Program
 // the other way round: in a bundle the Rewriter writes absolute paths to them
@@ -11,13 +11,13 @@ import * as path from "node:path"
 // itself: `bigRational`'s arithmetic for constant folding, and `DEFAULT_CASES`
 // from `Testing` for the test runner.
 //
-// NOTE: Resolved off this module's own location rather than the working
+// Resolved off this module's own location rather than the working
 // directory, so `esc` finds the runtime from any cwd. Computed here, in the
 // package that holds the files, rather than by the Rewriter and the Bundler
 // each counting `../`s towards them — they used to, and the two counts had to
 // stay agreeing with each other and with the directory layout.
 //
-// NOTE: Two layouts. In the workspace this module IS a runtime module, and
+// Two layouts. In the workspace this module IS a runtime module, and
 // the directory is its own. The published package is compiled, and this
 // module runs as `dist/index.js` — but what the Bundler inlines must stay the
 // TypeScript sources, which ship as `src/` beside `dist/` exactly so that a
@@ -29,7 +29,7 @@ export function runtimeDirectoryFor(moduleDirname: string): string {
 		: moduleDirname
 }
 
-// NOTE: A THIRD layout, and the only one this module can not answer from its
+// A THIRD layout, and the only one this module can not answer from its
 // own path: a bundle. The Language Server inside the VS Code extension is one
 // file, `import.meta.dirname` is wherever that file was written, and the runtime
 // sources have to have been copied next to it — the Bundler writes their
@@ -46,7 +46,7 @@ export const RUNTIME_DIRECTORY = existsSync(path.join(OWN_RUNTIME, "type.ts"))
 	? OWN_RUNTIME
 	: BUNDLED_RUNTIME
 
-// NOTE: The tsconfig esbuild transpiles the runtime modules with while
+// The tsconfig esbuild transpiles the runtime modules with while
 // inlining them. It is deliberately not this repository's — the runtime is
 // emitted into a user's bundle and compiles under its own settings.
 export const RUNTIME_TSCONFIG = path.join(RUNTIME_DIRECTORY, "tsconfig.json")

@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: The suffix the Simplifier mangles an Overload's name with, spelled once
+// The suffix the Simplifier mangles an Overload's name with, spelled once
 // for the two Functions that write it and read it back.
 const OVERLOAD_SUFFIX = "__overload$"
 
@@ -8,7 +8,7 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}${OVERLOAD_SUFFIX}${index + 1}`
 }
 
-// NOTE: And the inverse: the Overload slot a mangled name names, counting from
+// And the inverse: the Overload slot a mangled name names, counting from
 // zero, or null where the name carries no suffix at all — which is what a
 // Method with one Overload emits. Beside the Function that writes the name,
 // because a suffix written in one place and read in another is a suffix two
@@ -25,7 +25,7 @@ export function overloadIndexOf(name: string): number | null {
 	return Number.isInteger(index) && index > 0 ? index - 1 : null
 }
 
-// NOTE: The unit Type — the empty Record, `{}`. A Function that answers
+// The unit Type — the empty Record, `{}`. A Function that answers
 // nothing useful says so by promising a Record with no members: there is
 // nothing to read off it, and a caller that tries names a member it does not
 // have. Essence had a `Nothing` Type for this and it earned its keep nowhere
@@ -39,13 +39,13 @@ export function isUnitType(type: common.Type): boolean {
 	return type.type === "Record" && Object.keys(type.members).length === 0
 }
 
-// NOTE: What a `<-` in a body answers with — the declared Type for every
+// What a `<-` in a body answers with — the declared Type for every
 // ordinary body, and the INNER Type for a completing one. A body that suspends
 // is written as though it answered the value, and the future is what the
 // emission wraps around it, so `function headline(_ url: String) ->
 // Future<String>` returns a String from its `<-`.
 //
-// NOTE: A completing body whose declaration is not a Future is answered with
+// A completing body whose declaration is not a Future is answered with
 // what it declared. The `complete` inside it has been reported already, and
 // unwrapping something that is not a future would say the same thing again at
 // every `<-`.
@@ -58,7 +58,7 @@ export function returnedTypeOf(
 		: declared
 }
 
-// NOTE: What a Type mismatch has to say about ASYNCHRONY, and null wherever it
+// What a Type mismatch has to say about ASYNCHRONY, and null wherever it
 // has nothing — which is every mismatch in a Program that waits for nothing.
 // Three shapes are worth naming, and each is one missing word rather than a
 // wrong value:
@@ -98,7 +98,7 @@ export function asynchronyMismatch(
 	return null
 }
 
-// NOTE: A structural walk over a Type, visiting each object it is built from
+// A structural walk over a Type, visiting each object it is built from
 // exactly once. Types are plain data, so walking them covers every shape —
 // including ones added later — without enumerating any, which is why the
 // questions asked of a whole Type are asked this way.
@@ -117,7 +117,7 @@ export function asynchronyMismatch(
 // "collect every X" — so a second visit to a shared object could only find what
 // the first one already did.
 //
-// NOTE: The one field it does NOT follow is a display `alias`, on the two Types
+// The one field it does NOT follow is a display `alias`, on the two Types
 // that carry one. Walking whatever is there is what makes this cover shapes
 // nobody has added yet, and a display spelling is the one thing on a Type that
 // is not part of it: the Type Arguments an `alias` holds are already standing
@@ -158,7 +158,7 @@ function typeWalkFinds(
 			return true
 		}
 
-		// NOTE: Asked of the FIELD before it is asked of the Type, so that every
+		// Asked of the FIELD before it is asked of the Type, so that every
 		// Type but a spelled one walks exactly as it always did — `entries`
 		// allocates a pair per field where `values` allocates a value, and this
 		// runs over every Type the Enricher resolves.
@@ -181,7 +181,7 @@ function typeWalkFinds(
 
 export type GenericBindings = Map<common.GenericName, common.Type>
 
-// NOTE: The mutable state of one inference — `bindableNames` holds the Type
+// The mutable state of one inference — `bindableNames` holds the Type
 // Parameters the current invocation may bind, `bindings` the Types they have
 // been bound to so far. Generics outside of `bindableNames` stay opaque
 // symbols that only match themselves.
@@ -190,7 +190,7 @@ export type GenericInferenceContext = {
 	bindings: GenericBindings
 }
 
-// NOTE: `infer` Generics start unbound and re-bind on every invocation.
+// `infer` Generics start unbound and re-bind on every invocation.
 // Plain Generics bind at definition time — their default Type is seeded as
 // an immutable binding; without a default they stay opaque and can never be
 // bound, which the caller reports at the invocation.
@@ -221,18 +221,18 @@ export function createInferenceContext(
 	return { bindableNames, bindings }
 }
 
-// NOTE: A per-instantiation counter for `createFreshenedInference`. Only its
+// A per-instantiation counter for `createFreshenedInference`. Only its
 // uniqueness matters, never its value — it never reaches a Type a Program can
 // observe, so it does not compromise the determinism the Enricher otherwise
 // keeps (unlike `Date.now`/`Math.random`, which are banned for that reason).
 let freshGenericCounter = 0
 
-// NOTE: What separates a freshened Generic's name from its counter. A source
+// What separates a freshened Generic's name from its counter. A source
 // Generic can not carry it, which is the whole assumption the alpha-renaming
 // below rests on.
 const freshGenericSeparator = "\u200B"
 
-// NOTE: Whether a Type still carries a Type Parameter of the call it is being
+// Whether a Type still carries a Type Parameter of the call it is being
 // matched against — one `createFreshenedInference` renamed for the span of this
 // match and that the match has not solved. Every Parameter it DID solve was
 // substituted away by `applyGenericBindings` before the Type got here, so a
@@ -251,7 +251,7 @@ export function mentionsUnsolvedTypeParameter(type: common.Type): boolean {
 	)
 }
 
-// NOTE: Alpha-renames a signature's own Generics to fresh, collision-proof names
+// Alpha-renames a signature's own Generics to fresh, collision-proof names
 // for the span of one invocation's Argument matching. A caller may declare a
 // Generic under the SAME spelling as the callee's — a Method generic in
 // `ItemType` calling `List.reduce`, whose Namespace Generic is also `ItemType`;
@@ -320,7 +320,7 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	}
 }
 
-// NOTE: The construction-side twin of `createFreshenedInference` — a Choice's
+// The construction-side twin of `createFreshenedInference` — a Choice's
 // own Type Parameters, alpha-renamed for the span of the one payload match that
 // binds them. The collision it settles is the same one, one rail over: a
 // callback inside `myCount<State>` answering `#Done(current.carried)` hands a
@@ -356,7 +356,7 @@ export function createFreshenedChoiceInference(
 		rename,
 		freshNames,
 		context: {
-			// NOTE: Every one of them, unlike a signature's, where only an
+			// Every one of them, unlike a signature's, where only an
 			// `infer` Parameter binds — a Choice's Type Parameters are applied
 			// rather than declared bindable, and the payload match is the one
 			// place they are worked out from a value at all.
@@ -366,7 +366,7 @@ export function createFreshenedChoiceInference(
 	}
 }
 
-// NOTE: The name a FABRICATED signature borrows a Type Parameter under. A
+// The name a FABRICATED signature borrows a Type Parameter under. A
 // derived Method takes its Parameters from the Type it was fabricated for, so
 // their names are that Type's own — and `createFreshenedInference` can not undo
 // a collision with the CALLER's Generics on its own here, because the receiver's
@@ -382,7 +382,7 @@ export function borrowedGenericName(
 	return `${name}${freshGenericSeparator}`
 }
 
-// NOTE: Substitutes what each Parameter of ONE invocation bound into every
+// Substitutes what each Parameter of ONE invocation bound into every
 // other binding of that same invocation that still names it, until nothing
 // moves. A binding the Arguments produced names no Parameter of the invocation
 // and comes back as itself; a `defaultType` PIN is the one that does — a
@@ -427,7 +427,7 @@ function settlePins(bindings: GenericBindings): GenericBindings {
 	return settled
 }
 
-// NOTE: Translates the bindings collected against freshened Generic names back
+// Translates the bindings collected against freshened Generic names back
 // to the Generics the signature declares, so the return-Type substitution and
 // conformance resolution downstream read in the original names. Binding VALUES
 // come from the Arguments, which never mention the callee's fresh names — but a
@@ -441,7 +441,7 @@ export function unfreshenBindings(
 		return bindings
 	}
 
-	// NOTE: The usual shape, and the one `bindNamespaceTarget` asks a thousand
+	// The usual shape, and the one `bindNamespaceTarget` asks a thousand
 	// times over a Program: every binding is a Type the SUBJECT produced, which
 	// can mention no fresh name of this invocation, so the two substitutions
 	// below have nothing to substitute and only the KEYS change. Asked of the
@@ -476,7 +476,7 @@ export function unfreshenBindings(
 	return result
 }
 
-// NOTE: Whether any binding VALUE names something the translation above would
+// Whether any binding VALUE names something the translation above would
 // rewrite — a Parameter this invocation bound (which is what `settlePins`
 // settles) or a fresh name (which is what the reverse rename replaces). False
 // means both passes are the identity and only the keys have to move. Asked of
@@ -497,7 +497,7 @@ function bindingsMentionAPin(
 	return false
 }
 
-// NOTE: A Namespace as the specificity order below sees it — the target Type
+// A Namespace as the specificity order below sees it — the target Type
 // exactly as DECLARED, plus the Generics that are open in it. Never a
 // specialized copy: `List<Integer>` specialized out of `List<ItemType>` is
 // structurally identical to a hand written `for List<Integer>`, and comparing
@@ -507,7 +507,7 @@ export type NamespaceTarget = {
 	generics: Array<common.GenericDeclaration>
 }
 
-// NOTE: A Namespace's own Generics bound from a receiver, in the Namespace's OWN
+// A Namespace's own Generics bound from a receiver, in the Namespace's OWN
 // names — null where its target Type does not cover that receiver at all. THE
 // one door every "does this Namespace target that value" question goes through:
 // Method dispatch's candidate set, the specialized target a Diagnostic prints,
@@ -558,7 +558,7 @@ export function bindNamespaceTarget(
 	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
 }
 
-// NOTE: A Choice's Type Parameter that no Case's payload mentions is carried by
+// A Choice's Type Parameter that no Case's payload mentions is carried by
 // the Type Arguments alone, and matching reads only payloads, so the match
 // leaves it open. It is bound from the subject's Type Arguments instead, where
 // every Case of the subject carries the same one: `[Tag<Integer>#A,
@@ -592,7 +592,7 @@ function bindPhantomTypeArguments(
 	}
 }
 
-// NOTE: The different Type Arguments a subject's Cases carry where a Choice
+// The different Type Arguments a subject's Cases carry where a Choice
 // pattern names `genericName`, which is why a binding of it was left open.
 // Null where they agree, or where the pattern names it at no such position.
 export function disagreeingTypeArguments(
@@ -668,13 +668,13 @@ function agreedTypeArgument(
 	return agreed
 }
 
-// NOTE: Remembered per pattern, which a Namespace renames once.
+// Remembered per pattern, which a Namespace renames once.
 const phantomTypeArgumentsMemo = new WeakMap<
 	common.Type,
 	Array<[number, common.GenericName]>
 >()
 
-// NOTE: The positions of a Choice pattern's Type Arguments that name a Generic
+// The positions of a Choice pattern's Type Arguments that name a Generic
 // no payload of its Cases mentions.
 function phantomTypeArguments(
 	pattern: common.Type,
@@ -721,7 +721,7 @@ function choiceCasesOf(type: common.Type): Array<common.CaseType> {
 		: []
 }
 
-// NOTE: The alpha-renamed half of `bindNamespaceTarget` — the Namespace's
+// The alpha-renamed half of `bindNamespaceTarget` — the Namespace's
 // Generics under fresh names, its target Type rewritten to use them, and the way
 // back. It depends on the PATTERN alone: the same Namespace against a thousand
 // receivers renames once.
@@ -732,7 +732,7 @@ type RenamedNamespaceTarget = {
 	declaredGenerics: Array<common.GenericDeclaration>
 }
 
-// NOTE: Remembered per target TYPE object, because that is the stable half of a
+// Remembered per target TYPE object, because that is the stable half of a
 // Namespace here: `solveNamespaceConformance` wraps `{ targetType, generics }`
 // in a fresh literal per candidate, so the wrapper is no key at all, while the
 // Type it names and the Generics array it hands on are the Namespace's own
@@ -751,7 +751,7 @@ const renamedNamespaceTargets = new WeakMap<
 	RenamedNamespaceTarget
 >()
 
-// NOTE: ONE set of fresh names per Namespace, reused by every question asked of
+// ONE set of fresh names per Namespace, reused by every question asked of
 // it. What makes that sound is what makes the renaming work in the first place:
 //
 //   • the names are counter-unique — `Item`, a zero-width space and a number
@@ -819,7 +819,7 @@ export function renamedNamespaceTarget(
 	return renamed
 }
 
-// NOTE: Whether `pattern`'s target Type covers `subject` with the pattern's own
+// Whether `pattern`'s target Type covers `subject` with the pattern's own
 // Generics OPEN — `List<ItemType>` covers `List<Integer>` and `List<List<X>>`,
 // while `List<List<ItemType>>` covers only the nested one.
 function targetCoversAsPattern(
@@ -829,7 +829,7 @@ function targetCoversAsPattern(
 	return bindNamespaceTarget(pattern, subject) !== null
 }
 
-// NOTE: THE specificity order over overlapping Namespaces, shared by Method
+// THE specificity order over overlapping Namespaces, shared by Method
 // dispatch and Protocol conformance so both answer "which Namespace covers this
 // receiver more closely" the same way. `target` wins when `other` covers it as a
 // pattern and not the other way around: a concrete `List<Integer>` beats the
@@ -853,7 +853,7 @@ function isStrictlyMoreSpecificTarget(
 	)
 }
 
-// NOTE: Keeps only the candidates no other candidate is strictly more specific
+// Keeps only the candidates no other candidate is strictly more specific
 // than. A cyclic order would leave nothing standing, which must not read as "no
 // Namespace matched" — the unfiltered set is handed back instead, and the
 // caller reports the ambiguity it already reports for a tie.
@@ -876,7 +876,7 @@ export function filterMostSpecificByTarget<Candidate>(
 	return mostSpecific.length > 0 ? mostSpecific : candidates
 }
 
-// NOTE: The copies taken of a refinement whose predicate is still unread, kept
+// The copies taken of a refinement whose predicate is still unread, kept
 // from the source object to the copies made of it. It exists ONLY while a hoist
 // is open — outside one there is no fill left to complete a pending copy, so
 // taking one is a Compiler bug and stays a throw.
@@ -895,7 +895,7 @@ let pendingRefinementCopies = new Map<
 	Array<common.RefinementType>
 >()
 
-// NOTE: Hoists NEST — a name resolved during a Program's rounds may be the
+// Hoists NEST — a name resolved during a Program's rounds may be the
 // first to touch the standard library, whose lazy load hoists every library
 // file inside that round. So the registry is opened by counting rather than by
 // replacing: the inner hoist registers into the same map, the outer's fill still
@@ -914,13 +914,13 @@ export function closePendingRefinementCopies(): void {
 	}
 }
 
-// NOTE: What a declaration throws when it reads something the hoist has not
+// What a declaration throws when it reads something the hoist has not
 // reached yet, and the only throw the rounds retry. Like the parser's
 // `ParseError` it is not an `Error`, so `toString` gives crash reports its text.
 export class NotHoistedYet {
 	name = "NotHoistedYet"
 	message: string
-	// NOTE: The refinement whose unread predicate was asked for, which is how
+	// The refinement whose unread predicate was asked for, which is how
 	// the fill tells which predicate waits on which.
 	refinement: common.RefinementType | null
 
@@ -937,7 +937,7 @@ export class NotHoistedYet {
 	}
 }
 
-// NOTE: During a hoist a predicate still unread asks the rounds to retry its
+// During a hoist a predicate still unread asks the rounds to retry its
 // reader once the predicate is filled. Outside one nothing is left to fill it,
 // so reading it is a Compiler bug.
 export function refusePendingPredicate(
@@ -950,7 +950,7 @@ export function refusePendingPredicate(
 		: new NotHoistedYet(message, refinement)
 }
 
-// NOTE: THE door every copy of a refinement goes through, and the reason there
+// THE door every copy of a refinement goes through, and the reason there
 // are only two callers rather than a spread at each site: a copy taken while the
 // predicate is still unread is a promise to finish it, and the promise is kept by
 // registering the copy against the object it came from. The fill then hands the
@@ -967,7 +967,7 @@ function trackedRefinementCopy(
 		return copy
 	}
 
-	// NOTE: Outside an open hoist no fill is left to complete the copy, so a
+	// Outside an open hoist no fill is left to complete the copy, so a
 	// pending refinement reaching here is a Compiler bug.
 	if (openHoists === 0) {
 		refusePendingPredicate(source)
@@ -984,7 +984,7 @@ function trackedRefinementCopy(
 	return copy
 }
 
-// NOTE: The applied spelling stamped onto an instantiation, which is the second
+// The applied spelling stamped onto an instantiation, which is the second
 // place a refinement is copied — `NonEmptyList<String>` prints as written rather
 // than as the bare Alias name every instantiation would otherwise share. It goes
 // through the same door as the substitution above, because a copy taken here of a
@@ -998,7 +998,7 @@ export function refinementWithTypeArguments(
 	return trackedRefinementCopy(refinement, { ...refinement, typeArguments })
 }
 
-// NOTE: Every copy taken of this refinement, copies of those copies included —
+// Every copy taken of this refinement, copies of those copies included —
 // what the fill hands the conjuncts to, and what the poison path turns into its
 // own base. The walk terminates without a visited set because every registration
 // is a FRESH object: a copy is never its own source, and no object is ever
@@ -1021,7 +1021,7 @@ export function pendingRefinementCopiesOf(
 	return copies
 }
 
-// NOTE: Substitutes bound Generics in `type` — unbound bindable Generics are
+// Substitutes bound Generics in `type` — unbound bindable Generics are
 // left untouched, opaque Generics always are.
 export function applyGenericBindings(
 	type: common.Type,
@@ -1037,7 +1037,7 @@ export function applyGenericBindings(
 				? type
 				: { type: "List", itemType }
 		}
-		// NOTE: The one slot a Future has, substituted exactly as a List's item
+		// The one slot a Future has, substituted exactly as a List's item
 		// Type is — `Future<Value>` is what a `namespace Future<infer Value>`
 		// reads its Parameter off, so a Method of one is resolved by the same
 		// machinery every other container's is.
@@ -1055,7 +1055,7 @@ export function applyGenericBindings(
 				? type
 				: { type: "Started", valueType }
 		}
-		// NOTE: Both slots substituted, and the identity check asks about both:
+		// Both slots substituted, and the identity check asks about both:
 		// a `Dictionary<String, T>` comes back as itself while `T` is unbound,
 		// which is what keeps a Type nothing changed comparing by reference for
 		// every reader downstream.
@@ -1067,7 +1067,7 @@ export function applyGenericBindings(
 				? type
 				: { type: "Dictionary", keyType, valueType }
 		}
-		// NOTE: A refinement's conjuncts are keys rather than Types, so only the
+		// A refinement's conjuncts are keys rather than Types, so only the
 		// base can hold a Generic — `NonEmptyList<Item>`'s `List<Item>` is where one
 		// does. The conjuncts travel along BY REFERENCE and unsubstituted, which is
 		// the whole reason a generic refinement costs so little: a predicate that
@@ -1075,7 +1075,7 @@ export function applyGenericBindings(
 		// what survives is item-agnostic and the Type Arguments live in the base,
 		// where `matchTypes` already compares them.
 		//
-		// NOTE: An applied spelling substitutes right along with the base, so
+		// An applied spelling substitutes right along with the base, so
 		// `NonEmptyList<Item>` heals into `NonEmptyList<String>` rather than going stale —
 		// the same healing an applied Union's `alias` gets below, and just as
 		// display-only.
@@ -1096,7 +1096,7 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// NOTE: Copying a PENDING predicate is what lets the Namespace that
+			// Copying a PENDING predicate is what lets the Namespace that
 			// ANSWERS a generic Alias' predicate apply that Alias in its own
 			// signatures — `namespace List` answering `hasItems` while promising
 			// `append(_ item) -> NonEmptyList<ItemType>`. Refusing the copy would send
@@ -1138,7 +1138,7 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// NOTE: A plain `name` cannot follow a substitution — it might
+			// A plain `name` cannot follow a substitution — it might
 			// spell out the very Type Parameters being replaced — so it is
 			// dropped rather than kept stale. Parameter-free named Unions
 			// (`Number`, a Choice) come back untouched member by member and
@@ -1178,7 +1178,7 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// NOTE: The two display fields follow the rule they follow on a
+			// The two display fields follow the rule they follow on a
 			// Union, one branch up, and for the same reasons: a plain `name`
 			// may well spell out the very Type Parameters being replaced, so
 			// it is dropped rather than kept stale, while an `alias` carries
@@ -1220,7 +1220,7 @@ export function applyGenericBindings(
 						typeArgument === type.typeArguments?.[index],
 				)
 
-			// NOTE: A DECLARED Case of a generic Choice (`choiceGenerics` set,
+			// A DECLARED Case of a generic Choice (`choiceGenerics` set,
 			// no `typeArguments` yet) is being instantiated — force a fresh
 			// object so the applied spelling can be stamped, mirroring the Union
 			// alias healing above. Everything else (a plain Case, an already
@@ -1240,7 +1240,7 @@ export function applyGenericBindings(
 				: Object.fromEntries(entries)
 
 			if (isDeclaredCase) {
-				// NOTE: The applied spelling, in declaration order — an unbound
+				// The applied spelling, in declaration order — an unbound
 				// Generic stays a GenericUse so a later substitution can still
 				// bind it (a never-`#Done` callback keeps `Result` open). The
 				// declared-only `choiceGenerics` is dropped; what survives is an
@@ -1257,7 +1257,7 @@ export function applyGenericBindings(
 								name: generic.name,
 							},
 					),
-					// NOTE: Carried, because it is a fact about the
+					// Carried, because it is a fact about the
 					// DECLARATION rather than about the instantiation — a
 					// generic Choice with no payloads has none whichever
 					// Arguments are bound into it. Every other branch of this
@@ -1280,7 +1280,7 @@ export function applyGenericBindings(
 		case "StaticMethod":
 			return {
 				...type,
-				// NOTE: Spread rather than rebuilt — a Parameter carries what
+				// Spread rather than rebuilt — a Parameter carries what
 				// documents it, and binding a Generic must not lose that.
 				parameterTypes: type.parameterTypes.map((parameter) => ({
 					...parameter,
@@ -1314,7 +1314,7 @@ export function applyGenericBindings(
 	}
 }
 
-// NOTE: Handles an expected or actual GenericUse — the first occurrence of a
+// Handles an expected or actual GenericUse — the first occurrence of a
 // bindable Generic binds the Type on the other side, every later occurrence
 // substitutes the binding and re-checks with the normal assignability rules.
 function matchGenericUse(
@@ -1327,7 +1327,7 @@ function matchGenericUse(
 		let binding = context.bindings.get(generic.name)
 
 		if (binding !== undefined) {
-			// NOTE: A Generic already bound to exactly this opaque Generic is
+			// A Generic already bound to exactly this opaque Generic is
 			// consistent by identity — short-circuit. Without this, verifying
 			// the binding recurses forever when the bound value is a Generic use
 			// of the same name: a Method forwarding a same-named Generic to
@@ -1351,13 +1351,13 @@ function matchGenericUse(
 		return true
 	}
 
-	// NOTE: A Generic that is not bindable here is an opaque symbol of an
+	// A Generic that is not bindable here is an opaque symbol of an
 	// enclosing definition — it only matches itself, which the caller has
 	// already checked.
 	return false
 }
 
-// NOTE: A mark in a context's bindings, taken before a match attempt — the
+// A mark in a context's bindings, taken before a match attempt — the
 // number of bindings it starts from. Everything the attempt binds is added
 // AFTER the mark, so `restoreBindings` can undo a failed attempt by dropping
 // the tail, which beats copying the whole Map for every attempt of every Union
@@ -1370,7 +1370,7 @@ function markBindings(context: GenericInferenceContext | null): number {
 	return context === null ? 0 : context.bindings.size
 }
 
-// NOTE: Rolls a context back to a mark — the state before a match attempt that
+// Rolls a context back to a mark — the state before a match attempt that
 // has since failed. A failed attempt may well have bound Generics on its way
 // down, and those bindings are worth no more than the attempt that made them:
 // left behind, they decide the attempts that follow. The bindings are dropped
@@ -1400,7 +1400,7 @@ function restoreBindings(
 	}
 }
 
-// NOTE: Members that would bind a still-unbound Generic are tried last, so
+// Members that would bind a still-unbound Generic are tried last, so
 // that a Union member with a concrete counterpart does not get eaten by a
 // greedy first-occurrence binding (`String` must match the `String` member
 // of `Value | String`, not bind `Value`).
@@ -1432,7 +1432,7 @@ function orderUnionMembersForMatching(
 
 // #endregion
 
-// NOTE: Whether every member `promised` says a call may leave out is one
+// Whether every member `promised` says a call may leave out is one
 // `supplied` fills in. Both lists are sorted, so this is a merge rather than a
 // lookup per name — and the overwhelmingly common answer, two Parameters that
 // carry no Record default at all, costs one comparison.
@@ -1465,7 +1465,7 @@ function defaultMembersCover(
 	return true
 }
 
-// NOTE: A signature is substitutable when the actual signature accepts at
+// A signature is substitutable when the actual signature accepts at
 // least what the expected signature promises to feed it (contravariant
 // parameter types) and returns no more than the expected signature promises
 // to yield (covariant return type).
@@ -1486,7 +1486,7 @@ function signatureMatches(
 			return false
 		}
 
-		// NOTE: A Parameter the expected signature says may be left out has to
+		// A Parameter the expected signature says may be left out has to
 		// be one the actual signature can answer without — a call written
 		// against the expected Type omits the Argument, and the emitted call
 		// passes `undefined` in its place, which only a Parameter that carries
@@ -1500,7 +1500,7 @@ function signatureMatches(
 			return false
 		}
 
-		// NOTE: The same rule one level down. A call written against the
+		// The same rule one level down. A call written against the
 		// expected Type may leave the members the expected Parameter names out
 		// of its Record Argument, and only a Parameter whose own default fills
 		// those members in can answer it — so every member the expected side
@@ -1532,7 +1532,7 @@ function signatureMatches(
 
 // #region Type Walks, Proofs and Slots
 
-// NOTE: Whether a Type mentions a Generic anywhere in its tree. Types are
+// Whether a Type mentions a Generic anywhere in its tree. Types are
 // plain data, so a structural walk covers every shape — including ones added
 // later — without enumerating them. Used to reject `where` conditions on a
 // Type Parameter the target Type never carries: unification could never bind
@@ -1544,7 +1544,7 @@ export function typeMentionsGeneric(
 	return typeMentionsAnyGeneric(type, new Set([genericName]))
 }
 
-// NOTE: The same walk where the NAMES are what is wanted rather than a yes or
+// The same walk where the NAMES are what is wanted rather than a yes or
 // no. Asked of a refinement's base, whose Type Parameters are exactly the ones a
 // value standing at that position may decide: `NonEmptyList<Item>` is a Type only
 // once something says what `Item` is, and unifying the base against the value's
@@ -1554,7 +1554,7 @@ export function genericNamesMentioned(
 ): Set<common.GenericName> {
 	let names = new Set<common.GenericName>()
 
-	// NOTE: A search that never finds anything, so the whole Type is walked —
+	// A search that never finds anything, so the whole Type is walked —
 	// collecting is what it is here for, and answering would stop it early.
 	typeWalkFinds(type, (record) => {
 		if (record.type === "GenericUse" && typeof record.name === "string") {
@@ -1567,7 +1567,7 @@ export function genericNamesMentioned(
 	return names
 }
 
-// NOTE: The same walk over a whole SET of Generic names, which is what
+// The same walk over a whole SET of Generic names, which is what
 // Argument ordering asks (`does this Parameter wait on anything still
 // unbound?`) — one pass instead of one per name.
 function typeMentionsAnyGeneric(
@@ -1583,7 +1583,7 @@ function typeMentionsAnyGeneric(
 	)
 }
 
-// NOTE: Whether an Error Type sits anywhere in this one — the same structural
+// Whether an Error Type sits anywhere in this one — the same structural
 // walk, for the same reason it does not enumerate shapes. An Error was already
 // reported where it came from, so a Type carrying one buried in a List's items
 // or a Record's members must not be diagnosed a second time for whatever it
@@ -1592,7 +1592,7 @@ export function typeContainsError(type: common.Type): boolean {
 	return typeWalkFinds(type, (record) => record.type === "Error")
 }
 
-// NOTE: Whether a checked refinement sits anywhere in this Type — the same
+// Whether a checked refinement sits anywhere in this Type — the same
 // structural walk again, and for one purpose: refinements erase before
 // emission, so a Type still carrying one where the Rewriter is about to
 // SERIALIZE it names a Compiler bug rather than a Program's mistake. The walk
@@ -1603,7 +1603,7 @@ export function typeContainsRefinement(type: common.Type): boolean {
 	return typeWalkFinds(type, (record) => record.type === "Refinement")
 }
 
-// NOTE: What makes two predicate leaves the SAME question — the Namespace that
+// What makes two predicate leaves the SAME question — the Namespace that
 // answers it, the Method, whether the answer is negated, and the Arguments.
 // Assignability between two refinements is set inclusion over these keys, so
 // nothing may spell two questions alike. Which is why the separator is a COLON
@@ -1624,7 +1624,7 @@ export function predicateConjunctKey(
 	}${JSON.stringify(conjunct.args)}`
 }
 
-// NOTE: The same leaf asked the other way round. A resolved leaf carries its
+// The same leaf asked the other way round. A resolved leaf carries its
 // polarity as a flag, so the opposite of one is one field flipped — and the
 // spelling goes with the polarity it belonged to: `hasCharacters` is not what
 // the contrary of `@::hasCharacters()` is called.
@@ -1636,7 +1636,7 @@ export function negatedPredicateConjunct(
 	return { ...leaf, negated: !conjunct.negated }
 }
 
-// NOTE: What a set of leaves proves BESIDES the leaves themselves, as keys. A
+// What a set of leaves proves BESIDES the leaves themselves, as keys. A
 // value proven above zero has been proven not to be zero — so a receiver the
 // `if` proved `@::isPositive()` of reaches `NonZeroInteger`, which is what a
 // reader expects of the two and what comparing the spelled leaves alone does
@@ -1655,7 +1655,7 @@ export function negatedPredicateConjunct(
 // literal any refinement in scope mentions — so what is here is the closure a
 // set carries on its own, which can not grow with the Program.
 //
-// NOTE: The Methods are named, but only where the base itself answers them.
+// The Methods are named, but only where the base itself answers them.
 // `is`, `isLessThan` and `isGreaterThan` are `Equatable`'s and `Comparable`'s
 // vocabulary, and `isBetween` is `Orderable`'s, and the ordering's law is a
 // promise the BASE makes — so a leaf is read for it only when the Namespace
@@ -1724,7 +1724,7 @@ export function impliedConjunctKeys(
 	return keys
 }
 
-// NOTE: Whether the Namespace that answered a leaf is one the base's own
+// Whether the Namespace that answered a leaf is one the base's own
 // ordering speaks through — the base's Namespace, or the covering `Number` a
 // bound of the other numeric kind falls to. Anything else is a Program's own
 // word for something, and says nothing about below, above and equal.
@@ -1735,7 +1735,7 @@ export function answersForBase(
 	return namespaceAnswersForBase(conjunct.namespaceName, tag)
 }
 
-// NOTE: The same question asked of a NAME alone, which is what reading a body
+// The same question asked of a NAME alone, which is what reading a body
 // has instead of a leaf: the Enricher decides whether a flipped call may be
 // read as the ordering's converse before it has a conjunct to ask about.
 export function namespaceAnswersForBase(
@@ -1745,7 +1745,7 @@ export function namespaceAnswersForBase(
 	return namespaceName === tag || namespaceName === "Number"
 }
 
-// NOTE: The tag of the Type a refinement is written ON. A refinement of a
+// The tag of the Type a refinement is written ON. A refinement of a
 // refinement carries its own base one level in, and a generic Alias carries the
 // refinement one level in — so both are walked through to the Integer, Rational,
 // String or List underneath. Anything else answers as itself, which no conjunct's
@@ -1761,7 +1761,7 @@ export function refinableBaseTag(type: common.Type): string {
 	return current.type
 }
 
-// NOTE: The two comparisons one leaf rules out, over its own Argument.
+// The two comparisons one leaf rules out, over its own Argument.
 function excludedByConjunct(
 	conjunct: common.PredicateConjunct,
 ): Array<common.PredicateConjunct> {
@@ -1792,7 +1792,7 @@ function excludedByConjunct(
 			return []
 		}
 
-		// NOTE: The two bounds name the same range in either order, which is
+		// The two bounds name the same range in either order, which is
 		// what the standard library's own body says — so a pair written the
 		// other way round is read with the two exchanged, rather than as a
 		// contradiction nothing may be read off.
@@ -1811,7 +1811,7 @@ function excludedByConjunct(
 	return []
 }
 
-// NOTE: The comparison two EXCLUSIONS over one bound leave standing. The three
+// The comparison two EXCLUSIONS over one bound leave standing. The three
 // cover everything between them, so ruling out two proves the third: the `else`
 // of `@::is(0)` and the `else` of `@::isLessThan(0)` say nothing apiece and say
 // "above zero" together.
@@ -1845,7 +1845,7 @@ function leftByExclusions(
 		: []
 }
 
-// NOTE: The three comparisons over one bound, each mapped to the other two. Read
+// The three comparisons over one bound, each mapped to the other two. Read
 // in one direction it is what a leaf rules out, and in the other what two ruled
 // out leave standing.
 const COMPARISON_TRIO: Record<string, Array<string>> = {
@@ -1868,7 +1868,7 @@ function comparisonLeaf(
 	}
 }
 
-// NOTE: A bound as the exact number it is — a run of digits, or two of them
+// A bound as the exact number it is — a run of digits, or two of them
 // with a slash between, which is what a Rational receiver's conjunct keeps. The
 // two are only ever COMPARED here, so the pair is kept rather than divided, and
 // a negative denominator is moved onto the numerator so the cross-multiplication
@@ -1903,7 +1903,7 @@ function boundArgument(
 		: { numerator, denominator }
 }
 
-// NOTE: The one door to a refinement's conjuncts. They are null while a refined
+// The one door to a refinement's conjuncts. They are null while a refined
 // Alias waits for the Namespace answering its predicate to hoist, and nothing
 // may be decided about a predicate nobody has read, so the null is refused.
 export function provenConjuncts(
@@ -1916,7 +1916,7 @@ export function provenConjuncts(
 	return refinement.conjuncts
 }
 
-// NOTE: The canonical form a refinement's conjuncts are stored in — sorted by
+// The canonical form a refinement's conjuncts are stored in — sorted by
 // key, with duplicates dropped, so that one predicate spells one conjunct set
 // however it was written. Two aliases proving the same thing are then the same
 // Type to every reader of `conjuncts`, and the inclusion check above never has
@@ -1940,7 +1940,7 @@ export function canonicalPredicateConjuncts(
 		.map(([, conjunct]) => conjunct)
 }
 
-// NOTE: Whether a slot nothing has decided yet sits anywhere in this Type. It
+// Whether a slot nothing has decided yet sits anywhere in this Type. It
 // enumerates the shapes on purpose, unlike its Error-hunting sibling: an
 // Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
 // walk that reads every field would call every bare `List` undecided. Only the
@@ -1952,7 +1952,7 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return true
 		case "List":
 			return typeContainsUnknown(type.itemType)
-		// NOTE: And the two asynchronous containers, whose open slot no Program
+		// And the two asynchronous containers, whose open slot no Program
 		// can write — a bare `Future` is refused where it is spelled, and no
 		// Expression builds one out of nothing. So the answer here is about the
 		// Compiler's own Types: a Future nobody decided the answer Type of is
@@ -1960,7 +1960,7 @@ export function typeContainsUnknown(type: common.Type): boolean {
 		case "Future":
 		case "Started":
 			return typeContainsUnknown(type.valueType)
-		// NOTE: Either slot undecided leaves the Type undecided — there is one
+		// Either slot undecided leaves the Type undecided — there is one
 		// answer to "is anything here still open?", and two slots to ask it of.
 		// `GenericDictionary` is left out for the reason a bare `List` is: its
 		// Unknowns are DECLARED defaults, not slots waiting on an answer.
@@ -1973,7 +1973,7 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return Object.values(type.members).some(typeContainsUnknown)
 		case "UnionType":
 			return type.types.some(typeContainsUnknown)
-		// NOTE: A refinement decides nothing its base has not decided — what is
+		// A refinement decides nothing its base has not decided — what is
 		// still undecided about `List<Unknown> where …` is the item Type.
 		case "Refinement":
 			return typeContainsUnknown(type.base)
@@ -1982,7 +1982,7 @@ export function typeContainsUnknown(type: common.Type): boolean {
 	}
 }
 
-// NOTE: Whether a value written into a slot nothing has decided DECIDES it.
+// Whether a value written into a slot nothing has decided DECIDES it.
 // Anything that is not itself a blank does, with one exception: a Type carrying
 // an Error decides nothing. Whatever produced that Error was reported where it
 // came from, and an Error is poison everywhere else for the same reason —
@@ -1998,7 +1998,7 @@ export function decidesAnUndecidedSlot(written: common.Type): boolean {
 	return written.type !== "Unknown" && !typeContainsError(written)
 }
 
-// NOTE: The Type with every proof taken off it, however deep one sits — the
+// The Type with every proof taken off it, however deep one sits — the
 // shape a decision is allowed to be. It enumerates the places a Type ARGUMENT
 // can stand, the same list `typeContainsUnknown` walks and for the same reason:
 // those are the positions a value's own Type reaches. A Type holding no
@@ -2038,7 +2038,7 @@ function withoutRefinements(type: common.Type): common.Type {
 				? type
 				: { type: "Dictionary", keyType, valueType }
 		}
-		// NOTE: A rebuilt Record drops its own display spelling for the same
+		// A rebuilt Record drops its own display spelling for the same
 		// reason the Union below drops its arms' — a `Standing` whose
 		// `NonZeroInteger` member erased to an Integer declares something
 		// `Standing` does not, and a shape is not the Alias it stopped being.
@@ -2054,7 +2054,7 @@ function withoutRefinements(type: common.Type): common.Type {
 
 			return stripped ? { type: "Record", members } : type
 		}
-		// NOTE: The name and the alias go with the arm they described:
+		// The name and the alias go with the arm they described:
 		// `NonEmptyList<String> | X` is not what a Union whose first arm is now
 		// a plain List is called.
 		case "UnionType": {
@@ -2069,7 +2069,7 @@ function withoutRefinements(type: common.Type): common.Type {
 	}
 }
 
-// NOTE: The Type with a Record's display spelling taken off it, however deep one
+// The Type with a Record's display spelling taken off it, however deep one
 // sits — what a Type looks like to anything that is not a reader. A descriptor is
 // DATA the runtime consults, and `Standing` says nothing about a value that
 // `{ team: …, played: … }` does not; emitted, it would put a name the runtime has
@@ -2082,7 +2082,7 @@ function withoutRefinements(type: common.Type): common.Type {
 // descriptor today, inert, and taking them out here would change the output this
 // is written to keep identical. The one new field is the one that goes.
 //
-// NOTE: Identity-preserving, like every walk here: a Type holding no named Record
+// Identity-preserving, like every walk here: a Type holding no named Record
 // comes back as itself, so the common descriptor allocates nothing. The visiting
 // set is the back-edge guard `resolveUnknownSlots` carries.
 //
@@ -2167,7 +2167,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 						? type
 						: { type: "Dictionary", keyType, valueType }
 				}
-				// NOTE: The Type ARGUMENTS of a Union's or a Case's applied
+				// The Type ARGUMENTS of a Union's or a Case's applied
 				// spelling are stripped alongside its members, because a
 				// spelling is printed too: `Optional<Standing>` is the word a
 				// reader recognises in a Diagnostic and `Optional<{ … }>` is
@@ -2223,7 +2223,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 									: { typeArguments }),
 							}
 				}
-				// NOTE: Walked through as well, because a Function Type is DATA
+				// Walked through as well, because a Function Type is DATA
 				// in a descriptor like any other and a Record standing in one of
 				// its Parameters is still a Record nobody can name at run time.
 				// The one field `isValueOfType` reads of a Function is that it
@@ -2236,7 +2236,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 
 					return signature === type ? type : { ...type, ...signature }
 				}
-				// NOTE: An Overload set is those signatures in a list, and a
+				// An Overload set is those signatures in a list, and a
 				// Record standing in one of them is as nameless as one in a
 				// plain Function's. Nothing emits an Overload set today — the
 				// descriptor path can not reach here — but this walk answers
@@ -2266,7 +2266,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 	return strip(type)
 }
 
-// NOTE: The same answer for a signature, which is what the embedding boundary
+// The same answer for a signature, which is what the embedding boundary
 // asks — `printSignature` takes a `BaseFunction`, and a `BaseFunction` carries no
 // `type` field to discriminate on, so the walk above can not hand one back. This
 // is that walk's Function case, shared rather than written twice.
@@ -2276,7 +2276,7 @@ export function withoutRecordNamesInSignature(
 	return strippedSignature(signature, withoutRecordNames)
 }
 
-// NOTE: A list of Type Arguments stripped, answering the very list it was given
+// A list of Type Arguments stripped, answering the very list it was given
 // where nothing changed — which is how each branch above tells a Type it has to
 // rebuild from one it can hand back.
 function strippedArguments<Argument extends common.Type>(
@@ -2316,7 +2316,7 @@ function strippedSignature<Signature extends common.BaseFunction>(
 		: { ...signature, parameterTypes, returnType }
 }
 
-// NOTE: `stored` with every Unknown slot `value` has an answer for filled in —
+// `stored` with every Unknown slot `value` has an answer for filled in —
 // what turns `variable items = []` into a List of Integers the moment
 // `items = [1, 2]` says so. Only slots that are Unknown are touched, so a Type
 // that already decided something keeps it and the caller can tell that nothing
@@ -2325,7 +2325,7 @@ export function resolveUnknownSlots(
 	stored: common.Type,
 	value: common.Type,
 ): common.Type {
-	// NOTE: The Types being walked. The Enricher refuses a Type declaration
+	// The Types being walked. The Enricher refuses a Type declaration
 	// that names itself, so meeting one of them again is defence only.
 	let visiting = new Set<common.Type>()
 
@@ -2334,7 +2334,7 @@ export function resolveUnknownSlots(
 			return stored
 		}
 
-		// NOTE: A DECISION never carries a refinement, at any depth. A slot
+		// A DECISION never carries a refinement, at any depth. A slot
 		// decided by inference holds many values over the life of the name that
 		// owns it — a fold's accumulator, a Dictionary's values, a List's items —
 		// and a refinement is a proof about ONE value. Pinning the proof into the
@@ -2353,7 +2353,7 @@ export function resolveUnknownSlots(
 				: stored
 		}
 
-		// NOTE: A refinement standing over the CONTAINER whose slots are being
+		// A refinement standing over the CONTAINER whose slots are being
 		// filled is looked through instead, and its evidence dropped:
 		// `variable items = []` followed by `items = items::append("a")` pins a
 		// `List<String>`, never the `NonEmptyList<String>` the call answered.
@@ -2369,7 +2369,7 @@ export function resolveUnknownSlots(
 			value = value.base
 		}
 
-		// NOTE: A written Union is asked member by member, because a value built
+		// A written Union is asked member by member, because a value built
 		// out of branches says what it holds in the branches that WRITE into the
 		// accumulator and nothing at all in the ones that hand it back untouched.
 		// `if number::isLessThan(0) { <- kept }` beside `<- kept::append(number)`
@@ -2402,7 +2402,7 @@ export function resolveUnknownSlots(
 					: { type: "List", itemType }
 			}
 
-			// NOTE: The one slot each, pinned the way a List's item Type is.
+			// The one slot each, pinned the way a List's item Type is.
 			if (stored.type === "Future" && value.type === "Future") {
 				let valueType = resolve(stored.valueType, value.valueType)
 
@@ -2419,7 +2419,7 @@ export function resolveUnknownSlots(
 					: { type: "Started", valueType }
 			}
 
-			// NOTE: Each slot pinned INDEPENDENTLY, which is the whole of what
+			// Each slot pinned INDEPENDENTLY, which is the whole of what
 			// a second slot changes here: a `Dictionary<Unknown, Unknown>` that
 			// meets a `Dictionary<String, Unknown>` keeps its undecided values
 			// and gains its keys. Nothing may read one slot from the other.
@@ -2452,7 +2452,7 @@ export function resolveUnknownSlots(
 			}
 
 			if (stored.type === "UnionType" && value.type === "UnionType") {
-				// NOTE: Arms are paired by shape — a `List` arm is answered by
+				// Arms are paired by shape — a `List` arm is answered by
 				// the value's `List` arm — and only when exactly one arm
 				// answers. Two arms of the same shape have no obvious pairing,
 				// and guessing one would decide a slot from the wrong Type.
@@ -2466,7 +2466,7 @@ export function resolveUnknownSlots(
 						: arm
 				})
 
-				// NOTE: The name and the alias are dropped along with the arm
+				// The name and the alias are dropped along with the arm
 				// they described — `Optional<List<Unknown>>` is not what a
 				// Union whose List arm now holds Integers is called.
 				return types.some((arm, index) => arm !== stored.types[index])
@@ -2483,7 +2483,7 @@ export function resolveUnknownSlots(
 	return resolve(stored, value)
 }
 
-// NOTE: What several readings of the same `stored` AGREE its blanks are, slot by
+// What several readings of the same `stored` AGREE its blanks are, slot by
 // slot. Each candidate is `stored` with some of its blanks filled — one per
 // member of a written Union — so every one of them has its shape, and each blank
 // is answered by the candidates that HAVE an answer for it: a branch handing the
@@ -2573,7 +2573,7 @@ function agreedDecisions(
 			: { type: "Dictionary", keyType, valueType }
 	}
 
-	// NOTE: Member by member, which is what a seed holding two accumulators
+	// Member by member, which is what a seed holding two accumulators
 	// needs: `{ evens = [], odds = [] }` is written one member per branch, so
 	// neither branch decides the Record and both together decide every member.
 	if (stored.type === "Record") {
@@ -2598,7 +2598,7 @@ function agreedDecisions(
 		return pinned ? { type: "Record", members } : stored
 	}
 
-	// NOTE: Arm by arm and by POSITION, because every candidate came out of the
+	// Arm by arm and by POSITION, because every candidate came out of the
 	// same `stored` — a Union whose arms were rebuilt still has them in the order
 	// it had them in, and a candidate that is not that Union at all decided
 	// nothing about its arms.
@@ -2628,7 +2628,7 @@ function agreedDecisions(
 
 // #region Protocol Conformance
 
-// NOTE: A Simple requirement is fulfilled by a Simple Method or by the first
+// A Simple requirement is fulfilled by a Simple Method or by the first
 // matching overload of an Overloaded one — mirroring how invocations resolve
 // their overload. Staticness must agree; the emitted name of the fulfilling
 // Method (with its own overload suffix) and the Method itself are returned, the
@@ -2686,7 +2686,7 @@ export function flattenUnionMembers(
 	return members
 }
 
-// NOTE: Like `flattenUnionMembers`, except a *named* nested Union (a Choice,
+// Like `flattenUnionMembers`, except a *named* nested Union (a Choice,
 // `Number`, a named Type Alias, or an applied `Optional<X>`) stays whole.
 // Union-building code uses this so Hovers and Diagnostics keep the name
 // instead of spelling out every member — purely a display concern, since
@@ -2716,20 +2716,20 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null, OUTERMOST)
 }
 
-// NOTE: Whether `part` says only things `whole` already declares — every member
+// Whether `part` says only things `whole` already declares — every member
 // of `part` is a member of `whole`, carrying a value the member's declared Type
 // admits. It is what a `with` right-hand side has to be, and it is not
 // assignability in either direction: `matchesType(whole, part)` asks the
 // opposite question (does `part` answer everything `whole` promises), and
 // `matchesType(part, whole)` reads the member Types the wrong way round.
 //
-// NOTE: Judged by assignability, not by identity — an update sets a member
+// Judged by assignability, not by identity — an update sets a member
 // to a VALUE, and a value of one arm is enough for a Union-typed member,
 // exactly as it is at the Declaration. Deep equality refused `{ c with
 // n = 5 }` against a declared `Integer | String`, and told two spellings
 // of one Union apart.
 //
-// NOTE: `context` is threaded to the member comparisons so a caller that is
+// `context` is threaded to the member comparisons so a caller that is
 // INFERRING can ask this — the partial fit of an Argument against a Parameter
 // whose Type is still binding Generics. A caller with nothing to bind passes
 // nothing, which is `matchesType`'s own `null`.
@@ -2739,7 +2739,7 @@ export function isPartialOf(
 	context: GenericInferenceContext | null = null,
 ): boolean {
 	for (let [partName, partMemberType] of Object.entries(part.members)) {
-		// NOTE: `Object.hasOwn` before the read — a member named after one
+		// `Object.hasOwn` before the read — a member named after one
 		// of `Object.prototype`'s would otherwise be compared against a
 		// JavaScript function the Record does not have.
 		if (
@@ -2758,7 +2758,7 @@ export function isPartialOf(
 	return true
 }
 
-// NOTE: The Type a Record Literal carrying path keys HAS once the default it is
+// The Type a Record Literal carrying path keys HAS once the default it is
 // merged into has filled the rest in. A member a path key wrote stands for the
 // WHOLE member the merge rebuilds — `{ server.port = 1 }` carries a `server` of
 // Type `Server`, because the callee reads `port` off the Argument and every
@@ -2789,7 +2789,7 @@ export function mergedRecordType(
 	return mergedLevelType(into, nesting ?? {}, value, context)
 }
 
-// NOTE: A level a path key built, which is a partial of the member it stands
+// A level a path key built, which is a partial of the member it stands
 // for. Written as a guard rather than read inline so that "was this written as a
 // path" is asked in one spelling everywhere.
 export function isMergedLevel(
@@ -2813,7 +2813,7 @@ function mergedLevelType(
 			continue
 		}
 
-		// NOTE: `Object.hasOwn` before either read — a member named after one of
+		// `Object.hasOwn` before either read — a member named after one of
 		// `Object.prototype`'s would otherwise find a JavaScript function where
 		// the Record has nothing, and a nesting that names nothing.
 		if (
@@ -2836,7 +2836,7 @@ function mergedLevelType(
 			context,
 		)
 
-		// NOTE: The level has to be a PARTIAL of the member it merges into,
+		// The level has to be a PARTIAL of the member it merges into,
 		// which is the very question the whole Literal is asked one level up —
 		// every member it writes is one that member declares, at a Type that
 		// member admits. What it leaves out is what the default fills in, and a
@@ -2851,7 +2851,7 @@ function mergedLevelType(
 	return { type: "Record", members }
 }
 
-// NOTE: The subsumption order Union building dedupes by — whether `member`
+// The subsumption order Union building dedupes by — whether `member`
 // says nothing `existing` does not already cover. Assignability alone can not
 // answer that: the Unknown item Type an empty List Literal carries is a
 // wildcard in BOTH directions — `List<Unknown>` accepts `List<Integer>`
@@ -2873,7 +2873,7 @@ function subsumesForUnion(existing: common.Type, member: common.Type): boolean {
 	return !(isLessSpecific(existing, member) && matchesType(member, existing))
 }
 
-// NOTE: Whether `left` says strictly less about the same shape than `right` —
+// Whether `left` says strictly less about the same shape than `right` —
 // an Unknown standing where `right` names a Type. ONLY the placeholder an
 // empty List Literal leaves behind is weighed; every other pair reports no
 // difference, so nothing but that one wildcard can change which member of a
@@ -2894,7 +2894,7 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 		return isLessSpecific(left.valueType, right.valueType)
 	}
 
-	// NOTE: Slot-wise, and it takes only ONE slot to say less — a
+	// Slot-wise, and it takes only ONE slot to say less — a
 	// `Dictionary<Unknown, Integer>` beside a `Dictionary<String, Integer>`
 	// spells less out and yields to it, exactly as the empty List's placeholder
 	// yields to the concrete item Type beside it.
@@ -2908,7 +2908,7 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 	return false
 }
 
-// NOTE: Builds a Union from a list of members. Members that subsume one another
+// Builds a Union from a list of members. Members that subsume one another
 // collapse (`Integer` alongside `Number` becomes just `Number`), anonymous
 // nested Unions are flattened in, and NAMED ones (`Number`, a Choice, an
 // applied `Optional<X>`, a named Alias) stay whole — their name is their
@@ -2959,7 +2959,7 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	return { type: "UnionType", types: distinct }
 }
 
-// NOTE: The deduped member list for a Union built from several candidate
+// The deduped member list for a Union built from several candidate
 // Types. Anonymous (unnamed, unaliased) nested Unions are exploded so their
 // members merge in; a named nested Union (`Number`, a Choice, a named Alias)
 // stays whole so the result prints by name. A member already subsumed by one
@@ -2997,7 +2997,7 @@ export function mergeUnionMembers(
 	return distinct
 }
 
-// NOTE: The inference-aware form of `matchesType` — the first occurrence of
+// The inference-aware form of `matchesType` — the first occurrence of
 // a bindable Generic (in `context.bindableNames`) binds the Type on the
 // other side, every later occurrence checks with the normal assignability
 // rules. Bindings accumulate in `context.bindings`.
@@ -3009,14 +3009,14 @@ export function matchesTypeWithBindings(
 	return matchTypes(lhs, rhs, context, OUTERMOST)
 }
 
-// NOTE: The (lhs, rhs) Case pairs whose members are mid-comparison, keyed by
+// The (lhs, rhs) Case pairs whose members are mid-comparison, keyed by
 // `lhs` identity — a nested Set so a pair is recognised by both halves. Guards
 // the coinductive Case recursion in `matchTypes` against a cyclic payload
 // looping forever; entries are added and removed within a single `matchTypes`
 // call, so the map is empty between top-level matches.
 const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 
-// NOTE: The Generic names a binding mentions, remembered per Type object. The
+// The Generic names a binding mentions, remembered per Type object. The
 // question is asked of one binding on every later occurrence of its Parameter,
 // so one walk per distinct binding is the whole cost. A remembered answer never
 // misses a name because no edit made in place adds one: filling in a
@@ -3038,7 +3038,7 @@ function mentionedGenericNames(binding: common.Type): Set<common.GenericName> {
 	return remembered
 }
 
-// NOTE: Whether following a Parameter's binding, and the bindings of everything
+// Whether following a Parameter's binding, and the bindings of everything
 // that binding mentions, leads back to the Parameter itself. THE occurs check,
 // written over the whole binding graph rather than over one edge of it: the
 // plain shape is `Item := List<Item>`, but two Parameters can hold each other
@@ -3053,7 +3053,7 @@ function bindingCyclesBackTo(
 	name: common.GenericName,
 	context: GenericInferenceContext,
 ): boolean {
-	// NOTE: The answer for very nearly every binding, and worth its own line
+	// The answer for very nearly every binding, and worth its own line
 	// because this is asked on EVERY later occurrence of a bound Parameter: a
 	// Type the Arguments produced mentions no Generic at all, so there is
 	// nothing for the walk below to follow. Reading that off the memoised
@@ -3092,7 +3092,7 @@ function bindingCyclesBackTo(
 	return false
 }
 
-// NOTE: Whether a Generic name is still OPEN to binding here — bindable AND not
+// Whether a Generic name is still OPEN to binding here — bindable AND not
 // already pinned to a Type that MENTIONS its own name. Such a binding arises
 // when a callee's bindable Generic shares a spelling with the caller's opaque
 // one, and the two are one symbol because Generic identity is by name. The plain
@@ -3105,7 +3105,7 @@ function bindingCyclesBackTo(
 // `Result` of `ItemType | String`). Left as "open" it would instead be chased
 // through its own binding forever.
 //
-// NOTE: The occurs check is the whole rule, not just the `X := X` shape it was
+// The occurs check is the whole rule, not just the `X := X` shape it was
 // first written for, and it is asked of the binding GRAPH — see
 // `bindingCyclesBackTo`. `Item := List<Item>` is the same collision one level
 // down — a `namespace Pairing<infer Item> for { left: Item, right: Item }`
@@ -3129,7 +3129,7 @@ function isOpenBindable(
 	return !(context.bindings.has(name) && bindingCyclesBackTo(name, context))
 }
 
-// NOTE: Whether a Type Parameter already stands for a refinement. A Parameter
+// Whether a Type Parameter already stands for a refinement. A Parameter
 // binds the BASE wherever a value is measured against it, so this is only ever
 // true of one bound from INSIDE a Type — `ItemType` off a
 // `List<NonEmptyList<Integer>>` receiver — or of one an author applied by hand.
@@ -3146,7 +3146,7 @@ function refinementBoundTo(
 	return context?.bindings.get(type.name)?.type === "Refinement"
 }
 
-// NOTE: Where in a Type the comparison currently stands. `OUTERMOST` is the
+// Where in a Type the comparison currently stands. `OUTERMOST` is the
 // whole of what a position asks — an Argument against its Parameter, a value
 // against its Declaration — and `NESTED` is everything reached by going THROUGH
 // a Type: a List's items, a Record's or a Case's members, a signature's
@@ -3164,7 +3164,7 @@ function matchTypes(
 	context: GenericInferenceContext | null,
 	depth: MatchDepth,
 ): boolean {
-	// NOTE: Error Types are poison values — they only occur after a
+	// Error Types are poison values — they only occur after a
 	// Diagnostic has already been reported, and match anything in both
 	// directions so that a single mistake does not cascade into
 	// follow-up Diagnostics.
@@ -3172,7 +3172,7 @@ function matchTypes(
 		return true
 	}
 
-	// NOTE: A checked refinement flows into anything its BASE flows into — the
+	// A checked refinement flows into anything its BASE flows into — the
 	// evidence is simply forgotten, and every value of `NonZeroInteger` is an
 	// Integer. This unwrapping sits ahead of Generic binding below on purpose:
 	// it is what makes a Type Parameter bind the base at the OUTERMOST position,
@@ -3183,7 +3183,7 @@ function matchTypes(
 	// Integer is a Program that works, and binding `State` to `NonZeroInteger`
 	// off the seed would refuse it.
 	//
-	// NOTE: A refinement standing INSIDE another Type is a different matter, and
+	// A refinement standing INSIDE another Type is a different matter, and
 	// binds as itself. Nobody inferred it there — `List<NonEmptyList<Integer>>`
 	// says what it says because something wrote it down or because a Method
 	// promised it, and the item Type is not a place a later value can widen. So
@@ -3191,14 +3191,14 @@ function matchTypes(
 	// proof survives being a Type Argument, while the outermost rule above is
 	// untouched.
 	//
-	// NOTE: An expected Union is left to decompose FIRST — unwrapping here
+	// An expected Union is left to decompose FIRST — unwrapping here
 	// would strip the evidence before the Union's own refinement member could
 	// read it, so `NonZeroInteger | String` refused the very `NonZeroInteger`
 	// it names. Each member then faces the intact refinement: a refinement
 	// member by its conjuncts below, any other member through this same
 	// unwrapping one level down.
 	//
-	// NOTE: And not where the Type Parameter is already BOUND to a refinement,
+	// And not where the Type Parameter is already BOUND to a refinement,
 	// wherever it stands. There is nothing left to infer there — the Parameter
 	// stands for a proof already, and unwrapping would ask a proven Argument to
 	// fit the base and then refuse it for being proven. It is what a Method
@@ -3219,7 +3219,7 @@ function matchTypes(
 		return matchTypes(lhs, rhs.base, context, depth)
 	}
 
-	// NOTE: The other direction needs the evidence. A refinement is accepted by
+	// The other direction needs the evidence. A refinement is accepted by
 	// a refinement over the same base whose conjuncts INCLUDE its own — proving
 	// more than was asked is proof enough, proving less is no proof at all — and
 	// by nothing else: a bare Integer arriving where `NonZeroInteger` stands is
@@ -3230,7 +3230,7 @@ function matchTypes(
 	// proven not to be zero, and a Type saying so has to reach the Namespace
 	// that asks for exactly that.
 	//
-	// NOTE: A Generic that is already BOUND is not "nothing else" — it stands
+	// A Generic that is already BOUND is not "nothing else" — it stands
 	// for whatever it was bound to, and the comparison belongs against that. It
 	// is reached when a Type Parameter has picked a refinement up out of a Type
 	// Argument and the same Parameter comes back round in a flipped position:
@@ -3263,7 +3263,7 @@ function matchTypes(
 		)
 	}
 
-	// NOTE: Two opaque Generics of the same name are the same Generic and match.
+	// Two opaque Generics of the same name are the same Generic and match.
 	// This must NOT short-circuit a Generic still OPEN to binding that happens to
 	// share a name with an opaque one: when a Method forwards to another whose
 	// `infer` generic is spelled identically — `List`'s Methods all bind
@@ -3282,7 +3282,7 @@ function matchTypes(
 		return true
 	}
 
-	// NOTE: Generics can occur on either side — an expected Generic binds the
+	// Generics can occur on either side — an expected Generic binds the
 	// actual Type, while an actual-side Generic occurs when signatures are
 	// compared (contravariant parameter positions flip the sides).
 	if (lhs.type === "GenericUse" && isOpenBindable(lhs.name, context)) {
@@ -3297,7 +3297,7 @@ function matchTypes(
 		)
 	}
 
-	// NOTE: An opaque Generic is a symbol of an enclosing definition — as the
+	// An opaque Generic is a symbol of an enclosing definition — as the
 	// expected Type it only accepts itself, which the same-name check above
 	// already covered. As the actual Type it falls through, so that an
 	// expected Union can still accept its own Generic member.
@@ -3305,7 +3305,7 @@ function matchTypes(
 		return false
 	}
 
-	// NOTE: `Unknown` as the WHOLE expected Type accepts everything, and stays
+	// `Unknown` as the WHOLE expected Type accepts everything, and stays
 	// that way. No author wrote it — `Unknown` is unspellable in Essence — so
 	// the only place it can stand here is an answer the Compiler had nothing
 	// better to give: a `case _` with nothing left to catch
@@ -3318,14 +3318,14 @@ function matchTypes(
 	// is written instead, because it was a spelling that minted VALUES of this
 	// Type and no recovery at all.
 	//
-	// NOTE: The undecided SLOT of a container is a different question and has
+	// The undecided SLOT of a container is a different question and has
 	// its own rules below — the Unknown a `[]` or a `[=]` leaves behind is a
 	// blank waiting to be filled, and a value written into it decides it.
 	if (lhs.type === "Unknown") {
 		return true
 	}
 
-	// NOTE: A bare `List` demands nothing of the items, so it accepts every
+	// A bare `List` demands nothing of the items, so it accepts every
 	// List. The reverse does NOT hold: a bare `List` PROMISES nothing about
 	// them either, and letting one satisfy a `List<Integer>` would hand a List
 	// of Strings to everything reading Integers out of it. That direction is
@@ -3340,7 +3340,7 @@ function matchTypes(
 	}
 
 	if (lhs.type === "List" && rhs.type === "List") {
-		// NOTE: An undecided item Type is a SLOT, and a slot may be READ as
+		// An undecided item Type is a SLOT, and a slot may be READ as
 		// bottom but never WRITTEN into without being decided. Accepting a
 		// decided List here did both at once: `List<Unknown>` took a List of
 		// Strings and remained a `List<Unknown>` afterwards, which fits every
@@ -3356,7 +3356,7 @@ function matchTypes(
 			return false
 		}
 
-		// NOTE: Empty List Literals have an Unknown itemType and
+		// Empty List Literals have an Unknown itemType and
 		// are assignable to any List.
 		if (rhs.itemType.type === "Unknown") {
 			return true
@@ -3365,7 +3365,7 @@ function matchTypes(
 		return matchTypes(lhs.itemType, rhs.itemType, context, NESTED)
 	}
 
-	// NOTE: The bare-container rule again, unchanged by the second slot — a
+	// The bare-container rule again, unchanged by the second slot — a
 	// bare `Dictionary` demands nothing of either, so it accepts every one, and
 	// the reverse direction is the Unknown-slot rule below rather than this one.
 	if (
@@ -3376,7 +3376,7 @@ function matchTypes(
 	}
 
 	if (lhs.type === "Dictionary" && rhs.type === "Dictionary") {
-		// NOTE: The write rule above, asked per slot: an undecided key or value
+		// The write rule above, asked per slot: an undecided key or value
 		// Type refuses a Dictionary that has decided that slot, and the other
 		// slot has no say in it. Both halves matter — a Dictionary whose keys
 		// were decided and whose values were not still launders its values —
@@ -3390,7 +3390,7 @@ function matchTypes(
 			return false
 		}
 
-		// NOTE: The empty-List rule applied to each slot SEPARATELY. An empty
+		// The empty-List rule applied to each slot SEPARATELY. An empty
 		// Dictionary decides neither, so it is assignable to any Dictionary the
 		// way an empty List Literal is assignable to any List — and a slot that
 		// was decided is still checked, so a `Dictionary<Unknown, Integer>`
@@ -3409,7 +3409,7 @@ function matchTypes(
 		)
 	}
 
-	// NOTE: Covariant in the one slot, which is the only variance a Future can
+	// Covariant in the one slot, which is the only variance a Future can
 	// have: it is a producer and nothing ever writes a value INTO one. There is
 	// no bare spelling to give a rule of its own — a written `Future` is refused
 	// for the Type Argument it left off — so the slot reaching here still open
@@ -3454,7 +3454,7 @@ function matchTypes(
 		let lhsMembers = orderUnionMembersForMatching(lhs.types, context)
 
 		if (rhs.type === "UnionType") {
-			// NOTE: An actual Union is assignable when every one of its
+			// An actual Union is assignable when every one of its
 			// members is accepted by some member of the expected Union — the
 			// actual Type must not be able to hold any value the expected
 			// Type can not hold. A whole member is tried first, so a binding
@@ -3467,7 +3467,7 @@ function matchTypes(
 
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
-				// NOTE: Every candidate is tried from the bindings the ones
+				// Every candidate is tried from the bindings the ones
 				// BEFORE it earned, never from the wreckage of a candidate that
 				// bound its way down and then failed — see the `else` arm below
 				// for what such leftovers do to the candidates after them.
@@ -3494,7 +3494,7 @@ function matchTypes(
 
 			return matchedWholeMembers
 		} else {
-			// NOTE: Each member is tried on its own. A composite member — a
+			// Each member is tried on its own. A composite member — a
 			// Record, Case or Function mentioning a bindable Generic — can bind
 			// Generics on its way down and THEN fail, and those bindings are
 			// worth no more than the member that made them: rolled back here,
@@ -3521,7 +3521,7 @@ function matchTypes(
 		return false
 	}
 
-	// NOTE: Cases are nominal — a Case only matches its own Choice's Case of
+	// Cases are nominal — a Case only matches its own Choice's Case of
 	// the same name, never a structurally identical Record (and vice versa).
 	// That identity is the entire point of declaring a Choice. Compared by
 	// `choiceIdentity` rather than by the Choice's written name, so that two
@@ -3540,7 +3540,7 @@ function matchTypes(
 			return false
 		}
 
-		// NOTE: The same Case object matches itself in O(1) — every non-generic
+		// The same Case object matches itself in O(1) — every non-generic
 		// Choice's Cases keep their identity through `applyGenericBindings`, so
 		// this is the entire cost for them. It runs before any pair-guard
 		// bookkeeping so that path allocates nothing.
@@ -3548,7 +3548,7 @@ function matchTypes(
 			return true
 		}
 
-		// NOTE: Re-entering the same (lhs, rhs) pair while it is already being
+		// Re-entering the same (lhs, rhs) pair while it is already being
 		// compared is the coinductive hypothesis — assume it holds. A genuine
 		// counterexample would differ at some finite member path, which is
 		// checked before the cycle can close, so assuming the cycle is sound.
@@ -3571,7 +3571,7 @@ function matchTypes(
 		inProgress.add(rhs)
 
 		try {
-			// NOTE: Cases sharing a tag share a declaration, so their member
+			// Cases sharing a tag share a declaration, so their member
 			// name sets are identical — the length check plus the per-name
 			// lookup below assert that strictly rather than trusting it.
 			let lhsMemberNames = Object.keys(lhs.members)
@@ -3609,7 +3609,7 @@ function matchTypes(
 
 	if (lhs.type === "Record" && rhs.type === "Record") {
 		for (let memberName in lhs.members) {
-			// NOTE: `Object.hasOwn` before the read — a member named after one
+			// `Object.hasOwn` before the read — a member named after one
 			// of `Object.prototype`'s would otherwise be compared against a
 			// JavaScript function the Record does not have.
 			if (!Object.hasOwn(rhs.members, memberName)) {
@@ -3631,7 +3631,7 @@ function matchTypes(
 		return true
 	}
 
-	// NOTE: A Method NAMED rather than called — `Reader.readsBase`,
+	// A Method NAMED rather than called — `Reader.readsBase`,
 	// `Doubler.double` — is a Function value like any other: its receiver
 	// already stands as the first Parameter of the Type, and it is emitted as a
 	// plain function taking it there. The `SimpleMethod`/`StaticMethod` tag
@@ -3679,7 +3679,7 @@ function matchTypes(
 	return false
 }
 
-// NOTE: The Argument Type is provided lazily — resolving an Argument's Type
+// The Argument Type is provided lazily — resolving an Argument's Type
 // in the Enricher can report Diagnostics, so `getType` is only invoked for
 // Arguments whose label already matched, exactly like the previous inline
 // checks did.
@@ -3696,28 +3696,28 @@ export type MatchableArgument = {
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
 	) => common.Type
-	// NOTE: Set on an Argument that can bind no Type Parameter of the call it
+	// Set on an Argument that can bind no Type Parameter of the call it
 	// stands in — a prefixed Case construction with no Type Arguments of its own,
 	// which is DECIDED by the Parameter it is matched against and decides nothing
 	// itself. Said by the Argument rather than read off the Parameter, because a
 	// `Box<Item>` Parameter is a Parameter like any other: what can not decide is
 	// this way of writing the value, not the place it is written in.
 	bindsNothing?: boolean
-	// NOTE: The Argument's enriched value where there is one, so a Record
+	// The Argument's enriched value where there is one, so a Record
 	// Literal that wrote a path key can be measured by what the merge makes of
 	// it rather than by what it says on its own. Answered lazily: an Argument is
 	// enriched at most once per Invocation, and this is asked once per candidate.
 	mergedValue?: () => common.typed.ExpressionNode | null
-	// NOTE: Fills the Unknown slots of this Argument's own Type from the Type the
+	// Fills the Unknown slots of this Argument's own Type from the Type the
 	// finished call decided for the Parameter it stands at — the brackets of a
 	// written `[]` taking what the call worked out for them. Absent everywhere the
 	// Argument has no Node to write onto: the Validator matches typed Nodes, and
 	// what it reads there is a decision the Enricher has already made.
 	decide?: (decided: common.Type) => void
-	// NOTE: Set on an Argument written as a Record LITERAL, whose emitted value
+	// Set on an Argument written as a Record LITERAL, whose emitted value
 	// therefore carries exactly the members its Type names and no others.
 	//
-	// NOTE: Which is what a PARTIAL Argument has to promise, and why only a
+	// Which is what a PARTIAL Argument has to promise, and why only a
 	// literal may be one. Record assignability is width subtyping, so a value
 	// typed `{ host: String }` may carry a `retries` of any Type at all — and a
 	// callee filling in the members a caller left out reads
@@ -3729,7 +3729,7 @@ export type MatchableArgument = {
 	spellsItsMembers?: boolean
 }
 
-// NOTE: Which Argument each Parameter was given. `forParameter[i]` is the
+// Which Argument each Parameter was given. `forParameter[i]` is the
 // Argument index paired with Parameter `i`, or null when the Parameter took its
 // default; `omittedParameterIndices` is the same fact the other way round, and
 // is what rides out to the emission side. Both are indexed over the FULL
@@ -3740,7 +3740,7 @@ export type ArgumentPairing = {
 	omittedParameterIndices: Array<number>
 }
 
-// NOTE: What ONE refused Argument was refused for, for a report that has to
+// What ONE refused Argument was refused for, for a report that has to
 // name the Argument rather than only the signature it was held to. Collected
 // only where a caller hands `matchArguments` somewhere to put it, which is the
 // Diagnostic path alone: a match that is only asked whether it matches pays one
@@ -3768,7 +3768,7 @@ export type ArgumentMatchResult =
 	| {
 			type: "ArgumentMismatch"
 			mismatchedArgumentIndices: Array<number>
-			// NOTE: For Argument `i`, the Parameter it was paired with — which
+			// For Argument `i`, the Parameter it was paired with — which
 			// is `i` itself for every call that omits nothing, and is not once
 			// a default has been skipped. The Validator reports one Diagnostic
 			// per mismatching Argument and names the Parameter it was held to,
@@ -3776,7 +3776,7 @@ export type ArgumentMatchResult =
 			parameterForArgument: Array<number>
 	  }
 
-// NOTE: Collects every Type Parameter of THIS invocation that `type` mentions
+// Collects every Type Parameter of THIS invocation that `type` mentions
 // — a structural walk, so a Generic buried in a Record member, a List's items
 // or a nested signature counts as much as one written at the top. Generics of
 // an enclosing definition are opaque symbols here and are not collected: they
@@ -3802,7 +3802,7 @@ function collectBindableGenerics(
 	})
 }
 
-// NOTE: Whether a callback Parameter's own PARAMETERS mention a Type Parameter
+// Whether a callback Parameter's own PARAMETERS mention a Type Parameter
 // nothing has bound yet — the Types an unannotated Function literal would have
 // to read off them. Its return Type is deliberately not asked about: an omitted
 // `-> Type` is read off the literal's BODY, so a Generic standing there is one
@@ -3828,7 +3828,7 @@ function callbackWaitsOnUnboundGeneric(
 	return false
 }
 
-// NOTE: Whether a Parameter Type mentions a Type Parameter of this call that
+// Whether a Parameter Type mentions a Type Parameter of this call that
 // nothing has bound yet — asked of the Parameter an Argument that binds nothing
 // stands at, where the whole Type is what the Argument reads, not just the
 // Parameters of a callback.
@@ -3850,7 +3850,7 @@ function parameterWaitsOnUnboundGeneric(
 	return false
 }
 
-// NOTE: The order the Arguments are matched in — their own, except that a
+// The order the Arguments are matched in — their own, except that a
 // callback Parameter still waiting on an unbound `infer` Generic is held back
 // to the end. An unannotated Function literal is typed FROM the Parameter it
 // is passed to, so matching it while that Generic is open makes it echo the
@@ -3882,7 +3882,7 @@ function deferredArgumentOrder(
 	parameters: common.BaseFunction["parameterTypes"],
 	context: GenericInferenceContext | null,
 	matchableArguments: Array<MatchableArgument>,
-	// NOTE: Read through the pairing rather than by Parameter index. An omitted
+	// Read through the pairing rather than by Parameter index. An omitted
 	// Parameter has no Argument at all, so it can neither bind nor wait — it is
 	// treated exactly like a Parameter whose Argument names nothing.
 	pairing: ArgumentPairing,
@@ -3899,7 +3899,7 @@ function deferredArgumentOrder(
 			: matchableArguments[argumentIndex]
 	}
 
-	// NOTE: Only a Parameter that FOLLOWS one that waits has anything to gain
+	// Only a Parameter that FOLLOWS one that waits has anything to gain
 	// from being matched first, so an invocation whose waiting Arguments already
 	// come last — every Method in the stdlib, `map`'s transform being its final
 	// Parameter — is answered here, by a walk that allocates nothing.
@@ -3945,7 +3945,7 @@ function deferredArgumentOrder(
 
 		immediate.push(index)
 
-		// NOTE: What this Parameter can name is counted as bound for the
+		// What this Parameter can name is counted as bound for the
 		// Parameters after it — a callback waits for the Argument that names its
 		// Types, not for one that waits alongside it.
 		collectBindableGenerics(parameter.type, context, boundSoFar)
@@ -3960,7 +3960,7 @@ function deferredArgumentOrder(
 	return order
 }
 
-// NOTE: Whether one Argument answers one Parameter — assignability, or, for a
+// Whether one Argument answers one Parameter — assignability, or, for a
 // Record Parameter carrying a Record default, the partial reading that default
 // buys: an Argument that writes SOME of the members and leaves the rest to the
 // default. Two things have to hold for that, and `matchesType` answers neither
@@ -3968,13 +3968,13 @@ function deferredArgumentOrder(
 // fit it, which is `isPartialOf`, and every member the default does NOT fill in
 // has to be written, which is what makes the merged value complete.
 //
-// NOTE: Asked of the SUBSTITUTED Parameter Type, unlike the assignability check
+// Asked of the SUBSTITUTED Parameter Type, unlike the assignability check
 // beside it: `matchTypes` is handed the unsubstituted Type so that a Generic's
 // first occurrence binds off the Argument, and by the time this is reached that
 // has either happened or the Generic is still open — in which case the member
 // comparisons bind it, through the very inference context they are given.
 //
-// NOTE: Extras are not refused here, because Record assignability is width
+// Extras are not refused here, because Record assignability is width
 // subtyping and refusing them would make a partial Argument stricter than a
 // whole one. `{ port = 1, extra = 2 }` fails `isPartialOf` all the same, since
 // `extra` is not a member the Parameter declares.
@@ -3985,13 +3985,13 @@ function argumentFits(
 	argumentType: common.Type,
 	inferenceContext: GenericInferenceContext | null,
 ): boolean {
-	// NOTE: A path key writes SOME of a member the default fills in, and the
+	// A path key writes SOME of a member the default fills in, and the
 	// merge makes the whole of it — so the Argument is measured by what it will
 	// be, not by what it wrote. Asked before assignability rather than after it:
 	// a Literal carrying one is never assignable as it stands, and asking twice
 	// would bind a Generic off a partial member on the way past.
 	//
-	// NOTE: Asked only where a path key could possibly stand — a Parameter whose
+	// Asked only where a path key could possibly stand — a Parameter whose
 	// default reaches into something, given an Argument written as a Record
 	// Literal. `mergedValue` ENRICHES, and an Argument that reacts to the
 	// position it stands in must not be enriched by a candidate merely probing.
@@ -4026,7 +4026,7 @@ function argumentFits(
 	)
 }
 
-// NOTE: The members a Record Argument had to write and did not — the ones its
+// The members a Record Argument had to write and did not — the ones its
 // Parameter declares, the default does not fill in, and the Argument does not
 // carry. The Validator reports them by name, which is why this answers a list
 // rather than a boolean.
@@ -4043,7 +4043,7 @@ export function missingRecordMembers(
 	)
 }
 
-// NOTE: Checks whether passed Arguments match a parameter list — arity,
+// Checks whether passed Arguments match a parameter list — arity,
 // labels (matched by name equality; a labelless Argument only matches a
 // labelless parameter), and per-Argument `matchesType`.
 // By default the check stops at the first mismatching Argument, which callers
@@ -4063,7 +4063,7 @@ export function matchArguments(
 	options: {
 		collectAllMismatches?: boolean
 		inference?: GenericInferenceContext
-		// NOTE: Where to put what each refusal was ABOUT, in the order the
+		// Where to put what each refusal was ABOUT, in the order the
 		// Arguments were matched in — see `ArgumentMismatchDetail`. Passed by the
 		// reports that name the Argument a candidate refused, and by nothing else.
 		explain?: Array<ArgumentMismatchDetail>
@@ -4090,7 +4090,7 @@ export function matchArguments(
 		let parameter = parameters[i]
 		let argumentIndex = pairing.forParameter[i]
 
-		// NOTE: A Parameter nobody wrote an Argument for takes its default,
+		// A Parameter nobody wrote an Argument for takes its default,
 		// which was checked against this Parameter's Type where it was written.
 		// It binds nothing either — there is no Argument to read a Type off, so
 		// a Type Parameter bound ONLY by an omitted Parameter stays unbound and
@@ -4103,7 +4103,7 @@ export function matchArguments(
 
 		let argument = matchableArguments[argumentIndex]
 
-		// NOTE: A callback is matched after the Arguments that bind, so the
+		// A callback is matched after the Arguments that bind, so the
 		// Generics its Parameters mention have been bound by then —
 		// substituting them is what turns `map`'s declared
 		// `(_ item: ItemType) -> Result` into the `(_ item: Integer) ->
@@ -4116,7 +4116,7 @@ export function matchArguments(
 						inferenceContext.bindings,
 					)
 
-		// NOTE: The label is compared before the Type is asked for, and the two
+		// The label is compared before the Type is asked for, and the two
 		// branches stay apart so that it still is: a labelless Argument standing
 		// at a labelled Parameter is refused without typing anything, which is
 		// what keeps an Argument nothing committed to from being enriched.
@@ -4167,7 +4167,7 @@ export function matchArguments(
 	}
 
 	if (mismatchedArgumentIndices.length > 0) {
-		// NOTE: Sorted, because a deferred callback may have been matched out
+		// Sorted, because a deferred callback may have been matched out
 		// of turn — the Validator reports one Diagnostic per index and they
 		// must still arrive in the order the Arguments were written.
 		return {
@@ -4185,7 +4185,7 @@ export function matchArguments(
 	}
 }
 
-// NOTE: Which Argument answers which Parameter, decided from LABELS and
+// Which Argument answers which Parameter, decided from LABELS and
 // `hasDefault` alone and never from a Type. That is what makes it cheap enough
 // to run once per Overload candidate, and it is also what keeps everything that
 // has to know a call's shape before its Arguments are typed working: overload
@@ -4225,7 +4225,7 @@ export function pairArguments(
 			forParameter.push(null)
 			omittedParameterIndices.push(forParameter.length - 1)
 		} else if (argument !== undefined) {
-			// NOTE: A required Parameter and an Argument whose label disagrees
+			// A required Parameter and an Argument whose label disagrees
 			// — paired anyway, so that the loop above reports it as the label
 			// mismatch it is rather than as a count nobody miscounted.
 			forParameter.push(next)
@@ -4235,7 +4235,7 @@ export function pairArguments(
 		}
 	}
 
-	// NOTE: Left-over Arguments mean the greedy walk skipped past a default
+	// Left-over Arguments mean the greedy walk skipped past a default
 	// that a wrongly labelled Argument was meant for. Where the counts agree
 	// after all, the identity pairing is what the writer wrote and reports the
 	// label mismatch against the Parameter they clearly meant; where they do
@@ -4249,7 +4249,7 @@ export function pairArguments(
 	return { forParameter, omittedParameterIndices }
 }
 
-// NOTE: The answer for every signature that declares no default — Argument `i`
+// The answer for every signature that declares no default — Argument `i`
 // answers Parameter `i`, nothing left out. It is asked once per Overload
 // candidate of every call in the Program, so it is CACHED by arity rather than
 // built: nothing ever writes into a pairing, and one shared Array per arity is
@@ -4270,7 +4270,7 @@ function identityPairing(length: number): ArgumentPairing {
 	return cached
 }
 
-// NOTE: The pairing read the other way round — for Argument `i`, the Parameter
+// The pairing read the other way round — for Argument `i`, the Parameter
 // it answers. Built only where something has to NAME that Parameter: a
 // Diagnostic about a mismatching Argument, and Completion reading a Record
 // literal against the Type it will be held to. The forward direction is what

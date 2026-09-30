@@ -2,13 +2,13 @@ import { describe, expect, it } from "bun:test"
 
 import { analysedDiagnosticsFor, compiles, firstOf } from "./followedHelps"
 
-// NOTE: The Helps about Choices and about asynchrony that named a spelling the
+// The Helps about Choices and about asynchrony that named a spelling the
 // language does not have, contradicted the message above them, or were printed
 // once per arm for one mistake. And the codes in this family that knew the fix
 // and printed nothing at all.
 
 describe("A hole holding a Type Parameter", () => {
-	// NOTE: The Union Help is UNFOLLOWABLE for one: `Item` is no Union to match
+	// The Union Help is UNFOLLOWABLE for one: `Item` is no Union to match
 	// apart and no Optional to unwrap, so a reader who followed it had nothing
 	// to write a Case for. What it wants is a bound, and whose Parameter it is
 	// decides where the bound goes.
@@ -24,7 +24,7 @@ describe("A hole holding a Type Parameter", () => {
 		Terminal.print("{{ item = 1 }}")
 	}`
 
-	// NOTE: `toString` FULFILS this Namespace's `Printable`, so the conformance
+	// `toString` FULFILS this Namespace's `Printable`, so the conformance
 	// promises it unconditionally and a bound of its own is refused — the
 	// condition belongs on the conformance, and that is the only Help offered.
 	it("should ask for the bound rather than for a Match", () => {
@@ -33,7 +33,7 @@ describe("A hole holding a Type Parameter", () => {
 		])
 	})
 
-	// NOTE: The per-Method bound is not offered here because it does not work
+	// The per-Method bound is not offered here because it does not work
 	// here: a Method that answers a requirement can not quietly want more of its
 	// receiver than the conformance promised.
 	it("should not offer a per-Method bound to a fulfilling Method", () => {
@@ -60,7 +60,7 @@ describe("A hole holding a Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// NOTE: A hole that holds neither work nor a Type Parameter keeps the Help
+	// A hole that holds neither work nor a Type Parameter keeps the Help
 	// it was written for.
 	it("should leave an unprintable Union alone", () => {
 		let union = `implementation {
@@ -98,7 +98,7 @@ describe("A Match written on a Future", () => {
 		Terminal.print(name())
 	}`
 
-	// NOTE: One mistake — the subject — said once per arm, each time about a
+	// One mistake — the subject — said once per arm, each time about a
 	// different Case name. The arms below the first answer with the Error they
 	// would have answered with anyway.
 	it("should report the subject once, not once per arm", () => {
@@ -109,7 +109,7 @@ describe("A Match written on a Future", () => {
 		).toBe(1)
 	})
 
-	// NOTE: `complete` is refused in a body that answers anything but a Future,
+	// `complete` is refused in a body that answers anything but a Future,
 	// so the edit takes two steps and the declaration is the first of them.
 	it("should name the declaration where the body can not wait", () => {
 		expect(firstOf(source, "unknown-case").helps).toEqual([
@@ -117,7 +117,7 @@ describe("A Match written on a Future", () => {
 		])
 	})
 
-	// NOTE: A body only WAITS once it writes the word — that is what the Parser
+	// A body only WAITS once it writes the word — that is what the Parser
 	// marks a body completing by — so the declaration alone is not enough and
 	// the two-step Help above is right for a body that has not written one yet.
 	// A Program's top level waits outright, and there the word is the whole edit.
@@ -173,7 +173,7 @@ describe("A Match written on a Future", () => {
 })
 
 describe("A 'start' on work already in flight", () => {
-	// NOTE: The Note explained a value that is NOT work, which is the opposite
+	// The Note explained a value that is NOT work, which is the opposite
 	// complaint to the message above it — a reader told both had a
 	// contradiction to resolve on their own.
 	it("should say what a Started is", () => {
@@ -207,7 +207,7 @@ describe("A 'start' on work already in flight", () => {
 })
 
 describe("A payload default a generic Choice can not take", () => {
-	// NOTE: "Declare a Choice for the Type this default is a value of" is a
+	// "Declare a Choice for the Type this default is a value of" is a
 	// Choice of what the MEMBER holds — `1` is an Integer, and a Choice of
 	// Integers defaults nothing. What admits the default is a Choice that
 	// abstracts over nothing.
@@ -247,7 +247,7 @@ describe("A payload default a generic Choice can not take", () => {
 })
 
 describe("A payload default that names a value", () => {
-	// NOTE: `'= { … }'` says only "a Record goes here", which the message above
+	// `'= { … }'` says only "a Record goes here", which the message above
 	// it already said. The member names are in hand at the report site; the
 	// values are not, and stay the `…` they are.
 	let source = `implementation {

@@ -15,7 +15,7 @@
  * caption. The `§ …` comments at the end of a `Terminal.print` line stay: they
  * are the output a reader would see, written where the reader looks for it.
  *
- * NOTE: Nothing here imports Astro or Shiki. The root `tsc` program reaches
+ * Nothing here imports Astro or Shiki. The root `tsc` program reaches
  * this file through the spec, and it has to type-check on a fresh clone.
  */
 
@@ -60,7 +60,7 @@ export function readSampleMarker(code: string): SampleMarker {
 	return { code, fragment: false, file: undefined }
 }
 
-// NOTE: The pages open every Essence fence at the start of a line with no meta
+// The pages open every Essence fence at the start of a line with no meta
 // string, so the pattern needs no more than that.
 const ESSENCE_FENCE = /```essence[^\n]*\n([\s\S]*?)```/g
 

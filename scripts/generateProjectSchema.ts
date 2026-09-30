@@ -3,7 +3,7 @@ import * as path from "node:path"
 
 import { projectSchema } from "@essence-lang/compiler/configuration"
 
-// NOTE: The JSON Schema for `essence.json` is generated from the reader's own
+// The JSON Schema for `essence.json` is generated from the reader's own
 // catalogue of settings, so that what an editor completes and validates can
 // not drift from what the toolchain reads. Two copies are checked in, each
 // owned by the package that ships it: the VS Code extension bundles one and

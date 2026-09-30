@@ -9,7 +9,7 @@ import { createRecord } from "../Record"
 import { createString } from "../String"
 import { type AnyType, createCase, isValueOfType, typeKeySymbol } from "../type"
 
-// NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
+// `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
 // in `type.ts` — so a Case value is cast on the way in here exactly as the
 // runtime helpers cast it internally. A Function value carries no Type key at
 // all, so it is cast the same way.
@@ -22,7 +22,7 @@ const functionType: common.Type = {
 	returnType: { type: "String" },
 }
 
-// NOTE: Every plain object inherits `toString`, `valueOf` and the rest of
+// Every plain object inherits `toString`, `valueOf` and the rest of
 // `Object.prototype`, and each of those is a function — so a Matcher naming a
 // Function-typed member of one of those names asks exactly the question the
 // prototype chain answers wrongly. These tests hold the checks to the value's
@@ -73,14 +73,14 @@ describe("matching against inherited members", () => {
 	})
 })
 
-// NOTE: The Dictionary arm of the runtime Type check, against boxes built BY
+// The Dictionary arm of the runtime Type check, against boxes built BY
 // HAND rather than through the Dictionary Module's own writers. That is the
 // point of them: what `isValueOfType` reads is the box SHAPE — `store.slots` in
 // insertion order, the newest version each slot's generation lets a box see —
 // and a test that built its boxes through `set` and `remove` would agree with
 // those writers rather than with the shape they promise to leave behind.
 //
-// NOTE: `TOMBSTONE` is imported because it is the one part of the shape that is
+// `TOMBSTONE` is imported because it is the one part of the shape that is
 // an identity rather than a layout. The check itself does not import it — see
 // the NOTE on `everyLiveEntry` — and asks whether a version holds a SYMBOL,
 // which no Essence value is.
@@ -88,7 +88,7 @@ describe("matching a Dictionary", () => {
 	type Version = { value: unknown; generation: number }
 	type Slot = { key: AnyType; encoded: unknown; versions: Array<Version> }
 
-	// NOTE: `encoded` and `index` are the FAST PATH and nothing the Type check
+	// `encoded` and `index` are the FAST PATH and nothing the Type check
 	// reads — every slot here takes the scan-path `null` so that a test which
 	// passed on the encodings alone can not pass at all.
 	function box(
@@ -162,7 +162,7 @@ describe("matching a Dictionary", () => {
 		).toBe(false)
 	})
 
-	// NOTE: Each slot stops at the tag on its OWN, so a Matcher that names one
+	// Each slot stops at the tag on its OWN, so a Matcher that names one
 	// and leaves the other undecided walks the half it named and asks nothing
 	// of the other.
 	test("an undecided slot asks nothing of that half", () => {
@@ -188,7 +188,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(createRecord({}), bare)).toBe(false)
 	})
 
-	// NOTE: An empty Dictionary holds no entry to disagree about, so it is a
+	// An empty Dictionary holds no entry to disagree about, so it is a
 	// value of every Dictionary Type there is — the same rule the empty List
 	// gets, and the reason the Validator's `overlapsAtRuntime` answers true for
 	// any two of them.
@@ -197,7 +197,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(box([], 0, 0), stringToString)).toBe(true)
 	})
 
-	// NOTE: The live view, which is the whole of what a box holds: the NEWEST
+	// The live view, which is the whole of what a box holds: the NEWEST
 	// version its generation can see, never an older one that is still standing
 	// in the slot.
 	test("only the newest visible version of a slot is read", () => {
@@ -212,7 +212,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(box(slots, 1, 1), stringToString)).toBe(false)
 	})
 
-	// NOTE: And an OLDER box reading the same store still sees what it saw. This
+	// And an OLDER box reading the same store still sees what it saw. This
 	// is the generation stamp doing its work: the tip's write is standing in the
 	// slot and is not this box's.
 	test("an older box reads its own generation", () => {
@@ -227,7 +227,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(box(slots, 0, 1), stringToInteger)).toBe(false)
 	})
 
-	// NOTE: A slot whose newest visible version is a tombstone holds no entry,
+	// A slot whose newest visible version is a tombstone holds no entry,
 	// so what it used to hold is no part of what the box is checked against.
 	test("a removed key is no entry at all", () => {
 		let slots = [
@@ -244,7 +244,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(box(slots, 2, 1), stringToInteger)).toBe(false)
 	})
 
-	// NOTE: A slot written AFTER this box has no version it can see at all, and
+	// A slot written AFTER this box has no version it can see at all, and
 	// holds no entry for it either.
 	test("a slot written after the box holds nothing for it", () => {
 		let slots = [
@@ -260,7 +260,7 @@ describe("matching a Dictionary", () => {
 		expect(isValueOfType(box(slots, 1, 2), stringToString)).toBe(false)
 	})
 
-	// NOTE: The tag decides first, in both directions — a List is no Dictionary
+	// The tag decides first, in both directions — a List is no Dictionary
 	// however its items line up, and a Dictionary answers no List Matcher.
 	test("the tag tells a Dictionary from a List", () => {
 		expect(

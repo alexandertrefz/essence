@@ -1,6 +1,6 @@
 import type { EssenceRational } from "./rational"
 
-// NOTE: What a JavaScript caller may HAND the boundary where the Module declared
+// What a JavaScript caller may HAND the boundary where the Module declared
 // `T` — as opposed to what it gets back, which is `T` itself. The two differ in
 // exactly one place: an Integer comes out as a `bigint`, always, so a call's Type
 // does not depend on how big its answer was; but going in the interpreter takes
@@ -8,7 +8,7 @@ import type { EssenceRational } from "./rational"
 // A declaration that said `bigint` at a Parameter would send every caller
 // through `BigInt(i)` to satisfy a checker the runtime never needed satisfied.
 //
-// NOTE: A mapped Type rather than a second declaration of every alias, so that a
+// A mapped Type rather than a second declaration of every alias, so that a
 // Parameter still reads `Input<Rectangle>` and hovers to the shape, rather than
 // spelling a Record out at every place it is passed. It walks what a value
 // walks: down a List, through both slots of a Dictionary, into a Record's
@@ -18,12 +18,12 @@ import type { EssenceRational } from "./rational"
 // its Parameters are the Module's own values coming out, and its declared shape
 // is already the one whoever writes it really answers.
 //
-// NOTE: A `Map` is named before the object below rather than left to it. The
+// A `Map` is named before the object below rather than left to it. The
 // mapped Type would walk its METHODS — every member `keyof Map` names — and
 // answer a shape that has a `get` and a `set` and no widened key at all, which
 // is the one thing a Parameter of a Dictionary needs said.
 //
-// NOTE: And a `Promise` is named for the same reason. It is what work crosses
+// And a `Promise` is named for the same reason. It is what work crosses
 // as — a call's answer, and a callback declared to answer a Future — so the
 // mapped Type would otherwise walk `then`, `catch` and `finally` and hand back
 // a shape with three Functions in it and nothing awaitable about it. It stops

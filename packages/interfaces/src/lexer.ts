@@ -24,7 +24,7 @@ export enum TokenType {
 	LiteralTrue = "LiteralTrue",
 	LiteralFalse = "LiteralFalse",
 	LiteralString = "LiteralString",
-	// NOTE: The three pieces an interpolated String Literal lexes into — the
+	// The three pieces an interpolated String Literal lexes into — the
 	// text before the first hole (`Start`), the text between two holes
 	// (`Middle`) and the text after the last hole (`End`), with the hole's own
 	// Tokens lexed in place between them. A String with no holes stays a single
@@ -76,7 +76,7 @@ export interface Token {
 	value: string
 	type: TokenType
 	position: Position
-	// NOTE: Where the Token stands in the source as absolute offsets — `start`
+	// Where the Token stands in the source as absolute offsets — `start`
 	// is the first character of it, `end` the one after its last, so
 	// `source.slice(start, end)` is the Token as it was written. The same span
 	// `position` describes, counted the one way that needs no line table: it is

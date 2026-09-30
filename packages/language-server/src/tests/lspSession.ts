@@ -31,7 +31,7 @@ import {
 	type TestRunNotification,
 } from "../testProtocol"
 
-// NOTE: The real Server, driven the way an Editor drives it: over a connection,
+// The real Server, driven the way an Editor drives it: over a connection,
 // through the document store, past the debounce, one request at a time. Every
 // other test in this package calls a request's insides directly, which is the
 // right way to check WHAT it answers and no way at all to check what it COSTS —
@@ -44,7 +44,7 @@ import {
 
 export type SessionRequestResult<Result> = {
 	result: Result
-	// NOTE: What answering the request compiled. The debounce is what makes this
+	// What answering the request compiled. The debounce is what makes this
 	// readable at all: nothing runs between two awaits unless a timer fired, and
 	// the harness decides when timers fire.
 	compilations: CompilationTally
@@ -101,20 +101,20 @@ export function startSession() {
 	let published = new Map<string, Array<Diagnostic>>()
 	let publishCount = 0
 	let versions = new Map<string, number>()
-	// NOTE: Every publish as it came over the wire, rather than only the latest
+	// Every publish as it came over the wire, rather than only the latest
 	// per URI. What a Server sends that changes nothing is invisible in the state
 	// it leaves behind, and it is exactly what a client pays for.
 	let publishLog: Array<{ uri: string; version?: number }> = []
 	let testRuns: Array<TestRunNotification> = []
 	let watchers: Array<{ stop: () => void }> = []
 
-	// NOTE: The custom notification the test session pushes. Kept as a log
+	// The custom notification the test session pushes. Kept as a log
 	// rather than as a latest-value, because what a client pays for is every
 	// one of them and a run is two: a `start` and an `end`.
 	client.onNotification(TEST_RUN_NOTIFICATION, (notification) => {
 		testRuns.push(notification as TestRunNotification)
 	})
-	// NOTE: The Server registers its watcher and its configuration listener
+	// The Server registers its watcher and its configuration listener
 	// dynamically, and a registration is a REQUEST — unanswered, it stays
 	// pending for the whole session and the first `Promise.all` a test writes
 	// never settles.
@@ -127,7 +127,7 @@ export function startSession() {
 	})
 	client.listen()
 
-	// NOTE: The capabilities a client advertises decide what the Server may
+	// The capabilities a client advertises decide what the Server may
 	// send it, so the default here is VS Code's: it takes a Workspace Edit in
 	// either shape and creates the files one asks it to. A test about an editor
 	// that can do LESS says so, by handing its own `workspace` block over — the
@@ -137,7 +137,7 @@ export function startSession() {
 		folders: Array<string>,
 		workspace: object = {
 			workspaceFolders: true,
-			// NOTE: False on purpose: a client that answers no configuration
+			// False on purpose: a client that answers no configuration
 			// request is the case the Server has to keep its Inlay Hints under,
 			// and it is one less round trip between a keystroke and a
 			// measurement.
@@ -161,7 +161,7 @@ export function startSession() {
 		await client.sendNotification(InitializedNotification.type, {})
 	}
 
-	// NOTE: The language id is the client's, and a client forwards more than
+	// The language id is the client's, and a client forwards more than
 	// Essence: the extension's document selector names `essence.json` too, so
 	// that the Server can report on a project file it could not read. Defaulted
 	// rather than passed everywhere, because every other caller opens a source.
@@ -210,11 +210,11 @@ export function startSession() {
 		})
 	}
 
-	// NOTE: A request and what it cost, which is the whole point of the harness.
+	// A request and what it cost, which is the whole point of the harness.
 	// The tally is read around the await rather than inside the handler: what a
 	// request costs includes everything it made the Server do, cache misses in
 	// other files included.
-	// NOTE: Sent by method name rather than by request type. The typed overloads
+	// Sent by method name rather than by request type. The typed overloads
 	// pin the parameters to the exact request, which is what a handler wants and
 	// the opposite of what a harness wants — one function that sends any of them
 	// and hands back what came over the wire.
@@ -252,10 +252,10 @@ export function startSession() {
 				(diagnostic) => diagnostic.code,
 			),
 		testRuns: () => testRuns,
-		// NOTE: Waits for a NUMBER of finished runs rather than for a length of
+		// Waits for a NUMBER of finished runs rather than for a length of
 		// time: a compile takes as long as the machine takes.
 		//
-		// NOTE: The deadline THROWS, and it is the whole budget every caller's
+		// The deadline THROWS, and it is the whole budget every caller's
 		// own `it` was given rather than half of it. Handing back the runs that
 		// did arrive made a starved worker read as a false claim about the
 		// Server — the caller asserted on a short list and named the behaviour
@@ -280,7 +280,7 @@ export function startSession() {
 
 			return testRuns.filter((run) => run.kind === "end")
 		},
-		// NOTE: The finished run the Server ANSWERED a request with, waited for
+		// The finished run the Server ANSWERED a request with, waited for
 		// by the number it answered with rather than by its ordinal among the
 		// runs the session has seen. A session runs on its own account as well
 		// — an edit, a settings change, a folder arriving — so "the second run
@@ -310,7 +310,7 @@ export function startSession() {
 
 			return found
 		},
-		// NOTE: The run a cycle IN FLIGHT carries — started, not yet ended —
+		// The run a cycle IN FLIGHT carries — started, not yet ended —
 		// which is the state a request has to land in for the session to defer
 		// it rather than start a cycle of its own. A test that means to ask
 		// what a deferred request is answered with waits for this rather than
@@ -349,7 +349,7 @@ export function startSession() {
 
 			return found
 		},
-		// NOTE: The same question asked of a run NOBODY numbered — one an edit
+		// The same question asked of a run NOBODY numbered — one an edit
 		// caused rather than one a request answered with an ordinal. A session
 		// defers a cycle it was asked for while another was in flight and arms
 		// it the moment that one ends, so opening a file ends two runs of the
@@ -393,7 +393,7 @@ export function startSession() {
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,
-		// NOTE: Waits until the Server has linked COUNT graphs since a mark,
+		// Waits until the Server has linked COUNT graphs since a mark,
 		// rather than for a length of time — what a link costs is a fact about
 		// the machine, and what a test wants to say is "once the analysis has
 		// started". The tally is a module-level counter inside this process, so
@@ -432,7 +432,7 @@ export function startSession() {
 
 			return linked
 		},
-		// NOTE: The most graphs the Server linked inside ONE turn of the event
+		// The most graphs the Server linked inside ONE turn of the event
 		// loop, watched from the moment this is called until it is stopped. What
 		// a test that types mid-sweep wants to say is that the change batch took
 		// the roots reaching the change and not the ones the queue still owes,
@@ -478,7 +478,7 @@ export function startSession() {
 
 			return watcher
 		},
-		// NOTE: The same kind of wait over the WIRE rather than over the tally:
+		// The same kind of wait over the WIRE rather than over the tally:
 		// what a test that has just typed something waits for is the answer to
 		// what it typed, and everything else arriving is the Server doing its
 		// other work beside it. The mark is where to start looking, since the
@@ -501,7 +501,7 @@ export function startSession() {
 
 			return arrived()
 		},
-		// NOTE: Waits for a Diagnostic to be GONE from a file, for a test that
+		// Waits for a Diagnostic to be GONE from a file, for a test that
 		// has just made the thing it reported true again. The wait is over the
 		// state rather than over a length of time on purpose: a run's results
 		// and the republish that carries them are two callbacks — `notify` puts
@@ -542,7 +542,7 @@ export function startSession() {
 		resetCounts: resetCompilationCounts,
 		counts: currentTally,
 		tallySince: tallyOf,
-		// NOTE: Waits for the Server to have CAUGHT UP — the window fired, the
+		// Waits for the Server to have CAUGHT UP — the window fired, the
 		// batch or the sweep it fired into run to the end, every Diagnostic it
 		// published across the pipe — which is the state an Editor spends its
 		// time in and the state every measurement here is taken from. Asked of
@@ -552,13 +552,13 @@ export function startSession() {
 		// this used to be was a sleep of some multiple of the debounce, which
 		// was most of what this file cost and a bet on the machine besides.
 		//
-		// NOTE: Not a way to prove an absence over time — a test that means to
+		// Not a way to prove an absence over time — a test that means to
 		// say "and nothing happened for a while" says how long, in its own
 		// sleep, because that is a fact about a clock and this is not.
 		settle: async () => {
 			await client.sendRequest(IDLE_REQUEST)
 		},
-		// NOTE: Every document is closed first, which is what hands each of them
+		// Every document is closed first, which is what hands each of them
 		// back to disk the way a closing Editor does — and closing SCHEDULES an
 		// analysis rather than cancelling one, since what a file on disk says is
 		// still true once its buffer is gone. What cancels the window is the
@@ -572,7 +572,7 @@ export function startSession() {
 		// here, where closing a pipe would take the test runner with it. A
 		// PassThrough holds nothing open on its own.
 		dispose: async () => {
-			// NOTE: Every watcher stopped first. A poll that re-arms itself on
+			// Every watcher stopped first. A poll that re-arms itself on
 			// `setImmediate` holds the loop open for as long as it runs, and a
 			// test that threw before it stopped its own would leave the runner
 			// spinning rather than reporting the failure.
@@ -584,7 +584,7 @@ export function startSession() {
 				await close(filePath)
 			}
 
-			// NOTE: The shutdown request rather than merely dropping the pipes:
+			// The shutdown request rather than merely dropping the pipes:
 			// it is what stops the test session's Worker, and a Worker left
 			// running keeps compiling for a Server nobody is listening to.
 			await client.sendRequest(ShutdownRequest.type).catch(() => {})
@@ -596,7 +596,7 @@ export function startSession() {
 	}
 }
 
-// NOTE: A workspace is a directory of files, the way `workspace.spec.ts` builds
+// A workspace is a directory of files, the way `workspace.spec.ts` builds
 // one — which specifier resolves to which path is a fact about a filesystem, and
 // an in-memory host would leave exactly that untested.
 export function makeSessionWorkspace(files: Record<string, string>): {

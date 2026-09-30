@@ -15,14 +15,14 @@ import {
 } from "../purity"
 import { rewriteExpressions } from "../walk"
 
-// NOTE: An operation whose operands are written out in the source has one
+// An operation whose operands are written out in the source has one
 // answer, and the Program computed it again at every evaluation: `60::multiply(
 // with 60)::multiply(with 24)` allocated three Integers and made three calls to
 // arrive at 86400, per turn of whatever loop it stood in, and `"a count: {7}"`
 // rendered `7` through a witness to build a String that could have been written.
 // So the answer is what is emitted, and the operation is not.
 //
-// NOTE: The whole of what makes it safe is that the Compiler computes the
+// The whole of what makes it safe is that the Compiler computes the
 // answer THE SAME WAY the Program would have. Essence arithmetic is exact —
 // bigints and pairs of bigints, never a float — so there is no rounding to
 // disagree about, and every fold below is the body of the Method it replaces
@@ -31,7 +31,7 @@ import { rewriteExpressions } from "../walk"
 // followed statement by statement, because what a Rational STORES is decided by
 // the Essence body and not by the value it stands for.
 //
-// NOTE: Which is the one thing about Rationals that has to be got exactly
+// Which is the one thing about Rationals that has to be got exactly
 // right. A Rational holds the parts it was BUILT with and reduces only what it
 // ANSWERS with — `4/2` stores 4 and 2, prints `2/1` and answers 2 for its
 // numerator — so what a fold has to reproduce is what the operation STORES, not
@@ -43,7 +43,7 @@ import { rewriteExpressions } from "../walk"
 // same functions the runtime calls, so there is one definition of the answer
 // rather than two that must agree.
 //
-// NOTE: Only LITERALS are folded, never a name a Program bound to a constant.
+// Only LITERALS are folded, never a name a Program bound to a constant.
 // A binding is a place a debugger stops and a name a reader looks for, and
 // what is gained by folding through one is an allocation the pool already
 // removes. What is asked of each operand is nevertheless `isPureExpression`,
@@ -54,14 +54,14 @@ import { rewriteExpressions } from "../walk"
 export const foldConstants: OptimiserPass = {
 	name: "fold-constants",
 	run: (program, namespaces) => {
-		// NOTE: The same set `lower-scalar-operations` refuses to lower on, for
+		// The same set `lower-scalar-operations` refuses to lower on, for
 		// the same reason: a Namespace named after a builtin stands in front of
 		// it for the rest of its block, and an `add` written there is a Method
 		// the Program wrote. Refused for the whole Program rather than per
 		// Scope — the Optimiser walks Expressions and not Scopes.
 		let shadowed = namespaces.nested
 
-		// NOTE: A Parameter's `= expression` default is folded too — it answers
+		// A Parameter's `= expression` default is folded too — it answers
 		// an Expression with an Expression and never lifts anything, which is
 		// the whole of what a default's position asks of a pass.
 		return rewriteExpressions(program, (node) => fold(node, shadowed), {
@@ -70,7 +70,7 @@ export const foldConstants: OptimiserPass = {
 	},
 }
 
-// NOTE: A deliberate ceiling on how large a folded number may be, in decimal
+// A deliberate ceiling on how large a folded number may be, in decimal
 // digits. None of the operations folded here can reach it: addition and
 // multiplication of bigints grow the answer by at most the digits of their
 // operands, so a whole tree of them is bounded by the digits WRITTEN in the
@@ -81,19 +81,19 @@ export const foldConstants: OptimiserPass = {
 // balloons. A fold that would exceed it is simply not taken, and the Program
 // computes the answer as it always did.
 //
-// NOTE: Strings need none. Concatenation copies each operand once, so a folded
+// Strings need none. Concatenation copies each operand once, so a folded
 // text is never longer than the literals it was built from.
 const MAXIMUM_FOLDED_DIGITS = 4096
 const MAXIMUM_FOLDED_MAGNITUDE = 10n ** BigInt(MAXIMUM_FOLDED_DIGITS)
 
-// NOTE: A `define` is not among these, deliberately. Folding an arm whose
+// A `define` is not among these, deliberately. Folding an arm whose
 // Condition is decided would drop the arms below it, and what it would buy is
 // an emission nobody produces: `as VALUE if true` is the shape the Node exists
 // to avoid, nothing in the repository writes one, and the arm it would drop is
 // one a coverage counter stands in. An `if` is left alone for exactly the same
 // reasons.
 //
-// NOTE: The Condition itself is folded like any other Expression, and neither
+// The Condition itself is folded like any other Expression, and neither
 // reading of it asks whether another pass ran. A lowered Condition is an
 // `essence-boolean` around a raw test: unboxed, it IS that raw test and the
 // rule below never folds one, so there is nothing here to fold; still boxed, it
@@ -118,13 +118,13 @@ function fold(
 	}
 }
 
-// NOTE: The shapes `lower-scalar-operations` leaves behind, folded as well as
+// The shapes `lower-scalar-operations` leaves behind, folded as well as
 // the Invocations below — because that pass runs FIRST and takes every Integer
 // operation this one would otherwise have found. Neither pass may assume the
 // other ran, so both forms are read: with the lowering off, `1::add(2)` is
 // still a Method Invocation and is folded as one.
 //
-// NOTE: A RAW test is never folded, only an `essence-boolean` around one. A raw
+// A RAW test is never folded, only an `essence-boolean` around one. A raw
 // intrinsic stands where JavaScript says `if (…)` — a lowered Conditional's
 // question, a Match Handler's test, a dispatch case's — and a `BooleanValue`
 // there would be an object, which is true whatever it holds.
@@ -163,7 +163,7 @@ function foldIntrinsic(
 		return booleanNode(comparisonOf(test.operator, left, right), node)
 	}
 
-	// NOTE: Integers alone. Two Strings are equal when their CHARACTERS are,
+	// Integers alone. Two Strings are equal when their CHARACTERS are,
 	// which is a comparison of their canonically normalised forms — an answer
 	// the JavaScript running the Compiler gives out of its own Unicode tables,
 	// and not necessarily the ones the JavaScript running the Program has. The
@@ -195,7 +195,7 @@ function foldInvocation(
 	switch (node.base.name) {
 		case "Integer":
 			return foldInteger(node, member, shadowed)
-		// NOTE: The same rung `lower-scalar-operations` reads, and for the same
+		// The same rung `lower-scalar-operations` reads, and for the same
 		// reason: a refinement is erased before the first pass runs, so both
 		// operands are plain Integers here, but the Method the Simplifier
 		// emitted is still `NonZeroInteger`'s — which is where a written
@@ -211,7 +211,7 @@ function foldInvocation(
 				member === "absolute"
 				? foldInteger(node, member, shadowed)
 				: node
-		// NOTE: The other two refinements of Integer, and the one holding both
+		// The other two refinements of Integer, and the one holding both
 		// proofs, for the same reason: each closes over a sum or a product by
 		// re-exporting Integer's own, so a written `2::add(3)` is
 		// `PositiveInteger`'s sum now and folds to the same `5`.
@@ -222,7 +222,7 @@ function foldInvocation(
 				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
-		// NOTE: The Rational sister of the rung above, for the same reason: a
+		// The Rational sister of the rung above, for the same reason: a
 		// written `1/2` proves it is not zero, so its product and its negation
 		// are `NonZeroRational`'s and the name is all this pass has to go by.
 		// `negate` folds as Rational's does, through the lowest-terms parts —
@@ -237,7 +237,7 @@ function foldInvocation(
 				member === "absolute"
 				? foldRational(node, member, shadowed)
 				: node
-		// NOTE: The two sign refinements of Rational, for the reason the Integer
+		// The two sign refinements of Rational, for the reason the Integer
 		// pair above is here: each closes over a sum or a product by
 		// re-exporting Rational's own, so a written `1/2::add(1/4)` is
 		// `PositiveRational`'s sum now and folds to the same `3/4`. `squareRoot`
@@ -254,7 +254,7 @@ function foldInvocation(
 	}
 }
 
-// NOTE: The operations whose bodies are one bigint operation — the same
+// The operations whose bodies are one bigint operation — the same
 // enumeration `lower-scalar-operations` writes out, plus the two that take only
 // the receiver. `divide` and `quotient` answer an Optional and `raise` is the
 // one whose answer can be larger than the Program that asks for it; `compare`
@@ -316,12 +316,12 @@ function foldInteger(
 	}
 }
 
-// NOTE: Two Rationals, and no other pair. The Essence bodies for a Rational
+// Two Rationals, and no other pair. The Essence bodies for a Rational
 // beside an Integer are three further bodies to follow exactly, for an operand
 // pair nobody writes as two literals — and mixed kinds are left to the general
 // path here for the same reason `lower-scalar-operations` leaves them there.
 //
-// NOTE: Each of these IS what the Method does, carried out. The three
+// Each of these IS what the Method does, carried out. The three
 // arithmetic entries are natives on the bigint-rational core and are folded
 // through the very functions those natives call, so the folded parts are the
 // parts the Program would have stored — in lowest terms, which is what that
@@ -342,7 +342,7 @@ function foldRational(
 			return node
 		}
 
-		// NOTE: `absolute` answers the Rational ITSELF where it is not negative
+		// `absolute` answers the Rational ITSELF where it is not negative
 		// — `<- @` — so a `4/2` stays 4 over 2 rather than turning into its own
 		// lowest-terms form. `negate` goes through `Rational.of` on the
 		// lowest-terms parts, so it does not.
@@ -366,7 +366,7 @@ function foldRational(
 		return node
 	}
 
-	// NOTE: The cross-multiplication `Rational.compare` performs, on the parts
+	// The cross-multiplication `Rational.compare` performs, on the parts
 	// as stored. Denominators are positive — `createRational` puts the sign on
 	// the numerator — so the sign of the difference is the sign of the
 	// comparison.
@@ -406,7 +406,7 @@ function foldRational(
 	}
 }
 
-// NOTE: Concatenation, which is the one String operation that is JavaScript's
+// Concatenation, which is the one String operation that is JavaScript's
 // own `+` on what the two values hold — `append` is `createString(a.value +
 // b.value)` and `prepend` is `append` with the operands the other way round.
 // Every other String Method either normalises, segments or allocates by a rule
@@ -445,13 +445,13 @@ function foldString(
 	)
 }
 
-// NOTE: A hole whose value is written out and whose witness names a Method the
+// A hole whose value is written out and whose witness names a Method the
 // Compiler can carry out is TEXT, and text is what the segment becomes. The
 // Rewriter renders a hole as `<witness>.toString(<value>).value` and
 // concatenates the pieces, so a hole that folds costs the Program nothing at
 // all: no witness, no call, no String built to be read back out of.
 //
-// NOTE: And where every hole folds, the interpolation is a String literal — one
+// And where every hole folds, the interpolation is a String literal — one
 // the pool then declares once, where the unfolded form built it at every
 // evaluation.
 function foldInterpolation(
@@ -477,7 +477,7 @@ function foldInterpolation(
 			changed = true
 		}
 
-		// NOTE: Runs of text are joined as they are folded. The Rewriter emits
+		// Runs of text are joined as they are folded. The Rewriter emits
 		// each segment as a piece of one `+` chain, so two text pieces beside
 		// each other are two literals JavaScript would concatenate at run time
 		// to no purpose.
@@ -509,7 +509,7 @@ function foldInterpolation(
 	return { ...node, segments }
 }
 
-// NOTE: What one hole renders to, or null wherever the Compiler can not say.
+// What one hole renders to, or null wherever the Compiler can not say.
 // `toString` is the one Method `Printable` declares and the one the Rewriter
 // calls, and the four entries below are the standard library's own — each read
 // off the source of the Method it stands for, each an operation on the literal
@@ -539,17 +539,17 @@ function renderedHole(
 	}
 
 	switch (namespaceName) {
-		// NOTE: `Integer.toString` is `createString(value.toString())`, which is
+		// `Integer.toString` is `createString(value.toString())`, which is
 		// what a bigint's own decimal spelling is.
 		case "Integer": {
 			let integer = integerOf(value)
 
 			return integer === null ? null : integer.toString()
 		}
-		// NOTE: `String::toString` answers the String itself.
+		// `String::toString` answers the String itself.
 		case "String":
 			return value.nodeType === "StringValue" ? value.value : null
-		// NOTE: `Boolean::toString` is written as the Conditional that spells
+		// `Boolean::toString` is written as the Conditional that spells
 		// the two answers out.
 		case "Boolean":
 			return value.nodeType === "BooleanValue"
@@ -557,7 +557,7 @@ function renderedHole(
 					? "true"
 					: "false"
 				: null
-		// NOTE: The no-Argument `Rational::toString` reads the lowest-terms
+		// The no-Argument `Rational::toString` reads the lowest-terms
 		// accessors and answers the numerator alone where the denominator is
 		// one, so a Rational storing 4 and 2 renders `2`. `Terminal.inspect`
 		// keeps the structural `2/1`, and it is not this Method.
@@ -579,7 +579,7 @@ function renderedHole(
 	}
 }
 
-// NOTE: The receiver and the Method's own Parameters, all of EXACTLY the named
+// The receiver and the Method's own Parameters, all of EXACTLY the named
 // kind — the same question `lower-scalar-operations` asks, for the same reason:
 // a Union-typed operand or a Type Parameter reaches a different Method, and a
 // second Parameter means a different entry of the Overload.
@@ -612,7 +612,7 @@ function foldableOperands(
 	return node.arguments.map((argument) => argument.value)
 }
 
-// NOTE: The literal readers, and the whole of what makes a fold possible: a
+// The literal readers, and the whole of what makes a fold possible: a
 // value written in the source, read as the number the Rewriter would have
 // emitted. A spelling that is not plain digits is refused rather than coerced —
 // the Lexer can not produce one, and a fold is not the place to find out
@@ -627,7 +627,7 @@ function integerOf(node: common.typedSimple.ExpressionNode): bigint | null {
 	return BigInt(node.value)
 }
 
-// NOTE: A Rational literal as the parts the value HOLDS, which is what
+// A Rational literal as the parts the value HOLDS, which is what
 // `Rational.createRational` stores rather than what was written: the sign moves
 // onto the numerator and a zero is `0/1`. A zero denominator is refused — the
 // value it makes is one no operation here has an answer for.
@@ -649,7 +649,7 @@ function rationalOf(
 	return storedRational(BigInt(node.numerator), BigInt(node.denominator))
 }
 
-// NOTE: What `Rational.createRational` makes of two bigints — the single
+// What `Rational.createRational` makes of two bigints — the single
 // gateway every Rational in a running Program is built through, written out
 // here because a folded Rational has to hold what one built there would.
 function storedRational(
@@ -668,7 +668,7 @@ function storedRational(
 	return { numerator, denominator }
 }
 
-// NOTE: The three same-kind arithmetic entries, through the very functions the
+// The three same-kind arithmetic entries, through the very functions the
 // natives behind them call — one cross-multiplication and one reduction each,
 // on the operands' lowest-terms parts. Answering them any other way here would
 // be a second definition of Rational arithmetic that has to agree with the
@@ -686,7 +686,7 @@ function foldedRationalArithmetic(
 	return storedRational(answer.numerator, answer.denominator)
 }
 
-// NOTE: `Rational::negate` is still an Essence body — `Rational.of` over the
+// `Rational::negate` is still an Essence body — `Rational.of` over the
 // lowest-terms parts with the numerator flipped — so it is followed statement
 // for statement, as `absolute`'s negative branch is.
 function negatedRational(value: { numerator: bigint; denominator: bigint }): {
@@ -736,7 +736,7 @@ function withinCap(value: bigint): boolean {
 	return magnitude < MAXIMUM_FOLDED_MAGNITUDE
 }
 
-// NOTE: The written-out answers. Each carries the Type and the Position of the
+// The written-out answers. Each carries the Type and the Position of the
 // Node it replaces — the Position above all, because the operation is where the
 // author wrote it and a debugger stopping there should still say so.
 function integerNode(

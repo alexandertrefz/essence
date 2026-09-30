@@ -33,7 +33,7 @@ import {
 } from "../String"
 import { typeKeySymbol } from "../type"
 
-// NOTE: An Integer is HYBRID — a JavaScript number while its value is one a
+// An Integer is HYBRID — a JavaScript number while its value is one a
 // double holds exactly, a bigint beyond that — and the whole design rests on ONE
 // invariant, which this file is here to keep true:
 //
@@ -49,7 +49,7 @@ import { typeKeySymbol } from "../type"
 const SAFE = 9007199254740991
 const SAFE_AS_BIG = 9007199254740991n
 
-// NOTE: The invariant as a predicate, asked of an answer rather than reasoned
+// The invariant as a predicate, asked of an answer rather than reasoned
 // about. It is the assertion nearly every test here ends with.
 function isCanonical(integer: IntegerType): boolean {
 	let value = integer.value
@@ -67,7 +67,7 @@ function decimalOf(integer: IntegerType): string {
 	return toString__overload$1(integer).value
 }
 
-// NOTE: The three values either side of the boundary, which is where every
+// The three values either side of the boundary, which is where every
 // crossing below starts or lands.
 const boundary = {
 	below: 9007199254740990n,
@@ -100,7 +100,7 @@ describe("the canonical representation", () => {
 		}
 	})
 
-	// NOTE: The direction that only a value from OUTSIDE can take — every
+	// The direction that only a value from OUTSIDE can take — every
 	// operation checks its own answer, so nothing in here produces one.
 	test("takes a number past the boundary back to a bigint", () => {
 		let escaped = createInteger(2 ** 60)
@@ -110,7 +110,7 @@ describe("the canonical representation", () => {
 		expect(decimalOf(escaped)).toBe("1152921504606846976")
 	})
 
-	// NOTE: A product can leave a NEGATIVE ZERO behind — `-3 * 0` is `-0` in
+	// A product can leave a NEGATIVE ZERO behind — `-3 * 0` is `-0` in
 	// IEEE 754 — and it is a number in safe range, so it is canonical by the
 	// letter of the invariant. What this holds is that it is also invisible: it
 	// prints, compares, orders and crosses to a host exactly as `0` does, so
@@ -130,7 +130,7 @@ describe("the canonical representation", () => {
 		expect(BigInt(negative.value)).toBe(0n)
 	})
 
-	// NOTE: A number's own `toString` reaches for exponential notation at 1e21.
+	// A number's own `toString` reaches for exponential notation at 1e21.
 	// A number-held Integer can not get near it, and a bigint spells itself in
 	// decimal at any size — so no Integer ever prints as `1e+21`.
 	test("never prints in exponential notation", () => {
@@ -195,7 +195,7 @@ describe("crossing the boundary", () => {
 		}
 	})
 
-	// NOTE: The operation the answer-side check exists for. Two factors well
+	// The operation the answer-side check exists for. Two factors well
 	// inside safe range can have a product far outside it, and the double
 	// product of two safe integers is the correctly-rounded true product — so
 	// a product that has left safe range rounds to a double AT OR ABOVE 2⁵³ and
@@ -229,7 +229,7 @@ describe("crossing the boundary", () => {
 		}
 	})
 
-	// NOTE: The escape arm canonicalises its answer only where the answer can
+	// The escape arm canonicalises its answer only where the answer can
 	// still BE inside safe range, because asking costs two bigint comparisons.
 	// Two arguments say when it can not, and this is what holds them: a product
 	// with an escaped factor can only come back for a zero factor, and a pair of
@@ -261,7 +261,7 @@ describe("crossing the boundary", () => {
 			expect(isCanonical(answer)).toBe(true)
 		}
 
-		// NOTE: The other shortcut — the two-number overflow, which is written
+		// The other shortcut — the two-number overflow, which is written
 		// as the bigint it is rather than asked about. `SAFE + SAFE` and
 		// `SAFE · SAFE` are the smallest answers either operation can leave
 		// safe range with.
@@ -279,7 +279,7 @@ describe("crossing the boundary", () => {
 		}
 	})
 
-	// NOTE: The exhaustive half of the argument above. Every product of two
+	// The exhaustive half of the argument above. Every product of two
 	// factors that a double holds either fits safe range exactly or is caught —
 	// so the check is asked of the products that sit closest to the boundary,
 	// where a rounding that carried would show.
@@ -316,7 +316,7 @@ describe("crossing the boundary", () => {
 			expect(isCanonical(answer)).toBe(true)
 		}
 
-		// NOTE: Negating zero must not leave a negative zero behind, which is a
+		// Negating zero must not leave a negative zero behind, which is a
 		// number that prints and compares as `0` but is not the same double.
 		expect(Object.is(negate(createInteger(0)).value, 0)).toBe(true)
 	})
@@ -343,7 +343,7 @@ describe("crossing the boundary", () => {
 		}
 	})
 
-	// NOTE: `Math.trunc(a / b)` is exact for two safe integers, which is what
+	// `Math.trunc(a / b)` is exact for two safe integers, which is what
 	// the number arm of `quotient` rests on — so the cases here are the ones
 	// where a rounding that carried across an integer boundary would show: a
 	// dividend at the top of safe range over small divisors.
@@ -366,7 +366,7 @@ describe("crossing the boundary", () => {
 				let right = createInteger(divisor)
 				let remainderOf = remainder(left, right)
 				let quotientOf = quotient(left, right)
-				// NOTE: Euclidean — a remainder is never negative, and the
+				// Euclidean — a remainder is never negative, and the
 				// quotient is whatever makes the pair reconstruct the dividend.
 				let expectedRemainder =
 					((dividend % divisor) +
@@ -386,7 +386,7 @@ describe("crossing the boundary", () => {
 })
 
 describe("equality and ordering across the two representations", () => {
-	// NOTE: What the Compiler emits for `a is b` is `===` on what the two hold,
+	// What the Compiler emits for `a is b` is `===` on what the two hold,
 	// and it is the invariant that makes that the whole answer.
 	test("=== decides equality exactly", () => {
 		let values: Array<number | bigint> = [
@@ -445,7 +445,7 @@ describe("equality and ordering across the two representations", () => {
 		}
 	})
 
-	// NOTE: The one cross-kind cell in the language — `1 is 1/1` holds — and it
+	// The one cross-kind cell in the language — `1 is 1/1` holds — and it
 	// reads an Integer's value into the bigint the Rational side is written on.
 	test("an Integer equals the Rational spelling the same value", () => {
 		expect(anyIs(createInteger(1), createRational(1n, 1n))).toBe(true)
@@ -493,7 +493,7 @@ describe("the bridges that carry a position", () => {
 			item(list, createInteger(1)),
 		)
 
-		// NOTE: A slice clamps rather than refuses, so a bound past either end
+		// A slice clamps rather than refuses, so a bound past either end
 		// answers the whole List or none of it — which is what the same bound
 		// written as a safe number does.
 		expect(slice(list, createInteger(0), far)).toEqual(

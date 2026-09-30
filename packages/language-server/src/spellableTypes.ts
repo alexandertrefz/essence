@@ -4,7 +4,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { typeNamedAt } from "./namedTypes"
 
-// NOTE: WHERE a Type is about to be written, for the half of "can this be
+// WHERE a Type is about to be written, for the half of "can this be
 // written down" that depends on the place: a name is a spelling only where it
 // names something, and `Point` is a Type Declaration in the file that declares
 // it and an `unknown-type` in the file next door. The cursor is where the TEXT
@@ -14,12 +14,12 @@ import { typeNamedAt } from "./namedTypes"
 export type SpellingScope = {
 	program: common.typed.Program
 	cursor: common.Cursor
-	// NOTE: The Type Parameters the text is written under that no Scope of the
+	// The Type Parameters the text is written under that no Scope of the
 	// Program declares, as the written target is for a Protocol's `Self`.
 	typeParameters?: ReadonlySet<string>
 }
 
-// NOTE: Whether a Type can be WRITTEN — the question `printType` does not
+// Whether a Type can be WRITTEN — the question `printType` does not
 // answer. It prints a Function signature as `(_ Integer) -> Integer` and a Case
 // as `Choice#Case`, and neither is a Type Declaration the Parser accepts; a
 // Type Parameter prints under a name that means nothing outside the Declaration
@@ -30,7 +30,7 @@ export type SpellingScope = {
 // selection away when the answer is no, rather than producing source that does
 // not parse.
 //
-// NOTE: `at` is what turns "this shape has a spelling" into "this shape has a
+// `at` is what turns "this shape has a spelling" into "this shape has a
 // spelling HERE". Left out, the answer is the old one — every name is taken as
 // readable — which is what a caller holding no typed Program to read Scopes off
 // can ask. Every caller that writes into source hands one in, because a Record
@@ -60,7 +60,7 @@ export function isSpellableType(
 				isSpellableType(type.keyType, at) &&
 				isSpellableType(type.valueType, at)
 			)
-		// NOTE: A Record Alias prints under its own name, and an applied generic
+		// A Record Alias prints under its own name, and an applied generic
 		// one under that name with its Arguments — the Union's rule below asked
 		// one Type over, because `printType` now answers both the same way.
 		// What its members are made of stops mattering once the name is what
@@ -83,7 +83,7 @@ export function isSpellableType(
 			return Object.values(type.members).every((member) =>
 				isSpellableType(member, at),
 			)
-		// NOTE: A Choice prints under its own name and an applied Alias under
+		// A Choice prints under its own name and an applied Alias under
 		// its own with the Arguments spelled out; a bare structural Union is
 		// the pipe list, which is written the same way it prints.
 		case "UnionType":
@@ -101,7 +101,7 @@ export function isSpellableType(
 			}
 
 			return type.types.every((arm) => isSpellableType(arm, at))
-		// NOTE: The alias is the spelling — the predicate is what the
+		// The alias is the spelling — the predicate is what the
 		// Declaration says, not what a use site writes. An applied generic one
 		// prints its Arguments, so those have to be writable too.
 		case "Refinement":
@@ -118,7 +118,7 @@ export function isSpellableType(
 	}
 }
 
-// NOTE: The text to WRITE for a Type at a position, or null where there is
+// The text to WRITE for a Type at a position, or null where there is
 // none. Not the question a label asks: an Inlay Hint reading `: Point` is
 // information wherever the reader is standing, and only the edit behind it has
 // to be source the file can hold.
@@ -146,7 +146,7 @@ export function spellTypeAt(
 	return isSpellableType(structural, at) ? printType(structural) : null
 }
 
-// NOTE: Whether the NAME resolves, where the text is going, to the very Type it
+// Whether the NAME resolves, where the text is going, to the very Type it
 // is being written for — the whole of the rule, and the reason asking whether
 // the name resolves at all is not enough. Two Modules may each declare a
 // `Shape`, and the one in reach here is the one this file's own Declarations
@@ -172,7 +172,7 @@ function namesTypeAt(
 	)
 }
 
-// NOTE: The looser question, for the spellings that are not the Type itself but
+// The looser question, for the spellings that are not the Type itself but
 // a Declaration it was made FROM: an applied generic Alias prints `Box<Integer>`
 // where `Box` names `{ value: Item }`, which is no Type the application equals.
 // So what is asked of those is that the word still names a Type here — enough
@@ -183,7 +183,7 @@ function namesSomethingAt(name: string, at: SpellingScope | null): boolean {
 	return at === null || typeInScope(name, at) !== null
 }
 
-// NOTE: What the name means where the text lands, read off the document's own
+// What the name means where the text lands, read off the document's own
 // Scopes — the Language Server's mirror of `findTypeInScope`, which is what the
 // Enricher reads the applied edit with. The import block is asked after them,
 // because a name this file declares shadows one it imports, and its entries are
@@ -214,7 +214,7 @@ export function typeInScope(
 	return null
 }
 
-// NOTE: The same Type with the names the position can not read taken off it, so
+// The same Type with the names the position can not read taken off it, so
 // that what is left is the shape — `List<Point>` becomes `List<{ x: Integer,
 // y: Integer }>` where `Point` is somebody else's word, and stays `List<Point>`
 // where it is this file's. A name that IS in reach is left standing rather than
@@ -226,7 +226,7 @@ export function typeInScope(
 // so the strip has nothing to hand back, and the caller finds it unspellable,
 // which is the withheld edit.
 //
-// NOTE: The visiting set is the back-edge guard `withoutRecordNames` carries,
+// The visiting set is the back-edge guard `withoutRecordNames` carries,
 // and is defence rather than a case that arises: the only Types that lead back
 // to themselves go through a Choice, and a Choice stops the walk one line up.
 function withoutUnreadableSpellings(
@@ -326,7 +326,7 @@ function withoutUnreadableSpellings(
 	return strip(type)
 }
 
-// NOTE: The name the import block binds a named Type under where it is not the
+// The name the import block binds a named Type under where it is not the
 // declared one, as `Colour as Hue` binds a Choice. Null where no entry binds it.
 function importedSpelling(
 	type: common.RecordType | common.UnionType,

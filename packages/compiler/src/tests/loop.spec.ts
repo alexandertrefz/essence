@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — the
+// The full pipeline minus bundling, mirroring codeGeneration.spec — the
 // `loop` family and the early-stopping `reduce` are only proven once every stage
 // agrees on them AND the emitted JavaScript runs. In the loop and reduce blocks
 // every `Step` is READ, by the native drivers; the final block compares them
@@ -40,7 +40,7 @@ async function run(source: string): Promise<Array<string>> {
 
 	writeFileSync(file, js)
 
-	// NOTE: Both doors, into one buffer in writing order — `Terminal.inspect`
+	// Both doors, into one buffer in writing order — `Terminal.inspect`
 	// ends its line through `console.log`, `Terminal.print` writes its own to
 	// the stream, and `Loops.es` prints.
 	let written = ""
@@ -81,7 +81,7 @@ describe("loop", () => {
 	})
 
 	it("answers the seed when the counted loop's end is below its start", async () => {
-		// NOTE: The count only runs up, so this body never runs. The direction
+		// The count only runs up, so this body never runs. The direction
 		// is what the label says, exactly as `List.of` reads it.
 		expect(
 			await run(`implementation {
@@ -94,7 +94,7 @@ describe("loop", () => {
 	})
 
 	it("counts down through the end the downTo entry names", async () => {
-		// NOTE: 3, then 2, then 1 — the same direction `List.of(downTo:)`
+		// 3, then 2, then 1 — the same direction `List.of(downTo:)`
 		// counts, so the appended digits read "321".
 		expect(
 			await run(`implementation {
@@ -107,7 +107,7 @@ describe("loop", () => {
 	})
 
 	it("always takes the first turn of a down count", async () => {
-		// NOTE: The first Integer is always seen, which is the promise
+		// The first Integer is always seen, which is the promise
 		// `List.of(integersFrom:downTo:)` carries into its Type.
 		expect(
 			await run(`implementation {
@@ -131,7 +131,7 @@ describe("loop", () => {
 	})
 
 	it("steps while a condition holds", async () => {
-		// NOTE: 1, 2, 4, 8, … the first power of two that is not below 100.
+		// 1, 2, 4, 8, … the first power of two that is not below 100.
 		expect(
 			await run(`implementation {
 				constant doubled = loop(startingWith 1,
@@ -180,7 +180,7 @@ describe("loop", () => {
 	})
 
 	it("finishes the general loop on the first #Done, threading a Record State", async () => {
-		// NOTE: A Record State threaded with `{ state with … }`, stopping with
+		// A Record State threaded with `{ state with … }`, stopping with
 		// the single-payload `#Done(state.total)` shorthand rather than the full
 		// `#Done({ value = … })`. Sums 1 through 5 = 15.
 		expect(
@@ -201,7 +201,7 @@ describe("loop", () => {
 	})
 
 	it("finishes the general loop with a Result of a different Type than the State", async () => {
-		// NOTE: The State is an Integer counter, the Result a String — the
+		// The State is an Integer counter, the Result a String — the
 		// general loop's two Type Parameters are independent.
 		expect(
 			await run(`implementation {
@@ -217,7 +217,7 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
-	// NOTE: A general loop inside another general loop's `step`, each finishing
+	// A general loop inside another general loop's `step`, each finishing
 	// with a Result of its own Type — the inner one with the Integer it counted
 	// to, the outer one with a String. `<-` returns from the callback it is
 	// written in, so each `#Done` belongs to its own loop, and the inner Result
@@ -247,7 +247,7 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
-	// NOTE: The callback writes its return Type here, where the bare-sigil
+	// The callback writes its return Type here, where the bare-sigil
 	// version above leaves it out. A Choice's Type Parameters are applied, never
 	// inferred: the bare `#Done` is read off whatever the position expects and,
 	// where nothing expects anything, off the body — but the PREFIXED spelling
@@ -267,7 +267,7 @@ describe("loop", () => {
 		).toEqual(['"6"'])
 	})
 
-	// NOTE: The two spellings of the one walk, run side by side. A bare
+	// The two spellings of the one walk, run side by side. A bare
 	// construction whose payload leaves one of its Choice's Type Parameters
 	// standing is refused now, and this is the shape that must never be caught by
 	// that: `#Done("done")` names `Result` and says nothing about `State`, so
@@ -296,14 +296,14 @@ describe("loop", () => {
 	})
 })
 
-// NOTE: The three counted entries whose body answers a `Step`. They share every
+// The three counted entries whose body answers a `Step`. They share every
 // label with the run-to-the-end entries beside them and are told apart by the
 // last one — `step` against a positional body — which is the whole reason the
 // family was relabelled: a callback's answer Type is not what an Overload is
 // chosen by, so the counted early exit had no spelling before.
 describe("a counted loop whose body answers a Step", () => {
 	it("leaves the count on the first #Done", async () => {
-		// NOTE: 1 + 2 + 3 + 4 = 10, and 10 + 5 = 15 is the first total above
+		// 1 + 2 + 3 + 4 = 10, and 10 + 5 = 15 is the first total above
 		// ten — so the answer is 15 rather than the 5050 the whole count
 		// reaches. That is proof no Integer past the #Done was visited.
 		expect(
@@ -388,7 +388,7 @@ describe("a counted loop whose body answers a Step", () => {
 		).toEqual(['"543"', '"321"', '"3"'])
 	})
 
-	// NOTE: The label is the whole of the difference, so the pair has to be
+	// The label is the whole of the difference, so the pair has to be
 	// checked side by side: the same Arguments under the same labels reach two
 	// different entries and answer two different things.
 	it("is a different entry from the positional body under the same labels", async () => {
@@ -411,7 +411,7 @@ describe("a counted loop whose body answers a Step", () => {
 	})
 })
 
-// NOTE: Every counted entry has two implementations that have to agree: the
+// Every counted entry has two implementations that have to agree: the
 // Essence body in `Loop.es`, and the `for` the Optimiser writes where the call
 // stands. `inline-loops` only writes the walk out where every callback is
 // written AT the call, so binding the body to a name is what reaches the Essence
@@ -455,7 +455,7 @@ describe("the counted entries answer alike inlined and not", () => {
 		])
 	})
 
-	// NOTE: The Step-answering counted entries have one implementation rather
+	// The Step-answering counted entries have one implementation rather
 	// than two — they are written on the general driver, which is inlined inside
 	// their own prelude bodies rather than at the call — so this reads the same
 	// walk through a named body to be sure the Essence is what runs.
@@ -492,7 +492,7 @@ describe("reduce(startingWith:step:)", () => {
 	})
 
 	it("stops the fold on the first #Done and visits no later item", async () => {
-		// NOTE: The accumulator counts the items the combiner has seen. It stops
+		// The accumulator counts the items the combiner has seen. It stops
 		// itself at two, so the Result is 2 rather than the five it would reach
 		// folding the whole List — proof no item past the #Done was visited.
 		expect(
@@ -524,7 +524,7 @@ describe("reduce(startingWith:step:)", () => {
 	})
 })
 
-// NOTE: The untested combination once WP4 and WP6 both merged — the builtin,
+// The untested combination once WP4 and WP6 both merged — the builtin,
 // generic `Step` compared with its DERIVED Equatable. Every value here is a
 // `Step<State, Result>` instantiation, and every comparison routes through the
 // widened `boundChoiceIs` descriptor computed for a GenericAlias that lives in
@@ -577,7 +577,7 @@ describe("a Step compares by its derived Equality", () => {
 		).toEqual(['"true"', '"false"', '"true"'])
 	})
 
-	// NOTE: The point of routing a generic payload through a witness rather than
+	// The point of routing a generic payload through a witness rather than
 	// the flat structural comparison — `1/2` and `2/4` are equal by Rational's
 	// own `is`, and only the Rational witness threaded into `Step`'s descriptor
 	// carries that across the stdlib boundary.

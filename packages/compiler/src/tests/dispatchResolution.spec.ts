@@ -12,7 +12,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: What a resolved Invocation DOES — which Namespace's Method the emitted
+// What a resolved Invocation DOES — which Namespace's Method the emitted
 // Program calls, with which Arguments, and which dispatch branch it takes.
 // Every fault pinned here type-checked cleanly and only showed up in what the
 // Program printed: a Function literal compiled against a Namespace that lost
@@ -20,11 +20,11 @@ import { validate } from "../validator/index"
 // member Type that swallows it was tried first. Asserting on Types would have
 // seen none of it, so these run.
 
-// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `Terminal.inspect` calls run — the same harness `codeGeneration.spec.ts`
 // and `resolvers.spec.ts` use.
 //
-// NOTE: `expectedWarnings` names the Diagnostics a Program is SUPPOSED to carry.
+// `expectedWarnings` names the Diagnostics a Program is SUPPOSED to carry.
 // A Union of two List member Types overlaps for the empty List — the Validator
 // warns that the second branch never sees one — and a Program below is about
 // which branch's compiled Argument runs rather than about that Warning. Every
@@ -63,14 +63,14 @@ async function run(
 	return output
 }
 
-// NOTE: The counterpart for the Programs that are supposed to be refused —
+// The counterpart for the Programs that are supposed to be refused —
 // which is where the probe ORDER is visible as something a reader sees, rather
 // than as which body ran.
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
 }
 
-// NOTE: The characters a Diagnostic's Label covers, which is the only way to
+// The characters a Diagnostic's Label covers, which is the only way to
 // say "it points at what the Program wrote" without counting columns by hand.
 // Single line spans only; every Label asked this covers one call or one name.
 function underlinedText(source: string, label: common.DiagnosticLabel): string {
@@ -86,7 +86,7 @@ function underlinedText(source: string, label: common.DiagnosticLabel): string {
 
 describe("Dispatch and Resolution", () => {
 	describe("Contextual Function literal Arguments", () => {
-		// NOTE: `IntApplier` wins — its target is strictly more specific than
+		// `IntApplier` wins — its target is strictly more specific than
 		// `Number` — but every Namespace is probed before that is decided, and
 		// each probe resolves the unannotated literal against its own
 		// Parameter Type. With the last probe's resolution left standing, the
@@ -113,7 +113,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"1"'])
 		})
 
-		// NOTE: The same call with the Namespaces written the other way round.
+		// The same call with the Namespaces written the other way round.
 		// The winner does not depend on declaration order, so neither may the
 		// literal's Parameter Types.
 		it("compiles the literal the same way whichever Namespace is probed last", async () => {
@@ -137,7 +137,7 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
-	// NOTE: Regression tests — a dispatched Invocation passes the SAME Arguments
+	// Regression tests — a dispatched Invocation passes the SAME Arguments
 	// to every branch, and a Function literal that omitted its annotations was
 	// compiled once, against whichever member Type resolved last. Every other
 	// branch was then handed a body compiled for somebody else: the callback of
@@ -173,7 +173,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['[ "ALPHA" ]'])
 		})
 
-		// NOTE: The member the value actually has decides, so how the Union is
+		// The member the value actually has decides, so how the Union is
 		// written may not — least of all which member happens to be written
 		// last, which is precisely what used to decide it.
 		it("compiles it the same way however the Union is spelled", async () => {
@@ -191,7 +191,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['[ "ALPHA" ]'])
 		})
 
-		// NOTE: The same fault with the Namespaces the Standard Library
+		// The same fault with the Namespaces the Standard Library
 		// provides, which is where it is likeliest to be met: `String.toString`
 		// answers with its receiver unchanged, so the Integer List compiled
 		// against the String branch printed `[ 1, 2 ]` — Integers in a
@@ -211,7 +211,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['[ "1", "2" ]', '[ "a", "b" ]'])
 		})
 
-		// NOTE: A Standard Library Method reached ONLY from a branch's own copy
+		// A Standard Library Method reached ONLY from a branch's own copy
 		// still has to be emitted with the Program. The search that decides
 		// which of them a Program carries recurses into whatever it is given,
 		// and a copy is an ordinary Expression hanging off the dispatch — but a
@@ -269,7 +269,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"ALPHAALPHA!"'])
 		})
 
-		// NOTE: The copies are per branch, the rest of the Arguments are not:
+		// The copies are per branch, the rest of the Arguments are not:
 		// they are evaluated once, at the call site, before any branch is
 		// picked. An Argument that prints would print once per branch if the
 		// Arguments were emitted per branch instead — which is the obvious way
@@ -316,7 +316,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"evaluated"', '"ALPHA!"'])
 		})
 
-		// NOTE: Every member of a Union must provide what is asked of it, and a
+		// Every member of a Union must provide what is asked of it, and a
 		// literal's body is part of what is asked. Compiling it against one
 		// branch hid what it meant to the others: this Program used to compile
 		// without a Diagnostic and die reading `.b` off a Record that has an
@@ -349,7 +349,7 @@ describe("Dispatch and Resolution", () => {
 	})
 
 	describe("Union dispatch order", () => {
-		// NOTE: `isValueOfType` matches a Record openly — a value "may carry
+		// `isValueOfType` matches a Record openly — a value "may carry
 		// more besides" — and `dispatchMethod` takes the first branch that
 		// matches, so the branch for `{ width }` answers for a
 		// `{ width, height }` value unless the more specific branch is tried
@@ -428,7 +428,7 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
-	// NOTE: An Overload set is first fit, and a refinement is freely assignable to
+	// An Overload set is first fit, and a refinement is freely assignable to
 	// its base — so an entry taking the base Type accepts every Argument a refined
 	// entry would have taken, and the refined entry only ever wins by being read
 	// first. Writing it first is not how it gets there: an Overload's slot is
@@ -484,7 +484,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"total"', '"zero"'])
 		})
 
-		// NOTE: The other half of the rule, and the reason the sort is a sort
+		// The other half of the rule, and the reason the sort is a sort
 		// rather than a preference: a value carrying no evidence must still find
 		// the base entry. It compiles green, so this is not only about which body
 		// runs — a refined entry that swallowed the call would report the Argument
@@ -504,7 +504,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"checked"', '"checked"'])
 		})
 
-		// NOTE: Probed first is not selected: a candidate whose bound the Arguments
+		// Probed first is not selected: a candidate whose bound the Arguments
 		// can not satisfy is no candidate at all, refinement or not. The refined
 		// entry below takes the Arguments — `3` is admitted, `Value` binds the
 		// Boolean — and is passed over for the bound it fails, which is also what
@@ -547,7 +547,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"base"', '"vector"'])
 		})
 
-		// NOTE: And the assertion that this costs a Program declaring no refinement
+		// And the assertion that this costs a Program declaring no refinement
 		// nothing. A wide entry written ahead of a narrow one is the same situation
 		// with no evidence asked for anywhere, and it is probed in the order it was
 		// written: the entry written first wins a call both of them accept. Every
@@ -572,7 +572,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"wide"'])
 		})
 
-		// NOTE: The whole rule again over a GENERIC refinement, which the sort sees
+		// The whole rule again over a GENERIC refinement, which the sort sees
 		// for exactly the reason it sees any other: what it asks is whether a
 		// Parameter Type mentions a refinement anywhere, and an applied
 		// `Filled<String>` is one. A written List reaches the entry asking for
@@ -629,7 +629,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(['"total"', '"empty"', '"checked"'])
 		})
 
-		// NOTE: What the sort costs a call that FAILS, which is where an order is
+		// What the sort costs a call that FAILS, which is where an order is
 		// visible as something a reader is told rather than as which body ran. A
 		// probe reports about the Arguments it was given, and a losing one's report
 		// is held — but only from the first candidate whose Arguments matched
@@ -637,7 +637,7 @@ describe("Dispatch and Resolution", () => {
 		// before that would be held forever. So the sort decides which entry the
 		// call is reported ABOUT, and these say which, in both directions.
 		describe("the report a call every entry refuses gets", () => {
-			// NOTE: Both entries take the Arguments — `3` is admitted into
+			// Both entries take the Arguments — `3` is admitted into
 			// `NonZero`, and `true` binds each entry's Type Parameter — and both
 			// fail the bound that Parameter carries. Named differently on purpose:
 			// which Protocol the Diagnostic names is which entry the call was
@@ -678,7 +678,7 @@ describe("Dispatch and Resolution", () => {
 					}
 				}`
 
-			// NOTE: The entry asking for evidence is probed first, so it is the
+			// The entry asking for evidence is probed first, so it is the
 			// first whose Arguments match, so it is the one the call is reported
 			// about — its bound is the one named. The report is about the Argument
 			// the Program wrote either way: both entries would refuse `true` for the
@@ -706,7 +706,7 @@ describe("Dispatch and Resolution", () => {
 				)
 			})
 
-			// NOTE: And the same two entries with the refinement taken out, which is
+			// And the same two entries with the refinement taken out, which is
 			// the assertion that this costs a Program declaring none: with nothing
 			// asking for evidence the entries are probed as written, the entry
 			// written FIRST is the first to match, and its bound is named. Every
@@ -728,7 +728,7 @@ describe("Dispatch and Resolution", () => {
 				)
 			})
 
-			// NOTE: The other half of a probe's report — not what solving the
+			// The other half of a probe's report — not what solving the
 			// candidate's bounds said, but what TYPING an Argument against its
 			// Parameter Types did. An unannotated Function literal is resolved
 			// against each candidate's Parameter Types in turn, and where NO
@@ -775,7 +775,7 @@ describe("Dispatch and Resolution", () => {
 					Terminal.inspect(1::apply((item) { <- item::isEven()::toString() }, with true))
 				}`
 
-				// NOTE: One Diagnostic, and it is about the call rather than about
+				// One Diagnostic, and it is about the call rather than about
 				// the literal: the base entry was probed last, it reads `item` as an
 				// Integer, and `isEven` is a Method an Integer answers. The refined
 				// entry's reading — where `item` is a String and `isEven` is nothing
@@ -784,7 +784,7 @@ describe("Dispatch and Resolution", () => {
 					diagnosticsFor(source).map((diagnostic) => diagnostic.code),
 				).toEqual(["no-matching-overload"])
 
-				// NOTE: And the entries are still LISTED as they were written. What
+				// And the entries are still LISTED as they were written. What
 				// the sort decides is the order they are tried in, never the order a
 				// Program's own declarations are read back to it in.
 				expect(diagnosticsFor(source)[0]!.notes).toEqual([
@@ -793,7 +793,7 @@ describe("Dispatch and Resolution", () => {
 				])
 			})
 
-			// NOTE: The same call with nothing asking for evidence, which is what
+			// The same call with nothing asking for evidence, which is what
 			// says the paragraph above is the sort's doing: probed as written, the
 			// entry left compiled into the literal is the one written LAST, so the
 			// body is read as a String's and the Method it calls is reported missing
@@ -820,7 +820,7 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
-	// NOTE: An `overload` block resolves by the Arguments a call WRITES, so a
+	// An `overload` block resolves by the Arguments a call WRITES, so a
 	// default — which lets an entry be called with fewer — is the one thing that
 	// can make two entries answer the same call. Refused where it is written.
 	describe("Overloads a default makes identical", () => {
@@ -845,7 +845,7 @@ describe("Dispatch and Resolution", () => {
 			expect(underlinedText(source, diagnostics[0].labels[0]!)).toBe("1")
 		})
 
-		// NOTE: The `loop` shape: entries told apart by their label sets
+		// The `loop` shape: entries told apart by their label sets
 		// alone. Defaulting `while` would give the first entry here the
 		// second's written shape, and two entries resolved purely by label
 		// would become indistinguishable.
@@ -869,7 +869,7 @@ describe("Dispatch and Resolution", () => {
 			])
 		})
 
-		// NOTE: The regression guard the whole "only by omitting a default"
+		// The regression guard the whole "only by omitting a default"
 		// qualifier exists for — the numeric tower's entries all have the same
 		// written shape and resolve by Type.
 		it("should leave entries of the same written shape alone", () => {
@@ -908,7 +908,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Pinning what a default on a REFINED Parameter does rather than
+		// Pinning what a default on a REFINED Parameter does rather than
 		// asserting what it ought to do. `overloadProbeOrder` hoists the entries
 		// asking for a refinement so a refined entry is probed before its base,
 		// and a default makes an entry accept more shapes — the two have not
@@ -931,7 +931,7 @@ describe("Dispatch and Resolution", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A PARTIAL Record default adds no accepted shape — its Argument
+		// A PARTIAL Record default adds no accepted shape — its Argument
 		// is still written — but it widens the RECORDS an entry accepts, which
 		// is the same mistake one level down.
 		describe("a partial Record default", () => {
@@ -961,7 +961,7 @@ describe("Dispatch and Resolution", () => {
 				)
 			})
 
-			// NOTE: The two Records still tell themselves apart: nothing a call
+			// The two Records still tell themselves apart: nothing a call
 			// writes satisfies both, because each declares a member the other
 			// requires and does not declare.
 			it("should leave two Records that share no Argument alone", () => {
@@ -984,7 +984,7 @@ describe("Dispatch and Resolution", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A member of the same name and a different Type is what
+			// A member of the same name and a different Type is what
 			// keeps the two apart, so the default changes nothing.
 			it("should leave two Records that disagree on a member alone", () => {
 				expect(
@@ -1006,7 +1006,7 @@ describe("Dispatch and Resolution", () => {
 				).toEqual([])
 			})
 
-			// NOTE: Labels are read before Types, so an entry a call can not
+			// Labels are read before Types, so an entry a call can not
 			// even address is not a clash.
 			it("should leave entries told apart by their labels alone", () => {
 				expect(
@@ -1031,7 +1031,7 @@ describe("Dispatch and Resolution", () => {
 	})
 
 	describe("Static Method bodies", () => {
-		// NOTE: A static Method is emitted without the `_self` Parameter `@`
+		// A static Method is emitted without the `_self` Parameter `@`
 		// lowers to, so `@` in one used to compile to an unbound name and the
 		// Program died on its first call. The Enricher refuses it now; this is
 		// the Simplifier's own guard, reached by retagging an enriched
@@ -1070,7 +1070,7 @@ describe("Dispatch and Resolution", () => {
 			)
 		})
 
-		// NOTE: A Match Handler is emitted as a Function of its own taking the
+		// A Match Handler is emitted as a Function of its own taking the
 		// value that matched, so its `@` is bound wherever the Match is
 		// written — the guard above must not mistake it for the receiver.
 		it("keeps a Match Handler's '@' inside a static Method", async () => {
@@ -1093,7 +1093,7 @@ describe("Dispatch and Resolution", () => {
 	})
 })
 
-// NOTE: What a call no candidate accepts is TOLD. The report used to name only
+// What a call no candidate accepts is TOLD. The report used to name only
 // what each candidate declares — "'String::append' takes 1 Argument: Parameter 1
 // is String" under "this call passes 1 Argument" — which says everything about
 // the callee and nothing about the call: the Argument's own Type, the half a
@@ -1102,7 +1102,7 @@ describe("Dispatch and Resolution", () => {
 // with the closest candidate now, and the Labels say what was passed and what
 // was wanted where.
 describe("What a refused call is told", () => {
-	// NOTE: The finding's own example, and the shape three studies named as the
+	// The finding's own example, and the shape three studies named as the
 	// most frequent complaint: one candidate, one Argument, and a message that
 	// said neither what it is nor what it should have been.
 	describe("an Argument of the wrong Type", () => {
@@ -1139,7 +1139,7 @@ describe("What a refused call is told", () => {
 			)
 		})
 
-		// NOTE: The signature is still listed. What the Labels say is where THIS
+		// The signature is still listed. What the Labels say is where THIS
 		// call went wrong; what the Note says is what the callee takes, which is
 		// what a reader rewriting the call needs to see whole.
 		it("still lists the signature", () => {
@@ -1149,7 +1149,7 @@ describe("What a refused call is told", () => {
 		})
 	})
 
-	// NOTE: A fold's accumulator is decided by what its combiner writes, so
+	// A fold's accumulator is decided by what its combiner writes, so
 	// `kept` is a `List<String>` handed to a Method over Numbers. A Label names
 	// the Type that was passed, the one fact that explains the refusal.
 	it("names the Type a Method over Numbers was handed instead", () => {
@@ -1173,7 +1173,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: Eight entries of one `add` refuse the same Argument for the same
+	// Eight entries of one `add` refuse the same Argument for the same
 	// reason, and the Labels say it once. A clause per Note would be the same
 	// sentence eight times over the list a reader is scanning for the entry they
 	// meant — and the list itself stops at five, for the same reason: see
@@ -1193,7 +1193,7 @@ describe("What a refused call is told", () => {
 		])
 	})
 
-	// NOTE: Fourteen entries under one Label is a wall to read past rather than
+	// Fourteen entries under one Label is a wall to read past rather than
 	// a list to read, and the entry a reader is looking for is somewhere in it.
 	// Five, and a count of what is left.
 	describe("a name with more entries than a report lists", () => {
@@ -1210,7 +1210,7 @@ describe("What a refused call is told", () => {
 			)
 		})
 
-		// NOTE: The closest candidate's Note is what the report's own Labels are
+		// The closest candidate's Note is what the report's own Labels are
 		// about, so a list that left it out would be the list of the wrong five.
 		it("keeps the closest candidate's own Note in the list", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -1229,7 +1229,7 @@ describe("What a refused call is told", () => {
 		})
 	})
 
-	// NOTE: And where a candidate disagreed somewhere ELSE, its Note says so —
+	// And where a candidate disagreed somewhere ELSE, its Note says so —
 	// which is the whole of what tells two entries of one name apart. The entry
 	// taking a bare item refused the LABEL; the entry the call meant refused the
 	// Type behind it.
@@ -1246,7 +1246,7 @@ describe("What a refused call is told", () => {
 		])
 	})
 
-	// NOTE: Which is also the tie the closest candidate is decided by. Both
+	// Which is also the tie the closest candidate is decided by. Both
 	// entries stopped at the same Parameter, and the one that agreed on the
 	// label got further into the call than the one that did not — leading with
 	// the entry the call clearly did not mean would be a report about the wrong
@@ -1266,7 +1266,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: Among candidates of the right arity, the closest is the one that
+	// Among candidates of the right arity, the closest is the one that
 	// answered the most Parameters before refusing one — the second entry here,
 	// which took the String and stopped at the Integer beside it.
 	it("leads with the candidate that got furthest into the call", () => {
@@ -1295,7 +1295,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: A label that does not agree is what the call got wrong, and saying
+	// A label that does not agree is what the call got wrong, and saying
 	// it is an Integer where a String was wanted would name nothing the call did
 	// — the Type behind the label was never even read. The Help is the
 	// Validator's own, word for word: one mistake, one edit, however the callee
@@ -1329,7 +1329,7 @@ describe("What a refused call is told", () => {
 		})
 	})
 
-	// NOTE: The other half of a label mismatch — a label written where the
+	// The other half of a label mismatch — a label written where the
 	// Parameter takes none.
 	it("says so where the Parameter takes no label at all", () => {
 		let diagnostics = diagnosticsFor(`implementation {
@@ -1345,7 +1345,7 @@ describe("What a refused call is told", () => {
 		expect(diagnostics[0]!.helps).toEqual(["Pass the value with no label."])
 	})
 
-	// NOTE: A label no candidate declares anywhere is matched before anything is
+	// A label no candidate declares anywhere is matched before anything is
 	// typed, and the Parameter it names nowhere leaves the count wrong — so the
 	// report falls back to the call's shape and would be about a count nobody
 	// miscounted. The label is named instead, which is what went wrong.
@@ -1364,7 +1364,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: The order a reader arriving from another language writes a fold in.
+	// The order a reader arriving from another language writes a fold in.
 	// The refusal was about the LABEL the first Argument was missing, which is
 	// true and is not the mistake — and the Help, followed, wrote that label
 	// onto the step and answered with three more Diagnostics.
@@ -1396,7 +1396,7 @@ describe("What a refused call is told", () => {
 			)
 		})
 
-		// NOTE: The label moves with the Argument. A reader who exchanged the
+		// The label moves with the Argument. A reader who exchanged the
 		// two values and nothing else would be answered next by the label they
 		// did not write, which is the report this one replaced.
 		it("writes the label the swap carries with it", () => {
@@ -1405,7 +1405,7 @@ describe("What a refused call is told", () => {
 			])
 		})
 
-		// NOTE: A Function literal takes its Parameter Types from the call, and
+		// A Function literal takes its Parameter Types from the call, and
 		// a call nothing answered has none to give — so saying that its
 		// Parameters have no Type is the same mistake told twice more. The
 		// refusal is the one report, and every Type in the literal follows from
@@ -1417,7 +1417,7 @@ describe("What a refused call is told", () => {
 		})
 	})
 
-	// NOTE: The other half of that rule: where writing the LABELS fixes the
+	// The other half of that rule: where writing the LABELS fixes the
 	// call, the labels are what went wrong and the report about them is the one
 	// to make. Only a swap that is the whole edit is reported as one.
 	it("keeps the label report where the order is right", () => {
@@ -1435,7 +1435,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: Where no candidate takes this many Arguments there is no Argument to
+	// Where no candidate takes this many Arguments there is no Argument to
 	// lead with — nothing was refused for what it is. The report stays about the
 	// call's shape, and says what the call handed over, which is the half a
 	// reader can not count off their own source.
@@ -1454,7 +1454,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: A call that passes nothing has nothing to list, and the count says
+	// A call that passes nothing has nothing to list, and the count says
 	// the whole of it.
 	it("leaves the list out where the call passes nothing", () => {
 		expect(
@@ -1464,7 +1464,7 @@ describe("What a refused call is told", () => {
 		).toBe("this call passes 0 Arguments")
 	})
 
-	// NOTE: A Function literal Argument is named by the signature it was read as
+	// A Function literal Argument is named by the signature it was read as
 	// — which is the one thing a reader can not see, since the literal they
 	// wrote spells none of it.
 	it("names the signature a Function literal was read as", () => {
@@ -1484,7 +1484,7 @@ describe("What a refused call is told", () => {
 		)
 	})
 
-	// NOTE: And where the literal could not be read at all, the report says that
+	// And where the literal could not be read at all, the report says that
 	// and points at it rather than naming the Error Type nobody wrote. The
 	// literal's own Diagnostic is untouched — it is the one that says which
 	// Parameter has no Type and how to give it one.
@@ -1507,7 +1507,7 @@ describe("What a refused call is told", () => {
 		])
 	})
 
-	// NOTE: The pair the blank question is about is in hand here for the first
+	// The pair the blank question is about is in hand here for the first
 	// time — the Parameter Type the closest candidate held the Argument to, and
 	// the Type the Argument came to. A Type Parameter bound to a blank by an
 	// earlier Argument refuses the one after it for being a write into a blank
@@ -1541,7 +1541,7 @@ describe("What a refused call is told", () => {
 		expect(diagnostics[0]!.notes).toContain(
 			"An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
 		)
-		// NOTE: `List<String>`, read off the `["a"]` the blank refused — and no
+		// `List<String>`, read off the `["a"]` the blank refused — and no
 		// hedge, because nothing here is an example. The blank used to be filled
 		// with `Integer` whatever stood opposite it, which named an item Type
 		// the reader never wrote one line under a Label saying what they had.
@@ -1550,7 +1550,7 @@ describe("What a refused call is told", () => {
 		])
 	})
 
-	// NOTE: A Union receiver whose covering Namespace declares the Method is
+	// A Union receiver whose covering Namespace declares the Method is
 	// reported against the receiver as written — per-member dispatch is the
 	// second chance, not the failure worth reporting — and the Argument it
 	// refused is named exactly as it is anywhere else.

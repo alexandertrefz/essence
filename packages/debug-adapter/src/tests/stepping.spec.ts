@@ -20,7 +20,7 @@ function mapWithLines(lines: Array<number>): BundleMap {
 }
 
 describe("blackboxPositions", () => {
-	// NOTE: The toggles: blackboxed from the top of the file, plain across
+	// The toggles: blackboxed from the top of the file, plain across
 	// each run of mapped lines, blackboxed again after. Lines here are the
 	// map's 1-based ones, positions CDP's 0-based ones.
 	it("wraps each run of mapped lines in toggles", () => {

@@ -127,7 +127,7 @@ describe("LSP", () => {
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// NOTE: The Compiler stops after the Parser, so what a habit written
+		// The Compiler stops after the Parser, so what a habit written
 		// BEHIND a Statement costs is only ever visible here: a Declaration
 		// dropped with the refusal leaves its name undeclared, and the editor
 		// answers that at every line that reads it. The Parser reads past a ';'
@@ -158,7 +158,7 @@ describe("LSP", () => {
 			).toEqual(["A Comment is written with '§'"])
 		})
 
-		// NOTE: The same property for `primes[0]`, and visible in the same one
+		// The same property for `primes[0]`, and visible in the same one
 		// place: an `essence check` stops after the Parser, so a cascade a
 		// refused index set off would be the editor's alone to show. Both
 		// halves are pinned — the name is still DECLARED, so nothing says
@@ -176,7 +176,7 @@ describe("LSP", () => {
 			).toEqual(["A value is not indexed with brackets"])
 		})
 
-		// NOTE: And nothing the BASE of a refused index has to say is said
+		// And nothing the BASE of a refused index has to say is said
 		// either. What stands in front of the brackets is decided by where the
 		// Parser cut the Expression: a label written flush against a '[' is
 		// read as the value the brackets index, so `contentsOf[3, 4]` reported
@@ -198,7 +198,7 @@ describe("LSP", () => {
 			).toEqual(["A value is not indexed with brackets"])
 		})
 
-		// NOTE: The Validator runs whatever the Enricher found, so a Type error
+		// The Validator runs whatever the Enricher found, so a Type error
 		// and a Validator error in one file are one run's worth of report. It
 		// used to take two: the Enricher's Diagnostic hid the Validator's, and
 		// the second only appeared once the first was fixed.
@@ -214,7 +214,7 @@ describe("LSP", () => {
 			])
 		})
 
-		// NOTE: The order a report comes out in is the order the lines are
+		// The order a report comes out in is the order the lines are
 		// written, whichever stage found each of them — a Validator Diagnostic
 		// above a syntax error where that is where they stand.
 		it("should report every stage in file order", () => {
@@ -269,7 +269,7 @@ describe("LSP", () => {
 			})
 		})
 
-		// NOTE: An empty selection is what an Editor sends for a cursor sitting
+		// An empty selection is what an Editor sends for a cursor sitting
 		// on a squiggle, which is how a Quick Fix is asked for in practice.
 		it("should carry an empty selection through as a zero-width Position", () => {
 			let cursor = { line: 5, character: 0 }
@@ -434,7 +434,7 @@ describe("LSP", () => {
 		})
 	})
 
-	// NOTE: A capability is the only thing standing between a working feature
+	// A capability is the only thing standing between a working feature
 	// and one no Editor ever asks for — every handler below keeps passing its
 	// own spec while the feature is dark. So the announcement is asserted as
 	// its own fact, feature by feature.
@@ -521,7 +521,7 @@ describe("LSP", () => {
 			})
 		})
 
-		// NOTE: The legend is handed over as two arrays of names and every
+		// The legend is handed over as two arrays of names and every
 		// Token is an index into them, so a client holding an older response
 		// recolours everything past an entry that moved.
 		it("should carry the semantic token legend in the order the encoder uses", () => {
@@ -549,7 +549,7 @@ describe("LSP", () => {
 			})
 		})
 
-		// NOTE: Not one of the fixes is both unambiguous and
+		// Not one of the fixes is both unambiguous and
 		// semantics-preserving, so an Editor must never be told it may apply
 		// them all at once.
 		it("should not offer a fix-all Code Action kind", () => {
@@ -597,7 +597,7 @@ describe("LSP", () => {
 			expect(item.sortText).toBe("3greet")
 		})
 
-		// NOTE: Halfway through a keystroke nothing resolves, and a callable
+		// Halfway through a keystroke nothing resolves, and a callable
 		// still has to insert something better than its bare name.
 		it("should fall back to bare parentheses for a callable with no snippet", () => {
 			let item = toLspCompletionItem(entry({ snippet: null }))
@@ -606,7 +606,7 @@ describe("LSP", () => {
 			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
 		})
 
-		// NOTE: `$` is an ordinary Identifier character, so the fallback is as
+		// `$` is an ordinary Identifier character, so the fallback is as
 		// able to spell a snippet variable by accident as the resolved snippet
 		// is — an unescaped `we$rd` inserts `we` followed by whatever the
 		// Editor holds in `$rd`, which is the wrong name silently.
@@ -631,7 +631,7 @@ describe("LSP", () => {
 
 			expect(item.insertText).toBe("we\\$rd($0)")
 			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
-			// NOTE: The label the Editor matches and sorts on is not snippet
+			// The label the Editor matches and sorts on is not snippet
 			// text, so it keeps the name as written.
 			expect(item.label).toBe("we$rd")
 			expect(item.filterText).toBe("we$rd")
@@ -647,7 +647,7 @@ describe("LSP", () => {
 			expect(item.sortText).toBe("1subject")
 		})
 
-		// NOTE: The inserted call never types `(` or `,`, so the Editor is
+		// The inserted call never types `(` or `,`, so the Editor is
 		// asked to open the parameter hints itself — for the resolved snippet
 		// and the bare-parentheses fallback alike, and for nothing that is
 		// referred to rather than called.
@@ -746,7 +746,7 @@ describe("LSP", () => {
 			return { code, range, message: "", source: "essence" }
 		}
 
-		// NOTE: Spelled out rather than found, for the shapes no fix produces
+		// Spelled out rather than found, for the shapes no fix produces
 		// yet — an entry reaching a second file, and one carrying a command.
 		const span = {
 			start: { line: 2, column: 2 },
@@ -785,7 +785,7 @@ describe("LSP", () => {
 			])
 		})
 
-		// NOTE: Attribution only — the edits were computed on the buffer as it
+		// Attribution only — the edits were computed on the buffer as it
 		// is now, while the Diagnostics the client echoes back belong to a
 		// buffer that is up to a debounce older.
 		it("should attach only the client Diagnostic the fix answers", () => {
@@ -834,7 +834,7 @@ describe("LSP", () => {
 			expect(item.diagnostics).toBeUndefined()
 		})
 
-		// NOTE: Every fix edits the document it was offered on, and a
+		// Every fix edits the document it was offered on, and a
 		// refactoring that moves something does not — which the protocol says
 		// as a second key of the one map.
 		it("should group the edits of an action by the file each belongs to", () => {
@@ -858,7 +858,7 @@ describe("LSP", () => {
 			])
 		})
 
-		// NOTE: A path that spells the open document IS the open document. Two
+		// A path that spells the open document IS the open document. Two
 		// keys to the one file would have the Editor apply half the action to a
 		// buffer it is holding and half to the file under it.
 		it("should keep an edit naming the open file under the URI it came in under", () => {
@@ -880,7 +880,7 @@ describe("LSP", () => {
 			expect(item.edit?.changes?.[uri]).toHaveLength(2)
 		})
 
-		// NOTE: A text edit can not create the file it edits, so the one action
+		// A text edit can not create the file it edits, so the one action
 		// that writes a Module hands its edits over as `documentChanges` with
 		// the creation in front of them — the shape the protocol says a
 		// resource operation in, and the only one an Editor will apply.
@@ -954,7 +954,7 @@ describe("LSP", () => {
 			expect(isRequestedKind("quickfix", [])).toBe(true)
 		})
 
-		// NOTE: The Refactor menu is the request that asks for `refactor`, and
+		// The Refactor menu is the request that asks for `refactor`, and
 		// a fix listed in it is a fix the reader went looking for a rewrite in.
 		it("should keep the refactors and drop the fixes for a refactor request", () => {
 			expect(isRequestedKind("refactor.rewrite", ["refactor"])).toBe(true)
@@ -968,7 +968,7 @@ describe("LSP", () => {
 			)
 		})
 
-		// NOTE: A kind matches itself and everything under it, and nothing
+		// A kind matches itself and everything under it, and nothing
 		// above it — an Editor asking for one branch of the menu must not be
 		// handed the whole of `refactor`.
 		it("should read a requested kind as itself and what it holds", () => {
@@ -1051,7 +1051,7 @@ describe("LSP", () => {
 		})
 	})
 
-	// NOTE: The transport is not something this Server chooses — createConnection
+	// The transport is not something this Server chooses — createConnection
 	// reads it off process.argv and throws when it finds none, so the invocation
 	// that breaks is the one nobody automated: a person running the Server by
 	// hand, and `essence lsp`, which forwards whatever the Editor passed and so
@@ -1119,7 +1119,7 @@ describe("LSP", () => {
 	})
 })
 
-// NOTE: Read off the request as it arrives rather than only out of the pure
+// Read off the request as it arrives rather than only out of the pure
 // filter beside it: `context.only` is what an Editor sends, and a handler that
 // never looks at it passes every spec it has while the Refactor menu lists the
 // Quick Fixes.
@@ -1173,7 +1173,7 @@ describe("Code Actions asked for one kind", () => {
 				CodeActionKind.Refactor,
 			])
 
-			// NOTE: Every kind the menu lists is one of the refactorings and
+			// Every kind the menu lists is one of the refactorings and
 			// none of them is a fix — which is the whole of what `only` asks
 			// for. Spelled as a prefix rather than as one kind, because the
 			// Server offers more than one of them: a Type annotation written
@@ -1197,7 +1197,7 @@ describe("Code Actions asked for one kind", () => {
 	})
 })
 
-// NOTE: What a client can APPLY is not what the Server can compute, and the
+// What a client can APPLY is not what the Server can compute, and the
 // protocol says both shapes of a Workspace Edit are the client's to allow: an
 // editor that never advertised `documentChanges` silently applies nothing when
 // it is sent one, and one whose `resourceOperations` omit `create` can not be
@@ -1261,7 +1261,7 @@ describe("Code Actions for a client that can apply less", () => {
 		let full = await inSession(undefined)
 		let plain = await inSession({ workspaceFolders: true })
 
-		// NOTE: The move to a NEW Module is the one action in this Server that
+		// The move to a NEW Module is the one action in this Server that
 		// writes a file that is not there yet.
 		expect(full.map((action) => action.title)).toContain(
 			"Move 'answer' to a new Module",
@@ -1270,7 +1270,7 @@ describe("Code Actions for a client that can apply less", () => {
 			"Move 'answer' to a new Module",
 		)
 
-		// NOTE: And everything that is left reaches such a client in the shape
+		// And everything that is left reaches such a client in the shape
 		// it does take — a map of files, and no resource operation beside it.
 		expect(plain.length).toBeGreaterThan(0)
 		expect(
@@ -1283,7 +1283,7 @@ describe("Code Actions for a client that can apply less", () => {
 		).toBe(true)
 	})
 
-	// NOTE: `documentChanges` without `create` is the other half: the shape is
+	// `documentChanges` without `create` is the other half: the shape is
 	// allowed, the operation is not.
 	it("withholds the creation from a client that only edits documents", async () => {
 		let edits = await inSession({
@@ -1297,7 +1297,7 @@ describe("Code Actions for a client that can apply less", () => {
 	})
 })
 
-// NOTE: A list of protocol TextEdits applied to a buffer. The protocol counts
+// A list of protocol TextEdits applied to a buffer. The protocol counts
 // lines and characters from zero, and the applier reads one-based Cursors.
 function applyLspEdits(text: string, edits: Array<TextEdit>): string {
 	let cursorOf = (position: { line: number; character: number }) => ({
@@ -1317,7 +1317,7 @@ function applyLspEdits(text: string, edits: Array<TextEdit>): string {
 	)
 }
 
-// NOTE: `essence.json` reaches this Server because the extension's document
+// `essence.json` reaches this Server because the extension's document
 // selector names it, and every request over it is refused — a project file is
 // not a source. Code Actions are the one exception: a Diagnostic that names its
 // own answer and will not apply it is a squiggle that reads as the editor being
@@ -1425,7 +1425,7 @@ describe("Code Actions on the project file", () => {
 		}
 	})
 
-	// NOTE: Nothing else about a project file changed — the Server still has no
+	// Nothing else about a project file changed — the Server still has no
 	// Program to answer a Hover, a Completion or a rename over one.
 	it("should still refuse every other request over a project file", async () => {
 		let project = ["{", '\t"excludes": ["build"]', "}", ""].join("\n")
@@ -1452,7 +1452,7 @@ describe("Code Actions on the project file", () => {
 	})
 })
 
-// NOTE: The two Keywords over the wire, on a document an editor opened: what the
+// The two Keywords over the wire, on a document an editor opened: what the
 // Server publishes about it, what it says about the words themselves, and what
 // the lightbulb offers where the Compiler has something to say. Every layer
 // between the walks and the client is what this exercises — the analysis, the
@@ -1486,7 +1486,7 @@ describe("A document that starts and completes work", () => {
 
 			expect(session.diagnosticsFor(files.pathOf("Async.es"))).toEqual([])
 
-			// NOTE: The Hover positions are zero based over the wire — the
+			// The Hover positions are zero based over the wire — the
 			// `complete` of line 6 and the `start` of line 7.
 			let hoverAt = async (line: number, character: number) => {
 				let { result } = await session.request<{
@@ -1502,7 +1502,7 @@ describe("A document that starts and completes work", () => {
 			expect(await hoverAt(5, 19)).toContain("Integer")
 			expect(await hoverAt(6, 20)).toContain("Started<Integer>")
 
-			// NOTE: The same document with the future dropped on the floor,
+			// The same document with the future dropped on the floor,
 			// which is the Error the two words answer.
 			let dropped = source
 				.replace(
@@ -1544,7 +1544,7 @@ describe("A document that starts and completes work", () => {
 	})
 })
 
-// NOTE: A specifier is a path written in the source, so a file that moves takes
+// A specifier is a path written in the source, so a file that moves takes
 // every entry naming it out of step — and takes its own entries out of step too,
 // since they were written from where it used to be. Both are answered before the
 // move happens, in one edit with it.
@@ -1645,7 +1645,7 @@ describe("A file about to be renamed", () => {
 		}
 	})
 
-	// NOTE: A directory is ONE request about the directory rather than one per
+	// A directory is ONE request about the directory rather than one per
 	// file under it, and the client sends it because the Server asked about
 	// folders as well. A folder holding no Essence answers with nothing.
 	it("should answer for every source under a directory that moves", async () => {
@@ -1711,7 +1711,7 @@ describe("A file about to be renamed", () => {
 		}
 	})
 
-	// NOTE: A source renamed OUT of the language is not a move to rewrite to.
+	// A source renamed OUT of the language is not a move to rewrite to.
 	// `"./Shared.txt"` is a specifier the Compiler refuses outright, so writing
 	// it into every dependent would be the Server volunteering text that can
 	// not compile and putting it in the reader's undo stack. The import was
@@ -1755,7 +1755,7 @@ describe("A file about to be renamed", () => {
 	})
 })
 
-// NOTE: The Server picks the rule a new name has to satisfy from the symbol the
+// The Server picks the rule a new name has to satisfy from the symbol the
 // workspace joined, so a Parameter whose name doubles as its label has to reach
 // it still marked as one.
 describe("A rename asked of the Server", () => {
@@ -1776,7 +1776,7 @@ describe("A rename asked of the Server", () => {
 		"",
 	].join("\n")
 
-	// NOTE: The lines a rename rewrote, or the error it was refused with.
+	// The lines a rename rewrote, or the error it was refused with.
 	async function renameEach(
 		requests: Array<{ at: string; newName: string }>,
 	): Promise<Array<{ lines: Array<number> } | { refused: object }>> {
@@ -1871,7 +1871,7 @@ describe("A rename asked of the Server", () => {
 		).toEqual([{ lines: [1, 3, 4] }, { lines: [9, 10] }])
 	})
 
-	// NOTE: The conformer is inside the workspace and its requirement is not,
+	// The conformer is inside the workspace and its requirement is not,
 	// so renaming the one would rename the other in a file nothing indexed.
 	it("should refuse a Method whose requirement is declared outside the workspace", async () => {
 		let bag = [
@@ -1943,7 +1943,7 @@ describe("A rename asked of the Server", () => {
 		}
 	})
 
-	// NOTE: `Boxes` reaches `toString` through a Protocol another Module
+	// `Boxes` reaches `toString` through a Protocol another Module
 	// declares, and `describe` is that Protocol's own. `Equatable` does not
 	// declare `toString`.
 	it("should refuse a Method that answers a standard library Protocol's member", async () => {
@@ -2045,7 +2045,7 @@ describe("A rename asked of the Server", () => {
 	})
 })
 
-// NOTE: A standard library source is an ordinary `.es` file that two rules do
+// A standard library source is an ordinary `.es` file that two rules do
 // not apply to — it may open with `declarations { … }`, and its declarations
 // are already in the builtin tables because the loader read this very file to
 // put them there. Both are keyed off WHERE the document lives, so the Language
@@ -2073,7 +2073,7 @@ describe("LSP in a standard library source", () => {
 		"}",
 	].join("\n")
 
-	// NOTE: THE standard library — the one this compiler loads — not any
+	// THE standard library — the one this compiler loads — not any
 	// directory that happens to be spelled `src/stdlib`. Essence is a language;
 	// a user's own project may well have one of those.
 	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
@@ -2086,7 +2086,7 @@ describe("LSP in a standard library source", () => {
 		expect(analyse(source, `file://${stdlibPath}`)).toEqual([])
 	})
 
-	// NOTE: The same file under the spelling the Editor happens to have opened
+	// The same file under the spelling the Editor happens to have opened
 	// the checkout with. A developer working through a symlink
 	// (`~/dev/essence` → the real directory) hands the Language Server a path
 	// that names this very file — compared lexically it matched nothing, and
@@ -2097,7 +2097,7 @@ describe("LSP in a standard library source", () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-symlink-"))
 		let checkout = path.join(directory, "essence")
 
-		// NOTE: The link and the path through it are derived from
+		// The link and the path through it are derived from
 		// `STDLIB_DIRECTORY` rather than spelled out, so this stays a test
 		// about symlink resolution instead of a second, silent assertion about
 		// where the sources happen to sit. Written out, the two halves have to
@@ -2115,7 +2115,7 @@ describe("LSP in a standard library source", () => {
 			expect(isStdlibDocument(linkedPath)).toBe(true)
 			expect(analyse(source, linkedPath)).toEqual([])
 		} finally {
-			// NOTE: The link is unlinked FIRST and on its own. A recursive
+			// The link is unlinked FIRST and on its own. A recursive
 			// delete over a directory holding a link to the checkout is a
 			// sentence nobody should have to trust twice.
 			rmSync(checkout, { force: true })
@@ -2123,7 +2123,7 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// NOTE: On a case-insensitive filesystem — macOS' default — `sources`
+	// On a case-insensitive filesystem — macOS' default — `sources`
 	// and `SOURCES` are one directory and an Editor may hand over either
 	// spelling; on a case-sensitive one they are two, and the variant is
 	// genuinely not the standard library. Which of the two it is, is the
@@ -2139,7 +2139,7 @@ describe("LSP in a standard library source", () => {
 		expect(isStdlibDocument(variantPath)).toBe(existsSync(variantPath))
 	})
 
-	// NOTE: A standard library source that has never been saved is still a
+	// A standard library source that has never been saved is still a
 	// standard library source — the Editor opens
 	// `packages/standard-library/sources/Ordering.es` as a new file and the
 	// `declarations` header has to be allowed while it is typed.
@@ -2150,7 +2150,7 @@ describe("LSP in a standard library source", () => {
 		).toBe(true)
 	})
 
-	// NOTE: The other half of resolving paths for real: a user's own
+	// The other half of resolving paths for real: a user's own
 	// `src/stdlib/Boolean.es` exists on disk and canonicalises perfectly well,
 	// and is still not THIS compiler's standard library. Matching by shape
 	// would tell them in their Editor that a `declarations { … }` block is
@@ -2172,7 +2172,7 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// NOTE: The permission is the standard library's alone. Lifting it for
+	// The permission is the standard library's alone. Lifting it for
 	// every document would retire `declarations-outside-stdlib` by accident —
 	// and a user's own `src/stdlib/Boolean.es` is a plausible thing to write,
 	// so the Editor must not tell them a `declarations` block is fine there
@@ -2192,7 +2192,7 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// NOTE: The self-collision. The loader put this file's `Boolean` into the
+	// The self-collision. The loader put this file's `Boolean` into the
 	// builtin Scope; enriched against the untouched tables the document
 	// redeclares itself, and every Namespace it declares reports twice over.
 	it("should not report a Namespace as a redeclaration of itself", () => {
@@ -2231,7 +2231,7 @@ describe("LSP in a standard library source", () => {
 		).toContain("Integer")
 	})
 
-	// NOTE: A rename inside a standard library source is silently destructive
+	// A rename inside a standard library source is silently destructive
 	// — the edit reaches this document only, while the name is the binding a
 	// runtime export answers to and a `is …` clause may depend on. Renaming
 	// `isPrime` to `prime` passes `essence check` and leaves a caller calling
@@ -2241,7 +2241,7 @@ describe("LSP in a standard library source", () => {
 		let { program } = parseDocument(source, stdlibPath)
 		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
 
-		// NOTE: Every kind the document holds — the Namespace name (already
+		// Every kind the document holds — the Namespace name (already
 		// protected, since it resolves to a builtin), a conformance Method, a
 		// plain native Method, and a Parameter.
 		for (let cursor of [
@@ -2261,7 +2261,7 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// NOTE: The guard is keyed off the path and must not touch anything else —
+	// The guard is keyed off the path and must not touch anything else —
 	// renaming in an ordinary document still works.
 	it("should still rename in an ordinary document", () => {
 		let ordinary = [
@@ -2285,7 +2285,7 @@ describe("LSP in a standard library source", () => {
 		expect(occurrence?.declaration.occurrences).toHaveLength(2)
 	})
 
-	// NOTE: A standard library document declares the very Namespaces the
+	// A standard library document declares the very Namespaces the
 	// builtin table holds, so both would match a receiver and every signature
 	// would be listed twice. Completion dedupes by Method name and hides it;
 	// Signature Help does not, and an Overload set would double entry for
@@ -2298,7 +2298,7 @@ describe("LSP in a standard library source", () => {
 		).toEqual(["Boolean"])
 	})
 
-	// NOTE: A body-less native signature has NO typed Node — the Enricher
+	// A body-less native signature has NO typed Node — the Enricher
 	// drops it, since there is no body to emit — so Hover, which reads the
 	// typed tree, answered every question inside one of these files with the
 	// enclosing Namespace. The standard library is nothing but these
@@ -2316,14 +2316,14 @@ describe("LSP in a standard library source", () => {
 
 		expect(hoverAt(8, 4)?.content).toBe("is(_ Boolean) -> Boolean")
 		expect(hoverAt(8, 4)?.documentation).toBe("Whether the two are equal.")
-		// NOTE: The Parameter's own name, and the annotations either side of it.
+		// The Parameter's own name, and the annotations either side of it.
 		expect(hoverAt(8, 9)?.content).toBe("other: Boolean")
 		expect(hoverAt(8, 16)?.content).toBe("Boolean")
 		expect(hoverAt(8, 28)?.content).toBe("Boolean")
 		expect(hoverAt(14, 4)?.content).toBe("toString() -> String")
 	})
 
-	// NOTE: What the pass above could never answer — it pairs a parsed
+	// What the pass above could never answer — it pairs a parsed
 	// annotation with the Type it resolved to as a WHOLE, so the cursor inside
 	// one got the whole thing back. The annotation index records each nested
 	// Type against its own span, so `Boolean` within `List<Boolean>` is its own
@@ -2353,7 +2353,7 @@ describe("LSP in a standard library source", () => {
 		expect(hoverAt(4, 21)?.content).toBe("Boolean")
 	})
 
-	// NOTE: Every real standard library source, analysed the way the editor
+	// Every real standard library source, analysed the way the editor
 	// analyses it, is clean. The loader already throws on a Diagnostic; this
 	// says the Language Server agrees with it, which it did not before — and
 	// since the standard library is where the language is now written, an
@@ -2376,7 +2376,7 @@ describe("LSP in a standard library source", () => {
 	})
 })
 
-// NOTE: The Workspace holds nothing for a standard library source, so a request
+// The Workspace holds nothing for a standard library source, so a request
 // over one enriches the document itself. A Compiler throw there degrades the
 // answer, and the throw has to reach the Server's log.
 describe("A Compiler throw while a request enriches a document", () => {
@@ -2401,7 +2401,7 @@ describe("A Compiler throw while a request enriches a document", () => {
 		return errors
 	}
 
-	// NOTE: Every enrichment through the Server's compilation seam throws while
+	// Every enrichment through the Server's compilation seam throws while
 	// `run` is in flight and only then, so opening and settling the document
 	// are untouched.
 	async function withEnrichmentThrowing<Result>(
@@ -2423,7 +2423,7 @@ describe("A Compiler throw while a request enriches a document", () => {
 		}
 	}
 
-	// NOTE: Only the enrichment of the document's own text throws. The probes
+	// Only the enrichment of the document's own text throws. The probes
 	// written from it enrich as usual, so a request that reads both still
 	// types what it probes.
 	async function withDocumentEnrichmentThrowing<Result>(
@@ -2526,7 +2526,7 @@ describe("A Compiler throw while a request enriches a document", () => {
 		}
 	})
 
-	// NOTE: Every probe throws as well, so nothing types `person` and the list
+	// Every probe throws as well, so nothing types `person` and the list
 	// is empty. The request answers all the same.
 	it("should log the throw and still answer a member completion", async () => {
 		let text = [
@@ -2566,7 +2566,7 @@ describe("A Compiler throw while a request enriches a document", () => {
 		}
 	})
 
-	// NOTE: The call's Arguments match no Overload yet, so Signature Help lists
+	// The call's Arguments match no Overload yet, so Signature Help lists
 	// what every Namespace for the receiver offers, which reads the document's
 	// own Namespaces and Protocols.
 	it("should log the throw once and still answer a Signature Help", async () => {

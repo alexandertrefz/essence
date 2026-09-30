@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `0.75` is a second SPELLING of `3/4` and nothing more — the Parser
+// `0.75` is a second SPELLING of `3/4` and nothing more — the Parser
 // joins the two digit runs into a fraction over a power of ten, and every
 // stage behind it sees the Rational it has always seen. So what is worth
 // testing is not the Node, which `parserDiagnostics.spec.ts` pins, but that
@@ -19,7 +19,7 @@ import { validate } from "../validator/index"
 // exact, reduced on read, printed as a fraction, and folded by the Optimiser
 // the way a written fraction is.
 //
-// NOTE: The harness is `rationals.spec.ts`'s, for the reason that spec gives —
+// The harness is `rationals.spec.ts`'s, for the reason that spec gives —
 // the damage a broken Rational does is visible from Essence, so these run
 // Essence rather than reading the tree.
 
@@ -61,7 +61,7 @@ async function run(source: string): Promise<Array<string>> {
 }
 
 describe("Decimal Literals", () => {
-	// NOTE: The whole reason a decimal can be a Rational Literal at all. A
+	// The whole reason a decimal can be a Rational Literal at all. A
 	// Program that adds two tenths in binary floating point answers something
 	// that is not three tenths; this one answers three tenths, because the
 	// Literal never became a float.
@@ -82,7 +82,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"true"', '"3/4"'])
 	})
 
-	// NOTE: No scale is kept anywhere — a Rational has no memory of how it was
+	// No scale is kept anywhere — a Rational has no memory of how it was
 	// written, so `1.50` and `1.5` are one value rather than two that compare
 	// equal.
 	it("keeps no scale, so a trailing zero changes nothing", async () => {
@@ -94,7 +94,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"true"', '"3/2"'])
 	})
 
-	// NOTE: Printing is untouched by any of this. `inspect` shows a Rational
+	// Printing is untouched by any of this. `inspect` shows a Rational
 	// as the fraction it is, whichever way the Literal was written, and the
 	// decimal form is asked for by name.
 	it("prints as a fraction and as a decimal on request", async () => {
@@ -106,7 +106,7 @@ describe("Decimal Literals", () => {
 		).toEqual(["1999/100", '"19.99"'])
 	})
 
-	// NOTE: `2.0` is a Rational the way `4/2` is one, and a whole Rational
+	// `2.0` is a Rational the way `4/2` is one, and a whole Rational
 	// prints its numerator alone — so the spelling that looks like a float
 	// still prints `2`.
 	it("prints a whole decimal bare", async () => {
@@ -118,7 +118,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"2"', '"2"'])
 	})
 
-	// NOTE: A written decimal above zero proves its sign for itself, so the
+	// A written decimal above zero proves its sign for itself, so the
 	// root reaches `PositiveRational`'s total entry and there is no Optional
 	// to take apart. A computed receiver goes to `Rational`'s own entry, which
 	// still answers one.
@@ -135,7 +135,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"3/2"', '"3/2"', '"1/2"'])
 	})
 
-	// NOTE: A whole mixed sum answers an Integer rather than a Rational over
+	// A whole mixed sum answers an Integer rather than a Rational over
 	// one, which is the rule the fraction spelling already follows — the
 	// decimal spelling reaches the same fold.
 	it("sums a mixed List down to an Integer", async () => {
@@ -160,7 +160,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"a half"'])
 	})
 
-	// NOTE: The Optimiser folds a decimal because it folds a Rational, and it
+	// The Optimiser folds a decimal because it folds a Rational, and it
 	// never learned about decimals at all — the numerator and denominator it
 	// reads are plain digit strings, which is what the Parser normalises them
 	// through `BigInt` to guarantee.

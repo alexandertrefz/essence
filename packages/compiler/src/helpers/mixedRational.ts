@@ -1,4 +1,4 @@
-// NOTE: `1.5/2` — a Rational written as a fraction and a decimal at once, and
+// `1.5/2` — a Rational written as a fraction and a decimal at once, and
 // the value the two spellings say between them, written back each way.
 //
 // This lives in the Compiler rather than beside the Quick Fix it was first
@@ -14,7 +14,7 @@ const fractionOverDecimalPattern =
 
 type Rational = { numerator: bigint; denominator: bigint }
 
-// NOTE: Both spellings of the written value, the fraction first. A value with no
+// Both spellings of the written value, the fraction first. A value with no
 // terminating decimal — `1.5/7` — is one spelling alone: there is no decimal
 // that says it, and a rounded one would answer with a different number.
 //
@@ -37,7 +37,7 @@ export function mixedRationalSpellings(written: string): Array<string> {
 	]
 }
 
-// NOTE: The two mixed spellings read as one value. `A.B/C` is `AB` over
+// The two mixed spellings read as one value. `A.B/C` is `AB` over
 // `10^len(B) · C`, and `A/B.C` is `A · 10^len(C)` over `BC` — the same
 // arithmetic either way round, with the power of ten on the side the decimal was
 // written on. Reduced to lowest terms, so that what is offered back is the
@@ -81,7 +81,7 @@ function rationalOf(
 	}
 }
 
-// NOTE: Euclid's, over a magnitude that may be zero and a denominator that is
+// Euclid's, over a magnitude that may be zero and a denominator that is
 // not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
 function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	while (denominator !== 0n) {
@@ -91,7 +91,7 @@ function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	return magnitude
 }
 
-// NOTE: A decimal is a fraction over a power of ten, so a value has one exactly
+// A decimal is a fraction over a power of ten, so a value has one exactly
 // where its reduced denominator divides one — which is to say where it is built
 // of twos and fives and nothing else. Null for every other value, since a
 // rounded decimal would be a different number than the one that was written.

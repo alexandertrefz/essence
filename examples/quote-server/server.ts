@@ -4,7 +4,7 @@ import {
 	EssenceMarshalError,
 } from "@essence-lang/client/errors"
 
-// NOTE: An ordinary import. The Bun plugin registered in `essence.ts` (see
+// An ordinary import. The Bun plugin registered in `essence.ts` (see
 // `bunfig.toml`) compiles the Module graph behind it and serves it as
 // marshalled JavaScript: `quote` is a Function taking a plain object and
 // answering one, `catalog` is an Array of them, and `Pricing.d.es.ts` beside
@@ -12,7 +12,7 @@ import {
 // edit to any `.es` file in the graph reloads this module with the new rules.
 import { catalog, type Order, quote } from "./rules/Pricing.es"
 
-// NOTE: JavaScript's JSON has no spelling for a bigint, and every Integer
+// JavaScript's JSON has no spelling for a bigint, and every Integer
 // crosses the boundary as one — the Type never depends on how big a value
 // happens to be. Every amount here is cents, well inside what a double holds
 // exactly, so a Number is a faithful spelling on the way out. A host that
@@ -46,14 +46,14 @@ const server = Bun.serve({
 				}
 
 				try {
-					// NOTE: The boundary is the validation. `quote` declares what an
+					// The boundary is the validation. `quote` declares what an
 					// Order is — the keys, their Types, that `zone` is one of three
 					// names, that `coupon` may be missing — and a body that does not
 					// fit is refused BEFORE any rule runs, with the path to the
 					// member that did not fit. Nothing here checks a field by hand.
 					let answer = quote(body as Input<Order>)
 
-					// NOTE: A Choice comes back tagged. `Rejected` is a well-formed
+					// A Choice comes back tagged. `Rejected` is a well-formed
 					// order the shop can not price — a different status from a body
 					// the boundary refused.
 					if (answer.$case === "Quote#Rejected") {

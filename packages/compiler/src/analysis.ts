@@ -13,7 +13,7 @@ import { enrichDocument, parseDocument } from "./documents"
 import type { LinkedModule } from "./modules/index"
 import { validate } from "./validator/index"
 
-// NOTE: What every stage of the Compiler has to say about one source, in one
+// What every stage of the Compiler has to say about one source, in one
 // list, in the order the lines are written.
 //
 // ONE description of that, because there are two programs that show it — `esc`
@@ -37,14 +37,14 @@ export type Analysis = {
 }
 
 export type AnalysisOptions = CompileMode & {
-	// NOTE: Only the Language Server sets this, for Hovers over a written Type.
+	// Only the Language Server sets this, for Hovers over a written Type.
 	annotations?: boolean
-	// NOTE: The document's own text. Only a test analysis reads it, and only to
+	// The document's own text. Only a test analysis reads it, and only to
 	// compile the `@example` blocks of a `§§` block — see `enrichDocument`.
 	source?: string
 }
 
-// NOTE: One source, from text to verdict — the way in for a caller holding a
+// One source, from text to verdict — the way in for a caller holding a
 // file and nothing else. A Program that writes a Module section is NOT analysed
 // through this: what a name it imports resolves to is a question about the
 // graph, and `analyseLinkedModules` is where that is answered.
@@ -65,7 +65,7 @@ export function analyseSource(
 	)
 }
 
-// NOTE: The same verdict for a caller that ran the two stages itself. The
+// The same verdict for a caller that ran the two stages itself. The
 // Language Server enriches through a counted door of its own — "how many times
 // did answering this request compile something" is what tells a cache that
 // works from one that merely exists — so what is shared is the JUDGEMENT rather
@@ -92,7 +92,7 @@ export function analyseEnriched(
 	}
 }
 
-// NOTE: Every Module of a linked graph, judged: its own Diagnostics, then the
+// Every Module of a linked graph, judged: its own Diagnostics, then the
 // Validator's, then what its dependencies came to. The Diagnostics of a Module
 // depend on that Module and on what IT reaches — never on the entry the graph
 // was loaded from — which is what lets a caller keep the answer for every
@@ -102,7 +102,7 @@ export function analyseEnriched(
 // every Module has been judged, and a cycle means a Module may depend on one
 // that comes after it.
 //
-// NOTE: Null when the work was abandoned. A cancelled analysis produces NOTHING
+// Null when the work was abandoned. A cancelled analysis produces NOTHING
 // — half a pass is a Module judged against dependencies that were never judged,
 // and a Diagnostic list is not a thing that can be half right.
 export function analyseLinkedModules(
@@ -163,7 +163,7 @@ export function analyseLinkedModules(
 	return analyses
 }
 
-// NOTE: Whether an importer's dependency did not compile: it has errors of its
+// Whether an importer's dependency did not compile: it has errors of its
 // own, or it reaches a Module that has. Paths back through the importer do not
 // count, so no Module is told about its own failure coming round a cycle.
 function failureReach(
@@ -184,7 +184,7 @@ function failureReach(
 		}
 	}
 
-	// NOTE: Every Module with some path to a failed one, so that no walk from a
+	// Every Module with some path to a failed one, so that no walk from a
 	// dependency enters a part of the graph that compiled.
 	let reaching = new Set(failed)
 	let pending = [...failed]
@@ -221,14 +221,14 @@ function failureReach(
 	}
 }
 
-// NOTE: The Validator, run over a Program that may be nothing like whole — and
+// The Validator, run over a Program that may be nothing like whole — and
 // told so. `reported` takes the Compiler's own invariant rails out of the way,
 // because every one of them is about what the emitter will be handed and
 // nothing is emitted from a Program with an Error in it; the Parser's
 // `recovery` takes the checks about a construct being complete out of the way
 // of the lines it abandoned. See `ValidateOptions`.
 //
-// NOTE: A throw is caught here rather than left to the caller. The Validator
+// A throw is caught here rather than left to the caller. The Validator
 // walks a Program two recovering stages built, and a Compiler bug met there
 // must cost the reader the Validator's half of the report — not the half that
 // already explains what went wrong.
@@ -247,7 +247,7 @@ function validateGuarded(
 	}
 }
 
-// NOTE: Structurally the LSP's own CancellationToken, so a handler can pass the
+// Structurally the LSP's own CancellationToken, so a handler can pass the
 // one it was handed straight down without wrapping it. Read rather than awaited:
 // every stage is synchronous, so the only thing a token can do is stop the NEXT
 // one from starting.
@@ -269,7 +269,7 @@ export function internalError(error: unknown): common.Diagnostic {
 	)
 }
 
-// NOTE: One Diagnostic per broken dependency rather than per entry naming it:
+// One Diagnostic per broken dependency rather than per entry naming it:
 // six names imported from one file is one thing to go and fix, and six
 // underlines saying so is the report burying itself. Reported on the specifier
 // of the FIRST entry that names it, in written order, since that is the one a

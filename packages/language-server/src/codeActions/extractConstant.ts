@@ -19,7 +19,7 @@ import { enclosingStatementOf, findInnermostNodeContaining } from "./lookups"
 import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 
-// NOTE: An Expression lifted out of the Statement it was written in, and left
+// An Expression lifted out of the Statement it was written in, and left
 // behind as the name of a Constant declared above it. The whole of what makes
 // it safe is that the Expression is EVALUATED where it was: everything below
 // turns away a selection that would move an Expression from a place that runs
@@ -60,7 +60,7 @@ export function extractConstantActions(
 
 	let statement = enclosing.statement
 
-	// NOTE: The Expression has to be one the Statement evaluates on its way
+	// The Expression has to be one the Statement evaluates on its way
 	// through — see `collectEager`. A `define` arm's value and a Match Handler's
 	// Guard are inside the Statement and are read only when the arm is reached,
 	// so a Constant above the Statement would run what the Program declined to.
@@ -68,7 +68,7 @@ export function extractConstantActions(
 		return []
 	}
 
-	// NOTE: The Constant is written as a whole line, so the Statement it goes
+	// The Constant is written as a whole line, so the Statement it goes
 	// above has to own its line. A `case Integer { <- total() }` written on one
 	// line has no point above the Return that is not in the middle of the arm.
 	if (!opensItsLine(lines, statement.position.start)) {
@@ -106,7 +106,7 @@ export function extractConstantActions(
 			kind: "refactor.extract",
 			diagnosticCode: null,
 			diagnosticPosition: null,
-			// NOTE: Never preferred. Nothing was wrong with what the reader
+			// Never preferred. Nothing was wrong with what the reader
 			// wrote — this is one of two spellings of it, and the Editor must
 			// not pick between them on its own.
 			isPreferred: false,
@@ -119,7 +119,7 @@ export function extractConstantActions(
 	]
 }
 
-// NOTE: What is worth naming, listed rather than subtracted — everything not
+// What is worth naming, listed rather than subtracted — everything not
 // named here is turned away. A bare Identifier already has a name and a scalar
 // Literal already reads as its own value, so a Constant over either says
 // nothing the line did not say. The three that are absent for a harder reason
@@ -141,7 +141,7 @@ function isExtractable(
 		case "DictionaryValue":
 		case "InterpolatedStringValue":
 			return true
-		// NOTE: Both are ordinary values — a `Started` and whatever was waited for
+		// Both are ordinary values — a `Started` and whatever was waited for
 		// — and both read better under a name where a line holds the Keyword and a
 		// chain besides. The Constant lands in the same body, so a `complete`
 		// lifted out of one is a `complete` in the body it already suspended.
@@ -155,7 +155,7 @@ function isExtractable(
 	}
 }
 
-// NOTE: The Expressions a Statement reads every time it is reached, which is
+// The Expressions a Statement reads every time it is reached, which is
 // the whole set a Constant above it may hold. The walk stops at everything that
 // opens a body of its own — a Function literal, a Match Handler — because a
 // selection inside one of those has a body of its OWN to be lifted into and
@@ -177,7 +177,7 @@ function collectInto(
 	found: Set<parser.ImplementationNode>,
 ) {
 	switch (node.nodeType) {
-		// NOTE: The Statements, which are not themselves candidates — what a
+		// The Statements, which are not themselves candidates — what a
 		// Constant can hold is an Expression. A body one of them opens is
 		// deliberately not walked, for the reason above.
 		case "ConstantDeclarationStatement":
@@ -194,7 +194,7 @@ function collectInto(
 		case "IfElseStatement":
 			collectInto(node.condition, found)
 			return
-		// NOTE: A declaration evaluates nothing where it stands: a Function
+		// A declaration evaluates nothing where it stands: a Function
 		// Statement's body runs when it is called, a Namespace's static
 		// Property when the Namespace is first reached, and a Type says nothing
 		// at run time at all.
@@ -271,7 +271,7 @@ function collectInto(
 			}
 
 			return
-		// NOTE: The scrutinee is read on the way in; every Handler is a body of
+		// The scrutinee is read on the way in; every Handler is a body of
 		// its own, and a Guard is read only for the values its Matcher caught.
 		case "Match":
 			collectInto(node.value, found)
@@ -290,7 +290,7 @@ function collectArguments(
 	}
 }
 
-// NOTE: Whether every name the Expression reads is already in scope where the
+// Whether every name the Expression reads is already in scope where the
 // Constant will stand. Constants and Variables are not hoisted, so a name
 // declared between the insertion point and the Expression is a name the
 // Constant can not see.
@@ -330,7 +330,7 @@ function readsResolveAbove(
 	return true
 }
 
-// NOTE: What the Expression is ABOUT, read off its own head — the Method a call
+// What the Expression is ABOUT, read off its own head — the Method a call
 // invokes, the member a lookup reads, the Function a call names. It is a
 // placeholder either way: the action ends by opening rename on it, and a
 // derived name is what makes that a decision the reader confirms rather than
@@ -348,7 +348,7 @@ function headName(node: parser.ExpressionNode): string {
 			return node.member.content
 		case "FunctionInvocation":
 			return headName(node.name)
-		// NOTE: The name comes from under the Keyword — what `complete
+		// The name comes from under the Keyword — what `complete
 		// headline(url)` is about is the headline, not the waiting.
 		case "Start":
 		case "Complete":
@@ -357,7 +357,7 @@ function headName(node: parser.ExpressionNode): string {
 			return node.content
 		case "MemberPath":
 			return node.steps[node.steps.length - 1]?.content ?? "value"
-		// NOTE: Lowercased, because a Case is written `#Win` and a value is
+		// Lowercased, because a Case is written `#Win` and a value is
 		// not written `Win` — the sigil is what carries the capital.
 		case "CaseValue":
 			return `${node.caseName.content.charAt(0).toLowerCase()}${node.caseName.content.slice(1)}`

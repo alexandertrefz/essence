@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `SignStyle` is a builtin Choice, like `Rounding` and `NumberFormat` —
+// `SignStyle` is a builtin Choice, like `Rounding` and `NumberFormat` —
 // its values carry Case tags (`"SignStyle#Always"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method
@@ -11,7 +11,7 @@ export type NegativeType = { [typeKeySymbol]: "SignStyle#Negative" }
 export type AlwaysType = { [typeKeySymbol]: "SignStyle#Always" }
 export type SignStyleType = NegativeType | AlwaysType
 
-// NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
+// Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
 export const negative: NegativeType = { [typeKeySymbol]: "SignStyle#Negative" }
 export const always: AlwaysType = { [typeKeySymbol]: "SignStyle#Always" }

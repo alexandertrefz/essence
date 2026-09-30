@@ -2,7 +2,7 @@ import type { BooleanType } from "./Boolean"
 import type { StepType } from "./Step"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The `loop` family — the native drivers behind the `loop` Overloads
+// The `loop` family — the native drivers behind the `loop` Overloads
 // declared in `packages/standard-library/sources/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
 // is the order the entries are written there. Only TWO of the nine are native: a
@@ -12,7 +12,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // written in Essence on one of these two (see `Loop.es`), so they have no driver
 // here.
 
-// NOTE: `$1` is the `while` loop — steps while the condition holds, checked
+// `$1` is the `while` loop — steps while the condition holds, checked
 // BEFORE each step, so a condition false on the seed returns it unchanged. It is
 // the predicate primitive the Essence `until` and counted entries build on.
 export function loop__overload$1<State extends AnyType>(
@@ -27,7 +27,7 @@ export function loop__overload$1<State extends AnyType>(
 	return state
 }
 
-// NOTE: `$4` is the general loop — each step answers with a `Step`. `#Done` stops the
+// `$4` is the general loop — each step answers with a `Step`. `#Done` stops the
 // loop and its `value` is the answer; `#Continue` carries the next State and the
 // loop goes again. The tag is read the same way `List.sort` reads an `Ordering`.
 // The three counted entries whose body answers a `Step` are written on this one,

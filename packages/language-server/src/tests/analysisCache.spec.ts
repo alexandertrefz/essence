@@ -26,7 +26,7 @@ import {
 } from "../workspace"
 import { makeSessionWorkspace, startSession } from "./lspSession"
 
-// NOTE: What the cache and the request loop around it guarantee. Half of these
+// What the cache and the request loop around it guarantee. Half of these
 // are cost invariants, and they are written as tests because they are invisible
 // everywhere else: every request in this package answers correctly whether it
 // compiled the document once or five times, so nothing but a counter tells the
@@ -90,7 +90,7 @@ afterEach(() => {
 	directories = []
 })
 
-// NOTE: A three file chain — Top imports Middle imports Base — because that is
+// A three file chain — Top imports Middle imports Base — because that is
 // the shape every invariant here turns on: editing the middle of it has to
 // invalidate what depends on it and nothing else, and analysing any of them has
 // to fill the cache for all of them.
@@ -155,11 +155,11 @@ const chain = {
 	"Top.es": topSource,
 }
 
-// NOTE: A Module nothing imports and that imports nothing — a second root of
+// A Module nothing imports and that imports nothing — a second root of
 // whatever workspace it is put in, and therefore a second link.
 const soloSource = `implementation {\n\tconstant solo = 1\n}\n\nexport {\n\tsolo\n}\n`
 
-// NOTE: Two Modules importing each other, which nothing else imports: the one
+// Two Modules importing each other, which nothing else imports: the one
 // shape a dependency graph can hold that has no root at all, since neither
 // member is a file with no in-edge. `Loop.es` is the broken one deliberately —
 // it is the member that is NOT chosen as the entry, so its Diagnostics only
@@ -207,7 +207,7 @@ const cycle = {
 	"Loop.es": loopSource,
 }
 
-// NOTE: The shape a project of tests has: N files importing one library, none
+// The shape a project of tests has: N files importing one library, none
 // of them importing another, which is N roots and therefore N links — that count
 // is inherent, one graph per file nothing imports, and it is not what the sweep's
 // chunking is about. What it is about is the order: analysing all of them inside
@@ -234,7 +234,7 @@ function heavyFanOut(
 	}
 
 	for (let index of roots) {
-		// NOTE: Two digits, so that the order a name sorts in is the order the
+		// Two digits, so that the order a name sorts in is the order the
 		// number counts in — the Server analyses the roots in path order, and a
 		// test that waits for the last of them has to be able to name it.
 		let name = String(index).padStart(2, "0")
@@ -251,7 +251,7 @@ function heavyFanOut(
 	return files
 }
 
-// NOTE: The same shape with one more Module in it. `Library.es` is BROKEN, and
+// The same shape with one more Module in it. `Library.es` is BROKEN, and
 // the two files importing it are the FIRST root and the LAST — a dependency
 // shared by two roots standing at either end of the queue, which is the case a
 // batch firing mid-sweep can get wrong. Every other root imports an `Other.es`
@@ -290,7 +290,7 @@ function heavyFanOutOverALibrary(
 	return files
 }
 
-// NOTE: Nested String interpolation, which the Lexer reads by recursing once per
+// Nested String interpolation, which the Lexer reads by recursing once per
 // level — deep enough and it runs out of call stack, which is a Compiler throw
 // reachable from a text an Editor can hold. Deliberately far past where it starts
 // failing: how much stack is left depends on how deep the caller already is, and a
@@ -316,7 +316,7 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(after)
 	})
 
-	// NOTE: The invariant the write-through rides on. If a Module analysed
+	// The invariant the write-through rides on. If a Module analysed
 	// inside a bigger graph could differ from the same Module analysed on its
 	// own, filling the cache for a whole component would be filling it with
 	// answers that belong to whoever happened to ask first.
@@ -337,7 +337,7 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// NOTE: What a Module reaches, not what the graph the analysis started from
+	// What a Module reaches, not what the graph the analysis started from
 	// reaches. The Server publishes these under the other files' own URIs and
 	// owns them afterwards — a file this Module never names would be a squiggle
 	// it can not clear.
@@ -368,7 +368,7 @@ describe("the analysis cache", () => {
 		expect(workspace.documentOf(pathOf("Middle.es"))!.enrichedProgram).toBe(
 			first!,
 		)
-		// NOTE: Collecting the annotations runs a SECOND link, because the
+		// Collecting the annotations runs a SECOND link, because the
 		// collector only opens for one Module at a time — and it must not swap
 		// the typed Program the index was built against out from under it.
 		workspace.annotationsOf(pathOf("Middle.es"))
@@ -394,7 +394,7 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(settled + 1)
 	})
 
-	// NOTE: An Editor may report the same version for a document it re-opened,
+	// An Editor may report the same version for a document it re-opened,
 	// which is why the text is compared as well as the version.
 	it("should miss when a re-opened document reports a version it already used", () => {
 		let { workspace, pathOf, open } = workspaceOf(chain)
@@ -428,13 +428,13 @@ describe("the analysis cache", () => {
 
 		expect(workspace.enrichedOf(pathOf("Top.es"))).not.toBe(top!)
 		expect(compilationCounts.links).toBe(relinks + 1)
-		// NOTE: The same link filled Base again, so reading it costs nothing —
+		// The same link filled Base again, so reading it costs nothing —
 		// the component is what an edit invalidates and what one link restores.
 		expect(workspace.enrichedOf(pathOf("Base.es"))).not.toBe(base!)
 		expect(compilationCounts.links).toBe(relinks + 1)
 	})
 
-	// NOTE: The reason the edges are kept rather than rebuilt. This used to read
+	// The reason the edges are kept rather than rebuilt. This used to read
 	// the entries of every known file on every keystroke, which meant a parse
 	// and a `realpath` per specifier per file.
 	it("should not parse the workspace to invalidate a component", () => {
@@ -507,13 +507,13 @@ describe("the analysis cache", () => {
 		expect(
 			workspace.documentOf(pathOf("Top.es"), { cancellation }),
 		).toBeNull()
-		// NOTE: Nothing was written either, so the next uncancelled ask still
+		// Nothing was written either, so the next uncancelled ask still
 		// produces a complete answer rather than reading a half filled entry.
 		expect(workspace.analysisOf(pathOf("Top.es"))).not.toBeNull()
 		expect(workspace.enrichedOf(pathOf("Top.es"))).not.toBeNull()
 	})
 
-	// NOTE: A file that writes neither section is a Program of its own
+	// A file that writes neither section is a Program of its own
 	// everywhere in this Server, even where a graph reaches it as a dependency —
 	// two enrichments of one file with different Choice identities is the bug
 	// this prevents.
@@ -531,7 +531,7 @@ describe("the analysis cache", () => {
 		expect(plain.enrichedProgram).not.toBeNull()
 	})
 
-	// NOTE: And what is held for one survives a keystroke next door. A file
+	// And what is held for one survives a keystroke next door. A file
 	// writing neither section can not name anything another file declares, so
 	// nothing an importer does can move what it means — and an importer is what
 	// it has while its own `export` block is still being written, which is the
@@ -561,14 +561,14 @@ describe("the analysis cache", () => {
 		expect(workspace.enrichedOf(pathOf("Plain.es"))).toBe(plain!)
 		expect(compilationCounts.enrichments).toBe(enriched)
 
-		// NOTE: Its own text moving is the other question, and that still drops
+		// Its own text moving is the other question, and that still drops
 		// everything this holds for it.
 		open("Plain.es", `${plainSource}\n`, 2)
 
 		expect(workspace.isAnalysed(pathOf("Plain.es"))).toBe(false)
 	})
 
-	// NOTE: The asymmetry the edge index used to have. A graph only holds an edge
+	// The asymmetry the edge index used to have. A graph only holds an edge
 	// it could READ, so a specifier naming a file that is not there yet recorded
 	// nothing — and the importer then kept answering `Error` for that name for as
 	// long as the session lasted, however many times the file was created.
@@ -597,7 +597,7 @@ describe("the analysis cache", () => {
 		).toEqual([])
 	})
 
-	// NOTE: The set an edit obliges the Server to publish again, which is the
+	// The set an edit obliges the Server to publish again, which is the
 	// dependents and not the component. A sibling importing the same Module
 	// imports nothing from this one, so nothing it means can have moved — and it
 	// is its own graph root, so including it costs a whole link.
@@ -614,14 +614,14 @@ describe("the analysis cache", () => {
 		expect(workspace.dependentsOf(pathOf("Left.es"))).toEqual([
 			pathOf("Left.es"),
 		])
-		// NOTE: The undirected walk still answers with all three, because a
+		// The undirected walk still answers with all three, because a
 		// rename through the shared name has to reach every file writing it.
 		expect(workspace.componentOf(pathOf("Left.es")).sort()).toEqual(
 			[pathOf("Shared.es"), pathOf("Left.es"), pathOf("Right.es")].sort(),
 		)
 	})
 
-	// NOTE: The unit of analysis. A root is a file no other file imports, which
+	// The unit of analysis. A root is a file no other file imports, which
 	// is where a dependency graph starts — the roots between them reach every
 	// file of the workspace, so analysing those analyses all of it.
 	it("should answer with the files nothing imports as the roots of the workspace", () => {
@@ -635,7 +635,7 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// NOTE: "Closest to root", which is what a cycle nobody imports needs: no
+	// "Closest to root", which is what a cycle nobody imports needs: no
 	// member of it has the empty in-edge set a root has, so the first half of
 	// the rule covers none of it. The member reaching the most others is taken
 	// instead, and its graph covers the rest.
@@ -647,7 +647,7 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// NOTE: What an edit obliges the Server to run, which is never every root. A
+	// What an edit obliges the Server to run, which is never every root. A
 	// root that does not reach the edited file was judged against text that did
 	// not move, so re-linking it would find exactly what it found before — the
 	// invariant that keeps a keystroke in a Module thirty roots share from
@@ -671,7 +671,7 @@ describe("the analysis cache", () => {
 		])
 	})
 
-	// NOTE: How the Server finds what a batch of roots was supposed to judge and
+	// How the Server finds what a batch of roots was supposed to judge and
 	// did not — a root that threw, a graph that could not read one of its
 	// Modules. It answers about the text the file holds NOW, and it answers
 	// without producing anything: a coverage check that analysed to answer would
@@ -694,7 +694,7 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(counted + 1)
 	})
 
-	// NOTE: Which Module of a graph an analysis collects annotations for is
+	// Which Module of a graph an analysis collects annotations for is
 	// decided once and never again: a root's analysis is cached whole, so asking
 	// it a second time for a Module BENEATH it reads the cache rather than
 	// collecting anything. The Hover that follows then pays for a link of its
@@ -718,7 +718,7 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(linked + 1)
 	})
 
-	// NOTE: The Lexer recurs once per nesting level of an interpolated String and
+	// The Lexer recurs once per nesting level of an interpolated String and
 	// runs out of call stack before the Parser's own depth guard can refuse it, so
 	// this text is a Compiler throw that a buffer can actually hold. It has to come
 	// back as a Diagnostic: `fileOf` is called from request handlers, from the edge
@@ -740,7 +740,7 @@ describe("the analysis cache", () => {
 		])
 	})
 
-	// NOTE: The graph parses its Modules through the Compiler's own path, so a
+	// The graph parses its Modules through the Compiler's own path, so a
 	// dependency the Parser can not read throws out of the link rather than out of
 	// `fileOf` — into `analysisOf`'s catch, whose whole point is that the answer is
 	// KEPT. It was not, for the one field a Hover reads: the guard re-enters
@@ -771,7 +771,7 @@ describe("the analysis cache", () => {
 })
 
 describe("the Server's request loop", () => {
-	// NOTE: The contract every other test in this block stands on. `settle` is
+	// The contract every other test in this block stands on. `settle` is
 	// the `essence/idle` request, and what it promises is that the answer comes
 	// BEHIND whatever the loop published on its way to having nothing left —
 	// so a test that has the answer has the Diagnostics — and that a Server
@@ -839,7 +839,7 @@ describe("the Server's request loop", () => {
 
 			await session.settle()
 
-			// NOTE: One link for the component, whichever of the two open
+			// One link for the component, whichever of the two open
 			// documents' timers happened to fire first — the other reads it.
 			expect(session.tallySince(window).links).toBe(1)
 		} finally {
@@ -848,7 +848,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A request that arrives inside the window pays for the graph the
+	// A request that arrives inside the window pays for the graph the
 	// window was going to link anyway — the ROOT above this document, not the
 	// document's own smaller graph. Both would otherwise be linked, since the
 	// Editor asks for Semantic Tokens and a Hover in the same 200 ms in which
@@ -868,7 +868,7 @@ describe("the Server's request loop", () => {
 				middleSource.replace("by 2", "by 4"),
 			)
 
-			// NOTE: Inside the debounce window on purpose: the Hover computes
+			// Inside the debounce window on purpose: the Hover computes
 			// the analysis itself, and the debounced one that follows finds it.
 			let hover = await session.request<Hover | null>(HoverRequest.type, {
 				textDocument: { uri: uriFor(files.pathOf("Middle.es")) },
@@ -886,7 +886,7 @@ describe("the Server's request loop", () => {
 			expect(session.diagnosticsFor(files.pathOf("Middle.es"))).toEqual(
 				[],
 			)
-			// NOTE: The root nobody has open was published all the same, out of
+			// The root nobody has open was published all the same, out of
 			// the graph the Hover paid for.
 			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
 		} finally {
@@ -895,7 +895,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The same window, measured from the request an Editor actually sends
+	// The same window, measured from the request an Editor actually sends
 	// first. Semantic Tokens, Document Symbols and Code Actions all arrive
 	// inside the 200 ms after a keystroke, so this is the ordinary shape of
 	// typing rather than a race — and a file that is not itself a root would
@@ -971,7 +971,7 @@ describe("the Server's request loop", () => {
 				),
 			).toEqual([0, 0, 0, 0])
 
-			// NOTE: Rename is the one request that reads the WORKSPACE rather
+			// Rename is the one request that reads the WORKSPACE rather
 			// than the document: it walks the component to join the symbol
 			// across Modules, which parses the files nobody has open. It
 			// enriches nothing, and the walk is kept, so asking twice costs
@@ -1013,7 +1013,7 @@ describe("the Server's request loop", () => {
 
 			source.cancel()
 
-			// NOTE: `RequestCancelled` — the protocol's own answer for a request
+			// `RequestCancelled` — the protocol's own answer for a request
 			// nobody is waiting for any more.
 			await expect(pending).rejects.toMatchObject({ code: -32800 })
 		} finally {
@@ -1022,7 +1022,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A request is answered on the version it named or not at all. Its
+	// A request is answered on the version it named or not at all. Its
 	// Positions belong to that version, and an answer measured against a later
 	// one points at whatever moved into their place.
 	//
@@ -1055,7 +1055,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A watched file changing schedules the roots reaching it, and a file
+	// A watched file changing schedules the roots reaching it, and a file
 	// that did not exist a moment ago is reached through the edge its importer's
 	// specifier records whether or not it was there. However many files that
 	// comes to, one window and one link is what it must cost.
@@ -1084,7 +1084,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The Completion list used to enrich the document WITHOUT its graph to
+	// The Completion list used to enrich the document WITHOUT its graph to
 	// find the Namespaces it declares, so every signature naming an imported Type
 	// printed `Error`. Reading the cache fixed it, which is why this is pinned
 	// here rather than left as a happy accident.
@@ -1118,7 +1118,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The file binds `Sized` only as `Measurable`, so an outline that
+	// The file binds `Sized` only as `Measurable`, so an outline that
 	// wrote `Sized` would name a Protocol the file can not read.
 	it("should spell a bound in the outline the way the document names its Protocol", async () => {
 		let sized = [
@@ -1181,7 +1181,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: Writing the import first and creating the file second is the ordinary
+	// Writing the import first and creating the file second is the ordinary
 	// order to work in, and it is the case an edge index built from what a graph
 	// could READ can not see — the edge to a file that is not there is the one
 	// nothing records. Both halves are checked, because a stale publish and a
@@ -1225,11 +1225,11 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: One timer restarted by every keystroke is a document that is never
+	// One timer restarted by every keystroke is a document that is never
 	// analysed while another one is being typed in. Nothing here is stale-wrong —
 	// it is simply never published, for as long as the typing goes on.
 	//
-	// NOTE: The burst is twelve keystrokes 60 ms apart, so three quarters of a
+	// The burst is twelve keystrokes 60 ms apart, so three quarters of a
 	// second is spent waiting by design. The written budget is the one
 	// `scripts/testBudget.ts` gives every spec.
 	it("should analyse a document nobody is typing in during a burst elsewhere", async () => {
@@ -1251,7 +1251,7 @@ describe("the Server's request loop", () => {
 				`implementation {\n\tconstant apart: Integer = "two"\n}\n`,
 			)
 
-			// NOTE: A clock, deliberately, and the one place in this file that
+			// A clock, deliberately, and the one place in this file that
 			// keeps one: a burst is keystrokes arriving FASTER than the window
 			// closes, and the fact under test is that the other document's own
 			// deadline is honoured while the window is re-armed under it. Waiting
@@ -1267,7 +1267,7 @@ describe("the Server's request loop", () => {
 				})
 			}
 
-			// NOTE: Read before the burst is given any time to drain, which is
+			// Read before the burst is given any time to drain, which is
 			// what makes this about the schedule rather than about the analysis.
 			expect(session.codesFor(files.pathOf("Apart.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1278,7 +1278,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// NOTE: The version the list was computed against, which is what lets a client
+	// The version the list was computed against, which is what lets a client
 	// throw away a publish that raced a keystroke — the exact window a debounce
 	// widens. Free to send, since the analysis is always of the current buffer.
 	it("should name the buffer version every publish was computed against", async () => {
@@ -1292,7 +1292,7 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// NOTE: An edit that changes the Diagnostics, since one that does not
+			// An edit that changes the Diagnostics, since one that does not
 			// is deliberately never sent.
 			await session.change(
 				files.pathOf("Middle.es"),
@@ -1317,7 +1317,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: Refreshing a file whose meaning moved is why the root above it runs
+	// Refreshing a file whose meaning moved is why the root above it runs
 	// at all; sending one the list it already has is a wire message and a
 	// client-side rebuild for a file the reader is not even in — and a
 	// workspace-wide analysis has one of those per file it holds.
@@ -1338,7 +1338,7 @@ describe("the Server's request loop", () => {
 			await session.change(files.pathOf("Base.es"), `${baseSource}\n`)
 			await session.settle()
 
-			// NOTE: The analysis really ran — this is the send being skipped, not
+			// The analysis really ran — this is the send being skipped, not
 			// the work.
 			expect(session.tallySince(counts).links).toBeGreaterThan(0)
 			expect(session.publishesSince(mark)).toEqual([])
@@ -1359,7 +1359,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A fan-in — one Module several files import — is the ordinary shape of
+	// A fan-in — one Module several files import — is the ordinary shape of
 	// a workspace, and it is the one the undirected component gets wrong: no
 	// sibling's graph contains another's, so every sibling would pay for its own
 	// link on every keystroke in any of them. With all of them open, which is
@@ -1402,7 +1402,7 @@ describe("the Server's request loop", () => {
 
 			expect(session.tallySince(counts).links).toBe(1)
 
-			// NOTE: The other direction still fans out, which is what the roots
+			// The other direction still fans out, which is what the roots
 			// reaching a change are FOR: editing what they all import DOES
 			// change what every one of them means.
 			await session.change(
@@ -1422,7 +1422,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The same invariant with none of the siblings open, which is where
+	// The same invariant with none of the siblings open, which is where
 	// analysing a whole workspace could have lost it: every one of those files
 	// is a root now, and scheduling all the roots rather than the ones REACHING
 	// the keystroke would be a link apiece on every keystroke in any of them.
@@ -1460,7 +1460,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A file writing NEITHER Module section has TWO answers about it — its
+	// A file writing NEITHER Module section has TWO answers about it — its
 	// own, and the one the graph reaching it made and threw away — and only one
 	// of them may be published, or the Problems panel changes twice per keystroke
 	// in the importer. Its own is the one that is kept: it is what every request
@@ -1483,7 +1483,7 @@ describe("the Server's request loop", () => {
 			await session.open(files.pathOf("Importer.es"), importer)
 			await session.settle()
 
-			// NOTE: The graph's answer holds the syntax error and not the
+			// The graph's answer holds the syntax error and not the
 			// mismatch, so a list holding both is the file's own. In file
 			// order, which puts the mismatch above the Statement that broke.
 			expect(session.codesFor(files.pathOf("Plain.es"))).toEqual([
@@ -1517,7 +1517,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And answering for itself must not mean being re-analysed for ever. A
+	// And answering for itself must not mean being re-analysed for ever. A
 	// section-less file is one the graph deliberately holds nothing for, so it
 	// reads as uncovered after every window — while nothing an importer does can
 	// change what it means, since it can not name anything the importer declares.
@@ -1566,7 +1566,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: Closing a file hands it back to disk, and the roots reaching it have
+	// Closing a file hands it back to disk, and the roots reaching it have
 	// to RUN for what the FILE says to reach the Editor — no keystroke is going
 	// to land in a document the reader just closed, so nothing else would ask
 	// them to. Nothing is cleared by a close any more; the test below this one
@@ -1603,7 +1603,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The entry reaches the broken file only through a facade that
+	// The entry reaches the broken file only through a facade that
 	// re-exports from it, and its own Problems still say which import to follow.
 	it("should report on the entry a broken Module it reaches through a re-export", async () => {
 		let measure = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
@@ -1639,7 +1639,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The debounced analysis is a timer callback, and a throw out of one is
+	// The debounced analysis is a timer callback, and a throw out of one is
 	// the process — no request left to answer, no Diagnostic, nothing in the log.
 	// The Parser reaching that state is not hypothetical: see `unparseableSource`.
 	it("should keep answering after opening a document the Parser can not read", async () => {
@@ -1672,7 +1672,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The window goes with the client. A closing Editor hands every buffer
+	// The window goes with the client. A closing Editor hands every buffer
 	// back to disk, and each of those schedules an analysis — one firing after
 	// the connection has gone publishes into nothing, and a throw out of a timer
 	// callback is the process rather than a failed request. Nothing else in this
@@ -1690,7 +1690,7 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// NOTE: An edit that moves the list, sent inside the window and
+			// An edit that moves the list, sent inside the window and
 			// followed by the shutdown request — an analysis that did fire would
 			// publish, and there would be a message here to see. The settle is
 			// what makes the absence a finding rather than a race: a window the
@@ -1709,7 +1709,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The whole feature, in one assertion: a file nobody opened, that
+	// The whole feature, in one assertion: a file nobody opened, that
 	// nothing open imports, is reported on. What the Problems panel used to hold
 	// was the open documents and their dependencies, so a mistake anywhere else
 	// in the project was invisible until somebody happened to open the file.
@@ -1725,7 +1725,7 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("Lonely.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
-			// NOTE: A file with nothing wrong with it is published as an
+			// A file with nothing wrong with it is published as an
 			// explicitly empty list rather than left unmentioned, which is what
 			// tells the Problems panel it has been looked at.
 			expect(session.diagnosticsFor(files.pathOf("Base.es"))).toEqual([])
@@ -1736,7 +1736,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The other half of reporting on a whole project: a project holds
+	// The other half of reporting on a whole project: a project holds
 	// `.es` files that are not its sources — a corpus kept deliberately broken
 	// is the one this repository holds — and a panel that lists those is a panel
 	// nobody reads. `exclude` in the nearest `essence.json` is how a project
@@ -1767,7 +1767,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: Excluded from the WALK, not from the Server. A reader looking
+	// Excluded from the WALK, not from the Server. A reader looking
 	// straight at a file is owed its Diagnostics — what the setting declines is
 	// the panel listing files nobody asked about.
 	it("should report on an excluded file that is open", async () => {
@@ -1793,7 +1793,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The project file is watched, so a reader who has just drawn the
+	// The project file is watched, so a reader who has just drawn the
 	// boundary somewhere else watches the panel answer rather than being told
 	// to restart the editor.
 	it("should report on what the project file stops excluding", async () => {
@@ -1830,7 +1830,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And the other direction, which is the one a reader reaches for: a
+	// And the other direction, which is the one a reader reaches for: a
 	// corpus that was being reported on goes quiet the moment the project says
 	// it is not a source. The discovery walk has to be answered again, and the
 	// squiggles it stops owning have to be cleared rather than left standing on
@@ -1866,7 +1866,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A mistake in the project file is a Warning with a span, published on
+	// A mistake in the project file is a Warning with a span, published on
 	// the project file — the only place a reader would look for it. The setting
 	// falls back to its default and the note says so, which is the point: a
 	// setting that did not read is a setting the author believes is in force.
@@ -1890,7 +1890,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And out of the BUFFER while one is open, because that is the text
+	// And out of the BUFFER while one is open, because that is the text
 	// the reader is looking at. It is the whole reason the extension forwards
 	// `essence.json` at all: a Diagnostic that waited for a save would arrive
 	// after the mistake had already been obeyed.
@@ -1915,7 +1915,7 @@ describe("the Server's request loop", () => {
 				"unknown-setting",
 			])
 
-			// NOTE: And the file on disk answers again once the buffer is gone
+			// And the file on disk answers again once the buffer is gone
 			// — which is what the walk and the run have been obeying all along.
 			await session.close(files.pathOf("essence.json"))
 			await session.settle()
@@ -1927,7 +1927,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: An open project file is never treated as Essence. Every request that
+	// An open project file is never treated as Essence. Every request that
 	// reads a buffer goes through one lookup and it refuses this one — otherwise
 	// the Essence Parser would read JSON, and a file that is perfectly well
 	// formed would fill the panel with syntax errors.
@@ -1959,7 +1959,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The `essence` key of a `package.json` is where these settings used
+	// The `essence` key of a `package.json` is where these settings used
 	// to live. Nothing is read from one now — the corpus it named is walked and
 	// reported on — and the key is answered with a Diagnostic on itself rather
 	// than with silence, because a setting the author believes is in force is
@@ -1990,7 +1990,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A manifest changing costs the settings and nothing else: no walk, no
+	// A manifest changing costs the settings and nothing else: no walk, no
 	// analysis, no test run. All one can say is that its `essence` key has
 	// moved, and answering `bun install` with a project rebuilt from scratch
 	// would make an install cost more than the install.
@@ -2020,7 +2020,7 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
 				"moved-setting",
 			])
-			// NOTE: Not one link, which is what tells the two paths apart: a
+			// Not one link, which is what tells the two paths apart: a
 			// PROJECT file changing sets the folders again, and that drops
 			// every cached analysis, so the sweep behind it links the whole
 			// workspace from scratch. A manifest drops the settings alone.
@@ -2031,7 +2031,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: What a whole workspace costs to report on: one link per ROOT, and
+	// What a whole workspace costs to report on: one link per ROOT, and
 	// nothing per file beneath one. Two roots here — the chain's Top, whose
 	// graph holds Middle and Base, and a Module nothing imports.
 	it("should link once per root at startup", async () => {
@@ -2051,7 +2051,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The sweep is a QUEUE, drained one root per callback, and this is what
+	// The sweep is a QUEUE, drained one root per callback, and this is what
 	// that buys: a request sent while it is running is answered out of the middle
 	// of it rather than after the last root. Before the chunking, an Editor that
 	// opened a project of two dozen test files asked its first Hover into a Server
@@ -2079,11 +2079,11 @@ describe("the Server's request loop", () => {
 			let counts = session.counts()
 
 			await session.initialize([files.root])
-			// NOTE: The LAST root of the queue, so that the document the reader
+			// The LAST root of the queue, so that the document the reader
 			// is looking at is the one the sweep would get to last — which is the
 			// case the chunking is for.
 			await session.open(files.pathOf("Root23.es"), fanOut["Root23.es"]!)
-			// NOTE: The tally rather than a publish, because the tally is a
+			// The tally rather than a publish, because the tally is a
 			// counter in this process and a publish has a pipe between it and
 			// the fact it reports. One link is the sweep having started, read at
 			// the moment it starts.
@@ -2099,12 +2099,12 @@ describe("the Server's request loop", () => {
 			})
 
 			expect(hover.result).not.toBeNull()
-			// NOTE: Which is to say the sweep had roots left when the answer
+			// Which is to say the sweep had roots left when the answer
 			// arrived. Unchunked, this is exactly the count of the roots: the
 			// batch was one callback, and nothing was answered until it returned.
 			expect(session.tallySince(counts).links).toBeLessThan(roots.length)
 
-			// NOTE: And it goes on to cover everything it was queued for — being
+			// And it goes on to cover everything it was queued for — being
 			// interruptible is not being abandoned. The last root by path is the
 			// last one analysed, so its Diagnostics arriving is the sweep having
 			// finished.
@@ -2127,7 +2127,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// NOTE: A keystroke mid-sweep, which is the interleaving the queue could have
+	// A keystroke mid-sweep, which is the interleaving the queue could have
 	// got wrong. `entriesFor` adds every root that has never published, so that a
 	// file PROMOTED to one is found — and mid-sweep every root still queued has
 	// published nothing, so an unguarded scan reads the whole remaining project
@@ -2161,7 +2161,7 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Root00.es"), fanOut["Root00.es"]!)
 			await session.waitForLinks(counts, 1)
-			// NOTE: Root00 is the first root of the queue, and its swept
+			// Root00 is the first root of the queue, and its swept
 			// Diagnostics have to be on the client before the mark is taken —
 			// otherwise the mark is behind the sweep's own publish and the wait
 			// below answers to that rather than to the keystroke.
@@ -2172,7 +2172,7 @@ describe("the Server's request loop", () => {
 			let mark = session.publishMark()
 			let bursts = session.watchLinkBursts()
 
-			// NOTE: A keystroke that MOVES the file's list, so the publish
+			// A keystroke that MOVES the file's list, so the publish
 			// answering it is one the dedup can not swallow — it is the event the
 			// burst is read at.
 			await session.change(
@@ -2186,14 +2186,14 @@ describe("the Server's request loop", () => {
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root00.es"), mark),
 			).toBe(true)
-			// NOTE: Two: the one root the keystroke reaches, and the sweep's next
+			// Two: the one root the keystroke reaches, and the sweep's next
 			// entry, which land between the same two polls because a due timer
 			// runs ahead of the check phase the sweep's callback waits in.
 			// Swallowing the queue is not two — it is every root still owed,
 			// linked inside the one callback the reader is waiting on.
 			expect(bursts.most()).toBeLessThanOrEqual(2)
 
-			// NOTE: The sweep then finishes the roots it still owed, and the
+			// The sweep then finishes the roots it still owed, and the
 			// answer to the keystroke survives it: Root00 was dropped from the
 			// queue by the batch that analysed it, so nothing published it again
 			// out of the text it no longer holds.
@@ -2203,7 +2203,7 @@ describe("the Server's request loop", () => {
 
 			bursts.stop()
 
-			// NOTE: One link per root and one more for the keystroke, which is
+			// One link per root and one more for the keystroke, which is
 			// the count whatever order the two of them interleaved in — the
 			// queue drops the root the batch analysed rather than analysing it
 			// twice, and nothing the batch reached is left for the queue to
@@ -2229,7 +2229,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// NOTE: A dependency changing HANDS mid-sweep, which is the other thing a
+	// A dependency changing HANDS mid-sweep, which is the other thing a
 	// batch firing into a queue can get wrong. A URI is cleared once no entry
 	// still reports on it, and what answers that question is what has PUBLISHED
 	// — mid-queue a fraction of the project. So the keystroke that takes the
@@ -2260,7 +2260,7 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Root00.es"), fanOut["Root00.es"]!)
 			await session.waitForLinks(counts, 1)
-			// NOTE: Root00 is the first root of the queue and the Library is in
+			// Root00 is the first root of the queue and the Library is in
 			// its graph, so the Library's own Diagnostics are on the client
 			// before the mark — which is what makes every publish after it one
 			// this keystroke caused.
@@ -2273,7 +2273,7 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// NOTE: The import taken away, which is the whole event: Root00
+			// The import taken away, which is the whole event: Root00
 			// stops reporting on the Library, and the only other file importing
 			// it is the root the sweep has not reached.
 			await session.change(
@@ -2290,14 +2290,14 @@ describe("the Server's request loop", () => {
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root00.es"), mark),
 			).toBe(true)
-			// NOTE: Still on the client — though it is the log below that pins
+			// Still on the client — though it is the log below that pins
 			// it. A clear and the publish that undoes it leave the same state
 			// behind, and only the messages tell the two apart.
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
 
-			// NOTE: And still, once the root that took it over has run and the
+			// And still, once the root that took it over has run and the
 			// sweep has made every decision it was holding.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root47.es"), 0),
@@ -2321,7 +2321,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// NOTE: The other half of the shutdown test above. A sweep is a queue with a
+	// The other half of the shutdown test above. A sweep is a queue with a
 	// callback armed, so a client that goes away in the middle of one leaves a
 	// project's worth of roots still to analyse and to publish for — into a
 	// connection that is not there, where a throw is the process rather than a
@@ -2338,18 +2338,18 @@ describe("the Server's request loop", () => {
 			await session.waitForLinks(counts, 1)
 			await session.client.sendRequest(ShutdownRequest.type)
 
-			// NOTE: After the shutdown has been ANSWERED, which is what makes the
+			// After the shutdown has been ANSWERED, which is what makes the
 			// mark deterministic: the response is written behind every publish
 			// the Server had already sent, so nothing that crossed the pipe
 			// before it is counted as coming after.
 			let mark = session.publishMark()
 
-			// NOTE: A queue the shutdown failed to stop is a queue the settle
+			// A queue the shutdown failed to stop is a queue the settle
 			// waits out, and every root it had left would publish on the way.
 			await session.settle()
 
 			expect(session.publishesSince(mark)).toEqual([])
-			// NOTE: And the sweep really was unfinished, or this would assert
+			// And the sweep really was unfinished, or this would assert
 			// that a Server with nothing left to do published nothing.
 			expect(session.tallySince(counts).links).toBeLessThan(roots.length)
 		} finally {
@@ -2358,7 +2358,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// NOTE: A keystroke refreshes every root that IMPORTS what changed, and a
+	// A keystroke refreshes every root that IMPORTS what changed, and a
 	// root need not be open to be one. Under the open-document model a mistake
 	// pushed into a Module from a file the reader had open simply never appeared
 	// in the file that could not survive it.
@@ -2395,7 +2395,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The one document no root can ever stand in for: a buffer opened from
+	// The one document no root can ever stand in for: a buffer opened from
 	// outside the workspace folders. No discovery walk finds it, so it is in no
 	// root set, and nothing imports it, so no graph reaches it — it is an entry
 	// of its own, and the only one that has to be scheduled by what it READS
@@ -2434,7 +2434,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A closed file's Diagnostics are still true — they are what the file
+	// A closed file's Diagnostics are still true — they are what the file
 	// on disk says, and a buffer going away does not change what is written in
 	// it. Nothing imports this one, so no importer could publish for it either:
 	// under the open-document model closing it cleared its squiggles for the
@@ -2465,7 +2465,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The other half of that. A file that is gone has nothing to say, and
+	// The other half of that. A file that is gone has nothing to say, and
 	// nobody but this Server is going to take its squiggles down — it owned them
 	// itself, since nothing imports it.
 	it("should clear the Diagnostics of a file that was deleted", async () => {
@@ -2496,7 +2496,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The mirror of a file being deleted, and the case a walk of the roots
+	// The mirror of a file being deleted, and the case a walk of the roots
 	// REACHING a change can not see: a change that drops an import PROMOTES what
 	// it named to a root, which by definition reaches nothing that changed. It
 	// is what stopped being reached. Nothing else will ever schedule it — no
@@ -2528,7 +2528,7 @@ describe("the Server's request loop", () => {
 			)
 			await session.settle()
 
-			// NOTE: The whole subtree under the dropped edge, not only the file
+			// The whole subtree under the dropped edge, not only the file
 			// promoted to a root: Mid is what Leaf's Diagnostics reach the
 			// Editor through now.
 			expect(session.codesFor(files.pathOf("Leaf.es"))).toEqual([
@@ -2543,7 +2543,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The same promotion, made by a deletion rather than by a keystroke.
+	// The same promotion, made by a deletion rather than by a keystroke.
 	// Here it is retirement that would clear them: the deleted file is retired
 	// and everything it owned is orphaned, and what was beneath it has no other
 	// claimant — so the file that is gone takes a project's squiggles with it
@@ -2579,7 +2579,7 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("Mid.es"))).toEqual([
 				"dependency-has-errors",
 			])
-			// NOTE: And the file that IS gone is still cleared, which is the
+			// And the file that IS gone is still cleared, which is the
 			// other half of the same batch.
 			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
 		} finally {
@@ -2588,7 +2588,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And with the promoted file OPEN, which is the worst of the three: a
+	// And with the promoted file OPEN, which is the worst of the three: a
 	// buffer the reader is looking at goes quiet while the mistake is on the
 	// screen in front of them. An open document is not an entry of its own here
 	// — a root's graph reaches it — so its Diagnostics belonged to the importer
@@ -2626,7 +2626,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A file something starts importing stops being a root, and its
+	// A file something starts importing stops being a root, and its
 	// Diagnostics become the importing root's to publish. The hand-over has to
 	// be silent: the new owner publishes before the old entry is retired, and
 	// what the two of them say is the same list — a Module's Diagnostics depend
@@ -2658,7 +2658,7 @@ describe("the Server's request loop", () => {
 			])
 			await session.settle()
 
-			// NOTE: The importer really did become the only root — it has the
+			// The importer really did become the only root — it has the
 			// Diagnostic that says it imported something broken.
 			expect(session.codesFor(files.pathOf("Main.es"))).toEqual([
 				"dependency-has-errors",
@@ -2680,7 +2680,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And the other direction, which is the same requirement read
+	// And the other direction, which is the same requirement read
 	// backwards: a file that BECOMES a root takes its own Diagnostics over, and
 	// the entry that used to lend them stops reporting on it in the same batch.
 	// What each of them says is the same list, so a reader watching the Problems
@@ -2730,7 +2730,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A cycle nobody imports is the one shape with no root in it at all,
+	// A cycle nobody imports is the one shape with no root in it at all,
 	// and the member reaching the most others is analysed in its place. The
 	// broken file is the OTHER member: it is reported on only because the
 	// entry's graph reached it.
@@ -2754,7 +2754,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: And a cycle can be MADE by a deletion, which is where "closest to
+	// And a cycle can be MADE by a deletion, which is where "closest to
 	// root" has to be worked out again rather than once at startup: the file
 	// above it was the only root either member had, and losing it leaves two
 	// files importing each other and nothing else.
@@ -2790,7 +2790,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The coverage fallback — "closest to root we can actually analyse".
+	// The coverage fallback — "closest to root we can actually analyse".
 	// A root the Compiler threw on judged nothing beneath it, and every file
 	// under it used to analyse itself because every file under it was open. The
 	// fallback analyses the ones the batch was supposed to cover and did not, so
@@ -2817,7 +2817,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: A build drops the `tests { … }` section, so the Editor is the only
+	// A build drops the `tests { … }` section, so the Editor is the only
 	// thing that reports on one while it is being written. The Server's
 	// Workspace types it for that reason, and this is what says so.
 	it("should report on a tests section, which no build ever sees", async () => {
@@ -2855,7 +2855,7 @@ function uriFor(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }
 
-// NOTE: A Position by what it points AT rather than by a line and column counted
+// A Position by what it points AT rather than by a line and column counted
 // out by hand — these sources are tab-indented, and a counted column is a fact
 // about the whitespace rather than about the name. Zero based, which is what the
 // protocol speaks.

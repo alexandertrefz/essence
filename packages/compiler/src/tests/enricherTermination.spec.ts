@@ -3,7 +3,7 @@ import path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: THE guard that type matching comes back. Every job below is one where a
+// THE guard that type matching comes back. Every job below is one where a
 // Namespace's Type Parameter and a caller's are spelled the SAME, which is the
 // shape a Type Parameter's identity — its name, and nothing else — can not tell
 // apart on its own. Before `bindNamespaceTarget` alpha-renamed a Namespace's
@@ -12,14 +12,14 @@ import type { common } from "@essence-lang/interfaces"
 // that name through itself: 363 million `matchGenericUse` turns in 25 seconds,
 // flat memory, and no answer ever. `esc` had to be killed.
 //
-// NOTE: Run in a CHILD process, one per job, under a wall clock. A spin can not
+// Run in a CHILD process, one per job, under a wall clock. A spin can not
 // be caught in the process that started it — `bun test` would inherit it and
 // report nothing at all, which is exactly what a guard against spinning must not
 // do. The timeout is far above what the work costs (well under a second either
 // way) so that a loaded machine can not turn it red; what it catches is
 // unboundedness, not slowness.
 //
-// NOTE: TWO KINDS of job, because the two protections sit at different depths
+// TWO KINDS of job, because the two protections sit at different depths
 // and a guard that can only see one of them is half a guard. The `source` jobs
 // are the Programs a reader writes, and they are answered by the alpha-renaming:
 // break that and they spin. The `match` jobs reach past it, handing the matcher
@@ -28,7 +28,7 @@ import type { common } from "@essence-lang/interfaces"
 // check alone: break THAT and they spin. Each was confirmed to time out with
 // its own protection reverted and the other left in place.
 //
-// NOTE: The Programs are the FAMILY, not the one report. Several are errors
+// The Programs are the FAMILY, not the one report. Several are errors
 // under the per-Method bound rules and are expected to stay errors — that is the
 // point. Whether a Program compiles is decided elsewhere; termination is not
 // allowed to depend on it, and a Program that stops being an error must still be
@@ -247,7 +247,7 @@ describe("Type matching terminates under a Type Parameter name collision", () =>
 				let output = await new Response(child.stdout).text()
 				let errors = await new Response(child.stderr).text()
 
-				// NOTE: The word, not merely a zero exit — a child killed by the
+				// The word, not merely a zero exit — a child killed by the
 				// wall clock above exits non-zero, and so does one that threw.
 				// The three are told apart here so a failure says which happened.
 				expect(`${exitCode} ${output} ${errors}`).toBe("0 returned ")

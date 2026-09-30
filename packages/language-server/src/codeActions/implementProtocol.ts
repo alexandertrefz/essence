@@ -30,7 +30,7 @@ import {
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry, FixContext } from "./index"
 
-// NOTE: The Methods a `namespace … is P` owes, written out as empty Methods
+// The Methods a `namespace … is P` owes, written out as empty Methods
 // with the Protocol's own signatures. It is offered twice, on the same edit:
 // as the Quick Fix for `nonconforming-namespace`, whose span is the Protocol
 // Identifier of the clause, and as a refactoring on the whole Namespace HEAD —
@@ -40,24 +40,24 @@ import type { CodeActionEdit, CodeActionEntry, FixContext } from "./index"
 // Never preferred: every stub it writes has an empty body, so what it buys is
 // a hole with the right signature on it rather than a Program that compiles.
 //
-// NOTE: An empty body is written `{}`, on the signature's own line — the shape
+// An empty body is written `{}`, on the signature's own line — the shape
 // `esfmt` leaves alone, and the shape the `missing-case` generator already
 // writes. Spelled over two lines it was text a reader had to reformat before
 // they could commit what the fix gave them.
 
-// NOTE: The `Self` of a Protocol's signatures, which is the conformer's target
+// The `Self` of a Protocol's signatures, which is the conformer's target
 // Type at the declaration — `is(_ other: Self)` is written `is(_ other: Point)`
 // in a Namespace `for Point`. The same substitution the conformance check makes
 // before it compares a requirement to what a Namespace wrote.
 const selfGenericName = "Self"
 
-// NOTE: The Protocols a Choice answers without anybody writing a Method for
+// The Protocols a Choice answers without anybody writing a Method for
 // them, mirroring `derivedConformanceSource`: the derives are what makes
 // `namespace Colour for Colour is Equatable { }` right rather than empty, and
 // stubbing `is` into it would replace a derived answer with a hole.
 const equatableProtocolName = "Equatable"
 
-// NOTE: A Namespace paired with what the Enricher made of it. The edit is
+// A Namespace paired with what the Enricher made of it. The edit is
 // measured against the PARSED Node — the braces it is written between, the
 // column its members stand at — while what it owes is a question about Types,
 // and only the typed side knows the answer.
@@ -76,7 +76,7 @@ export function implementProtocolAction(
 	}
 
 	let { protocol: protocolName, methods } = diagnostic.data
-	// NOTE: Found by the clause the Diagnostic underlines rather than by name:
+	// Found by the clause the Diagnostic underlines rather than by name:
 	// a file may declare two Namespaces for one Type, and only one of them
 	// wrote the clause that was refused.
 	let conformer = conformersOf(program, enrichedProgram).find((candidate) =>
@@ -103,7 +103,7 @@ export function implementProtocolAction(
 		conformer,
 		protocol,
 		protocolName,
-		// NOTE: Held to the Protocol in hand. The payload is the Enricher's
+		// Held to the Protocol in hand. The payload is the Enricher's
 		// answer about a Protocol this Server looked up a second time, and a
 		// name that is no requirement of it is a name nothing here can write a
 		// signature for.
@@ -135,7 +135,7 @@ export function implementProtocolActions(
 		for (let clause of conformer.typed.conformsTo) {
 			let protocol = protocolNamed(protocols, clause.name, granted)
 
-			// NOTE: The Quick Fix answers on the clause's own Identifier, and
+			// The Quick Fix answers on the clause's own Identifier, and
 			// this is the same edit under the same title — so it stands down
 			// wherever the request reaches that Identifier, rather than
 			// offering the reader one thing twice. What it is FOR is the rest
@@ -152,7 +152,7 @@ export function implementProtocolActions(
 			let owed = missingRequirements(
 				protocol,
 				conformer.typed.type,
-				// NOTE: Asked of every Protocol the Namespace conforms
+				// Asked of every Protocol the Namespace conforms
 				// to, not of this one alone — a Method one clause only
 				// REQUIRES may carry another's body, and then nothing
 				// is owed for it. The Enricher's own check asks the
@@ -198,7 +198,7 @@ export function implementProtocolActions(
 function entryFor(
 	conformer: Conformer,
 	protocol: common.ProtocolType,
-	// NOTE: The Protocol as the conformer's file names it.
+	// The Protocol as the conformer's file names it.
 	spelling: string,
 	methods: Array<string>,
 	lines: Array<string>,
@@ -222,7 +222,7 @@ function entryFor(
 			kind,
 			diagnosticCode: diagnostic?.code ?? null,
 			diagnosticPosition: diagnostic?.position ?? null,
-			// NOTE: A body per stub, and every one of them empty — see the
+			// A body per stub, and every one of them empty — see the
 			// header. Applying this leaves a `missing-return` under each,
 			// which is the reader's to answer.
 			isPreferred: false,
@@ -231,7 +231,7 @@ function entryFor(
 	]
 }
 
-// NOTE: Where the stubs are going to STAND — inside the Namespace, one line
+// Where the stubs are going to STAND — inside the Namespace, one line
 // above its closing brace — which is the Scope their signatures are read in.
 // Null where no typed Program was handed in, and then no stub is written.
 function spelledAt(
@@ -253,7 +253,7 @@ function stubsEdit(
 	let { node } = conformer
 	let end = node.position.end
 
-	// NOTE: Read back off the buffer, as every edit here is. A Position from a
+	// Read back off the buffer, as every edit here is. A Position from a
 	// stale analysis pointing at something that is no longer a closing brace
 	// would write the stubs into the middle of a line.
 	if (sliceOf(lines, { start: closingBraceOf(end), end }) !== "}") {
@@ -264,12 +264,12 @@ function stubsEdit(
 		return null
 	}
 
-	// NOTE: The NAME's line rather than the Statement's — a `§§` block above
+	// The NAME's line rather than the Statement's — a `§§` block above
 	// the declaration moves the Statement's start onto it, and a head broken
 	// over several lines still opens on the line the name is written on.
 	let indentation = indentationOf(lines, node.name.position.start.line)
 	let member = `${indentation}\t`
-	// NOTE: `Self` is written back as the target Type was WRITTEN, read off the
+	// `Self` is written back as the target Type was WRITTEN, read off the
 	// buffer rather than printed from the Type. A Record Alias resolves to the
 	// Record it names and carries its own name nowhere, so printing the Type
 	// would spell `namespace Square for Square is Shape` out as
@@ -287,7 +287,7 @@ function stubsEdit(
 
 	let stubs = stubbed.join("\n")
 
-	// NOTE: A blank line in front of the first stub where the Namespace
+	// A blank line in front of the first stub where the Namespace
 	// already holds something — its members stand one blank line apart, and a
 	// Method written straight under the last one reads as part of it. A body
 	// with nothing in it has nothing to be separated from.
@@ -302,7 +302,7 @@ function stubsEdit(
 	)
 }
 
-// NOTE: One Method, spelled as the Protocol declares it and as a Namespace has
+// One Method, spelled as the Protocol declares it and as a Namespace has
 // to write it. `printSignature` is deliberately NOT what does this: it prints a
 // Parameter as `_ Boolean`, which is a Function TYPE's spelling and a syntax
 // error in a declaration that carries a body — a bodied Method writes
@@ -315,7 +315,7 @@ function stubFor(
 	indentation: string,
 	at: SpellingScope | null,
 ): string | null {
-	// NOTE: Bound to a Type that PRINTS as the written target and is nothing
+	// Bound to a Type that PRINTS as the written target and is nothing
 	// else — a GenericUse is exactly "a Type standing under a name", which is
 	// what the source wrote, and it substitutes wherever `Self` appears rather
 	// than only where it stands alone: `shrink() -> List<Self>` has to come out
@@ -357,7 +357,7 @@ function stubFor(
 		: `${indentation}${isStatic ? "static " : ""}${signature} {}\n`
 }
 
-// NOTE: Every Type in the signature is spelled as the NAMESPACE can read it,
+// Every Type in the signature is spelled as the NAMESPACE can read it,
 // not as the Protocol declares it: a requirement naming a Record another Module
 // declares is written as the shape where this file has no word for it, which is
 // the same Type and needs nothing imported. A Type with no spelling here at all
@@ -377,7 +377,7 @@ function signatureOf(
 		return null
 	}
 
-	// NOTE: `Self` is never declared — it is the target Type, which the head
+	// `Self` is never declared — it is the target Type, which the head
 	// already names, and `describeSignature` drops it for the same reason.
 	let declared = signature.generics.filter(
 		(generic) => generic.name !== selfGenericName,
@@ -396,7 +396,7 @@ function signatureOf(
 					)
 					.join(", ")}>`
 	let parameters = signature.parameterTypes
-		// NOTE: The label doubles as the name a body reads the Parameter under,
+		// The label doubles as the name a body reads the Parameter under,
 		// which is the `count: Integer` form every Declaration may write. A
 		// Parameter that carries no label binds nothing at all until the reader
 		// names it, which is what `_: Type` says.
@@ -409,7 +409,7 @@ function signatureOf(
 	return `${name}${generics}(${parameters}) -> ${returnType}`
 }
 
-// NOTE: Whether this clause is answered by the Choice itself. A Namespace over
+// Whether this clause is answered by the Choice itself. A Namespace over
 // a Choice that writes NONE of a Protocol's Methods conforms without them —
 // equality from the Cases' tags, listing and printing from their names — and
 // the Enricher accepts exactly that, so an offer to write the stubs here would
@@ -438,7 +438,7 @@ function derives(protocol: common.ProtocolType, conformer: Conformer): boolean {
 	return protocol.identity === equatableProtocolName && isChoice(target)
 }
 
-// NOTE: Equality derives for EVERY Choice, payload or no payload, so this is
+// Equality derives for EVERY Choice, payload or no payload, so this is
 // the one derive that has no builder to ask — a Union whose every member is a
 // Case is what the Enricher's own `choiceTypeOf` answers for.
 function isChoice(type: common.Type): boolean {
@@ -447,7 +447,7 @@ function isChoice(type: common.Type): boolean {
 	return cases.length > 0 && cases.every((member) => member.type === "Case")
 }
 
-// NOTE: `granted` holds identities, as a Namespace's `conformsTo` does. A body
+// `granted` holds identities, as a Namespace's `conformsTo` does. A body
 // counts only where it fulfils the requirement `solving` has of its name, and
 // one whose Protocol is out of reach here is taken to fulfil it.
 function providerIn(
@@ -491,7 +491,7 @@ function providerIn(
 	}
 }
 
-// NOTE: Whether a stub written as `solving` declares it would refuse another
+// Whether a stub written as `solving` declares it would refuse another
 // conformance whose body of the name it replaces, as the Enricher judges it.
 // The Enricher offers no stub there either.
 function refusedElsewhere(
@@ -522,7 +522,7 @@ function refusedElsewhere(
 	)
 }
 
-// NOTE: Every Protocol the document can name, under the name it binds it by:
+// Every Protocol the document can name, under the name it binds it by:
 // the builtins, what its import block bound, which is an alias where it wrote
 // one, and what it declares, a tests block's own among them.
 type ProtocolInReach = { spelling: string; protocol: common.ProtocolType }
@@ -552,7 +552,7 @@ function protocolsOf(
 	return protocols
 }
 
-// NOTE: The Protocol a clause names, told apart from another of its spelling
+// The Protocol a clause names, told apart from another of its spelling
 // by the identity the Enricher resolved the clause to. A standard library
 // source declares the builtin Protocols over again, and its own declaration
 // is the one read.
@@ -590,7 +590,7 @@ function conformersOf(
 			continue
 		}
 
-		// NOTE: Paired by the NAME's Position, which the Enricher copies
+		// Paired by the NAME's Position, which the Enricher copies
 		// across untouched — the Statement's own Position is the same pair of
 		// numbers, but a Namespace the Parser recovered from is the one case
 		// where it is not, and a mispairing would write one Namespace's stubs

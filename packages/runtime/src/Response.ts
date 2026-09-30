@@ -1,4 +1,4 @@
-// NOTE: The runtime module of the `Response` Namespace — what a host answered
+// The runtime module of the `Response` Namespace — what a host answered
 // with. Both of its Methods are written in Essence
 // (`packages/standard-library/sources/Http.es`): one reads the status and one
 // reads a header, and neither needs anything the Record does not hold. So there

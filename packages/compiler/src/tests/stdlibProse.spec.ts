@@ -6,7 +6,7 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 import { containsErrors } from "../diagnostics/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// NOTE: The writing rules the standard library's prose is held to, read off the
+// The writing rules the standard library's prose is held to, read off the
 // sources themselves. They are the ASD-STE100 *writing* rules — not its
 // dictionary, since the language's own terms are technical names:
 //
@@ -32,7 +32,7 @@ const REPORTING = process.env.ESSENCE_PROSE_REPORT !== undefined
 
 const WORD_LIMIT = 25
 
-// NOTE: Written in capitals and meant that way. Everything else in capitals is
+// Written in capitals and meant that way. Everything else in capitals is
 // emphasis, which the rules spend on nothing. `O(1)` and the like never reach
 // this list — a single capital is not three.
 const ACRONYMS = new Set([
@@ -53,7 +53,7 @@ const ACRONYMS = new Set([
 	"ZWJ",
 ])
 
-// NOTE: An abbreviation ends in a period without ending a sentence. There are
+// An abbreviation ends in a period without ending a sentence. There are
 // five of them in technical prose, and a sentence that ends in one of them is
 // rare enough to be worth the one sentence a run-on makes.
 const abbreviationPattern = /\b(?:e\.g|i\.e|etc|vs|cf)\.$/
@@ -71,18 +71,18 @@ type Finding = {
 	detail: string
 }
 
-// NOTE: A `choice` or a `type` alias declared in a `declarations` body. Both
+// A `choice` or a `type` alias declared in a `declarations` body. Both
 // are Types a user's Program writes down, so both are read by somebody who
 // never opens this directory, and a `§` note above one reaches nobody but the
 // next editor of the file.
 //
-// NOTE: The indentation is not pinned, though every declaration here stands at
+// The indentation is not pinned, though every declaration here stands at
 // one tab today. A pattern that reads the indentation would answer nothing for
 // a declaration written at another one, and a rule that silently stops looking
 // is worse than no rule — which is what the count below guards.
 const declarationPattern = /^\s*(choice|type)\s+([A-Za-z][A-Za-z0-9]*)/
 
-// NOTE: One run of Comment lines of the same sigil, with the line each started
+// One run of Comment lines of the same sigil, with the line each started
 // on. A `§§` run is the block above a Declaration; a `§` run is one note.
 type ProseBlock = {
 	kind: "§§" | "§"
@@ -119,16 +119,16 @@ function blocksOf(file: string, sourceText: string): Array<ProseBlock> {
 	return blocks
 }
 
-// NOTE: A `@param` or `@returns` head and the em-dash that separates it from
+// A `@param` or `@returns` head and the em-dash that separates it from
 // its text. The separator is the form the rules ask for, so it is taken off
 // before the em-dash rule ever sees the line.
 const tagPattern = /^@(?:param\s+\S+|returns)\s*(?:—\s*)?/
 
-// NOTE: What is being SHOWN rather than written: a fenced block holds example
+// What is being SHOWN rather than written: a fenced block holds example
 // code, and counting its words says nothing about the prose.
 const fencePattern = /^\s*(?:```|~~~)/
 
-// NOTE: A `code span` is one term however long it is, and the periods inside it
+// A `code span` is one term however long it is, and the periods inside it
 // end no sentence — `List.of(integersFrom:through:)` is one word. Masked to a
 // single lowercase token, which the ALL-CAPS rule also then leaves alone: what
 // is written in code is spelled the way the code is.
@@ -136,14 +136,14 @@ function maskCode(text: string): string {
 	return text.replace(/`[^`]*`/g, "code")
 }
 
-// NOTE: One paragraph of a block, kept as the lines it was written on so that
+// One paragraph of a block, kept as the lines it was written on so that
 // a finding can name the line it starts at.
 type Paragraph = {
 	line: number
 	parts: Array<string>
 }
 
-// NOTE: The paragraphs of one block, each already stripped of its tag head and
+// The paragraphs of one block, each already stripped of its tag head and
 // of anything fenced. A blank line separates two paragraphs, and a sentence
 // never runs across one.
 function paragraphsOf(block: ProseBlock): Array<Paragraph> {
@@ -173,7 +173,7 @@ function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 			continue
 		}
 
-		// NOTE: A tag opens a section of its own, so it opens a paragraph of
+		// A tag opens a section of its own, so it opens a paragraph of
 		// its own — its text is a sentence about that Parameter, and nothing
 		// above it belongs to the same one.
 		if (current === null || tagPattern.test(raw)) {
@@ -187,7 +187,7 @@ function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 	return paragraphs
 }
 
-// NOTE: A sentence ends at a period, a question mark or an exclamation mark
+// A sentence ends at a period, a question mark or an exclamation mark
 // followed by a space and the start of another one. Not at a colon: a colon
 // introduces an example, which the rules allow, and the example belongs to the
 // sentence that introduced it. Not inside a number either — `1.5` is followed
@@ -199,7 +199,7 @@ function sentencesOf(text: string): Array<string> {
 	for (let piece of maskCode(text).split(/(?<=[.!?])\s+(?=[A-Z`"'(])/)) {
 		let previous = sentences[sentences.length - 1]
 
-		// NOTE: The period that ends an abbreviation ends no sentence, so what
+		// The period that ends an abbreviation ends no sentence, so what
 		// it split off is put back on. Nothing is masked to arrange that — a
 		// placeholder in the text would have to survive every rule below it.
 		if (previous !== undefined && abbreviationPattern.test(previous)) {
@@ -282,7 +282,7 @@ export function proseFindings(): Array<Finding> {
 	return findings
 }
 
-// NOTE: The Types the sources declare, each with whether the Comment run
+// The Types the sources declare, each with whether the Comment run
 // directly above it holds a `§§` block. The run is walked upwards over every
 // Comment line, `§` notes included, because the Parser reads the documentation
 // above the Statement whatever else stands between: a note that explains a
@@ -353,7 +353,7 @@ export function undocumentedDeclarations(): Array<Finding> {
 		}))
 }
 
-// NOTE: A code span holding a `define` is written out for a reader to COPY —
+// A code span holding a `define` is written out for a reader to COPY —
 // it is the one construct the prose spells in full rather than naming — and
 // two of them told a reader to write `define { as v if c otherwise d }`, which
 // the parser refuses: the form is `as v if c as d otherwise`. Both stood in
@@ -368,7 +368,7 @@ export function unparsableCodeSpans(): Array<Finding> {
 
 	for (let { filePath, sourceText } of readStdlibFiles()) {
 		for (let block of blocksOf(path.basename(filePath), sourceText)) {
-			// NOTE: The lines of one block are joined, because a span can
+			// The lines of one block are joined, because a span can
 			// break across two Comment lines and each half alone parses as
 			// nothing.
 			let text = block.lines.join(" ")
@@ -412,7 +412,7 @@ function report(findings: Array<Finding>): string {
 }
 
 describe("Standard Library Prose", () => {
-	// NOTE: The splitter decides what a "sentence" is, so every rule above is
+	// The splitter decides what a "sentence" is, so every rule above is
 	// only as good as it is. These run — they are about the reader here, not
 	// about the sources.
 	describe("sentences", () => {
@@ -428,7 +428,7 @@ describe("Standard Library Prose", () => {
 		})
 
 		it("should keep a code span whole, periods and all", () => {
-			// NOTE: One term, one word, and no sentence end inside it.
+			// One term, one word, and no sentence end inside it.
 			expect(
 				sentencesOf("Counts up, as `List.of(integersFrom 1)` does."),
 			).toEqual(["Counts up, as code does."])
@@ -453,7 +453,7 @@ describe("Standard Library Prose", () => {
 		})
 
 		it("should not split at a colon", () => {
-			// NOTE: A colon introduces an example, which the rules allow, so
+			// A colon introduces an example, which the rules allow, so
 			// what follows it is part of the same sentence and counts towards
 			// the same limit.
 			expect(sentencesOf("Two ways: The first is shorter.")).toEqual([
@@ -463,7 +463,7 @@ describe("Standard Library Prose", () => {
 	})
 
 	it("should find the Types the sources declare", () => {
-		// NOTE: The same guard as the one below, for the declaration scanner.
+		// The same guard as the one below, for the declaration scanner.
 		// The rule it feeds passes on an empty list, so a pattern that stopped
 		// matching would turn the whole check into a no-op nobody notices.
 		// There are twenty Choices and Type Aliases as this is written.
@@ -471,7 +471,7 @@ describe("Standard Library Prose", () => {
 	})
 
 	it("should find prose to read", () => {
-		// NOTE: A guard on the reading above. Every rule below passes on an
+		// A guard on the reading above. Every rule below passes on an
 		// empty report, so a collector that read no file, or that found no
 		// Comment in the files it read, would make the whole file a no-op that
 		// nobody notices. The sources hold hundreds of blocks.
@@ -528,7 +528,7 @@ describe("Standard Library Prose", () => {
 		expect(report(findingsFor("all-caps"))).toBe("")
 	})
 
-	// NOTE: A `§§` block is what a reader of the LANGUAGE sees and a `§` note
+	// A `§§` block is what a reader of the LANGUAGE sees and a `§` note
 	// is what the next editor of the file sees, so a Type documented by a note
 	// alone is documented for nobody who uses it. Every `choice` and every
 	// `type` alias here carries one, and this is what keeps that true: the
@@ -537,7 +537,7 @@ describe("Standard Library Prose", () => {
 		expect(report(undocumentedDeclarations())).toBe("")
 	})
 
-	// NOTE: The count guards the scanner, as the two above guard theirs: a
+	// The count guards the scanner, as the two above guard theirs: a
 	// pattern that stopped matching would make this pass on nothing. There
 	// are two `define` spans as this is written, both on `Boolean`.
 	it("should write a 'define' span a reader can copy", () => {

@@ -21,10 +21,10 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 import { compiles } from "./followedHelps"
 
-// NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — a
+// The full pipeline minus bundling, mirroring codeGeneration.spec — a
 // Choice is only implemented once every stage agrees on it.
 //
-// NOTE: The Options are a Parameter because one question below is about what
+// The Options are a Parameter because one question below is about what
 // the Rewriter emits for a derived equality, and the Optimiser answers a
 // comparison against a payload-less Case without reaching the Rewriter's
 // emission at all. Turning that one pass off is how the emission is asked
@@ -80,7 +80,7 @@ function notesOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
 }
 
-// NOTE: The text under the carets, which for the undecided rails is where the
+// The text under the carets, which for the undecided rails is where the
 // reader is told WHICH Type Argument is missing — the message names the
 // construction and the labels name the Parameters.
 function labelsOf(source: string): Array<string> {
@@ -89,7 +89,7 @@ function labelsOf(source: string): Array<string> {
 	)
 }
 
-// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `Terminal.inspect` calls run — the counterpart of `generate`, mirroring
 // codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
 // rather than only type-checked.
@@ -125,7 +125,7 @@ function codesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.code)
 }
 
-// NOTE: The declared Type of a named Declaration in an enriched Program — the
+// The declared Type of a named Declaration in an enriched Program — the
 // applied Union of a `type Applied = Progress<Integer, String>` alias, or the
 // Generic Alias a generic `choice` resolves to — so a test can read a Type off
 // the tree without also constructing a value for it.
@@ -151,7 +151,7 @@ function declaredTypeOf(source: string, name: string): common.Type {
 	return node.type
 }
 
-// NOTE: The Type of a Constant's VALUE — a constructed Case carries its
+// The Type of a Constant's VALUE — a constructed Case carries its
 // instantiated CaseType here, so a test can assert on the members and Type
 // Arguments the construction site inferred.
 function valueTypeOf(source: string, name: string): common.Type {
@@ -389,7 +389,7 @@ describe("Choices", () => {
 			expect((bare!.binding as parser.IdentifierNode).content).toBe(
 				"pair",
 			)
-			// NOTE: The Matcher's Position has to reach the closing paren, or
+			// The Matcher's Position has to reach the closing paren, or
 			// an editor greys out a dead Handler short of its own binding.
 			expect(bare!.position.end.column).toBeGreaterThan(
 				bare!.caseName.position.end.column,
@@ -435,7 +435,7 @@ describe("Choices", () => {
 			expect(choice.generics).toEqual([])
 		})
 
-		// NOTE: A Case payload is ONE value — every construct that takes a
+		// A Case payload is ONE value — every construct that takes a
 		// trailing comma is a LIST — so the comma is refused. What matters is
 		// WHERE: the applied form is read speculatively, because only the `#`
 		// past the Type Arguments tells it from a comparison chain, and a
@@ -620,7 +620,7 @@ describe("Choices", () => {
 
 			let body = alias.aliasedType as common.UnionType
 
-			// NOTE: The body Union is anonymous so an application heals its
+			// The body Union is anonymous so an application heals its
 			// display `alias` onto it.
 			expect(body.name).toBeUndefined()
 			expect(body.alias).toBeUndefined()
@@ -630,7 +630,7 @@ describe("Choices", () => {
 					member.type === "Case" && member.name === "Stopped",
 			)!
 
-			// NOTE: A declared Case records the Choice's Generics and keeps its
+			// A declared Case records the Choice's Generics and keeps its
 			// members as GenericUses until a use site binds them — the interface
 			// construction-side instantiation reads back.
 			expect(done.choiceGenerics?.map((generic) => generic.name)).toEqual(
@@ -742,7 +742,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: A Type Parameter may spell the Choice's own name, and then the
+		// A Type Parameter may spell the Choice's own name, and then the
 		// payload names the Parameter — no recursion, and as silent as the
 		// plain `type Bad<Bad> = { next: Bad }` the same shadowing makes.
 		it("reads a payload as the Type Parameter shadowing the Choice's name", () => {
@@ -770,7 +770,7 @@ describe("Choices", () => {
 			).toContain("wrong-type-argument-count")
 		})
 
-		// NOTE: The `combinationTypeOf` TODO (resolvers.ts) is about applied
+		// The `combinationTypeOf` TODO (resolvers.ts) is about applied
 		// Types in `{ … with … }`. An applied Generic Alias of a Record already
 		// resolves to a plain Record at annotation time, so the update reads its
 		// members straight off — the TODO's remaining work is applied *non*-alias
@@ -787,7 +787,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: Everything the direct check above does NOT catch — a mutual pair, a
+	// Everything the direct check above does NOT catch — a mutual pair, a
 	// non-generic Choice, a Type Alias — is caught by the cycle pre-pass before
 	// the hoist rounds. `toEqual` throughout, because the point of the pre-pass
 	// is as much what it does NOT report: each of these used to be a pile of
@@ -848,7 +848,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: A Generic's default Type is resolved along with the declaration
+		// A Generic's default Type is resolved along with the declaration
 		// it belongs to, so a cycle through one is just as unresolvable — and it
 		// is the position the direct check never looked at.
 		it("names a cycle closed by a Generic's default Type", () => {
@@ -859,7 +859,7 @@ describe("Choices", () => {
 			).toEqual(["Type 'Boxed' names itself"])
 		})
 
-		// NOTE: A default Type resolves in the Scope AROUND the declaration,
+		// A default Type resolves in the Scope AROUND the declaration,
 		// where the Parameter it belongs to is not visible yet — so the `B` in
 		// `type B<B = B>` is the declaration being made, and the shadowing the
 		// body enjoys must not be applied here.
@@ -891,7 +891,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: The other side of the same coin — a default Type naming what its
+		// The other side of the same coin — a default Type naming what its
 		// Parameter shadows in the body is no cycle at all, and stays silent.
 		it("reads a default Type as the declaration its Parameter shadows", () => {
 			expect(
@@ -923,7 +923,7 @@ describe("Choices", () => {
 			).toEqual(["recursive-generic-choice"])
 		})
 
-		// NOTE: The cascade the pre-pass exists to prevent: every name in the
+		// The cascade the pre-pass exists to prevent: every name in the
 		// cycle stays declared — as an Error — so a declaration naming one of
 		// them, above or below, is not reported at all.
 		it("leaves declarations that merely name a cycle member alone", () => {
@@ -966,7 +966,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: A Type Parameter is not the Type its name may also spell
+		// A Type Parameter is not the Type its name may also spell
 		// further out — the graph resolves the shadowing, so this is no cycle.
 		it("does not read a Type Parameter as naming the declaration it shadows", () => {
 			expect(
@@ -979,7 +979,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: `infer` marks a Type Parameter a USE works out for itself. A Choice
+	// `infer` marks a Type Parameter a USE works out for itself. A Choice
 	// and a Type Alias have no such use — every one of theirs applies its
 	// Arguments outright — so the marker is refused rather than accepted and
 	// ignored, which is what it was while a construction's payload could stand in
@@ -1028,7 +1028,7 @@ describe("Choices", () => {
 			).toEqual(["Remove the 'infer' before 'Right'."])
 		})
 
-		// NOTE: The Generic list is the same grammar a Method writes, where the
+		// The Generic list is the same grammar a Method writes, where the
 		// marker is the whole point — which is why this is a Diagnostic and not a
 		// parse error.
 		it("leaves a Method's own Type Parameters alone", async () => {
@@ -1047,7 +1047,7 @@ describe("Choices", () => {
 			).toEqual(['"1"'])
 		})
 
-		// NOTE: `infer` is a valid Identifier, so `<infer>` declares a Generic
+		// `infer` is a valid Identifier, so `<infer>` declares a Generic
 		// NAMED infer and marks nothing — the Parser only reads it as the modifier
 		// when a name follows it.
 		it("leaves a Type Parameter actually named 'infer' alone", () => {
@@ -1074,7 +1074,7 @@ describe("Choices", () => {
 			).toContain("This Match Expression does not handle every Case")
 		})
 
-		// NOTE: The Union's OTHER member is an ordinary Type — the claim is that a
+		// The Union's OTHER member is an ordinary Type — the claim is that a
 		// Choice standing in a Union contributes its Cases rather than itself, so
 		// exhaustiveness is every Case plus every non-Choice member, and the
 		// second member is only here to make a Union at all.
@@ -1157,7 +1157,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The bare form CARRYING A PAYLOAD reads what its payload MENTIONS
+		// The bare form CARRYING A PAYLOAD reads what its payload MENTIONS
 		// and nothing else, which used to be blessed here as the whole of the
 		// rule: `#Stopped({ value = "x" })` decided `Result` and let `State` — a
 		// Parameter no member of `#Stopped` names — stand in the Program as the
@@ -1189,7 +1189,7 @@ describe("Choices", () => {
 					"'Progress' takes 2 Type Parameters: 'State', 'Result'.",
 					"A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
 				])
-				// NOTE: The Argument the payload DECIDED is spelled out and the
+				// The Argument the payload DECIDED is spelled out and the
 				// one it left is an ellipsis. Both used to be the Choice's own
 				// Parameter names — `Progress<State, Result>` copied out of a
 				// Help is `unknown-type` twice over, since those names belong to
@@ -1199,7 +1199,7 @@ describe("Choices", () => {
 					"Or apply the Type Arguments here — 'Progress<…, String>#Stopped(…)', with the Type you mean in place of each '…'.",
 				])
 
-				// NOTE: And the spelling with its blank filled in compiles, which
+				// And the spelling with its blank filled in compiles, which
 				// is the whole of what a Help promises.
 				expect(
 					compiles(`implementation { ${progressChoice}
@@ -1208,7 +1208,7 @@ describe("Choices", () => {
 				).toBe(true)
 			})
 
-			// NOTE: The other flavour — a payload that mentions no Type Parameter
+			// The other flavour — a payload that mentions no Type Parameter
 			// at all, so there is not even half a decision to report on.
 			it("reports one whose payload decides nothing at all", () => {
 				let source = `implementation {
@@ -1223,7 +1223,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: And asked only where a payload STOOD. A Case that carries one
+			// And asked only where a payload STOOD. A Case that carries one
 			// and was written without has `missing-payload` to report, and one
 			// whose payload is not the Case's Record has `payload-type-mismatch` —
 			// each about the mistake the reader made, where the refusal is about
@@ -1279,7 +1279,7 @@ describe("Choices", () => {
 				})
 			})
 
-			// NOTE: A Choice every one of whose Parameters the payload mentions
+			// A Choice every one of whose Parameters the payload mentions
 			// needs no position at all — the rule asks what is left, not whether
 			// a position spoke.
 			it("leaves one its payload decides entirely alone", () => {
@@ -1302,7 +1302,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: An Argument position decides a bare construction exactly as it
+		// An Argument position decides a bare construction exactly as it
 		// decides the prefixed twin — the two spellings used to part ways here,
 		// the prefixed one reading `Step<Integer, Integer>` straight off the
 		// Parameter Type while the bare one was left to its payload and refused
@@ -1320,7 +1320,7 @@ describe("Choices", () => {
 			expect(messagesOf(program)).toEqual([])
 		})
 
-		// NOTE: And decides it whatever order the Overloads are declared in. A
+		// And decides it whatever order the Overloads are declared in. A
 		// candidate that decides nothing — an unrelated Parameter Type, or an
 		// instantiation the payload does not fit — used to leave the construction to
 		// be enriched FOR REAL from inside the probe: the refusal was reported from
@@ -1354,7 +1354,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: A unit Case has no payload to read a decision off and no Choice
+		// A unit Case has no payload to read a decision off and no Choice
 		// name to apply Type Arguments to, so the bare spelling of one is asked to
 		// be decided exactly as the prefixed form is. Every position that decides
 		// the prefixed form decides this one; nothing around it at all is what
@@ -1363,7 +1363,7 @@ describe("Choices", () => {
 		describe("A unit Case of a generic Choice", () => {
 			const box = `choice Box<Value> { Full { value: Value }, Empty }`
 
-			// NOTE: `Optional` is a generic Choice in every Program's scope now, and
+			// `Optional` is a generic Choice in every Program's scope now, and
 			// its empty Case is spelled `#Empty` — so a Choice of one's own that
 			// names a unit Case the same way makes the BARE spelling ambiguous
 			// before anything gets as far as asking what decides it. Which is what
@@ -1393,7 +1393,7 @@ describe("Choices", () => {
 				).toBe(true)
 			})
 
-			// NOTE: And a bare `#Empty` is answered by the ambiguity rail rather
+			// And a bare `#Empty` is answered by the ambiguity rail rather
 			// than the undecided one, because which Choice is meant has to be
 			// settled before its Type Arguments can be: `Optional` declares one too,
 			// and a Program that declares a second is told to prefix the spelling.
@@ -1415,7 +1415,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: The Help has to ask for the Type Arguments where the Choice
+			// The Help has to ask for the Type Arguments where the Choice
 			// it names is generic, because picking the Choice is only half of
 			// what the position is missing: `Optional#Empty` written from a Help
 			// that stopped at the name resolves the ambiguity and then meets
@@ -1447,7 +1447,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: The `data` carries the NAMES and stops there — the `<…>`
+			// The `data` carries the NAMES and stops there — the `<…>`
 			// the Help shows is a shape rather than a spelling, and a Quick Fix
 			// writing it would produce source that does not parse. Prefixing
 			// settles the ambiguity, `undecided-type-arguments` asks for the
@@ -1498,7 +1498,7 @@ describe("Choices", () => {
 				).toEqual(['"empty"'])
 			})
 
-			// NOTE: And waits for the Argument beside it that decides the Parameter,
+			// And waits for the Argument beside it that decides the Parameter,
 			// the same holding-back the prefixed form gets: matching a Case that
 			// binds nothing first would only read a Parameter Type nothing has
 			// decided yet.
@@ -1522,7 +1522,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: `case Choice#Case` says which Choice's Case is meant. A Case the
+	// `case Choice#Case` says which Choice's Case is meant. A Case the
 	// matched value can not be is the bare form's error, and used to be a
 	// Validator Warning here — the Handler stood, typed by the DECLARED Case,
 	// whose members are still the Choice's Type Parameters. A bounded one then
@@ -1548,7 +1548,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: The near miss is looked for among the matched Union's Cases OF
+		// The near miss is looked for among the matched Union's Cases OF
 		// THIS CHOICE, because a Quick Fix replaces the NAME and nothing else —
 		// which is also why the underline stops short of the prefix, exactly as
 		// the bare form's does.
@@ -1577,7 +1577,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: Where the PREFIX is what went wrong, no rewrite of the name
+		// Where the PREFIX is what went wrong, no rewrite of the name
 		// answers — `B#Wait` on an `A` is not a misspelling of anything — so
 		// nothing is suggested rather than a rewrite that changes the spelling
 		// without changing the answer.
@@ -1644,7 +1644,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: Regression tests — a Case's runtime tag is shared by every
+	// Regression tests — a Case's runtime tag is shared by every
 	// instantiation of it, so `Box<Integer>#Full` and `Box<String>#Full` are
 	// both "Box#Full" and no Matcher and no dispatch branch can tell them apart
 	// by tag. The Enricher typed a Matcher by the FIRST instantiation the Union
@@ -1703,7 +1703,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: The bare form used to call these an ambiguity and name one
+		// The bare form used to call these an ambiguity and name one
 		// Choice twice — an ambiguity a prefix could not have resolved, since
 		// the prefix says which CHOICE is meant and both candidates are its.
 		it("takes a bare Matcher for the instantiations of one Choice", async () => {
@@ -1762,7 +1762,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: A bound on a Choice's Type Parameter is a promise the APPLICATION
+	// A bound on a Choice's Type Parameter is a promise the APPLICATION
 	// has to keep — nothing downstream asks again, so `Box<Function>` used to
 	// substitute a Type with no equality into a payload declared Equatable and
 	// only fall over when something reached for the witness.
@@ -1772,7 +1772,7 @@ describe("Choices", () => {
 			Empty,
 		}`
 
-		// NOTE: The same Choice with its unit Case spelled so nothing else in
+		// The same Choice with its unit Case spelled so nothing else in
 		// scope declares it. The builtin `Optional` declares an `#Empty` of its
 		// own, so a BARE `#Empty` no position decides is answered by the ambiguity
 		// rail before the undecided one is reached — and it is the undecided one
@@ -1807,7 +1807,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: The Parameter beside the Protocol, because the Quick Fix edits
+		// The Parameter beside the Protocol, because the Quick Fix edits
 		// the DECLARATION and the Diagnostic is reported at the use — the name is
 		// the only thing that leads from one to the other.
 		it("carries that Parameter and Protocol as data", () => {
@@ -1824,7 +1824,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: And no Parameter where the Type that failed is a concrete one:
+		// And no Parameter where the Type that failed is a concrete one:
 		// what that asks for is a Namespace declaring the conformance, which is a
 		// Declaration rather than an edit to a span.
 		it("names no Parameter for a concrete Type that does not conform", () => {
@@ -1839,7 +1839,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: The Type Argument the annotation decides is what answers for the
+		// The Type Argument the annotation decides is what answers for the
 		// bound — the payload never decides one, so a construction whose payload
 		// is a Function is a `Box<Function>` only where something said so.
 		it("rejects a construction whose Type Argument does not conform", () => {
@@ -1851,7 +1851,7 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		// NOTE: The bare form carrying a payload is the one place a payload still
+		// The bare form carrying a payload is the one place a payload still
 		// decides, so it is the one place a payload can still decide BADLY — and it
 		// answers for the bound where it does. A payload that mentions no Generic at
 		// all decides none and is asked nothing, which is what keeps an `#Empty` a
@@ -1864,7 +1864,7 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		// NOTE: A unit Case has no payload to decide with, so a bare one nothing
+		// A unit Case has no payload to decide with, so a bare one nothing
 		// around decides is undecided rather than free. It used to stand as a Box of
 		// the Choice's OWN Type Parameter: the raw GenericUse left here for the rest
 		// of the Program, where the bound had nothing to ask about and the Type
@@ -1904,7 +1904,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Choice's Type Parameters are APPLIED, never inferred — so an
+		// A Choice's Type Parameters are APPLIED, never inferred — so an
 		// undecided construction is no longer a state a Program can reach. It used
 		// to be: `Holder#Bare` bound nothing at all and stood as a Holder of its
 		// own Type Parameter, and `Holder#Full(f)` let its payload decide, which
@@ -1932,7 +1932,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: Identically — the payload is checked against the instantiation,
+			// Identically — the payload is checked against the instantiation,
 			// it never picks one, so carrying one changes nothing about whether
 			// this construction is decided.
 			it("reports a prefixed construction with a payload identically", () => {
@@ -1954,7 +1954,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: And the parentheses stay on where the Case CARRIES a payload.
+			// And the parentheses stay on where the Case CARRIES a payload.
 			// The prefixed rail dropped them, so `Holder#Full` written out of the
 			// Help met `missing-payload` on the very next run.
 			it("keeps the payload on a Case that takes one", () => {
@@ -2013,7 +2013,7 @@ describe("Choices", () => {
 				).toEqual(['"bare"', '"full"'])
 			})
 
-			// NOTE: An item stands in the item position of whatever the List is
+			// An item stands in the item position of whatever the List is
 			// expected to be, and a member in the position its name has in the
 			// expected Record — the same decision the annotation makes for a Case
 			// written directly under it.
@@ -2037,7 +2037,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: And from the payload position of the Case around it, which is
+			// And from the payload position of the Case around it, which is
 			// a position like any other once the Case that carries it is decided —
 			// so a nesting whose outer Type is spelled out in full decides every
 			// construction inside it, however deep and through whatever stands
@@ -2073,7 +2073,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: Through the one-member shorthand and through the Record it is
+			// Through the one-member shorthand and through the Record it is
 			// shorthand FOR, and through a List and a Record standing between two
 			// constructions — every position that hands an expected Type down
 			// hands down what the Case decided for it.
@@ -2106,7 +2106,7 @@ describe("Choices", () => {
 				).toEqual(["true"])
 			})
 
-			// NOTE: Which instantiation a position offering several of them meant
+			// Which instantiation a position offering several of them meant
 			// is what the payload answers — so the payload is read once per
 			// candidate, under that candidate's own members, and a payload that
 			// can not be read under one has not fit it. Read once with no context
@@ -2139,7 +2139,7 @@ describe("Choices", () => {
 				})
 			})
 
-			// NOTE: What arm selection asks is asked silently, and the reading it
+			// What arm selection asks is asked silently, and the reading it
 			// settles on is the one that reports — so a payload that is wrong is
 			// wrong once, however many instantiations were offered, and a reading
 			// only the LOSING candidate would have complained about says nothing at
@@ -2164,7 +2164,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The reading arm selection chose BY is the reading committed —
+			// The reading arm selection chose BY is the reading committed —
 			// it was made under the very Case the payload ends up standing in, so
 			// reading it again would read the whole subtree beneath it again. Read
 			// afresh, a nesting N deep costs 2^N readings of its innermost value:
@@ -2176,7 +2176,7 @@ describe("Choices", () => {
 			// paying per candidate where there is nothing to choose between would
 			// be the same cost by another route.
 			//
-			// NOTE: A time, because a count of readings is not something a Program
+			// A time, because a count of readings is not something a Program
 			// can be asked for — but a generous one: a thousandth of the ceiling
 			// when the readings are kept, four times it when they are not, and
 			// further apart with every level. Its other half is the shared-Type
@@ -2215,7 +2215,7 @@ describe("Choices", () => {
 				}
 			}, 30000)
 
-			// NOTE: An Argument is matched by a Case's MEMBERS, and a payload that
+			// An Argument is matched by a Case's MEMBERS, and a payload that
 			// does not fit them is a Diagnostic one stage later — too late to keep
 			// an overload from winning on it. So the probe answers with the
 			// declared Case where the payload does not fit what the Parameter
@@ -2239,7 +2239,7 @@ describe("Choices", () => {
 				).toEqual(['"integer"', '"string"'])
 			})
 
-			// NOTE: And the bare twin picks the same one. The bare form asks the
+			// And the bare twin picks the same one. The bare form asks the
 			// position first now, so a candidate that decides but does NOT fit
 			// must leave no recording behind: the enrichment pass reads that
 			// recording back, and `#Full(5)` became a `Box<String>#Full` off the
@@ -2263,7 +2263,7 @@ describe("Choices", () => {
 				).toEqual(['"integer"', '"string"'])
 			})
 
-			// NOTE: A partially generic decision is still a decision — `Item` is
+			// A partially generic decision is still a decision — `Item` is
 			// the enclosing Function's Type Parameter, and the construction is a
 			// Holder OF it rather than of nothing.
 			it("takes a partially generic decision inside generic code", async () => {
@@ -2281,7 +2281,7 @@ describe("Choices", () => {
 				).toEqual(['"full"'])
 			})
 
-			// NOTE: The other side of that — a Parameter Type mentioning the
+			// The other side of that — a Parameter Type mentioning the
 			// CALL's own Type Parameters decides nothing, because nothing has
 			// decided them either. Recorded as a decision it built the undecided
 			// state outright: the construction became a `Holder<Item>` whose
@@ -2318,7 +2318,7 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			// NOTE: With no bound in sight either — the shape that used to blame
+			// With no bound in sight either — the shape that used to blame
 			// the payload for not being an unsolved Type Parameter, with no help
 			// and no mention of Type Arguments at all.
 			it("refuses one carrying no bound", () => {
@@ -2335,7 +2335,7 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			// NOTE: And says it ONCE. The unsolved Type Parameter used to travel
+			// And says it ONCE. The unsolved Type Parameter used to travel
 			// out through the return Type, where the next Method call searched a
 			// Namespace named after the Compiler's own conformance Parameter.
 			it("says so once, and lets nothing carry the Parameter onward", () => {
@@ -2356,7 +2356,7 @@ describe("Choices", () => {
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
 			})
 
-			// NOTE: The three spellings that DO decide such a call, which is what
+			// The three spellings that DO decide such a call, which is what
 			// makes refusing it a Diagnostic rather than a wall: the Arguments
 			// written at the construction, the bare sigil the Parameter's own
 			// Choice resolves, and a Constant annotated on the way in.
@@ -2376,7 +2376,7 @@ describe("Choices", () => {
 				).toEqual(['"took"', '"took"', '"took"'])
 			})
 
-			// NOTE: And an Argument beside it that DOES decide the Parameter is
+			// And an Argument beside it that DOES decide the Parameter is
 			// waited for, the way a callback's Argument is: a construction binds
 			// nothing, so matching it before the Arguments that can bind only
 			// reads a Parameter Type nothing has decided yet. Which of the two is
@@ -2407,7 +2407,7 @@ describe("Choices", () => {
 				).toEqual(['"1"', '"7"'])
 			})
 
-			// NOTE: A receiver is not a position that decides, and deliberately
+			// A receiver is not a position that decides, and deliberately
 			// so: dispatch READS the receiver's Type to find the Namespace, so a
 			// Namespace found by handing one down would be the Namespace deciding
 			// what it is being called on. A construction written directly on a
@@ -2434,7 +2434,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The Alias application rail is where the bound is kept, and the
+			// The Alias application rail is where the bound is kept, and the
 			// construction reads its instantiation off exactly that — so writing
 			// the Type Argument out is as strict here as in any annotation.
 			it("holds the Choice's own application as strictly as ever", () => {
@@ -2450,7 +2450,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: What is left of the "Type Parameter does not conform" rail: a
+			// What is left of the "Type Parameter does not conform" rail: a
 			// value typed by a Type Parameter inside generic code, where the
 			// annotation naming `Holder<Item>` is the site that answers. No
 			// construction can reach it any more, because no construction can
@@ -2477,7 +2477,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: The other half of the decision — the Type Arguments written at the
+		// The other half of the decision — the Type Arguments written at the
 		// construction itself, which is the spelling for every position that hands
 		// none down. It is the SAME application an annotation's `Holder<Integer>`
 		// is, routed through the same rail, so everything the annotation is held to
@@ -2504,7 +2504,7 @@ describe("Choices", () => {
 				).toEqual(["true"])
 			})
 
-			// NOTE: Read through `.value` rather than through a Match, because the
+			// Read through `.value` rather than through a Match, because the
 			// construction's own Type is the CASE — a Match wants the Choice's
 			// Union, which is what an annotation would have made of it.
 			it("decides a Case carrying a payload", async () => {
@@ -2517,7 +2517,7 @@ describe("Choices", () => {
 				).toEqual(['"1"'])
 			})
 
-			// NOTE: The Arguments decide, and THEN the payload is checked against
+			// The Arguments decide, and THEN the payload is checked against
 			// what they decided — which is the one-member shorthand's Record here,
 			// wrapped after the instantiation exactly as everywhere else.
 			it("takes the one-member shorthand", async () => {
@@ -2583,7 +2583,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: The payload is checked against the instantiation the Arguments
+			// The payload is checked against the instantiation the Arguments
 			// decided, which is the whole point of them deciding first.
 			it("checks the payload against what the Arguments decided", () => {
 				expect(
@@ -2611,7 +2611,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The written Arguments win, so a position that wanted something
+			// The written Arguments win, so a position that wanted something
 			// else is an ordinary value-does-not-fit — no Diagnostic of its own,
 			// because there is nothing special about this way of disagreeing.
 			it("leaves a disagreeing annotation to the assignment", () => {
@@ -2635,7 +2635,7 @@ describe("Choices", () => {
 				).toEqual(["argument-type-mismatch"])
 			})
 
-			// NOTE: Both of those are seen because the Case's members differ
+			// Both of those are seen because the Case's members differ
 			// under the two instantiations. A Case that carries nothing the Type
 			// Parameters reach is the same Record under all of them — which
 			// `matchesType` reads as one Type on purpose — so nothing downstream
@@ -2683,7 +2683,7 @@ describe("Choices", () => {
 				).toEqual(["assignment-type-mismatch"])
 			})
 
-			// NOTE: Agreement is assignability, not sameness — a `Box<Integer>`
+			// Agreement is assignability, not sameness — a `Box<Integer>`
 			// stands under a `Box<Integer | String>` for the same reason its
 			// payload-carrying twin does, and a Union position offering several
 			// instantiations is answered by matching any one of them.
@@ -2699,7 +2699,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: An Argument's position is a Parameter Type, and a Parameter
+			// An Argument's position is a Parameter Type, and a Parameter
 			// Type is only decided once the call is: `id(Box<Integer>#Empty, 1)`
 			// is matched while `T` is still open and the Argument beside it is
 			// what decides it. Compared against the position as it stood at that
@@ -2755,7 +2755,7 @@ describe("Choices", () => {
 				).toEqual(['"ok"'])
 			})
 
-			// NOTE: And still disagrees where the decided position says so — with
+			// And still disagrees where the decided position says so — with
 			// a note and a help naming the Type the call decided, which is a
 			// spelling the caller can write.
 			it("says which Arguments the call decided on", () => {
@@ -2779,7 +2779,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: A Type Parameter nothing ever decided is left standing, and
+			// A Type Parameter nothing ever decided is left standing, and
 			// left to the call to report — one Diagnostic saying nothing inferred
 			// it, rather than that one and a disagreement with the undecided
 			// Parameter on top of it.
@@ -2812,7 +2812,7 @@ describe("Choices", () => {
 				).toEqual(['"empty"'])
 			})
 
-			// NOTE: A `<` after an Identifier opens nothing else in expression
+			// A `<` after an Identifier opens nothing else in expression
 			// position, but the reading is speculative all the same — what makes it
 			// a construction is the `#` on the far side of the Arguments. Reaching
 			// no `#` has to leave the Identifier readable as itself.
@@ -2826,7 +2826,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// NOTE: An application is written on one line, in a value position for
+			// An application is written on one line, in a value position for
 			// the reason it is in a Type position — a `<` that opens the NEXT line
 			// begins something of its own, and reading across the break would let
 			// it be swallowed.
@@ -2841,12 +2841,12 @@ describe("Choices", () => {
 				).toEqual(["syntax-error"])
 			})
 
-			// NOTE: The far side of the same rule. A `#` reaches this parse only
+			// The far side of the same rule. A `#` reaches this parse only
 			// when it sits directly against what precedes it — that is what keeps
 			// `label #Case` readable as a labelled Argument — and an application
 			// standing between the two must not be the way around it.
 			//
-			// NOTE: Under its own code, which is what carries the refusal out of
+			// Under its own code, which is what carries the refusal out of
 			// the speculative reading it is written in. Under the generic one it
 			// was rewound and the message a reader got named the wrong character.
 			it("does not read a '#' that opens the next line", () => {
@@ -2860,7 +2860,7 @@ describe("Choices", () => {
 				).toEqual(["case-application-across-lines"])
 			})
 
-			// NOTE: The line the `#` is held to is the one the Arguments CLOSE
+			// The line the `#` is held to is the one the Arguments CLOSE
 			// on, not the one they open on, so a list written over several lines
 			// still constructs.
 			it("holds the '#' to the line the Arguments close on", () => {
@@ -2878,7 +2878,7 @@ describe("Choices", () => {
 	})
 
 	describe("Contextual Case Resolution", () => {
-		// NOTE: `A` and `B` deliberately share the Case name `Go` — the scope
+		// `A` and `B` deliberately share the Case name `Go` — the scope
 		// scan alone can not resolve it, so these only pass when the expected
 		// Type of the position is consulted first, like a Matcher consults
 		// the scrutinee.
@@ -2983,7 +2983,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: Every Choice is Equatable without anyone writing it — a Case is
+	// Every Choice is Equatable without anyone writing it — a Case is
 	// decided by its tag and its payload is a Record, which the language
 	// already compares. These cover the four things that has to mean: the
 	// Methods resolve, the conformance solves, a written Namespace still wins,
@@ -3066,7 +3066,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: Printing is derived on narrower terms than equality. A Choice
+	// Printing is derived on narrower terms than equality. A Choice
 	// compares by its tags whatever anyone says, but how it READS is a
 	// decision — so the Namespace has to declare `is Printable`, and every Case
 	// has to carry no payload, because a Case with one has more to say than its
@@ -3091,7 +3091,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `inspect` rather than `print`, because that is the write this
+		// `inspect` rather than `print`, because that is the write this
 		// harness captures. It renders a String with the quotes a Literal is
 		// written with, which is why every expectation below carries them.
 		it("answers the Case's name, without the sigil", async () => {
@@ -3107,7 +3107,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"', '"a Red one"'])
 		})
 
-		// NOTE: The witness a bounded Method is handed has to be the derived
+		// The witness a bounded Method is handed has to be the derived
 		// Method too, or `Terminal.print` would refuse what a direct call
 		// answers.
 		it("hands the derived Method over as a Printable witness", async () => {
@@ -3141,7 +3141,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"'])
 		})
 
-		// NOTE: The Namespace is what makes the decision, so a Choice nobody
+		// The Namespace is what makes the decision, so a Choice nobody
 		// declared `is Printable` for prints through nothing — the same Choice,
 		// the same Cases, and no conformance for a hole or `print` to reach.
 		it("derives nothing for a Choice no Namespace declares Printable", () => {
@@ -3154,7 +3154,7 @@ describe("Choices", () => {
 			).not.toEqual([])
 		})
 
-		// NOTE: A Case carrying a payload has no name that stands for it, so
+		// A Case carrying a payload has no name that stands for it, so
 		// the declaration is refused rather than half-answered.
 		it("refuses a declared 'is Printable' on a Choice with a payload", () => {
 			expect(
@@ -3168,7 +3168,7 @@ describe("Choices", () => {
 			).toContain("nonconforming-namespace")
 		})
 
-		// NOTE: The derive is a fallback, never an override — a Namespace that
+		// The derive is a fallback, never an override — a Namespace that
 		// writes `toString` keeps it, at the call AND in the witness a bounded
 		// Method is handed.
 		it("keeps a written 'toString' at the call and in the witness", async () => {
@@ -3195,7 +3195,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: The third derive, and the one whose answer is the Choice itself
+	// The third derive, and the one whose answer is the Choice itself
 	// rather than a value of it: `Enumerable::cases` is a static, so it is
 	// spelled on the Choice's name. It is derived like equality rather than
 	// like printing — nothing declares it — and it is withheld for a Choice
@@ -3210,7 +3210,7 @@ describe("Choices", () => {
 			}
 		`
 
-		// NOTE: The order is the DECLARATION order, which is the promise the
+		// The order is the DECLARATION order, which is the promise the
 		// `§§` makes and the only order a caller can build a menu on.
 		it("answers every Case of a builtin Choice in declaration order", async () => {
 			expect(
@@ -3221,7 +3221,7 @@ describe("Choices", () => {
 			).toEqual(['"[Start, End, BothEnds]"', '"[Less, Equal, Greater]"'])
 		})
 
-		// NOTE: A Choice with no Namespace at all still answers. The name in
+		// A Choice with no Namespace at all still answers. The name in
 		// the base position is the Choice's, and the derive is what it reads
 		// through — which is what keeps `cases()` from costing an empty
 		// Namespace nobody would otherwise write.
@@ -3243,7 +3243,7 @@ describe("Choices", () => {
 			).toEqual(['"[Red, Green, Blue]"'])
 		})
 
-		// NOTE: The answer's Type is `NonEmptyList`, so `firstItem` answers an
+		// The answer's Type is `NonEmptyList`, so `firstItem` answers an
 		// item rather than an Optional. A Choice declares at least one Case,
 		// which is what makes the proof honest.
 		it("answers a List proven to hold an item", async () => {
@@ -3256,7 +3256,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"'])
 		})
 
-		// NOTE: A Case with a payload has no value the Choice itself can name,
+		// A Case with a payload has no value the Choice itself can name,
 		// so nothing is derived and the name is simply not a member.
 		it("derives nothing for a Choice with a payload", () => {
 			expect(
@@ -3280,7 +3280,7 @@ describe("Choices", () => {
 			).toEqual(["unknown-member"])
 		})
 
-		// NOTE: A written `cases` replaces the derive where the Namespace
+		// A written `cases` replaces the derive where the Namespace
 		// DECLARES the conformance, and both rails answer it — the direct one
 		// through the Choice's own name, the bounded one through the witness.
 		// Without the declaration the two used to disagree in silence, which is
@@ -3302,7 +3302,7 @@ describe("Choices", () => {
 			).toEqual(["1"])
 		})
 
-		// NOTE: The three spellings a written `cases` can be reached through,
+		// The three spellings a written `cases` can be reached through,
 		// each asked on BOTH rails. The Namespace's NAME used to decide which
 		// answer a Program got: one spelled like the Choice is a value in Scope
 		// and shadows the Type-named rail away, one of any other name did not,
@@ -3353,7 +3353,7 @@ describe("Choices", () => {
 			).toContain("Colours.cases()")
 		})
 
-		// NOTE: The derive is built from the CHOICE and never consults a
+		// The derive is built from the CHOICE and never consults a
 		// Namespace nobody declared the clause on, so a written Method that
 		// does not declare it answers the direct rail while the derive answers
 		// every bounded call. Refused at the Namespace rather than left to
@@ -3378,7 +3378,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: The Protocol alone — what carries a conformance here is the
+		// The Protocol alone — what carries a conformance here is the
 		// Namespace's own head, and there is no Type Parameter in the question.
 		it("carries that Protocol as data with no Parameter", () => {
 			expect(
@@ -3401,7 +3401,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: The guard is by NAME, exactly as the derive's own replacement
+		// The guard is by NAME, exactly as the derive's own replacement
 		// rule is — so a `cases` of the wrong shape suppresses the listing as
 		// surely as a right one would, and is told so here rather than leaving
 		// `Colour.cases()` typed as whatever it happens to answer.
@@ -3422,7 +3422,7 @@ describe("Choices", () => {
 			).toEqual(["undeclared-conformance"])
 		})
 
-		// NOTE: Equality splits the same way and always did — the derive is
+		// Equality splits the same way and always did — the derive is
 		// unconditional for a Choice, so a Namespace writing `is` without the
 		// clause answered one thing directly and another through a bound. Only
 		// the REQUIREMENT is refused: `isNot` is provided, and a Namespace
@@ -3467,7 +3467,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Printing derives ONLY where a Namespace declares it, so a
+		// Printing derives ONLY where a Namespace declares it, so a
 		// written `toString` without the clause replaces nothing and splits
 		// nothing — which is why the refusal above names two Protocols and not
 		// three.
@@ -3488,7 +3488,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And a Choice carrying a payload derives no listing at all, so
+		// And a Choice carrying a payload derives no listing at all, so
 		// writing `cases` for it replaces nothing either.
 		it("accepts a written 'cases' for a Choice that derives none", () => {
 			expect(
@@ -3511,7 +3511,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Namespace may say so, and saying so is neither needed nor
+		// A Namespace may say so, and saying so is neither needed nor
 		// refused — exactly what a Choice declaring `is Equatable` does.
 		it("accepts a declared conformance a Choice already has", () => {
 			expect(
@@ -3547,7 +3547,7 @@ describe("Choices", () => {
 			).toEqual(["nonconforming-namespace"])
 		})
 
-		// NOTE: The Protocol earns its keep here: a body bounded by it calls
+		// The Protocol earns its keep here: a body bounded by it calls
 		// the static on the Type Parameter, and the witness the call is handed
 		// is what answers. `T.cases()` is the only spelling a static
 		// requirement has, there being no value of `T` to call it on.
@@ -3569,7 +3569,7 @@ describe("Choices", () => {
 			).toEqual(["3", "3"])
 		})
 
-		// NOTE: And a Choice that carries a payload reaches the same bound by
+		// And a Choice that carries a payload reaches the same bound by
 		// writing the Method, which is the whole of what a conformance the
 		// derive withholds costs.
 		it("answers through a bound for a written conformance", async () => {
@@ -3600,7 +3600,7 @@ describe("Choices", () => {
 			).toEqual(["2"])
 		})
 
-		// NOTE: A receiver narrowed to ONE Case does not conform. `Self` stands
+		// A receiver narrowed to ONE Case does not conform. `Self` stands
 		// in the ANSWER here, so a Case binding would promise a List of that
 		// Case and hand back the Choice's — which is why the Case rail equality
 		// takes is no rail for this. The Choice conforms; the Case is refused.
@@ -3614,7 +3614,7 @@ describe("Choices", () => {
 			}`
 
 			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
-			// NOTE: The Help a Case gets names the CHOICE, because the one
+			// The Help a Case gets names the CHOICE, because the one
 			// every other binding gets can not be written for it — `namespace X
 			// for Colour#Red is Enumerable` does not parse, and a Namespace's
 			// target is never one Case of a Choice.
@@ -3623,7 +3623,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: And a value annotated at the Choice is what the Help asks for,
+		// And a value annotated at the Choice is what the Help asks for,
 		// which is the call the page shows beside the bounded example.
 		it("answers a bound for a value annotated at the Choice", async () => {
 			expect(
@@ -3639,7 +3639,7 @@ describe("Choices", () => {
 			).toEqual(["3"])
 		})
 
-		// NOTE: Every mode Choice the library declares answers, and none of
+		// Every mode Choice the library declares answers, and none of
 		// them says so — which is the whole of what deriving without a
 		// declaration means. `Step`, `Optional` and `Result` are left out
 		// because each carries a payload.
@@ -3671,7 +3671,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// NOTE: A GENERIC Choice of payload-free Cases answers through a bound,
+		// A GENERIC Choice of payload-free Cases answers through a bound,
 		// where the receiver's Type Arguments are already applied — the Cases
 		// carry no payload, so what they bind to decides nothing about the
 		// values. Its own NAME answers nothing: it resolves to a Generic Alias,
@@ -3703,7 +3703,7 @@ describe("Choices", () => {
 			).toEqual(["unknown-name"])
 		})
 
-		// NOTE: The emission is the runtime helper curried with the tags, for
+		// The emission is the runtime helper curried with the tags, for
 		// the reason a static has to be: there is no receiver at the call for
 		// the Choice to be recovered from. The tags are the very strings a Case
 		// value carries — a Choice a Module declares is prefixed by its path,
@@ -3719,7 +3719,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: A *generic* Choice can only derive Equatable CONDITIONALLY — its
+	// A *generic* Choice can only derive Equatable CONDITIONALLY — its
 	// payloads may be Type Parameters, which are equal exactly when the Types
 	// they bind to say so. The derive gains a `where <each payload Parameter> is
 	// Equatable` bound, compares each generic payload through that Parameter's
@@ -3764,7 +3764,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: A payload Union of one generic arm and one concrete one — the
+		// A payload Union of one generic arm and one concrete one — the
 		// concrete arm claims its own tag and the generic arm is the fallback
 		// everything else falls through to, so a value of the concrete arm is
 		// never compared through the Type Argument's witness and the other way
@@ -3796,7 +3796,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// NOTE: The whole point of routing generic payloads through witnesses
+		// The whole point of routing generic payloads through witnesses
 		// rather than the flat structural comparison — `1/2` and `2/4` are equal
 		// by Rational's own `is`, and the witness is what carries that here.
 		it("compares a Rational payload by its own equality, not by structure", async () => {
@@ -3825,7 +3825,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A payload whose Type carries no equality withholds the derive
+		// A payload whose Type carries no equality withholds the derive
 		// rather than crashing — the conformance Diagnostic surfaces instead.
 		it("withholds the derive when a payload is not Equatable", () => {
 			let diagnostics = diagnosticsOf(`implementation { ${maybe}
@@ -3858,7 +3858,7 @@ describe("Choices", () => {
 			expect(generated).toContain('"k": "w"')
 		})
 
-		// NOTE: The nested witness for `List<Maybe<Integer>>` is the derive
+		// The nested witness for `List<Maybe<Integer>>` is the derive
 		// curried with the Integer equality it compares payloads through.
 		it("wraps the nested derive witness in boundConformance", () => {
 			let generated = generate(`implementation { ${maybe}
@@ -3871,7 +3871,7 @@ describe("Choices", () => {
 			expect(generated).toContain("$helpers.boundChoiceIs(")
 		})
 
-		// NOTE: The shape the whole derive exists for — a List of a generic
+		// The shape the whole derive exists for — a List of a generic
 		// Choice compares as a List, which needs the Choice's conditional
 		// conformance as a nested witness rather than a Namespace anybody wrote.
 		it("compares two Lists of a generic Choice", async () => {
@@ -3887,7 +3887,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: The same withholding one level out — the bound is reported where
+		// The same withholding one level out — the bound is reported where
 		// the List asks its Item for equality, rather than the derive quietly
 		// comparing a Function structurally.
 		it("reports the bound at a List element site too", () => {
@@ -3901,7 +3901,7 @@ describe("Choices", () => {
 			).toContain("unsatisfied-bound")
 		})
 
-		// NOTE: Only the Parameters some payload MENTIONS are bounded — a
+		// Only the Parameters some payload MENTIONS are bounded — a
 		// phantom Parameter is equal to nothing and compares nothing, so
 		// demanding equality of it would refuse a Choice that never holds one.
 		// The Rational payload is what says the remaining witness is still the
@@ -3921,7 +3921,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// NOTE: The condition a derive solves can be another derive — the outer
+		// The condition a derive solves can be another derive — the outer
 		// `Maybe`'s witness for its payload is the inner `Maybe`'s own
 		// conditional one, curried with Integer's equality.
 		it("chains one derive's condition onto another's", async () => {
@@ -3938,7 +3938,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
 
-		// NOTE: The fallback rule holds for a generic Choice exactly as it does
+		// The fallback rule holds for a generic Choice exactly as it does
 		// for a plain one — a written Namespace decides equality at the call AND
 		// in the witness a List reaches for, so both answer the Namespace's way
 		// rather than the derive's structural one.
@@ -3973,7 +3973,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// NOTE: The shape the derive was written for and could not answer: a
+		// The shape the derive was written for and could not answer: a
 		// generic helper over a generic Choice, both spelling their Type
 		// Parameter `T`. The derived Methods borrowed the Choice's names, so the
 		// caller's `T` and the Choice's were one symbol, and the receiver's Type
@@ -4004,7 +4004,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"', '"false"'])
 		})
 
-		// NOTE: Per NAME, not per position — one Parameter colliding was enough
+		// Per NAME, not per position — one Parameter colliding was enough
 		// to lose the whole derive, so the mixed case is pinned rather than only
 		// the all-colliding one.
 		it("derives where only some of the caller's names collide", async () => {
@@ -4029,7 +4029,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: And the Diagnostic the missing bound gets is the same one it gets
+		// And the Diagnostic the missing bound gets is the same one it gets
 		// under any other name. The collision degraded it to a
 		// `no-matching-overload` about `Maybe#Some`, which points nowhere near
 		// the `is Equatable` the declaration is missing.
@@ -4051,7 +4051,7 @@ describe("Choices", () => {
 			expect(codesOf(unbounded("Elem"))).toEqual(["unsatisfied-bound"])
 		})
 
-		// NOTE: The nested-witness rail carried the collision all along — it is
+		// The nested-witness rail carried the collision all along — it is
 		// pinned beside the direct one so the two can not drift apart again.
 		it("takes a colliding name through the List witness too", async () => {
 			expect(
@@ -4070,7 +4070,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: The written Namespace above wins because it is written with
+		// The written Namespace above wins because it is written with
 		// `infer`. Without the marker it is not a competitor at all — its Type
 		// Parameter binds to nothing, so the Namespace matches no receiver and
 		// the derive answered `is` in its place, contradicting the Method in the
@@ -4104,7 +4104,7 @@ describe("Choices", () => {
 			).toEqual(["uninferred-namespace-parameter"])
 		})
 
-		// NOTE: A generic RECORD needs none of this. Its equality is the
+		// A generic RECORD needs none of this. Its equality is the
 		// runtime's structural one, which reads each member's own Type key and
 		// answers by it — so a Rational member is compared as a Rational without
 		// any compile-time witness deciding that. There is nothing to derive and
@@ -4125,7 +4125,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// NOTE: Regression tests — a payload Union with SEVERAL arms mentioning
+		// Regression tests — a payload Union with SEVERAL arms mentioning
 		// the Type Parameter emitted several fallback arms (`tag: null`), and
 		// the runtime took the first one it found for everything no arm
 		// claimed. A `T | List<T>` payload therefore compared every List
@@ -4170,12 +4170,12 @@ describe("Choices", () => {
 				).toEqual(['"true"'])
 			})
 
-			// NOTE: With no Type Arguments to shape the arms with, both stand
+			// With no Type Arguments to shape the arms with, both stand
 			// for whatever the eventual Argument turns out to be — no
 			// descriptor can be right about that, so the comparison is refused
 			// rather than emitted wrong.
 			//
-			// NOTE: Written inside generic code, because that is the only place
+			// Written inside generic code, because that is the only place
 			// left where a Choice's Type Argument IS a Type Parameter — a
 			// construction can not leave one undecided any more. The whole set is
 			// asserted, not just the refusal: the caller's `T` carries the bound
@@ -4195,7 +4195,7 @@ describe("Choices", () => {
 				).toEqual(["indistinguishable-union-arms"])
 			})
 
-			// NOTE: One generic arm is the fallback it always was, and the
+			// One generic arm is the fallback it always was, and the
 			// descriptor it emits is the one it always emitted.
 			it("leaves a single generic arm carrying no shape", () => {
 				let generated = generate(`implementation {
@@ -4211,7 +4211,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// NOTE: A non-generic Choice carries no descriptor, so it keeps emitting
+		// A non-generic Choice carries no descriptor, so it keeps emitting
 		// the flat helper — the guarantee that this whole feature adds nothing to
 		// the code a non-generic Choice already generated.
 		it("leaves a non-generic Choice emitting the flat helper", () => {
@@ -4249,13 +4249,13 @@ describe("Choices", () => {
 			expect(generated).toContain("$helpers.choiceIsNot(")
 		})
 
-		// NOTE: A written Namespace is not merely PREFERRED over the derive at
+		// A written Namespace is not merely PREFERRED over the derive at
 		// the call — the WITNESS has to be the written Method too, or a bounded
 		// Method would compare by tag while a direct call compared the
 		// Namespace's way, and the same two values would be both equal and not.
 		// Both spellings are asserted for exactly that reason.
 		//
-		// NOTE: Asserted by what the Colour call sites emit rather than by the
+		// Asserted by what the Colour call sites emit rather than by the
 		// absence of `choiceIs` anywhere: the standard library's own Choices
 		// derive their equality now, so an inlined `List.contains` drags
 		// `Ordering`'s derived `is` into this Program no matter what Colour does.
@@ -4289,7 +4289,7 @@ describe("Choices", () => {
 
 			expect(generated).toContain("Colour.is(red,")
 			expect(generated).toContain("is: Colour.is")
-			// NOTE: And `isNot` with it, though it is `Equatable`'s PROVIDED
+			// And `isNot` with it, though it is `Equatable`'s PROVIDED
 			// Method: a Namespace that writes one has replaced it, and the
 			// witness is what a bounded call reads — an override that stayed out
 			// of the map would answer a bounded call with the Protocol's body
@@ -4297,7 +4297,7 @@ describe("Choices", () => {
 			expect(generated).toContain("isNot: Colour.isNot")
 		})
 
-		// NOTE: One helper for every Choice of every Program — the whole cost of
+		// One helper for every Choice of every Program — the whole cost of
 		// the printing derive. A per Choice `match` over the Case names is what
 		// this asserts is NOT emitted.
 		it("emits the runtime helper for a derived 'toString'", () => {
@@ -4318,7 +4318,7 @@ describe("Choices", () => {
 		})
 
 		it("emits tagged Case constructions", () => {
-			// NOTE: Printed rather than merely declared, because a Constant
+			// Printed rather than merely declared, because a Constant
 			// nothing reads is a value the Program builds and drops —
 			// `eliminate-dead-code` takes one out, and a Program with nothing
 			// left in it emits nothing to ask about.
@@ -4330,14 +4330,14 @@ describe("Choices", () => {
 				Terminal.inspect(cleared)
 			}`)
 
-			// NOTE: A Case carrying a payload is built in one allocation, its
+			// A Case carrying a payload is built in one allocation, its
 			// tag written straight onto the object its members are written into
 			// — `collapse-construction`, which is what a Case construction
 			// comes out as unless that pass is turned off.
 			expect(generated).toContain(
 				'[$type.typeKeySymbol]: "CalculatorOperation#Add"',
 			)
-			// NOTE: A unit Case keeps its constructor: `createCase` hands out
+			// A unit Case keeps its constructor: `createCase` hands out
 			// one instance per tag rather than building a literal per
 			// construction.
 			expect(generated).toContain(
@@ -4355,7 +4355,7 @@ describe("Choices", () => {
 				})
 			}`
 
-			// NOTE: Nominal, and by the tag alone — the Choice and the Case are
+			// Nominal, and by the tag alone — the Choice and the Case are
 			// what the value was stamped with, and `compile-type-tests` proved
 			// the stamp is the whole question here: `#Add` is the only member of
 			// this Choice carrying that tag, and its payload is Integers the
@@ -4364,7 +4364,7 @@ describe("Choices", () => {
 				'_self[$type.typeKeySymbol] === "CalculatorOperation#Add"',
 			)
 
-			// NOTE: The same nominal question as the descriptor the runtime
+			// The same nominal question as the descriptor the runtime
 			// walks, with the pass that compiles it away turned off.
 			let unoptimised = generate(source, withoutCompiledTypeTests)
 
@@ -4382,7 +4382,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: A bare or prefixed construction resolves to the DECLARED Case, whose
+	// A bare or prefixed construction resolves to the DECLARED Case, whose
 	// members are still GenericUses; the position it stands in instantiates it,
 	// so the value carries a concrete CaseType. This is the shape WP4/WP6/WP7
 	// read back.
@@ -4402,11 +4402,11 @@ describe("Choices", () => {
 				{ type: "Integer" },
 				{ type: "String" },
 			])
-			// NOTE: An instantiated Case drops the declared-only `choiceGenerics`.
+			// An instantiated Case drops the declared-only `choiceGenerics`.
 			expect(type.choiceGenerics).toBeUndefined()
 		})
 
-		// NOTE: A payload that mentions ONE of the Choice's Generics used to leave
+		// A payload that mentions ONE of the Choice's Generics used to leave
 		// the others standing as their own Type Parameters, because it was the
 		// payload that decided them. The annotation decides every one of them now,
 		// the ones no member mentions included.
@@ -4433,7 +4433,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Plain assignability (null inference context) must REJECT a value
+		// Plain assignability (null inference context) must REJECT a value
 		// of a different instantiation — the whole reason `matchTypes` recurses
 		// into Case members rather than trusting the shared tag.
 		it("rejects a value of a different instantiation", () => {
@@ -4474,7 +4474,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: `#Case(value)` on a single-member Case may hand the value directly;
+	// `#Case(value)` on a single-member Case may hand the value directly;
 	// the Enricher wraps it into the one-member Record the rest of the pipeline
 	// expects. A payload that already fits the Record is never rewrapped.
 	describe("Single-member Shorthand", () => {
@@ -4487,7 +4487,7 @@ describe("Choices", () => {
 		})
 
 		it("emits the same Record whether written long or short", () => {
-			// NOTE: Printed for the same reason as above: a Constant nothing
+			// Printed for the same reason as above: a Constant nothing
 			// reads is one `eliminate-dead-code` drops, and two Programs that
 			// emit nothing are equal for a reason that is not this one.
 			let short = generate(`implementation { ${progressChoice}
@@ -4504,7 +4504,7 @@ describe("Choices", () => {
 			expect(short).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
 			expect(short).toContain("value")
 			expect(long).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
-			// NOTE: The whole claim, and the reason the two above are worth
+			// The whole claim, and the reason the two above are worth
 			// asserting separately: the shorthand is REWRAPPED into the Record
 			// the long form writes, so the two emit the same text.
 			expect(short).toBe(long)
@@ -4566,7 +4566,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: The load-bearing case — a user-defined generic Choice and a user
+	// The load-bearing case — a user-defined generic Choice and a user
 	// Namespace static Method shaped like the general loop driver, with the
 	// callback's `Result` inferred through the `#Stopped` payload.
 	describe("End-to-end Inference", () => {
@@ -4660,7 +4660,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: `case #Value(item)` — the binder names what the CONSTRUCTOR takes,
+	// `case #Value(item)` — the binder names what the CONSTRUCTOR takes,
 	// which is the whole rule. `@` is deliberately untouched by it, so these
 	// pin BOTH: the bound name reads the payload, and `@` still reads the Case.
 	describe("Case Matcher payload bindings", () => {
@@ -4705,7 +4705,7 @@ describe("Choices", () => {
 		})
 
 		it("hands the whole Case onwards from a bound arm", async () => {
-			// NOTE: The reason `@` is not redefined as the payload — rebuilding
+			// The reason `@` is not redefined as the payload — rebuilding
 			// the Case to pass it on would be the cost of that choice.
 			expect(
 				await run(`implementation {
@@ -4750,7 +4750,7 @@ describe("Choices", () => {
 			)
 		})
 
-		// NOTE: A NAME is what a multi-member Case has nothing single to bind;
+		// A NAME is what a multi-member Case has nothing single to bind;
 		// a Pattern is the form that takes such a payload apart, and the help
 		// names it rather than sending the reader back to `@.member`.
 		it("refuses a NAME on a Case that carries several, naming them", () => {
@@ -4778,7 +4778,7 @@ describe("Choices", () => {
 		})
 
 		it("lets a Guard name the binding", async () => {
-			// NOTE: The Guard is emitted into the Handler's test, which runs
+			// The Guard is emitted into the Handler's test, which runs
 			// before the body's constant exists — so the name resolves there
 			// into the `@.radius` it stands for instead. Safe because the
 			// Matcher's own check is ANDed in front of it.
@@ -4804,7 +4804,7 @@ describe("Choices", () => {
 		})
 
 		it("lets a Handler's own binding shadow the one a Guard was lent", async () => {
-			// NOTE: The alias is read off the Scope that declares the name, so
+			// The alias is read off the Scope that declares the name, so
 			// the callback's Parameter wins inside the callback — the List is
 			// what is searched, not the payload.
 			expect(
@@ -4860,7 +4860,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// NOTE: A payload shape may carry a `= { … }` the construction is filled out
+	// A payload shape may carry a `= { … }` the construction is filled out
 	// of. Unlike a Parameter's default there is no callee to fill it in at — a
 	// Case is built where it is written, and that may be a Module that never
 	// named the Choice — so the value travels on the Case Type and is spliced
@@ -4910,7 +4910,7 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Get { url = "/x", retries = 3 }'])
 		})
 
-		// NOTE: A payload is merged into its default exactly as an Argument is
+		// A payload is merged into its default exactly as an Argument is
 		// merged into a Parameter's, so it takes path keys for the same reason —
 		// and the Case is filled in where it is CONSTRUCTED, so the merge is
 		// spliced per site rather than made at a callee.
@@ -4935,7 +4935,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: The members a level WROTE come first and the ones the
+			// The members a level WROTE come first and the ones the
 			// default filled in follow, one level down exactly as they do at the
 			// top — `#Get({ url = "/x" })` prints `url` before `retries` for the
 			// same reason.
@@ -4951,7 +4951,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// NOTE: A member written WHOLE replaces, which is the one difference
+			// A member written WHOLE replaces, which is the one difference
 			// between the two spellings and the reason a path key is spelled at
 			// all.
 			it("leaves a member written whole a replacement", async () => {
@@ -4999,7 +4999,7 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Blank { tags = [], title = "" }'])
 		})
 
-		// NOTE: A bare `#Case` stays a UNIT Case's spelling however much of a
+		// A bare `#Case` stays a UNIT Case's spelling however much of a
 		// payload is defaulted — the rule the marshaller's bare-Case strings
 		// live by, and the reason `#Blank({})` above is the spelling.
 		it("still refuses a bare Case whose payload is defaulted in full", () => {
@@ -5023,7 +5023,7 @@ describe("Choices", () => {
 			)
 		})
 
-		// NOTE: The same `data` an Argument's own partial carries — a payload
+		// The same `data` an Argument's own partial carries — a payload
 		// is a Record Literal measured against a default, and one scaffold
 		// answers both.
 		it("carries those members as data for the scaffold", () => {
@@ -5034,7 +5034,7 @@ describe("Choices", () => {
 			).toEqual({ kind: "missing-members", names: ["url"] })
 		})
 
-		// NOTE: A member with the wrong Type is not a partial of the payload at
+		// A member with the wrong Type is not a partial of the payload at
 		// all, so the payload is measured whole and named whole.
 		it("keeps payload-type-mismatch for a member of the wrong Type", () => {
 			expect(
@@ -5044,7 +5044,7 @@ describe("Choices", () => {
 			).toContain("payload-type-mismatch")
 		})
 
-		// NOTE: Only a payload WRITTEN as a Record Literal may leave a member
+		// Only a payload WRITTEN as a Record Literal may leave a member
 		// out: width subtyping lets any other value carry more members than its
 		// Type names, and the members the splice fills in are exactly the ones
 		// its Type left it without.
@@ -5101,7 +5101,7 @@ describe("Choices", () => {
 			).toContain("case-default-not-a-literal")
 		})
 
-		// NOTE: A Case is constructed wherever its Choice is in reach, so no
+		// A Case is constructed wherever its Choice is in reach, so no
 		// Expression may be spliced into a construction — but a Constant of the
 		// declaring Module can be READ there, at the declaration, and its value
 		// baked into the Case Type as data. What travels is a value either way.
@@ -5179,7 +5179,7 @@ describe("Choices", () => {
 				)
 			})
 
-			// NOTE: The refusal follows the CHAIN — a Constant that holds a
+			// The refusal follows the CHAIN — a Constant that holds a
 			// written Record whose member is worked out is not a literal either —
 			// and reports at the name the default wrote, not at the leaf.
 			it("refuses a Constant that reaches a worked-out value", () => {
@@ -5203,7 +5203,7 @@ describe("Choices", () => {
 				)
 			})
 
-			// NOTE: A Pattern Declaration is the Constants an author could have
+			// A Pattern Declaration is the Constants an author could have
 			// written, and each one reads a member off the value — a Lookup, and
 			// no literal. It is refused for what it IS rather than for a name
 			// this Module supposedly does not declare.
@@ -5223,7 +5223,7 @@ describe("Choices", () => {
 				expect(reported[0].message).toBe(
 					"The Constant 'small' does not hold a literal",
 				)
-				// NOTE: The binding's value stands at the span of the name it
+				// The binding's value stands at the span of the name it
 				// binds, so the declaration label would repeat one already
 				// there.
 				expect(reported[0].labels).toHaveLength(2)
@@ -5246,7 +5246,7 @@ describe("Choices", () => {
 				)
 			})
 
-			// NOTE: The standard library is a graph of Modules like any other
+			// The standard library is a graph of Modules like any other
 			// and its files carry a top level Scope of their own, so the rule
 			// holds there too — one map per FILE, which is also what keeps the
 			// Diagnostic pointing inside the file being reported on. The loader
@@ -5271,7 +5271,7 @@ describe("Choices", () => {
 				).not.toThrow()
 			})
 
-			// NOTE: A Constant does not hoist, and a payload default is read at
+			// A Constant does not hoist, and a payload default is read at
 			// the Choice's own Statement — so one written below it is not there
 			// yet, and `unknown-name` is the whole of the answer.
 			it("refuses a Constant declared below the Choice", () => {
@@ -5286,7 +5286,7 @@ describe("Choices", () => {
 				).toEqual(["unknown-name"])
 			})
 
-			// NOTE: The Constant a name stands for is read off the Scope that
+			// The Constant a name stands for is read off the Scope that
 			// DECLARES it, so a binding closer in answers with nothing rather than
 			// with the Module Constant it hides.
 			it("refuses a binding that shadows a Constant", () => {
@@ -5343,7 +5343,7 @@ describe("Choices", () => {
 			).toContain("case-default-on-generic-choice")
 		})
 
-		// NOTE: The one-member shorthand asks whether the payload fits the
+		// The one-member shorthand asks whether the payload fits the
 		// payload Record; with a default it asks whether it is a PARTIAL of one,
 		// so `#Only({})` is a payload and not the member's value. Everything
 		// that is not a Record Literal is wrapped exactly as before.

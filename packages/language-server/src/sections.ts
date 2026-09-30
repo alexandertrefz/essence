@@ -2,7 +2,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "./positions"
 
-// NOTE: A Program is no longer one list of Statements. Below the implementation
+// A Program is no longer one list of Statements. Below the implementation
 // stands the `tests { … }` block, and inside it every test and every suite
 // opens a body of its own — so a request that walks `implementation.nodes` and
 // stops there answers about half a file. This is the ONE walk that reaches all
@@ -30,18 +30,18 @@ type SectionKind = "implementation" | "tests" | "suite" | "test"
 
 export type ParserSection = {
 	kind: SectionKind
-	// NOTE: Read in the PARENT's Scope — see the note above.
+	// Read in the PARENT's Scope — see the note above.
 	head: Array<parser.ImplementationNode>
-	// NOTE: The Statements written directly in the Section, and the head
+	// The Statements written directly in the Section, and the head
 	// Expressions that are read in its own Scope. A test and a suite standing
 	// here are NOT among them: each is a Section of its own.
 	nodes: Array<parser.ImplementationNode>
-	// NOTE: What the Section binds that no Statement of it declares — the row
+	// What the Section binds that no Statement of it declares — the row
 	// Parameter of `across [ … ] (row: Row)` and the generated Parameters of
 	// `for any (a: T, b: U)`. Empty everywhere else, which is every Section but
 	// a test's.
 	parameters: Array<parser.ParameterNode>
-	// NOTE: The whole form — `implementation { … }`, `tests { … }`,
+	// The whole form — `implementation { … }`, `tests { … }`,
 	// `suite "…" { … }`, `test "…" { … }` — which is the span the Scope covers.
 	// A test's head is inside it on purpose: the row a table binds is in reach
 	// of the name, and the name is written in the head.
@@ -53,7 +53,7 @@ type TypedSection = {
 	kind: SectionKind
 	head: Array<common.typed.ImplementationNode>
 	nodes: Array<common.typed.ImplementationNode>
-	// NOTE: The Parameters `for any` generates a value of, which carry a Type
+	// The Parameters `for any` generates a value of, which carry a Type
 	// and a Position and are named by no Node of the body. A table's row is
 	// absent because the typed table names it with a string rather than an
 	// Identifier — what the row IS is answered by the Statements that read it.
@@ -62,7 +62,7 @@ type TypedSection = {
 	parent: TypedSection | null
 }
 
-// NOTE: `TestsNode` is a test, a suite, or any ordinary Statement. The two
+// `TestsNode` is a test, a suite, or any ordinary Statement. The two
 // items open Sections of their own, so what is left is the Section's Statements.
 function isStatement(
 	node: parser.TestsNode,
@@ -76,7 +76,7 @@ function isTypedStatement(
 	return node.nodeType !== "Test" && node.nodeType !== "Suite"
 }
 
-// NOTE: Depth first and in source order, the implementation first — so a walk
+// Depth first and in source order, the implementation first — so a walk
 // that carries state down the list meets a Section only after the one it is
 // nested in.
 export function programSections(program: parser.Program): Array<ParserSection> {
@@ -141,7 +141,7 @@ function testSection(
 
 	return {
 		kind: "test",
-		// NOTE: The rows are written outside the body and read there — a row
+		// The rows are written outside the body and read there — a row
 		// can not name the row Parameter it is bound to. Every other test
 		// reads its name outside as well; only a table's is worked out where
 		// the row is bound.
@@ -156,7 +156,7 @@ function testSection(
 	}
 }
 
-// NOTE: The typed side of the same walk. It covers the tests the SOURCE wrote:
+// The typed side of the same walk. It covers the tests the SOURCE wrote:
 // the section the Enricher hands back also holds the `@example` blocks, turned
 // into the tests they are, and those stand at Positions inside a Comment. A
 // Semantic Token drawn over a Comment and a rename edit written into one are
@@ -233,7 +233,7 @@ function typedTestSection(
 	return {
 		kind: "test",
 		head: table === null ? [node.name] : table.rows,
-		// NOTE: What a Pattern row Parameter binds stands on the table rather
+		// What a Pattern row Parameter binds stands on the table rather
 		// than at the head of the body, because the NAME reads it too — so it
 		// is read here in front of both.
 		nodes:
@@ -246,7 +246,7 @@ function typedTestSection(
 	}
 }
 
-// NOTE: What the many walkers that care about Statements and not about Scopes
+// What the many walkers that care about Statements and not about Scopes
 // ask for: every body a Program holds, head Expressions included, in the order
 // the Sections stand in.
 export function programBodies(
@@ -267,7 +267,7 @@ export function typedProgramBodies(
 	])
 }
 
-// NOTE: Every Statement of every body, flattened — for the passes that only
+// Every Statement of every body, flattened — for the passes that only
 // ever ask "is there a Node of this kind anywhere in the file", and would
 // otherwise write the same two loops each.
 export function programNodes(

@@ -4,14 +4,14 @@ import type { OptimiserPass } from "../index"
 import { isPureExpression, withoutOverloadSuffix } from "../purity"
 import { rewriteExpressions } from "../walk"
 
-// NOTE: The primitive operations of the language, written out where they were
+// The primitive operations of the language, written out where they were
 // called. `a::isLessThan(b)` on two Integers is `a.value < b.value`, and it was
 // a call into a Namespace whose Method called `Integer.compare`, which built an
 // `Ordering` Case, which was compared against `#Less` — three calls and an
 // allocation to decide something JavaScript decides with one `<`, on the
 // bigints both values were holding all along.
 //
-// NOTE: It matters far past the sites a Program writes, because the standard
+// It matters far past the sites a Program writes, because the standard
 // library's own bodies are optimised alongside it and this is what THEY are
 // made of: `isLessThanOrEqualTo` is `@::isGreaterThan(other)::negate()`,
 // `subtract` is `@::add(other::negate())`, `isNot` is `@::is(other)::negate()`.
@@ -19,7 +19,7 @@ import { rewriteExpressions } from "../walk"
 // lower like any other site and every Program is compiled against the lowered
 // ones.
 //
-// NOTE: What makes it safe is that the Types are EXACT. `Integer` means an
+// What makes it safe is that the Types are EXACT. `Integer` means an
 // Integer and nothing else — not a Union it is a member of, not a Type
 // Parameter that could be one — so the value at run time is the branded object
 // the runtime's own constructor built, holding a number or a bigint under
@@ -31,7 +31,7 @@ import { rewriteExpressions } from "../walk"
 // Mixed kinds are left alone — an Integer beside a Rational is a widening the
 // covering Namespace decides, and cross-multiplication is not `===`.
 //
-// NOTE: And that ARGUMENT ORDER survives. Essence evaluates every Argument
+// And that ARGUMENT ORDER survives. Essence evaluates every Argument
 // before the call, so a lowering may not put one behind a JavaScript operator
 // that might skip it: `&&` and `||` are used only over an operand that can be
 // proven to observe nothing, and otherwise the call stays exactly as it was.
@@ -40,7 +40,7 @@ import { rewriteExpressions } from "../walk"
 export const lowerScalarOperations: OptimiserPass = {
 	name: "lower-scalar-operations",
 	run: (program, namespaces) => {
-		// NOTE: A Program may write `namespace Integer for Integer` in a block
+		// A Program may write `namespace Integer for Integer` in a block
 		// of its own and give it an `isLessThan` that answers whatever it likes
 		// — the name is free there, and it stands in front of the builtin for
 		// the rest of the block. Such an Invocation carries the same Namespace
@@ -51,7 +51,7 @@ export const lowerScalarOperations: OptimiserPass = {
 		// the whole Program, which costs a Program that writes one nothing it
 		// can measure.
 		//
-		// NOTE: The same set answers the purity question, and has to. Refusing
+		// The same set answers the purity question, and has to. Refusing
 		// to LOWER `5::isLessThan(3)` says nothing about whether that call may
 		// be skipped where it stands as the Argument of an `and` — and it may
 		// not, for exactly the reason it may not be lowered.
@@ -75,7 +75,7 @@ function lower(
 
 	let member = withoutOverloadSuffix(node.member.name)
 
-	// NOTE: A PROVIDED Method is named by the Namespace whose conformance put it
+	// A PROVIDED Method is named by the Namespace whose conformance put it
 	// in reach — `Integer` for `5::isNot(3)`, `String` for two Strings — so the
 	// Protocol that WROTE the body is the only thing that says which lowering
 	// applies. Asked before the Namespace name, which would otherwise send an
@@ -89,7 +89,7 @@ function lower(
 	switch (node.base.name) {
 		case "Integer":
 			return lowerInteger(node, member)
-		// NOTE: A refinement is erased before the first pass runs, so the
+		// A refinement is erased before the first pass runs, so the
 		// operands and the answer are plain Integers by the time this reads them
 		// — but the Method the Simplifier emitted is still the refined
 		// Namespace's, and a name is all this pass has to go by. `NonZeroInteger`
@@ -97,7 +97,7 @@ function lower(
 		// Integers: the same bigints, the same operator, and evidence that was
 		// spent while compiling.
 		//
-		// NOTE: That name now covers THREE entries. The other two scale an
+		// That name now covers THREE entries. The other two scale an
 		// Algebraic or a Transcendental, and each is a call into the irrational's
 		// own arithmetic that no bigint operator stands for. The overload index is
 		// not what tells them apart — `withoutOverloadSuffix` took it off above,
@@ -109,7 +109,7 @@ function lower(
 		// because the answer's size is the exponent's value rather than its length.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
-		// NOTE: The two other refinements of Integer, and the one holding both
+		// The two other refinements of Integer, and the one holding both
 		// proofs, for the same reason. Each closes over `add` or `multiply` or
 		// both by re-exporting Integer's own sum and product — the same
 		// operator over the same operands, with the proof already spent — so
@@ -130,7 +130,7 @@ function lower(
 	}
 }
 
-// NOTE: `isNot` is a Protocol's PROVIDED Method — one body over `Self`, shared
+// `isNot` is a Protocol's PROVIDED Method — one body over `Self`, shared
 // by every conformer — so its Invocation carries the conformance witness as a
 // trailing Argument. Everything the lowering rests on is unchanged: the
 // receiver's Type is still exactly an Integer or exactly a String, and what the
@@ -162,7 +162,7 @@ function lowerProvidedEquatable(
 		: equality(node, kind, operands[0], operands[1], true)
 }
 
-// NOTE: The comparison family, equality, and the three exact operations.
+// The comparison family, equality, and the three exact operations.
 // `divide` is absent because it answers an Optional — dividing by zero is
 // empty — and `quotient`, `remainder` and `raise` for the same reason or
 // because their cost is in the answer's size rather than in the call.
@@ -202,7 +202,7 @@ function lowerInteger(
 	}
 }
 
-// NOTE: Equality of two Strings is NOT `===` on what they hold. A String
+// Equality of two Strings is NOT `===` on what they hold. A String
 // compares by its characters after canonical normalisation, so an accent
 // written as one code point equals the same accent written as two — which is
 // what `String.compare` decides and what `String.is` is written on. The
@@ -242,7 +242,7 @@ function lowerBoolean(
 
 	let booleanType = node.type
 
-	// NOTE: `negate` is the language's `not`, and it takes only the receiver —
+	// `negate` is the language's `not`, and it takes only the receiver —
 	// which is evaluated wherever the answer comes from, so there is no
 	// Argument to skip and nothing to prove about one.
 	if (member === "negate") {
@@ -275,7 +275,7 @@ function lowerBoolean(
 
 	let [left, right] = operands
 
-	// NOTE: THE ONE PLACE THIS PASS CAN BE WRONG, and the reason
+	// THE ONE PLACE THIS PASS CAN BE WRONG, and the reason
 	// `isPureExpression` exists. `a::and(b)` evaluates `b` and then calls; `a &&
 	// b` evaluates `b` only when `a` is true. Where `b` prints, assigns, or is a
 	// call that might do either — or might not come back at all — the two are
@@ -283,7 +283,7 @@ function lowerBoolean(
 	// instead would need both operands in temporaries, which is a Statement,
 	// which is a shape this pass does not produce.
 	//
-	// NOTE: The whole SUBTREE is asked, not the Node standing at its top. What
+	// The whole SUBTREE is asked, not the Node standing at its top. What
 	// `and` skips is everything the Argument would have evaluated, so an
 	// Invocation on a shadowed Namespace nested three Expressions down is as
 	// much a reason to leave the call alone as one written directly.
@@ -306,14 +306,14 @@ function lowerBoolean(
 	)
 }
 
-// NOTE: The receiver and the one declared Parameter, both of EXACTLY the named
+// The receiver and the one declared Parameter, both of EXACTLY the named
 // kind — and null for anything else, which is where every Type question this
 // pass rests on is asked. A Union-typed operand, a Type Parameter, a second
 // Parameter (`is(_ other, comparing sensitivity)` is a different Method) or an
 // Invocation shape the Simplifier did not produce all answer null and are left
 // to the Namespace that understands them.
 //
-// NOTE: `arity` is the whole Argument count the Invocation must have, and it is
+// `arity` is the whole Argument count the Invocation must have, and it is
 // asked rather than assumed: a Protocol's provided Method carries the
 // conformance witness behind the declared Parameters, so its `isNot` is three
 // Arguments where the written one was two.
@@ -421,7 +421,7 @@ function arithmetic(
 	}
 }
 
-// NOTE: A raw test as an Essence Boolean. Both Nodes carry the Invocation's
+// A raw test as an Essence Boolean. Both Nodes carry the Invocation's
 // Position, which is the span of the whole operation as it was written — there
 // is no smaller piece of source for the test alone to point at.
 function essenceBoolean(
@@ -438,7 +438,7 @@ function essenceBoolean(
 	}
 }
 
-// NOTE: A Boolean value as the JavaScript boolean inside it — and, where the
+// A Boolean value as the JavaScript boolean inside it — and, where the
 // value is one this pass just built, the test it was built from. The walk is
 // bottom-up, so `@::isGreaterThan(other)::negate()` reaches `negate` with its
 // operand already lowered: unwrapping is what keeps the answer one comparison
@@ -460,7 +460,7 @@ function rawBooleanOf(
 	}
 }
 
-// NOTE: The opposite of a raw test, asked rather than negated wherever the test
+// The opposite of a raw test, asked rather than negated wherever the test
 // has an opposite to ask. Each rewrite below is an identity over the values
 // that can reach it: the Integers a `raw-compare` reads are totally ordered
 // whichever of their two representations each is holding, with no value unequal

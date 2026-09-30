@@ -12,7 +12,7 @@
 //
 // Exit 0 when every link resolves; 1 otherwise, with one line per broken link.
 //
-// NOTE: It reads the BUILT site rather than the pages' sources, because an id
+// It reads the BUILT site rather than the pages' sources, because an id
 // is not something a page's source spells: a heading's comes from the slugger,
 // a library member's from the generator, a CLI flag's from a `<span>` — and
 // the link a reader follows is only broken or not once all of them have run.

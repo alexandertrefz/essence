@@ -1,9 +1,9 @@
-// NOTE: The runtime module of the `NonEmptyString` Namespace — the Strings a
+// The runtime module of the `NonEmptyString` Namespace — the Strings a
 // Program has proven have a character in them. The Simplifier emits
 // `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
 // this is the whole of it.
 //
-// NOTE: A refinement erases before anything runs, so what arrives is an
+// A refinement erases before anything runs, so what arrives is an
 // ordinary `StringType` and the evidence the Type carried was spent while
 // compiling. Read off a String nothing proved anything about, the first
 // character of an empty view is `undefined` — and that this can not happen is
@@ -12,7 +12,7 @@
 // way to be told that it holds.
 import { characterIn, type StringType } from "./String"
 
-// NOTE: Both ends are `String::character(at:)` without its `Optional` — the
+// Both ends are `String::character(at:)` without its `Optional` — the
 // same one reader, which takes the two-branch shape that Method takes: an ASCII
 // String is read by UNIT, and every other one comes through the character view.
 // Reading one end off the WHOLE view builds an Array of every character to hand
@@ -25,7 +25,7 @@ import { characterIn, type StringType } from "./String"
 // of a `split` is, so a Method asked about the answer does not rescan it, and
 // that mark is what `asciiFastPath.spec.ts` reads to say which branch ran.
 //
-// NOTE: The `!` is where the proof is spent. A position inside the String
+// The `!` is where the proof is spent. A position inside the String
 // answers a character, and 0 and -1 are inside every String that has one; the
 // `undefined` the reader answers past either end is what only an EMPTY receiver
 // could reach, and that this one is not empty is exactly what the Namespace's
@@ -38,7 +38,7 @@ export function lastCharacter(string: StringType): StringType {
 	return characterIn(string, -1)!
 }
 
-// NOTE: Everything below is `String`'s own Function under this Namespace's
+// Everything below is `String`'s own Function under this Namespace's
 // name. The characters are the same segmentation and the count is the same
 // walk, and the four transforms are the same operations — none of them can
 // empty a String that was not empty, which is all the refined answer says.

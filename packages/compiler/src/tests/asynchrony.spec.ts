@@ -14,13 +14,13 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: Asynchrony end to end — the two Keywords, the two Types, the rule that
+// Asynchrony end to end — the two Keywords, the two Types, the rule that
 // makes a body a completing one, and what all of it emits. Every claim about
 // what a Program MEANS is made by running it: a future is a description, and the
 // difference between a description that ran and one that did not is not visible
 // in a Type.
 //
-// NOTE: `Async.deferred` is the base case every Program here rests on. It is the
+// `Async.deferred` is the base case every Program here rests on. It is the
 // one way to build a future out of nothing — a completing body wraps a future it
 // already has, `start` runs one and `complete` reads one — so a Program with no
 // native answering a Future can not write one down at all.
@@ -46,7 +46,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: `await import`, and not because this file prefers it: a Program that
+// `await import`, and not because this file prefers it: a Program that
 // completes anything at its top level emits a top-level `await`, which is a
 // Module a `require` can not read at all.
 async function run(source: string): Promise<Array<string>> {
@@ -97,7 +97,7 @@ function codesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.code)
 }
 
-// NOTE: The Type the last top level Constant was inferred at, spelled the way a
+// The Type the last top level Constant was inferred at, spelled the way a
 // Hover spells it — which is what the claims about `start` and `complete`
 // answering are about.
 function lastConstantType(source: string): string {
@@ -135,7 +135,7 @@ describe("Asynchrony", () => {
 			).toEqual(["FunctionInvocation", "Start", "Complete"])
 		})
 
-		// NOTE: The whole postfix chain belongs to the Keyword, which is what
+		// The whole postfix chain belongs to the Keyword, which is what
 		// makes the everyday call — a future built by a call and completed —
 		// need nothing written around it.
 		it("takes the whole postfix chain as the operand", () => {
@@ -172,7 +172,7 @@ describe("Asynchrony", () => {
 			}
 		})
 
-		// NOTE: Both words are CONTEXTUAL — the Keyword only in front of an
+		// Both words are CONTEXTUAL — the Keyword only in front of an
 		// Expression, an ordinary name everywhere else, which is the rule
 		// `expect` and `require` are read by. The positions below are the ones
 		// the standard library, the fixtures, the examples and the docs write
@@ -232,7 +232,7 @@ describe("Asynchrony", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The one name the two words may not be, and the price of the
+		// The one name the two words may not be, and the price of the
 		// contextual reading. An Argument's label stands exactly where the
 		// prefix form opens, so the Keyword wins there as it wins everywhere —
 		// which is what lets `Terminal.print(complete headline(url))` be the
@@ -256,7 +256,7 @@ describe("Asynchrony", () => {
 			expect(node.value.arguments[0]!.value.nodeType).toBe("Start")
 		})
 
-		// NOTE: The other side of that: a Parameter's label may not be spelled
+		// The other side of that: a Parameter's label may not be spelled
 		// with either word, and the signature is where it is refused. A call
 		// could never satisfy such a label — `compute(start 1)` is a `start` of
 		// `1` — so the Declaration answers for it once rather than every call
@@ -282,7 +282,7 @@ describe("Asynchrony", () => {
 			).toEqual(["reserved-parameter-label"])
 		})
 
-		// NOTE: A Parameter NAMED with either word behind a label of its own is
+		// A Parameter NAMED with either word behind a label of its own is
 		// untouched — it is the label the caller writes, and the name is the
 		// body's alone.
 		it("reads either word as a Parameter's name behind '_'", () => {
@@ -297,7 +297,7 @@ describe("Asynchrony", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And where the word does NOT open the Keyword form in Argument
+		// And where the word does NOT open the Keyword form in Argument
 		// position, it is a name and what follows is read off it — never a
 		// label, which nothing could declare.
 		it("reads a member path behind either word as a read off a name", () => {
@@ -318,7 +318,7 @@ describe("Asynchrony", () => {
 			expect(node.value.arguments[0]!.value.nodeType).toBe("Lookup")
 		})
 
-		// NOTE: The line is half the rule. A Statement ending on one of the
+		// The line is half the rule. A Statement ending on one of the
 		// words and a Statement opening with an Expression read as TWO, because
 		// the operand of a `start` begins on the `start`'s own line or the word
 		// is a name. Without that, Essence ending a Statement at the end of its
@@ -342,7 +342,7 @@ describe("Asynchrony", () => {
 			expect(held.value.nodeType).toBe("Identifier")
 		})
 
-		// NOTE: And an operand written over several lines still begins on the
+		// And an operand written over several lines still begins on the
 		// Keyword's own line, which is why the line rule costs nothing anybody
 		// writes.
 		it("reads an operand whose Arguments are broken over lines", () => {
@@ -361,7 +361,7 @@ describe("Asynchrony", () => {
 			expect(answered.value.nodeType).toBe("Complete")
 		})
 
-		// NOTE: The Tokens that begin an Expression and yet only ever stand
+		// The Tokens that begin an Expression and yet only ever stand
 		// where one has ENDED — every one of them can follow a value named
 		// `start` or `complete`, and the Keyword reading of any of them was a
 		// `needless-start` at best. `{` alone covers three forms: an `if`'s
@@ -403,7 +403,7 @@ describe("Asynchrony", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And where nothing follows at all the word is a name, so it is
+		// And where nothing follows at all the word is a name, so it is
 		// the Enricher that answers for one nothing declared — the Parser has
 		// no refusal of its own left to make.
 		it("reads a word with nothing behind it as a name", () => {
@@ -438,7 +438,7 @@ describe("Asynchrony", () => {
 			).toBe("String")
 		})
 
-		// NOTE: A Union of work is reachable from a `define`, a `match` or an
+		// A Union of work is reachable from a `define`, a `match` or an
 		// `if` whose arms answer different Future Types, and the runtime reads
 		// it MEMBER BY MEMBER: a Future is run, a Started is waited for, and
 		// anything else is its own answer. So the Type is read the same way —
@@ -498,7 +498,7 @@ describe("Asynchrony", () => {
 			).toBe("Started<Integer> | String")
 		})
 
-		// NOTE: And what it is not: a Union with no work in it is the same
+		// And what it is not: a Union with no work in it is the same
 		// `needless-*` Warning a single value of that Type is.
 		it("still refuses a Union holding no work at all", () => {
 			expect(
@@ -519,7 +519,7 @@ describe("Asynchrony", () => {
 			).toEqual(["needless-complete", "needless-start"])
 		})
 
-		// NOTE: A Statement holding a Union of work drops exactly as much as one
+		// A Statement holding a Union of work drops exactly as much as one
 		// holding a single Future, so it is the same two Diagnostics.
 		it("names a Union of work dropped in a Statement", () => {
 			expect(
@@ -541,7 +541,7 @@ describe("Asynchrony", () => {
 			).toEqual(["unused-future", "unobserved-started"])
 		})
 
-		// NOTE: A completing body is written as though it answered the value,
+		// A completing body is written as though it answered the value,
 		// and the future is what the emission wraps around it — so a `<-`
 		// answering the inner Type is what compiles, and one answering the
 		// future is the mistake.
@@ -562,7 +562,7 @@ ${deferredThree}
 			).toEqual(["return-type-mismatch"])
 		})
 
-		// NOTE: And the note that says so names the Type the `<-` answers with
+		// And the note that says so names the Type the `<-` answers with
 		// rather than the one the signature declares — a reader checking the
 		// note against `-> Future<Integer>` would otherwise find the two
 		// disagreeing.
@@ -579,7 +579,7 @@ ${deferredThree}
 			)
 		})
 
-		// NOTE: A body that completes NOTHING is ordinary — it hands back a
+		// A body that completes NOTHING is ordinary — it hands back a
 		// future it assembled, and its `<-` answers the future itself.
 		it("holds an ordinary body to the Future it declared", () => {
 			expect(
@@ -601,7 +601,7 @@ ${deferredThree}
 			).toBe("NonEmptyList<Future<Integer>>")
 		})
 
-		// NOTE: A `complete` written inside a Function literal belongs to THAT
+		// A `complete` written inside a Function literal belongs to THAT
 		// literal — the mark is about the body the word stands in, and a
 		// literal has a body of its own.
 		it("marks the nearest body, not the one around it", () => {
@@ -620,7 +620,7 @@ ${deferredThree}
 	})
 
 	describe("the Diagnostics", () => {
-		// NOTE: Both Types take their one Type Argument, and a bare spelling is
+		// Both Types take their one Type Argument, and a bare spelling is
 		// refused exactly as a bare `Optional` is. There is no unapplied Type to
 		// mean — the name resolves to the applied shape with its slot left
 		// Unknown — so a written `Future` meant `Future<Unknown>`, and `complete`
@@ -652,7 +652,7 @@ ${deferredThree}
 			).toEqual(["wrong-type-argument-count"])
 		})
 
-		// NOTE: The Program the hole was found through, refused now at the
+		// The Program the hole was found through, refused now at the
 		// annotation that opened it. Nothing downstream of the refusal is
 		// reported: the recovery is the container with an Error inside it, and an
 		// Error is already somebody's Diagnostic.
@@ -706,7 +706,7 @@ ${deferredThree}
 			expect(diagnostics[0]!.helps?.[0]).toContain("'complete'")
 		})
 
-		// NOTE: Fire and forget is a real thing to write, so it is an
+		// Fire and forget is a real thing to write, so it is an
 		// Information rather than a complaint.
 		it("mentions a Started nobody waits for", () => {
 			let diagnostics = diagnosticsOf(`implementation {
@@ -740,7 +740,7 @@ ${deferredThree}
 			).toEqual(["needless-start"])
 		})
 
-		// NOTE: The four Helps a mismatch gets where the difference is one
+		// The four Helps a mismatch gets where the difference is one
 		// missing word rather than a wrong value.
 		it("says which word a mismatch is missing", () => {
 			let unstarted = diagnosticsOf(`implementation {
@@ -779,7 +779,7 @@ ${deferredThree}
 			expect(completing[0]!.helps?.[0]).toContain("Add 'complete'")
 		})
 
-		// NOTE: And the same answer as DATA, at every one of the five sites
+		// And the same answer as DATA, at every one of the five sites
 		// that reports it. A Quick Fix reads this rather than the Help's
 		// sentence: the Helps are written per site, in wording that is free to
 		// change, and a fix keyed on prose stops firing with the suite green.
@@ -853,7 +853,7 @@ ${deferredThree}
 			)
 		})
 
-		// NOTE: The context is `$ctx` where a completing body encloses the site
+		// The context is `$ctx` where a completing body encloses the site
 		// and a fresh root where none does — which is a question about the
 		// emitted JavaScript rather than about the Program.
 		it("starts top level work under a root context", () => {
@@ -872,7 +872,7 @@ ${deferredThree}
 			)
 		})
 
-		// NOTE: A Match is emitted as a Function the Rewriter calls, and an
+		// A Match is emitted as a Function the Rewriter calls, and an
 		// `await` belongs to the nearest enclosing Function — so a Handler that
 		// waits makes that wrapper `async` and the call awaited. It is asked of
 		// a Match in an ARGUMENT, because a Match standing where a Statement may
@@ -894,7 +894,7 @@ ${deferredThree}
 			expect(await run(source)).toEqual(["42", "1"])
 		})
 
-		// NOTE: An Essence Boolean is an object, so a Condition reads the
+		// An Essence Boolean is an object, so a Condition reads the
 		// `value` off it — and off an `await` that has to be parenthesised, or
 		// the read binds to the operand instead.
 		it("parenthesises a value read off an await", () => {
@@ -929,7 +929,7 @@ ${deferredThree}
 			).toEqual(['"built"', '"ran"', "1"])
 		})
 
-		// NOTE: A Future is a description, so each start is a fresh run. A
+		// A Future is a description, so each start is a fresh run. A
 		// Started is one run, so completing it twice answers the same value and
 		// runs nothing the second time.
 		it("runs a Future per start and a Started once", async () => {
@@ -966,7 +966,7 @@ ${deferredThree}
 			).toEqual(["42"])
 		})
 
-		// NOTE: A sync closure written inside a completing body closes over its
+		// A sync closure written inside a completing body closes over its
 		// `$ctx`, so what it starts belongs to the run that built it.
 		it("starts work from inside a closure the body wrote", async () => {
 			expect(

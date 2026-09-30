@@ -31,7 +31,7 @@ let {
 let documentTitle = bareTitle ? title : `${title} — ${SITE_NAME}`
 let canonical = new URL(Astro.url.pathname, Astro.site)
 
-// NOTE: A description is displayed with its `backticked` spans promoted to
+// A description is displayed with its `backticked` spans promoted to
 // inline code (see `RichText`), but a meta tag has no markup to promote them
 // into — the backticks would be shown verbatim in a search result.
 let metaDescription = description.replaceAll("`", "")

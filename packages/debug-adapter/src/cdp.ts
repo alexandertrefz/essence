@@ -1,4 +1,4 @@
-// NOTE: The debuggee side of the adapter: Chrome DevTools Protocol over a
+// The debuggee side of the adapter: Chrome DevTools Protocol over a
 // WebSocket, spoken with the global `WebSocket` both Node and Bun ship — the
 // surface used (the Debugger and Runtime domains) is small enough that a
 // client library would mostly be weight.
@@ -22,7 +22,7 @@ export class CdpConnection {
 			this.receive(String(event.data))
 		})
 		socket.addEventListener("close", () => {
-			// NOTE: Commands still in flight when the debuggee dies would hang
+			// Commands still in flight when the debuggee dies would hang
 			// their callers forever — a session that ends mid-step must
 			// settle, not stall.
 			for (let [, command] of this.pending) {

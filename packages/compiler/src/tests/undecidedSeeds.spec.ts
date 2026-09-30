@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: End to end, because a decision made here is judged everywhere else: the
+// End to end, because a decision made here is judged everywhere else: the
 // Enricher decides what a call carries, the Validator measures the Declaration
 // it is written into against it, and a body typed under the decision is what
 // reports a misread accumulator.
@@ -29,7 +29,7 @@ function codesFor(source: string): Array<string> {
 	return errorsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// NOTE: Writes the emitted Program to a throwaway module and imports it so its
+// Writes the emitted Program to a throwaway module and imports it so its
 // top-level `Terminal.inspect` calls run, capturing `console.log`. Every
 // Program here sorts what it built: a sort is handed the witness the decided
 // item Type picks, so what the Program PRINTS is where a slot decided wrongly
@@ -67,7 +67,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: The Type a top-level Declaration came to, for the decisions that are
+// The Type a top-level Declaration came to, for the decisions that are
 // about a Type rather than about what a Program answers.
 function typeOfDeclaration(source: string, name: string): common.Type {
 	let { program } = enrich(parse(source))
@@ -85,7 +85,7 @@ function typeOfDeclaration(source: string, name: string): common.Type {
 	throw new Error(`no Declaration named '${name}'`)
 }
 
-// NOTE: The Type the seed's own Node carries, found by the one Argument of the
+// The Type the seed's own Node carries, found by the one Argument of the
 // Declaration's Invocation that is written as a List Literal.
 function typeOfSeedNode(source: string, name: string): common.Type {
 	let { program } = enrich(parse(source))
@@ -115,7 +115,7 @@ function typeOfSeedNode(source: string, name: string): common.Type {
 	throw new Error(`no List Literal Argument under '${name}'`)
 }
 
-// NOTE: An empty `[]` seed is typed `List<Unknown>`, and a Type Parameter bound
+// An empty `[]` seed is typed `List<Unknown>`, and a Type Parameter bound
 // to one carries a slot nobody decided. `Unknown` is bottom as an Argument and
 // top as a Parameter, so every later occurrence of that Parameter was waved
 // through against it: `words::reduce(startingWith [], (kept, word) { <-
@@ -138,7 +138,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a", "bb", "ccc" ]'])
 		})
 
-		// NOTE: The laundering the undecided answer used to allow. Nothing was
+		// The laundering the undecided answer used to allow. Nothing was
 		// reported at either end: the call answered a List that promised nothing
 		// about its items, and a Type that promises nothing fits every
 		// annotation.
@@ -167,7 +167,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// NOTE: The other half of the same hole, and the half an annotation can
+		// The other half of the same hole, and the half an annotation can
 		// not close: the accumulator the combiner's BODY reads is the Type the
 		// call decided, so the body is checked against the decision rather than
 		// against the seed that started it.
@@ -184,7 +184,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// NOTE: A combiner that answers the seed untouched decides nothing, and
+		// A combiner that answers the seed untouched decides nothing, and
 		// nothing else here does either — so the fold really does answer an empty
 		// List, and the Type that says so is the honest one. No Diagnostic of its
 		// own: there is nothing wrong with a Program that builds nothing.
@@ -200,7 +200,7 @@ describe("Undecided Seeds", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The Node as well as the answer. Every stage after the Enricher
+		// The Node as well as the answer. Every stage after the Enricher
 		// reads a call off its Nodes — the Validator re-matches the committed
 		// signature against exactly these Types — so a seed still typed
 		// `List<Unknown>` beside a combiner typed `(_: List<String>, _: String)
@@ -221,7 +221,7 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// NOTE: The combiner an author actually writes. A filter keeps the
+	// The combiner an author actually writes. A filter keeps the
 	// accumulator in one branch and writes into it in the other, so the body
 	// answers `NonEmptyList<Integer> | List<Unknown>` — one branch saying what it
 	// holds and one saying nothing at all. Read as one Type that decides nothing,
@@ -262,7 +262,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// NOTE: Which branch writes is nothing to the rule — a slot takes what
+		// Which branch writes is nothing to the rule — a slot takes what
 		// the branches that fill it agree on, and the order they are written in
 		// is not one of them.
 		it("decides it with the branches the other way round", async () => {
@@ -296,7 +296,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// NOTE: A `step` body answers a Choice rather than the accumulator, so
+		// A `step` body answers a Choice rather than the accumulator, so
 		// the branches are two instantiations of one Choice and the slot is a
 		// Case's payload member. Same rule, one level in.
 		it("decides it through a step body answering a Case", async () => {
@@ -315,7 +315,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// NOTE: Two Parameters, and the second decided only once the first is.
+		// Two Parameters, and the second decided only once the first is.
 		// `#Done` hands back the accumulator, so what the loop ANSWERS is what
 		// the accumulator came to — which the arm that appends says and the arm
 		// that answers can only repeat.
@@ -351,7 +351,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 1, 3, 5 ]"])
 		})
 
-		// NOTE: One accumulator per member, each written by its own branch —
+		// One accumulator per member, each written by its own branch —
 		// so neither branch decides the Record and the two together decide
 		// every member of it.
 		it("decides a Record seed one member per branch", async () => {
@@ -371,7 +371,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
 		})
 
-		// NOTE: A branch answering the seed itself decides nothing and refuses
+		// A branch answering the seed itself decides nothing and refuses
 		// nothing either — what the OTHER branch writes is still the answer.
 		it("decides it where a branch answers an empty List of its own", async () => {
 			expect(
@@ -413,7 +413,7 @@ describe("Undecided Seeds", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Branches that disagree decide nothing. There is no one Type the
+		// Branches that disagree decide nothing. There is no one Type the
 		// accumulator holds, and taking the branch that happens to be written
 		// first would be inventing one — so the slot stays open and every write
 		// into it is refused, which is the same answer a fold nothing writes
@@ -436,7 +436,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["return-type-mismatch", "return-type-mismatch"])
 		})
 
-		// NOTE: A branch that decides the accumulator WHOLE is not made worse by
+		// A branch that decides the accumulator WHOLE is not made worse by
 		// the branch beside it that decides one member of it.
 		it("decides a member one branch leaves alone", async () => {
 			expect(
@@ -456,7 +456,7 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("the position a fold is written in", () => {
-		// NOTE: The Declaration's annotation is a decision somebody wrote down,
+		// The Declaration's annotation is a decision somebody wrote down,
 		// and it is read BEFORE anything is inferred from the call's own
 		// Arguments — which is what decides a fold whose combiner says nothing,
 		// and what makes the combiner below answer to the annotation rather than
@@ -503,7 +503,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// NOTE: The annotation wins, and the combiner is then measured against
+		// The annotation wins, and the combiner is then measured against
 		// it: appending an Integer to a List of Strings is refused where the
 		// undecided accumulator used to accept both and promise neither.
 		it("refuses a combiner that disagrees with the annotation", () => {
@@ -518,7 +518,7 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("the other empty seeds", () => {
-		// NOTE: Two slots, decided independently — the keys off what the update
+		// Two slots, decided independently — the keys off what the update
 		// writes and the values off what it stores.
 		it("decides both slots of an empty Dictionary Literal", async () => {
 			expect(
@@ -545,7 +545,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ [], [ 2 ], [ 1 ] ]"])
 		})
 
-		// NOTE: A Record seed, whose open slot is a member rather than the whole
+		// A Record seed, whose open slot is a member rather than the whole
 		// accumulator — decided from the member the combiner answers, and decided
 		// to the BASE of the `NonEmptyList` that answer carries, because the seed
 		// wrote `[]` into that member and an empty List is not a proof of
@@ -566,7 +566,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a", "ccc" ]', '"2"'])
 		})
 
-		// NOTE: The decision a slot takes carries no proof, which is what keeps
+		// The decision a slot takes carries no proof, which is what keeps
 		// the idiom that BUILT the Dictionary writable against it. Deciding the
 		// values `NonEmptyList<String>` off the `[]::append(word)` one turn
 		// answers refuses the `defaultingTo []` of the very next turn — a
@@ -599,7 +599,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 5, 7 ]"])
 		})
 
-		// NOTE: And at every depth, because a proof one level in refuses the
+		// And at every depth, because a proof one level in refuses the
 		// next write just as surely: `rows::append(["a"]::append("b"))` decides
 		// a List of Lists of Strings, never a List of NON-EMPTY ones, so the
 		// empty List written after it still fits.
@@ -616,7 +616,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ [ "a", "b" ], [] ]'])
 		})
 
-		// NOTE: The other direction, unchanged and worth saying beside them: a
+		// The other direction, unchanged and worth saying beside them: a
 		// slot the fold DECIDED still reads an empty List as bottom, so clearing
 		// what was built is not a write that has to decide anything.
 		it("still takes an empty List into a slot the fold decided", async () => {
@@ -633,7 +633,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[]"])
 		})
 
-		// NOTE: A Type Parameter the RECEIVER bound, which is the order every
+		// A Type Parameter the RECEIVER bound, which is the order every
 		// Method is matched in: `rows::append(["a"])` binds the item Type to
 		// `List<Unknown>` off the receiver and then had nothing left to do with
 		// the `List<String>` that followed but agree with it. The decision is
@@ -657,7 +657,7 @@ describe("Undecided Seeds", () => {
 			})
 		})
 
-		// NOTE: The other end of that decision. What the call answers is what the
+		// The other end of that decision. What the call answers is what the
 		// assignment pins the Variable to, so the write that decided the item
 		// Type is also the write every later one is held to — an undecided slot
 		// laundered a second write of another Type through the same name.
@@ -674,7 +674,7 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("a generic Function rather than a Method", () => {
-		// NOTE: Two callbacks, one decision. `loop` is an Overloaded Function
+		// Two callbacks, one decision. `loop` is an Overloaded Function
 		// whose entries each carry their own `State`, and the seed is the
 		// Argument every one of them binds it from — so the `while` condition and
 		// the body are both resolved against the State the loop was decided to
@@ -722,7 +722,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 3 ]"])
 		})
 
-		// NOTE: One Parameter open beside one the Arguments decided — the
+		// One Parameter open beside one the Arguments decided — the
 		// callback's own Parameter Types are read from both, and only the open
 		// one is filled in.
 		it("decides one Type Parameter where a second is already decided", async () => {
@@ -746,7 +746,7 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// NOTE: A decision the call makes but writes onto no Node. The seed's own
+	// A decision the call makes but writes onto no Node. The seed's own
 	// brackets take the decided Type where the seed is WRITTEN as a Literal, and
 	// a name standing in the same place keeps the undecided Type its Declaration
 	// gave it — so everything downstream that re-derives the call from its Nodes
@@ -755,7 +755,7 @@ describe("Undecided Seeds", () => {
 	// the blank again it asks a second time, seeded from the Type the call itself
 	// carries.
 	describe("a seed written as a name rather than as a Literal", () => {
-		// NOTE: Reported as an Internal Compiler Error before the Validator read
+		// Reported as an Internal Compiler Error before the Validator read
 		// the call's own Type: the combiner it re-matched was recorded as
 		// `(_: Integer, _: List<Integer>) -> List<Integer>` and the seed beside
 		// it still said `List<Unknown>`, which is a call no re-match of those two
@@ -773,7 +773,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 1, 2 ]"])
 		})
 
-		// NOTE: The whole accumulator bound to a Type Parameter rather than a slot
+		// The whole accumulator bound to a Type Parameter rather than a slot
 		// inside one, which is the case a later Argument decides: `T := List<Unknown>`
 		// off the name, then `["a"]` says what the List holds.
 		it("decides a Type Parameter a name bound to an undecided slot", async () => {
@@ -791,7 +791,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a" ]'])
 		})
 
-		// NOTE: One mistake, one report. An Argument carrying a blank binds no
+		// One mistake, one report. An Argument carrying a blank binds no
 		// Type Parameter, so `["a"]` is what decides `T` and the blank is read
 		// against it. Binding `T` to the blank instead made the very Argument
 		// that decides it a write into one, and the call was refused twice: for
@@ -809,7 +809,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["argument-type-mismatch"])
 		})
 
-		// NOTE: Every Argument a blank. The deferred ones are matched in the
+		// Every Argument a blank. The deferred ones are matched in the
 		// order they were written, so the first binds the Type Parameter and the
 		// rest are read against it — to a blank, which is the honest answer for a
 		// call that was handed nothing that says anything.
@@ -829,7 +829,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[]"])
 		})
 
-		// NOTE: The seeded re-match rescues nothing it cannot explain. An
+		// The seeded re-match rescues nothing it cannot explain. An
 		// Argument that disagrees with a Parameter the decision never touched is
 		// reported exactly as it is in a call that writes no empty seed at all.
 		it("still reports an Argument the decision does not explain", () => {
@@ -846,7 +846,7 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// NOTE: The first match stops at its first mismatch, and where a blank seed
+	// The first match stops at its first mismatch, and where a blank seed
 	// bound the Type Parameter that mismatch is the very Argument that decides it
 	// — so an Argument written AFTER it is read for the first time by the second
 	// match. An Argument is enriched once and its Node kept, so a Diagnostic the
@@ -880,7 +880,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// NOTE: An ANNOTATED Function literal, which is enriched once like any
+		// An ANNOTATED Function literal, which is enriched once like any
 		// other Argument rather than re-resolved per position — so its body is
 		// read here, and read nowhere else.
 		it("reports what a written callback's body gets wrong", () => {
@@ -898,7 +898,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// NOTE: And once only. With no blank to decide there is no second match
+		// And once only. With no blank to decide there is no second match
 		// at all; with one, both matches read the same Argument and say the same
 		// thing about it, which `report` counts as said.
 		it("reports it once where the first match reached it too", () => {

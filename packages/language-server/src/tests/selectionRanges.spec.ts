@@ -23,7 +23,7 @@ describe("Selection Ranges", () => {
 
 		let ranges = selectionRangesOf(source, { line: 2, column: 22 })
 
-		// NOTE: Innermost first — the Identifier, then the Statement, then the
+		// Innermost first — the Identifier, then the Statement, then the
 		// implementation block.
 		expect(ranges[0].start).toEqual({ line: 2, column: 22 })
 		expect(ranges[0].end).toEqual({ line: 2, column: 27 })
@@ -41,11 +41,11 @@ describe("Selection Ranges", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The cursor sits on the `1` inside the innermost call.
+		// The cursor sits on the `1` inside the innermost call.
 		let ranges = selectionRangesOf(source, { line: 5, column: 37 })
 
 		expect(ranges.slice(0, 4)).toEqual([
-			// NOTE: The literal, then each enclosing call, then `Terminal.inspect(…)`.
+			// The literal, then each enclosing call, then `Terminal.inspect(…)`.
 			{
 				start: { line: 5, column: 37 },
 				end: { line: 5, column: 38 },
@@ -64,7 +64,7 @@ describe("Selection Ranges", () => {
 			},
 		])
 
-		// NOTE: Widening ends at the implementation block.
+		// Widening ends at the implementation block.
 		expect(ranges[ranges.length - 1]).toEqual({
 			start: { line: 1, column: 1 },
 			end: { line: 6, column: 2 },
@@ -96,7 +96,7 @@ describe("Selection Ranges", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The Match is the next range out in both cases — a Handler has
+		// The Match is the next range out in both cases — a Handler has
 		// no Position of its own to widen to.
 		it("should start at the Guard the cursor is in", () => {
 			let ranges = selectionRangesOf(source, { line: 7, column: 30 })
@@ -133,7 +133,7 @@ describe("Selection Ranges", () => {
 	})
 })
 
-// NOTE: A default is a span of its own inside no body, so expanding from inside
+// A default is a span of its own inside no body, so expanding from inside
 // one has to reach it — otherwise the selection jumps straight from the name to
 // the whole Declaration.
 describe("Selection Ranges inside a default", () => {
@@ -157,7 +157,7 @@ describe("Selection Ranges inside a default", () => {
 	})
 })
 
-// NOTE: A Case payload's default is a span inside no body either — without the
+// A Case payload's default is a span inside no body either — without the
 // descent the selection jumps from the name straight to the whole Choice.
 describe("Selection Ranges inside a Case payload default", () => {
 	it("should widen from a name in a payload default out through the default", () => {
@@ -202,7 +202,7 @@ describe("Selection Ranges inside a Case payload default", () => {
 	})
 })
 
-// NOTE: An arm has a Position of its own covering `as VALUE if CONDITION`, so
+// An arm has a Position of its own covering `as VALUE if CONDITION`, so
 // it stands on the chain between what is written in it and the whole `define` —
 // the same answer a Dictionary entry gets, and one a Match Handler can not give.
 describe("Selection Ranges inside a define", () => {
@@ -241,7 +241,7 @@ describe("Selection Ranges inside a define", () => {
 
 		expect(ranges).toContainEqual(arm)
 		expect(ranges).toContainEqual(block)
-		// NOTE: Innermost first, so the arm stands in front of the block it is
+		// Innermost first, so the arm stands in front of the block it is
 		// an arm of.
 		expect(armIndex).toBeLessThan(blockIndex)
 	})
@@ -256,7 +256,7 @@ describe("Selection Ranges inside a define", () => {
 	})
 })
 
-// NOTE: The operand is a span of its own inside the Keyword's, so a selection
+// The operand is a span of its own inside the Keyword's, so a selection
 // widened from inside it reaches the call, then the whole `complete …`, then
 // the Statement — one step per thing written, which is what a walk with no case
 // for the two Keywords would collapse into a jump from the call to the

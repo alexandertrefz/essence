@@ -4,28 +4,28 @@ import { declaredCases, describeType } from "../../helpers/describe"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
-// NOTE: Coverage is instrumentation, not an improvement — it is the one entry
+// Coverage is instrumentation, not an improvement — it is the one entry
 // in the registry that makes a Program do MORE work, and it runs only where the
 // caller asked to be told what ran. `essence test --coverage` is that caller,
 // and `OptimiserOptions.coverage` is how it asks. Every other compile finds
 // this pass a no-op, which is why it can stand in the registry beside passes
 // that are always right to run.
 //
-// NOTE: It is FIRST in the order, and that is the whole of what makes the
+// It is FIRST in the order, and that is the whole of what makes the
 // answer about the source rather than about the Program the Optimiser made of
 // it. A counter written before `lower-matches-to-statements` stands in the arm
 // the author wrote; one written after it stands in a Statement the Compiler
 // invented, at a Position that may not exist in the file. Coverage is a claim
 // about a file, so it is measured on the shape the file has.
 //
-// NOTE: What that costs is honest and worth writing down: a later pass may
+// What that costs is honest and worth writing down: a later pass may
 // remove code a counter stands in — `fold-constants` folds a Conditional whose
 // condition is known, `prune-dead-match-arms` drops an arm no value can reach —
 // and the point stays in the table, counted zero, and is reported as never
 // taken. Which it is: a branch nothing can enter was never entered. Nothing is
 // ever counted that did not run, which is the direction that matters.
 //
-// NOTE: Which is also what settles where a counter stands relative to the value
+// Which is also what settles where a counter stands relative to the value
 // it answers with. A point counting that a PATH was taken is written in front of
 // the value — taking the path is the whole of what it claims, and a value that
 // throws while it is built was still the value that path chose. A point counting
@@ -33,11 +33,11 @@ import { rewriteNodes } from "../walk"
 // halfway counts nothing. Both readings say only what happened; see
 // `CoverageCounterNode.leads`.
 //
-// NOTE: A counter is impure (`purity.ts`), so no pass pools one, hoists it out
+// A counter is impure (`purity.ts`), so no pass pools one, hoists it out
 // of the branch it belongs to, or drops it where the value it answers with is
 // unread.
 //
-// NOTE: The standard library is never instrumented. The prelude is built with
+// The standard library is never instrumented. The prelude is built with
 // coverage stripped out of the Options (see `withOptimiserOptions` in
 // `rewriter/stdlibPrelude.ts`) — a report about a project is a report about the
 // project's own files, and instrumenting the library's Programs into every
@@ -49,7 +49,7 @@ export const instrumentCoverage: OptimiserPass = {
 		options.coverage === true ? instrument(program) : program,
 }
 
-// NOTE: Where a Namespace Method or a free Function stands, so that a point can
+// Where a Namespace Method or a free Function stands, so that a point can
 // say which one it is in — `Standings::compute › case #Postponed` reads without
 // the reader opening the file. It is answered by POSITION rather than carried
 // down a walk: the shared walk offers Nodes bottom-up and says nothing about
@@ -80,14 +80,14 @@ function instrument(
 		return points.length - 1
 	}
 
-	// NOTE: Both forms of the Node, in one place, because which one a point
+	// Both forms of the Node, in one place, because which one a point
 	// needs is a fact about WHERE it stands rather than about what it counts. A
 	// Statement position takes a counter standing on its own, which is the
 	// value-less form; an Expression position takes one that answers with the
 	// very value it was handed. An arm of a `define` has no body to write a
 	// Statement into and is the second kind.
 	//
-	// NOTE: The valued form counts on either side of the value, and which side
+	// The valued form counts on either side of the value, and which side
 	// is a claim about what the point MEANS — `leads` is what says so, see
 	// `CoverageCounterNode`. It defaults to the side a value-less counter never
 	// reads, so the calls that spell it are the ones it is a claim about.
@@ -105,7 +105,7 @@ function instrument(
 		position,
 	})
 
-	// NOTE: The implementation is instrumented WHOLE — every Statement, every
+	// The implementation is instrumented WHOLE — every Statement, every
 	// branch, every arm, every Case construction. The tests section is
 	// instrumented for constructions and for nothing else: what a report is
 	// about is the code under test, and counting a test's own Statements would
@@ -131,7 +131,7 @@ function instrument(
 
 	let choices = choicesOf(program)
 
-	// NOTE: A Module with nothing to count and nothing to declare carries no
+	// A Module with nothing to count and nothing to declare carries no
 	// table at all — which is what keeps a `Foo.tests.es` whose tests build no
 	// Case, and a Module of nothing but imports, out of every report.
 	if (points.length === 0 && choices.length === 0) {
@@ -162,7 +162,7 @@ type Counter = (
 	leads?: boolean,
 ) => common.typedSimple.CoverageCounterNode
 
-// NOTE: One counter in front of every Statement a reader wrote. Declarations
+// One counter in front of every Statement a reader wrote. Declarations
 // are skipped — a `namespace`, a `type`, a `protocol` and a `function` are
 // there whether or not anything ran, and counting them would report a file that
 // declares and is never called as covered. So is anything with no Position: the
@@ -211,11 +211,11 @@ function countsAsStatement(
 	}
 }
 
-// NOTE: Both sides of every Conditional, counted apart — which is what branch
+// Both sides of every Conditional, counted apart — which is what branch
 // coverage IS, and why an `if` with no `else` still gets one: "the condition
 // was never false" is the thing worth being told.
 //
-// NOTE: Each half is marked with the claim about the path IT counts — the
+// Each half is marked with the claim about the path IT counts — the
 // condition's own for the `if`, and what the condition left its `else` for the
 // other — because a branch whose condition established something is a doorway,
 // and the question a report asks about a doorway is exactly whether the guarded
@@ -262,7 +262,7 @@ function instrumentStatement(
 	}
 }
 
-// NOTE: A Match's arms, and every Case construction. The two are the whole of
+// A Match's arms, and every Case construction. The two are the whole of
 // what makes coverage in an exhaustive language more precise than lines: a
 // `match` names every Case it can meet, so "which arms never ran" is a complete
 // statement, and a `choice` names every Case there is, so "which were never
@@ -283,25 +283,25 @@ function instrumentExpression(
 	return instrumentConstruction(node, mark)
 }
 
-// NOTE: An arm is a BRANCH — the same kind an `if` writes, with the same two
+// An arm is a BRANCH — the same kind an `if` writes, with the same two
 // labels, because that is what an arm is: a question, a path taken where it
 // holds and a fallback below it where it does not. So it rolls into the branch
 // coverage a report already writes and neither the report nor the runtime has to
 // hear that `define` exists.
 //
-// NOTE: The WRAPPING form of the counter, and it has to be. Every other point in
+// The WRAPPING form of the counter, and it has to be. Every other point in
 // this pass is a Statement prepended to a body; an arm has no body — both halves
 // of it are Expressions — so the counter stands AROUND the value the arm answers
 // with and answers with it in turn. `instrumentConstruction` is the other user
 // of that form, for the same reason.
 //
-// NOTE: Positioned at the arm's ANSWER rather than at the whole arm, which is
+// Positioned at the arm's ANSWER rather than at the whole arm, which is
 // the same line `instrumentStatement` draws: a branch's point stands where its
 // body starts, not where its `if` was written. It is also the only Position in
 // reach — the span an arm was written across is a question about the source that
 // nothing below the Simplifier asks, and so nothing below it carries.
 //
-// NOTE: `refinement` rides the arm's own claim, and the `otherwise` arm rides
+// `refinement` rides the arm's own claim, and the `otherwise` arm rides
 // what the arms ABOVE it left behind — it is reached by a value every one of
 // their Conditions declined, so it stands behind a doorway exactly when one of
 // those complements established something. It is the reading
@@ -375,7 +375,7 @@ function instrumentHandlers(
 	})
 }
 
-// NOTE: Only a construction the SOURCE wrote. The Simplifier and the Enricher
+// Only a construction the SOURCE wrote. The Simplifier and the Enricher
 // build Cases nobody asked for — an Optional wrapped around a value, a witness
 // — and those carry no Position, which is exactly the line between the two.
 function instrumentConstruction(
@@ -396,7 +396,7 @@ function instrumentConstruction(
 			tag: node.tag,
 		}),
 		value: node,
-		// NOTE: AROUND the construction rather than in front of it, because what
+		// AROUND the construction rather than in front of it, because what
 		// this point claims is that the Case was built — a payload that threw
 		// halfway built none, and counting one that was not built is the
 		// direction this pass never goes. An arm is the other reading: it counts
@@ -407,7 +407,7 @@ function instrumentConstruction(
 	}
 }
 
-// NOTE: What a report calls an arm, spelled the way the arm itself was written.
+// What a report calls an arm, spelled the way the arm itself was written.
 // A Case Matcher is `case #Postponed`; a Matcher that tests a VALUE is that
 // value, because `case 0` and `case Integer` are two different arms of one
 // `match` and a report that called them both `case Integer` would name neither.
@@ -433,7 +433,7 @@ function matcherLabel(handler: common.typedSimple.MatchHandler): string {
 		: `case { ${members.join(", ")} }`
 }
 
-// NOTE: A literal as a reader wrote it. Anything that is not one — which a
+// A literal as a reader wrote it. Anything that is not one — which a
 // Matcher's literal never is, but the Type says it could be — falls back to the
 // Type, because a label that is a fragment of emitted JavaScript is worse than
 // a label that is vague.
@@ -456,7 +456,7 @@ function literalLabel(node: common.typedSimple.ExpressionNode): string {
 
 // #region Scopes and Choices
 
-// NOTE: Collected through the shared walk rather than through a reading of the
+// Collected through the shared walk rather than through a reading of the
 // tree's shape written here: a Namespace nested inside a Function is still a
 // Namespace, and a second walk would be a second chance to disagree about where
 // one can stand. Nothing is rewritten — every hook answers with what it was
@@ -501,7 +501,7 @@ function scopesOf(program: common.typedSimple.Program): Array<CoverageScope> {
 	return scopes
 }
 
-// NOTE: The INNERMOST scope holding the point — a Function literal written
+// The INNERMOST scope holding the point — a Function literal written
 // inside a Method is the Method's business, and a Method written inside a
 // Namespace inside a Function is its own. A tie goes to the one collected
 // FIRST, and the walk that collects them is bottom-up, so on a tie the nested
@@ -529,7 +529,7 @@ function scopeAt(
 	return found
 }
 
-// NOTE: How two spans of one file stand to each other, spelled HERE because a
+// How two spans of one file stand to each other, spelled HERE because a
 // coverage point's span is this pass's own — the span of the Node it stood in
 // front of. `essence test --mutate` joins its mutation sites onto these points
 // by position, and agreement with this pass about what "holds" and "overlaps"
@@ -553,7 +553,7 @@ export function overlaps(
 	return !before(left.end, right.start) && !before(right.end, left.start)
 }
 
-// NOTE: The overload suffix the Simplifier mangles a Method's name with is not
+// The overload suffix the Simplifier mangles a Method's name with is not
 // what the author wrote, and a report is read by the author.
 const overloadSuffix = /__overload\$\d+$/
 
@@ -561,7 +561,7 @@ function displayMemberName(name: string): string {
 	return name.replace(overloadSuffix, "")
 }
 
-// NOTE: Every Choice the Module declares, with the tag of each of its Cases.
+// Every Choice the Module declares, with the tag of each of its Cases.
 function choicesOf(
 	program: common.typedSimple.Program,
 ): Array<common.typedSimple.CoverageChoice> {

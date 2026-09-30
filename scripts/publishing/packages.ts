@@ -1,6 +1,6 @@
 import * as path from "node:path"
 
-// NOTE: The one description of what gets published. Everything else in this
+// The one description of what gets published. Everything else in this
 // directory — staging, packing, smoke-testing, publishing — walks this list,
 // so a package joins or leaves the published set by editing exactly one place.
 
@@ -12,17 +12,17 @@ export const TARBALL_DIRECTORY = path.join(BUILD_DIRECTORY, "tarballs")
 
 export type PublishedPackage = {
 	directory: string
-	// NOTE: Directories shipped verbatim beside `dist/` — the standard
+	// Directories shipped verbatim beside `dist/` — the standard
 	// library's `.es` sources, and the runtime's TypeScript, which the
 	// Bundler inlines from source so a published compiler emits the same
 	// bundle bytes a workspace checkout does.
 	data?: Array<string>
-	// NOTE: A package that already is JavaScript. The listed files are the
+	// A package that already is JavaScript. The listed files are the
 	// package; there is no compilation and no `dist/`.
 	prebuilt?: Array<string>
 }
 
-// NOTE: In dependency order, so `npm publish` never makes a package visible
+// In dependency order, so `npm publish` never makes a package visible
 // on the registry before the packages it depends on.
 export const PUBLISHED_PACKAGES: Array<PublishedPackage> = [
 	{ directory: "interfaces" },

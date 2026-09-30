@@ -13,19 +13,19 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The Namespace every other spec here PRINTS through, tested on its own
+// The Namespace every other spec here PRINTS through, tested on its own
 // terms. `stdlibGolden.spec.ts` can not cover it — that harness works by
 // calling `Terminal.inspect`, so a `Terminal.print` beside it would print
 // twice and a `Terminal.write` would put text in the middle of a captured line
 // — so this is where the behaviour of the Methods that write is pinned.
 //
-// NOTE: What has to be true, and is not true of any other standard library
+// What has to be true, and is not true of any other standard library
 // Method: `print` renders through `Printable` and ENDS THE LINE, `inspect`
 // renders the STRUCTURE of any value at all and answers with it unchanged, and
 // `write` adds NOTHING. Every one of those is invisible to every stage before
 // the emitted Program runs, so every one of them is checked by running one.
 
-// NOTE: Both streams are intercepted, not just `console.log`. `inspect` goes
+// Both streams are intercepted, not just `console.log`. `inspect` goes
 // through `console.log` because a structural rendering is a whole line by
 // construction; `write` goes through `process.stdout.write`/`process.stderr.write`
 // because there is no way to spell "no newline" through the console. So a test
@@ -33,7 +33,7 @@ import { validate } from "../validator/index"
 // and the missing newline, which is the whole difference between `print` and
 // `write`, would be exactly what it missed.
 type Written = {
-	// NOTE: The raw text each stream received, concatenated in order. Raw
+	// The raw text each stream received, concatenated in order. Raw
 	// rather than split into lines: what is being asserted is often the
 	// ABSENCE of a line break.
 	output: string
@@ -65,7 +65,7 @@ async function write(source: string): Promise<Written> {
 	let originalOut = process.stdout.write
 	let originalError = process.stderr.write
 
-	// NOTE: `console.log` appends the newline its callers rely on, so the
+	// `console.log` appends the newline its callers rely on, so the
 	// interception has to append one too — otherwise an `inspect` and a `print`
 	// of the same value would look alike here, which is the one distinction
 	// this file exists to make.
@@ -115,7 +115,7 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 
 describe("Terminal", () => {
 	describe("print", () => {
-		// NOTE: THE distinction. A String is a Printable whose `toString` is
+		// THE distinction. A String is a Printable whose `toString` is
 		// itself, so `print` writes its text; `inspect` writes the Literal a
 		// reader would have to type to get it back, quotes included. Getting
 		// this backwards is what made every fixture read like a debugger.
@@ -128,7 +128,7 @@ describe("Terminal", () => {
 			expect(written.error).toBe("")
 		})
 
-		// NOTE: The newline is `print`'s, added in Essence around the value's
+		// The newline is `print`'s, added in Essence around the value's
 		// rendering — so two prints are two lines with nothing between them.
 		it("ends each line, and adds nothing else", async () => {
 			let written = await write(`implementation {
@@ -139,7 +139,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("one\ntwo\n")
 		})
 
-		// NOTE: Rendered through the value's OWN `Printable` conformance, not
+		// Rendered through the value's OWN `Printable` conformance, not
 		// through the structural printer — an Integer reads as its digits and a
 		// Choice as whatever its Namespace's `toString` says, which for
 		// `Ordering` is the bare word.
@@ -153,7 +153,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("42\ntrue\nLess\n")
 		})
 
-		// NOTE: The `to` Overload picks the stream, and nothing else changes —
+		// The `to` Overload picks the stream, and nothing else changes —
 		// same rendering, same newline, other file handle. The stream-less entry
 		// IS this one applied to `#Output`, so a Program that never names a
 		// Stream is writing to one all the same.
@@ -167,12 +167,12 @@ describe("Terminal", () => {
 			expect(written.error).toBe("broken\n")
 		})
 
-		// NOTE: `Printable` is a BOUND, so a value that conforms to nothing is
+		// `Printable` is a BOUND, so a value that conforms to nothing is
 		// refused where a Program asks for it to be printed — and refused at the
 		// call, with a Diagnostic, rather than rendered as whatever the runtime
 		// could make of it.
 		it("refuses a value that conforms to no Printable", () => {
-			// NOTE: A Choice derives `Equatable` from its tags and nothing
+			// A Choice derives `Equatable` from its tags and nothing
 			// else — `Printable` is a decision about how it should READ, so it
 			// has to be written, and this one does not write it.
 			let diagnostics = diagnosticsOf(`implementation {
@@ -191,7 +191,7 @@ describe("Terminal", () => {
 	})
 
 	describe("write", () => {
-		// NOTE: The primitive. No newline, no quotes, no separator — three
+		// The primitive. No newline, no quotes, no separator — three
 		// writes are one line, which is the whole reason it exists beside
 		// `print`.
 		it("adds nothing at all to the text it is given", async () => {
@@ -214,7 +214,7 @@ describe("Terminal", () => {
 			expect(written.error).toBe("err")
 		})
 
-		// NOTE: A String and nothing else. `write` is about TEXT — a value with
+		// A String and nothing else. `write` is about TEXT — a value with
 		// a `Printable` conformance is what `print` takes, and routing one
 		// through here would silently make `write` a second `print` without the
 		// newline.
@@ -228,7 +228,7 @@ describe("Terminal", () => {
 	})
 
 	describe("inspect", () => {
-		// NOTE: The structural form, for the Program's AUTHOR — a String comes
+		// The structural form, for the Program's AUTHOR — a String comes
 		// back with the quotes a Literal is written with, which is exactly what
 		// `print` leaves off.
 		it("writes a String with its quotes", async () => {
@@ -239,7 +239,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe('"hello"\n')
 		})
 
-		// NOTE: Any value at all, conformance or none. The Record below belongs
+		// Any value at all, conformance or none. The Record below belongs
 		// to a Namespace that declares no `toString`, so `print` would refuse it
 		// — and `inspect` lays it out anyway, which is the other half of why the
 		// two are separate Methods.
@@ -258,7 +258,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("Colour#Red\n")
 		})
 
-		// NOTE: It answers with the very value it was handed, so it can be
+		// It answers with the very value it was handed, so it can be
 		// wrapped around any Expression without changing what that Expression
 		// evaluates to. That is what let every printing call site in this
 		// repository become a `Terminal.inspect` without the golden file moving.
@@ -274,7 +274,7 @@ describe("Terminal", () => {
 	})
 
 	describe("describe", () => {
-		// NOTE: The same rendering `inspect` writes, handed back as a String —
+		// The same rendering `inspect` writes, handed back as a String —
 		// so a Program can put a value's structure in a message rather than on
 		// a line of its own. A String comes back with the quotes a Literal
 		// carries, which `print` then writes as text.
@@ -286,7 +286,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe('"hello"\n')
 		})
 
-		// NOTE: THE reason the Method exists. `inspect` can only write, so a
+		// THE reason the Method exists. `inspect` can only write, so a
 		// failure message, a log line or an error payload could not carry a
 		// value's structure at all.
 		it("puts a value's structure inside a message", async () => {
@@ -299,7 +299,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("unexpected: { won = 2, lost = 1 }\n")
 		})
 
-		// NOTE: Every container the structural walk knows, in one call: a
+		// Every container the structural walk knows, in one call: a
 		// Record holding a List, a Dictionary, and a Case. The Strings inside
 		// each are quoted, which is the rule a structure is rendered under and
 		// the one thing `print` of the same value would not do.
@@ -322,7 +322,7 @@ describe("Terminal", () => {
 			)
 		})
 
-		// NOTE: Any value at all, conformance or none — the half of `inspect`
+		// Any value at all, conformance or none — the half of `inspect`
 		// that makes it the Method for a Program's author rather than for its
 		// reader.
 		it("takes a value that conforms to no Printable", async () => {
@@ -340,7 +340,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("Colour#Red\n")
 		})
 
-		// NOTE: One walk, two doors. `inspect` writes exactly the String this
+		// One walk, two doors. `inspect` writes exactly the String this
 		// answers, which is what lets a Program that was printing its structure
 		// keep printing the same thing while a message carries it too.
 		it("answers exactly what inspect writes", async () => {
@@ -359,7 +359,7 @@ describe("Terminal", () => {
 		})
 	})
 
-	// NOTE: The Optimiser may never take one of these away. `isPureExpression`
+	// The Optimiser may never take one of these away. `isPureExpression`
 	// answers "can this be left unevaluated" and its enumeration of pure Method
 	// calls names no `Terminal` entry — but the enumeration is an allowlist, and
 	// an allowlist is exactly the kind of thing a later entry can widen by
@@ -367,7 +367,7 @@ describe("Terminal", () => {
 	// so it is pinned by running a Program whose print stands where a pass would
 	// most like to drop it.
 	describe("purity", () => {
-		// NOTE: `and` short-circuits in JavaScript and does not in Essence, so
+		// `and` short-circuits in JavaScript and does not in Essence, so
 		// `lower-scalar-operations` may only compile it to `&&` when the right
 		// operand can be left unevaluated. A print there is the case it must
 		// refuse.
@@ -387,7 +387,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("the Argument ran\nfalse\n")
 		})
 
-		// NOTE: A READ is the other kind of effect, and the one a pass is most
+		// A READ is the other kind of effect, and the one a pass is most
 		// likely to take for a pure Function: it takes no Argument, so two
 		// calls of it look alike to anything that compares Expressions. They
 		// are not alike — the first answers one line and the second the next —

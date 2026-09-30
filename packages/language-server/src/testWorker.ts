@@ -29,19 +29,19 @@ import type {
 	TestWorkerResponse,
 } from "./testProtocol"
 
-// NOTE: The other end of the session — see `testProtocol.ts` for why a Worker
+// The other end of the session — see `testProtocol.ts` for why a Worker
 // exists at all. It compiles each entry with the tests enriched, writes the
 // bundle somewhere nothing has read, imports it and drives its own runner. What
 // crosses back is events, which are plain data and already rendered: a value an
 // Essence Program built carries a hidden Type key that is a Symbol of the
 // runtime instance that built it, and no two realms share one.
 //
-// NOTE: This file is a Worker ENTRY. It starts listening as soon as it is
+// This file is a Worker ENTRY. It starts listening as soon as it is
 // loaded, and it is bundled on its own beside the Server — see
 // `buildServer.js` — because the Server ships as a single file with no
 // `node_modules` to resolve out of.
 
-// NOTE: How many distinct bundles one Worker will load before the session is
+// How many distinct bundles one Worker will load before the session is
 // told to start another. Every bundle is a Module that can never be unloaded,
 // and an editing session compiles a new one on every meaningful save.
 const BUNDLE_LIMIT = 128
@@ -50,11 +50,11 @@ type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
 let { staging } = workerData as TestWorkerData
-// NOTE: Keyed by the staged file, which is what `import()` caches a Module
+// Keyed by the staged file, which is what `import()` caches a Module
 // under, so running a bundle again does not count toward `BUNDLE_LIMIT`.
 let loaded = new Set<string>()
 
-// NOTE: Descriptor 0 is the Server's input, which over stdio is the LSP stream.
+// Descriptor 0 is the Server's input, which over stdio is the LSP stream.
 // Every test reads an empty input, and here so do a Module's own statements,
 // which run as its bundle loads and read through this Worker's `node:fs`.
 let fileSystem = process.getBuiltinModule("node:fs")
@@ -65,7 +65,7 @@ fileSystem.readSync = ((descriptor: unknown, ...rest: Array<unknown>) =>
 		? 0
 		: readSync(descriptor, ...rest)) as typeof fileSystem.readSync
 
-// NOTE: The bundle is named after its own hash, so sources this Worker compiled
+// The bundle is named after its own hash, so sources this Worker compiled
 // before, such as a file run again unchanged or an edit undone, name a file it
 // already imported, and the run reuses that Module rather than loading another.
 function stage(hash: string, code: string): string {
@@ -78,7 +78,7 @@ function stage(hash: string, code: string): string {
 	return file
 }
 
-// NOTE: An overlay always wins over disk. The buffer an Editor holds is the
+// An overlay always wins over disk. The buffer an Editor holds is the
 // only truthful version of a file that has not been saved, and may be the only
 // version of one that is not on disk at all.
 function hostOf(overlays: Record<string, string>): ModuleHost {
@@ -105,7 +105,7 @@ function rendered(error: unknown): string {
 		: String(error)
 }
 
-// NOTE: The tests of one Module as an Editor needs them — where each one
+// The tests of one Module as an Editor needs them — where each one
 // stands, what it is tagged, and whether it would run — read off the manifest
 // the Compiler emitted rather than off anything a run produced. It is answered
 // even for a run that was narrowed to one test, because a tree lists what
@@ -115,7 +115,7 @@ function sitesOf(registry: Registry, entry: string): Array<TestSite> {
 		id: test.id,
 		name: test.name,
 		row: test.row,
-		// NOTE: Through the runtime's own rule rather than a second copy of it
+		// Through the runtime's own rule rather than a second copy of it
 		// — the rows of a table test are reported under the template they
 		// share, and the events say so too.
 		suitePath: pathOf(test),
@@ -151,7 +151,7 @@ async function runEntry(
 		problem,
 		rewrites,
 	})
-	// NOTE: The project's own filters, laid under the run's — what the whole
+	// The project's own filters, laid under the run's — what the whole
 	// run selects is one question and what THIS entry's project skips is
 	// another, and the second is what makes a workspace of two projects run
 	// each of them as its own author asked.
@@ -162,12 +162,12 @@ async function runEntry(
 		let emitted = await compileToMemory(entry.filePath, {
 			host: hostOf(request.overlays),
 			tests: true,
-			// NOTE: Part of the compile MODE, so it is part of `bundleHash` the
+			// Part of the compile MODE, so it is part of `bundleHash` the
 			// way `tests` is: the goals a project's declarations promise are a
 			// suite synthesized into the section, out of sources that are byte
 			// for byte the same as a plain run's.
 			contracts: entry.contracts,
-			// NOTE: The instrumentation is part of the Optimiser's Options, so
+			// The instrumentation is part of the Optimiser's Options, so
 			// it is part of `bundleHash` — an instrumented bundle and a plain
 			// one never share a staged name, and turning the setting on or off
 			// mid-session compiles rather than answering out of what is
@@ -183,7 +183,7 @@ async function runEntry(
 		})
 
 		if (emitted.code === "") {
-			// NOTE: What stopped it, said in one line. The Diagnostics
+			// What stopped it, said in one line. The Diagnostics
 			// themselves are the analysis's to publish — out of the same
 			// buffers, at the same Positions — so what is worth carrying back
 			// is why there is no result rather than a second copy of the
@@ -219,7 +219,7 @@ async function runEntry(
 			return answer([], [], false, true, null)
 		}
 
-		// NOTE: The tests of THIS Module and no others. A file two entries
+		// The tests of THIS Module and no others. A file two entries
 		// import would otherwise have its tests reported once per importer, and
 		// the session would have to decide which report to believe. An entry is
 		// a file that WROTE a section, so every section is somebody's entry
@@ -234,7 +234,7 @@ async function runEntry(
 			...(request.ids.length > 0 ? { ids: request.ids } : {}),
 		}
 		let events: Array<TestEvent> = []
-		// NOTE: The stored entries of every Module this bundle holds, read off
+		// The stored entries of every Module this bundle holds, read off
 		// disk here — the Worker is the only end of the session with a
 		// filesystem, and the bundle it drives has none at all.
 		let modules = registry.modules.flatMap((each) =>
@@ -243,7 +243,7 @@ async function runEntry(
 		let stored = await readSnapshots(modules)
 
 		await tests.run(registry, {
-			// NOTE: The bundle's own bookends are dropped. One cycle may cover
+			// The bundle's own bookends are dropped. One cycle may cover
 			// several entries and is one run as far as a client is concerned;
 			// the counts it needs travel on the notification, and every event
 			// left here is about a test and carries its id.
@@ -255,10 +255,10 @@ async function runEntry(
 				events.push(event)
 			},
 			filters: selection,
-			// NOTE: A bundle with no counters in it answers with nothing, so
+			// A bundle with no counters in it answers with nothing, so
 			// asking costs a run that was not instrumented exactly nothing.
 			coverage: request.coverage,
-			// NOTE: Attribution — which test touched which point — rides on the
+			// Attribution — which test touched which point — rides on the
 			// same instrumented run, so a session that counts also learns which
 			// tests reach which lines, at the cost of one `test-coverage` event
 			// per test per Module it touched. It is what lets a change re-run the
@@ -269,7 +269,7 @@ async function runEntry(
 			update: request.update,
 		})
 
-		// NOTE: Only where the run was ASKED to record. Every other cycle
+		// Only where the run was ASKED to record. Every other cycle
 		// leaves the disk alone: a session runs on every keystroke, and a
 		// snapshot written by one would be a file changing under a reader who
 		// was only typing.
@@ -279,7 +279,7 @@ async function runEntry(
 					sources: sourcesOf(request.overlays, modules),
 					stored,
 					inline: () => Promise.resolve(writeInlineSnapshots),
-					// NOTE: The companion files are written here; a SOURCE
+					// The companion files are written here; a SOURCE
 					// comes back as an edit, because the buffer that produced
 					// it may never have been saved.
 					writeSources: false,
@@ -301,7 +301,7 @@ async function runEntry(
 	}
 }
 
-// NOTE: What each Module of the run SAYS, which is the unsaved buffer where
+// What each Module of the run SAYS, which is the unsaved buffer where
 // there is one and the file otherwise. A rewrite is spliced into the text the
 // run was compiled from, and compiling one text while rewriting another is how
 // a recorded value lands on the wrong line.
@@ -351,7 +351,7 @@ async function handle(request: TestWorkerRequest): Promise<void> {
 	})
 }
 
-// NOTE: One request at a time, in the order they arrived. A session never has
+// One request at a time, in the order they arrived. A session never has
 // two runs in flight — it terminates the Worker to cancel one — but a message
 // arriving while the previous one is still compiling would otherwise interleave
 // two Diagnostic collections, which is the very thing this Worker exists to

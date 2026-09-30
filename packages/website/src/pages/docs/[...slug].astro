@@ -64,7 +64,7 @@ let sections = getSidebar(entries)
 let crumbs = getCrumbs(entries, entry.id)
 let { previous, next } = getPrevNext(entries, entry.id)
 let isGuide = entry.data.template === "guide"
-// NOTE: A guide's list carries its steps as well as its headings — see
+// A guide's list carries its steps as well as its headings — see
 // `getGuideToc` — so on every template the rail is what is on the page.
 let toc = isGuide
 	? getGuideToc(entry.body ?? "", headings, entry.data.tocDepth)
@@ -83,14 +83,14 @@ let library = isType
 	? findLibraryPage(entry.id.replace(/^library\//, ""))
 	: undefined
 
-// NOTE: `filePath` is relative to this package, which is not the repository
+// `filePath` is relative to this package, which is not the repository
 // root — the blob URL has to put the package back in front of it.
 let editUrl =
 	entry.filePath === undefined
 		? undefined
 		: `${GITHUB_URL}/blob/master/packages/website/${entry.filePath}`
 
-// NOTE: Optional, Result and Protocols are each a Language page and a Library
+// Optional, Result and Protocols are each a Language page and a Library
 // page. A browser tab, a bookmark and a filed issue carry the title alone, so a
 // title another page also wears takes its section's label there. The heading on
 // the page keeps the bare title: the sidebar and breadcrumbs already say where

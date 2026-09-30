@@ -8,7 +8,7 @@ import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 
-// NOTE: `@example` blocks, and the tests they become. What is written under the
+// `@example` blocks, and the tests they become. What is written under the
 // tag is Essence compiled in the file's own scope, at the very lines it was
 // written on — so an example that stops being true fails a run rather than
 // sitting in hover text saying something that is not so.
@@ -110,7 +110,7 @@ describe("The @example grammar", () => {
 		).toBe(false)
 	})
 
-	// NOTE: A tag with nothing under it promises nothing, and a test that runs
+	// A tag with nothing under it promises nothing, and a test that runs
 	// no Statement is a test that can never fail.
 	it("drops an example with no code under it", () => {
 		expect(
@@ -165,7 +165,7 @@ describe("What an @example becomes", () => {
 		).toEqual(["double example", "double example 2"])
 	})
 
-	// NOTE: The whole reason an example is compiled out of the file's own lines
+	// The whole reason an example is compiled out of the file's own lines
 	// rather than out of a text of its own: everything a run says about one
 	// points at the `§§` line it was written on.
 	it("stands where it was written", () => {

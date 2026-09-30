@@ -16,7 +16,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The numeric tower beyond its arithmetic — the number theory on
+// The numeric tower beyond its arithmetic — the number theory on
 // `Integer`, the radix pair, the division modes, the kind conversions, the
 // sign refinements on `Rational` and the statistics a List of Numbers answers.
 // Each is exercised through a compiled Program, because what is being checked
@@ -61,13 +61,13 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: A Program that prints one line per expression, so a case reads as the
+// A Program that prints one line per expression, so a case reads as the
 // list of answers it expects.
 function program(...lines: Array<string>): string {
 	return `implementation {\n\t${lines.join("\n\t")}\n}`
 }
 
-// NOTE: `Terminal.inspect` rather than `Terminal.print`, because `print`
+// `Terminal.inspect` rather than `Terminal.print`, because `print`
 // writes to the Program's own stream and only `inspect` goes through the
 // `console.log` this file captures. It renders a value through `Printable`,
 // so an Optional reads as `Value(…)` and `Empty`.
@@ -75,7 +75,7 @@ function show(expression: string): string {
 	return `Terminal.inspect(${expression})`
 }
 
-// NOTE: A deterministic pseudo-random sequence, as `irrationals.spec.ts` uses,
+// A deterministic pseudo-random sequence, as `irrationals.spec.ts` uses,
 // so a property test draws the same cases on every run and a failure names a
 // case that can be re-run.
 function* deterministicNumbers(seed: number): Generator<number> {
@@ -124,7 +124,7 @@ describe("Number theory on Integer", () => {
 		).toEqual(["12", "12", "42", "0", "0", "0"])
 	})
 
-	// NOTE: The two laws the §§ blocks promise, over a spread of pairs each
+	// The two laws the §§ blocks promise, over a spread of pairs each
 	// representation covers: the divisor divides both, and the product of the
 	// two answers is the product of the two Integers without its sign.
 	it("keeps both laws of the divisor and the multiple, for any pair", () => {
@@ -181,7 +181,7 @@ describe("Number theory on Integer", () => {
 		])
 	})
 
-	// NOTE: A written receiver proves its own sign, so it reaches the entry
+	// A written receiver proves its own sign, so it reaches the entry
 	// `NonNegativeInteger` declares and the answer is bare.
 	it("answers the factorial itself for a receiver proven not to be negative", async () => {
 		expect(
@@ -226,7 +226,7 @@ describe("Number theory on Integer", () => {
 		])
 	})
 
-	// NOTE: The witnesses are what the §§ block promises exactness below its
+	// The witnesses are what the §§ block promises exactness below its
 	// bound on, so the test is against a sieve rather than against a table of
 	// answers this file wrote down.
 	it("agrees with a sieve below a hundred thousand", () => {
@@ -257,7 +257,7 @@ describe("Number theory on Integer", () => {
 		}
 	})
 
-	// NOTE: Past 2⁵³ − 1 an Integer is a bigint, and the modular exponentiation
+	// Past 2⁵³ − 1 an Integer is a bigint, and the modular exponentiation
 	// the test rests on is the arm that is only reached there.
 	it("decides a prime past the safe range", () => {
 		expect(
@@ -310,7 +310,7 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
-	// NOTE: The base-less entry reads a leading sign and an underscore between
+	// The base-less entry reads a leading sign and an underscore between
 	// two digits, and this is the same shape at every base — an Overload whose
 	// two entries read one text two ways is the trap these lines close.
 	it("reads the sign and the separators the base-less entry reads", async () => {
@@ -345,7 +345,7 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
-	// NOTE: The clamp both entries read a base through, which is what keeps
+	// The clamp both entries read a base through, which is what keeps
 	// them a round trip at a base no positional notation has.
 	it("reads a base outside two through thirty-six as the nearest of the two", async () => {
 		expect(
@@ -369,7 +369,7 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
-	// NOTE: The round trip the §§ blocks promise, over every base and both
+	// The round trip the §§ blocks promise, over every base and both
 	// representations of an Integer.
 	it("reads back what it wrote, at every base and either sign", () => {
 		let numbers = deterministicNumbers(20260910)
@@ -415,7 +415,7 @@ describe("Division modes", () => {
 		).toEqual(["4", "3", "3", "-3", "-3", "-4", "4", "3"])
 	})
 
-	// NOTE: The one place the direction and the Euclidean pairing part
+	// The one place the direction and the Euclidean pairing part
 	// company, which the §§ block of the entry names.
 	it("answers the Euclidean quotient for a positive divisor alone", async () => {
 		expect(
@@ -448,7 +448,7 @@ describe("Division modes", () => {
 		).toEqual(["2", "-1", "1", "-1", "1", "0", "0"])
 	})
 
-	// NOTE: The two laws the §§ blocks promise. The Euclidean remainder is
+	// The two laws the §§ blocks promise. The Euclidean remainder is
 	// never negative and always below the divisor's magnitude; the truncating
 	// one takes the dividend's sign; and either pairing rebuilds the dividend.
 	it("keeps the laws of both pairings, for any pair", () => {
@@ -526,7 +526,7 @@ describe("Crossing between the two exact kinds", () => {
 		).toEqual(["5/1", "-5/1", "0/1", "3/4", "3/2"])
 	})
 
-	// NOTE: The Integer form is tried first, which is the whole of what this
+	// The Integer form is tried first, which is the whole of what this
 	// static adds over the two parsers it is written on.
 	it("reads a whole number as an Integer and everything else as a Rational", async () => {
 		expect(
@@ -560,7 +560,7 @@ describe("Crossing between the two exact kinds", () => {
 })
 
 describe("The sign refinements on Rational", () => {
-	// NOTE: A written Rational proves its own sign, so each of these reaches
+	// A written Rational proves its own sign, so each of these reaches
 	// the narrowest Namespace that declares the name. The answers are the
 	// same arithmetic either way; what the proof buys is the ANSWER's Type,
 	// which the compiled cases below read back through a declaration.
@@ -597,7 +597,7 @@ describe("The sign refinements on Rational", () => {
 		).toEqual(["5/4", "0/1", "0/1", "1/3", "5/4", "3/8"])
 	})
 
-	// NOTE: The Types the proofs answer, read back off a declaration — an
+	// The Types the proofs answer, read back off a declaration — an
 	// answer too wide would be a `constant-type-mismatch` here.
 	it("answers the proven Types the declarations promise", () => {
 		expect(() =>
@@ -617,7 +617,7 @@ describe("The sign refinements on Rational", () => {
 		).not.toThrow()
 	})
 
-	// NOTE: A value above zero is a NonZeroRational and a NonNegativeRational
+	// A value above zero is a NonZeroRational and a NonNegativeRational
 	// at once, so both of those Namespaces are in reach — and `multiply` on
 	// the narrowest target is what keeps the call from being ambiguous.
 	it("passes a positive Rational wherever either weaker proof is wanted", () => {
@@ -635,7 +635,7 @@ describe("The sign refinements on Rational", () => {
 })
 
 describe("The statistics a List of Numbers answers", () => {
-	// NOTE: The three general Namespaces and the three proven ones are told
+	// The three general Namespaces and the three proven ones are told
 	// apart here by whether the receiver is annotated `NonEmptyList`, which is
 	// what decides between the Optional answer and the bare one.
 	it("answers the median of an odd and an even count", async () => {
@@ -686,7 +686,7 @@ describe("The statistics a List of Numbers answers", () => {
 		])
 	})
 
-	// NOTE: A List with an item in it answers each of these bare, so a `match`
+	// A List with an item in it answers each of these bare, so a `match`
 	// over the answer would be `no-matching-case` — which is the point of the
 	// proven Namespaces, and what these lines read back.
 	it("answers the whole family bare for a List with an item in it", async () => {
@@ -735,7 +735,7 @@ describe("The statistics a List of Numbers answers", () => {
 		).toEqual(["7", "5", "1/4"])
 	})
 
-	// NOTE: Two spellings of one value are one item to count. The walk counts
+	// Two spellings of one value are one item to count. The walk counts
 	// by the canonical key encoding — the same rule a Dictionary finds a slot
 	// by — so `2/4` counts with `1/2` and a whole Rational counts with the
 	// Integer it equals, and the item answered is the first of them to stand.
@@ -787,7 +787,7 @@ describe("The statistics a List of Numbers answers", () => {
 		).toEqual(["6", "1/3", "5", "1"])
 	})
 
-	// NOTE: The Types the proofs answer, read back off a declaration. An answer
+	// The Types the proofs answer, read back off a declaration. An answer
 	// too wide is a `constant-type-mismatch` here, which is the only way to see
 	// that `variance` promises a NonNegativeRational rather than a Rational.
 	it("answers the proven Types the declarations promise", () => {
@@ -809,7 +809,7 @@ describe("The statistics a List of Numbers answers", () => {
 		).not.toThrow()
 	})
 
-	// NOTE: The laws the §§ blocks promise, checked in Essence over a spread of
+	// The laws the §§ blocks promise, checked in Essence over a spread of
 	// Lists so that one compile covers every case. Each line answers `true`,
 	// and a failure names the case by its position in this List.
 	it("keeps the laws of the statistics, for any List", async () => {

@@ -5,7 +5,7 @@ import type {
 	Descriptor,
 	Fill,
 	FunctionDescriptor,
-	// NOTE: Renamed on the way in, because `Members` is already the name of the
+	// Renamed on the way in, because `Members` is already the name of the
 	// COMPILED members below — the readers a shape was turned into. This is the
 	// shape itself, as the Descriptor states it.
 	Members as DescribedMembers,
@@ -16,7 +16,7 @@ import type {
 import { EssenceCallError, EssenceMarshalError } from "./errors"
 import { EssenceRational } from "./rational"
 
-// NOTE: The RUN-TIME half of the boundary — every conversion, every refusal and
+// The RUN-TIME half of the boundary — every conversion, every refusal and
 // every call, over Descriptors rather than over Types. It knows nothing about the
 // Compiler and can not be made to: the two imports above that reach a file the
 // Compiler is in are `import type`, which is erased before anything runs, and
@@ -31,7 +31,7 @@ import { EssenceRational } from "./rational"
 // has to be a boundary that does not bring a Compiler with it, and there is
 // exactly one of them either way.
 //
-// NOTE: The two directions across the boundary, and they are not mirror images.
+// The two directions across the boundary, and they are not mirror images.
 //
 // Coming OUT, a value says what it is: every Essence value but a Function carries
 // its Type on the bundle's own hidden key, so `toJS` reads the tag and answers.
@@ -53,7 +53,7 @@ import { EssenceRational } from "./rational"
 // directions are reached from both, and every rule below is written once for both
 // callers.
 //
-// NOTE: Every rule is COMPILED rather than asked on every value. A Descriptor is
+// Every rule is COMPILED rather than asked on every value. A Descriptor is
 // fixed long before the first value crosses against it — it is written when the
 // Module is built — so every question this file puts to a shape has one answer
 // for the whole life of a binding: which branch a `list` takes, whether an
@@ -68,12 +68,12 @@ import { EssenceRational } from "./rational"
 // ONE marshaller, rather than an interpreter and a compiler that would have to
 // be kept agreeing.
 //
-// NOTE: Nothing here guesses at the runtime. The Symbol every tag is read through
+// Nothing here guesses at the runtime. The Symbol every tag is read through
 // and every constructor a value is built by come out of the BUNDLE, through the
 // bridge — a value built any other way carries a Symbol the Module has never seen,
 // and every Method it reaches would find it untyped.
 //
-// NOTE: A value the way in builds is admitted by the Descriptor it was built
+// A value the way in builds is admitted by the Descriptor it was built
 // against BY CONSTRUCTION — each member is built against the member's own
 // Descriptor and each arm of a Union is the arm that took the value — so the
 // runtime's own `isValueOfType` is not asked afterwards. Asking would mean
@@ -83,7 +83,7 @@ import { EssenceRational } from "./rational"
 // `emittedIdentity` states, and a second copy is the only way the two could ever
 // disagree. What is worth checking is checked where the value is built.
 
-// NOTE: The two tags the runtime's own `Optional` carries. Every other Choice
+// The two tags the runtime's own `Optional` carries. Every other Choice
 // belongs to a Module, and a Module's tags are spelled relative to the entry —
 // which is why a Descriptor bakes those and not these. `Optional` is declared
 // where no Module path can qualify it, so its two Cases are spelled the same in
@@ -91,12 +91,12 @@ import { EssenceRational } from "./rational"
 const OPTIONAL_VALUE = "Optional#Value"
 const OPTIONAL_EMPTY = "Optional#Empty"
 
-// NOTE: Where the value under discussion sits, for an Error to name. The root is
+// Where the value under discussion sits, for an Error to name. The root is
 // what the caller called it — `argument 2`, `PI`, `return value` — and every step
 // below it is a JavaScript accessor, so a failure deep inside a List of Records
 // reads `argument 2 → .items[0].width` rather than `expected Integer`.
 //
-// NOTE: A CHAIN rather than a string, and a converter is handed the place it is
+// A CHAIN rather than a string, and a converter is handed the place it is
 // INSIDE plus the one step from there to the value it was given —
 // `(value, at, step)`. Spelling is the one piece of work the boundary would
 // otherwise do on every value and needs on almost none, so it is done where an
@@ -105,7 +105,7 @@ const OPTIONAL_EMPTY = "Optional#Empty"
 // own, and the root of a walk is spelled by its step alone with nothing above it.
 type Path = { at: Path | null; step: Step }
 
-// NOTE: A member name or a position in a List — `.width` and `[3]` — and at the
+// A member name or a position in a List — `.width` and `[3]` — and at the
 // root, the whole of what the caller called the value.
 type Step = string | number
 
@@ -131,7 +131,7 @@ function accessor(step: Step): string {
 	return typeof step === "number" ? `[${step}]` : `.${step}`
 }
 
-// NOTE: A place of its own INSIDE the value at this one — a callback's own
+// A place of its own INSIDE the value at this one — a callback's own
 // Arguments and its answer, which are not parts of the Function the way a member
 // is part of a Record. Everything reached from there is spelled below the whole
 // of where the callback was, so a refusal reads `argument 2 → return value →
@@ -141,10 +141,10 @@ function within(at: string, what: string): string {
 	return `${at} → ${what}`
 }
 
-// NOTE: How many names an Error spells out before it starts counting.
+// How many names an Error spells out before it starts counting.
 const NAMES_SHOWN = 5
 
-// NOTE: Every Type key an interpreter in this process has been built over. A
+// Every Type key an interpreter in this process has been built over. A
 // value tagged with one of them and handed to an interpreter built over ANOTHER
 // is the failure that has no symptom of its own: it reads as a plain object, is
 // refused as "not from this Module", and the host is left staring at a value
@@ -154,7 +154,7 @@ const NAMES_SHOWN = 5
 // both deserve to be named as what they are rather than as an object with the
 // wrong keys. The set is only ever read on the way to an Error.
 //
-// NOTE: The runtime describes its key as `$type`, and a copy of the runtime this
+// The runtime describes its key as `$type`, and a copy of the runtime this
 // package never bound — a host that imported `@essence-lang/runtime` itself
 // beside a bundle — mints a Symbol under that description too. It is looked for
 // as well, so that the case is named the same way; a Symbol is a hidden key on
@@ -163,7 +163,7 @@ const NAMES_SHOWN = 5
 const mintedTypeKeys = new Set<symbol>()
 const TYPE_KEY_DESCRIPTION = "$type"
 
-// NOTE: The tag a value carries under a Type key that is not the one being read
+// The tag a value carries under a Type key that is not the one being read
 // with — or `null` where it carries none such. Every own Symbol is examined:
 // there are never more than a few, and this runs only once a value has already
 // been refused.
@@ -185,25 +185,25 @@ function foreignTag(value: object, own: symbol): string | null {
 
 export type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
-// NOTE: One entry of a Dictionary as the two halves it is made of, which is what
+// One entry of a Dictionary as the two halves it is made of, which is what
 // the bridge hands over and what it takes back — the shape a `Map` iterates and
 // the shape its constructor reads, so neither side of the boundary has to lay
 // one out for the other.
 type Entry = [EssenceValue, EssenceValue]
 
-// NOTE: One shape's rule, compiled — the way in and the way out of a single
+// One shape's rule, compiled — the way in and the way out of a single
 // Descriptor node, as the Function each of them is. Everything a call does is
 // one of these being run.
 type Inbound = (value: unknown, at: Path | null, step: Step) => EssenceValue
 
 type Outbound = (value: unknown, at: Path | null, step: Step) => unknown
 
-// NOTE: What a link that was never made is released by. One Function rather
+// What a link that was never made is released by. One Function rather
 // than a `null` to test for, because the release is run on a path that has just
 // waited for work: a branch there buys nothing and reads worse.
 function nothing(): void {}
 
-// NOTE: The members of one Record or one Case's payload, compiled — the readers
+// The members of one Record or one Case's payload, compiled — the readers
 // under the names a value carries them under, and the same readers in the order
 // the Type declares them. Which of the two answers is asked first is the whole
 // of the difference between them; see `compiledMembers`.
@@ -213,7 +213,7 @@ type Members = {
 	named: Map<string, Outbound>
 }
 
-// NOTE: Everything about a call that its SIGNATURE settles: which labels it may
+// Everything about a call that its SIGNATURE settles: which labels it may
 // be written with, the reader for every Parameter and for the answer, and what
 // an Error calls each Argument written either way. None of it depends on the
 // Function it wraps or on the name that Function was met under, so all of it is
@@ -229,18 +229,18 @@ type Call = {
 }
 
 export type Interpreter = {
-	// NOTE: An Essence value out, as the JavaScript it maps to. The optional name
+	// An Essence value out, as the JavaScript it maps to. The optional name
 	// is what an Error calls the value, and everything below it is spelled
 	// relative to that; the optional Descriptor is for the one value that carries
 	// none of its own.
 	toJS: (value: unknown, path?: string, expected?: Descriptor) => unknown
-	// NOTE: A JavaScript value in, as the shape it is being handed to.
+	// A JavaScript value in, as the shape it is being handed to.
 	fromJS: (
 		value: unknown,
 		expected: Descriptor,
 		path?: string,
 	) => EssenceValue
-	// NOTE: The same two doors for a caller that will cross the SAME shape more
+	// The same two doors for a caller that will cross the SAME shape more
 	// than once — a constant read again and again, a host's own hot loop. The
 	// Descriptor is walked here and never again; what comes back takes the value
 	// alone.
@@ -252,7 +252,7 @@ export type Interpreter = {
 		expected: Descriptor,
 		path?: string,
 	) => (value: unknown) => unknown
-	// NOTE: One Essence Function as a JavaScript one: Arguments marshalled
+	// One Essence Function as a JavaScript one: Arguments marshalled
 	// against the Parameters the Module declared, the call made positionally —
 	// which is how every Essence call is emitted, labels and all — and the answer
 	// marshalled back.
@@ -263,7 +263,7 @@ export type Interpreter = {
 	) => (...args: Array<unknown>) => unknown
 }
 
-// NOTE: A List box as the runtime lays one out, and the only place this package
+// A List box as the runtime lays one out, and the only place this package
 // knows that layout. `packages/runtime/src/List.ts` is the authority: a List is
 // TWO runs and a view into each — the back run stored forward in `value`, the
 // front run stored REVERSED in `front` — because the runs are SHARED between the
@@ -272,7 +272,7 @@ export type Interpreter = {
 // Array, `front` absent means the box never prepended, and reading `value` on its
 // own answers neither the right items nor the right number of them.
 //
-// NOTE: Read, never written back. The runtime's own `materialise` combines the
+// Read, never written back. The runtime's own `materialise` combines the
 // two runs and leaves the result ON the box, because the natives will read that
 // box again; marshalling reads it once and hands JavaScript an Array of its own,
 // so there is nothing here worth caching and no reason for this side of the
@@ -294,18 +294,18 @@ export type ListBox = {
 	}
 }
 
-// NOTE: The back run AS THIS BOX SEES IT. A positional write changes that Array
+// The back run AS THIS BOX SEES IT. A positional write changes that Array
 // IN PLACE and counts a version up, leaving every other box on the run behind —
 // `packages/runtime/src/listWrites.ts` is the authority, and `writes` holds the
 // log of what each write overwrote beside the version this box views. A box that
 // is behind undoes the writes made since it looked, into a copy of its own view.
 //
-// NOTE: Repeated rather than imported because the runtime's `caughtUp` writes
+// Repeated rather than imported because the runtime's `caughtUp` writes
 // the replayed run back onto the box, and this side never writes into a
 // bundle's values. The runtime repairs such a box wherever it reads one, so a
 // box left alone here loses nothing by it.
 //
-// NOTE: Exported for `tests/undoReplay.spec.ts`, which holds this copy and the
+// Exported for `tests/undoReplay.spec.ts`, which holds this copy and the
 // one in `tools/bench.ts` against the runtime's own. An export nothing else
 // reaches is shaken out of a bundle, so it costs a host nothing.
 export function backRunSeenBy(list: ListBox): Array<unknown> {
@@ -335,13 +335,13 @@ export function backRunSeenBy(list: ListBox): Array<unknown> {
 	return own
 }
 
-// NOTE: What a binding knows that a Descriptor does not — today the one thing:
+// What a binding knows that a Descriptor does not — today the one thing:
 // the host's own `AbortSignal`, if it has one. It belongs to the INTERPRETER
 // rather than to a call because it is a fact about the whole binding: every run
 // this boundary starts belongs under it, so stopping it stops everything the
 // host asked this Module for and nothing else.
 export type InterpreterOptions = {
-	// NOTE: The ROOT context of every run the boundary starts, rather than a
+	// The ROOT context of every run the boundary starts, rather than a
 	// second mechanism beside the one the language already has. A Program's own
 	// `start` makes a child of the context it was written in and `::within` and
 	// `::race` stop their losers through exactly such a child — so a host that
@@ -355,7 +355,7 @@ export function createInterpreter(
 	module: ModuleDescriptor,
 	options: InterpreterOptions = {},
 ): Interpreter {
-	// NOTE: The bundle's own Type key and constructors, read off the bridge ONCE.
+	// The bundle's own Type key and constructors, read off the bridge ONCE.
 	// Every value that crosses reaches one of them, and a property load on the
 	// way to each call is exactly the sort of work the compile step exists to
 	// have already done. None of them is a Method — the bridge hands over the
@@ -366,7 +366,7 @@ export function createInterpreter(
 
 	mintedTypeKeys.add(typeKey)
 
-	// NOTE: A Record or a payload Case this reader BUILDS is tagged in place
+	// A Record or a payload Case this reader BUILDS is tagged in place
 	// rather than handed to the bridge's constructor, which spreads what it is
 	// given into a second object — one allocation per value that this reader,
 	// having just built the first, has no reason to pay: a quarter of a tree of
@@ -392,14 +392,14 @@ export function createInterpreter(
 		return payload
 	}
 
-	// NOTE: A Case payload default's value, built. It is the one value this side
+	// A Case payload default's value, built. It is the one value this side
 	// makes out of nothing a host handed over — every other one is read off
 	// something — because a Case is BUILT where it is written and a host writing
 	// one is where it is written: there is no callee between the object and the
 	// Case for a default to be filled in at, the way there is for a Record
 	// Parameter.
 	//
-	// NOTE: Built once, when the reader is compiled, and handed to every value
+	// Built once, when the reader is compiled, and handed to every value
 	// that leaves the member out. Essence values are immutable, and the Compiler
 	// shares a literal across its own construction sites for the same reason —
 	// `pool-constants` is that very sharing.
@@ -443,7 +443,7 @@ export function createInterpreter(
 	let makeString = bridge.string
 	let makeBoolean = bridge.boolean
 	let makeList = bridge.list
-	// NOTE: The two halves of the Dictionary door, which a bundle carries only
+	// The two halves of the Dictionary door, which a bundle carries only
 	// where its boundary names a Dictionary — see `runtimeBridgeModules`, which
 	// says why it is not carried always. Undefined where it is not, and a
 	// Descriptor that names a Dictionary is then a Descriptor from another
@@ -451,7 +451,7 @@ export function createInterpreter(
 	// a `TypeError` about `undefined` from inside a walk.
 	let makeDictionary = bridge.dictionary
 	let dictionaryEntries = bridge.dictionaryEntries
-	// NOTE: And the three of the asynchrony door, carried under the same rule —
+	// And the three of the asynchrony door, carried under the same rule —
 	// see `runtimeBridgeModules`. Undefined where the boundary names no Future
 	// and no Started, and a Descriptor that names one is then a Descriptor from
 	// another compile, which is what `noFutureDoor` says.
@@ -459,7 +459,7 @@ export function createInterpreter(
 	let makeFutureContext = bridge.futureContext
 	let futureAnswer = bridge.futureAnswer
 	let hostSignal = options.signal
-	// NOTE: Every unit Choice Case the MODULE names, under the tag its values
+	// Every unit Choice Case the MODULE names, under the tag its values
 	// carry. Whether a Case crosses as a bare string is a fact about the Choice
 	// and a value carries nothing that says it, so the general walk — which
 	// reads a value by what it says it is — could otherwise only answer it
@@ -468,7 +468,7 @@ export function createInterpreter(
 	// that `toJS` with nothing declared hands back the same string a declared
 	// position would have and a host can hand it straight back.
 	//
-	// NOTE: Bounded by the Descriptor, and complete for what a host can reach:
+	// Bounded by the Descriptor, and complete for what a host can reach:
 	// a value only leaves this boundary through an export, and an export names
 	// its Type. The Module is required for the same reason — an interpreter
 	// built without one would walk a Case into its object form at an undeclared
@@ -478,19 +478,19 @@ export function createInterpreter(
 
 	// #region Compiling
 
-	// NOTE: One compiled rule per Descriptor NODE, kept against the node itself.
+	// One compiled rule per Descriptor NODE, kept against the node itself.
 	// A Descriptor outlives every value that crosses against it — a bound Module
 	// holds its own for as long as it is bound — so a shape is compiled once and
 	// never again, while a Descriptor nobody holds any more takes its closures
 	// with it rather than filling a table that only grows.
 	//
-	// NOTE: A Descriptor is a TREE — `describe` answers a Type that reaches
+	// A Descriptor is a TREE — `describe` answers a Type that reaches
 	// itself with a `refused` node rather than following it — so compiling a
 	// node's children while compiling the node terminates, and a call finds every
 	// converter below it already built.
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
-	// NOTE: A table of its own, because an ANSWER is the one position that reads
+	// A table of its own, because an ANSWER is the one position that reads
 	// a shape differently from every other: a Future is work everywhere and a
 	// `Promise` here. The same Descriptor node can stand in both — a Type Alias
 	// for a Future, answered by one Function and held by a Record somewhere else
@@ -498,7 +498,7 @@ export function createInterpreter(
 	let answers = new WeakMap<Descriptor, Outbound>()
 	let outboundMembers = new WeakMap<DescribedMembers, Members>()
 	let calls = new WeakMap<FunctionDescriptor, Call>()
-	// NOTE: What a position that declared nothing reads its members by — no
+	// What a position that declared nothing reads its members by — no
 	// names to guess with and no reader to find, so every member of it is read
 	// by the walk the VALUE directs. One of them rather than a `null` to branch
 	// on, because a Record nothing was declared for is read by the same loop as
@@ -527,14 +527,14 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// NOTE: What a call ANSWERS with, which is the one position asynchronous
+	// What a call ANSWERS with, which is the one position asynchronous
 	// work crosses at — `Future<T>` and `Started<T>` come back as a `Promise` of
 	// what they answer with, and everywhere else they are refused. The rule is
 	// here rather than in `buildOut` because it is a rule about the POSITION: a
 	// Function's answer is where a Program said work would be handed over, and a
 	// Record's member is where it said a value would be.
 	//
-	// NOTE: Every other shape goes to the ordinary door, memo table and all —
+	// Every other shape goes to the ordinary door, memo table and all —
 	// this is one branch in front of it, not a second reading of anything.
 	function compileAnswerOut(expected: Descriptor): Outbound {
 		if (expected.kind !== "future" && expected.kind !== "started") {
@@ -551,7 +551,7 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// NOTE: The compiled way out for a Descriptor, or the value-directed walk
+	// The compiled way out for a Descriptor, or the value-directed walk
 	// where a position declared nothing — the one place the two doors meet, so
 	// that a piece whose shape was declared is read through its own rule and a
 	// piece whose shape was not is still read.
@@ -563,12 +563,12 @@ export function createInterpreter(
 		return toJS(value, at, step, null)
 	}
 
-	// NOTE: The members of a Record or the payload of a Case, each compiled —
+	// The members of a Record or the payload of a Case, each compiled —
 	// twice over, in the two ways a member is looked for. Memoised against the
 	// members object itself, because the general walk below reaches for it per
 	// value.
 	//
-	// NOTE: The names IN THE TYPE'S ORDER beside the readers, because a value the
+	// The names IN THE TYPE'S ORDER beside the readers, because a value the
 	// Module built against this Type carries its members in that order — so the
 	// reader a position wants is almost always the one standing at the same
 	// position, found by comparing two names rather than by hashing one. And the
@@ -594,7 +594,7 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// NOTE: A signature's half of a call, compiled — the half that is fixed the
+	// A signature's half of a call, compiled — the half that is fixed the
 	// moment the Module declares the Function, which is everything but the
 	// Function itself and the name an Error calls it. Memoised against the
 	// FunctionDescriptor, because a Function is the one Essence value whose
@@ -619,7 +619,7 @@ export function createInterpreter(
 				readers: parameters.map((parameter) => compileIn(parameter.of)),
 				answer: compileAnswerOut(signature.returns),
 				positional,
-				// NOTE: The same Array where no labels may be written, rather
+				// The same Array where no labels may be written, rather
 				// than a second one holding the same strings — `readCall`
 				// answers the Arguments it was passed where it did not reorder
 				// them, and the two spellings are then told apart by identity.
@@ -640,11 +640,11 @@ export function createInterpreter(
 
 	// #region In
 
-	// NOTE: A whole Array of one shape rather than one value of it — the items of
+	// A whole Array of one shape rather than one value of it — the items of
 	// a List, walked by the loop the ITEM's kind picks, picked once where the
 	// List is compiled and never looked at again.
 	//
-	// NOTE: This is the ONE place where compiling to closures costs something
+	// This is the ONE place where compiling to closures costs something
 	// interpreting did not, and so the one place a rule is written twice. A loop
 	// that calls a converter it was handed can not see what it is calling: every
 	// List in a Module reaches the SAME loop, whose one call is made against
@@ -656,19 +656,19 @@ export function createInterpreter(
 	// everything; 124 µs every time through a loop that walks leaves alone; and
 	// 111 µs every time through these.
 	//
-	// NOTE: So a leaf's admission is spelled here as well as in the branch of
+	// So a leaf's admission is spelled here as well as in the branch of
 	// `buildIn` that compiles the leaf on its own, and the two say the same
 	// thing. They are two spellings of ONE rule rather than two rules — a value
 	// met on its own and the same value met inside a List are the same value —
 	// so a difference between a loop here and its branch there is a bug and never
 	// a decision.
 	//
-	// NOTE: A Rational is walked by the loop at the bottom with everything else.
+	// A Rational is walked by the loop at the bottom with everything else.
 	// Its admission is three branches, a read of a double's bits and two
 	// allocations, and a call per item is a small part of that — where an
 	// Integer's is two type checks that the call itself outweighs.
 	//
-	// NOTE: A hole in an Array is read as the `undefined` it holds, and admitted
+	// A hole in an Array is read as the `undefined` it holds, and admitted
 	// only where the ITEM's shape admits absence. An Array with a gap in it is
 	// not a List with a gap: `[1, , 3]` is refused where the items are Integers,
 	// and crosses with `#Empty` in the middle where they are `Optional<Integer>`
@@ -683,7 +683,7 @@ export function createInterpreter(
 		if (item.kind === "integer") {
 			return (source, at) => {
 				let count = source.length
-				// NOTE: The argument is the answer's LENGTH. The rule below suggests
+				// The argument is the answer's LENGTH. The rule below suggests
 				// `Array.from({ length })` instead, which fills through an iterator —
 				// the very turn-by-turn work a walk written out like this avoids.
 				// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
@@ -748,7 +748,7 @@ export function createInterpreter(
 			}
 		}
 
-		// NOTE: And everything else through its own converter, which is every
+		// And everything else through its own converter, which is every
 		// shape whose items are worth more than the call that reaches them —
 		// a List of Lists, of Records, of Cases, of anything the two checks
 		// above do not settle.
@@ -765,7 +765,7 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: What a JavaScript value has to become to be this shape, as one
+	// What a JavaScript value has to become to be this shape, as one
 	// Function. Every branch is the branch the interpreter took per value, with
 	// everything it could have decided without the value decided here instead: a
 	// nested `Optional` is a refusal compiled to a throw, a Case's tag and the
@@ -777,7 +777,7 @@ export function createInterpreter(
 		switch (expected.kind) {
 			case "integer":
 				return (value, at, step) => {
-					// NOTE: Both kinds go in AS THEY ARE — the bridge's
+					// Both kinds go in AS THEY ARE — the bridge's
 					// `createInteger` canonicalises, so a bigint that fits a
 					// double arrives as a number and a number that does not
 					// arrives as a bigint, and neither caller has to know which
@@ -786,7 +786,7 @@ export function createInterpreter(
 						return makeInteger(value)
 					}
 
-					// NOTE: A number is admitted only where it is exactly an
+					// A number is admitted only where it is exactly an
 					// integer a double can hold — `2 ** 53` is not one, and
 					// taking it would hand the Module a value already off by
 					// whatever the double had lost before it ever arrived.
@@ -823,7 +823,7 @@ export function createInterpreter(
 						throw mismatch(value, shown, at, step)
 					}
 
-					// NOTE: Normalised on the way in, because String equality in
+					// Normalised on the way in, because String equality in
 					// Essence is normalised — a composed `é` and a decomposed one
 					// are one value there — and letting both spellings through
 					// would put two values into the Module that it insists are
@@ -846,7 +846,7 @@ export function createInterpreter(
 						throw mismatch(value, shown, at, step)
 					}
 
-					// NOTE: `bridge.list` copies what it is handed, so the Array
+					// `bridge.list` copies what it is handed, so the Array
 					// built here is copied once more before a List holds it. The
 					// alternative was to bridge the runtime's own `createList`,
 					// which takes ownership — and then this call would be safe
@@ -855,12 +855,12 @@ export function createInterpreter(
 					return makeList(items(value, { at, step }))
 				}
 			}
-			// NOTE: A `Map` and nothing else. Every key Type crosses, so what
+			// A `Map` and nothing else. Every key Type crosses, so what
 			// is read is the entries rather than any spelling of a key — in
 			// the order the Map holds them, which is the order a Dictionary
 			// holds its own.
 			//
-			// NOTE: The entries are marshalled HERE and the Dictionary is
+			// The entries are marshalled HERE and the Dictionary is
 			// built THERE. Which slot a key lands in, whether two keys are
 			// one, and what a key encodes to are the runtime's own and stay
 			// there: this side hands over an Array of pairs it does not keep,
@@ -879,7 +879,7 @@ export function createInterpreter(
 
 				return (value, at, step) => {
 					if (!(value instanceof Map)) {
-						// NOTE: An object is what a host reaches for first
+						// An object is what a host reaches for first
 						// where the keys are Strings, so it is answered with
 						// the shape to write instead of with the Type it
 						// already named — see `objectSpelledDictionary`.
@@ -893,7 +893,7 @@ export function createInterpreter(
 					let entries: Array<Entry> = new Array(value.size)
 					let position = 0
 
-					// NOTE: One place per ENTRY, which both halves of it are
+					// One place per ENTRY, which both halves of it are
 					// spelled below — `argument 1 → [2].value`. A Map has no
 					// accessor that names one entry, so what an Error names is
 					// the entry's position and the half of it that is wrong,
@@ -910,7 +910,7 @@ export function createInterpreter(
 
 					let built = build(entries)
 
-					// NOTE: The position of an entry whose key the Dictionary
+					// The position of an entry whose key the Dictionary
 					// already holds — two Map keys that are one key here. It
 					// is answered rather than thrown because the place is this
 					// side's to name; see `createDictionaryFrom`.
@@ -926,7 +926,7 @@ export function createInterpreter(
 				let readers = names.map((name) =>
 					compileIn(expected.members[name]!.of),
 				)
-				// NOTE: The members the callee's own default fills in, which a
+				// The members the callee's own default fills in, which a
 				// host may therefore leave out. Absence has to reach the built
 				// Record as a MISSING KEY rather than as an `undefined` one: the
 				// callee reads `options.retries ?? 3`, and a key holding
@@ -948,7 +948,7 @@ export function createInterpreter(
 
 					let fields: Record<string, EssenceValue> = {}
 					let inside: Path = { at, step }
-					// NOTE: The keys the value carries against the members the
+					// The keys the value carries against the members the
 					// Type names, IN ORDER — which answers both questions a
 					// Record asks at once, wherever the two lists agree. A host
 					// writing an object against a declaration writes the members
@@ -986,12 +986,12 @@ export function createInterpreter(
 						return ownRecord(fields)
 					}
 
-					// NOTE: And every value the two lists did not settle, read
+					// And every value the two lists did not settle, read
 					// the long way — a member left out, a member the Type does
 					// not name, or the very same members written in another
 					// order.
 					//
-					// NOTE: An absent key IS a value here — `undefined`, which is
+					// An absent key IS a value here — `undefined`, which is
 					// exactly what an `Optional` member is spelled as — so what
 					// the key holds is read and the member's own shape decides.
 					// Refusing absence up front reported "expected
@@ -1002,11 +1002,11 @@ export function createInterpreter(
 					// still fails, with the same sentence, where the sentence is
 					// true.
 					//
-					// NOTE: An OWN key, because an absent `toString` read plainly
+					// An OWN key, because an absent `toString` read plainly
 					// finds `Object.prototype`'s — a function where the rule above
 					// promises `undefined`.
 					//
-					// NOTE: Unless the member is one the callee fills in, whose
+					// Unless the member is one the callee fills in, whose
 					// absence is not a value at all — it is the caller saying
 					// nothing, which is what the default is for. A key that IS
 					// written goes to the reader like any other, `undefined` and
@@ -1027,13 +1027,13 @@ export function createInterpreter(
 						)
 					}
 
-					// NOTE: Closed, unlike the Matcher a `case` narrows with. A
+					// Closed, unlike the Matcher a `case` narrows with. A
 					// key the Type does not name is a mistake in the making — a
 					// misspelled member, or a value from somewhere else entirely
 					// — and taking it silently drops it, which is how a `widht`
 					// gets as far as production.
 					//
-					// NOTE: Looked for AFTER the members are read, so that a
+					// Looked for AFTER the members are read, so that a
 					// value which is wrong in both ways is named by the member
 					// that is wrong rather than by the one that is extra.
 					let undeclared = undeclaredOf(given, declared, false)
@@ -1046,7 +1046,7 @@ export function createInterpreter(
 				}
 			}
 			case "optional": {
-				// NOTE: The refusal `toJS` makes for the same pair, made here
+				// The refusal `toJS` makes for the same pair, made here
 				// too: `#Value(#Empty)` and `#Empty` would both be `undefined`,
 				// and Essence is explicit that they are two values. It is a fact
 				// about the SHAPE rather than about any value of it, so a shape
@@ -1059,12 +1059,12 @@ export function createInterpreter(
 
 				let item = compileIn(expected.of)
 
-				// NOTE: `Optional` is spelled by its ABSENCE on this side — `T |
+				// `Optional` is spelled by its ABSENCE on this side — `T |
 				// undefined` — so it reads the value itself rather than a `$case`
 				// on it. `null` is admitted beside `undefined` because JSON has
 				// only the one of them; `undefined` is what comes back.
 				//
-				// NOTE: This is the Union of `#Value` and `#Empty` with its two
+				// This is the Union of `#Value` and `#Empty` with its two
 				// arms run through: absence is the `#Empty` arm, anything else is
 				// the `#Value` arm, and a refusal that got INSIDE the value is the
 				// one the Union would have kept — `#Empty` never reaches inside
@@ -1094,7 +1094,7 @@ export function createInterpreter(
 			case "case":
 				return buildCaseIn(expected)
 			case "union": {
-				// NOTE: Before any arm is tried, because a nested Optional is
+				// Before any arm is tried, because a nested Optional is
 				// refused rather than answered and an arm's refusal is something
 				// the next arm gets to overrule. A Union that offers an `Optional`
 				// among its arms would otherwise let a later arm take the
@@ -1108,7 +1108,7 @@ export function createInterpreter(
 					}
 				}
 
-				// NOTE: And the second shape a Union can be in that no
+				// And the second shape a Union can be in that no
 				// JavaScript value could be read into: a unit Choice's Case
 				// crosses as its bare name, so `"Up"` standing beside a String
 				// — or beside another Choice's `#Up` — is one string two arms
@@ -1117,7 +1117,7 @@ export function createInterpreter(
 				// value would be an arm that had already decided, and what is
 				// wrong here is that there is nothing to decide it WITH.
 				//
-				// NOTE: Refused rather than decided, which is the one place the
+				// Refused rather than decided, which is the one place the
 				// "first arm wins" stance the arms below are compiled under
 				// does not reach. Deciding would hand a String `"Up"` back out
 				// as a `Direction#Up`, and losing the value it was given is the
@@ -1132,7 +1132,7 @@ export function createInterpreter(
 
 				let arms = expected.arms.map((arm) => compileIn(arm))
 				let count = arms.length
-				// NOTE: Which JavaScript families each arm could take at all,
+				// Which JavaScript families each arm could take at all,
 				// so that an arm is only TRIED where it could succeed. An arm
 				// says no by throwing, and a thrown Error captures a stack —
 				// which is nothing against a value that fits the first arm and
@@ -1144,7 +1144,7 @@ export function createInterpreter(
 				// taken it nor have been the one refusal worth reporting.
 				let families = expected.arms.map((arm) => familiesOf(arm))
 
-				// NOTE: A Union of bare Cases and nothing else — a unit Choice
+				// A Union of bare Cases and nothing else — a unit Choice
 				// as a value of it is declared, which is the shape a status or
 				// a kind is — is a lookup and no search: every string it can
 				// take is known when the reader is compiled, under both of its
@@ -1153,7 +1153,7 @@ export function createInterpreter(
 				// in exactly the words it always was.
 				let named = bareCaseTable(expected)
 
-				// NOTE: And the same for the Cases that cross as objects: which
+				// And the same for the Cases that cross as objects: which
 				// arm a `$case` names is known when the reader is compiled, so
 				// an object that names one is handed to that arm and no other.
 				// The arm's own refusal — a payload member wrong under a
@@ -1161,7 +1161,7 @@ export function createInterpreter(
 				// search below would have concluded after trying the rest.
 				let tagged = caseArmTable(expected)
 
-				// NOTE: In declaration order, and the first arm that admits the
+				// In declaration order, and the first arm that admits the
 				// value is the one it becomes. Overlapping arms are therefore
 				// DECIDED rather than ambiguous: `Optional<String> | Integer`
 				// makes a String out of `"7"` because `Optional<String>` is
@@ -1193,7 +1193,7 @@ export function createInterpreter(
 						}
 					}
 
-					// NOTE: Built on the first refusal rather than before the
+					// Built on the first refusal rather than before the
 					// first arm — an arm that takes the value is the whole of
 					// what usually happens, and it should leave nothing behind.
 					let refused: Array<EssenceMarshalError> | null = null
@@ -1235,7 +1235,7 @@ export function createInterpreter(
 			}
 			case "function":
 				return buildCallbackIn(expected)
-			// NOTE: Work can not be BUILT from a JavaScript value. A Future is a
+			// Work can not be BUILT from a JavaScript value. A Future is a
 			// description of Essence work and a Started is one run of it, and
 			// what a host holds instead is a `Promise` — an answer that has not
 			// arrived, which describes nothing and can not be run again. The one
@@ -1247,7 +1247,7 @@ export function createInterpreter(
 				return (_value, at, step) => {
 					throw asynchronyFromHost(shown, at, step)
 				}
-			// NOTE: Everything the boundary has no mapping for, refused in the
+			// Everything the boundary has no mapping for, refused in the
 			// words the Compiler wrote when it still had the Type to name.
 			case "refused": {
 				let why = expected.why
@@ -1265,7 +1265,7 @@ export function createInterpreter(
 		let shown = expected.shown
 		let tag = expected.tag
 
-		// NOTE: One of `Optional`'s own Cases, met without the other — which is
+		// One of `Optional`'s own Cases, met without the other — which is
 		// what `constant thing = Optional<Integer>#Value(3)` infers, a Case
 		// rather than the Union an annotation would have named. The pair is
 		// collapsed into an `optional` before it ever reaches here, so this is
@@ -1283,7 +1283,7 @@ export function createInterpreter(
 
 			let item = expected.payload.item
 
-			// NOTE: A `#Value` carrying nothing, and a `#Value` carrying another
+			// A `#Value` carrying nothing, and a `#Value` carrying another
 			// absence — neither is a shape any value has, so both are the whole
 			// of what this Case compiles to.
 			if (item === undefined) {
@@ -1309,13 +1309,13 @@ export function createInterpreter(
 			}
 		}
 
-		// NOTE: A Case of a unit Choice is the STRING of its own name and
+		// A Case of a unit Choice is the STRING of its own name and
 		// nothing else — `"Up"`, or the `"Direction#Up"` the source itself
 		// would write. Both spellings, exactly as the object form below takes
 		// both; the difference is that they are the value rather than a member
 		// on it, which is the whole ergonomic point of the rule.
 		//
-		// NOTE: The object form is not kept as a second spelling. One shape has
+		// The object form is not kept as a second spelling. One shape has
 		// one spelling here: a position that took `{ $case: 'Up' }` as well
 		// would be a position two different JavaScript values cross into, while
 		// the way out can only ever hand one of them back — so a round trip
@@ -1326,19 +1326,19 @@ export function createInterpreter(
 
 			return (value, at, step) => {
 				if (value === named || value === spelled) {
-					// NOTE: No payload at all, for the reason the payload-less
+					// No payload at all, for the reason the payload-less
 					// branch below gives — `createCase` hands out one shared
 					// instance per unit Case tag, and a fresh `{}` would not be
 					// the Module's own `#Up`.
 					return makeCase(tag)
 				}
 
-				// NOTE: The spelling this Case used to cross as, met where the
+				// The spelling this Case used to cross as, met where the
 				// string is now the only one. Worth a sentence of its own,
 				// because "expected Direction#Up, got an object with '$case'"
 				// is true and says nothing about what to write instead.
 				//
-				// NOTE: Marked as having reached INSIDE the value, so that a
+				// Marked as having reached INSIDE the value, so that a
 				// Union of the Choice's Cases answers with this sentence rather
 				// than with the Choice — exactly one arm can match a given
 				// `$case`, which is the condition that rule asks for.
@@ -1355,7 +1355,7 @@ export function createInterpreter(
 			}
 		}
 
-		// NOTE: Either spelling of the same Case, both built here. `Shape#Circle`
+		// Either spelling of the same Case, both built here. `Shape#Circle`
 		// is what `toJS` writes, and so what a round trip hands back; the bare
 		// `Circle` is what the Essence source itself writes, where a `#Circle`
 		// needs no Choice in front of it.
@@ -1364,7 +1364,7 @@ export function createInterpreter(
 		let colliding = Object.hasOwn(expected.payload, "$case")
 		let names = Object.keys(expected.payload)
 		let readers = names.map((name) => compileIn(expected.payload[name]!.of))
-		// NOTE: The value each member the Case's own default fills in is filled
+		// The value each member the Case's own default fills in is filled
 		// WITH, built once here. Where a Record Parameter's default is written in
 		// by the callee — the boundary leaves the key out and the Function's
 		// prologue writes it — a Case has no callee: a constructor writes the tag
@@ -1391,7 +1391,7 @@ export function createInterpreter(
 				throw mismatch(value, shown, at, step)
 			}
 
-			// NOTE: The refusal `toJS` makes for the same Case, made here too.
+			// The refusal `toJS` makes for the same Case, made here too.
 			// The tag is written under `$case`, so a payload member of that name
 			// has nowhere to sit: read it and the tag string becomes the member's
 			// value, silently, and there is no way to pass any other. Coming out
@@ -1404,7 +1404,7 @@ export function createInterpreter(
 			let payload: Record<string, EssenceValue> = {}
 			let inside: Path = { at, step }
 
-			// NOTE: The keys the value carries against the payload the Case
+			// The keys the value carries against the payload the Case
 			// declares, IN ORDER, with the tag at one end or the other — the
 			// two layouts a value of this Case is written in: `{ ...payload,
 			// $case }` is what a constructor and `toJS` build, `{ $case,
@@ -1454,18 +1454,18 @@ export function createInterpreter(
 			}
 
 			if (count === 0) {
-				// NOTE: No payload at all rather than an empty one —
+				// No payload at all rather than an empty one —
 				// `createCase` hands out one shared instance per unit Case tag,
 				// and passing `{}` would build a fresh object each time that the
 				// Module's own `#Blank` is not.
 				return makeCase(tag)
 			}
 
-			// NOTE: An absent key is read as `undefined` — through an OWN-key
+			// An absent key is read as `undefined` — through an OWN-key
 			// check, past what `Object.prototype` holds — and the member's own
 			// shape decides, for the reasons the Record branch above states.
 			//
-			// NOTE: Unless the Case's own default fills that member in, whose
+			// Unless the Case's own default fills that member in, whose
 			// absence is not a value at all but the host saying nothing, which
 			// is what the default is for. A key that IS written goes to the
 			// reader like any other, `undefined` and all — writing a member is
@@ -1492,20 +1492,20 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: One JavaScript Function as an Essence one — the mirror image of
+	// One JavaScript Function as an Essence one — the mirror image of
 	// `wrapFunction`, and the only place the boundary is crossed by a call the
 	// MODULE makes. What the Module hands the callback are its own values, so
 	// they cross OUT; what the callback answers with is built against the
 	// declared return, so it crosses IN. Every rule of both directions is the
 	// same rule as everywhere else, applied at a call site the host wrote.
 	//
-	// NOTE: Positionally, and never by label. A labelled call is how Essence
+	// Positionally, and never by label. A labelled call is how Essence
 	// writes its own calls and how a host may write one INTO the Module; a
 	// JavaScript Function takes its Arguments in order, and handing one an
 	// object of labels would be this package inventing a calling convention
 	// for code it did not write.
 	//
-	// NOTE: The path a refusal inside the callback is spelled from is the path
+	// The path a refusal inside the callback is spelled from is the path
 	// the callback itself arrived at — `argument 2 → return value` — because
 	// that is where a reader has to go to fix it. The Function that failed is
 	// the one they passed at `argument 2`, not one of the Module's. It is
@@ -1517,7 +1517,7 @@ export function createInterpreter(
 		let handed = signature.parameters.map((parameter) =>
 			compileOut(parameter.of),
 		)
-		// NOTE: A callback the Module calls for WORK rather than for a value —
+		// A callback the Module calls for WORK rather than for a value —
 		// declared `-> Future<T>`, which is the one way asynchronous work
 		// crosses INTO a Module. What the host writes is an ordinary Function
 		// answering a `Promise`; what the Module gets is a Future, and the two
@@ -1527,7 +1527,7 @@ export function createInterpreter(
 		// a request that has not been made, and `::attempt(times 3)` over it
 		// makes three.
 		//
-		// NOTE: A `Started` answer is not a door of its own. A Started is one
+		// A `Started` answer is not a door of its own. A Started is one
 		// run of the Module's own work and a host has no way to start one, so it
 		// falls to the refusal in `buildIn` like every other position — see
 		// `asynchronyFromHost`.
@@ -1541,7 +1541,7 @@ export function createInterpreter(
 				throw mismatch(value, shown, at, step)
 			}
 
-			// NOTE: Asked where the callback ARRIVES rather than where it is
+			// Asked where the callback ARRIVES rather than where it is
 			// called, because that is where a host can still be told what to do
 			// about it: a refusal out of a call the Module made names a Function
 			// the host passed pages earlier.
@@ -1579,13 +1579,13 @@ export function createInterpreter(
 
 			let build = makeWork!
 
-			// NOTE: The Arguments cross when the MODULE calls the callback, and
+			// The Arguments cross when the MODULE calls the callback, and
 			// the host is called when the work is STARTED. They are two moments
 			// and the values belong to the first of them: the Module handed them
 			// over when it built the future, and a start that read them again
 			// would be reading values the Module may have moved on from.
 			//
-			// NOTE: The context is not passed on. A host Function takes what its
+			// The context is not passed on. A host Function takes what its
 			// own declaration says it takes, and handing it a fourth Argument it
 			// never asked for would be this package inventing a calling
 			// convention for code it did not write — the same reason a callback
@@ -1616,7 +1616,7 @@ export function createInterpreter(
 
 	// #region Out
 
-	// NOTE: The way out compiled, and it is NOT the mirror of the way in. A value
+	// The way out compiled, and it is NOT the mirror of the way in. A value
 	// coming out SAYS what it is, so what a Descriptor buys here is only the
 	// expectation: the tag is read and compared against the one shape this
 	// position declared, and where the two agree everything below is already
@@ -1627,7 +1627,7 @@ export function createInterpreter(
 	// rather than a second reading.
 	function buildOut(expected: Descriptor): Outbound {
 		switch (expected.kind) {
-			// NOTE: ALWAYS a bigint on the way out, whichever of its two
+			// ALWAYS a bigint on the way out, whichever of its two
 			// representations the Integer arrived in. An Integer holds a
 			// JavaScript number while its value fits one and a bigint beyond that,
 			// and handing that split across the boundary would make the TYPE of
@@ -1694,7 +1694,7 @@ export function createInterpreter(
 			case "optional": {
 				let item = compileOut(expected.of)
 
-				// NOTE: An Optional is transparent — `Optional<T>` IS `T |
+				// An Optional is transparent — `Optional<T>` IS `T |
 				// undefined` on this side — so the Case does not appear in the
 				// answer, and the path gains no segment for it either. A host
 				// reading `.item` off what came back would be reading the
@@ -1703,7 +1703,7 @@ export function createInterpreter(
 					if (tagged(value, OPTIONAL_VALUE)) {
 						let held = (value as { item: unknown }).item
 
-						// NOTE: Absence does not nest. `#Value(#Empty)` and
+						// Absence does not nest. `#Value(#Empty)` and
 						// `#Empty` would both be `undefined` here, and Essence is
 						// explicit that they are two values — so the pair is
 						// refused rather than collapsed into the one of them a
@@ -1723,7 +1723,7 @@ export function createInterpreter(
 				}
 			}
 			case "case": {
-				// NOTE: One of `Optional`'s own two Cases, met WITHOUT the other
+				// One of `Optional`'s own two Cases, met WITHOUT the other
 				// — which is what `constant thing = Optional<Integer>#Value(3)`
 				// infers, a Case rather than the Union an annotation would have
 				// named. It is
@@ -1739,7 +1739,7 @@ export function createInterpreter(
 
 				let tag = expected.tag
 
-				// NOTE: A unit Choice's Case IS its name on this side, so the
+				// A unit Choice's Case IS its name on this side, so the
 				// whole of the way out is that name: no payload to read, no
 				// `$case` to write, nothing to walk. The tag still decides —
 				// a value carrying another one is handed to the general walk
@@ -1753,7 +1753,7 @@ export function createInterpreter(
 							: toJS(value, at, step, expected)
 				}
 
-				// NOTE: The Case as a host spells it, cut out of the tag once
+				// The Case as a host spells it, cut out of the tag once
 				// here rather than out of every value that carries it.
 				let name = caseName(tag)
 				let members = compiledMembers(expected.payload)
@@ -1764,7 +1764,7 @@ export function createInterpreter(
 						: toJS(value, at, step, expected)
 			}
 			case "union": {
-				// NOTE: The same refusal the way in makes, in the same words
+				// The same refusal the way in makes, in the same words
 				// and before anything else is compiled. It is a fact about the
 				// SHAPE rather than about any value of it — the position has no
 				// unambiguous JavaScript spelling — so it holds whichever
@@ -1785,7 +1785,7 @@ export function createInterpreter(
 					}
 				}
 
-				// NOTE: A Union names more than one shape and the VALUE says
+				// A Union names more than one shape and the VALUE says
 				// which, so what is compiled is the CHOOSING: one reader per Case
 				// the Union offers, under the tag its values carry. That is how a
 				// Choice reaches this side and what a host meets on every answer
@@ -1813,7 +1813,7 @@ export function createInterpreter(
 					return toJS(value, at, step, expected)
 				}
 			}
-			// NOTE: The one untagged Essence value, and the one place a Descriptor
+			// The one untagged Essence value, and the one place a Descriptor
 			// decides the way out rather than merely confirming it — a Function is
 			// emitted as a bare JavaScript function, so only what its position
 			// declared can say what a call to one means.
@@ -1826,7 +1826,7 @@ export function createInterpreter(
 								spell(at, step),
 							)
 						: toJS(value, at, step, expected)
-			// NOTE: Work met somewhere other than a call's answer, which is the
+			// Work met somewhere other than a call's answer, which is the
 			// one position it crosses at — see `compileAnswerOut`, which is the
 			// door, and `asynchronyInsideValue`, which is the sentence. A fact
 			// about the SHAPE rather than about any value of it, so it compiles
@@ -1836,7 +1836,7 @@ export function createInterpreter(
 				return (_value, at, step) => {
 					throw asynchronyInsideValue(expected.shown, at, step)
 				}
-			// NOTE: A Type the way IN has no mapping for is still a value on the
+			// A Type the way IN has no mapping for is still a value on the
 			// way out, and its tag says what it is — `Optional<Algebraic>` hands
 			// back an Algebraic's own refusal rather than the Type Parameter's.
 			case "refused":
@@ -1844,7 +1844,7 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: A call's answer that has not run — the whole of the asynchrony door,
+	// A call's answer that has not run — the whole of the asynchrony door,
 	// and the only place this boundary starts anything.
 	//
 	// A FUTURE is started here, once per call: what a Function answers with is a
@@ -1860,12 +1860,12 @@ export function createInterpreter(
 	// anywhere, so a deadline or a stop written by one holder may not stop the
 	// work the others are waiting for.
 	//
-	// NOTE: The value inside is marshalled when it ARRIVES, so a refusal of it
+	// The value inside is marshalled when it ARRIVES, so a refusal of it
 	// comes back as a rejected promise rather than as a throw at the call. There
 	// is nowhere else for it to go: the value does not exist yet when the call
 	// answers, which is the whole reason the position is a promise.
 	//
-	// NOTE: The promise gains no segment of its own in the path. It is
+	// The promise gains no segment of its own in the path. It is
 	// transparent on this side exactly as an `Optional` is — a host awaiting a
 	// call's answer reads the value, not a box around it — so a refusal inside
 	// one is spelled from where the answer was.
@@ -1890,7 +1890,7 @@ export function createInterpreter(
 				return toJS(value, at, step, expected)
 			}
 
-			// NOTE: A host that has already pulled its stop is a host that wants
+			// A host that has already pulled its stop is a host that wants
 			// nothing started. A Future has not run yet — the call above only
 			// BUILT it — so there is nothing here to stop: it is simply not
 			// started, and what the host holds is the promise a stopped run
@@ -1903,7 +1903,7 @@ export function createInterpreter(
 				return new Promise(() => {})
 			}
 
-			// NOTE: A Started is waited for under a context of its own that
+			// A Started is waited for under a context of its own that
 			// nothing reads — the runtime answers one with the promise it
 			// already holds — so there is nothing to unlink afterwards either.
 			let root = started
@@ -1926,13 +1926,13 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: The context a run the boundary started belongs to: a root of its
+	// The context a run the boundary started belongs to: a root of its
 	// own, with the host's signal linked above it where the binding was given
 	// one. Per CALL, because two calls are two runs and one may not stop the
 	// other — which is exactly what the Rewriter emits at a Program's top level,
 	// a fresh root per site.
 	//
-	// NOTE: `release` is what takes the link off again once the run is over, and
+	// `release` is what takes the link off again once the run is over, and
 	// it is why the link is not simply left in place: a host signal lives as
 	// long as the host does, and a listener per call on it would be a listener
 	// per call that outlives the call. It is the same bookkeeping `childOf`
@@ -1947,13 +1947,13 @@ export function createInterpreter(
 			return { context, release: nothing }
 		}
 
-		// NOTE: A signal that is aborted ALREADY aborts this context before
+		// A signal that is aborted ALREADY aborts this context before
 		// anything is run under it. The run is declined outright one level up,
 		// where the answer is built — see `buildAnswerOut` — and this is what
 		// makes a run that somehow reaches here read a signal that is already
 		// pulled.
 		//
-		// NOTE: What a MID-RUN abort does is cooperative, and the word for it is
+		// What a MID-RUN abort does is cooperative, and the word for it is
 		// signalled rather than stopped. Work suspended in a native that reads
 		// the signal — `Async.sleep`, `Http.send`, and `::within` and `::race`
 		// over either — stops there and answers nothing at all. Work already
@@ -1977,12 +1977,12 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: Every Case a Union offers, under the tag its values carry — nested
+	// Every Case a Union offers, under the tag its values carry — nested
 	// Unions walked in the order `caseFor` reads them and the first one under a
 	// tag winning, so the compiled dispatch answers with the arm the general
 	// walk would have found.
 	//
-	// NOTE: `Optional`'s own two Cases are left out. They are spelled by ABSENCE
+	// `Optional`'s own two Cases are left out. They are spelled by ABSENCE
 	// on this side rather than by a `$case`, which is a rule of the general walk
 	// and not of the Case that carries the tag — dispatching to one would hand
 	// back `{ $case: 'Optional#Value' }` where the boundary promises the value
@@ -2009,7 +2009,7 @@ export function createInterpreter(
 		}
 	}
 
-	// NOTE: The walk a value directs — what is left when a position declared
+	// The walk a value directs — what is left when a position declared
 	// nothing, and what every compiled reader falls back to when the tag it met
 	// is not the tag it expected. It is the same switch it always was, and it is
 	// the whole of the door `marshaller.toJS(value)` opens.
@@ -2019,7 +2019,7 @@ export function createInterpreter(
 		step: Step,
 		expected: Descriptor | null,
 	): unknown {
-		// NOTE: The one untagged Essence value — a Function is emitted as a bare
+		// The one untagged Essence value — a Function is emitted as a bare
 		// JavaScript function, and a Namespace as a class, which is one too. So
 		// only what its position declared can say what a call to one means: where
 		// that names exactly one signature the Function is wrapped, so a caller
@@ -2037,7 +2037,7 @@ export function createInterpreter(
 				)
 			}
 
-			// NOTE: A Union of two signatures says two things a call could mean,
+			// A Union of two signatures says two things a call could mean,
 			// and an untagged value can not say which — refused rather than
 			// wrapped as whichever was written first and misdispatched.
 			if (signatures.length > 1) {
@@ -2107,7 +2107,7 @@ export function createInterpreter(
 			}
 			case OPTIONAL_EMPTY:
 				return undefined
-			// NOTE: Work met where nothing declared any — a Record member the
+			// Work met where nothing declared any — a Record member the
 			// boundary never named, a `toJS` with no Type over it. It is refused
 			// in the words a declared position is refused in, because it is the
 			// same refusal: work crosses as a call's answer and nowhere else,
@@ -2118,7 +2118,7 @@ export function createInterpreter(
 		}
 
 		if (tag.includes("#")) {
-			// NOTE: The one fact about a Case that its VALUE does not carry.
+			// The one fact about a Case that its VALUE does not carry.
 			// A `Direction#Up` and a `Shape#Blank` are the same object with the
 			// same emptiness under two tags, and which of them crosses as a
 			// string is a property of the CHOICE — so it is asked of what was
@@ -2140,7 +2140,7 @@ export function createInterpreter(
 				)
 			}
 
-			// NOTE: Nothing was declared, so the Module is asked instead — the
+			// Nothing was declared, so the Module is asked instead — the
 			// table it was built with is the same Descriptor every declared
 			// position was cut out of, which is what keeps a value crossing
 			// with nothing over it and the same value crossing a Parameter
@@ -2155,7 +2155,7 @@ export function createInterpreter(
 			return casedFields(value, at, step, noMembers, caseName(tag))
 		}
 
-		// NOTE: A value that IS this Module's and still has no mapping — the
+		// A value that IS this Module's and still has no mapping — the
 		// numeric tower above Rational, for now. Saying so beats telling its owner
 		// it came from somewhere else, which is what the wording below would have
 		// claimed.
@@ -2167,7 +2167,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: Whether the value in hand carries THIS tag — the whole of what a
+	// Whether the value in hand carries THIS tag — the whole of what a
 	// compiled reader checks before it trusts the shape its Descriptor promised.
 	// Read through the bridge's key like every other tag, so a value from another
 	// bundle fails it and is handed to the general walk, which says so properly.
@@ -2179,7 +2179,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: Read through the bridge's key like every other tag, so a value from
+	// Read through the bridge's key like every other tag, so a value from
 	// another bundle is not mistaken for one of this Module's Optionals.
 	function isOptionalValue(value: unknown): boolean {
 		if (value === null || typeof value !== "object") {
@@ -2191,11 +2191,11 @@ export function createInterpreter(
 		return tag === OPTIONAL_VALUE || tag === OPTIONAL_EMPTY
 	}
 
-	// NOTE: The items a List holds, in the order it holds them — the front run
+	// The items a List holds, in the order it holds them — the front run
 	// backwards, then the back run — each read by the item's own compiled reader,
 	// into an Array of this side's own.
 	//
-	// NOTE: The counts are fixed before the first item crosses, which is the rule
+	// The counts are fixed before the first item crosses, which is the rule
 	// the runtime's natives are written under as well: a run Array is shared, and
 	// nothing may read its `length` again once a walk has started. Nothing here
 	// can grow one — the way out only reads — but a walk that asked twice would
@@ -2231,14 +2231,14 @@ export function createInterpreter(
 		return items
 	}
 
-	// NOTE: The entries a Dictionary holds, in the order it holds them, as a
+	// The entries a Dictionary holds, in the order it holds them, as a
 	// `Map` of this side's own. It is read through the BRIDGE, unlike the List
 	// above: what a box holds is decided by version stamps against a generation,
 	// and reading that here would be a second copy of a rule rather than a
 	// second reading of a layout — `liveEntriesOf` is where the runtime states
 	// it, and every native of its own reads it there too.
 	//
-	// NOTE: The two halves of an entry are marshalled independently, each by the
+	// The two halves of an entry are marshalled independently, each by the
 	// reader its own slot was compiled to, and the Map is filled in the order
 	// the walk answers — which is the order the Dictionary holds its entries,
 	// and the order a `Map` gives back.
@@ -2267,7 +2267,7 @@ export function createInterpreter(
 			)
 		}
 
-		// NOTE: The one way this direction can lose something, asked once at the
+		// The one way this direction can lose something, asked once at the
 		// end rather than per key. A Map tells its keys apart by `===` and a
 		// Dictionary by the key Type's own `is`, and where a Namespace wrote
 		// that `is` the two can disagree — two keys the Module holds apart
@@ -2280,17 +2280,17 @@ export function createInterpreter(
 		return answer
 	}
 
-	// NOTE: The VALUE's own members rather than the Descriptor's, because a
+	// The VALUE's own members rather than the Descriptor's, because a
 	// Record in Essence is structural — a value of `{ width, height, depth }`
 	// crosses where `{ width, height }` was declared, and dropping the member the
 	// declaration did not name would be this side deciding what the Module meant.
 	// What the Descriptor decides is how each member it DOES name is read.
 	//
-	// NOTE: Own, enumerable and string-keyed, which is exactly the members — the
+	// Own, enumerable and string-keyed, which is exactly the members — the
 	// Type key is a Symbol, and is skipped here by the same rule that makes it
 	// hidden inside Essence.
 	//
-	// NOTE: Each member read by the reader its name was compiled to, looked for
+	// Each member read by the reader its name was compiled to, looked for
 	// at the position it was DECLARED at first — see `compiledMembers`, which is
 	// where both ways of looking are built and why the first one almost always
 	// answers. A member no name of the shape matches is read by the walk the
@@ -2324,7 +2324,7 @@ export function createInterpreter(
 		return fields
 	}
 
-	// NOTE: A Case as a host reads one — its payload, and WHICH Case it is under
+	// A Case as a host reads one — its payload, and WHICH Case it is under
 	// `$case`. The tag is written last and wins the collision: which Case a value
 	// is is part of the value, and a payload member actually named `$case` would
 	// be dropped by that. Dropping one silently is the single thing a lossless
@@ -2351,15 +2351,15 @@ export function createInterpreter(
 
 	// #region Calls
 
-	// NOTE: Everything a caller can get wrong before the first Argument is even
+	// Everything a caller can get wrong before the first Argument is even
 	// looked at is an `EssenceCallError`; everything about a value is an
 	// `EssenceMarshalError`. The two are told apart because they are fixed in
 	// different places.
 	//
-	// NOTE: The answer is marshalled back through the compiled reader for the
+	// The answer is marshalled back through the compiled reader for the
 	// DECLARED return, so a Function a call answers with comes back callable too.
 	//
-	// NOTE: Everything about a call that does not depend on its Arguments is
+	// Everything about a call that does not depend on its Arguments is
 	// settled before it: which labels the call may be written with, what an Error
 	// calls each Argument either way, the reader for every Parameter and the
 	// reader for the answer. All of it is settled by the SIGNATURE alone, so
@@ -2378,7 +2378,7 @@ export function createInterpreter(
 			let ordered = readCall(args, signature, labels, name)
 			let places = ordered === args ? positional : named
 
-			// NOTE: A slot the call left out is handed on as `undefined`, which
+			// A slot the call left out is handed on as `undefined`, which
 			// is precisely what fires the emitted JavaScript default parameter
 			// — and nothing is marshalled for it, because there is nothing to
 			// marshal. The unrolled arities below skip it the same way, which
@@ -2393,7 +2393,7 @@ export function createInterpreter(
 							places[position]!,
 						)
 
-			// NOTE: The Arguments a Function of this many Parameters takes,
+			// The Arguments a Function of this many Parameters takes,
 			// passed as that many Arguments. Everything below one line is the
 			// same call written out at the two arities almost every Function
 			// has, because handing an Array over to be spread builds a call
@@ -2424,7 +2424,7 @@ export function createInterpreter(
 
 	// #region Errors
 
-	// NOTE: Whether a refusal got INSIDE the value before making it — a Case whose
+	// Whether a refusal got INSIDE the value before making it — a Case whose
 	// `$case` named this arm and whose payload was then wrong, rather than an arm
 	// that never took the value at all. `Optional<Box>` handed a Box with a String
 	// `height` fails at `.height`, where `#Empty` fails at the value itself. Where
@@ -2432,7 +2432,7 @@ export function createInterpreter(
 	// answering with the Union instead would throw away the only sentence that
 	// says what is actually wrong.
 	//
-	// NOTE: A deeper path is the usual sign of that, and not the only one: a Case
+	// A deeper path is the usual sign of that, and not the only one: a Case
 	// whose `$case` matched and whose PAYLOAD is then wrong refuses the value
 	// itself, at this very path, and says so — so it marks itself instead. Without
 	// that, every misspelled payload member of every Choice reads as "expected
@@ -2477,7 +2477,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The one shape `Optional<T> ↔ T | undefined` can not describe, in both
+	// The one shape `Optional<T> ↔ T | undefined` can not describe, in both
 	// directions, worded the same way. `null` is no help — JSON turns an
 	// `undefined` into one, so it is the same absence wearing another name — and
 	// there is no third spelling of nothing to spend on the second level.
@@ -2490,19 +2490,19 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The other shape with no JavaScript spelling, worded the way
+	// The other shape with no JavaScript spelling, worded the way
 	// `nestedOptional` is and refused in both directions for the same reason.
 	// What COLLIDES is named by `bare-cases.ts`, which is the one copy of that
 	// rule and the one the generated declarations read too; the frame is here,
 	// because only the marshaller knows that a value was about to cross.
 	//
-	// NOTE: The way out of it is a change to the Essence source rather than to
+	// The way out of it is a change to the Essence source rather than to
 	// the JavaScript, so the sentence ends with the two that work: a Record
 	// around one side gives it a shape of its own, and a payload on the Case
 	// puts it back into the object form. Renaming the Case works as well and is
 	// left unsaid — it is the one fix a reader thinks of unprompted.
 	//
-	// NOTE: Marked as having reached INSIDE the value, which is what keeps the
+	// Marked as having reached INSIDE the value, which is what keeps the
 	// sentence where an `Optional` stands around the position — that branch
 	// answers with its own Type for anything a value could have got right, and
 	// this is a refusal no value could have avoided. `reachedInside` is the
@@ -2523,7 +2523,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The spelling a bare Case used to cross as, met on the way in. It is
+	// The spelling a bare Case used to cross as, met on the way in. It is
 	// told apart from every other wrong value because it is the one that is
 	// RIGHT about which Case it means and wrong only about how to write it —
 	// so it is answered with the string to write instead, rather than with the
@@ -2543,13 +2543,13 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The shape a Dictionary crosses as, met where a host wrote the OTHER
+	// The shape a Dictionary crosses as, met where a host wrote the OTHER
 	// object JavaScript has. It is told apart from every other wrong value the
 	// way `objectSpelledCase` is: it is the one that is right about what it
 	// means and wrong only about how to write it, so it is answered with the
 	// shape to write rather than with the Type it already named.
 	//
-	// NOTE: A plain object is not a second spelling on the way in, though every
+	// A plain object is not a second spelling on the way in, though every
 	// key of a `Dictionary<String, V>` would fit one. One shape has one spelling
 	// here: a position that took an object as well would be a position two
 	// different JavaScript values cross into, while the way out can hand back
@@ -2557,7 +2557,7 @@ export function createInterpreter(
 	// first, whatever order they were written in, which is the one thing a
 	// Dictionary promises about its entries.
 	//
-	// NOTE: Marked as having reached INSIDE the value, so that a Union holding a
+	// Marked as having reached INSIDE the value, so that a Union holding a
 	// Dictionary answers with this sentence rather than with the Union — for the
 	// reason `objectSpelledCase` is marked: it is the refusal that says what to
 	// do about it.
@@ -2575,7 +2575,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: Two entries of one Map that are one entry of the Dictionary they
+	// Two entries of one Map that are one entry of the Dictionary they
 	// were going to become — `1` and `1n` are two Map keys and one Integer, and
 	// a String written twice in its two Unicode spellings is one String. Which
 	// entry it was is the runtime's answer; the place it stands at is this
@@ -2589,7 +2589,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The same disagreement met from the other side: keys the Module holds
+	// The same disagreement met from the other side: keys the Module holds
 	// apart that are one JavaScript value, which only an `is` a Namespace wrote
 	// can arrange. Refused rather than handed over short, because a Map with an
 	// entry missing is the one thing a lossless boundary may not answer with.
@@ -2609,7 +2609,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: A Dictionary met where the bundle carries no door for one. The door
+	// A Dictionary met where the bundle carries no door for one. The door
 	// is conditional — 15 kB of store and key encoding a boundary that names no
 	// Dictionary does not pay for — and it is decided from the boundary the
 	// Module DECLARES: its exported values and its exported Types. So this is
@@ -2618,7 +2618,7 @@ export function createInterpreter(
 	// the outbound walk reads the VALUE's members, so a member the boundary
 	// never declared can carry a Dictionary the door question could not see.
 	//
-	// NOTE: Said out loud for the reason `runtimeBridgeOf` says its own: a
+	// Said out loud for the reason `runtimeBridgeOf` says its own: a
 	// `TypeError` about `undefined` from inside a walk names nothing a reader
 	// can act on.
 	function noDictionaryDoor(
@@ -2633,7 +2633,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: Work met anywhere but a call's answer, in both directions and in the
+	// Work met anywhere but a call's answer, in both directions and in the
 	// same words, because it is one rule: a Future is a DESCRIPTION of work and
 	// the boundary starts it where it crosses, so a position that holds one has
 	// to be a position that says when it should run. A call's answer says so —
@@ -2643,7 +2643,7 @@ export function createInterpreter(
 	// description over unstarted would hand over a JavaScript object that
 	// describes nothing.
 	//
-	// NOTE: Marked as having reached INSIDE the value, so that a Union holding
+	// Marked as having reached INSIDE the value, so that a Union holding
 	// work answers with this sentence rather than with the Union — it is a
 	// refusal of the SHAPE, which `reachedInside` calls the useful one.
 	function asynchronyInsideValue(
@@ -2660,7 +2660,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: The same rule met from the other side: a host handing work IN. It is
+	// The same rule met from the other side: a host handing work IN. It is
 	// worded apart from the refusal above because the way out of it is different
 	// — there is no JavaScript value that is a Future, whatever position it is
 	// written at, so the fix is never "move it" but always "hand over what it
@@ -2679,14 +2679,14 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: Work met where the bundle carries no door for it. Unlike the
+	// Work met where the bundle carries no door for it. Unlike the
 	// Dictionary's, this one is not reachable from a boundary the Compiler
 	// described: work at an undeclared position is refused by
 	// `asynchronyInsideValue` before any door is asked for, so a Descriptor that
 	// names a Future while the bundle carries none is a Descriptor and a bundle
 	// that did not come from one compile.
 	//
-	// NOTE: Said out loud for the reason `runtimeBridgeOf` says its own: a
+	// Said out loud for the reason `runtimeBridgeOf` says its own: a
 	// `TypeError` about `undefined` from inside a walk names nothing a reader
 	// can act on.
 	function noFutureDoor(at: Path | null, step: Step): EssenceMarshalError {
@@ -2740,7 +2740,7 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: What the value IS, in one clause, for the second half of an Error.
+	// What the value IS, in one clause, for the second half of an Error.
 	// Never the value itself past a bounded length: what is being described is a
 	// value a host got wrong, which is exactly the sort that turns out to be a
 	// megabyte of JSON.
@@ -2765,7 +2765,7 @@ export function createInterpreter(
 					}`
 		}
 
-		// NOTE: A Promise, named as one. It has no own keys either, so the clause
+		// A Promise, named as one. It has no own keys either, so the clause
 		// at the bottom would call it an empty object — and of every value a
 		// host is likely to hand the wrong door, this is the one whose mistake is
 		// worth naming: it is an answer that has not arrived, and the Module has
@@ -2774,7 +2774,7 @@ export function createInterpreter(
 			return "a Promise, which crosses only where the Module declared a Future"
 		}
 
-		// NOTE: Named as the Map it is rather than read for members it has none
+		// Named as the Map it is rather than read for members it has none
 		// of — `Object.keys` answers nothing at all for one, so the clause below
 		// would call a Map of a thousand entries an empty object.
 		if (value instanceof Map) {
@@ -2797,14 +2797,14 @@ export function createInterpreter(
 				return "a function"
 		}
 
-		// NOTE: An Essence value, named by its own tag — read through the bridge's
+		// An Essence value, named by its own tag — read through the bridge's
 		// key like every other tag, so a value from ANOTHER bundle is described as
 		// the plain object it is from here rather than misreported as one of this
 		// Module's.
 		let tag = (value as Record<symbol, unknown>)[typeKey]
 
 		if (typeof tag === "string") {
-			// NOTE: A Case is named the way a host reads it — `Shape#Circle`,
+			// A Case is named the way a host reads it — `Shape#Circle`,
 			// with the Module the tag carries taken back off, which is the
 			// spelling `caseName` below hands out everywhere else on this
 			// boundary. A refusal that named the compiling machine's path told
@@ -2812,7 +2812,7 @@ export function createInterpreter(
 			return `an Essence ${tag.includes("#") ? caseName(tag) : tag} value`
 		}
 
-		// NOTE: Tagged, but by another copy of the runtime — see
+		// Tagged, but by another copy of the runtime — see
 		// `mintedTypeKeys`. Named as the Essence value it is, and as one this
 		// Module can not accept, because "an object with 'value'" is true and
 		// sends the host looking in the wrong place entirely.
@@ -2832,7 +2832,7 @@ export function createInterpreter(
 	// #endregion
 
 	return {
-		// NOTE: A NULLISH Descriptor rather than an absent one, because a host
+		// A NULLISH Descriptor rather than an absent one, because a host
 		// that has none to pass reaches for either spelling — `undefined` from a
 		// caller that left the Argument off, `null` from one that had a variable
 		// holding no Descriptor — and both say the same thing: nothing was
@@ -2857,11 +2857,11 @@ export function createInterpreter(
 	}
 }
 
-// NOTE: The keys of a value that the shape it is crossing as does not name, or
+// The keys of a value that the shape it is crossing as does not name, or
 // `null` where there are none — the Array is built on the first of them, because
 // a value that fits declares nothing extra and should leave nothing behind.
 //
-// NOTE: Reached for a Record only where its keys were not the members
+// Reached for a Record only where its keys were not the members
 // themselves — see the two lists compared where the members are read, which is
 // what answers this without a walk at all for a value written as its Type reads.
 function undeclaredOf(
@@ -2888,26 +2888,26 @@ function undeclaredOf(
 
 // #region Binding
 
-// NOTE: The Module's exports as things a host can USE — a Function it can call, a
+// The Module's exports as things a host can USE — a Function it can call, a
 // Namespace it can reach a Method on — rather than the tagged values the bundle
 // binds. Marshalling says what a value crossing the boundary becomes; this says
 // which name is bound to what.
 export type ModuleBindings = {
-	// NOTE: JavaScript all the way down: values marshalled, Functions callable
+	// JavaScript all the way down: values marshalled, Functions callable
 	// with JavaScript Arguments, Namespaces plain objects of the same.
 	exports: Readonly<Record<string, unknown>>
-	// NOTE: The bundle's own bindings under the names their author wrote, and
+	// The bundle's own bindings under the names their author wrote, and
 	// nothing else done to them.
 	raw: Readonly<Record<string, unknown>>
 }
 
 export type BindOptions = {
-	// NOTE: THIS bundle's own Type key and value constructors. Not optional and
+	// THIS bundle's own Type key and value constructors. Not optional and
 	// not discoverable: every Essence value carries its Type on a Symbol minted
 	// when a bundle was evaluated, so a bridge belongs to one bundle and binding
 	// against another's would build values the Module can not read.
 	bridge: RuntimeBridge
-	// NOTE: The host's own stop, which becomes the ROOT of every run this
+	// The host's own stop, which becomes the ROOT of every run this
 	// binding starts — see `InterpreterOptions`.
 	signal?: AbortSignal
 }
@@ -2926,7 +2926,7 @@ export function bind(
 	let exports: Record<string, unknown> = {}
 
 	for (let [name, entry] of Object.entries(descriptor.exports)) {
-		// NOTE: An Overload set binds nothing under its own name, so it is the
+		// An Overload set binds nothing under its own name, so it is the
 		// one export whose binding is not read off `raw` — it is bound to the
 		// refusal that says why, and where its Overloads are instead.
 		if (entry.kind === "overloaded") {
@@ -2935,7 +2935,7 @@ export function bind(
 			continue
 		}
 
-		// NOTE: And a Choice binds nothing at all — its Cases are Types, which
+		// And a Choice binds nothing at all — its Cases are Types, which
 		// are erased before a byte is emitted. What goes under the name is
 		// built here instead of read off the bundle.
 		if (entry.kind === "choice") {
@@ -2976,12 +2976,12 @@ export function bind(
 	return { exports: Object.freeze(exports), raw }
 }
 
-// NOTE: The Module's exports under the names they were WRITTEN under. The
+// The Module's exports under the names they were WRITTEN under. The
 // Rewriter escapes a name JavaScript can not spell — `ok?` is bound as
 // `$user_ok_3f_` — and a Descriptor carries what it emitted, so the two spellings
 // can not drift apart.
 //
-// NOTE: A name the Descriptor lists that the bundle does not bind would be a
+// A name the Descriptor lists that the bundle does not bind would be a
 // Compiler bug, and is left out rather than bound to `undefined` — reading it
 // then says "no such export" instead of handing back nothing.
 function bindRaw(
@@ -2991,7 +2991,7 @@ function bindRaw(
 	let raw: Record<string, unknown> = {}
 
 	for (let [name, entry] of Object.entries(descriptor.exports)) {
-		// NOTE: An Overload set binds no name of its own — each Overload is its
+		// An Overload set binds no name of its own — each Overload is its
 		// own `name__overload$N` — so the whole set is put on `raw` under those
 		// names, which are the only ones a host can actually call. (No user Module
 		// reaches this today: `overload function` is the standard library's alone,
@@ -3008,7 +3008,7 @@ function bindRaw(
 			continue
 		}
 
-		// NOTE: A Choice is not on `raw` under any name, because the bundle
+		// A Choice is not on `raw` under any name, because the bundle
 		// binds none: its constructors are this side's answer to a Type that was
 		// erased, and `raw` promises the bundle's own bindings and nothing else.
 		if (entry.kind === "choice") {
@@ -3023,19 +3023,19 @@ function bindRaw(
 	return Object.freeze(raw)
 }
 
-// NOTE: One way to spell each Case of a Choice, under the Case's own name. A
+// One way to spell each Case of a Choice, under the Case's own name. A
 // Case with a payload is a Function of it — `Shape.Circle({ radius: 3n })` — and
 // one without is the value itself: there is nothing to pass, and `Shape.Blank()`
 // would be a call whose only purpose is to look like the others.
 //
-// NOTE: And a Case of a unit Choice is the STRING it crosses as, so
+// And a Case of a unit Choice is the STRING it crosses as, so
 // `Direction.Up` and `"Up"` are the same value rather than two spellings of
 // one. A host that writes the constructor gets what it would have written by
 // hand, which is what makes the name worth offering at all: it is a place to
 // read the Cases off and to have a typo caught, not a wrapper around the
 // value.
 //
-// NOTE: Nothing here marshals or checks. What comes back is the plain object the
+// Nothing here marshals or checks. What comes back is the plain object the
 // boundary already accepts, so a constructor is a SPELLING and the deciding
 // stays where every other decision is — at the crossing, once, with the path and
 // the Type to say it in. The tag is written last for the reason `toJS` writes it
@@ -3062,7 +3062,7 @@ function caseConstructors(
 	return Object.freeze(constructors)
 }
 
-// NOTE: A constant is marshalled ON READ rather than at bind time, for two
+// A constant is marshalled ON READ rather than at bind time, for two
 // reasons that happen to have one answer.
 //
 // A value the boundary has no mapping for — the numeric tower above Rational,
@@ -3076,7 +3076,7 @@ function caseConstructors(
 // is one a host can push onto, which changes what every other holder of the same
 // Module sees — while `Object.freeze(exports)` says, wrongly, that it cannot.
 //
-// NOTE: What was declared rides along for the one value a tag does not describe —
+// What was declared rides along for the one value a tag does not describe —
 // a Function inside the constant, which the way out wraps against it. The
 // Descriptor is walked once HERE, where the export is bound, so that reading the
 // name a hundred times walks it none.
@@ -3096,7 +3096,7 @@ function defineConstant(
 	})
 }
 
-// NOTE: WHICH Overload a call means is a question only the Compiler answers — it
+// WHICH Overload a call means is a question only the Compiler answers — it
 // reads the Argument Types, and a JavaScript value has none to read. So the name
 // is bound to the refusal rather than left off: reaching it says what is wrong
 // and where the Overloads are, where a missing name would only say that something
@@ -3116,17 +3116,17 @@ function overloadedCall(
 	}
 }
 
-// NOTE: A Namespace is emitted as a class of static Methods, so it comes back as
+// A Namespace is emitted as a class of static Methods, so it comes back as
 // a plain object of the same names — a host writes `Rectangle.of(…)` either way.
 // An INSTANCE Method keeps the receiver it is emitted with as its first Argument,
 // `Point.shifted(point, 4n)`, because there is no `::` on this side to put it
 // before the name.
 //
-// NOTE: OWN members, because a Namespace is emitted as a class and a class
+// OWN members, because a Namespace is emitted as a class and a class
 // inherits `name`, `length`, `call` and `bind` from `Function` — an `in` would
 // answer for a Method the bundle does not bind and hand back JavaScript's own.
 //
-// NOTE: A static constant is bound ON READ for the reasons `defineConstant`
+// A static constant is bound ON READ for the reasons `defineConstant`
 // states — a constant is a constant wherever it sits, and one the boundary has no
 // mapping for would otherwise take the whole Namespace with it.
 function bindNamespace(
@@ -3137,7 +3137,7 @@ function bindNamespace(
 	let namespace = value as Record<string, unknown>
 	let bound: Record<string, unknown> = {}
 
-	// NOTE: The constructors of the Choice this Namespace shares its name with,
+	// The constructors of the Choice this Namespace shares its name with,
 	// where there is one. They are written FIRST so that a Method or a static
 	// constant of the same name — which the bundle really does bind — wins:
 	// what a Module declares outranks what this side offers.
@@ -3188,7 +3188,7 @@ function bindNamespace(
 
 // #region Calls
 
-// NOTE: The Arguments in the order the emitted Function takes them, whichever way
+// The Arguments in the order the emitted Function takes them, whichever way
 // the caller wrote the call.
 //
 // A Function whose every Parameter carries a label may be called with one object
@@ -3198,7 +3198,7 @@ function bindNamespace(
 // EXACTLY the labels: a labelled call with a missing or a misspelled one is a
 // mistake, not a positional call that happens to pass an object.
 //
-// NOTE: The answer is the Array the call is made from, and WHICH Array it is says
+// The answer is the Array the call is made from, and WHICH Array it is says
 // how the call was written: a labelled call is read into one of its own, so
 // `ordered !== args` is that an Argument has a label to be named by in an Error.
 // One object less per call than a field saying the same thing, and there was
@@ -3225,7 +3225,7 @@ function readCall(
 					let optional =
 						signature.parameters[position]?.optional === true
 
-					// NOTE: A key that is absent and a key written as
+					// A key that is absent and a key written as
 					// `undefined` are the same call. The `.d.ts` this generator
 					// writes types an omittable label as `label?: T`, and
 					// TypeScript's `?` admits an explicit `undefined` — so
@@ -3241,7 +3241,7 @@ function readCall(
 				return ordered
 			}
 
-			// NOTE: One object that is not a labelled call is only a positional
+			// One object that is not a labelled call is only a positional
 			// call while the Function takes exactly one Argument. Where it takes
 			// more, the caller plainly meant the labels and got them wrong, and
 			// saying which is worth more than "takes 2 Arguments, 1 was passed".
@@ -3257,7 +3257,7 @@ function readCall(
 
 	let total = signature.parameters.length
 
-	// NOTE: A positional call may stop early only where every Parameter it stops
+	// A positional call may stop early only where every Parameter it stops
 	// BEFORE carries a default. Counting the omittable ones instead would admit
 	// `cut(7n)` against `(from: Integer = 1, to: Integer)` — one Argument, one
 	// default, the count agrees — and pad the REQUIRED `to` with a hole, which
@@ -3272,7 +3272,7 @@ function readCall(
 		)
 	}
 
-	// NOTE: The holes are filled here so that the bridge below reads one Array of
+	// The holes are filled here so that the bridge below reads one Array of
 	// the signature's own length however the call was written — a Parameter the
 	// call stopped before, and one written as an explicit `undefined`, which the
 	// `.d.ts` admits for an omittable slot and which means the same thing.
@@ -3303,7 +3303,7 @@ function readCall(
 	return filled
 }
 
-// NOTE: Whether a positional call that wrote `written` Arguments may stop there
+// Whether a positional call that wrote `written` Arguments may stop there
 // — which is whether every Parameter from that position on carries a default.
 function omittableFrom(
 	signature: FunctionDescriptor,
@@ -3322,11 +3322,11 @@ function omittableFrom(
 	return true
 }
 
-// NOTE: How the Function may be called, as the first half of every refusal — the
+// How the Function may be called, as the first half of every refusal — the
 // signature it was declared with, and both ways of writing a call to it. The
 // caller who got one wrong is reading it to find the other.
 //
-// NOTE: The name goes in FRONT of the signature, which is where `printSignature`
+// The name goes in FRONT of the signature, which is where `printSignature`
 // writes one — a Descriptor carries the nameless print precisely so that the same
 // signature can be named `labelled` here and `Point.shifted` one Namespace over.
 function callShape(
@@ -3350,12 +3350,12 @@ function callShape(
 			)}`
 }
 
-// NOTE: The labels a call may be written with, or `null` where it may not be
+// The labels a call may be written with, or `null` where it may not be
 // written that way at all. Every Parameter has to carry one: a Function with a
 // single `_` among its Parameters can not be called by label in Essence either,
 // and half a labelled call is no call.
 //
-// NOTE: A Function of ONE Parameter an object can inhabit is positional whatever
+// A Function of ONE Parameter an object can inhabit is positional whatever
 // its label says. Both readings take an object, and the Parameter is the one that
 // can hold any shape at all — so `describe({ width: 3n, height: 4n })` passes the
 // Rectangle rather than looking for a label named `width`, and a Union or an
@@ -3386,7 +3386,7 @@ export function labelsOf(signature: FunctionDescriptor): Array<string> | null {
 	return labels
 }
 
-// NOTE: What an Error calls the Argument that went wrong. A labelled call has no
+// What an Error calls the Argument that went wrong. A labelled call has no
 // positions to count, so it is named the way it was written.
 function argumentPath(
 	label: string | null,
@@ -3398,7 +3398,7 @@ function argumentPath(
 		: `argument ${position + 1}`
 }
 
-// NOTE: Key-set equality is only right where every Parameter must be written.
+// Key-set equality is only right where every Parameter must be written.
 // Once one carries a default the rule becomes "every REQUIRED label present, no
 // key that is not a label" — which is exactly what an Essence call is held to,
 // and which is still key-set equality for every signature that has no default.
@@ -3426,7 +3426,7 @@ function sameNames(
 	return true
 }
 
-// NOTE: The value standing where a call left an Argument out — a slot it stopped
+// The value standing where a call left an Argument out — a slot it stopped
 // before, or an omittable one written as an explicit `undefined`, which the
 // generated `.d.ts` admits and which means the same thing. On a REQUIRED slot an
 // `undefined` is a value the host passed and a Type error like any other, and
@@ -3435,7 +3435,7 @@ function sameNames(
 // nothing for it: there is nothing to marshal.
 const OMITTED: unique symbol = Symbol("omitted")
 
-// NOTE: How many Arguments a call MUST write, which is where the range in
+// How many Arguments a call MUST write, which is where the range in
 // `callShape` starts. Exported because the declaration generator asks the same
 // question of the same Descriptor — see `lastRequiredIndex`.
 export function requiredCount(signature: FunctionDescriptor): number {
@@ -3444,7 +3444,7 @@ export function requiredCount(signature: FunctionDescriptor): number {
 	).length
 }
 
-// NOTE: The last Parameter a call has to write, and `-1` when there is none —
+// The last Parameter a call has to write, and `-1` when there is none —
 // where the TRAILING run a call may leave out entirely begins, and therefore the
 // only run TypeScript lets a `?` be written on.
 export function lastRequiredIndex(
@@ -3465,7 +3465,7 @@ export function lastRequiredIndex(
 
 // #region Wording
 
-// NOTE: Bounded, for the reason the note above `describe` gives: the object being
+// Bounded, for the reason the note above `describe` gives: the object being
 // described is one a host got wrong, and a parsed JSON document with a thousand
 // keys is exactly that. The first few name the mistake as well as all of them
 // would.
@@ -3492,13 +3492,13 @@ function shortened(value: string): string {
 
 // #region Reading a Descriptor
 
-// NOTE: The spelling a Case is known by on this side — the Choice as it was
+// The spelling a Case is known by on this side — the Choice as it was
 // DECLARED and the Case, with the Module path a bundle qualifies its tags with
 // taken back off. `./Geometry.es#Shape#Circle` is `Shape#Circle` here: a host
 // writes what it reads in the Essence source, and never where the file happened
 // to sit on the machine that compiled it.
 //
-// NOTE: Read off the VALUE's tag rather than off a Descriptor, because a value
+// Read off the VALUE's tag rather than off a Descriptor, because a value
 // coming out is met by its tag alone — this is the same rule `displayChoiceName`
 // states, applied to the Choice half of a tag.
 function caseName(tag: string): string {
@@ -3510,7 +3510,7 @@ function caseName(tag: string): string {
 	)}`
 }
 
-// NOTE: What an `Optional` holds, or `null` where the shape is not one. The
+// What an `Optional` holds, or `null` where the shape is not one. The
 // sibling of `dts.ts`'s `optionalItem`, with `admitsAbsence` beside it — that is
 // the copy a change to the Optional rule has to be kept in step with, since it
 // decides what a DECLARATION says about the same shape. The Compiler's
@@ -3541,7 +3541,7 @@ function optionalItemOf(descriptor: Descriptor): Descriptor | null {
 	}
 }
 
-// NOTE: Whether `undefined` is a value of this shape — which is exactly whether
+// Whether `undefined` is a value of this shape — which is exactly whether
 // an `Optional`'s `#Empty` is reachable in it. What it decides is whether an
 // `Optional` is about to be put inside another one, and both levels spelled as
 // nothing.
@@ -3558,7 +3558,7 @@ function admitsAbsence(descriptor: Descriptor): boolean {
 	}
 }
 
-// NOTE: Whether a plain object could BE a value of this shape — a Record anywhere
+// Whether a plain object could BE a value of this shape — a Record anywhere
 // it reaches without a tag in the way: itself, an arm of a Union, the item of an
 // `Optional`, which is transparent on this side. A Case does not count, because
 // its object spelling always carries `$case`, which no set of labels is — and a
@@ -3585,7 +3585,7 @@ function admitsRecord(descriptor: Descriptor): boolean {
 	}
 }
 
-// NOTE: The signatures a shape declares a Function to have, for the way OUT — one
+// The signatures a shape declares a Function to have, for the way OUT — one
 // is the wrap, none is the passthrough, and two are a refusal, because an
 // untagged value can not say which of them it is.
 function callableSignatures(
@@ -3605,7 +3605,7 @@ function callableSignatures(
 	}
 }
 
-// NOTE: What a container's pieces were DECLARED as, where the Descriptor says —
+// What a container's pieces were DECLARED as, where the Descriptor says —
 // asked on the way out only for the sake of the one value that carries no tag of
 // its own. A Union offering two Lists (or two Records) does not decide, and `null`
 // is the honest answer: the pieces still cross as their tags say, and a Function
@@ -3630,7 +3630,7 @@ function listItemOf(descriptor: Descriptor | null): Descriptor | null {
 	}
 }
 
-// NOTE: The two slots a Dictionary's pieces were DECLARED as, read for the same
+// The two slots a Dictionary's pieces were DECLARED as, read for the same
 // reason `listItemOf` reads a List's item and answering `null` under the same
 // rule: a Union offering two Dictionaries does not decide, and the entries still
 // cross as their own tags say.
@@ -3683,7 +3683,7 @@ function recordMembersOf(
 	}
 }
 
-// NOTE: The Case a value's own tag names, where what was declared carries that
+// The Case a value's own tag names, where what was declared carries that
 // Case — its payload, so a Function inside one crosses out wrapped like any
 // other member, and whether it is a unit Choice's Case, which nothing but a
 // Descriptor knows. Both tags are the bundle's spelling, because a Descriptor
@@ -3715,7 +3715,7 @@ function caseFor(
 	}
 }
 
-// NOTE: The `typeof` families a Descriptor's reader could take a value from,
+// The `typeof` families a Descriptor's reader could take a value from,
 // or `null` for one that has to be tried to be known. Conservative on purpose:
 // a family named here is one the arm MIGHT take, and a family left out is one
 // it can not — a bare Case names `object` as well as `string`, because the
@@ -3769,7 +3769,7 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 		}
 		case "function":
 			return new Set(["function"])
-		// NOTE: Neither can take a value at all on the way in, and both are
+		// Neither can take a value at all on the way in, and both are
 		// answered the way `refused` is rather than with an empty Set: an arm
 		// that has to be TRIED is an arm whose own sentence is the one a reader
 		// gets, and "work can not be built from a JavaScript value" is worth
@@ -3781,7 +3781,7 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 	}
 }
 
-// NOTE: Every string a Union of bare Cases takes, under the tag it answers —
+// Every string a Union of bare Cases takes, under the tag it answers —
 // both spellings of every Case — or `null` where the Union holds anything
 // else, which is a Union that has to be searched. Nested Unions of bare Cases
 // are read through, since that is how a Choice's Cases reach a Union that
@@ -3815,7 +3815,7 @@ function collectBareCaseTable(
 	}
 }
 
-// NOTE: Which arm of a Union of CASES each `$case` a host could write names —
+// Which arm of a Union of CASES each `$case` a host could write names —
 // both spellings of every Case that crosses as an object — or `null` where any
 // arm is something else. Cases only, because the search below lets the FIRST
 // arm that takes a value win, and an arm that is not a Case is one whose
@@ -3846,7 +3846,7 @@ function caseArmTable(descriptor: {
 	return table.size === 0 ? null : table
 }
 
-// NOTE: Every Case of a unit Choice a whole Module names, under its tag and
+// Every Case of a unit Choice a whole Module names, under its tag and
 // answering the bare string it crosses as. Read ONCE, when an interpreter is
 // built, because it is a property of the declarations rather than of anything
 // that happens afterwards — and read at all because the general walk has no
@@ -3854,7 +3854,7 @@ function caseArmTable(descriptor: {
 // being crossed declared the Case, and a `toJS` with nothing declared is the
 // door a host reaches for exactly when it has no Type to hand over.
 //
-// NOTE: The whole Descriptor rather than its Choice exports alone. A Choice a
+// The whole Descriptor rather than its Choice exports alone. A Choice a
 // Module does not export by name still reaches a host through the Type of
 // something it does — a Function's return, a Record's member, a Namespace's
 // property — and a table holding only the named ones would spell those Cases
@@ -3910,7 +3910,7 @@ function bareCaseNames(module: ModuleDescriptor): Map<string, string> {
 	return found
 }
 
-// NOTE: No guard against walking a node twice, because a Descriptor is a TREE —
+// No guard against walking a node twice, because a Descriptor is a TREE —
 // `describe` answers a Type that reaches itself with a `refused` node rather
 // than following it — which is the same reason compiling a node's children
 // while compiling the node terminates.
@@ -3919,7 +3919,7 @@ function collectBareCases(
 	found: Map<string, string>,
 ): void {
 	switch (descriptor.kind) {
-		// NOTE: A Future and a Started are walked THROUGH, because what they
+		// A Future and a Started are walked THROUGH, because what they
 		// answer with is a value that crosses: a `Future<Direction>` answered by
 		// a Function puts that Choice's Cases on this boundary exactly as a
 		// `List<Direction>` does.
@@ -3970,12 +3970,12 @@ function collectBareCases(
 	}
 }
 
-// NOTE: A JavaScript object with members, and nothing that merely is one: an
+// A JavaScript object with members, and nothing that merely is one: an
 // Array is a List's shape, an `EssenceRational` is a Rational's and a `Map` is a
 // Dictionary's, so admitting any of them as a Record would make the shape that
 // named it unreachable.
 //
-// NOTE: A labelled call asks the very same question of its one Argument — an
+// A labelled call asks the very same question of its one Argument — an
 // `EssenceRational` passed to a Function whose labels happen to be `numerator`
 // and `denominator` is a Rational, not a labelled call — which is why `readCall`
 // reads through this rather than through a spelling of its own.

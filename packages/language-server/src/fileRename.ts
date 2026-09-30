@@ -3,7 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { relativeSpecifier } from "./autoImport"
 import type { Workspace } from "./workspace"
 
-// NOTE: What moving a file does to the Modules around it. A specifier is a path
+// What moving a file does to the Modules around it. A specifier is a path
 // written in the source, so a file that moves takes every entry naming it out of
 // step — and a file that moves takes its OWN entries out of step too, since they
 // are written from where it used to be.
@@ -34,7 +34,7 @@ export function importRewrites(
 		return []
 	}
 
-	// NOTE: The files that move, and every file that reaches one of them. A
+	// The files that move, and every file that reaches one of them. A
 	// Module that never named any of them writes no specifier that could have
 	// gone stale — and the ones that did are asked entry by entry below, since
 	// reaching a Module through a third is not naming it.
@@ -59,7 +59,7 @@ export function importRewrites(
 	return rewrites
 }
 
-// NOTE: One rename is one file, or — when the client renamed a directory — every
+// One rename is one file, or — when the client renamed a directory — every
 // `.es` file under it. Which of the two it is is not something the request says:
 // it hands over two paths, and what stands at the old one is a file this
 // workspace already knows or a directory whose files it knows. A path that is
@@ -105,7 +105,7 @@ function movesOf(
 	return moves
 }
 
-// NOTE: Every group of both blocks, written from where the file will be to where
+// Every group of both blocks, written from where the file will be to where
 // what it names will be. A group whose specifier comes out the same is left
 // alone — a file and its dependency moving together is the ordinary case of a
 // directory rename, and rewriting a specifier to itself would put every file of
@@ -140,7 +140,7 @@ function rewritesIn(
 
 		if (specifier !== group.source.path) {
 			edits.push({
-				// NOTE: The String Literal with its quotes, which is what the
+				// The String Literal with its quotes, which is what the
 				// Lexer's Position spans — the specifier written back is written
 				// back whole, so nothing depends on where the quotes ended up.
 				range: group.source.position,

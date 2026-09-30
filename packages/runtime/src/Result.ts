@@ -1,13 +1,13 @@
 import { createString, itemText, type StringType } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: `Result` is a builtin generic Choice, like `Optional` — its values carry
+// `Result` is a builtin generic Choice, like `Optional` — its values carry
 // Case tags (`"Result#Value"`, `"Result#Failure"`) exactly as user-declared
 // Cases do. Every Method of the covering Namespace but one is written in
 // Essence (`packages/standard-library/sources/Result.es`); what else lives here
 // is the Type the generated native contract renders that one signature against.
 //
-// NOTE: Two constructors, where there used to be none. Almost every Case of
+// Two constructors, where there used to be none. Almost every Case of
 // this Choice is built by an Essence body, which the Rewriter emits as a
 // `$type.createCase` call; `Http.send` is the one native that ANSWERS a Result,
 // and these are the door it builds one through. They are `Optional.ts`'s two
@@ -38,13 +38,13 @@ export function createFailure<Failure extends AnyType>(
 	return { [typeKeySymbol]: "Result#Failure", reason }
 }
 
-// NOTE: The one Method here, and native for the reason `Optional.toString` is:
+// The one Method here, and native for the reason `Optional.toString` is:
 // an Essence body renders a payload through a hole, and a hole renders a String
 // BARE. So the entry could not say the rule `itemText` holds — a String is
 // quoted inside a structure — and `#Failure("gone")` printed as `Failure(gone)`,
 // which `#Failure("")` then read as a word and a pair of parentheses.
 //
-// NOTE: The `#` sigil is left out, as `Optional` prints `Value` and `Ordering`
+// The `#` sigil is left out, as `Optional` prints `Value` and `Ordering`
 // prints `Less`. A rendering names the Case; it does not quote the Expression
 // that builds it. Both Cases carry a payload, so both are written with the
 // parentheses `Optional#Empty` has no use for.

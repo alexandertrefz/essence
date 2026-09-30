@@ -12,7 +12,7 @@ import {
 	matchesType,
 } from "./types"
 
-// NOTE: The spelling a Generic is SHOWN under. `createFreshenedInference`
+// The spelling a Generic is SHOWN under. `createFreshenedInference`
 // alpha-renames a callee's Generics for the span of one invocation — `T`
 // becomes `T`, a zero-width space and a counter — and a Generic that never
 // binds stays under that fresh name in the Types stamped onto the Argument
@@ -26,7 +26,7 @@ export function displayGenericName(name: common.GenericName): string {
 	return name.replace(/\u200B\d+$/, "")
 }
 
-// NOTE: A Match is the answer wherever the members can be told apart — it is the
+// A Match is the answer wherever the members can be told apart — it is the
 // one way to narrow a Union before a call, and a value of two DECLARED Types
 // really is decided by one. It is not the answer for a Union of Type PARAMETERS,
 // and offering one there was a closed loop: Types erase before a Match runs, so
@@ -46,7 +46,7 @@ export function displayGenericName(name: common.GenericName): string {
 export function undispatchableHelps(
 	memberTypes: Array<common.Type>,
 	valueName: string | null,
-	// NOTE: The name the reader's file reads a Parameter's bound under.
+	// The name the reader's file reads a Parameter's bound under.
 	spellBound: (
 		parameter: common.GenericUse & { constraint: string },
 	) => string,
@@ -75,7 +75,7 @@ export function undispatchableHelps(
 	]
 }
 
-// NOTE: The nominal identity of a Choice — what tells two Modules' same-named
+// The nominal identity of a Choice — what tells two Modules' same-named
 // Choices apart, and the whole of what `matchTypes` compares a Case by. It is
 // the Module's canonical path and the name the declaration wrote, because the
 // path alone would join every Choice in one file and the name alone joins the
@@ -93,7 +93,7 @@ export function choiceIdentity(
 	return modulePath === null ? name : `${modulePath}#${name}`
 }
 
-// NOTE: The Choice name a reader wrote, recovered from the identity above:
+// The Choice name a reader wrote, recovered from the identity above:
 // everything after the LAST separator, since a Module path may well contain one
 // and a Choice's name can not. Every site that PRINTS a Choice goes through
 // here — a Diagnostic, Hover or Completion naming the path would be naming
@@ -102,7 +102,7 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
-// NOTE: The nominal identity of a Protocol, by the Choice rule. One declared
+// The nominal identity of a Protocol, by the Choice rule. One declared
 // anywhere but its Program's top level also carries the Position of its name,
 // because it may shadow another of its name in the same Module.
 export function protocolIdentity(
@@ -117,7 +117,7 @@ export function protocolIdentity(
 		: `${identity}@${nestedAt.start.line}:${nestedAt.start.column}`
 }
 
-// NOTE: The declared name inside an identity. A Module path may hold `#` or `@`
+// The declared name inside an identity. A Module path may hold `#` or `@`
 // and a name holds neither.
 export function displayProtocolName(identity: string): string {
 	let name = identity.slice(identity.lastIndexOf("#") + 1)
@@ -126,7 +126,7 @@ export function displayProtocolName(identity: string): string {
 	return suffix === -1 ? name : name.slice(0, suffix)
 }
 
-// NOTE: How a Diagnostic names another Module: the specifier an import in this
+// How a Diagnostic names another Module: the specifier an import in this
 // one would write, never the canonical path, which differs per checkout.
 export function specifierTo(importerPath: string, filePath: string): string {
 	let relative = path
@@ -137,7 +137,7 @@ export function specifierTo(importerPath: string, filePath: string): string {
 	return relative.startsWith("../") ? relative : `./${relative}`
 }
 
-// NOTE: The Cases of the Choice a Type Alias declares, or null for an alias such
+// The Cases of the Choice a Type Alias declares, or null for an alias such
 // as `type Answer = Optional<Integer>` whose Cases belong to another Choice. The
 // alias holds the written name, not the Choice's identity.
 export function declaredCases(
@@ -168,7 +168,7 @@ export function declaredCases(
 	return cases
 }
 
-// NOTE: The Type Arguments an applied refinement is spelled with in a HOVER, or
+// The Type Arguments an applied refinement is spelled with in a HOVER, or
 // null when the bare Alias name says everything. A non-generic refinement carries
 // none at all, and an instantiation that bound every Parameter to a Parameter —
 // the one a generic Namespace makes of its own target — would only echo the
@@ -193,7 +193,7 @@ export function displayedRefinementArguments(
 	return type.typeArguments
 }
 
-// NOTE: A compact, one-line description of a Type for Diagnostics — the
+// A compact, one-line description of a Type for Diagnostics — the
 // spelling a reader would recognise from their own source, not the internal
 // Type tag. `printType` is its Hover-oriented sibling; this one is what every
 // Diagnostic message names a Type with.
@@ -213,7 +213,7 @@ export function describeType(type: common.Type): string {
 			return type.types.map(describeType).join(" | ")
 		case "Case":
 			return `${displayChoiceName(type.choice)}#${type.name}`
-		// NOTE: A checked refinement is named, never spelled out — the reader
+		// A checked refinement is named, never spelled out — the reader
 		// wrote `NonZeroInteger`, and `Integer where @::isNot(0)` is the
 		// Declaration rather than the Type a Diagnostic is about. An applied
 		// generic one is named as it was applied: a message about `NonEmptyList` where
@@ -246,7 +246,7 @@ export function describeType(type: common.Type): string {
 			)}>`
 		case "GenericDictionary":
 			return "Dictionary"
-		// NOTE: A Record reached through an Alias is named, on the rule a Union
+		// A Record reached through an Alias is named, on the rule a Union
 		// is named by and for the reason a message about nine members spelled
 		// out is no message at all: a reader asked to act on a `Standing` is
 		// asked about the Declaration they wrote, not about its shape. What the
@@ -254,7 +254,7 @@ export function describeType(type: common.Type): string {
 		// is what spells one out, and a mismatch between two Records says which
 		// member differs rather than printing either.
 		//
-		// NOTE: The spelling is the DECLARING file's, which two Modules
+		// The spelling is the DECLARING file's, which two Modules
 		// declaring a `Shape` apiece make visible: "this is a Shape" refused by
 		// "declared as Shape" is two Types under one word, and a file that
 		// imported one of them `as OtherShape` is told neither name it can
@@ -279,7 +279,7 @@ export function describeType(type: common.Type): string {
 		case "SimpleMethod":
 		case "StaticMethod":
 			return describeFunctionSignature(type)
-		// NOTE: An Overload set has no ONE signature to print, and spelling
+		// An Overload set has no ONE signature to print, and spelling
 		// every Overload out would drown the message it sits in — it stays the
 		// bare word. A Diagnostic that has an Overload set in hand names the
 		// Overloads itself, as per-candidate notes.
@@ -291,7 +291,7 @@ export function describeType(type: common.Type): string {
 		case "GenericUse":
 		case "GenericAlias":
 			return displayGenericName(type.name)
-		// NOTE: The poison Type is not a Type a Program can hold, write or be
+		// The poison Type is not a Type a Program can hold, write or be
 		// told about — it is the Compiler's marker for a position it has
 		// nothing to say about, either because the mistake there was already
 		// reported or because nothing bound the Type Parameter that stood
@@ -309,7 +309,7 @@ export function describeType(type: common.Type): string {
 	}
 }
 
-// NOTE: A function-ish Type spelled the way a Type Annotation spells it —
+// A function-ish Type spelled the way a Type Annotation spells it —
 // `(_: Integer) -> Integer`, a labelled Parameter under its label. The bare
 // word "Function" named every one of them alike, which made a mismatch read as
 // "this is a Function, and it is declared as Function"; the signature is the
@@ -330,7 +330,7 @@ function describeFunctionSignature(functionType: common.BaseFunction): string {
 	return `(${parameters}) -> ${describeType(functionType.returnType)}`
 }
 
-// NOTE: A Record with its members spelled out, whatever it is called — the
+// A Record with its members spelled out, whatever it is called — the
 // descriptive form `printCaseWithPayload` is for a Case, and the one place a
 // named Record still shows its shape: a mismatch is about the members, and a
 // report that answered `Standing` on both sides would name the difference
@@ -344,7 +344,7 @@ export function describeRecordShape(type: common.RecordType): string {
 	return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
 }
 
-// NOTE: A Parameter is identified by its label where it has one, and by its
+// A Parameter is identified by its label where it has one, and by its
 // place in the signature where it does not — `_ value: Integer` is written
 // without a label on purpose, and inventing one for the Diagnostic would name
 // something the reader can not find in the source.
@@ -357,7 +357,7 @@ export function describeParameter(
 		: `Parameter ${index + 1}`
 }
 
-// NOTE: How many Arguments a call MUST write — the count a Parameter carrying a
+// How many Arguments a call MUST write — the count a Parameter carrying a
 // default no longer adds to. Asked by every report of a call's shape and by
 // Signature Help, which is why it is one function rather than a `filter` spelled
 // out at each of them.
@@ -375,7 +375,7 @@ export function requiredParameterCount(
 	return required
 }
 
-// NOTE: The last Parameter a call has to write, and `-1` when there is none —
+// The last Parameter a call has to write, and `-1` when there is none —
 // which is where the TRAILING run a call may leave out entirely begins. A
 // defaulted Parameter with a required one AFTER it is not in that run: the
 // Argument following it still has to be written, and its own label is what
@@ -394,7 +394,7 @@ export function lastRequiredParameterIndex(
 	return last
 }
 
-// NOTE: A signature with defaults accepts a RANGE of Argument counts — "takes 1
+// A signature with defaults accepts a RANGE of Argument counts — "takes 1
 // or 2 Arguments", "takes 2 to 4 Arguments" — and each Parameter that may be
 // left out says so in its own clause. This one string is what
 // `argument-count-mismatch`, `argument-label-mismatch`, `argument-type-mismatch`
@@ -417,7 +417,7 @@ export function describeSignature(
 		.join(", ")}`
 }
 
-// NOTE: "no Arguments" reads as an absence, so the low end of a range spells it
+// "no Arguments" reads as an absence, so the low end of a range spells it
 // as the number it is — "0 to 2 Arguments" — and only an exact zero gets the
 // word.
 export function describeArgumentCount(required: number, total: number): string {
@@ -432,12 +432,12 @@ export function describeArgumentCount(required: number, total: number): string {
 	return `${required} to ${total} Arguments`
 }
 
-// NOTE: For Diagnostics — "1 Argument", not "1 Arguments".
+// For Diagnostics — "1 Argument", not "1 Arguments".
 export function countOf(count: number, singular: string): string {
 	return count === 1 ? `1 ${singular}` : `${count} ${singular}s`
 }
 
-// NOTE: For Diagnostics — "this is an Integer", not "this is a Integer".
+// For Diagnostics — "this is an Integer", not "this is a Integer".
 // Type names are the only thing this is ever applied to, and they are always
 // spelled out, so the vowel rule needs no exceptions.
 export function withArticle(description: string): string {
@@ -446,7 +446,7 @@ export function withArticle(description: string): string {
 		: `a ${description}`
 }
 
-// NOTE: Which container inside `expected` holds the blank a Diagnostic is about
+// Which container inside `expected` holds the blank a Diagnostic is about
 // — the first one found, because one is all a Diagnostic says a sentence about. A
 // slot is the item Type of a List or either half of a Dictionary left `Unknown`,
 // which in a Program only ever comes from `[]` or `[=]`: `Unknown` is
@@ -480,7 +480,7 @@ function refusedSlotIn(
 	expected: common.Type,
 	written: common.Type | null,
 ): "List" | "Dictionary" | null {
-	// NOTE: A refinement decides nothing its base has not — what is still
+	// A refinement decides nothing its base has not — what is still
 	// undecided about a `NonEmptyList<Unknown>` is the item Type, on either side.
 	while (expected.type === "Refinement") {
 		expected = expected.base
@@ -496,7 +496,7 @@ function refusedSlotIn(
 			: null
 	}
 
-	// NOTE: Walked THROUGH rather than reported on. A Future's own slot is never
+	// Walked THROUGH rather than reported on. A Future's own slot is never
 	// a blank a Program left — a bare `Future` is refused where it is written —
 	// but a Future built around an empty List carries one all the same, and the
 	// sentence about it is a sentence about that List.
@@ -565,7 +565,7 @@ function refusedSlotIn(
 		return null
 	}
 
-	// NOTE: Arm by arm and one-sidedly, because a Union's arms pair with nothing:
+	// Arm by arm and one-sidedly, because a Union's arms pair with nothing:
 	// the value was measured against the whole Union and turned away by all of
 	// them at once. A blank standing in one arm is still a blank the reader is
 	// shown — `variable x = define { as [] if flag  as "a" otherwise }` leaves one
@@ -585,7 +585,7 @@ function refusedSlotIn(
 	return null
 }
 
-// NOTE: The same Type with every undecided slot filled in, to be SPELLED rather
+// The same Type with every undecided slot filled in, to be SPELLED rather
 // than compared — an annotation that would have answered the blank, at the exact
 // depth the blank sits. Filled in with concrete example Types, which is what
 // makes it an example: `List<List<Unknown>>` reads back as `List<List<Integer>>`
@@ -610,7 +610,7 @@ function spelledWithDecidedSlots(
 ): common.Type {
 	switch (type.type) {
 		case "Unknown":
-			// NOTE: Anything but another blank, since one blank decides no
+			// Anything but another blank, since one blank decides no
 			// other — `rows = [[]]` over a `List<List<Unknown>>` leaves the
 			// reader exactly where they started.
 			if (written !== null && written.type !== "Unknown") {
@@ -629,7 +629,7 @@ function spelledWithDecidedSlots(
 					invented,
 				),
 			}
-		// NOTE: Spelled through, the way the walk above looks through one — the
+		// Spelled through, the way the walk above looks through one — the
 		// annotation an author writes for a `constant f = Async.deferred(() { <-
 		// [] })` is the whole `Future<List<Integer>>`, blank and container and
 		// all.
@@ -656,7 +656,7 @@ function spelledWithDecidedSlots(
 
 			return {
 				type: "Dictionary",
-				// NOTE: A key the value decides is read off it like any other
+				// A key the value decides is read off it like any other
 				// slot; a key nothing decides is a String, which is what every
 				// Dictionary written by hand is keyed by.
 				keyType:
@@ -691,7 +691,7 @@ function spelledWithDecidedSlots(
 				),
 			}
 		}
-		// NOTE: An arm at a time, so a blank standing in one arm of a Union is
+		// An arm at a time, so a blank standing in one arm of a Union is
 		// spelled where it stands and the arms beside it are spelled as they are.
 		// Nothing pairs with an arm — the value was measured against the whole
 		// Union and turned away by all of them at once — so each is spelled on its
@@ -703,7 +703,7 @@ function spelledWithDecidedSlots(
 					spelledWithDecidedSlots(arm, null, invented),
 				),
 			}
-		// NOTE: The Type ARGUMENTS as well as the base, because they are what a
+		// The Type ARGUMENTS as well as the base, because they are what a
 		// refinement is printed from: `describeType` spells one as its name and
 		// its Type Arguments and never reads the base at all, so filling the base
 		// alone filled a blank nobody would see.
@@ -724,7 +724,7 @@ function spelledWithDecidedSlots(
 	}
 }
 
-// NOTE: A Dictionary's KEY, which is the one blank with an example of its own —
+// A Dictionary's KEY, which is the one blank with an example of its own —
 // every Dictionary anybody writes by hand is keyed by a String, so that is what
 // stands where the value decides nothing.
 function keyExample(
@@ -740,7 +740,7 @@ function keyExample(
 	return { type: "String" }
 }
 
-// NOTE: What a mismatch has to say when the Type it EXPECTED carries a slot
+// What a mismatch has to say when the Type it EXPECTED carries a slot
 // nobody decided. `List<Unknown>` names no Type a reader can act on: it is a
 // blank, and the value is refused for being a write into a blank rather than for
 // holding the wrong thing — which is a refusal nothing else in the Diagnostic
@@ -781,13 +781,13 @@ export function undecidedSlotEvidence(
 				: "An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
 		],
 		helps: [
-			// NOTE: The shape alone where there is no name, because every report
+			// The shape alone where there is no name, because every report
 			// that has none is a step away from the Declaration that would answer
 			// it — a Record update names the value it updates by Expression, a
 			// `<-` and a `define` arm answer a position rather than a name — and
 			// the Type is what has to be written wherever that Declaration is.
 			//
-			// NOTE: And an example is called one. Where the refused value pairs
+			// And an example is called one. Where the refused value pairs
 			// with the blank, the Type printed here is the reader's OWN and is
 			// written down as it stands; where it does not — a String refused by
 			// a `List<Unknown>` pairs with nothing — the Type is made up, and
@@ -802,7 +802,7 @@ export function undecidedSlotEvidence(
 	}
 }
 
-// NOTE: The annotation that would decide the blanks in a Type, spelled as the
+// The annotation that would decide the blanks in a Type, spelled as the
 // Declaration holding it would be written — the same spelling
 // `undecidedSlotEvidence` puts in its help, offered to the one report that names
 // a Declaration rather than a refusal. `keyword` is what that Declaration was
@@ -827,7 +827,7 @@ export function undecidedSlotAnnotation(
 
 // #region Record mismatches
 
-// NOTE: What a mismatch between two RECORDS says instead of printing both of
+// What a mismatch between two RECORDS says instead of printing both of
 // them. Two nine-member shapes on two lines is a diff the reader is asked to do
 // by eye, and the one thing the Compiler knows and they do not — WHICH member
 // disagrees — is the thing neither line says. So the members are compared here
@@ -840,7 +840,7 @@ export function undecidedSlotAnnotation(
 // wanted is two Types and reads as two Types, and with a Record Alias's name on
 // one of them it reads well.
 export type RecordMismatchEvidence = {
-	// NOTE: The Label the report LEADS with, in place of the "this is a …" one
+	// The Label the report LEADS with, in place of the "this is a …" one
 	// its site would have written over the whole value — and the Position the
 	// Diagnostic itself takes, so an Editor underlines the member rather than
 	// the Literal around it. Null where nothing was written down to point at: a
@@ -850,14 +850,14 @@ export type RecordMismatchEvidence = {
 	labels: Array<common.DiagnosticLabel>
 	notes: Array<string>
 	helps: Array<string>
-	// NOTE: For the fix that writes a near miss over the name it was meant to
+	// For the fix that writes a near miss over the name it was meant to
 	// be. Carried only for a SINGLE misspelled member: two of them are two
 	// edits, and which one an Editor would apply without asking is not a
 	// question a Diagnostic can answer.
 	data: common.DiagnosticData | undefined
 }
 
-// NOTE: How many disagreeing members get a Label and how many more get a Note.
+// How many disagreeing members get a Label and how many more get a Note.
 // Past that the count stands in for them: a report naming fifteen members is one
 // nobody reads to the end, and the fifteen are usually one mistake — a value of
 // another Type entirely — which the first three already say.
@@ -865,11 +865,11 @@ const labelledMembers = 3
 const notedMembers = 6
 
 type MemberDifference = {
-	// NOTE: The member's path from the outermost Record — `points`, or
+	// The member's path from the outermost Record — `points`, or
 	// `team.code` for one a nested Literal got wrong. Read by nothing but the
 	// sentences, which is why it is a string rather than a list of steps.
 	path: string
-	// NOTE: Where the VALUE of the member was written, or null for a member
+	// Where the VALUE of the member was written, or null for a member
 	// reached through something that is not a Literal. Never the member's NAME:
 	// a typed Record keys its members by name and holds no Position for one, and
 	// the only Records that carry a name Position are the levels a dotted key
@@ -877,7 +877,7 @@ type MemberDifference = {
 	position: common.Position | null
 	label: string
 	note: string
-	// NOTE: Set on a member the Record does not declare at all, to the name it
+	// Set on a member the Record does not declare at all, to the name it
 	// was measured against — what a fix would write over it.
 	suggestion?: string
 }
@@ -887,13 +887,13 @@ export function recordMismatchEvidence(
 	written: common.Type,
 	value: common.typed.ExpressionNode | null,
 	options: {
-		// NOTE: Members a default fills in, which are not missing however
+		// Members a default fills in, which are not missing however
 		// little the value writes. `partial` is the whole of that rule rather
 		// than a list of names: an update and a payload default may leave out
 		// ANY member, so what refuses one is only what it writes.
 		filled?: ReadonlyArray<string>
 		partial?: boolean
-		// NOTE: What the sentences call the expected Record where it has no
+		// What the sentences call the expected Record where it has no
 		// Alias to be called by and the POSITION has a name of its own — a
 		// Case's payload is `{ origin: Server, limits: Server }` and is called
 		// `'#Get'` everywhere else in its own report. Top level only: a member
@@ -939,7 +939,7 @@ export function recordMismatchEvidence(
 	let misspelled = differences.filter(
 		(difference) => difference.suggestion !== undefined,
 	)
-	// NOTE: A refusal that is ONLY about members nobody wrote has nothing
+	// A refusal that is ONLY about members nobody wrote has nothing
 	// inside the Literal to point at, so the Literal itself is what the Label
 	// takes — and it says which members, because "this is a { team: { name:
 	// String, code: String } }" over a Record the reader is looking at is the
@@ -963,7 +963,7 @@ export function recordMismatchEvidence(
 			secondary(difference.position as common.Position, difference.label),
 		),
 		notes: [
-			// NOTE: Which arm the differences below are about, wherever the
+			// Which arm the differences below are about, wherever the
 			// position holds more than one Record. Without it a list of members
 			// reads as a list of everything wrong with the value, when it is the
 			// list of everything wrong with it AS ONE of the shapes it could be.
@@ -1005,7 +1005,7 @@ function emptyRecordMismatch(): RecordMismatchEvidence {
 	return { lead: null, labels: [], notes: [], helps: [], data: undefined }
 }
 
-// NOTE: The members nobody wrote, as one clause — a Label reads it without a
+// The members nobody wrote, as one clause — a Label reads it without a
 // full stop and a Note with one, and the two are never both written, so the
 // sentence is built once and punctuated by whoever takes it.
 function missingClause(missing: Array<string>): string {
@@ -1014,7 +1014,7 @@ function missingClause(missing: Array<string>): string {
 		: `${missing.map((name) => `'${name}'`).join(", ")} are missing`
 }
 
-// NOTE: The Record inside a Type, or null where there is none. A refinement is
+// The Record inside a Type, or null where there is none. A refinement is
 // looked through because what its base declares is what a value of it has to
 // write — the predicate is a separate refusal with a report of its own, which
 // `refinementEvidence` writes.
@@ -1026,7 +1026,7 @@ function recordShapeOf(type: common.Type): common.RecordType | null {
 	return type.type === "Record" ? type : null
 }
 
-// NOTE: Which Record the value is compared AGAINST, when the position holds a
+// Which Record the value is compared AGAINST, when the position holds a
 // Union of them. A value is turned away by every arm at once, and diffing
 // against all of them would list a member each arm disagrees about differently —
 // so it is diffed against the one it is closest to, and the report says which,
@@ -1080,7 +1080,7 @@ function closestRecordShape(
 	return closest === null ? null : { shape: closest.shape, among }
 }
 
-// NOTE: Every member the value writes that the Record does not take — one it
+// Every member the value writes that the Record does not take — one it
 // does not declare at all, and one it declares at another Type. In WRITTEN
 // order, because that is the order the reader's eye runs along the line the
 // Labels sit under.
@@ -1104,7 +1104,7 @@ function memberDifferences(
 		let position = memberPosition(literal, name)
 
 		if (!Object.hasOwn(target.members, name)) {
-			// NOTE: Measured only against members the value has NOT written
+			// Measured only against members the value has NOT written
 			// already. `goalsAgainst = 3` beside `goalAgainst = 4` is one
 			// member spelled right and a second nobody declared, and the
 			// nearest declared name to the second is the one standing a line
@@ -1122,7 +1122,7 @@ function memberDifferences(
 			differences.push({
 				path,
 				position,
-				// NOTE: The Label says what is wrong here and the near miss is
+				// The Label says what is wrong here and the near miss is
 				// left to the Help, the way `unknown-member` splits the same
 				// two facts — a Label repeating a Help is a line the reader
 				// reads twice. A member too far down to get a Label carries
@@ -1158,7 +1158,7 @@ function memberDifferences(
 			continue
 		}
 
-		// NOTE: "this is" only where the arrow lands on the member ALONE. A
+		// "this is" only where the arrow lands on the member ALONE. A
 		// single-member Case takes a whole Record through its shorthand —
 		// `#Circle({ radius = "big" })` is `radius = { radius = "big" }` — and
 		// the member's Position is then the Literal's own, so a Label reading
@@ -1180,7 +1180,7 @@ function memberDifferences(
 	return differences
 }
 
-// NOTE: The differences one step further in, or null where there is no step to
+// The differences one step further in, or null where there is no step to
 // take — the member is not a Record on both sides, the value did not write a
 // Literal there, or the two Records disagree about nothing the members can
 // explain. The last of those is what keeps a walk from answering with silence: a
@@ -1222,7 +1222,7 @@ function nestedDifferences(
 	return nested
 }
 
-// NOTE: The members the Record declares and the value does not write. Not a
+// The members the Record declares and the value does not write. Not a
 // refusal at all where the position takes a PARTIAL — an update, a payload
 // default — and not one for a member a default fills in, which is the same rule
 // `missingRecordMembers` answers for an Argument and is asked here in the same
@@ -1253,7 +1253,7 @@ function missingMemberNames(
 	)
 }
 
-// NOTE: Where a member of a written Literal stands. The desugared levels a
+// Where a member of a written Literal stands. The desugared levels a
 // dotted key built carry their keys' Positions and nothing else does, so the
 // value's own Position is what the rest are pointed at — the same order
 // `reportUnmergedPathKey` reads the two in.
@@ -1272,7 +1272,7 @@ function memberPosition(
 	)
 }
 
-// NOTE: What the sentences call the Record a value was measured against — its
+// What the sentences call the Record a value was measured against — its
 // Alias where it has one, and what the POSITION calls it where the Record has no
 // name of its own: "the value it updates", "the declared return Type". Every
 // site knows that much, and the last fallback is for the two that are about
@@ -1286,7 +1286,7 @@ function recordSubject(type: common.RecordType, written?: string): string {
 	return written ?? "the expected Record"
 }
 
-// NOTE: The member a path ends at, which is the name a fix writes over — a
+// The member a path ends at, which is the name a fix writes over — a
 // nested one is spelled from the outside in for the reader and edited where it
 // stands.
 function lastStep(path: string): string {
@@ -1295,7 +1295,7 @@ function lastStep(path: string): string {
 
 // #endregion
 
-// NOTE: The question a value of this Type answers with a Boolean. Every Type has
+// The question a value of this Type answers with a Boolean. Every Type has
 // `::is(…)` through Equatable, and the four shapes written where a Boolean was
 // wanted each have a better one: an Optional is asked whether it holds anything,
 // a String and a List whether they carry anything, a number where it stands.
@@ -1310,7 +1310,7 @@ export function booleanQuestionFor(type: common.Type): string {
 		return booleanQuestionFor(type.base)
 	}
 
-	// NOTE: An Optional is a Choice, so it arrives as its Union — under its own
+	// An Optional is a Choice, so it arrives as its Union — under its own
 	// name where the Declaration is reached directly, and under the Alias's where
 	// `Optional<Integer>` was applied.
 	if (
@@ -1333,7 +1333,7 @@ export function booleanQuestionFor(type: common.Type): string {
 	}
 }
 
-// NOTE: What a Future or a Started IS, in the clause every report about a
+// What a Future or a Started IS, in the clause every report about a
 // forgotten `complete` opens with. Several reports say it — a Type mismatch in
 // an ordinary position, one in return position, a Method call on the wrapper
 // instead of on the value, and work standing where a value was wanted — and
@@ -1346,7 +1346,7 @@ export function asynchronyState(mismatch: AsynchronyMismatch): string {
 		: "This is still in flight"
 }
 
-// NOTE: The same question the Helps below ask, answered as DATA. A Quick Fix
+// The same question the Helps below ask, answered as DATA. A Quick Fix
 // reads this rather than a Help's sentence: the wording is written per site and
 // is free to change, and a fix keyed on prose breaks silently when it does.
 // `not-a-future` carries nothing, because there is no edit to make — what a body
@@ -1354,7 +1354,7 @@ export function asynchronyState(mismatch: AsynchronyMismatch): string {
 export function asynchronyData(
 	expected: common.Type,
 	actual: common.Type,
-	// NOTE: See `asynchronyHelps`. The fix this data offers WRITES the word, so
+	// See `asynchronyHelps`. The fix this data offers WRITES the word, so
 	// it is withheld wherever the word would be refused — a Quick Fix must never
 	// hand the reader a second Diagnostic in place of the first.
 	canWait: boolean = true,
@@ -1370,7 +1370,7 @@ export function asynchronyData(
 		: undefined
 }
 
-// NOTE: The Helps a mismatch gets where the difference is one missing word about
+// The Helps a mismatch gets where the difference is one missing word about
 // asynchrony rather than a wrong value. `asynchronyMismatch` decides WHICH of
 // the three it is, by assignability.
 //
@@ -1379,7 +1379,7 @@ export function asynchronyData(
 export function asynchronyHelps(
 	expected: common.Type,
 	actual: common.Type,
-	// NOTE: Whether the body around this position may write `complete` at all.
+	// Whether the body around this position may write `complete` at all.
 	// `false` swaps the word out: a `complete` in a body that answers no Future
 	// is `complete-outside-future`, so offering it there — and offering a Quick
 	// Fix that writes it — sent the reader from one refusal to the next. What is
@@ -1389,7 +1389,7 @@ export function asynchronyHelps(
 	// Defaulted, because most positions are inside a body that can wait and the
 	// ones that are not have to look it up.
 	canWait: boolean = true,
-	// NOTE: And WHY it may not, where the answer is one of the four barriers
+	// And WHY it may not, where the answer is one of the four barriers
 	// rather than an ordinary body. "Declare the enclosing Function
 	// '-> Future<…>'" is no edit at all inside a property body, which has no
 	// enclosing Function, and none inside a Parameter's default, which is filled
@@ -1426,7 +1426,7 @@ export function asynchronyHelps(
 	}
 }
 
-// NOTE: And the same three in RETURN position, where the body is the thing to
+// And the same three in RETURN position, where the body is the thing to
 // change and one of them reads completely differently: a body that declares a
 // future and hands back a bare value has not written a future anywhere, and
 // whether it completes anything is what decides what it should do about that.
@@ -1455,7 +1455,7 @@ export function returnAsynchronyHelps(
 	}
 }
 
-// NOTE: What a position that can not suspend has to be told, per position. The
+// What a position that can not suspend has to be told, per position. The
 // four used to share one Note listing all four and one Help offering all three
 // edits, and only one line of each was ever about the reader: a property body
 // was told to complete the work "above this position", where the generated value
@@ -1507,7 +1507,7 @@ export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 				],
 			}
 		default:
-			// NOTE: No barrier named, which is a Scope that answered nothing at
+			// No barrier named, which is a Scope that answered nothing at
 			// all rather than one of the four. Nothing is known about the
 			// position, so nothing is claimed about it.
 			return {
@@ -1517,7 +1517,7 @@ export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 	}
 }
 
-// NOTE: A Future or a Started where a value was wanted, which is the forgotten
+// A Future or a Started where a value was wanted, which is the forgotten
 // `complete` wearing another Diagnostic's clothes: a hole told that
 // `Future<Integer>` is not Printable, an Argument told that it does not conform
 // to a bound. Both are one word short, and both would otherwise send the reader
@@ -1536,7 +1536,7 @@ export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 export function unwaitedWorkReport(
 	type: common.Type,
 	waits: boolean,
-	// NOTE: And which of the four barriers said no, where one did — see
+	// And which of the four barriers said no, where one did — see
 	// `barredCompletion`. Null is an ordinary body that answers something other
 	// than a Future, whose edit is to its own Declaration.
 	barrier: enricher.CompletionBarrier | null = null,

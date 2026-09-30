@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The same stages the CLI runs, minus bundling — what a body that falls
+// The same stages the CLI runs, minus bundling — what a body that falls
 // off its end answers is only visible once the emitted Function RUNS, so these
 // go all the way through.
 function generate(source: string): string {
@@ -27,7 +27,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: Writes the emitted Program to a throwaway module and imports it so its
+// Writes the emitted Program to a throwaway module and imports it so its
 // top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
 // this repo's runtime, so the module resolves from anywhere; `console.log` is
 // captured to collect the output, then restored.
@@ -55,7 +55,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: Regression tests — a body promising unit, the empty Record `{}`, is
+// Regression tests — a body promising unit, the empty Record `{}`, is
 // allowed to fall off its end, and the emitted JavaScript Function then
 // answered `undefined`. That is not an Essence value: it carries no hidden Type
 // key, so the failure surfaced somewhere else entirely, in whatever read that
@@ -111,7 +111,7 @@ describe("Return Synthesis", () => {
 		})
 	})
 
-	// NOTE: A Handler body is under the same rule for the same reason — it is
+	// A Handler body is under the same rule for the same reason — it is
 	// lowered to a Function of its own, and the emitted `if` chain's value is
 	// the Match's value. The Union being matched on is `Integer | String`
 	// because a Match needs something to narrow at all; the Handlers' own
@@ -131,7 +131,7 @@ describe("Return Synthesis", () => {
 		).toEqual(["{}"])
 	})
 
-	// NOTE: The synthesised Return is appended only where one is missing —
+	// The synthesised Return is appended only where one is missing —
 	// a body that already ends in `<- {}` must not grow a second, unreachable
 	// one behind it.
 	it("leaves a body that returns explicitly alone", () => {

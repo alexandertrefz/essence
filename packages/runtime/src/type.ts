@@ -17,13 +17,13 @@ import type { TranscendentalType } from "./Transcendental"
 
 export const typeKeySymbol = Symbol("$type")
 
-// NOTE: The runtime half of Union Method dispatch — each case holds a member
+// The runtime half of Union Method dispatch — each case holds a member
 // Type descriptor, the statically chosen Method, that Method's hidden
 // conformance Arguments, and the Arguments this case alone is given. The
 // Enricher orders the cases most specific first and only emits a dispatch when
 // some case is guaranteed to match.
 //
-// NOTE: An Argument means something different in every branch when its Type
+// An Argument means something different in every branch when its Type
 // came from the branch: the Function literal `(item) { <- item::label() }`
 // calls one Namespace's `label` for a `List<Alpha>` receiver and another's for
 // a `List<Beta>` one — so the Enricher compiles one copy per branch and lists
@@ -63,7 +63,7 @@ export function dispatchMethod(
 				}
 			}
 
-			// NOTE: The Parameters THIS branch's Method takes its defaults for
+			// The Parameters THIS branch's Method takes its defaults for
 			// — opened as holes in the shared Argument list, which holds what
 			// the call WROTE. Every branch resolves to a different Method and
 			// they need not agree on what may be left out, so this is per branch
@@ -81,7 +81,7 @@ export function dispatchMethod(
 				// oxlint-disable-next-line unicorn/no-new-array -- the length
 				let opened: Array<unknown> = new Array(total)
 				let next = 0
-				// NOTE: The indices arrive in Parameter order — they are
+				// The indices arrive in Parameter order — they are
 				// collected by a left-to-right walk of the signature — so the
 				// next hole is always the one this cursor points at, and no
 				// Argument has to search the list to find out whether it is one.
@@ -106,7 +106,7 @@ export function dispatchMethod(
 	return noDispatchCaseMatched()
 }
 
-// NOTE: The end of a dispatch, whether the search above walked it or
+// The end of a dispatch, whether the search above walked it or
 // `compile-union-dispatch` wrote it out as a chain of tests — one throw for
 // both, so which of the two a Program was built with does not change what it
 // says when it goes wrong. The Enricher emits a dispatch only where every
@@ -117,13 +117,13 @@ export function noDispatchCaseMatched(): never {
 	throw new Error("No dispatch case matched the receiver.")
 }
 
-// NOTE: The runtime half of a conditional conformance — each fulfilling Method
+// The runtime half of a conditional conformance — each fulfilling Method
 // is curried with the `where` conditions' own witnesses, which the bounded
 // helper (`List.compare`) receives as its hidden trailing conformance
 // Arguments. The unconditional case never reaches here: the Rewriter emits its
 // method map as a plain object literal instead.
 //
-// NOTE: And the one entry of a map that is NOT a Method: the `structural` brand
+// And the one entry of a map that is NOT a Method: the `structural` brand
 // a Dictionary reads, which on a conditional conformance means "structural if
 // the conditions are". `List<ItemType> is Equatable where ItemType is
 // Equatable` compares its items through the witness solving that `where`, so
@@ -133,11 +133,11 @@ export function noDispatchCaseMatched(): never {
 // have handed the Dictionary a Function where it reads `=== true`, which is
 // why it is lifted out rather than copied.
 //
-// NOTE: The check is per witness BUILT, not per lookup, and the Optimiser pools
+// The check is per witness BUILT, not per lookup, and the Optimiser pools
 // a witness built from constants into one Module const — so a Dictionary keyed
 // by a List asks it once for the whole Program.
 export function boundConformance(
-	// NOTE: The fulfilling Methods carry concrete runtime signatures
+	// The fulfilling Methods carry concrete runtime signatures
 	// (`List.compare` takes its own conformance Argument), so the map is
 	// typed loosely here — the curried witnesses restore the exact shape the
 	// bounded helper expects. The brand rides in the same map, which is what
@@ -169,10 +169,10 @@ export function boundConformance(
 	return bound
 }
 
-// NOTE: A witness whose provided bodies are each curried with the witness
+// A witness whose provided bodies are each curried with the witness
 // itself. The map is built first and every body closes over it, since an object
 // can not name itself while it is being written.
-// NOTE: The `structural` brand rides through untouched, whether it stood in a
+// The `structural` brand rides through untouched, whether it stood in a
 // plain map or `boundConformance` put it there: the spread copies it and the
 // loop below only ever writes the names the Protocol PROVIDES, which a brand is
 // not one of.
@@ -191,10 +191,10 @@ export function providedConformance(
 	return witness
 }
 
-// NOTE: Every group built, under the witness it answers with.
+// Every group built, under the witness it answers with.
 const groups = new WeakMap<object, Array<unknown>>()
 
-// NOTE: One conformer's witnesses for several Protocols, the first being the
+// One conformer's witnesses for several Protocols, the first being the
 // answer. `curried` indexes `conditions` and then the `shared` ones; every map
 // is built before a body closes over one, so bodies may call across witnesses.
 export function providedConformances(
@@ -251,7 +251,7 @@ function groupOf(witness: unknown): Array<unknown> {
 	return group
 }
 
-// NOTE: The runtime shape of a constructed Choice Case — the payload's
+// The runtime shape of a constructed Choice Case — the payload's
 // members with the Case's tag (`"CalculatorOperation#Add"`) on the hidden
 // Type key. Unit Cases simply carry no further members.
 export type CaseInstanceType = {
@@ -259,7 +259,7 @@ export type CaseInstanceType = {
 	[key: string]: AnyType
 }
 
-// NOTE: A unit Case carries nothing but its tag, so every value of one holds
+// A unit Case carries nothing but its tag, so every value of one holds
 // exactly what every other value of it holds — and Case equality goes by that
 // tag, with no operator anywhere in the language asking whether two values are
 // the SAME value. So one instance per tag is built and handed out ever after,
@@ -267,7 +267,7 @@ export type CaseInstanceType = {
 // with their Cases as Module consts; this does it for the ones a Program
 // declares.
 //
-// NOTE: The Map is bounded by how many distinct unit Case tags the Program
+// The Map is bounded by how many distinct unit Case tags the Program
 // CONSTRUCTS, which is a property of its text rather than of its work — a
 // constant pool that fills once, not a cache that grows with what the Program
 // is asked to do.
@@ -291,7 +291,7 @@ export function createCase(
 	return { ...payload, [typeKeySymbol]: tag }
 }
 
-// NOTE: CaseInstanceType is deliberately NOT part of AnyType — its
+// CaseInstanceType is deliberately NOT part of AnyType — its
 // `[typeKeySymbol]: string` would defeat the tag-based narrowing every
 // runtime helper relies on. Case values still flow through these helpers at
 // runtime; only the compile-time union stays precise.
@@ -306,25 +306,25 @@ export type AnyType =
 	| TranscendentalType
 	| BooleanType
 	| OrderingType
-	// NOTE: A source of randomness is a value like any other here — it is
+	// A source of randomness is a value like any other here — it is
 	// passed, held and answered — even though nothing written in Essence builds
 	// one and no Protocol reads one. It is in this union so that the printer and
 	// the Type test below can NAME it rather than fall to their "unknown value"
 	// arms.
 	| RandomnessType
-	// NOTE: And the two asynchronous kinds, for a plainer reason than that: a
+	// And the two asynchronous kinds, for a plainer reason than that: a
 	// List of them is a value the language writes down — `[first, second]::all()`
 	// — and `ListType` takes an item of this union. Both are declared in
 	// `Future.ts`, which imports nothing of this module but the key, so the
 	// reference back costs a type import and nothing at run time.
 	//
-	// NOTE: Neither carries a RENDERING or an equality here, the way every
+	// Neither carries a RENDERING or an equality here, the way every
 	// member above it does. Both are registered kinds, answered by `registry.ts`
 	// from the doors they are built through, which is what keeps the cost of
 	// asynchrony out of a Program that waits for nothing.
 	| FutureType<any>
 	| StartedType<any>
-	// NOTE: And the Cases of one Choice, which no other Choice needs. A Case is
+	// And the Cases of one Choice, which no other Choice needs. A Case is
 	// ordinarily built by an Essence body and reaches this union through nothing
 	// — `Optional`, `Result` and `Step` are all absent. `HttpFailure` is here
 	// because a NATIVE answers one: `Http.send` hands back a
@@ -335,17 +335,17 @@ export type AnyType =
 	// request.
 	| HttpFailureType
 
-// NOTE: A Dictionary box holding Essence values, which is the only Dictionary
+// A Dictionary box holding Essence values, which is the only Dictionary
 // anything outside the Dictionary Module ever has in hand. It is named here so
 // that the readers of a box — the check below, the universal equality, the
 // property-test generators — share one spelling rather than each reaching into
 // the Dictionary Module for a type of their own.
 export type AnyDictionary = DictionaryType<AnyType, AnyType>
 
-// NOTE: Whether every LIVE entry of a Dictionary box answers `check`, stopping
+// Whether every LIVE entry of a Dictionary box answers `check`, stopping
 // at the first that does not.
 //
-// NOTE: The live view is the whole of what any Dictionary reader ever sees, and
+// The live view is the whole of what any Dictionary reader ever sees, and
 // it is spelled out here rather than reached for in the Dictionary Module for
 // the reason the List walk below reads a List's runs itself: this Module is the
 // one EVERY Program carries, and importing the container it is asked about would
@@ -354,7 +354,7 @@ export type AnyDictionary = DictionaryType<AnyType, AnyType>
 // one is not what this box holds, and a slot with no visible version at all was
 // written after it.
 //
-// NOTE: A tombstone — the version a removal pushes — is recognised as a SYMBOL
+// A tombstone — the version a removal pushes — is recognised as a SYMBOL
 // rather than by importing the one the Dictionary Module exports, which would be
 // the very value import the paragraph above refuses. Nothing else a version can
 // hold is one: every Essence value is an object, or a Function.
@@ -362,7 +362,7 @@ export function everyLiveEntry(
 	dictionary: AnyDictionary,
 	check: (key: AnyType, value: AnyType) => boolean,
 ): boolean {
-	// NOTE: The generation is READ ONCE, before the walk, for the reason the
+	// The generation is READ ONCE, before the walk, for the reason the
 	// natives fix their counts before theirs: `check` may be user code, and a
 	// write made from inside it can move the very box being walked onto a store
 	// of its own — which the Dictionary Module does whenever a write on a stale
@@ -393,7 +393,7 @@ export function everyLiveEntry(
 	return true
 }
 
-// NOTE: The live view materialised, for the readers that have to LOOK an entry
+// The live view materialised, for the readers that have to LOOK an entry
 // up rather than walk past it — a Dictionary's equality is order-insensitive, so
 // it holds one side while it searches the other. It lives beside the walk above
 // so there is one reading of what a box holds rather than two that must agree.
@@ -431,7 +431,7 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 			return false
 		}
 
-		// NOTE: Structural and open — the value has to carry every member the
+		// Structural and open — the value has to carry every member the
 		// Matcher names, matching in Type, but may carry more besides.
 		// `Object.hasOwn`, never `in`: a member named `toString` or `valueOf`
 		// would otherwise be found on `Object.prototype` and satisfy the
@@ -446,12 +446,12 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 			return false
 		}
 
-		// NOTE: Item Types erase at runtime — narrowing a List means looking
+		// Item Types erase at runtime — narrowing a List means looking
 		// at the items it happens to hold. Every item has to fit, so the
 		// empty List fits any List matcher, the same way an empty literal is
 		// assignable to any List.
 		//
-		// NOTE: A List is two runs with a view into each — `List.ts` holds
+		// A List is two runs with a view into each — `List.ts` holds
 		// that shape and the reasoning behind it — so the items are the front
 		// run walked backwards and then the back run, with both counts fixed
 		// before the walk. Read here rather than through `List.viewOf`
@@ -462,7 +462,7 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		if (type.type === "List" && type.itemType.type !== "Unknown") {
 			let list = value as ListType<AnyType>
 
-			// NOTE: A box a positional write left behind holds an Array whose
+			// A box a positional write left behind holds an Array whose
 			// items have moved on, so it catches up before this walk reads one
 			// — `listWrites.ts` is a Module of its own exactly so that this one
 			// can say that without reaching into `List.ts`. It is the one thing
@@ -501,12 +501,12 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 			return false
 		}
 
-		// NOTE: Both slot Types erase, exactly as a List's item Type does —
+		// Both slot Types erase, exactly as a List's item Type does —
 		// narrowing a Dictionary means looking at the entries it happens to
 		// hold. Every entry has to fit, so the empty Dictionary fits any
 		// Dictionary Matcher, the way an empty List fits any List one.
 		//
-		// NOTE: And each slot stops at the tag ON ITS OWN. A bare `Dictionary`
+		// And each slot stops at the tag ON ITS OWN. A bare `Dictionary`
 		// names neither, so it is the tag and nothing else; a `Dictionary<String,
 		// Unknown>` checks every key and asks nothing of the values. Reading the
 		// two together would have made a half-decided Matcher either walk for a
@@ -530,13 +530,13 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 					isValueOfType(held, valueType)),
 		)
 	} else if (type.type === "Case") {
-		// NOTE: Nominal first — the tag says which Case, and a structurally
+		// Nominal first — the tag says which Case, and a structurally
 		// identical plain Record is not this Case however its members line up.
 		if (value[typeKeySymbol] !== `${type.choice}#${type.name}`) {
 			return false
 		}
 
-		// NOTE: Then the payload, because one tag is carried by every
+		// Then the payload, because one tag is carried by every
 		// instantiation of a generic Case: `Box<Integer>#Full` and
 		// `Box<String>#Full` are both "Box#Full", and the tag alone let a
 		// Matcher for one accept values of the other — a String payload
@@ -544,11 +544,11 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// is CLOSED (the Case declares every member it has), so unlike a
 		// Record this asks about all of it.
 		//
-		// NOTE: Inside generic code the members are still Type Parameters, and
+		// Inside generic code the members are still Type Parameters, and
 		// a GenericUse answers true below, so the check degrades to the tag
 		// alone exactly where nothing more is known about the payload.
 		//
-		// NOTE: Cast because `CaseInstanceType` is deliberately kept out of
+		// Cast because `CaseInstanceType` is deliberately kept out of
 		// `AnyType` — the tag matched above is what says this value is one.
 		let instance = value as unknown as CaseInstanceType
 
@@ -558,14 +558,14 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 				isValueOfType(instance[name], memberType),
 		)
 	} else if (type.type === "Future" || type.type === "Started") {
-		// NOTE: The kind and nothing else. What a Future will ANSWER is not
+		// The kind and nothing else. What a Future will ANSWER is not
 		// there to look at — the work has not run, and running it to decide a
 		// Matcher would be the one type test with an effect — so a
 		// `Future<String>` Matcher asks exactly what a bare `Future` one asks.
 		// It degrades the way a generic Case payload degrades to its tag inside
 		// generic code: the check stops where the evidence stops.
 		//
-		// NOTE: The tag is WIDENED to a String rather than compared against the
+		// The tag is WIDENED to a String rather than compared against the
 		// union above, because neither kind is a member of `AnyType`: both are
 		// registered kinds, answered by `registry.ts` wherever a value is
 		// printed or compared, which is what keeps the cost of asynchrony out of
@@ -574,7 +574,7 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))
 	} else if (type.type === "Function") {
-		// NOTE: A Function is the one runtime value carrying no Type key — it
+		// A Function is the one runtime value carrying no Type key — it
 		// is emitted as a bare JavaScript function — so `typeof` is what
 		// answers for it, exactly as `getStringRepresentation` and `anyIs`
 		// answer for it. Its Signature is erased by the time the check runs:
@@ -587,25 +587,25 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// them as a Case that can never match rather than letting it look like
 		// it narrows.
 		//
-		// NOTE: This used to fall through to the "not implemented" branch
+		// This used to fall through to the "not implemented" branch
 		// below and answer FALSE, so a Record Matcher naming a callback member
 		// could never match: every Handler declined, the emitted `if` chain
 		// fell off its end, and the Match answered `undefined`.
 		return typeof (value as unknown) === "function"
 	} else if (type.type === "GenericUse") {
-		// NOTE: Types erase at runtime — a Generic matcher stands for any
+		// Types erase at runtime — a Generic matcher stands for any
 		// value. Handlers are tested in order, so concrete matchers narrow
 		// the value before a Generic matcher catches the rest. A Handler
 		// written BELOW such a matcher can therefore never run, which the
 		// Validator reports as an unreachable Case.
 		return true
 	} else if (type.type === "Unknown") {
-		// NOTE: The Type a wildcard Handler (`case _`) resolves to once no
+		// The Type a wildcard Handler (`case _`) resolves to once no
 		// Types are left to narrow — like a Generic matcher, it accepts
 		// whatever the Handlers before it did not catch.
 		return true
 	} else {
-		// NOTE: Every Type a Matcher or a dispatch case can name is answered
+		// Every Type a Matcher or a dispatch case can name is answered
 		// above, so reaching here is a Compiler bug rather than a Program one
 		// — a descriptor was emitted that the runtime does not know. It used
 		// to `console.log` and answer false, which put a line of Compiler
@@ -617,7 +617,7 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	}
 }
 
-// NOTE: The end of an emitted Match's `if` chain — reached only when no
+// The end of an emitted Match's `if` chain — reached only when no
 // Handler accepted the value. The Validator refuses a Match that does not
 // cover its Union, so this is unreachable in a Program that compiled clean,
 // and reaching it means a Matcher's runtime check disagrees with the Type the
@@ -626,7 +626,7 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 // surfaced somewhere else entirely — as a `TypeError` in whatever read the
 // missing Type key next, or as a wrong value flowing on unnoticed.
 //
-// NOTE: The value is named by its Type key and nothing more — enough to say
+// The value is named by its Type key and nothing more — enough to say
 // WHICH value fell through, while staying small enough to carry: this Module
 // is not shaken out of any Program's bundle, so every line here is a line
 // every Program pays for. Rendering the value itself is

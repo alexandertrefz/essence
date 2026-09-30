@@ -15,7 +15,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: A benchmark's time does not say which path its keys took, so the
+// A benchmark's time does not say which path its keys took, so the
 // Dictionaries the key suites of `DictionaryBenchmarks.es` read are built here
 // and their stores asked. A slot with no encoding is one only a walk finds.
 

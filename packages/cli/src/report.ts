@@ -9,7 +9,7 @@ import type { Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"
 import { visibleLength } from "./theme"
 
-// NOTE: Every line the CLI prints about a finished compilation is produced
+// Every line the CLI prints about a finished compilation is produced
 // here, as strings, so that the shape of the output can be tested without a
 // terminal and so that no command grows its own private way of saying that
 // something succeeded.
@@ -37,7 +37,7 @@ export function formatBytes(bytes: number): string {
 	return `${(bytes / (1000 * 1000)).toFixed(2)} MB`
 }
 
-// NOTE: Roughly two significant digits at every scale, so that a column of
+// Roughly two significant digits at every scale, so that a column of
 // durations spanning three orders of magnitude stays readable and a stage that
 // took no measurable time is not reported as having taken exactly zero.
 export function formatDuration(milliseconds: number): string {
@@ -74,7 +74,7 @@ export function countDiagnostics(diagnostics: Array<common.Diagnostic>): {
 	return { errors, warnings }
 }
 
-// NOTE: An `s` unless the caller says otherwise, which covers every word the
+// An `s` unless the caller says otherwise, which covers every word the
 // report has needed so far and leaves the one that does not — `entry` — a way to
 // say so rather than a rule of its own somewhere else.
 export function pluralise(
@@ -93,7 +93,7 @@ function padVisibleStart(text: string, width: number): string {
 	return " ".repeat(Math.max(0, width - visibleLength(text))) + text
 }
 
-// NOTE: Diagnostics are rendered by the shared Ariadne renderer, the same one
+// Diagnostics are rendered by the shared Ariadne renderer, the same one
 // the Language Server output is checked against, so a Diagnostic looks
 // identical wherever it is shown.
 //
@@ -103,7 +103,7 @@ function padVisibleStart(text: string, width: number): string {
 // the compilation rather than to a file — an unreadable entry, a failed bundle
 // — and is rendered against the entry, which is the file the caller named.
 //
-// NOTE: Each block closes with its own tally, because each is one file's worth
+// Each block closes with its own tally, because each is one file's worth
 // of problems. The compilation's total is the headline underneath them all.
 export function renderDiagnosticsFor(
 	outcome: CompileOutcome,
@@ -274,7 +274,7 @@ function warningLine(
 	)}`
 }
 
-// NOTE: The full report for a single file. The stage breakdown is the point of
+// The full report for a single file. The stage breakdown is the point of
 // it — it is the only place the cost of the Compiler's own stages is visible,
 // and it is what makes a slow compilation explainable rather than mysterious.
 export function renderSingleReport(
@@ -331,7 +331,7 @@ export function renderSingleReport(
 	return lines.join("\n")
 }
 
-// NOTE: While watching, a rebuild is one line. The report form would push the
+// While watching, a rebuild is one line. The report form would push the
 // previous rebuilds — and the Diagnostics that matter — off the screen after
 // a handful of saves.
 export function renderWatchLine(
@@ -368,7 +368,7 @@ export function renderWatchLine(
 	)}`
 }
 
-// NOTE: What a failed compile stopped short of, or nothing at all where it
+// What a failed compile stopped short of, or nothing at all where it
 // stopped short of nothing.
 //
 // A stage NAME is only ever said where a stage refused: the file could not be
@@ -404,7 +404,7 @@ function stageVerb(stage: StageName): string {
 	return verbs[stage]
 }
 
-// NOTE: The per-file table for a batch. One line each, aligned into columns,
+// The per-file table for a batch. One line each, aligned into columns,
 // so that an unusually large or slow file stands out by shape alone.
 export function renderBatchReport(
 	outcomes: Array<CompileOutcome>,
@@ -420,7 +420,7 @@ export function renderBatchReport(
 		0,
 	)
 
-	// NOTE: `check` produces no output files, so the whole output half of the
+	// `check` produces no output files, so the whole output half of the
 	// table — arrow, path, size — is dropped rather than shown empty.
 	let emits = outcomes.some((outcome) => outcome.outputFileName !== null)
 	let summary: Array<string> = []

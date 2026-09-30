@@ -31,13 +31,13 @@ import type { common } from "@essence-lang/interfaces"
 import type { ReportContext } from "./report"
 import { formatDuration, pluralise } from "./report"
 
-// NOTE: Everything a person READS about a test run is produced here, as
+// Everything a person READS about a test run is produced here, as
 // strings, so that the shape of the report can be asserted on without a
 // terminal — the same rule `report.ts` follows for a compilation. What a run IS
 // — the fold of the event stream, and the Diagnostics a failure produces — is
 // the Compiler's, because the Language Server publishes the same ones.
 
-// NOTE: The Compiler's test-run helpers, re-exported for the command line.
+// The Compiler's test-run helpers, re-exported for the command line.
 // Not the only way in: some modules import them from
 // `@essence-lang/compiler/testing` directly.
 export {
@@ -106,7 +106,7 @@ function deselectionWord(reason: string | null): string {
 function testLine(test: TestRecord, context: ReportContext): string {
 	let { palette } = context
 	let symbol = symbolFor(test, context)
-	// NOTE: A row whose name says nothing about which row it is says so as the
+	// A row whose name says nothing about which row it is says so as the
 	// row it is — the template it shares with its siblings is the heading right
 	// above it, and reading it again N times names nothing.
 	let written = rowLabel(test) ?? printableText(test.name)
@@ -124,7 +124,7 @@ function testLine(test: TestRecord, context: ReportContext): string {
 		detail = palette.faint(`  ${formatDuration(test.duration)}`)
 	}
 
-	// NOTE: A property test says how many cases it ran, and says it whether it
+	// A property test says how many cases it ran, and says it whether it
 	// held or not — "a hundred cases held" is as much an answer as a
 	// counterexample is, and it is the only thing that tells a property test
 	// apart from an ordinary one in the tree.
@@ -137,11 +137,11 @@ function testLine(test: TestRecord, context: ReportContext): string {
 	return `${symbol} ${name}${cases}${measurement(test, context)}${detail}`
 }
 
-// NOTE: What a benchmark cost, beside its own line — the number IS the answer,
+// What a benchmark cost, beside its own line — the number IS the answer,
 // so it is shown whether the measurement held to its baseline or not, and it is
 // the only thing that tells a benchmark apart from a test in the tree.
 //
-// NOTE: An improvement says what to do about it. A run does not move a baseline
+// An improvement says what to do about it. A run does not move a baseline
 // on its own — a fast machine would otherwise ratchet the number down for
 // everybody — so the news comes with the command that records it.
 function measurement(test: TestRecord, context: ReportContext): string {
@@ -170,7 +170,7 @@ function measurement(test: TestRecord, context: ReportContext): string {
 	)}`
 }
 
-// NOTE: The cases a property drew, and the stored counterexamples it re-ran
+// The cases a property drew, and the stored counterexamples it re-ran
 // before drawing any. They are counted apart because they are different things:
 // a replay spends no randomness and asks a question the search has answered
 // once already, so folding the two together would make the number a `--seed`
@@ -183,7 +183,7 @@ function casesOf(property: PropertyRecord): string {
 		: `${drawn} · ${property.replayed} replayed`
 }
 
-// NOTE: What the tree shows without being asked. A deselected test is counted
+// What the tree shows without being asked. A deselected test is counted
 // in the summary rather than listed: a focused run silences everything else by
 // design, and printing forty lines saying so buries the two that ran.
 function isListed(test: TestRecord, context: ReportContext): boolean {
@@ -208,7 +208,7 @@ function commonPrefix(left: Array<string>, right: Array<string>): number {
 	return index
 }
 
-// NOTE: Suites are printed as they are entered rather than collected into a
+// Suites are printed as they are entered rather than collected into a
 // tree first — the tests of one Module arrive in source order, so a suite's
 // heading is due exactly where the path stops matching the previous test's.
 export function renderTestTree(
@@ -273,19 +273,19 @@ export function renderTestTree(
 export function renderTestSummary(
 	run: TestRun,
 	context: ReportContext,
-	// NOTE: What the run RECORDED, which is not what it counted: a snapshot
+	// What the run RECORDED, which is not what it counted: a snapshot
 	// written for the first time is a pass that left something on disk, and a
 	// reader has to be told it happened without reading a diff to find out.
 	snapshots = 0,
-	// NOTE: Whether every entry of the run came out of the bundle cache. The
+	// Whether every entry of the run came out of the bundle cache. The
 	// duration beside it is the RUN's, and a reader comparing two runs of the
 	// same project deserves to know that one of them also compiled it.
 	cacheWarm = false,
-	// NOTE: What the run recorded as baselines, which is what the snapshot
+	// What the run recorded as baselines, which is what the snapshot
 	// count beside it is: a measurement written for the first time is a pass
 	// that left something on disk.
 	baselines = 0,
-	// NOTE: How many compiled entries the run held, so that the replayed ones can
+	// How many compiled entries the run held, so that the replayed ones can
 	// be reported as a share of them rather than as a bare number a reader has
 	// nothing to compare against. Zero for a run that did not ask the result
 	// cache anything, which is what leaves the note off.
@@ -329,7 +329,7 @@ export function renderTestSummary(
 		notes.push("compile cache warm")
 	}
 
-	// NOTE: Beside the warm-compile note and after it, because the two answer the
+	// Beside the warm-compile note and after it, because the two answer the
 	// same question in the order a reader asks it: this run did not compile the
 	// project, and it did not run all of it either.
 	if (run.cached > 0 && entries > 0) {
@@ -351,7 +351,7 @@ export function renderTestSummary(
 	)
 }
 
-// NOTE: The line a run with nothing to do ends on. It is not a failure — a
+// The line a run with nothing to do ends on. It is not a failure — a
 // directory with no tests in it has answered the question — but it says what
 // was searched so that a mistyped path is visible.
 export function renderNoTests(
@@ -380,7 +380,7 @@ function indented(text: string, prefix: string): Array<string> {
 		.map((line) => `${prefix}${line}`)
 }
 
-// NOTE: What a test wrote while it ran, shown WITH the failure rather than
+// What a test wrote while it ran, shown WITH the failure rather than
 // interleaved with the reporter's own lines — which is the whole reason the
 // runtime captures it.
 function renderOutput(test: TestRecord, context: ReportContext): Array<string> {
@@ -400,7 +400,7 @@ function renderOutput(test: TestRecord, context: ReportContext): Array<string> {
 	]
 }
 
-// NOTE: A JavaScript stack under a message that already says what happened.
+// A JavaScript stack under a message that already says what happened.
 // The frames name a bundle staged in a temporary directory and the files of the
 // runner that staged it — nothing a reader of an Essence report can act on, and
 // a path that will not exist by the time they read it. `--verbose` keeps them,
@@ -414,7 +414,7 @@ function withoutFrames(error: string): string {
 
 type SourceLookup = (module: string | null) => string | null
 
-// NOTE: Every failure of a run, rendered. A test whose module's source is not
+// Every failure of a run, rendered. A test whose module's source is not
 // in reach — nothing in a CLI run, but a caller driving the reporter with
 // events alone — still reports, without the excerpt.
 export function renderTestFailures(
@@ -455,7 +455,7 @@ export function renderTestFailures(
 			)
 		}
 
-		// NOTE: A measurement that ran away from its baseline failed no
+		// A measurement that ran away from its baseline failed no
 		// assertion, so there is no span to underline and no Diagnostic to
 		// draw. What a reader needs is the two numbers and the one command that
 		// accepts the new one — written through the same pair of Functions the
@@ -477,7 +477,7 @@ export function renderTestFailures(
 			)
 		}
 
-		// NOTE: A regression's `error` is the stream's copy of the sentence the
+		// A regression's `error` is the stream's copy of the sentence the
 		// block above already wrote — repeating it here would report one failure
 		// twice.
 		if (test.error !== null && test.benchmark?.status !== "regressed") {
@@ -486,7 +486,7 @@ export function renderTestFailures(
 					testDisplayPath([...test.suitePath, test.name]),
 				)} ${palette.muted("stopped with an error")}`,
 			)
-			// NOTE: A property test that STOPPED rather than failed an
+			// A property test that STOPPED rather than failed an
 			// assertion still has to say which values it stopped on — the
 			// Diagnostic above is where they are written for a failed `expect`,
 			// and there is no Diagnostic here.
@@ -517,7 +517,7 @@ export function renderTestFailures(
 
 // #region Focus
 
-// NOTE: Grouped by the file each test was written in, in the order the runner
+// Grouped by the file each test was written in, in the order the runner
 // met them, so the report reads in the order the tree above it did.
 export function renderFocusedTests(
 	tests: Array<FocusedTest>,
@@ -571,7 +571,7 @@ export function renderFocusedTests(
 
 // #endregion
 
-// NOTE: The whole human-facing report, in the order it is read: what ran, what
+// The whole human-facing report, in the order it is read: what ran, what
 // failed, and the tally. Returned as two blocks rather than one string because
 // the failures are Diagnostics and go to stderr, exactly as a compilation's do,
 // while the tree and the tally are the report and go to stdout.
@@ -600,7 +600,7 @@ export function renderTestReport(
 
 // #region Mutation
 
-// NOTE: What became of ONE deliberate lie, flat — the same fields the `mutant`
+// What became of ONE deliberate lie, flat — the same fields the `mutant`
 // event carries, so the report and the stream can not drift into saying
 // different things about one mutant.
 export type MutantRecord = {
@@ -622,11 +622,11 @@ type MutantCounts = {
 	hung: number
 }
 
-// NOTE: ONE tally, read by the summary line and written into `mutation-end`.
+// ONE tally, read by the summary line and written into `mutation-end`.
 // They are two renderings of one fact, and counting twice is two chances to
 // disagree about what a run found.
 //
-// NOTE: `sites` is every site the WALKER kept rather than every record here,
+// `sites` is every site the WALKER kept rather than every record here,
 // because a `--mutation-limit` stops the judging without unfinding anything:
 // the remainder between the two is what the limit left alone, and a consumer
 // that wants it subtracts. It defaults to the records, which is what a run
@@ -648,11 +648,11 @@ export function tallyMutants(
 	}
 }
 
-// NOTE: The summary line, and a block per SURVIVOR: a mutant
+// The summary line, and a block per SURVIVOR: a mutant
 // nothing noticed is the whole finding, and the count above it is the context
 // it is read in.
 //
-// NOTE: A survivor is rendered the way a regressed benchmark is — a `✗` line
+// A survivor is rendered the way a regressed benchmark is — a `✗` line
 // naming where and what, and muted lines under it — rather than as a
 // Diagnostic. A Diagnostic carries a code, every code is a promise the
 // documentation keeps, and nothing here is a claim about whether the source
@@ -663,7 +663,7 @@ export function renderMutation(
 	mutants: Array<MutantRecord>,
 	context: ReportContext,
 	sourceOf: SourceLookup,
-	// NOTE: What a `--mutation-limit` stopped, where one did: how many mutants
+	// What a `--mutation-limit` stopped, where one did: how many mutants
 	// were judged before it was reached, and how many covered sites were left
 	// alone. Null for a run nobody narrowed. A reader comparing two scores has
 	// to be told that one of them was taken over a sample, because the sample is
@@ -699,7 +699,7 @@ export function renderMutation(
 		lines.push("")
 	}
 
-	// NOTE: Under --verbose the sites nothing reaches are named as well. They
+	// Under --verbose the sites nothing reaches are named as well. They
 	// are the coverage report's finding wearing mutation's hat — a line no test
 	// runs is a line no mutant of it could ever be caught on — and they are
 	// listed rather than summarised only where a reader asked for everything.
@@ -724,7 +724,7 @@ export function renderMutation(
 		lines.push("")
 	}
 
-	// NOTE: Above the summary rather than folded into it, because it is not a
+	// Above the summary rather than folded into it, because it is not a
 	// count of anything the run found — it is the sentence that says the run
 	// stopped looking, and a reader has to meet it before they read a score.
 	if (limit !== null) {
@@ -745,7 +745,7 @@ export function renderMutation(
 	return lines
 }
 
-// NOTE: What a status that is not a SURVIVOR is worth saying about a site, in
+// What a status that is not a SURVIVOR is worth saying about a site, in
 // the one line --verbose gives it. A killed mutant has none: it is the answer a
 // reader hoped for, and naming every one of them would bury the three that
 // matter.
@@ -769,7 +769,7 @@ function renderMutationSummary(
 		parts.push(palette.error(`${counts.survived} survived`))
 	}
 
-	// NOTE: Only where there were any, because a hang is rare enough that a
+	// Only where there were any, because a hang is rare enough that a
 	// standing "0 hung" would be noise on every run that never met one.
 	if (counts.hung > 0) {
 		parts.push(palette.success(`${counts.hung} hung`))
@@ -789,12 +789,12 @@ function renderMutationSummary(
 		parts.push(palette.muted(`${counts.invalid} did not compile`))
 	}
 
-	// NOTE: The SCORE is what a reader compares between runs, and it is the
+	// The SCORE is what a reader compares between runs, and it is the
 	// share of the mutants that could be judged at all: a site no test reaches
 	// and a mutant that would not compile say nothing about the tests, so
 	// counting them in would move the number for reasons nobody could act on.
 	//
-	// NOTE: A mutant that HUNG counts, and it counts as CAUGHT. A run that does
+	// A mutant that HUNG counts, and it counts as CAUGHT. A run that does
 	// not end is a failure a reader would notice as surely as a red test, and
 	// leaving it out would let a suite improve its number by writing the one
 	// kind of bug this tool can not wait for.
@@ -815,7 +815,7 @@ function siteLabel(mutant: MutantRecord): string {
 	return `${moduleLabel(mutant.module)}:${mutant.position.start.line}`
 }
 
-// NOTE: The one line the site stands on, quoted as the file has it. A site
+// The one line the site stands on, quoted as the file has it. A site
 // whose source is out of reach — a caller driving this with events alone —
 // simply has none, which is what keeps the block readable either way.
 function excerpt(mutant: MutantRecord, sourceOf: SourceLookup): Array<string> {
@@ -834,14 +834,14 @@ function excerpt(mutant: MutantRecord, sourceOf: SourceLookup): Array<string> {
 
 // #region Coverage
 
-// NOTE: What a `--coverage` run says, as a table: a row per file
+// What a `--coverage` run says, as a table: a row per file
 // with lines and branches as percentages, Match arms as taken out of total,
 // and — spilling down the last column — every branch and arm nothing reached,
 // named by the Method or Function it stands in. Under it, one line per Case of
 // a `choice` that no test ever built, which is a claim an exhaustive language
 // can make and a line-counting one can not.
 //
-// NOTE: A dash rather than a number where there was nothing to be a percentage
+// A dash rather than a number where there was nothing to be a percentage
 // of. A file with no branches in it is not 0% branch-covered and it is not 100%
 // either.
 export function renderCoverage(
@@ -923,7 +923,7 @@ export function renderCoverage(
 	return lines
 }
 
-// NOTE: A doorway that was never entered is marked, because it is the one a
+// A doorway that was never entered is marked, because it is the one a
 // reader should look at first: a branch whose condition established something
 // guards a path the rest of the file can not reach any other way.
 function missedLabels(file: FileCoverage): Array<string> {

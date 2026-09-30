@@ -19,7 +19,7 @@ import { createPalette, createTheme } from "@essence-lang/cli/src/theme.ts"
  * lists has an entry under that address, and no entry documents a flag no
  * screen lists: a renamed flag fails here in both directions.
  *
- * NOTE: What is read is the RENDERED screen's OPTIONS and GLOBAL OPTIONS
+ * What is read is the RENDERED screen's OPTIONS and GLOBAL OPTIONS
  * sections, never its description or its examples. Both of those mention flags
  * in passing — `--watch stays up and re-runs on every save` opens a line of
  * `essence help test` — and a flag named in passing is not one the command
@@ -32,7 +32,7 @@ const CLI_PAGE = path.resolve(
 	"../src/content/docs/reference/cli.mdx",
 )
 
-// NOTE: The flags only the experimental test modes take. The site documents
+// The flags only the experimental test modes take. The site documents
 // none of those modes, so these are neither required on the page nor allowed
 // on it.
 const EXPERIMENTAL_FLAGS = new Set([
@@ -44,7 +44,7 @@ const EXPERIMENTAL_FLAGS = new Set([
 	"strict",
 ])
 
-// NOTE: Hidden from every screen and documented anyway, beside the flag it
+// Hidden from every screen and documented anyway, beside the flag it
 // undoes: `--no-color` is how a reader keeps colour codes out of a file.
 const DOCUMENTED_HIDDEN_FLAGS = new Set(["no-color"])
 
@@ -69,12 +69,12 @@ function flagsUnder(screen: string, title: string): Array<string> {
 	let flags: Array<string> = []
 
 	for (let line of lines.slice(start + 1)) {
-		// NOTE: The next section's heading ends this one.
+		// The next section's heading ends this one.
 		if (/^ {2}[A-Z][A-Z ]*$/.test(line)) {
 			break
 		}
 
-		// NOTE: A row opens four spaces in, with its short flag or the four
+		// A row opens four spaces in, with its short flag or the four
 		// spaces that stand for a missing one; what an option says about
 		// itself is indented further and never matches.
 		let row = /^ {4}(?:-[A-Za-z], | {4})?--([a-z][a-z-]*)/.exec(line)
@@ -155,7 +155,7 @@ describe("the command-line reference", () => {
 	let entries = pageEntries()
 
 	it("reads the screens and the page", () => {
-		// NOTE: A guard on both readers — a section title or a heading shape
+		// A guard on both readers — a section title or a heading shape
 		// that stopped matching would make every check below vacuous.
 		expect(printed.size).toBeGreaterThan(30)
 		expect(entries.length).toBeGreaterThan(30)
@@ -223,7 +223,7 @@ describe("the command-line reference", () => {
 	})
 })
 
-// NOTE: An address a screen prints is one a reader types, long after the page
+// An address a screen prints is one a reader types, long after the page
 // behind it moved — so it names the site's real host, and a page the site
 // builds or a redirect `netlify.toml` serves. A help screen once sent readers to
 // a domain the site never had.

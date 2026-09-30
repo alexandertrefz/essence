@@ -14,7 +14,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The String vocabulary beyond the searches and the cases — the code
+// The String vocabulary beyond the searches and the cases — the code
 // points, the four character classes, the folding searches, the cuts and the
 // rest of it — beside the two parses that read the notation the language
 // writes.
@@ -23,7 +23,7 @@ import { validate } from "../validator/index"
 // refuses take two different routes through the runtime, so every answer below
 // is asked over both.
 //
-// NOTE: What the golden capture can not hold is here instead. It prints a
+// What the golden capture can not hold is here instead. It prints a
 // value per call, so a claim ABOUT two calls — that `everyIndex` and `count`
 // agree, that a String is its own points read back — has to be written down as
 // a claim.
@@ -68,7 +68,7 @@ async function run(source: string): Promise<Array<string>> {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// NOTE: The property tests, driven through the loaded program's OWN `$tests`
+// The property tests, driven through the loaded program's OWN `$tests`
 // for the reason `testingProperties.spec.ts` gives: every Essence value carries
 // a hidden Type key belonging to the runtime instance that built it.
 async function propertyFailures(source: string): Promise<Array<string>> {
@@ -98,7 +98,7 @@ async function propertyFailures(source: string): Promise<Array<string>> {
 	}
 }
 
-// NOTE: A four-person family emoji — eleven code units joined by zero-width
+// A four-person family emoji — eleven code units joined by zero-width
 // joiners, ONE character — and a flag, whose two regional indicators are also
 // one. The Lexer knows no `\u` escape, so the JavaScript String carries the
 // code points in. `combining` is an `e` and a combining acute, which is one
@@ -109,7 +109,7 @@ const combining = "e\u0301"
 const mark = "\u0301"
 
 describe("Character", () => {
-	// NOTE: A refinement erases before anything runs, so what this shows is
+	// A refinement erases before anything runs, so what this shows is
 	// that a Character reaches every position a String reaches and that a
 	// written one-character Literal is its own proof.
 	it("is a String a one-character Literal proves", async () => {
@@ -144,7 +144,7 @@ describe("Character", () => {
 })
 
 describe("code points", () => {
-	// NOTE: The level difference stated as a measurement: one character of
+	// The level difference stated as a measurement: one character of
 	// seven points, one of two, and one that NFC composes into one.
 	it("reads the points below the characters", async () => {
 		expect(
@@ -246,7 +246,7 @@ describe("the character classes", () => {
 		])
 	})
 
-	// NOTE: A mark belongs to the letter BEFORE it, which is what the two
+	// A mark belongs to the letter BEFORE it, which is what the two
 	// letter patterns say. So a decomposed accent is letters and a mark
 	// standing on its own is not.
 	it("counts a combining mark as part of the letter before it", async () => {
@@ -262,7 +262,7 @@ describe("the character classes", () => {
 	})
 })
 
-// NOTE: A count is never negative, and the entries say so, so the answer
+// A count is never negative, and the entries say so, so the answer
 // reaches a Parameter that asks for the proof. The refinement erases before
 // anything runs — what this reads back is that the Program compiles at all.
 describe("a counted proof", () => {
@@ -317,7 +317,7 @@ describe("a folded search", () => {
 		])
 	})
 
-	// NOTE: The rule the `§` note above `contains` states, as the one pair of
+	// The rule the `§` note above `contains` states, as the one pair of
 	// answers that tells the two foldings apart. A whole String folds a
 	// closing capital sigma to the final form and this walk does not, so `is`
 	// finds the part equal where `contains` does not find it inside.
@@ -332,7 +332,7 @@ describe("a folded search", () => {
 		).toEqual(["true", "false", "true", "Optional#Value(1)"])
 	})
 
-	// NOTE: A position is a position of the RECEIVER, which is what folding
+	// A position is a position of the RECEIVER, which is what folding
 	// per character buys — the answer indexes the String that was asked, not
 	// the folded copy the walk read.
 	it("answers a position of the receiver", async () => {
@@ -551,7 +551,7 @@ describe("the rest of the vocabulary", () => {
 })
 
 describe("the two parses", () => {
-	// NOTE: The claim is that the notation the language writes reads back, so
+	// The claim is that the notation the language writes reads back, so
 	// each of these is a Literal the Lexer accepts, spelled as text.
 	it("reads the sign and the separators the language writes", async () => {
 		expect(
@@ -583,7 +583,7 @@ describe("the two parses", () => {
 		])
 	})
 
-	// NOTE: The Lexer's rule exactly — an underscore stands between two digits
+	// The Lexer's rule exactly — an underscore stands between two digits
 	// and nowhere else. `1_.5` is the one the decimal arm has to read apart to
 	// refuse: joined, the two halves spell `1_5`.
 	it("refuses a shape the language does not write", async () => {
@@ -621,7 +621,7 @@ describe("the two parses", () => {
 	})
 })
 
-// NOTE: What holds for EVERY String rather than for the ones written above.
+// What holds for EVERY String rather than for the ones written above.
 // The generator's alphabet is ASCII plus an accent, an eszett and two emoji
 // (`CHARACTERS` in `Randomness.ts`), so a drawn String exercises the grapheme
 // route as well as the ASCII one.

@@ -3,7 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
-// NOTE: The one place a lowered Boolean is built only to be read back. Essence
+// The one place a lowered Boolean is built only to be read back. Essence
 // has no truthiness — a condition is a Boolean and nothing else — and an Essence
 // Boolean is an OBJECT, so every question a Program asks is emitted as the
 // `value` that object holds:
@@ -19,13 +19,13 @@ import { rewriteNodes } from "../walk"
 //
 //   if (a.value < b.value)
 //
-// NOTE: The `essence-boolean` intrinsic and NOTHING else. A condition that is
+// The `essence-boolean` intrinsic and NOTHING else. A condition that is
 // anything at all besides that — a Method a Namespace wrote, a name, a Record
 // member — is an Essence value, and its `value` is what JavaScript has to be
 // asked. Setting the raw flag over one of those would read `.value` off a
 // primitive, answer `undefined`, and quietly make every such condition false.
 //
-// NOTE: TWO Nodes, because a condition is a condition wherever it is written. A
+// TWO Nodes, because a condition is a condition wherever it is written. A
 // Conditional Statement holds one; a `define` holds one per arm, and an arm's is
 // the same Boolean built for the same reason — `rewriteDefine` reads `.value`
 // off it exactly as an `if` does. They were one rewrite spelled once from the
@@ -33,7 +33,7 @@ import { rewriteNodes } from "../walk"
 // first, which is the whole reason this is a pass of its own and not a case in
 // the one that lowers Matches.
 //
-// NOTE: Nothing here is REQUIRED for a correct emission — the flag is false
+// Nothing here is REQUIRED for a correct emission — the flag is false
 // until something sets it, and false is the reading that builds the Boolean and
 // takes it apart. So the registry's rule holds: with this pass off, the Program
 // says what it always said, one allocation per question the worse for it.
@@ -61,7 +61,7 @@ function unboxedStatement(
 		: { ...node, condition: test, conditionIsRaw: true }
 }
 
-// NOTE: Every arm asked on its own, and the Node rebuilt only where one of them
+// Every arm asked on its own, and the Node rebuilt only where one of them
 // answered — the structural sharing the walk keeps rests on a pass answering
 // with the very Node it was given wherever it changed nothing.
 function unboxedDefine(
@@ -83,7 +83,7 @@ function unboxedDefine(
 	return changed ? { ...node, arms } : node
 }
 
-// NOTE: The test a condition was BUILT from, and null wherever there is nothing
+// The test a condition was BUILT from, and null wherever there is nothing
 // to take apart — a condition already asked raw among them, which is a question
 // this pass has answered once already and must not answer twice.
 function rawTest(

@@ -1,9 +1,9 @@
-// NOTE: What JavaScript will let a name be — the rules a GENERATED file has to
+// What JavaScript will let a name be — the rules a GENERATED file has to
 // obey, wherever one is generated. A declaration file names an export and a
 // wrapper Module binds one, and both meet the same Essence: `ok?` is an export
 // nothing can be spelled after, `default` is a word nothing can be named.
 //
-// NOTE: The Rewriter's `escapeName` answers a related question and not this one.
+// The Rewriter's `escapeName` answers a related question and not this one.
 // It decides what the BUNDLE binds a name as, and a generated file has to spell
 // the name a host actually imports — so a wrapper reads `$module["ok?"]` and
 // exports it under the string, rather than renaming the Module's exports to
@@ -11,7 +11,7 @@
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 
-// NOTE: The words a declaration can not be named after. Deliberately the whole
+// The words a declaration can not be named after. Deliberately the whole
 // reserved set rather than the subset that happens to be illegal in each
 // position — a generated file is read at least as often as it is compiled, and
 // `let let` is not worth the two names it saves.
@@ -66,7 +66,7 @@ const RESERVED_WORDS = new Set([
 	"yield",
 ])
 
-// NOTE: TypeScript's own Type names on top of those. `type string = …` declares
+// TypeScript's own Type names on top of those. `type string = …` declares
 // a name nothing can refer to afterwards, so a Module exporting one is left
 // undeclared rather than declared unreachably.
 const TYPE_KEYWORDS = new Set([
@@ -90,13 +90,13 @@ export function isTypeName(name: string): boolean {
 	return isValueName(name) && !TYPE_KEYWORDS.has(name)
 }
 
-// NOTE: A member of an object — written plainly where it can be, quoted where
+// A member of an object — written plainly where it can be, quoted where
 // it can not. `toString` is an ordinary member name and `ok?` is a string.
 export function memberName(name: string): string {
 	return isValueName(name) ? name : JSON.stringify(name)
 }
 
-// NOTE: A local binding for a name JavaScript can not spell — `ok?` becomes
+// A local binding for a name JavaScript can not spell — `ok?` becomes
 // `ok_3f_`, which is a name, and the export it hangs off carries the real one as
 // a string. Every character JavaScript refuses is spelled as its code point, so
 // two names can not mangle to one.

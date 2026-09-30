@@ -1,6 +1,6 @@
 import type { parser } from "@essence-lang/interfaces"
 
-// NOTE: A Namespace member is one of six things — a Method, a static Method, an
+// A Namespace member is one of six things — a Method, a static Method, an
 // `overload` block of either, and, in a `declarations { … }` Program, a
 // body-less native signature or a block mixing the two. Every walker that
 // descends into a Namespace has to take that apart, and five of them had done it
@@ -42,7 +42,7 @@ export function methodsOf(
 	return []
 }
 
-// NOTE: A body-less native signature has no Function definition to walk, but it
+// A body-less native signature has no Function definition to walk, but it
 // still WRITES Type names (`Boolean`, `List<Item>`, `Ordering`), Parameter names
 // and — the one part of it that is Essence rather than a promise about the
 // runtime — a Parameter's `= expression` default.

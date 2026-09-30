@@ -5,7 +5,7 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// NOTE: `.price` and `(item) { <- item.price }` are one Function written two
+// `.price` and `(item) { <- item.price }` are one Function written two
 // ways — the Enricher writes the literal out of the path, and nothing
 // downstream of enrichment can tell which was typed. Which of them reads
 // better is the author's to decide, so both directions are offered and neither
@@ -20,7 +20,7 @@ import { walk } from "./lookups"
 // action that turns a path into a literal it would then refuse to turn back is
 // worse than no action.
 
-// NOTE: What the Diagnostic's own help calls the Parameter it would have
+// What the Diagnostic's own help calls the Parameter it would have
 // written — `'(_ item: SomeType) { <- item.price }'` — so the two agree on the
 // name a reader is offered.
 const preferredName = "item"
@@ -30,7 +30,7 @@ export function pathActions(
 	scopes: () => Array<ScopeRange>,
 	lines: Array<string>,
 	range: common.Position,
-	// NOTE: What the Compiler said about this file, so that a path it REFUSED is
+	// What the Compiler said about this file, so that a path it REFUSED is
 	// not offered as a literal — see `pathWasRefused`.
 	reported: Array<common.Diagnostic> = [],
 ): Array<CodeActionEntry> {
@@ -75,7 +75,7 @@ export function pathActions(
 	return entries
 }
 
-// NOTE: Whether the Compiler refused this very path. The rewrite is a change of
+// Whether the Compiler refused this very path. The rewrite is a change of
 // SPELLING and nothing else — it writes the literal the Enricher would have
 // written — so over a path that does not work it writes a literal that does not
 // work either, and spells the mistake out in more places than the path did:
@@ -99,7 +99,7 @@ function pathWasRefused(
 	)
 }
 
-// NOTE: The path a literal stands for, or null where the literal does anything
+// The path a literal stands for, or null where the literal does anything
 // a path can not — a Parameter carrying a label the path could not write, a
 // default it would drop, a body that computes rather than reads, a step that is
 // a call. `<- item` alone is left out too: a path is a dot and the members
@@ -148,7 +148,7 @@ function writtenPathOf(
 		return null
 	}
 
-	// NOTE: Measured against the live text, and against the WHOLE literal
+	// Measured against the live text, and against the WHOLE literal
 	// rather than the chain alone: everything between the brackets is about to
 	// be thrown away, so anything in there that no Node accounts for — a
 	// Comment above all — would be thrown away with it. Whitespace is the one
@@ -168,7 +168,7 @@ function writtenPathOf(
 	return `.${steps.join(".")}`
 }
 
-// NOTE: The literal a path stands for. The Parameter takes both its Type and
+// The literal a path stands for. The Parameter takes both its Type and
 // its label from the position the Argument fills, exactly as the path did, so
 // it is written bare — and the name is the reader's to change afterwards,
 // which is why an already taken one is stepped past rather than shadowed.
@@ -214,7 +214,7 @@ function isTaken(scope: Scope, name: string): boolean {
 	return false
 }
 
-// NOTE: An Argument's value, which is the one position both spellings are
+// An Argument's value, which is the one position both spellings are
 // certainly read in. An `Argument` carries no Position of its own and the walk
 // hands out no parents, so the values are collected from the Invocations that
 // hold them rather than recognised on the way past.
@@ -249,7 +249,7 @@ function rewrite(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// NOTE: Never, on the author's rule: the two spellings mean the same
+		// Never, on the author's rule: the two spellings mean the same
 		// thing and an Editor that applied one of them unasked would be making
 		// a decision about taste.
 		isPreferred: false,

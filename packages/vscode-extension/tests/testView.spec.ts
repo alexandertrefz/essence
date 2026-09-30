@@ -14,7 +14,7 @@ import {
 	type StubTestRun,
 } from "./vscodeStub.js"
 
-// NOTE: The half of the Test Explorer that calls VS Code, driven against a
+// The half of the Test Explorer that calls VS Code, driven against a
 // stand-in for it. What `testModel.ts` decides is covered beside this; what is
 // covered here is the bookkeeping the API forces — which item was created, which
 // run was ended, what was drawn on which editor — none of which an Extension
@@ -25,7 +25,7 @@ const stub = createStub()
 
 mock.module("vscode", () => stub.module)
 
-// NOTE: After the mock, because a static import would evaluate `testView.js` —
+// After the mock, because a static import would evaluate `testView.js` —
 // and its `import * as vscode` — before the registration ran.
 const { createTestView } = await import("../testView.js")
 
@@ -145,7 +145,7 @@ type Live = {
 	}) => Answer | Promise<Answer>
 }
 
-// NOTE: The Server answers a request with the cycle its results will arrive
+// The Server answers a request with the cycle its results will arrive
 // under, and sends the `start` notification from inside the handler — so a
 // spec's answer is where a start belongs, exactly as it does over the wire.
 function live(
@@ -197,7 +197,7 @@ function profileNamed(label: string) {
 	return stub.controller.profiles.find((profile) => profile.label === label)
 }
 
-// NOTE: A gutter icon is an SVG baked into a data URI, and its fill is the
+// A gutter icon is an SVG baked into a data URI, and its fill is the
 // only thing that tells one square from another — which is exactly what a reader
 // goes by.
 function colourOf(decoration: { options: Record<string, unknown> }): string {
@@ -214,7 +214,7 @@ function colourOf(decoration: { options: Record<string, unknown> }): string {
 	return /fill="(#[0-9a-f]{6})"/.exec(svg)?.[1] ?? ""
 }
 
-// NOTE: The lines drawn on one editor, by the colour they were drawn in; VS
+// The lines drawn on one editor, by the colour they were drawn in; VS
 // Code's lines, so 0-based.
 function drawnByColour(editor: {
 	drawn: Map<unknown, Array<unknown>>
@@ -261,11 +261,11 @@ describe("the tree it builds", () => {
 
 		let [first, suite] = children(file)
 
-		// NOTE: The order they were written in, which the Explorer only keeps
+		// The order they were written in, which the Explorer only keeps
 		// because it is told to — it sorts by label otherwise.
 		expect(first!.label).toBe("is quick")
 		expect(first!.sortText! < suite!.sortText!).toBe(true)
-		// NOTE: One-based Compiler Positions, zero-based VS Code ones.
+		// One-based Compiler Positions, zero-based VS Code ones.
 		expect(first!.range).toMatchObject({ startLine: 1, endLine: 5 })
 		expect(first!.tags.map((tag) => tag.id)).toEqual(["fast"])
 
@@ -274,7 +274,7 @@ describe("the tree it builds", () => {
 		expect(children(suite!).map((each) => each.label)).toEqual(["waits"])
 	})
 
-	// NOTE: The identity is structural, so an edit that MOVES a test is the
+	// The identity is structural, so an edit that MOVES a test is the
 	// same test — keeping its item keeps its state, its selection and whether
 	// its suite was expanded.
 	it("keeps the item a test already had when the file is read again", () => {
@@ -382,7 +382,7 @@ describe("what it tells VS Code a run found", () => {
 		expect(run!.ends).toBe(1)
 	})
 
-	// NOTE: `expected`/`actual` are what VS Code draws as a diff, and they are
+	// `expected`/`actual` are what VS Code draws as a diff, and they are
 	// a claim only an `is` makes.
 	it("hands over the two sides of an is, and where to say it", () => {
 		let session = live()
@@ -400,7 +400,7 @@ describe("what it tells VS Code a run found", () => {
 		expect(message!.location?.range).toMatchObject({ startLine: 3 })
 	})
 
-	// NOTE: The Test Results panel is a terminal, and text carrying only
+	// The Test Results panel is a terminal, and text carrying only
 	// newlines staircases down it.
 	it("puts what a test printed under that test, for a terminal", () => {
 		let session = live()
@@ -452,7 +452,7 @@ describe("the marks it draws", () => {
 			(ranges) => ranges.length > 0,
 		)
 
-		// NOTE: The test's own lines, and the line of the `expect` that failed.
+		// The test's own lines, and the line of the `expect` that failed.
 		expect(drawn).toHaveLength(2)
 		expect(other.drawn.size).toBe(0)
 	})
@@ -477,7 +477,7 @@ describe("the marks it draws", () => {
 	})
 })
 
-// NOTE: A source file the counters counted: one line that ran and one that did
+// A source file the counters counted: one line that ran and one that did
 // not, both sides of a branch with only one taken, an arm nothing took, and a
 // Choice with a Case nobody built.
 const SOURCE = "/repo/Season.es"
@@ -575,7 +575,7 @@ describe("the coverage it draws", () => {
 		expect(attached?.uri.fsPath).toBe(SOURCE)
 		expect(attached?.statementCoverage).toEqual({ covered: 1, total: 2 })
 		expect(attached?.branchCoverage).toEqual({ covered: 1, total: 2 })
-		// NOTE: One Match arm and two Cases of a Choice, of which the arm was
+		// One Match arm and two Cases of a Choice, of which the arm was
 		// never taken and one Case never built.
 		expect(attached?.declarationCoverage).toEqual({ covered: 1, total: 3 })
 	})
@@ -672,7 +672,7 @@ describe("the coverage it draws", () => {
 		])
 	})
 
-	// NOTE: Three colours down the gutter, one per line the counters know
+	// Three colours down the gutter, one per line the counters know
 	// about — green where the tests ran it, grey where nothing did, amber where
 	// it ran but not whole. VS Code's lines are 0-based.
 	it("marks every counted line in the gutter by what ran on it", () => {
@@ -763,7 +763,7 @@ describe("the profiles it offers", () => {
 				),
 		).toEqual(["Run network", "Run slow"])
 
-		// NOTE: VS Code offers a profile whether or not anything would run
+		// VS Code offers a profile whether or not anything would run
 		// under it, so a tag nothing carries any more must stop offering one.
 		session.view.handle(batch({ run: 2, sites: [site()] }))
 
@@ -799,7 +799,7 @@ describe("the profiles it offers", () => {
 		])
 	})
 
-	// NOTE: Debugging is not a test run: it launches the `essence` debug type
+	// Debugging is not a test run: it launches the `essence` debug type
 	// over a bundle compiled WITH the file's tests section, and asks the Server
 	// for nothing at all.
 	it("debugs a test by launching a session over the file it is in", async () => {
@@ -827,7 +827,7 @@ describe("the profiles it offers", () => {
 		expect(session.asked).toEqual([])
 	})
 
-	// NOTE: A session that would not start is the end of the walk: whatever
+	// A session that would not start is the end of the walk: whatever
 	// stopped it would stop the next one, and a reader watching debuggers open
 	// one after another for a reason nobody explained is worse than a line in
 	// the channel.
@@ -860,7 +860,7 @@ describe("the runs it keeps", () => {
 		let asked = stub.runs.length
 
 		session.answer = () => {
-			// NOTE: The Server sends the `start` from inside the request
+			// The Server sends the `start` from inside the request
 			// handler, so it routinely arrives before the answer naming the
 			// cycle it belongs to.
 			session.view.handle(
@@ -872,13 +872,13 @@ describe("the runs it keeps", () => {
 
 		await session.view.runIds([one.id], [FILE])
 
-		// NOTE: One run for the gesture, and the notification adopted it rather
+		// One run for the gesture, and the notification adopted it rather
 		// than opening a second.
 		expect(stub.runs).toHaveLength(asked + 1)
 
 		let run = stub.runs.at(-1)!
 
-		// NOTE: Once where the gesture was made, and again when the cycle said
+		// Once where the gesture was made, and again when the cycle said
 		// what it covers.
 		expect(run.enqueuedTests).toEqual([one.id, one.id])
 
@@ -896,7 +896,7 @@ describe("the runs it keeps", () => {
 		expect(run.ends).toBe(1)
 	})
 
-	// NOTE: "Accept snapshot" is an ordinary run, asked to RECORD what it finds.
+	// "Accept snapshot" is an ordinary run, asked to RECORD what it finds.
 	// The Server does the writing — a companion file where it stands, a source
 	// as an edit — so all this end has to do is say so.
 	it("asks for a run that records what it finds", async () => {
@@ -915,7 +915,7 @@ describe("the runs it keeps", () => {
 		})
 	})
 
-	// NOTE: The ids say WHICH tests and the file says where they live, and the
+	// The ids say WHICH tests and the file says where they live, and the
 	// Server works the second out from the results of a run it has already
 	// done — so a lens that sent ids alone ran nothing at all whenever the
 	// session remembers nothing: before the first run, and while
@@ -944,7 +944,7 @@ describe("the runs it keeps", () => {
 		})
 	})
 
-	// NOTE: Two gestures made while one cycle is in flight are deferred into the
+	// Two gestures made while one cycle is in flight are deferred into the
 	// same cycle and answered with the same number. Registering over the run
 	// already showing it would leave that one spinning with nothing left holding
 	// it.
@@ -962,7 +962,7 @@ describe("the runs it keeps", () => {
 		expect(stub.runs.at(-1)!.ends).toBe(0)
 	})
 
-	// NOTE: A number the Server has promised is a run still owed rather than a
+	// A number the Server has promised is a run still owed rather than a
 	// run that died. A request deferred behind a cycle in flight is answered
 	// with the number of the cycle that will RUN it, and a gesture made in the
 	// window before that cycle starts is a cycle of its own — a higher number,
@@ -987,7 +987,7 @@ describe("the runs it keeps", () => {
 		expect(promised.ends).toBe(1)
 	})
 
-	// NOTE: A cycle that never ended — a Worker died, the session was switched
+	// A cycle that never ended — a Worker died, the session was switched
 	// off — would leave VS Code spinning forever.
 	it("ends an older cycle when a newer one starts", () => {
 		let session = live()

@@ -14,7 +14,7 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return validate(program)
 }
 
-// NOTE: The text a Label underlines. A Diagnostic that names a Namespace the
+// The text a Label underlines. A Diagnostic that names a Namespace the
 // source never spells at the place it is reported — a conformance witness — is
 // only readable if its Labels land on the right two spans, and reading them
 // back out of the source is the only way to say so without counting columns by
@@ -58,7 +58,7 @@ describe("Validator", () => {
 		})
 
 		it("should treat an Optional and its payload Union as different Types", () => {
-			// NOTE: Optional is a nominal Choice: a value is `#Value(payload)`
+			// Optional is a nominal Choice: a value is `#Value(payload)`
 			// or `#Empty`, not the payload sitting in a Union. So the wrapper and
 			// its payload Union stay apart and neither direction is assignable:
 			// no hand-written Union can be Optional-shaped by accident, and the
@@ -96,7 +96,7 @@ describe("Validator", () => {
 		})
 
 		it("should keep a nested Optional distinct from the Optional it wraps", () => {
-			// NOTE: The Choice keeps the two levels of a nested Optional apart:
+			// The Choice keeps the two levels of a nested Optional apart:
 			// `#Value(#Empty)` is not `#Empty`, and only
 			// `NestedOptional::flatten` collapses one into the other. So a
 			// `List<Optional<Integer>>` can say whether `firstItem()` found an
@@ -244,7 +244,7 @@ describe("Validator", () => {
 			})
 		})
 
-		// NOTE: The Quick Fix writes one Handler per entry in the order it
+		// The Quick Fix writes one Handler per entry in the order it
 		// finds them, so the order is part of what `data` promises — Handlers
 		// that appear in a different order than the Union declares its members
 		// read as though the Compiler shuffled them.
@@ -332,7 +332,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The unit Type is the empty Record, `{}`. A Function that
+		// The unit Type is the empty Record, `{}`. A Function that
 		// answers nothing useful promises `{}`, and a body that promises `{}`
 		// is the one body allowed to fall off its end — the Validator exempts
 		// it here and the Simplifier appends the `return` for it.
@@ -399,7 +399,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: A free Function's Arguments are matched by their LABELS before their
+	// A free Function's Arguments are matched by their LABELS before their
 	// Types, exactly as a Method's are. A callee with one signature has no
 	// Overload to choose, so a call that matches nothing lands here rather than
 	// on the Enricher's `no-matching-overload` — and what it did wrong is the
@@ -478,7 +478,7 @@ describe("Validator", () => {
 			])
 		})
 
-		// NOTE: Both halves of the pair, at all three of its shapes — which of
+		// Both halves of the pair, at all three of its shapes — which of
 		// the three edits a Quick Fix offers is decided by the pair and by
 		// nothing in the message, so a site that carried only the expected half
 		// would leave the fix guessing whether there is a written label to
@@ -521,7 +521,7 @@ describe("Validator", () => {
 			})
 		})
 
-		// NOTE: The label is answered first — an Argument that agrees with
+		// The label is answered first — an Argument that agrees with
 		// NEITHER half of its Parameter is told about the label, because the
 		// Type it should have had is the Type of whichever Parameter it was
 		// meant for, and until the label says which one that is there is
@@ -556,7 +556,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: A value position is not a leaf — a List item, a Record member and
+	// A value position is not a leaf — a List item, a Record member and
 	// either side of a Combination hold whole Expressions, and everything the
 	// Validator says about a Statement has to hold there too. These check that
 	// the walk descends rather than stopping at the literal that contains them.
@@ -802,7 +802,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].labels[1]?.message).toBe(
 				"this Case runs first",
 			)
-			// NOTE: The second `case Integer`, not the first — the Warning is
+			// The second `case Integer`, not the first — the Warning is
 			// on the Case that never runs.
 			expect(diagnostics[0].position?.start.line).toBe(5)
 			expect(diagnostics[0].labels[1]?.position.start.line).toBe(4)
@@ -868,7 +868,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Regression test — Types erase before a Match runs, so the
+		// Regression test — Types erase before a Match runs, so the
 		// emitted check for a Generic Matcher is unconditionally true and every
 		// Case below it is dead. Assignability says `Value` matches nothing but
 		// `Value`, so this Match used to pass every check without a Diagnostic:
@@ -895,10 +895,10 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].code).toBe("erased-case-conflict")
-			// NOTE: Untagged — `unnecessary` greys a Case out, and this one is
+			// Untagged — `unnecessary` greys a Case out, and this one is
 			// not something to remove but something to reorder.
 			expect(diagnostics[0].tags).toBeUndefined()
-			// NOTE: On `case String`, the Case that never runs — pointing back
+			// On `case String`, the Case that never runs — pointing back
 			// at the Generic Case above it.
 			expect(diagnostics[0].position?.start.line).toBe(8)
 			expect(diagnostics[0].labels[1]?.position.start.line).toBe(7)
@@ -928,7 +928,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Function's Signature does not survive to runtime — the check
+		// A Function's Signature does not survive to runtime — the check
 		// emitted for a Function-typed member asks only whether the value is
 		// callable — so of two Cases naming differently-signed callbacks, the
 		// first swallows the second whichever way round they are written. That
@@ -957,7 +957,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].notes[1]).toBe(
 				"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 			)
-			// NOTE: No Guard clause, in either position. On this Case one
+			// No Guard clause, in either position. On this Case one
 			// changes nothing, and on the Case above it leaves no Case claiming
 			// the Type at all — `missing-case`, whose own two answers are both
 			// swallowed by the Case that decides first and report this again.
@@ -966,7 +966,7 @@ describe("Validator", () => {
 			])
 		})
 
-		// NOTE: Regression test — a payload requirement lived beside the
+		// Regression test — a payload requirement lived beside the
 		// Matcher and this analysis read only the tag, so the Case spelling of
 		// the callback conflict compiled clean while its Record spelling was
 		// refused: the first arm accepted every callable, bound it at the wrong
@@ -1001,7 +1001,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: A requirement that narrows is not erased — the arm declines the
+		// A requirement that narrows is not erased — the arm declines the
 		// payloads it does not name and leaves them to the Cases below, exactly
 		// as the Record spelling does.
 		it("should not warn about payload requirements that survive to runtime", () => {
@@ -1049,7 +1049,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("unreachable-case")
 		})
 
-		// NOTE: An Alias hiding a refinement is refused as a Matcher at the
+		// An Alias hiding a refinement is refused as a Matcher at the
 		// Enricher, before this analysis ever sees it — the conflict wording
 		// would only name a symptom, and a single such arm beside a wildcard
 		// has no conflict at all while being just as unsound. The refusal is
@@ -1095,7 +1095,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Guard can decline a value its Matcher accepted, so a Generic
+		// A Guard can decline a value its Matcher accepted, so a Generic
 		// Case carrying one leaves its Types to the Cases below it — the same
 		// rule every other conditional Handler follows.
 		it("should not warn about a Case below a Guarded Generic Case", () => {
@@ -1118,7 +1118,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: Regression tests — item Types erase before a Match runs, so a List
+	// Regression tests — item Types erase before a Match runs, so a List
 	// Matcher is answered by the items the value holds, and an empty List holds
 	// none. `case List<String>` therefore accepts an empty `List<Integer>`,
 	// which assignability calls impossible: the Validator reported NOTHING at
@@ -1138,13 +1138,13 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("warning")
 			expect(diagnostics[0].code).toBe("empty-list-overlap")
-			// NOTE: On `case List<Integer>`, the Case that misses the empty
+			// On `case List<Integer>`, the Case that misses the empty
 			// Lists — pointing back at the Case above that takes them.
 			expect(diagnostics[0].position?.start.line).toBe(7)
 			expect(diagnostics[0].labels[1]?.position.start.line).toBe(6)
 		})
 
-		// NOTE: The Case is not dead — every List with items still reaches it —
+		// The Case is not dead — every List with items still reaches it —
 		// so it is neither greyed out nor reported twice.
 		it("should not tag the Case as unnecessary", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -1173,7 +1173,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Regression test — the requirement was invisible here too, so
+		// Regression test — the requirement was invisible here too, so
 		// the payload spelling of the List crossover lost the warning its
 		// Record spelling had.
 		it("should warn about a List-typed payload requirement", () => {
@@ -1197,7 +1197,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].position?.start.line).toBe(11)
 		})
 
-		// NOTE: A Matcher that narrows a member by Type overlaps the Cases
+		// A Matcher that narrows a member by Type overlaps the Cases
 		// below it too, but the values it takes are exactly the ones it names —
 		// Cases being tried in order, with no List and no erasure anywhere.
 		it("should stay silent for a Record member narrowed by Type", () => {
@@ -1219,7 +1219,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Guarded Cases take nothing away from the Cases below them, so
+		// Guarded Cases take nothing away from the Cases below them, so
 		// the fix the Diagnostic asks for is a Match nobody has to warn about.
 		it("should stay silent once the Cases are Guarded", () => {
 			expect(
@@ -1236,7 +1236,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: A Match on an Integer or a String takes the VALUE apart, and there is
+	// A Match on an Integer or a String takes the VALUE apart, and there is
 	// no Union to be exhaustive over — so the SHAPE is what stands in for
 	// exhaustiveness, and it is a rule rather than a style because the last Case
 	// is what a refinement's evidence is read out of.
@@ -1261,7 +1261,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Case naming the matched Type is `case _` spelled out — the two are
+		// A Case naming the matched Type is `case _` spelled out — the two are
 		// one Matcher by the time a Match is typed, and both are total.
 		it("should accept the matched Type as the Case for the rest", () => {
 			expect(
@@ -1292,11 +1292,11 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("literal-match-shape")
-			// NOTE: On the Matcher that can not stand there, not on the Match.
+			// On the Matcher that can not stand there, not on the Match.
 			expect(diagnostics[0].position?.start.line).toBe(5)
 		})
 
-		// NOTE: The review finding this rule exists for — a Guard decides after the
+		// The review finding this rule exists for — a Guard decides after the
 		// value already matched, so a Guarded value Case would let the value it named
 		// through to the Cases below, whose evidence says they never see it.
 		it("should report a value Case carrying a Guard", () => {
@@ -1325,7 +1325,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: The Case is compared TO the matched value, so this is the mistake
+		// The Case is compared TO the matched value, so this is the mistake
 		// `n::is("zero")` is — reported in the one place the two Types were never
 		// checked against each other.
 		it("should report a value of another Type", () => {
@@ -1354,7 +1354,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A refinement is its base with evidence attached, and the values it
+		// A refinement is its base with evidence attached, and the values it
 		// holds are the base's values — so a Match on one takes them apart the same
 		// way, and the Cases add to what the Type already carries.
 		it("should take a refined value apart by value", () => {
@@ -1374,7 +1374,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Two values are an `if` written the long way, and a Boolean is no
+		// Two values are an `if` written the long way, and a Boolean is no
 		// refinable base — so nothing about it changed.
 		it("should keep refusing a Match on a Boolean", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -1390,7 +1390,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("match-on-non-union")
 		})
 
-		// NOTE: And a Match on an Integer that names no value asks nothing about the
+		// And a Match on an Integer that names no value asks nothing about the
 		// value it was given, which is the one-outcome Match that Diagnostic has
 		// always been about.
 		it("should keep refusing a Match that names no value", () => {
@@ -1401,7 +1401,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: The dispatch branches of a Method Invocation on a Union-typed
+	// The dispatch branches of a Method Invocation on a Union-typed
 	// receiver are the Cases nobody wrote — the receiver's runtime Type picks
 	// one, and the first that fits wins, so the two ways a Case can swallow the
 	// Case below it are two ways a branch can swallow the branch below it.
@@ -1568,7 +1568,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// NOTE: The receiver is BOUND to a `List` Type. A written List proves
+		// The receiver is BOUND to a `List` Type. A written List proves
 		// it holds an item, and `firstItem` on a proven receiver answers the
 		// item itself — there would be no Optional here to declare.
 		it("should accept declared Types matching inferred return Types", () => {
@@ -1592,7 +1592,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: The divisors and denominators here are COMPUTED, deliberately.
+		// The divisors and denominators here are COMPUTED, deliberately.
 		// `Rational.of`, `Integer.divide` and `Rational.divide` each have an
 		// entry taking a divisor proven not to be zero, and a divisor written
 		// where it stands is its own proof — so a written `2` reaches that
@@ -1647,7 +1647,7 @@ describe("Validator", () => {
 		})
 
 		it("should validate Match Expressions over Generic Choices", () => {
-			// NOTE: `firstItem()` answers `Optional<Item>` for a Generic
+			// `firstItem()` answers `Optional<Item>` for a Generic
 			// `Item`, so the Cases are the Choice's own — and the payload
 			// binding is what carries `Item` out of the Match: `item` is
 			// typed as the Namespace's `Item`, which is what the `<-` has to
@@ -1759,7 +1759,7 @@ describe("Validator", () => {
 		})
 
 		it("should reject a retrofitted conditional Method as a stored value", () => {
-			// NOTE: A conditional conformance retrofits the `where` bound onto
+			// A conditional conformance retrofits the `where` bound onto
 			// its fulfilling Method's Namespace Generic — so the Method carries
 			// hidden conformance Parameters and can no more be a value than any
 			// other bounded Function.
@@ -1857,7 +1857,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: A Namespace is emitted as a `class`, so its name holds nothing until
+	// A Namespace is emitted as a `class`, so its name holds nothing until
 	// the Declaration runs — every case here compiled green and failed at run
 	// time before the check existed.
 	describe("Use Before Declaration", () => {
@@ -1969,7 +1969,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: A conformance witness names a Namespace that the source does not
+		// A conformance witness names a Namespace that the source does not
 		// spell anywhere — `things::sort()` emits `{ compare: Thing.compare }`
 		// — so these compiled green and threw a `TypeError` reading `compare` of
 		// `undefined` before the witness rail existed.
@@ -1999,7 +1999,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].labels[1]?.message).toBe(
 				"declared here, below the use",
 			)
-			// NOTE: The Method the witness is passed to, and the Namespace the
+			// The Method the witness is passed to, and the Namespace the
 			// witness reads its Method off — the two spans are the whole of what
 			// the Diagnostic explains, since neither place spells the other.
 			expect(diagnostics[0].labels[0]?.kind).toBe("primary")
@@ -2031,7 +2031,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].labels[0]?.message).toBe(
 				"this call's Comparable conformance comes from it",
 			)
-			// NOTE: The call that hands the witness over, not the `items::sort()`
+			// The call that hands the witness over, not the `items::sort()`
 			// in the body that ends up using it — the body is only ever reached
 			// through a call, and the call is the place that can be moved.
 			expect(diagnostics[0].labels[0]?.position.start.line).toBe(6)
@@ -2070,7 +2070,7 @@ describe("Validator", () => {
 					"Namespace 'Thing' is used before it is declared",
 				],
 			)
-			// NOTE: One call, two Namespaces — the witness `boxes::sort()` is
+			// One call, two Namespaces — the witness `boxes::sort()` is
 			// built from is composed of both — so the secondary Label is the only
 			// thing telling the two Diagnostics apart.
 			expect(
@@ -2131,7 +2131,7 @@ describe("Validator", () => {
 					"the branch for { right: Integer } takes its Printable conformance from it",
 				],
 			])
-			// NOTE: A branch is not written anywhere, so both Diagnostics point at
+			// A branch is not written anywhere, so both Diagnostics point at
 			// the dispatched call itself; the branch each one is about is said in
 			// the Label's message, and the Namespace is pointed at.
 			expect(
@@ -2214,7 +2214,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Namespace names itself from its own body, so the order its
+		// A Namespace names itself from its own body, so the order its
 		// static Properties are written in became something a Program can feel:
 		// they are emitted as static fields, initialised top to bottom, and a
 		// read of one below answers `undefined` out of a Program that compiled
@@ -2278,7 +2278,7 @@ describe("Validator", () => {
 			})
 
 			it("accepts a static Property calling a Method written below it", () => {
-				// NOTE: A Method is installed with the class, ahead of every
+				// A Method is installed with the class, ahead of every
 				// static initialiser, so it answers whichever order the two are
 				// written in.
 				expect(
@@ -2294,7 +2294,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The one read that reaches no `validateExpression` of its own
+			// The one read that reaches no `validateExpression` of its own
 			// — a Property holding a Function is CALLED through the very Lookup
 			// that reads it, and the callee of a call is examined by the call.
 			it("reports a static Property calling one written below it", () => {
@@ -2345,11 +2345,11 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: The Validator's side of `= expression` defaults — what a call that
+	// The Validator's side of `= expression` defaults — what a call that
 	// leaves an Argument out is judged against, and what a signature that
 	// accepts a RANGE of Argument counts says about itself.
 	describe("Default Parameter Values", () => {
-		// NOTE: In the Parameter's declaration order rather than the order the
+		// In the Parameter's declaration order rather than the order the
 		// Argument happened to leave them out in — a scaffold writes them where
 		// it finds them, and members shuffled by a Quick Fix read as though the
 		// Compiler had rearranged the Record.
@@ -2396,7 +2396,7 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("argument-count-mismatch")
 		})
 
-		// NOTE: One string, read by `argument-count-mismatch`,
+		// One string, read by `argument-count-mismatch`,
 		// `argument-label-mismatch`, `argument-type-mismatch` and every
 		// `no-matching-overload` note — so a signature reads the same way
 		// wherever a call is held to it.
@@ -2442,7 +2442,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: `checkCommittedOverload` re-matches a committed call's
+		// `checkCommittedOverload` re-matches a committed call's
 		// Arguments and throws "This is a bug in the Compiler" when the
 		// signature it was committed to does not accept them. A defaulted call
 		// writes fewer Arguments than the signature has Parameters, so without
@@ -2468,7 +2468,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: The cross-checks are about the Compiler rather than about a
+	// The cross-checks are about the Compiler rather than about a
 	// Program: while the Compiler is right, nothing anyone can write reaches
 	// them. So each failing case is a typed Program put by hand into a state no
 	// source produces, such as a dropped witness or a call committed to an
@@ -2482,7 +2482,7 @@ describe("Validator", () => {
 			return program
 		}
 
-		// NOTE: Every Node of the typed Program, walked structurally — the Nodes
+		// Every Node of the typed Program, walked structurally — the Nodes
 		// below are reached through a Namespace, a Function body and a Match
 		// alike, and none of the tests here cares which.
 		function walk(
@@ -2508,7 +2508,7 @@ describe("Validator", () => {
 			program.implementation.nodes.forEach(go)
 		}
 
-		// NOTE: A Union receiver whose every member has the Method, each branch
+		// A Union receiver whose every member has the Method, each branch
 		// binding the enclosing Function's own bounded Type Parameter — so every
 		// branch forwards the same hidden conformance Parameter.
 		const dispatchedWitnesses = `implementation {
@@ -2569,7 +2569,7 @@ describe("Validator", () => {
 				Terminal.inspect(ordered)
 			}`)
 
-			// NOTE: What the silent `continue` in conformance solving left
+			// What the silent `continue` in conformance solving left
 			// behind — the Method still expects its hidden trailing Argument.
 			walk(program, (node) => {
 				if (node["nodeType"] === "MethodInvocation") {
@@ -2596,7 +2596,7 @@ describe("Validator", () => {
 				Terminal.inspect([1, 2]::total())
 			}`)
 
-			// NOTE: The weave a conditional conformance performs, arriving after
+			// The weave a conditional conformance performs, arriving after
 			// the call was typed — the Namespace Type is shared by reference, so
 			// the call site that resolved no witness now names a Method that
 			// wants one.
@@ -2640,7 +2640,7 @@ describe("Validator", () => {
 				Terminal.inspect(ordered([3, 1, 2]))
 			}`)
 
-			// NOTE: The bound gone from the Declaration the Simplifier emits the
+			// The bound gone from the Declaration the Simplifier emits the
 			// hidden Parameter from, while the call inside still forwards it —
 			// `Item__conformance` is read where nothing binds it.
 			walk(program, (node) => {
@@ -2662,7 +2662,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: Two Overloads that BOTH accept the same Argument, so which one a
+		// Two Overloads that BOTH accept the same Argument, so which one a
 		// call was committed to can only be read off the Node — matching again
 		// would answer with the first, whatever the Enricher decided — and one
 		// that accepts nothing the call passes, to commit to by hand.
@@ -2711,7 +2711,7 @@ describe("Validator", () => {
 
 			expect(calls.map((call) => call.overloadedMethodIndex)).toEqual([0])
 
-			// NOTE: The Overload a re-match would never arrive at, and the one
+			// The Overload a re-match would never arrive at, and the one
 			// this is about: the Enricher decides WHICH Overload with the context
 			// each Argument was written in, and the Simplifier mangles the callee
 			// from the index — so a Validator that answered again would emit a
@@ -2740,7 +2740,7 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: The check matches the Arguments against the committed Signature
+		// The check matches the Arguments against the committed Signature
 		// again, LABELS and all. `loop` is the standard library's overloaded free
 		// Function and its `while` and `until` entries are told apart by nothing
 		// BUT the middle label — identical Types, identical arity — so committing
@@ -2797,7 +2797,7 @@ describe("Validator", () => {
 		it("reports a dispatch branch's witness no enclosing Function declares", () => {
 			let program = enrichedProgram(dispatchedWitnesses)
 
-			// NOTE: A branch carries its own witnesses and its own Arguments, so
+			// A branch carries its own witnesses and its own Arguments, so
 			// it is its own chance to name something that is not there.
 			walk(program, (node) => {
 				if (node["nodeType"] !== "MethodInvocation") {
@@ -2825,7 +2825,7 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: A refinement demands evidence and a value written DOWN carries its
+	// A refinement demands evidence and a value written DOWN carries its
 	// own, so not one source below has an `if` in it anywhere: the predicate is
 	// decided while compiling, and a Program says exactly what it would have said
 	// without the refined Type. What is left for the Validator is the refusal —
@@ -2852,7 +2852,7 @@ describe("Validator", () => {
 			return diagnosticsFor(withRefinements(body))
 		}
 
-		// NOTE: Every predicate the standard library declares a refinement by,
+		// Every predicate the standard library declares a refinement by,
 		// asked of a written value. Each is stored RESOLVED — `isNot` is `is`
 		// negated, `hasItems` is `isEmpty` negated, `isPositive` is
 		// `isGreaterThan(0)` — so the evaluator answers a handful of primitives
@@ -2891,7 +2891,7 @@ describe("Validator", () => {
 				])
 			})
 
-			// NOTE: And a Program's own alias of a primitive is decided by the
+			// And a Program's own alias of a primitive is decided by the
 			// leaf it forwards to, exactly as the standard library's are.
 			it("should decide a Program's own alias by what it forwards to", () => {
 				let diagnostics = diagnosticsFor(`implementation {
@@ -2912,7 +2912,7 @@ describe("Validator", () => {
 				).toEqual(["assignment-type-mismatch"])
 			})
 
-			// NOTE: And one that FORWARDS the bound it was handed is decided by
+			// And one that FORWARDS the bound it was handed is decided by
 			// the leaf with that bound written into it. The Diagnostic names the
 			// predicate as the reader wrote it, which is the alias and its
 			// Argument rather than what either resolves to.
@@ -2971,7 +2971,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A committed Overload whose Arguments do not match is an ICE here
+		// A committed Overload whose Arguments do not match is an ICE here
 		// rather than a Diagnostic, so an admission the Enricher makes and the
 		// Validator does not would fail the compile outright and report nothing a
 		// reader could act on. This is that crossing, on the call shape that
@@ -2996,7 +2996,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A static Property's initialiser is the same Declaration written in
+		// A static Property's initialiser is the same Declaration written in
 		// a Namespace, and is held to what a Constant Declaration is held to — so
 		// it is admitted the same way, and refused the same way.
 		it("should admit a written value into a Namespace's Property", () => {
@@ -3012,7 +3012,7 @@ describe("Validator", () => {
 			expect(diagnosticsOfBody(property("0"))).toHaveLength(1)
 		})
 
-		// NOTE: A String and an applied List are the other two v1 bases, and their
+		// A String and an applied List are the other two v1 bases, and their
 		// predicates read what is written as plainly as an Integer's: a String with
 		// characters in it, a List with items in it.
 		it("should admit a written String and a written List", () => {
@@ -3032,7 +3032,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `isBetween` is not Integer's own — the conjunct is keyed to the
+		// `isBetween` is not Integer's own — the conjunct is keyed to the
 		// Namespace that ANSWERED it, which is the one declared over the whole
 		// numeric tower, so the allowlist has to name it under both.
 		it("should admit a predicate the covering Namespace answered", () => {
@@ -3047,7 +3047,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The two bounds name the same range in either order, which is
+		// The two bounds name the same range in either order, which is
 		// what `Orderable::isBetween` says — so a refinement written backwards
 		// admits what the same pair written forwards admits, and refuses what
 		// it refuses.
@@ -3128,7 +3128,7 @@ describe("Validator", () => {
 			])
 		})
 
-		// NOTE: The conjuncts are canonical — RESOLVED to the leaf each spelling
+		// The conjuncts are canonical — RESOLVED to the leaf each spelling
 		// asks, then sorted, so that one predicate is one set however it was
 		// written — and that is the order they are spelled back out in, rather
 		// than the order the clause happened to put them in. `isOdd` sorts under
@@ -3148,7 +3148,7 @@ describe("Validator", () => {
 			])
 		})
 
-		// NOTE: A name is a value the Program computes, however plainly it was
+		// A name is a value the Program computes, however plainly it was
 		// computed a line above. Deciding one would need an interpreter, which is
 		// exactly what the allowlist exists not to be.
 		it("should refuse a value the Program computes", () => {
@@ -3160,7 +3160,7 @@ describe("Validator", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: A List is a different question from the values in it, and it is
+		// A List is a different question from the values in it, and it is
 		// answered by the brackets: `[first]` holds exactly one item however
 		// `first` was arrived at, so `hasItems` is decided by what is written
 		// even though the item is not. Nothing in the allowlist asks what an
@@ -3174,7 +3174,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		// NOTE: And the boundary that keeps that from meaning "any List at
+		// And the boundary that keeps that from meaning "any List at
 		// all". A name standing for a whole List is a value the Program
 		// computed; how many items it arrived with is written nowhere, because
 		// there are no brackets here to count.
@@ -3187,7 +3187,7 @@ describe("Validator", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: Evidence is not something a Program can ask for and be given. The
+		// Evidence is not something a Program can ask for and be given. The
 		// refinement is declared over an Integer, so a String is refused whatever
 		// its own predicates would have said.
 		it("should refuse a written value of another base", () => {
@@ -3207,7 +3207,7 @@ describe("Validator", () => {
 			expect(diagnosticsFor(source("-3"))).toHaveLength(1)
 		})
 
-		// NOTE: A bound the entry can not read is a conjunct it can not decide, so
+		// A bound the entry can not read is a conjunct it can not decide, so
 		// nothing is admitted — which is also how the Overload falls out: this
 		// `isLessThan` is Integer's Rational entry, and comparing `1/2` as though
 		// its digits were an Integer's is exactly the mistake the shape check
@@ -3222,14 +3222,14 @@ describe("Validator", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: Essence's String equality is canonical equivalence — `String.is`
+		// Essence's String equality is canonical equivalence — `String.is`
 		// is `compare(to other)::is(#Equal)` over the NFC-normalised Strings — so a
 		// composed accent and a decomposed one are the same String and the
 		// evaluator has to agree. `isNot` is why it MUST: comparing the two as
 		// written would prove them different, which is a proof of something false
 		// rather than an admission missed.
 		it("should compare a written String the way the Program does", () => {
-			// NOTE: Written as escapes because the two are the same TEXT — an
+			// Written as escapes because the two are the same TEXT — an
 			// editor, a terminal and this file are all free to print them alike, and
 			// which one is which is the whole assertion.
 			let composed = "\u00e9"
@@ -3244,7 +3244,7 @@ describe("Validator", () => {
 			expect(diagnosticsFor(source("isNot"))).toHaveLength(1)
 		})
 
-		// NOTE: A generic refinement is admitted by the very same evaluator — the
+		// A generic refinement is admitted by the very same evaluator — the
 		// predicate reads the item COUNT, which a written List has, and the base is
 		// asked separately, which is where the Type Arguments are compared. So
 		// nothing here is new machinery; what is new is that one Alias asks a
@@ -3280,7 +3280,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The refusal names the Type as it was APPLIED, because the bare
+			// The refusal names the Type as it was APPLIED, because the bare
 			// Alias name is not a Type anything can be written as — a help offering
 			// to pass a value of 'Filled' names something the Program would refuse
 			// for taking no Arguments.
@@ -3300,7 +3300,7 @@ describe("Validator", () => {
 				])
 			})
 
-			// NOTE: The base is asked as well as the predicate, and the base is where
+			// The base is asked as well as the predicate, and the base is where
 			// the Type Arguments live: `[1]::hasItems()` is true and says nothing
 			// whatever about a List of Strings.
 			it("should refuse a written List of the wrong items", () => {
@@ -3311,7 +3311,7 @@ describe("Validator", () => {
 				).toHaveLength(1)
 			})
 
-			// NOTE: A Parameter written with a Type Parameter the CALL works out is
+			// A Parameter written with a Type Parameter the CALL works out is
 			// the one position where the refinement is not yet a Type: its base is
 			// `List<Item>`, and no written List is ever of that. So the value is asked
 			// about the refinement IT decides — its own Type unified against the
@@ -3341,7 +3341,7 @@ describe("Validator", () => {
 					).toEqual([])
 				})
 
-				// NOTE: The refusal names the Type as the Declaration spells it,
+				// The refusal names the Type as the Declaration spells it,
 				// Parameter and all. Named by the Alias alone it read 'Filled', which
 				// is not a Type anything can be written as — a help offering to pass a
 				// value of it names something the Program would refuse for taking no
@@ -3362,7 +3362,7 @@ describe("Validator", () => {
 					])
 				})
 
-				// NOTE: The instantiation is what the value is ASKED about, never what
+				// The instantiation is what the value is ASKED about, never what
 				// it is allowed to answer with: an `Item` the call can not bind is the
 				// enclosing Declaration's own opaque symbol, and a written String
 				// decides nothing whatever about it. Which is the ordinary
@@ -3381,7 +3381,7 @@ describe("Validator", () => {
 				})
 			})
 
-			// NOTE: Two applications of ONE Alias are two questions about the same
+			// Two applications of ONE Alias are two questions about the same
 			// written List, and the answer to each is kept for the Overload probes
 			// that follow. Keyed by the Alias' name alone, the first entry probed
 			// decided both and the call it was not about was refused for it.
@@ -3409,7 +3409,7 @@ describe("Validator", () => {
 			})
 		})
 
-		// NOTE: A refinement standing as a Type ARGUMENT comes back out as
+		// A refinement standing as a Type ARGUMENT comes back out as
 		// itself. Nobody inferred it there — something wrote
 		// `List<NonEmptyList<Integer>>` down, or a Method promised it — so the
 		// item Type is not a place a later value can widen, and a Type
@@ -3427,7 +3427,7 @@ describe("Validator", () => {
 				}`
 			}
 
-			// NOTE: Read by asking for a Boolean, which nothing here is: the
+			// Read by asking for a Boolean, which nothing here is: the
 			// Diagnostic then names the Type the expression really has.
 			function typeOf(expression: string): string {
 				let diagnostics = diagnosticsFor(
@@ -3449,7 +3449,7 @@ describe("Validator", () => {
 				).toBe("this is a List<Integer>")
 			})
 
-			// NOTE: The proof two levels down, which is what makes the Type
+			// The proof two levels down, which is what makes the Type
 			// worth promising: the outer List's own proof and the inner one's
 			// are read one after the other with no branch anywhere. The written
 			// List holds an item that is already proven, so the item Type it
@@ -3468,7 +3468,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A Namespace over the unrefined shape still answers — a
+			// A Namespace over the unrefined shape still answers — a
 			// `List<NonEmptyList<Integer>>` is a `List<List<Integer>>`, and the
 			// item Type binds through the base exactly as it always did.
 			it("should still reach a Namespace written over the base", () => {
@@ -3477,7 +3477,7 @@ describe("Validator", () => {
 				)
 			})
 
-			// NOTE: THE rule the outermost position keeps. A walk's State is a
+			// THE rule the outermost position keeps. A walk's State is a
 			// Type Parameter the call threads, and binding it to the seed's
 			// proof would refuse every step that answers an ordinary value.
 			it("should still bind a threaded Type Parameter to the base", () => {
@@ -3496,7 +3496,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The other half of "comes back out as itself": what comes
+			// The other half of "comes back out as itself": what comes
 			// back out has to go back IN. A Method whose Parameter is the item
 			// Type meets an `ItemType` bound to a refinement, and both a proven
 			// value and a written one are accepted there. A List with nothing
@@ -3515,7 +3515,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: Refused where the Method is RESOLVED rather than where a
+			// Refused where the Method is RESOLVED rather than where a
 			// value is measured against a Declaration, so these read the
 			// Enricher's own Diagnostics: an Argument that fits no Parameter
 			// leaves the call with no entry to commit to.
@@ -3536,7 +3536,7 @@ describe("Validator", () => {
 			})
 		})
 
-		// NOTE: What a written List lets the Compiler decide is its LENGTH, and
+		// What a written List lets the Compiler decide is its LENGTH, and
 		// the two List predicates in the allowlist read nothing else. `[x, y]`
 		// holds exactly two items whatever `x` and `y` turn out to be — the
 		// grammar has no spread, so nothing a Program can write makes a written
@@ -3556,7 +3556,7 @@ describe("Validator", () => {
 				}`
 			}
 
-			// NOTE: THE Program that was refused. Every part of it is written
+			// THE Program that was refused. Every part of it is written
 			// down — the List, the Record in it, the Integer in that — and it
 			// was refused because a Record was not one of the shapes the
 			// evaluator could read, which the predicate never asked about.
@@ -3578,7 +3578,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The same Program against the standard library's own alias,
+			// The same Program against the standard library's own alias,
 			// which is the spelling a reader reaches for — and where the
 			// admission is worth having, since it is what makes `firstItem`
 			// total.
@@ -3592,7 +3592,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: An item nobody wrote out is still an item. What the count
+			// An item nobody wrote out is still an item. What the count
 			// asks is how many stand there, and two stand there whether the
 			// Compiler can read them or not — so this is admitted for exactly
 			// the reason the Records above are, and refusing it was the same
@@ -3613,7 +3613,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: And a Record whose member is computed, which is the same
+			// And a Record whose member is computed, which is the same
 			// claim one level in: the List still holds one item.
 			it("should admit a Record item with a computed member", () => {
 				expect(
@@ -3627,7 +3627,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A written List of written Lists is counted at every level it
+			// A written List of written Lists is counted at every level it
 			// is written at, and each level is its own question: `[[]]` holds
 			// one item, so the outer List is admitted — while the empty List
 			// inside it, asked the same question in its own right, is refused
@@ -3646,7 +3646,7 @@ describe("Validator", () => {
 				expect(diagnosticsFor(source("[]"))).toHaveLength(1)
 			})
 
-			// NOTE: The one List a count refuses, and the reason the count is
+			// The one List a count refuses, and the reason the count is
 			// worth reading at all.
 			it("should still refuse the empty List", () => {
 				expect(
@@ -3658,7 +3658,7 @@ describe("Validator", () => {
 				).toHaveLength(1)
 			})
 
-			// NOTE: The base is asked as it always was, so a List of the wrong
+			// The base is asked as it always was, so a List of the wrong
 			// Records is refused for its Type rather than admitted for its
 			// length.
 			it("should refuse a written List of the wrong Records", () => {
@@ -3672,7 +3672,7 @@ describe("Validator", () => {
 			})
 		})
 
-		// NOTE: An item is a position like any other, so a written List standing
+		// An item is a position like any other, so a written List standing
 		// where the item Type is refined is asked the question item by item.
 		// `[[1], [2, 3]]` is a `List<NonEmptyList<Integer>>` for the reason `[1]`
 		// is a `NonEmptyList<Integer>`: the brackets are right there, one pair
@@ -3698,7 +3698,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: Both proofs at once — the outer List's own count and each
+			// Both proofs at once — the outer List's own count and each
 			// item's — which is the Type `split(intoGroupsOf:)` answers.
 			it("should admit a written List into a proven List of proven Lists", () => {
 				expect(
@@ -3710,7 +3710,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The refusal points at the ITEM. The List itself is written
+			// The refusal points at the ITEM. The List itself is written
 			// perfectly well and its Type names nothing wrong; what went
 			// unanswered is one item's predicate, and the arrow has to land
 			// where a reader can act on it.
@@ -3734,7 +3734,7 @@ describe("Validator", () => {
 				])
 			})
 
-			// NOTE: An item nobody wrote out is refused BY TYPE, which is the
+			// An item nobody wrote out is refused BY TYPE, which is the
 			// same rule the count already followed: what the brackets say is how
 			// many items there are, never what one of them is. An opaque item
 			// that already answers the refinement is admitted, and one that does
@@ -3762,7 +3762,7 @@ describe("Validator", () => {
 				)
 			})
 
-			// NOTE: The empty written List decides nothing about its items and
+			// The empty written List decides nothing about its items and
 			// needs to decide nothing: it has none, and every List Type already
 			// accepts it.
 			it("should keep the empty written List assignable", () => {
@@ -3775,7 +3775,7 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A written Rational item answers for itself the way a
+			// A written Rational item answers for itself the way a
 			// written Integer or a written List does — the item Type may be a
 			// refinement of any base a `where` clause is written on, and the
 			// question asked of each item is the one that base's own rung
@@ -3801,7 +3801,7 @@ describe("Validator", () => {
 				)
 			})
 
-			// NOTE: And the same question where the item's Type Arguments are
+			// And the same question where the item's Type Arguments are
 			// the call's to work out — the items decide the instantiation, and
 			// the List handed back is of what they decided.
 			it("should decide a Type Argument the call infers from the items", () => {
@@ -3821,7 +3821,7 @@ describe("Validator", () => {
 	})
 })
 
-// NOTE: A `= expression` default RUNS, in the frame the body runs in, so it is
+// A `= expression` default RUNS, in the frame the body runs in, so it is
 // held to everything the body is held to. Nothing inside one was checked at all
 // while `validateFunctionDefinition` walked the body alone — a call with the
 // wrong number of Arguments, one with the wrong Types, a Match missing a Case
@@ -3879,12 +3879,12 @@ describe("A default's own Expression", () => {
 	})
 })
 
-// NOTE: A native Method has no body, and the frame the Compiler synthesizes for
+// A native Method has no body, and the frame the Compiler synthesizes for
 // its defaults is the only Essence it owns — so it is the only thing here to
 // check, and checking it is what holds a `declarations { … }` Program to what
 // every other Program is held to.
 describe("A default written on a native signature", () => {
-	// NOTE: The `declarations { … }` header the standard library's own sources
+	// The `declarations { … }` header the standard library's own sources
 	// are written with, which is the only place a native signature — and
 	// therefore a default on one — can appear at all.
 	function declarationDiagnosticsFor(
@@ -3930,7 +3930,7 @@ describe("A default written on a native signature", () => {
 	})
 })
 
-// NOTE: A path key in a Literal that is merged into a default reaches into a
+// A path key in a Literal that is merged into a default reaches into a
 // member the merge REBUILDS, and the Enricher admits it wherever the position
 // merges at all. Whether the default reaches that far is a question about the
 // Parameter — or the Case — the Literal was committed to, which is settled here.
@@ -4014,7 +4014,7 @@ describe("A path key merged into a default", () => {
 		])
 	})
 
-	// NOTE: The default writes `server` out but leaves `tls` to a name, so the
+	// The default writes `server` out but leaves `tls` to a name, so the
 	// merge stops one level short of where the path reaches.
 	it("should refuse a path past where the default stops writing", () => {
 		let diagnostics = diagnosticsFor(`implementation {
@@ -4055,7 +4055,7 @@ describe("A path key merged into a default", () => {
 		])
 	})
 
-	// NOTE: A Function taken as a VALUE drops its defaults, so nothing is
+	// A Function taken as a VALUE drops its defaults, so nothing is
 	// filled in any more and there is nothing under the key to merge with.
 	it("should refuse a path through a Function value", () => {
 		let diagnostics = diagnosticsFor(`implementation {
@@ -4105,7 +4105,7 @@ describe("A path key merged into a default", () => {
 		])
 	})
 
-	// NOTE: The members the path did not write are the default's, so a payload
+	// The members the path did not write are the default's, so a payload
 	// that reaches into one is not missing anything.
 	it("should not call a merged payload incomplete", () => {
 		expect(
@@ -4122,7 +4122,7 @@ describe("A path key merged into a default", () => {
 	})
 })
 
-// NOTE: A `define` answers with a value wherever it stands, and every arm is one
+// A `define` answers with a value wherever it stands, and every arm is one
 // of the answers — so every arm is held to the answer Type, whichever of the
 // three decided it. The one thing the Validator can say about the SHAPE of a
 // `define` lives here too: a ladder with no rungs is a value written the long
@@ -4143,7 +4143,7 @@ describe("A definition by cases", () => {
 		)
 	})
 
-	// NOTE: Greyed out rather than underlined — what is wrong with it is that it
+	// Greyed out rather than underlined — what is wrong with it is that it
 	// does nothing, and this is exactly the shape a ladder has while it is being
 	// written.
 	it("should tag the define as unnecessary", () => {
@@ -4188,7 +4188,7 @@ describe("A definition by cases", () => {
 		expect(diagnostics[0].notes).toEqual(["This 'define' answers Integer."])
 	})
 
-	// NOTE: The `otherwise` arm is an answer like any other, and the position
+	// The `otherwise` arm is an answer like any other, and the position
 	// around the `define` decides the Type just as the arrow does — so the same
 	// check catches both without the Node having to say which of them spoke.
 	it("should refuse an otherwise arm the position's Type does not accept", () => {
@@ -4207,7 +4207,7 @@ describe("A definition by cases", () => {
 		expect(underlinedBy(source, diagnostics[0].labels[0])).toBe("0")
 	})
 
-	// NOTE: Where the arms decided the answer Type themselves it is the Union of
+	// Where the arms decided the answer Type themselves it is the Union of
 	// exactly these values, so every one of them fits by construction — the
 	// check can not fire, and a `define` inferring a Union is not a mistake.
 	it("should stay silent where the arms decided the Type themselves", () => {
@@ -4223,7 +4223,7 @@ describe("A definition by cases", () => {
 		).toEqual([])
 	})
 
-	// NOTE: An arm's Condition picks the path exactly as an `if` does, and is
+	// An arm's Condition picks the path exactly as an `if` does, and is
 	// held to what every Condition is held to.
 	it("should refuse a Condition that is not a Boolean", () => {
 		let diagnostics = diagnosticsFor(`implementation {

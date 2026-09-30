@@ -26,13 +26,13 @@ import { remembersResults } from "../test"
 import { type MutantRecord, renderMutation } from "../testReport"
 import { capture, within, withFiles as withProject } from "./harness"
 
-// NOTE: What `essence test --mutate` ANSWERS, driven the way `testRunner.spec`
+// What `essence test --mutate` ANSWERS, driven the way `testRunner.spec`
 // drives the rest of the runner: a throwaway project on disk and the command
 // line's own entry point over it. A mutation run is real compiles and real
 // runs, so every fixture here is tiny on purpose — the question each of them
 // asks is about one operator, one status or one flag.
 
-// NOTE: A directory of this suite's own, so one left behind by a crash says
+// A directory of this suite's own, so one left behind by a crash says
 // which spec made it. The harness under it is the one `testRunner.spec` drives.
 function withFiles<Value>(
 	files: Record<string, string>,
@@ -41,7 +41,7 @@ function withFiles<Value>(
 	return withProject(files, body, "essence-mutation-")
 }
 
-// NOTE: One job and one pinned seed, always. The seed is what makes a property
+// One job and one pinned seed, always. The seed is what makes a property
 // test in a covering set answer the same question twice, and one job keeps the
 // compile in this process — a worker would answer the same and boot a second
 // copy of the Compiler to do it. Spelled apart from `mutate` because the run
@@ -72,7 +72,7 @@ function mutate(
 	)
 }
 
-// NOTE: The same run, with the seam only a spec may reach. `runMutation`'s
+// The same run, with the seam only a spec may reach. `runMutation`'s
 // internals are not an Option and not an environment variable — see
 // `MutationInternals` — so a spec that needs a timeout measured in
 // milliseconds rather than in seconds goes through the entry point the command
@@ -118,14 +118,14 @@ function tally(out: string): Extract<TestEvent, { kind: "mutation-end" }> {
 	return end as Extract<TestEvent, { kind: "mutation-end" }>
 }
 
-// NOTE: How many mutants were actually BUILT and asked, which is what a
+// How many mutants were actually BUILT and asked, which is what a
 // `--mutation-limit` caps — `sites` counts what the walker found, and the
 // remainder between the two is what a limit left alone.
 function judged(counts: Extract<TestEvent, { kind: "mutation-end" }>): number {
 	return counts.killed + counts.survived + counts.hung
 }
 
-// NOTE: The threshold and the comparison on two lines of their own, so that the
+// The threshold and the comparison on two lines of their own, so that the
 // four-per-line cap leaves both operators with room. A fixture where the cap
 // decides which mutants exist would be a spec about the cap.
 function threshold(assertions: Array<string>): string {
@@ -154,7 +154,7 @@ const SHARP = threshold([
 	"expect passes(50)::is(false)",
 ])
 
-// NOTE: Two Functions, one of them tested. Every site in `untested` is one no
+// Two Functions, one of them tested. Every site in `untested` is one no
 // test reaches, which is what makes this the fixture for both claims about
 // them: that they are never compiled, and that a `--mutation-limit` leaves them
 // exactly where they were.
@@ -177,7 +177,7 @@ const UNCOVERED = [
 	"",
 ].join("\n")
 
-// NOTE: A Namespace Method with no written test at all, whose declared return
+// A Namespace Method with no written test at all, whose declared return
 // Type is a refinement a mutant of its body breaks for EVERY receiver. So the
 // only thing that reaches it is the goal its own declaration promises, and what
 // the goal answers is a fact rather than a draw.
@@ -204,13 +204,13 @@ const DECLARED = [
 	"",
 ].join("\n")
 
-// NOTE: A fixture where one mutant PROVABLY never ends. `loop(startingWith:
+// A fixture where one mutant PROVABLY never ends. `loop(startingWith:
 // while:_)` is the language's whole answer to iteration and the Optimiser
 // writes it out as a real `while`, so the mutant that rotates `::isLessThan`
 // into `::isGreaterThan` spins on a State the step never changes — no stack to
 // overflow, no error to catch, and nothing but a timeout that ends it.
 //
-// NOTE: `twice` is here for the half of the claim the hang can not make on its
+// `twice` is here for the half of the claim the hang can not make on its
 // own: its mutants are judged AFTER the hung one, so a run that reports them
 // killed is a run whose Worker was terminated and replaced. A driver that
 // terminated the thread and forgot to boot another would report them as
@@ -242,7 +242,7 @@ const SPINNING = [
 	"",
 ].join("\n")
 
-// NOTE: Long enough that nothing which actually finishes is ever called hung —
+// Long enough that nothing which actually finishes is ever called hung —
 // a mutant of this fixture runs one assertion, and two seconds is a machine
 // under load's worth of headroom over that — and short enough that the suite
 // pays for the hang once and in full. Nothing here asserts on a clock: what is
@@ -262,7 +262,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: The other half of the claim above, and the one that says the score
+	// The other half of the claim above, and the one that says the score
 	// means anything: the same code under a test that pins the boundary kills
 	// every mutant of it.
 	it("kills every mutant once the test pins the boundary", async () => {
@@ -293,7 +293,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A site nothing reaches is never COMPILED — it is the coverage
+	// A site nothing reaches is never COMPILED — it is the coverage
 	// report's finding wearing mutation's hat, and paying a compile and a run to
 	// be told what the counters already said would be the one cost this design
 	// exists to avoid. Proven by the counts: the tally names them apart, and
@@ -327,14 +327,14 @@ describe("essence test --mutate", () => {
 
 			expect(judged(whole)).toBeGreaterThan(2)
 			expect(judged(limited)).toBe(2)
-			// NOTE: What the limit stopped is JUDGING, and it unfinds nothing:
+			// What the limit stopped is JUDGING, and it unfinds nothing:
 			// the walker kept the same sites either way, and the remainder
 			// between them and what was judged is what a consumer subtracts.
 			expect(limited.sites).toBe(whole.sites)
 		})
 	})
 
-	// NOTE: A site nothing reaches costs neither a compile nor a run, so a
+	// A site nothing reaches costs neither a compile nor a run, so a
 	// limit — which is what a reader buys their way out of those with — has
 	// nothing to say about it. Leaving them out would report a project as
 	// having fewer untested lines the harder its run was narrowed, which is the
@@ -357,7 +357,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A mutant compares itself against the snapshots ON DISK, which the
+	// A mutant compares itself against the snapshots ON DISK, which the
 	// driver reads once and hands to each Worker as it boots. A Worker that
 	// never got them would find nothing to compare against, RECORD the mutant's
 	// own answer as a first snapshot, pass, and report a survivor — so this is
@@ -383,7 +383,7 @@ describe("essence test --mutate", () => {
 		].join("\n")
 
 		await withFiles({ "Label.es": source }, async (directory) => {
-			// NOTE: One plain run first, because a snapshot nothing has recorded
+			// One plain run first, because a snapshot nothing has recorded
 			// is written rather than compared — which is the very answer this
 			// spec has to tell apart from a store that never arrived.
 			await capture(() =>
@@ -406,7 +406,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A reader comparing two scores has to be told that one of them was
+	// A reader comparing two scores has to be told that one of them was
 	// taken over a sample — the sample is the file order, and a project's
 	// hardest lines may all be in the last file.
 	it("says so where the limit stopped the judging", async () => {
@@ -418,7 +418,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: The walker refuses a swap onto a member the Namespace does not
+	// The walker refuses a swap onto a member the Namespace does not
 	// declare — see `swappableMember`. A Namespace that writes `is` and no
 	// `isNot` is the plain case, and what it must never produce is a mutant
 	// that emits a read of `undefined` and is counted as a kill.
@@ -463,7 +463,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A property test in the covering set, and a fixture where EVERY case
+	// A property test in the covering set, and a fixture where EVERY case
 	// it could draw kills the mutant — the test's own `n::add(1)` is in the
 	// tests section, which is never mutated, so a mutated `increment` disagrees
 	// with it for every Integer there is. No seed luck, and therefore no flake.
@@ -491,12 +491,12 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: The safety claim the whole feature rests on. A mutation tool that
+	// The safety claim the whole feature rests on. A mutation tool that
 	// can wait for ever is a tool that can hang a job for ever, which is worse
 	// than no tool — so a mutant that does not come back is STOPPED, recorded
 	// as `hung`, and the run goes on.
 	//
-	// NOTE: The budget `scripts/testBudget.ts` gives every spec, written out.
+	// The budget `scripts/testBudget.ts` gives every spec, written out.
 	// This test waits: `SPIN_TIMEOUT` is two seconds the spinning mutant has
 	// to be allowed to spend before it is stopped, and the rest of the corpus
 	// is judged around it.
@@ -512,7 +512,7 @@ describe("essence test --mutate", () => {
 				"swap ::isLessThan for ::isGreaterThan",
 			)
 			expect(tally(out).hung).toBe(1)
-			// NOTE: The recycling, said as a fact about the ANSWERS rather than
+			// The recycling, said as a fact about the ANSWERS rather than
 			// about the threads: a mutant judged after the terminated one can
 			// only have been killed by a Worker that was booted to replace it.
 			expect(
@@ -524,7 +524,7 @@ describe("essence test --mutate", () => {
 		})
 	}, 60_000)
 
-	// NOTE: THE reproducibility claim. One seed, one pinned corpus and a walk
+	// THE reproducibility claim. One seed, one pinned corpus and a walk
 	// that is a function of the sources: two runs are the same stream, line for
 	// line, or nothing a mutation score says can be compared between runs.
 	it("writes the same stream twice at one seed", async () => {
@@ -547,7 +547,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: The one combination that would leave a run compiling, running and
+	// The one combination that would leave a run compiling, running and
 	// reporting while answering about nothing at all — no counters, no table,
 	// and every site in the project reported as one no test reaches.
 	it("refuses to be asked for a run with the counters off", async () => {
@@ -564,7 +564,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: And the same refusal when the PROJECT is what left the pass out,
+	// And the same refusal when the PROJECT is what left the pass out,
 	// named where it was written — the reason is the counters rather than which
 	// of the two spelled it, and a refusal naming a flag nobody typed would
 	// send its reader looking through a command line that does not hold it.
@@ -598,7 +598,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A focus silences most of the suite, and this run reads what RAN to
+	// A focus silences most of the suite, and this run reads what RAN to
 	// learn which tests reach which site — so a focused baseline reports every
 	// site the silenced tests cover as one no test reaches, and takes a score
 	// over whatever the focus left. Refused before a mutant is compiled.
@@ -631,7 +631,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A baseline that does not pass is a run with nothing to say: every
+	// A baseline that does not pass is a run with nothing to say: every
 	// mutant of it would be judged by tests that already fail.
 	it("refuses a baseline that does not pass", async () => {
 		let source = [
@@ -656,7 +656,7 @@ describe("essence test --mutate", () => {
 			expect(err).toContain("a baseline that passes")
 		})
 
-		// NOTE: And under --json the stream says the same thing rather than
+		// And under --json the stream says the same thing rather than
 		// nothing. A consumer reading it used to get an empty file and an exit
 		// code: no tally to end on, and no word about which test failed.
 		await withFiles({ "Grading.es": source }, async (directory) => {
@@ -672,7 +672,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: The baseline is what the project's own `essence test` runs, goals
+	// The baseline is what the project's own `essence test` runs, goals
 	// and all. A generated goal is a test like any other — it reaches sites and
 	// it kills mutants — and a run that left it out would report a project that
 	// tests its declarations as testing less than it does. `Tally::floor` has no
@@ -689,7 +689,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: And the setting says it without the flag, which is what a project
+	// And the setting says it without the flag, which is what a project
 	// that always tests its declarations has written down. Read out of the
 	// nearest essence.json, which is found from the working directory — so the
 	// working directory is what has to move.
@@ -712,7 +712,7 @@ describe("essence test --mutate", () => {
 					}),
 			)
 
-			// NOTE: And `--no-contracts` beats the setting, exactly as it does
+			// And `--no-contracts` beats the setting, exactly as it does
 			// for `essence test`: the site nothing but a goal reaches is a site
 			// no test reaches again.
 			let plain = mutants(
@@ -723,7 +723,7 @@ describe("essence test --mutate", () => {
 		})
 	})
 
-	// NOTE: A run a signal ends never reaches the code that removes its
+	// A run a signal ends never reaches the code that removes its
 	// staging, so the next run sweeps the directory of every run whose process
 	// has stopped. Its name is what says whose it was, and no process can have
 	// the one written here.
@@ -749,7 +749,7 @@ describe("essence test --mutate", () => {
 })
 
 describe("The mutant timeout", () => {
-	// NOTE: Nothing here waits for anything. The wait is a pure function of what
+	// Nothing here waits for anything. The wait is a pure function of what
 	// the same tests took while the code still told the truth, and that is the
 	// only part of it a spec can assert without becoming a spec about a machine.
 	it("never waits less than five seconds", () => {
@@ -785,7 +785,7 @@ describe("The mutation report", () => {
 	let rendered = (mutants: Array<MutantRecord>, verbose = false): string =>
 		renderMutation(mutants, reportContext(verbose), () => null).join("\n")
 
-	// NOTE: A hang is a failure a reader would notice as surely as a red test,
+	// A hang is a failure a reader would notice as surely as a red test,
 	// so it counts for the tests rather than against them — three killed and one
 	// hung out of four judged is a suite that caught everything.
 	it("counts a hung mutant as caught", () => {
@@ -804,7 +804,7 @@ describe("The mutation report", () => {
 		expect(rendered([mutant("killed")])).not.toContain("hung")
 	})
 
-	// NOTE: Which site stopped answering is the one thing the summary line can
+	// Which site stopped answering is the one thing the summary line can
 	// not say, and it is what a reader chasing a hang needs first.
 	it("names where a mutant hung under --verbose", () => {
 		expect(rendered([mutant("hung")], true)).toContain(
@@ -833,7 +833,7 @@ describe("The mutation scope", () => {
 		expect(isInScope("/project/other/Season.es", scope)).toBe(false)
 	})
 
-	// NOTE: A glob is read down to its literal head rather than expanded a
+	// A glob is read down to its literal head rather than expanded a
 	// second time — what is being answered is "is this Module one the reader
 	// pointed at", and the head is what they pointed at.
 	it("reads a glob down to the directory it names", () => {
@@ -861,7 +861,7 @@ describe("The result cache", () => {
 		expect(remembersResults(options())).toBe(true)
 	})
 
-	// NOTE: What a mutation run RUNS is a mutant — an entry compiled from a lie
+	// What a mutation run RUNS is a mutant — an entry compiled from a lie
 	// about the sources — and a record keyed by the bundle hash of the real ones
 	// would claim those tests passed against the code as written.
 	it("remembers nothing out of a mutation run", () => {
@@ -879,7 +879,7 @@ describe("The result cache", () => {
 		expect(remembersResults(options({ cases: 10 }))).toBe(false)
 	})
 
-	// NOTE: A project that wrote down how many values a property draws did not
+	// A project that wrote down how many values a property draws did not
 	// ask for a one-off run — `--cases` is what says that — so its ordinary run
 	// is remembered like anybody else's. A standing setting that turned the
 	// store off for ever would be a project paying for every run of it twice.

@@ -18,7 +18,7 @@ export function program(
 		implementation,
 		tests,
 		exports,
-		// NOTE: Left off entirely where the Parser abandoned nothing — see
+		// Left off entirely where the Parser abandoned nothing — see
 		// `parser.Program.recovery`.
 		...(recovery === undefined ? {} : { recovery }),
 		position,
@@ -172,7 +172,7 @@ export function importEntry(
 	}
 }
 
-// NOTE: `members` is the block as written — bare entries and groups in one
+// `members` is the block as written — bare entries and groups in one
 // order — which is what keeps `entries` in written order across both kinds.
 export function exportSection(
 	members: Array<parser.ExportNode | parser.ExportGroupNode>,
@@ -422,7 +422,7 @@ export function caseValueNode(
 	}
 }
 
-// NOTE: `brackets` and `bare` are written onto the Node only where they hold, so
+// `brackets` and `bare` are written onto the Node only where they hold, so
 // a braced update merging a whole value — every update there was before
 // Dictionaries — builds exactly the Node it always built. See
 // `parser.CombinationNode.brackets` and `.bare`.
@@ -1110,14 +1110,14 @@ export function parameter(
 
 type KeyValuePair = {
 	name: parser.IdentifierNode
-	// NOTE: Null exactly where `group` is set.
+	// Null exactly where `group` is set.
 	value: parser.ExpressionNode | null
 	position: common.Position
 	shorthand: boolean
-	// NOTE: A braced descend — a whole member list one level down, written in
+	// A braced descend — a whole member list one level down, written in
 	// place of a value.
 	group: parser.RecordValueNode | null
-	// NOTE: Null on an ordinary key. A path key carries every step it was
+	// Null on an ordinary key. A path key carries every step it was
 	// written with, the first of them the same Node `name` points at, and is
 	// keyed under the dotted spelling so `server` and `server.port` stay two
 	// entries — which is what lets the Parser refuse them as a clash instead of
@@ -1149,7 +1149,7 @@ export function keyGroupPair(
 	return { name, value: null, position, shorthand: false, steps, group }
 }
 
-// NOTE: The dotted spelling a path key is stored under, and the plain name of
+// The dotted spelling a path key is stored under, and the plain name of
 // every other key. One function so the Parser's clash check and the key of the
 // entry it checks can never drift apart.
 export function keyOf(pair: {
@@ -1170,7 +1170,7 @@ export function buildKeyValuePairList(
 	return {
 		data: keyValuePairList.reduce<KeyValuePairObject["data"]>(
 			(prev, curr) => {
-				// NOTE: `shorthand` and `steps` are written only where they
+				// `shorthand` and `steps` are written only where they
 				// are there to be written, so a member that spelled its value
 				// under a plain name keeps exactly the shape it has always
 				// had — the Formatter compares two ASTs key by key.
@@ -1242,7 +1242,7 @@ type OverloadedStaticMethodNode = {
 	documentation: common.Documentation | null
 }
 
-// NOTE: The `declarations { … }` counterparts — a body-less native signature in
+// The `declarations { … }` counterparts — a body-less native signature in
 // place of the block, and overload entries that may mix the two forms.
 type SimpleMethodSignatureNode = {
 	nodeType: "SimpleMethodSignatureNode"

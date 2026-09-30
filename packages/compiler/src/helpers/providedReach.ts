@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: A Namespace a provided body's emission names without the body writing
+// A Namespace a provided body's emission names without the body writing
 // the name: a Method of it called, or a witness built from its conformance.
 export type NamespaceReach =
 	| {
@@ -16,7 +16,7 @@ export type NamespaceReach =
 			position: common.Position
 	  }
 
-// NOTE: Every such Namespace in a typed provided body, but one a block around
+// Every such Namespace in a typed provided body, but one a block around
 // the reach declares. A witness names its Namespace once for each Method in its
 // map, so a witness whose map is empty names none.
 export function typedBodyNamespaceReaches(
@@ -25,7 +25,7 @@ export function typedBodyNamespaceReaches(
 	let reaches: Array<NamespaceReach> = []
 	let seen = new WeakMap<object, Set<ReadonlySet<string>>>()
 
-	// NOTE: `declared` holds the Namespaces the blocks around `value` declare.
+	// `declared` holds the Namespaces the blocks around `value` declare.
 	// Each is emitted as a class of its block, so there its name is that class
 	// and never the Program's Namespace.
 	let visit = (
@@ -50,7 +50,7 @@ export function typedBodyNamespaceReaches(
 		let record = value as Record<string, unknown>
 		let visits = seen.get(record) ?? new Set<ReadonlySet<string>>()
 
-		// NOTE: A Type names no Namespace, and a Protocol declared inside the
+		// A Type names no Namespace, and a Protocol declared inside the
 		// body is emitted apart from it.
 		if (
 			(typeof record.type === "string" &&
@@ -126,7 +126,7 @@ export function typedBodyNamespaceReaches(
 			}
 		}
 
-		// NOTE: A String hole's witness is asked for by the hole.
+		// A String hole's witness is asked for by the hole.
 		let hole =
 			record.kind === "expression" &&
 			typeof record.expression === "object" &&
@@ -149,7 +149,7 @@ export function typedBodyNamespaceReaches(
 
 const NO_NAMESPACES: ReadonlySet<string> = new Set()
 
-// NOTE: The Namespaces declared in a block and around it, or `declared` itself
+// The Namespaces declared in a block and around it, or `declared` itself
 // where the block declares none.
 function blockNamespaces(
 	items: Array<unknown>,

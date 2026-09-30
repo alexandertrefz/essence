@@ -8,7 +8,7 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 
 describe("Parser", () => {
 	describe("Expressions", () => {
-		// NOTE: `_` is a Symbol wherever the Lexer meets it — a wildcard Matcher,
+		// `_` is a Symbol wherever the Lexer meets it — a wildcard Matcher,
 		// a labelless Parameter, a Number's group separator — and never a
 		// character inside a name. A leading `__` used to be the ONE exception:
 		// the sigil of a native free Function, whose name the Parser reassembled
@@ -34,7 +34,7 @@ describe("Parser", () => {
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
-			// NOTE: The same refusal, from the same Lexer rule — which is the
+			// The same refusal, from the same Lexer rule — which is the
 			// point. A `__`-prefixed name is not a special case any more; it is an
 			// underscore inside a name, like every other one.
 			it("should refuse an underscore in the middle of a name", () => {
@@ -234,7 +234,7 @@ describe("Parser", () => {
 				expect(stepsOf(pathOf(".price"))).toEqual(["price"])
 			})
 
-			// NOTE: The whole chain belongs to the path — a step left to the
+			// The whole chain belongs to the path — a step left to the
 			// postfix loop would come back as a Lookup OVER the path, which is
 			// a shape nothing downstream has a meaning for.
 			it("should read every step of a path", () => {
@@ -271,7 +271,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: The adjacency rule, from both sides. A dot written flush
+			// The adjacency rule, from both sides. A dot written flush
 			// against a name continues that name; a dot with a space in front
 			// of it opens a path, and the name before it is a label.
 			it("should read an adjacent dot as a Lookup", () => {
@@ -379,7 +379,7 @@ describe("Parser", () => {
 			})
 		})
 
-		// NOTE: `{ x }` is `{ x = x }`, and it is a feature of a Record
+		// `{ x }` is `{ x = x }`, and it is a feature of a Record
 		// LITERAL's member list — never of an update's key list, where a bare
 		// name is already the whole value being merged in.
 		describe("Property shorthand", () => {
@@ -417,7 +417,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: The name and the value share one Position on purpose —
+			// The name and the value share one Position on purpose —
 			// that is what a rename of either one expands the member from.
 			it("should give the name and the value one Position", () => {
 				let member = recordOf("{ x }").members["x"]!
@@ -478,7 +478,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: The reading that keeps `{ base with other }` meaning what
+			// The reading that keeps `{ base with other }` meaning what
 			// it has always meant — a whole value merged in, not a member set.
 			it("should keep a bare name after 'with' as the value being merged", () => {
 				let node = parse(
@@ -516,7 +516,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: The third reading exists to explain a bare name, and a list
+			// The third reading exists to explain a bare name, and a list
 			// that is broken for some other reason must not be explained by it.
 			it("should leave a list broken for another reason to the Parser", () => {
 				let { diagnostics } = parseWithDiagnostics(
@@ -528,7 +528,7 @@ describe("Parser", () => {
 				).toEqual(["syntax-error"])
 			})
 
-			// NOTE: The speculative Literal reading of `{ base with … }` reads
+			// The speculative Literal reading of `{ base with … }` reads
 			// `base` as a shorthand member before it meets `with`, reports
 			// nothing on the way out, and leaves the Combination reading to it.
 			it("should leave nothing behind when the Literal reading is thrown away", () => {
@@ -550,7 +550,7 @@ describe("Parser", () => {
 			})
 		})
 
-		// NOTE: `server.port = 8080` — a key that reaches one step into the
+		// `server.port = 8080` — a key that reaches one step into the
 		// value being updated. The Parser reads one in EVERY key position and
 		// leaves the refusals to whoever knows what the braces are.
 		describe("Path keys", () => {
@@ -593,7 +593,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: `name` points at the FIRST step, so everything that reads
+			// `name` points at the FIRST step, so everything that reads
 			// a member's name without knowing about paths keeps working.
 			it("should point a path member's name at its first step", () => {
 				let combination = combinationOf(
@@ -638,7 +638,7 @@ describe("Parser", () => {
 				])
 			})
 
-			// NOTE: The one reading a path key must never take away: the left
+			// The one reading a path key must never take away: the left
 			// hand side of an update is an Expression, and a Lookup chain is
 			// one.
 			it("should leave a Lookup chain before 'with' as the value updated", () => {
@@ -649,7 +649,7 @@ describe("Parser", () => {
 				expect(combination.lhs.nodeType).toBe("Lookup")
 			})
 
-			// NOTE: An update takes either a key list or one Expression, and
+			// An update takes either a key list or one Expression, and
 			// one path is an Expression — so this merges the VALUE, exactly as
 			// `{ base with other }` does.
 			it("should read a lone path after 'with' as the value merged", () => {
@@ -703,7 +703,7 @@ describe("Parser", () => {
 				)
 			})
 
-			// NOTE: `server.{ … }` — one Token of lookahead after a step's dot
+			// `server.{ … }` — one Token of lookahead after a step's dot
 			// settles it: a `{` opens a descend, an Identifier continues the
 			// path, and a member name is never `{`.
 			it("should read a braced descend as a member list one level down", () => {
@@ -749,7 +749,7 @@ describe("Parser", () => {
 				expect(Object.keys(inner.group!.members)).toEqual(["enabled"])
 			})
 
-			// NOTE: Shorthand is allowed inside a descend and refused after a
+			// Shorthand is allowed inside a descend and refused after a
 			// `with`: a bare name there could be the whole value being merged,
 			// and inside a descend there is no such reading to lose.
 			it("should read a bare name inside a descend as its own value", () => {
@@ -793,7 +793,7 @@ describe("Parser", () => {
 				expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
 			})
 
-			// NOTE: The boundary is the dot, not the characters — `serverPort`
+			// The boundary is the dot, not the characters — `serverPort`
 			// is no part of `server`.
 			it("should leave a key that merely starts the same alone", () => {
 				let { diagnostics } = parseWithDiagnostics(
@@ -803,7 +803,7 @@ describe("Parser", () => {
 				expect(diagnostics).toEqual([])
 			})
 
-			// NOTE: A path key is read the same way in every key position —
+			// A path key is read the same way in every key position —
 			// the Parser writes one wherever a key can stand and the Enricher
 			// says where it MEANS something — so the refusals a key list is
 			// held to hold for a Literal merged into a default just the same.
@@ -835,7 +835,7 @@ describe("Parser", () => {
 					expect(diagnostics[0]!.code).toBe("duplicate-member")
 				})
 
-				// NOTE: A descend holds a member LIST, and a plain key of one
+				// A descend holds a member LIST, and a plain key of one
 				// takes the shorthand wherever the list it stands in does —
 				// there is no `with` inside a descend for a bare name to be the
 				// whole value merged.
@@ -1044,7 +1044,7 @@ describe("Parser", () => {
 			})
 
 			describe("AnonymousRecordLiteral", () => {
-				// NOTE: The empty Record is the unit value — the thing a
+				// The empty Record is the unit value — the thing a
 				// Function that answers nothing useful returns — so `{}` in
 				// Expression position has to reach the Parser as an ordinary
 				// AnonymousRecordLiteral with no members, not as a Literal of
@@ -1274,7 +1274,7 @@ describe("Parser", () => {
 				})
 			})
 
-			// NOTE: A decimal is a second spelling of a Rational and nothing
+			// A decimal is a second spelling of a Rational and nothing
 			// else — there is no DecimalValue Node, and no scale kept on the
 			// side, so what these snapshots pin is the fraction each spelling
 			// stands for.
@@ -1383,7 +1383,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			// NOTE: An `otherwise` arm on its own is a whole `define` — every
+			// An `otherwise` arm on its own is a whole `define` — every
 			// value it could answer with is the one that always holds.
 			it("should parse a define Expression that is nothing but its otherwise arm", () => {
 				let input: parser.Program = parse(
@@ -1458,7 +1458,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			// NOTE: A line break is invisible to the Parser, so nothing about
+			// A line break is invisible to the Parser, so nothing about
 			// the layout tells one arm from the next — the `as` does, and the
 			// end of an Expression is the first Token that can not carry it on.
 			it("should parse arms written on one line", () => {
@@ -1471,7 +1471,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			// NOTE: `otherwise` is a valid Identifier, so an arm may answer
+			// `otherwise` is a valid Identifier, so an arm may answer
 			// with a value spelled the same as the word that ends the arm. The
 			// two readings never meet: an arm's value stops at the word
 			// whatever the word is, and the loop then reads the Token AFTER
@@ -2251,7 +2251,7 @@ describe("Parser", () => {
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
-			// NOTE: Annotations may only be omitted by a Function literal in
+			// Annotations may only be omitted by a Function literal in
 			// expression position, where an expected signature exists to read
 			// them off. A Declaration has none, so its annotations stay
 			// mandatory.
@@ -2403,7 +2403,7 @@ describe("Parser", () => {
 					let namespace = program.implementation
 						.nodes[0] as parser.NamespaceDefinitionStatementNode
 
-					// NOTE: The comma before `is Printable` ends the `where`
+					// The comma before `is Printable` ends the `where`
 					// list — Printable is a second clause, not a condition.
 					expect(namespace.conformsTo.length).toBe(2)
 					expect(namespace.conformsTo[0].protocol.content).toBe(
@@ -2475,7 +2475,7 @@ describe("Parser", () => {
 			})
 		})
 
-		// NOTE: `where` is an ordinary Identifier — a Namespace's conformance
+		// `where` is an ordinary Identifier — a Namespace's conformance
 		// conditions and `removeEvery(where …)` both write it — so what the
 		// Parser has to get right is WHEN it opens a refinement's predicate. What
 		// the predicate may then SAY is a question about Types, which the
@@ -2525,7 +2525,7 @@ describe("Parser", () => {
 				expect(node.predicate?.nodeType).toBe("MethodInvocation")
 			})
 
-			// NOTE: Linebreak Tokens are discarded, so nothing but the line
+			// Linebreak Tokens are discarded, so nothing but the line
 			// numbers can tell a clause continuing this Type from a Statement
 			// that happens to begin with the name `where`. A `where` on the
 			// next line is the clause when what follows it on its own line
@@ -2577,7 +2577,7 @@ describe("Parser", () => {
 				}
 			})
 
-			// NOTE: Every base the Enricher refuses still PARSES — a refusal that
+			// Every base the Enricher refuses still PARSES — a refusal that
 			// came from the Parser would be a Syntax error about a Type, and the
 			// showcase file for these Diagnostics could never reach the Enricher
 			// at all.
@@ -2835,7 +2835,7 @@ describe("Parser", () => {
 		})
 	})
 
-	// NOTE: `= expression` at the end of a Parameter. Every case here is also a
+	// `= expression` at the end of a Parameter. Every case here is also a
 	// Formatter round-trip case in `formatter.spec.ts` — the two halves of "the
 	// source says what the AST says" are worth pinning apart.
 	describe("Default Parameter Values", () => {
@@ -2861,7 +2861,7 @@ describe("Parser", () => {
 			expect(parameter.defaultValue?.nodeType).toBe("IntegerValue")
 		})
 
-		// NOTE: The `position` of a Parameter still ends at its Type, never
+		// The `position` of a Parameter still ends at its Type, never
 		// past the default — the Inlay Hint that offers to write an inferred
 		// Type sits at exactly that spot, and the Quick Fix applies it.
 		it("should not widen the Parameter's position over the default", () => {
@@ -2875,7 +2875,7 @@ describe("Parser", () => {
 			).toBeGreaterThan(parameter.position.end.column)
 		})
 
-		// NOTE: `#Start` written after `= ` is a bare Case, not the adjacency
+		// `#Start` written after `= ` is a bare Case, not the adjacency
 		// rule's `Choice#Case` — nothing precedes the `#` to continue.
 		it("should parse a bare Case default", () => {
 			let parameter = parameterOf("(at side: Side = #Start)")
@@ -2898,7 +2898,7 @@ describe("Parser", () => {
 			expect(parameter.defaultValue?.nodeType).toBe("Identifier")
 		})
 
-		// NOTE: The two cases that prove §2.1's claim that there is nothing to
+		// The two cases that prove §2.1's claim that there is nothing to
 		// disambiguate — a comma inside a default is always inside brackets the
 		// sub-parser balances, so the Parameter list's own comma is never in
 		// doubt.
@@ -2945,7 +2945,7 @@ describe("Parser", () => {
 			expect(diagnostics).toEqual([])
 		})
 
-		// NOTE: The three positions a default is refused in. The first two are
+		// The three positions a default is refused in. The first two are
 		// reported and the default dropped; the third never parses at all,
 		// because a Function TYPE has no expression slot to read one into.
 		it("should refuse a default on a Function literal", () => {
@@ -3004,7 +3004,7 @@ describe("Parser", () => {
 			expect(containsErrors(diagnostics)).toBe(true)
 		})
 
-		// NOTE: A default needs a written Type to be checked against — the
+		// A default needs a written Type to be checked against — the
 		// Type can not be read back off the default, because `(_ n = 1)` and
 		// `(_ n: Number = 1)` mean different things to every caller. Nothing
 		// special enforces this: outside a Function literal, a Parameter's `:`
@@ -3017,7 +3017,7 @@ describe("Parser", () => {
 			expect(containsErrors(diagnostics)).toBe(true)
 		})
 
-		// NOTE: `_: Type` binds no name, so its default is unreachable from
+		// `_: Type` binds no name, so its default is unreachable from
 		// the body — but a caller may still leave the Argument out, which is
 		// the only thing a default has to mean. Allowed.
 		it("should allow a default on a nameless Parameter", () => {
@@ -3029,7 +3029,7 @@ describe("Parser", () => {
 	})
 
 	describe("Declarations Programs", () => {
-		// NOTE: `declarations { … }` is the standard library's opt-in Program
+		// `declarations { … }` is the standard library's opt-in Program
 		// form — only reachable when the caller passes `allowDeclarationsHeader`.
 		function declarationsNamespace(
 			source: string,
@@ -3230,7 +3230,7 @@ describe("Parser", () => {
 			}
 		})
 
-		// NOTE: The free-Function forms of a `declarations { … }` Program —
+		// The free-Function forms of a `declarations { … }` Program —
 		// only the standard library opens one.
 		function declarationsNode(source: string): parser.ImplementationNode {
 			let program = parse(source, { allowDeclarationsHeader: true })
@@ -3238,7 +3238,7 @@ describe("Parser", () => {
 			return program.implementation.nodes[0]
 		}
 
-		// NOTE: The standalone body-less form left the language with `__print`
+		// The standalone body-less form left the language with `__print`
 		// — a native free Function exists only as an `overload function`
 		// entry now, so a free `function` signature with no block is the
 		// plain missing-body parse error in every mode.
@@ -3254,7 +3254,7 @@ describe("Parser", () => {
 			expect(containsErrors(diagnostics)).toBe(true)
 		})
 
-		// NOTE: A declaration name is an ordinary Identifier — the Parser no longer
+		// A declaration name is an ordinary Identifier — the Parser no longer
 		// reassembles a `__`-prefixed one out of `_ _ name`, so the standard
 		// library can not declare a native free Function whose name a Program
 		// could never spell back.
@@ -3346,7 +3346,7 @@ describe("Parser", () => {
 			expect(diagnostic).toBeDefined()
 			expect(diagnostic?.labels[0]?.kind).toBe("primary")
 
-			// NOTE: Recovery parses the block as an implementation section so
+			// Recovery parses the block as an implementation section so
 			// the contents still yield an AST and downstream Diagnostics.
 			expect(program.kind).toBe("implementation")
 			expect(program.implementation.nodes).toHaveLength(1)
@@ -3382,7 +3382,7 @@ describe("Parser", () => {
 				"Write the Overloads as an 'overload' Method block inside a Namespace instead.",
 			])
 
-			// NOTE: Recovery parses the block anyway, so the block's contents
+			// Recovery parses the block anyway, so the block's contents
 			// still yield an AST instead of the cascade the Expression reading
 			// used to leave behind.
 			expect(program.implementation.nodes).toHaveLength(1)
@@ -3481,7 +3481,7 @@ describe("Parser", () => {
 			expect(program.imports).toBeNull()
 		})
 
-		// NOTE: The Formatter reads a Program's Position as the span of the block
+		// The Formatter reads a Program's Position as the span of the block
 		// it writes `implementation {` and its closing brace for, so the sections
 		// framing it may not widen it — each carries its own span instead.
 		it("should keep the Program's Position on the implementation block", () => {
@@ -3590,7 +3590,7 @@ export { from "./Geometry.es" { Rectangle } }`,
 			expect(entries[1].source?.path).toBe("./Geometry.es")
 		})
 
-		// NOTE: `as` is an Identifier everywhere but an entry's alias position, so
+		// `as` is an Identifier everywhere but an entry's alias position, so
 		// a Module may export something called `as` — and rename it to `as`.
 		it("should read an entry named after a Module Keyword", () => {
 			let entries = importEntries(
@@ -3639,7 +3639,7 @@ export { from "./Geometry.es" { Rectangle } }`,
 				expect(program.implementation.nodes).toHaveLength(1)
 			})
 
-			// NOTE: `from` is an Identifier in an export block unless a specifier
+			// `from` is an Identifier in an export block unless a specifier
 			// follows it, so `from` alone is an entry named `from` — and a group
 			// with a specifier but no braces is the one that is refused.
 			it("should read a bare export entry named 'from'", () => {
@@ -3743,7 +3743,7 @@ export { from "./Geometry.es" { Rectangle } }`,
 				expect(program.imports).toBeNull()
 			})
 
-			// NOTE: The block is DROPPED and the Diagnostic underlines the
+			// The block is DROPPED and the Diagnostic underlines the
 			// Keyword, so its own span is the only record left of where the
 			// text a fix has to move stands.
 			it("should carry the dropped block's own span", () => {
@@ -3763,7 +3763,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				})
 			})
 
-			// NOTE: A block on the wrong side is still parsed where it stands, so
+			// A block on the wrong side is still parsed where it stands, so
 			// what is inside it is read rather than cascading into the Diagnostics
 			// about the Program's shape. The two come out in the order the file
 			// reads them: the block's own Keyword stands left of what is in it.
@@ -3794,7 +3794,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 			})
 		})
 
-		// NOTE: A `declarations { … }` Program carries its sections on exactly
+		// A `declarations { … }` Program carries its sections on exactly
 		// the same terms as an `implementation { … }` one — the standard
 		// library's files are Modules too, each importing what it uses from its
 		// siblings. Only the SIDE a block is written on is still refused, and it
@@ -3842,7 +3842,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				expect(program.exports?.entries).toHaveLength(1)
 			})
 
-			// NOTE: The side check is what survives. An `import` written BELOW
+			// The side check is what survives. An `import` written BELOW
 			// the header is still misplaced in a declarations Program, exactly
 			// as it is in an implementation one.
 			it("should still refuse a misplaced section in a standard library file", () => {
@@ -3858,7 +3858,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 			})
 		})
 
-		// NOTE: All four Module Keywords stay valid Identifiers — `from` and `as`
+		// All four Module Keywords stay valid Identifiers — `from` and `as`
 		// are Argument labels the standard library already writes, so making them
 		// Keywords outright would have broken `slice(from 1, to 3)`.
 		describe("Contextual Keywords", () => {
@@ -3980,7 +3980,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				])
 			})
 
-			// NOTE: `otherwise` is a name like the rest of these, which is
+			// `otherwise` is a name like the rest of these, which is
 			// what keeps a Method spelled that way available — the standard
 			// library had an `Optional::otherwise` until it was renamed. The
 			// word ends a `define` arm only where an arm's value has already
@@ -4079,7 +4079,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				}
 			})
 
-			// NOTE: `define` is NOT a name, and the difference is the Token
+			// `define` is NOT a name, and the difference is the Token
 			// behind the word. An Identifier with a `{` behind it already
 			// parses — a name, and the Record literal below it — so a
 			// contextual `define` would quietly read two Statements as one
@@ -4095,7 +4095,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				)
 			})
 
-			// NOTE: A section is recognised by its Keyword AND its `{`, so a lone
+			// A section is recognised by its Keyword AND its `{`, so a lone
 			// Keyword below the implementation is a Token where the Program had
 			// ended rather than a section whose block went missing.
 			it("should not read a bare Keyword below the implementation as a section", () => {

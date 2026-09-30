@@ -8,7 +8,7 @@ type NetlifyConfiguration = {
 	build?: { environment?: { BUN_VERSION?: unknown } }
 }
 
-// NOTE: Netlify installs the Bun `BUN_VERSION` names, so the site is built by
+// Netlify installs the Bun `BUN_VERSION` names, so the site is built by
 // the Bun that development and CI run only while it matches `.bun-version`.
 describe("the Netlify deploy", () => {
 	it("builds with the Bun `.bun-version` pins", () => {

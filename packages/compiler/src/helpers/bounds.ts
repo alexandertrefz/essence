@@ -1,4 +1,4 @@
-// NOTE: THE words for "a Type Parameter carries one bound", shared by the two
+// THE words for "a Type Parameter carries one bound", shared by the two
 // Enricher reports that have to say it: two bounds written down in one `<…>`,
 // and a body that wants a second Protocol of a Parameter something already
 // bounded. A reader who meets the rule twice in two spellings has to work out
@@ -16,7 +16,7 @@ export function oneBoundOnly(
 	carried: string,
 	wanted: string,
 ): Array<string> {
-	// NOTE: Two Protocols spelled alike here can not both be written in one
+	// Two Protocols spelled alike here can not both be written in one
 	// clause, so the example is left out.
 	let example =
 		carried === wanted

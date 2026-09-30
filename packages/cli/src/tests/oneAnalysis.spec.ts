@@ -9,7 +9,7 @@ import { analyse } from "@essence-lang/language-server/analyse"
 
 import { compileFile } from "../pipeline"
 
-// NOTE: `essence check X.es` and the Editor's Problems for X.es are ONE list.
+// `essence check X.es` and the Editor's Problems for X.es are ONE list.
 // They run the same analysis — see `@essence-lang/compiler/analysis` — and this
 // is what says so over every deliberately broken file in the corpus rather than
 // over one example somebody remembered to write down.
@@ -17,7 +17,7 @@ import { compileFile } from "../pipeline"
 // It is a CLI spec because the CLI is the only package that can reach both: it
 // depends on the Language Server, and nothing depends on it.
 //
-// NOTE: Compared by code, Position and message. What is deliberately NOT
+// Compared by code, Position and message. What is deliberately NOT
 // compared is presentation: `esc` renders a report and the Editor publishes
 // LSP Diagnostics, and the two will never be the same bytes.
 function fingerprint(diagnostic: common.Diagnostic): string {
@@ -50,7 +50,7 @@ function editorFingerprints(filePath: string): Array<string> {
 	return analyse(readFileSync(filePath, "utf8"), filePath).map(fingerprint)
 }
 
-// NOTE: The THIRD reader of the same list — the seam a host embeds the Compiler
+// The THIRD reader of the same list — the seam a host embeds the Compiler
 // through, which is where the Vite, Bun and esbuild plugins get a build's
 // mistakes from. It used to stop at whichever stage reported first and call the
 // Validator bare underneath, so a plugin's Problems panel showed one mistake
@@ -85,7 +85,7 @@ describe("one analysis", () => {
 		})
 	}
 
-	// NOTE: A Module graph is the case the two used to be furthest apart on —
+	// A Module graph is the case the two used to be furthest apart on —
 	// the Editor answered a dependency's mistake AND said so over the import,
 	// while `esc` said only the first. The entry's own list is what is compared:
 	// each of the graph's other files is reported under its own name on both
@@ -99,7 +99,7 @@ describe("one analysis", () => {
 	})
 })
 
-// NOTE: Three mistakes in one file, from two stages: the Validator reports
+// Three mistakes in one file, from two stages: the Validator reports
 // `return-type-mismatch` and `missing-return`, the Enricher `unknown-name`, and
 // one run reports all three.
 describe("every stage in one run", () => {
@@ -124,7 +124,7 @@ describe("every stage in one run", () => {
 			["unknown-name", 21],
 		])
 		expect(outcome.ok).toBe(false)
-		// NOTE: And no stage refused, so nothing is said about one. A `check`
+		// And no stage refused, so nothing is said about one. A `check`
 		// writes no file, so there is nothing it stopped short of either.
 		expect(outcome.failedStage).toBeNull()
 	})
@@ -144,7 +144,7 @@ describe("every stage in one run", () => {
 		])
 	})
 
-	// NOTE: And through the embedding seam, which is the one that used to stop
+	// And through the embedding seam, which is the one that used to stop
 	// at the first stage that reported — a host building this file was handed
 	// the `unknown-name` and nothing else.
 	it("reports all three mistakes to an embedding host, in file order", async () => {

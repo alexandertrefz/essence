@@ -34,7 +34,7 @@ import { readSurface } from "../scripts/stdlibSurface.ts"
  * by the same run as the page. The checks read the manifests, and the anchor
  * checks read the pages the way Astro does.
  *
- * NOTE: The pages are read as files rather than through `astro:content`,
+ * The pages are read as files rather than through `astro:content`,
  * which only resolves inside an Astro build; this has to run under `bun test`.
  */
 
@@ -260,7 +260,7 @@ describe("the standard library reference", () => {
 	})
 
 	it("hands MDX no quoted prop with an escape in it", () => {
-		// NOTE: A quoted MDX attribute is taken literally, escapes and all. A
+		// A quoted MDX attribute is taken literally, escapes and all. A
 		// declaration that spans lines once rendered its `\n` and `\t` as text on
 		// three pages, and the pages still matched the generator above — so the
 		// shape is held here, where the output is.
@@ -413,7 +413,7 @@ describe("The overview's quoted signatures", () => {
 
 		expect(fragment).not.toBeNull()
 
-		// NOTE: An entry may be broken across lines, exactly as the sources
+		// An entry may be broken across lines, exactly as the sources
 		// have it — a continuation is indented or is the `)` that closes the
 		// Parameter list, so the entries are gathered rather than read one line
 		// at a time.

@@ -34,13 +34,13 @@ import { essenceSamples, type Sample } from "../src/lib/samples.ts"
  * the block under that name beside the page's other blocks, so a module the
  * next block imports is there to be imported.
  *
- * NOTE: In process, through the command line's own compile — `compileFile` over
+ * In process, through the command line's own compile — `compileFile` over
  * a `CompileSession` is what `essence check`, `build` and `run` hand a file to,
  * minus the report. Spawning `essence` per block is what the writers' checker
  * did; four hundred processes is minutes, and this has to sit in `bun test`.
  */
 
-// NOTE: A directory of this run's own for the bundle cache, set before the
+// A directory of this run's own for the bundle cache, set before the
 // first compile, because where the cache lives is read off the environment
 // every time it is asked for. A sample compiled here neither answers out of
 // the user's cache nor leaves a bundle in it.
@@ -57,7 +57,7 @@ afterAll(() => {
 	rmSync(bundleCache, { recursive: true, force: true })
 })
 
-// NOTE: The globals `run` below hijacks to read what a Program wrote. A test
+// The globals `run` below hijacks to read what a Program wrote. A test
 // that times out mid-import leaves its `finally` unrun, and every later sample
 // would then print into a buffer nothing reads — so they are put back after
 // every test as well.
@@ -87,7 +87,7 @@ function pagesUnder(directory: string): Array<string> {
 
 type WrittenSample = Sample & { fileName: string }
 
-// NOTE: Every block of a page is written before any of them is compiled, into
+// Every block of a page is written before any of them is compiled, into
 // one directory per page — a block that imports `./Money.es` finds the block
 // that is `Money.es` whichever of the two comes first on the page.
 function writeSamples(
@@ -110,7 +110,7 @@ function writeSamples(
 	})
 }
 
-// NOTE: A directory of its own for every bundle, made just before the bundle is
+// A directory of its own for every bundle, made just before the bundle is
 // written into it. Bun's resolver remembers what a directory held the first
 // time it resolved a module out of it, so a second bundle written beside one
 // already imported is "not found" for the rest of the process — every run
@@ -137,7 +137,7 @@ function report(outcome: Awaited<ReturnType<typeof compileFile>>): string {
 		.join("\n")
 }
 
-// NOTE: What a Program writes to standard output, the way `essence run` shows
+// What a Program writes to standard output, the way `essence run` shows
 // it: `Terminal.print` and `Terminal.write` reach the stream, and
 // `Terminal.inspect` ends its line through `console.log`, which under Bun goes
 // to the file descriptor without passing `process.stdout.write`. Both are held.
@@ -175,7 +175,7 @@ async function run(bundle: string): Promise<Array<string>> {
 	return lines
 }
 
-// NOTE: A `§ "quoted"` comment is the printed text in quotes, which a page
+// A `§ "quoted"` comment is the printed text in quotes, which a page
 // writes where the text has a meaningful space at either end. Either spelling
 // matches.
 function printedAsExpected(printed: string | undefined, expected: string) {
@@ -193,7 +193,7 @@ let pages = pagesUnder(DOCS_DIRECTORY)
 
 describe("the samples on the site", () => {
 	it("finds the site's samples", () => {
-		// NOTE: A guard on the reading — a fence pattern that silently stopped
+		// A guard on the reading — a fence pattern that silently stopped
 		// matching would turn every test below into no test at all.
 		expect(pages.length).toBeGreaterThan(30)
 		expect(pages.flatMap((page) => page.samples).length).toBeGreaterThan(
@@ -205,7 +205,7 @@ describe("the samples on the site", () => {
 		describe(page.id, () => {
 			let samples = writeSamples(page.id, page.samples)
 
-			// NOTE: One Session per page and per mode, which is how one
+			// One Session per page and per mode, which is how one
 			// `essence check` over a page's files would compile them: a module
 			// two blocks import is read and enriched once. A check links the
 			// tests section and a run does not, and a Session opened in one mode

@@ -24,7 +24,7 @@ function tokenAt(source: string, line: number, column: number) {
 }
 
 describe("Semantic Tokens", () => {
-	// NOTE: Every step of a dotted key colours as the member it names —
+	// Every step of a dotted key colours as the member it names —
 	// the first because the key list was written, the rest because the Lookups
 	// the Enricher synthesized stand exactly where the steps do.
 	it("should classify every step of a path key as a property", () => {
@@ -47,7 +47,7 @@ describe("Semantic Tokens", () => {
 		expect(tokenAt(source, 10, 43)?.type).toBe("property")
 	})
 
-	// NOTE: A Literal merged into a default carries path keys too, and there
+	// A Literal merged into a default carries path keys too, and there
 	// are no synthesized Lookups under one — every step but the first is a key
 	// of a list that exists nowhere in the written source, coloured off the
 	// occurrences `memberPositions` puts in the rename index.
@@ -109,7 +109,7 @@ describe("Semantic Tokens", () => {
 		expect(use?.modifiers).not.toContain("declaration")
 	})
 
-	// NOTE: A PROVIDED Method's body is walked as the Function Definition it is,
+	// A PROVIDED Method's body is walked as the Function Definition it is,
 	// so the names inside it colour like the names inside any other body — a
 	// Parameter is a Parameter, and the Protocol an extension names is a Type.
 	it("should colour the names inside a provided Protocol Method", () => {
@@ -166,7 +166,7 @@ describe("Semantic Tokens", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: `Box` is the Choice's Type; `Value` in the header and in the
+		// `Box` is the Choice's Type; `Value` in the header and in the
 		// payload are its Type Parameter; `value` is a Record member Property.
 		expect(tokenAt(source, 2, 9)?.type).toBe("type")
 		expect(tokenAt(source, 2, 13)?.type).toBe("typeParameter")
@@ -247,19 +247,19 @@ describe("Semantic Tokens", () => {
 			])
 
 			expect(data).toEqual([
-				// NOTE: First Token — deltas are from line 1, column 1.
+				// First Token — deltas are from line 1, column 1.
 				1,
 				10,
 				5,
 				semanticTokenTypes.indexOf("variable"),
 				0b001,
-				// NOTE: Same line, so the column delta is relative.
+				// Same line, so the column delta is relative.
 				0,
 				9,
 				3,
 				semanticTokenTypes.indexOf("function"),
 				0,
-				// NOTE: New line, so the column delta is absolute.
+				// New line, so the column delta is absolute.
 				2,
 				1,
 				4,
@@ -318,7 +318,7 @@ describe("Semantic Tokens for Cases", () => {
 	})
 
 	it("should leave the Choice prefix of a qualified Case a Type", () => {
-		// NOTE: The `#` sits between the two Tokens and belongs to neither —
+		// The `#` sits between the two Tokens and belongs to neither —
 		// the Case's Position covers its name alone, exactly as at its
 		// declaration.
 		let value = tokenAt(source, 13, 19)
@@ -383,7 +383,7 @@ describe("Semantic Tokens for the standard library", () => {
 })
 
 describe("the Semantic Token legend", () => {
-	// NOTE: Tokens are encoded as indices into these arrays, so entries may
+	// Tokens are encoded as indices into these arrays, so entries may
 	// only ever be appended — an insertion recolours everything past it.
 	it("should carry the new entries at its end", () => {
 		expect(semanticTokenTypes.at(-1)).toBe("enumMember")
@@ -432,7 +432,7 @@ describe("Semantic Tokens in where clauses", () => {
 	})
 })
 
-// NOTE: A `= #Case` default would go uncoloured otherwise — the Case walk
+// A `= #Case` default would go uncoloured otherwise — the Case walk
 // descends into bodies, and a default is not one.
 describe("Semantic Tokens of a Case written in a default", () => {
 	it("should colour a bare Case as an enum member", () => {
@@ -453,7 +453,7 @@ describe("Semantic Tokens of a Case written in a default", () => {
 	})
 })
 
-// NOTE: A Record Literal's bare member is two symbols at ONE Position — the
+// A Record Literal's bare member is two symbols at ONE Position — the
 // member it writes and the value it reads — and the protocol forbids
 // overlapping Tokens, so `sortTokens` keeps exactly one of them. Which one is
 // not a coin toss: the value is recorded by the lexical walk and the member by
@@ -485,7 +485,7 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 		expect(tokenAt(source, 6, 31)?.type).toBe("property")
 	})
 
-	// NOTE: One Token, not two — an overlapping pair would corrupt every
+	// One Token, not two — an overlapping pair would corrupt every
 	// Token after it, since the encoding is a chain of deltas.
 	it("writes one Token at the bare member, not two", () => {
 		expect(
@@ -496,10 +496,10 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 	})
 })
 
-// NOTE: A `#Case` written into a Case payload's default would go uncoloured
+// A `#Case` written into a Case payload's default would go uncoloured
 // otherwise, for the same reason a Parameter default's would.
 describe("Semantic Tokens of a Case written in a payload default", () => {
-	// NOTE: A default value may NAME a Constant of the Module, whose value is
+	// A default value may NAME a Constant of the Module, whose value is
 	// baked into the Case Type — and the name is coloured as the Constant it is,
 	// because what the walk meets is an Expression like any other.
 	it("should colour a Constant a default names as a readonly variable", () => {
@@ -539,7 +539,7 @@ describe("Semantic Tokens of a Case written in a payload default", () => {
 		expect(tokenAt(source, 8, 44)?.type).toBe("enumMember")
 	})
 
-	// NOTE: A path's steps carry no code of their own here — they colour
+	// A path's steps carry no code of their own here — they colour
 	// because the rename index records them off the Lookups the Enricher
 	// synthesizes, each standing at the span of the step that spelled it.
 	it("should colour every step of a member path as a property", () => {
@@ -580,7 +580,7 @@ describe("Semantic Tokens inside a define", () => {
 		"}",
 	].join("\n")
 
-	// NOTE: A Case resolves through its Choice rather than through a Scope, so
+	// A Case resolves through its Choice rather than through a Scope, so
 	// it is the one construct coloured off the Parser AST — which means the
 	// walk has to reach both halves of an arm on its own.
 	it("should classify a Case written in an arm's value as an enumMember", () => {
@@ -593,7 +593,7 @@ describe("Semantic Tokens inside a define", () => {
 	})
 })
 
-// NOTE: The two Types are builtins like every other, so they colour off the
+// The two Types are builtins like every other, so they colour off the
 // index — what is asserted here is that they REACH it. A Case written under one
 // of the Keywords is the other half: Cases are collected from the Parser AST by
 // a walk of this file's own, which reaches nothing under a `start` without a

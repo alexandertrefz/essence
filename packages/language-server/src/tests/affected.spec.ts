@@ -10,7 +10,7 @@ import {
 	type EntryAttribution,
 } from "../affected"
 
-// NOTE: The line-to-tests reasoning, pinned without an Editor: everything in
+// The line-to-tests reasoning, pinned without an Editor: everything in
 // `affected.ts` is a function of its arguments, so a hand-built event stream and
 // a pair of buffers is the whole world it needs. The session in `testSession.ts`
 // is what feeds it the real ones; here the events and the text are built by hand
@@ -71,7 +71,7 @@ describe("The attribution the session folds out of a run", () => {
 		expect(ids(table, "/A.es")).toEqual([["t1"], [], ["t1"]])
 	})
 
-	// NOTE: A `test-coverage` naming a Module no `coverage` event described has
+	// A `test-coverage` naming a Module no `coverage` event described has
 	// nowhere to land — the table is keyed by the coverage events alone.
 	it("drops a test-coverage for a Module with no coverage event", () => {
 		let events = [
@@ -105,7 +105,7 @@ describe("The span a change touched", () => {
 		let oldText = ["alpha", "beta", "gamma"].join("\n")
 		let newText = ["alpha", "BETA", "gamma"].join("\n")
 
-		// NOTE: 1-based and inclusive; the end column is one past the old line's
+		// 1-based and inclusive; the end column is one past the old line's
 		// last character.
 		expect(changedRange(oldText, newText)).toEqual({
 			start: { line: 2, column: 1 },
@@ -119,7 +119,7 @@ describe("The span a change touched", () => {
 		expect(changedRange(text, text)).toBeNull()
 	})
 
-	// NOTE: Refused on purpose — every point below the edit moved, so the stored
+	// Refused on purpose — every point below the edit moved, so the stored
 	// table's coordinates no longer describe the file.
 	it("refuses an edit that adds a line", () => {
 		let oldText = ["alpha", "beta"].join("\n")
@@ -135,7 +135,7 @@ describe("The span a change touched", () => {
 		expect(changedRange(oldText, newText)).toBeNull()
 	})
 
-	// NOTE: A scattered edit is over-stated into one bounding span rather than
+	// A scattered edit is over-stated into one bounding span rather than
 	// under-stated — a wider range reaches more tests, which is the safe way to be
 	// wrong. Line 3 here never changed and is inside the span anyway.
 	it("bounds a scattered in-line edit into one span", () => {
@@ -202,7 +202,7 @@ describe("The tests a change reached", () => {
 		"end",
 	].join("\n")
 
-	// NOTE: Line 2 is reached by "a", line 4 by "b" — two tests of one Module,
+	// Line 2 is reached by "a", line 4 by "b" — two tests of one Module,
 	// each over its own line.
 	let attr = entryFor("/E.es", [pt(2, 1), pt(4, 1)], [["a"], ["b"]], oldText)
 
@@ -239,7 +239,7 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// NOTE: A point reached at LOAD by no single test — a top-level Constant, a
+	// A point reached at LOAD by no single test — a top-level Constant, a
 	// suite's setup — feeds tests whose spans never touched it, so an edit there
 	// can change a test the attribution cannot name. Run whole.
 	it("runs whole for an edit to a line reached only at load", () => {
@@ -255,7 +255,7 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// NOTE: The trap the load flag exists for: a helper called BOTH from a
+	// The trap the load flag exists for: a helper called BOTH from a
 	// top-level Constant (at load) AND directly by test "a". Its point carries
 	// "a" in its set and ran at load, so narrowing to "a" alone would leave
 	// every test that read the load-time result stale. The load flag makes it a
@@ -273,7 +273,7 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// NOTE: A dead point (`count === 0`, no tests) narrows to nothing, and an
+	// A dead point (`count === 0`, no tests) narrows to nothing, and an
 	// empty result is itself the whole-run fallback rather than "nothing was
 	// affected".
 	it("runs whole for an edit to a line nothing reached", () => {
@@ -301,7 +301,7 @@ describe("The tests a change reached", () => {
 	})
 
 	it("ignores a changed file the entry does not reach", () => {
-		// NOTE: `reaches` answers false, so the unreached file is not this entry's
+		// `reaches` answers false, so the unreached file is not this entry's
 		// concern; with nothing else changed there is nothing to narrow to.
 		expect(
 			affectedTests(
@@ -312,7 +312,7 @@ describe("The tests a change reached", () => {
 			),
 		).toBeNull()
 
-		// NOTE: And an unreached change does not veto a narrowing a reached file
+		// And an unreached change does not veto a narrowing a reached file
 		// did produce — the edit to /M.es still selects "a".
 		expect(
 			affectedTests(

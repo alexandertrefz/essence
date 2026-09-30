@@ -23,7 +23,7 @@ import {
 	visibleOptions,
 } from "./commands"
 
-// NOTE: Anything the user could have typed wrong is a UsageError, and every
+// Anything the user could have typed wrong is a UsageError, and every
 // UsageError carries the command it happened in so the entry point can print
 // the right usage line next to it — a bare "unknown option" with no context is
 // the least helpful thing a CLI can say.
@@ -55,61 +55,61 @@ export type OptionValues = {
 	watch: boolean
 	execute: boolean
 	clear: boolean
-	// NOTE: The three flags a project may also write down, each with the way
+	// The three flags a project may also write down, each with the way
 	// out of the setting beside it — see `resolveProjectOptions`, which is
 	// where the two meet and where writing both twins is refused.
 	sourcemap: boolean
 	noSourcemap: boolean
 	minify: boolean
 	noMinify: boolean
-	// NOTE: Whether the bundle carries a runtime bridge, with a Descriptor
+	// Whether the bundle carries a runtime bridge, with a Descriptor
 	// written beside it — see the Option's own details.
 	embed: boolean
 	noEmbed: boolean
-	// NOTE: Whether `essence build` compiles the tests section into the bundle
+	// Whether `essence build` compiles the tests section into the bundle
 	// rather than dropping it. A debugger is what asks; see the Option.
 	tests: boolean
 	noOptimise: boolean
-	// NOTE: The pass names `--without-optimisation` was given, already checked
+	// The pass names `--without-optimisation` was given, already checked
 	// against the registry — an unknown one is a UsageError rather than a flag
 	// that quietly does nothing.
 	withoutOptimisation: Array<string>
 	jobs: number | undefined
-	// NOTE: How `essence test` narrows a run: a substring of a test's suites and
+	// How `essence test` narrows a run: a substring of a test's suites and
 	// name joined by `/`, the tags to run, and the tags to leave out. Repeats are
 	// unions and `skipTag` wins over `tag`; see the Command's own details.
 	filter: string | undefined
 	tag: Array<string>
 	skipTag: Array<string>
-	// NOTE: How `essence test` reports what the run REACHED. `coverage` turns
+	// How `essence test` reports what the run REACHED. `coverage` turns
 	// the instrumentation pass on; `coverageReport` names a file format to
 	// write beside the table and implies it; `coverageOut` says where.
 	coverage: boolean
 	coverageReport: CoverageReportFormat | null
 	coverageOut: string | undefined
-	// NOTE: Whether the run asks what its tests would CATCH rather than what
+	// Whether the run asks what its tests would CATCH rather than what
 	// they reached — see the Option. `mutationLimit` caps how many mutants are
 	// compiled, and null means every covered site.
 	mutate: boolean
 	mutationLimit: number | null
-	// NOTE: Whether a surviving mutant fails the run. A score is information, so
+	// Whether a surviving mutant fails the run. A score is information, so
 	// `--mutate` alone exits 0 whatever it found.
 	strict: boolean
-	// NOTE: Whether the benchmarks of the run are measured as well. It ADDS to a
+	// Whether the benchmarks of the run are measured as well. It ADDS to a
 	// run rather than replacing it — everything that would have run still runs
 	// — because a measurement of a body that is wrong is a number about nothing.
 	bench: boolean
-	// NOTE: Whether the run also tests what a Namespace's own declarations
+	// Whether the run also tests what a Namespace's own declarations
 	// promise — see the Option. It ADDS to a run the way `bench` does: every
 	// written test still runs, and the synthesized goals run beside them.
 	contracts: boolean
 	noContracts: boolean
-	// NOTE: Whether a snapshot that DIFFERS is recorded rather than reported.
+	// Whether a snapshot that DIFFERS is recorded rather than reported.
 	// One nothing has recorded is written either way — the first run of a new
 	// snapshot is what records it. A benchmark reads it the same way: a
 	// measurement outside its band is recorded rather than failed.
 	update: boolean
-	// NOTE: What every property test draws from, and how many values each of
+	// What every property test draws from, and how many values each of
 	// them runs for. A run with no seed makes one up and reports it beside
 	// whatever failed, which is what `--seed` reads back.
 	seed: string | undefined
@@ -122,13 +122,13 @@ export type Invocation = {
 	options: OptionValues
 	files: Array<string>
 	programArguments: Array<string>
-	// NOTE: Every token after a passthrough Command's name, exactly as it was
+	// Every token after a passthrough Command's name, exactly as it was
 	// typed — the delegate parses them itself, so nothing here is interpreted,
 	// reordered, or split on a bare `--`. Empty for every other Command.
 	rawArguments: Array<string>
 }
 
-// NOTE: The Options as they stand before anything has been read: what a
+// The Options as they stand before anything has been read: what a
 // passthrough Command leaves them at, and what an unreadable command line is
 // reported with.
 export const emptyOptions: OptionValues = {
@@ -170,10 +170,10 @@ export const emptyOptions: OptionValues = {
 	cases: null,
 }
 
-// NOTE: The two flags as the Compiler reads them. Nothing named means every
+// The two flags as the Compiler reads them. Nothing named means every
 // pass runs, which is what a build the user said nothing about compiles with.
 //
-// NOTE: And `--coverage`, which is not one of the two: it turns an
+// And `--coverage`, which is not one of the two: it turns an
 // instrumentation pass ON rather than an optimisation off, and it is here
 // because that pass lives in the registry and reads the Options. Only
 // `essence test` offers the flag, so every other command asks with it false.
@@ -201,7 +201,7 @@ function toParseArgsOptions(
 	return result
 }
 
-// NOTE: Everything after a bare `--` belongs to the compiled program, not to
+// Everything after a bare `--` belongs to the compiled program, not to
 // esc. Splitting it off before parsing keeps parseArgs from folding those
 // arguments into the file list.
 function splitProgramArguments(argv: Array<string>): {
@@ -244,7 +244,7 @@ function resolveCommand(
 		return { command, explicit: true, rest: argv.slice(1) }
 	}
 
-	// NOTE: A first argument that is not a command is a file name —
+	// A first argument that is not a command is a file name —
 	// `esc HelloWorld.es` is the shorthand every other form is measured against.
 	// Only something that looks like a command name but matches none is worth
 	// suggesting a correction for; a path is passed through untouched.
@@ -328,7 +328,7 @@ function readJobs(
 	return value
 }
 
-// NOTE: A tag is a bare lower-case name in the source, and `--tag`/`--skip-tag`
+// A tag is a bare lower-case name in the source, and `--tag`/`--skip-tag`
 // match it exactly — so a spelling that could never have been written is a
 // mistake worth refusing here rather than a filter that quietly selects
 // nothing. The rule is the Enricher's own, asked from the reading side: a tag
@@ -357,7 +357,7 @@ function readTags(
 	return names
 }
 
-// NOTE: How many cases a property test runs. It is read as text and checked
+// How many cases a property test runs. It is read as text and checked
 // here rather than taken as a number, because `node:util`'s parser has no
 // numeric Option — and a `--cases banana` that silently ran a hundred would be
 // a run nobody asked for.
@@ -382,7 +382,7 @@ function readCases(
 	return count
 }
 
-// NOTE: The same reading as `--cases`, and refused the same way — a limit of
+// The same reading as `--cases`, and refused the same way — a limit of
 // zero is a run that would compile nothing and report a score about nothing.
 function readMutationLimit(
 	raw: string | undefined,
@@ -405,11 +405,11 @@ function readMutationLimit(
 	return count
 }
 
-// NOTE: The format names are the Compiler's, checked here so that a misspelt
+// The format names are the Compiler's, checked here so that a misspelt
 // one is refused rather than written as the other format under the name that
 // was asked for.
 //
-// NOTE: A place to write with nothing to write there is refused as well, but
+// A place to write with nothing to write there is refused as well, but
 // not here: a project may have named the format in its essence.json, and this
 // reads a command line rather than a project. See `resolveProjectOptions`.
 function readCoverageReport(
@@ -431,7 +431,7 @@ function readCoverageReport(
 	return raw
 }
 
-// NOTE: A pass name is checked HERE rather than left to the Optimiser, which
+// A pass name is checked HERE rather than left to the Optimiser, which
 // would simply not find it in the registry and run everything — a misspelt name
 // that silently changed nothing looks exactly like a pass that does not do what
 // its name says. The message lists every valid name, because there is no other
@@ -462,7 +462,7 @@ function readDisabledPasses(
 	return names
 }
 
-// NOTE: A passthrough Command is recognised before anything else is read: its
+// A passthrough Command is recognised before anything else is read: its
 // arguments belong to the tool it delegates to, and reading them here — folding
 // `--` away, or refusing a flag esc has never heard of — would break flags that
 // are perfectly good ones over there. `--help` is the one exception: it is
@@ -568,7 +568,7 @@ export function parseArguments(
 				"--skip-tag",
 				command,
 			),
-			// NOTE: Asking for a report is asking for coverage — a written
+			// Asking for a report is asking for coverage — a written
 			// file with nothing in it is not what anybody meant by naming a
 			// format.
 			coverage:

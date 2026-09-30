@@ -3,7 +3,7 @@ import * as path from "node:path"
 
 import { snippets } from "@essence-lang/language-server/snippets"
 
-// NOTE: The VS Code `.code-snippets` file is generated from the Language
+// The VS Code `.code-snippets` file is generated from the Language
 // Server's own table, so that the bodies an Editor completes and the bodies it
 // expands from a prefix can not drift. The Server offers them scoped to the
 // block the cursor stands in, which a static file has no way to be; the file is
@@ -22,7 +22,7 @@ export const SNIPPETS_COPY = path.join(
 	"packages/vscode-extension/snippets/essence.code-snippets",
 )
 
-// NOTE: The prefix is the key as well. A `.code-snippets` file names each entry
+// The prefix is the key as well. A `.code-snippets` file names each entry
 // twice — once as the object key an Editor shows in its own snippet list, once
 // as the `prefix` that expands it — and one name for both is one name that can
 // not disagree with itself. The `contexts` a body carries are deliberately left

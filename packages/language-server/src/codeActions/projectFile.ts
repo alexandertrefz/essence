@@ -4,7 +4,7 @@ import type { common } from "@essence-lang/interfaces"
 import { overlaps } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// NOTE: The one request a project file answers. `essence.json` reaches this
+// The one request a project file answers. `essence.json` reaches this
 // Server because the extension's document selector names it — that is what puts
 // a mistake in it in the Problems panel — and every request over it is refused,
 // because a project file is not a source and nothing that answers about a
@@ -23,7 +23,7 @@ export function projectFileActions(
 	return settingEdits(sourceText, filePath)
 		.filter((edit) => overlaps(edit.position, range))
 		.map((edit) => ({
-			// NOTE: The setting is named in double quotes, which is how it is
+			// The setting is named in double quotes, which is how it is
 			// written in the file the action is offered on.
 			title:
 				edit.code === "unknown-setting"
@@ -32,7 +32,7 @@ export function projectFileActions(
 			kind: "quickfix" as const,
 			diagnosticCode: edit.code,
 			diagnosticPosition: edit.position,
-			// NOTE: Both are the one right answer their Diagnostic has. A near
+			// Both are the one right answer their Diagnostic has. A near
 			// miss is a rename and the value stays the author's; a key that has
 			// moved has exactly one place it moved to, and the move is withheld
 			// outright where that place is already written.

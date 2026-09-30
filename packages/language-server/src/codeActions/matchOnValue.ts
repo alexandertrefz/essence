@@ -14,7 +14,7 @@ import { isWritableMatcher } from "./fixes"
 import { containsRange, indentationOf, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// NOTE: The Match a reader is about to write, scaffolded from the value they
+// The Match a reader is about to write, scaffolded from the value they
 // are standing on: the arms come from the Union's own members, in declaration
 // order, exactly as the `missing-case` fix writes them into a Match that is
 // already there. The two agree by construction — one rule about which members
@@ -25,13 +25,13 @@ import type { CodeActionEntry } from "./index"
 // Never preferred: every arm it writes is empty, so what it buys is the shape
 // of the answer rather than the answer.
 
-// NOTE: What a Match can be scaffolded over: a name, a member read, or a call.
+// What a Match can be scaffolded over: a name, a member read, or a call.
 // Not a Literal — `match #Value(1)` takes apart a value that was just put
 // together — and not a Match or a `define`, which already answer per Case.
 const scaffoldable: ReadonlySet<common.typed.ExpressionNode["nodeType"]> =
 	new Set(["Identifier", "Lookup", "MethodInvocation", "FunctionInvocation"])
 
-// NOTE: The value to match on, and the Type a `<-` written where it stands
+// The value to match on, and the Type a `<-` written where it stands
 // would answer with — the enclosing Function's return Type, the Match's own
 // where the value stands in an arm, or the Type a Declaration was annotated
 // with. A Match has to declare its answer Type, so this is what it declares.
@@ -40,7 +40,7 @@ type Scaffold = {
 	answers: common.Type | null
 }
 
-// NOTE: What a `<-` in this body answers with, or null in a body no `<-` can
+// What a `<-` in this body answers with, or null in a body no `<-` can
 // stand in. Threaded rather than looked up because a Return is a Statement of
 // its own and knows nothing about the Function it ends.
 type Answers = common.Type | null
@@ -58,7 +58,7 @@ export function matchOnValueActions(
 
 	let found: Scaffold | null = null
 
-	// NOTE: The INNERMOST Expression the request sits inside wins, on the
+	// The INNERMOST Expression the request sits inside wins, on the
 	// reading `findInnermostNodeContaining` takes of its own walk: a Node is
 	// visited before the Nodes it holds, so the last one holding the range is
 	// the one no other holds. `items::firstItem()` and the `items` inside it
@@ -92,7 +92,7 @@ function scaffoldFor(
 		describeType,
 	)
 	let writable = matchers.filter(isWritableMatcher)
-	// NOTE: The catch-all rule the `missing-case` fix writes by, for the reason
+	// The catch-all rule the `missing-case` fix writes by, for the reason
 	// it writes by it: a member no Matcher can name is covered by a `case _`
 	// after the ones that can, and one is enough because `case _` covers
 	// everything left on its own.
@@ -102,7 +102,7 @@ function scaffoldFor(
 		return []
 	}
 
-	// NOTE: The line's indentation rather than the Expression's column — a
+	// The line's indentation rather than the Expression's column — a
 	// value being matched rarely opens its line, and `<- match @ -> … {` is the
 	// shape the arms have to line up under.
 	let indentation = indentationOf(lines, value.position.start.line)
@@ -110,7 +110,7 @@ function scaffoldFor(
 	let handlers = arms
 		.map((matcher) => `${indentation}\tcase ${matcher} {}\n`)
 		.join("")
-	// NOTE: A Match declares its answer Type and the grammar has no spelling
+	// A Match declares its answer Type and the grammar has no spelling
 	// for leaving it out, so the scaffold writes the Type the position it
 	// stands in already asks for — the Function's return Type, the Declaration's
 	// annotation. Where the position asks for nothing the value's OWN Type
@@ -118,7 +118,7 @@ function scaffoldFor(
 	// arrow would be a syntax error rather than a hole.
 	let answered =
 		answers === null || answers.type === "Error" ? value.type : answers
-	// NOTE: Spelled where the arrow is going to be written, so the Alias the
+	// Spelled where the arrow is going to be written, so the Alias the
 	// scaffold declares is one this file can read — an answer Type naming a
 	// Record another Module declares is an `unknown-type` over a Match that has
 	// holes in it already. Where the Type has no spelling here at all there is
@@ -134,18 +134,18 @@ function scaffoldFor(
 
 	return [
 		{
-			// NOTE: Whitespace collapsed, and only in the TITLE — a call
+			// Whitespace collapsed, and only in the TITLE — a call
 			// written over several lines is still one thing to match on, and a
 			// lightbulb entry holding a line break reads as two entries.
 			title: `Match on '${written.replace(/\s+/g, " ")}'`,
 			kind: "refactor.rewrite",
 			diagnosticCode: null,
 			diagnosticPosition: null,
-			// NOTE: Not preferred, and honest about why: every arm is empty, so
+			// Not preferred, and honest about why: every arm is empty, so
 			// what is left behind is a `missing-return` — a visible hole, which
 			// is what a scaffold is.
 			isPreferred: false,
-			// NOTE: Two insertions rather than one replacement, so the value's
+			// Two insertions rather than one replacement, so the value's
 			// own text — a chain, a call spanning lines — is never retyped by a
 			// refactoring that has no reason to read it. It is also what keeps
 			// a `<- x` a return: only what stands between `match ` and ` -> `
@@ -180,7 +180,7 @@ function visitBody(
 	}
 }
 
-// NOTE: Every typed Node that holds an Expression, which is the walk each
+// Every typed Node that holds an Expression, which is the walk each
 // feature of this Server keeps for itself — see `inlayHints.ts`, whose shape
 // this follows. Written over the TYPED tree because what decides the offer is
 // the value's Type, and over every Section's body because a value inside a
@@ -199,7 +199,7 @@ function visitNode(
 		case "VariableDeclarationStatement":
 			visitNode(node.value, node.declaredType ?? node.type, visit)
 			return
-		// NOTE: An assignment carries no Type of its own — what the Variable was
+		// An assignment carries no Type of its own — what the Variable was
 		// declared as is at the Declaration, which this walk has no way back
 		// to — so the value answers for itself.
 		case "VariableAssignmentStatement":
@@ -240,7 +240,7 @@ function visitNode(
 			}
 
 			return
-		// NOTE: An `if` opens no answer of its own — a `<-` inside one ends the
+		// An `if` opens no answer of its own — a `<-` inside one ends the
 		// Function around it, so what it answers with travels through.
 		case "IfStatement":
 			visitNode(node.condition, null, visit)
@@ -281,7 +281,7 @@ function visitNode(
 			visit(node, answers)
 			visitNode(node.base, null, visit)
 			return
-		// NOTE: The operand is walked and the Keyword itself is not offered: a
+		// The operand is walked and the Keyword itself is not offered: a
 		// Match is scaffolded over a name, a member read or a call, and `complete
 		// response` is none of the three — a reader who wants to match on what it
 		// answers with holds it in a Constant first, which is the one spelling
@@ -300,7 +300,7 @@ function visitNode(
 			visitNode(node.lhs, null, visit)
 			visitNode(node.rhs, null, visit)
 			return
-		// NOTE: An arm's `<-` answers the MATCH rather than the Function around
+		// An arm's `<-` answers the MATCH rather than the Function around
 		// it, which is what a Match written in a Function's Return is for.
 		case "Match":
 			visitNode(node.value, null, visit)

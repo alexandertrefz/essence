@@ -1,6 +1,6 @@
 import type { parser } from "@essence-lang/interfaces"
 
-// NOTE: One step of a binding's spine, as the source wrote it — the member
+// One step of a binding's spine, as the source wrote it — the member
 // Identifier and the Type annotation beside it, where there was one.
 //
 // Every step carries its own, not just the last: a nested Pattern's outer
@@ -13,7 +13,7 @@ export type PatternStep = {
 	type: parser.TypeDeclarationNode | null
 }
 
-// NOTE: One binding a Pattern makes. `path` is the spine from the value being
+// One binding a Pattern makes. `path` is the spine from the value being
 // taken apart down to what this name stands for, so `{ origin as { x } }`
 // gives `["origin", "x"]` and a Pattern's own `as` binder gives `[]` — the
 // value itself. `type` is what the source wrote for the member, where it wrote
@@ -22,17 +22,17 @@ export type PatternBinding = {
 	name: parser.IdentifierNode
 	path: Array<string>
 	steps: Array<PatternStep>
-	// NOTE: The LAST step's annotation — what the binding itself is declared
+	// The LAST step's annotation — what the binding itself is declared
 	// as. Null where the spine is empty, which is a Pattern's own `as` binder.
 	type: parser.TypeDeclarationNode | null
-	// NOTE: The LAST step's member Identifier, which is a DIFFERENT span from
+	// The LAST step's member Identifier, which is a DIFFERENT span from
 	// `name` wherever `as` renamed it. Both are needed: what the binding is
 	// read under is `name`, and what the Record calls it is this — and the
 	// Language Server rewrites one without touching the other.
 	member: parser.IdentifierNode | null
 }
 
-// NOTE: Every name a Pattern brings into scope, in source order, whatever the
+// Every name a Pattern brings into scope, in source order, whatever the
 // nesting. Every reader needs exactly this list and must never disagree about
 // it: the Enricher desugars one Constant per entry, the Module linker reports
 // a Declaration per entry so a top-level Pattern can be exported, and the
@@ -86,7 +86,7 @@ export function patternBindings(
 	return bindings
 }
 
-// NOTE: Every name a MATCHER introduces, in written order. Two Matchers
+// Every name a MATCHER introduces, in written order. Two Matchers
 // introduce anything at all: a Pattern names what its members name, and a Case
 // Matcher names what its payload binder names. A Type, a wildcard and a written
 // value each ask something of the value and name nothing.
@@ -110,7 +110,7 @@ export function matcherNames(matcher: parser.MatcherNode): Array<string> {
 		: [matcher.binding.content]
 }
 
-// NOTE: The members that make a Pattern able to DECLINE a value — a member
+// The members that make a Pattern able to DECLINE a value — a member
 // constrained by a written value, at any depth. A Matcher may hold them,
 // because an arm that declines falls through to the next one; a Parameter and
 // a Declaration may not, because neither has anywhere to fall through to.

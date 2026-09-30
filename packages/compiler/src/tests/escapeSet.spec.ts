@@ -4,7 +4,7 @@ import { quotedText } from "@essence-lang/runtime/String"
 
 import { actsOnTerminal } from "../helpers/terminalText"
 
-// NOTE: WHICH characters the printer escapes, pinned as a SET rather than one
+// WHICH characters the printer escapes, pinned as a SET rather than one
 // at a time. `roundTrip.spec.ts` holds the promise that whatever is printed
 // reads back, and that promise can not see an escape that is MISSING: a raw
 // U+2069 pasted back into a Literal lexes to U+2069, so the round trip passes
@@ -13,7 +13,7 @@ import { actsOnTerminal } from "../helpers/terminalText"
 // exactly that reason — one isolate dropped, one separator too many, and a
 // normalisation at lex time — and this is what closes them.
 //
-// NOTE: The expectation is derived from the DOCUMENTED sentence, written out
+// The expectation is derived from the DOCUMENTED sentence, written out
 // again here, and not from the code under test. A table captured from the
 // printer would agree with whatever the printer does, which is the one thing a
 // test about a set must not do. The sentence is
@@ -32,7 +32,7 @@ const SHORT_ESCAPES: { [code: number]: string } = {
 	0x7d: "\\}",
 }
 
-// NOTE: The invisible half of the set, said as the documentation says it. It is
+// The invisible half of the set, said as the documentation says it. It is
 // deliberately a ladder of comparisons naming each range, because a range
 // written as a bound that is one off — `U+202F` instead of `U+202E`, `U+2068`
 // instead of `U+2069` — is precisely the mistake this file exists to catch, and
@@ -68,7 +68,7 @@ function named(code: number): string {
 	return `U+${code.toString(16).toUpperCase().padStart(4, "0")}`
 }
 
-// NOTE: Every code point up to U+2FFF, which is every one of them that the set
+// Every code point up to U+2FFF, which is every one of them that the set
 // names something in, with the two isolates' neighbours and the byte order
 // mark's above it. A run rather than a list, because what is being checked is
 // as much what is NOT escaped as what is: U+202F is one past the last override
@@ -76,7 +76,7 @@ function named(code: number): string {
 // themselves.
 const SWEPT = 0x3000
 
-// NOTE: Above the sweep, where the set names one character and the interesting
+// Above the sweep, where the set names one character and the interesting
 // thing is everything around it. A surrogate is left out — it is not a
 // character, it has its own rule and its own tests.
 const SAMPLED = [
@@ -123,7 +123,7 @@ describe("the escape set", () => {
 		expect(mismatches).toEqual([])
 	})
 
-	// NOTE: An astral character is one character, and the set names none of
+	// An astral character is one character, and the set names none of
 	// them — a printer that judged its two code units separately would escape
 	// both halves of every emoji.
 	it("leaves every astral character as itself", () => {
@@ -140,7 +140,7 @@ describe("the escape set", () => {
 		expect(mismatches).toEqual([])
 	})
 
-	// NOTE: The toolchain's OWN rule for text it is about to print — a
+	// The toolchain's OWN rule for text it is about to print — a
 	// Diagnostic naming a character, a test name in the reporter — is the same
 	// set less the four the printer escapes so that its output reads back as a
 	// Literal. Two sets that are meant to agree and are written twice is a

@@ -13,7 +13,7 @@ import {
 } from "../optimiser/index"
 import { simplify } from "../simplifier/index"
 
-// NOTE: A standard library Namespace is written in TWO languages at once: some
+// A standard library Namespace is written in TWO languages at once: some
 // of its members are bound to a runtime module in `@essence-lang/runtime`, the
 // rest are implemented in Essence in `packages/standard-library/sources/`. Emitted user
 // code can not tell the two apart — it says `Boolean.isNot(…)` either way — so
@@ -21,7 +21,7 @@ import { simplify } from "../simplifier/index"
 // prelude is the Essence-implemented half: the typed Nodes of the BODIED
 // members, simplified and optimised once per process.
 //
-// NOTE: The two halves are not merged into one object. A native member stays a
+// The two halves are not merged into one object. A native member stays a
 // read off the plain `import * as <Namespace>`, which esbuild can rewrite to a
 // direct symbol reference and therefore tree-shake; an Essence-implemented one
 // is emitted as its OWN top-level const, named by `essenceMethodIdentifier`, so
@@ -31,20 +31,20 @@ import { simplify } from "../simplifier/index"
 // their own, after the Function-valued consts and ordered against each other by
 // what they read.
 
-// NOTE: The Namespaces the prelude has anything to say about — the ones with at
+// The Namespaces the prelude has anything to say about — the ones with at
 // least one Essence-implemented member. A Namespace whose every member is
 // native never appears here, and the Rewriter keeps importing it directly.
 export type PreludeNamespace = {
 	name: string
 	node: common.typedSimple.NamespaceDefinitionStatementNode
-	// NOTE: Set for a PROTOCOL's provided Methods, which ride here because
+	// Set for a PROTOCOL's provided Methods, which ride here because
 	// everything the emission wants from a Namespace is a name and a record of
 	// bodied Methods. It decides the const's NAME — see
 	// `protocolMemberIdentifier` — and it is a separate flag rather than a
 	// guess off the name, because a Protocol and a Namespace may be spelled
 	// exactly alike.
 	protocol?: true
-	// NOTE: The identity a Protocol entry's provided Methods are keyed by, which
+	// The identity a Protocol entry's provided Methods are keyed by, which
 	// is what an Invocation's `providedBy` names.
 	identity?: string
 }
@@ -59,7 +59,7 @@ type StdlibArtifacts = {
 	freeFunctions: Array<PreludeFreeFunction>
 }
 
-// NOTE: The member names a Namespace spells BOTH as a Method and as a static
+// The member names a Namespace spells BOTH as a Method and as a static
 // Property. The typed Node can not answer this on its own — only the BODIED
 // members reach it, so a native `yes() -> Boolean` beside a bodied
 // `static yes: Boolean = true` looks like a lone Property there, and the clash
@@ -85,7 +85,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	let freeFunctions: Array<PreludeFreeFunction> = []
 
 	for (let typedProgram of stdlib.typedPrograms) {
-		// NOTE: The typed Programs are one process-wide value the Language
+		// The typed Programs are one process-wide value the Language
 		// Server and the tests read too. The Simplifier and the Optimiser only
 		// read their input, and the copy keeps the prelude from sharing any
 		// object with it.
@@ -95,7 +95,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 		)
 
 		for (let node of program.implementation.nodes) {
-			// NOTE: A bodied free Function is emitted as its own top-level
+			// A bodied free Function is emitted as its own top-level
 			// Function, reached by the bare name a call site resolves to — a
 			// bodied `overload function` entry, whose name the Simplifier
 			// carried through as `<name>__overload$N`, or a plain bodied
@@ -108,7 +108,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 				continue
 			}
 
-			// NOTE: A Protocol's PROVIDED Methods are prelude entries like any
+			// A Protocol's PROVIDED Methods are prelude entries like any
 			// other — one `$es_<Protocol>__<member>` const each, shared by every
 			// conformer. It stands in for a Namespace here because everything
 			// downstream wants from one is a name and a record of bodied
@@ -147,7 +147,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 				continue
 			}
 
-			// NOTE: A Method and a static Property of one Namespace are emitted
+			// A Method and a static Property of one Namespace are emitted
 			// under the SAME `$es_<Namespace>_<member>` const name. Nothing
 			// upstream refuses it — the two live in records of their own, so
 			// `static yes: Boolean = true` beside `yes() -> Boolean` type checks
@@ -171,13 +171,13 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 				)
 			}
 
-			// NOTE: Only the BODIED members reach the typed Node — a native has
+			// Only the BODIED members reach the typed Node — a native has
 			// no body to emit — so a Namespace that is entirely native arrives
 			// here empty and is dropped. Keeping it would put a Namespace in the
 			// prelude that has no const to contribute, and every read of it is
 			// already the plain member read off the imported runtime module.
 			//
-			// NOTE: A bodied static Property counts as a member here, so a
+			// A bodied static Property counts as a member here, so a
 			// Namespace whose every Method is native but which gives one Property
 			// a value still belongs in the prelude. Its value is emitted as a
 			// const of its own, in the band the Rewriter orders AFTER every
@@ -198,7 +198,7 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	return { namespaces, freeFunctions }
 }
 
-// NOTE: The prelude proper — the Essence-implemented Namespace members — kept
+// The prelude proper — the Essence-implemented Namespace members — kept
 // beside the free Functions collected in the same pass. It is handed a WHOLE
 // standard library rather than its typed Programs alone, because the clash
 // refusal above has to read the loader's `nativeBindings` to see the members no
@@ -207,20 +207,20 @@ export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
 	return buildStdlibArtifacts(stdlib).namespaces
 }
 
-// NOTE: The Optimiser Options the prelude is being built under. The standard
+// The Optimiser Options the prelude is being built under. The standard
 // library's bodies are optimised HERE, by the same passes and under the same
 // Options as the Program that imports them — `esc build --no-optimise` that
 // left the prelude optimised would be a half-answer, and the passes that pay
 // most (a Choice's equality, a comparison chain) are prelude bodies.
 //
-// NOTE: It is ambient rather than a Parameter for the reason the Rewriter's
+// It is ambient rather than a Parameter for the reason the Rewriter's
 // source path and Namespace scopes are: everything that reads the prelude reads
 // it through a no-argument accessor, several of them from deep inside emission,
 // and threading one compilation-wide constant through all of them would say
 // nothing the `withOptimiserOptions` around the whole rewrite does not.
 let currentOptimiserOptions: OptimiserOptions = defaultOptimiserOptions
 
-// NOTE: Coverage is taken OUT here and nowhere else. The standard library is
+// Coverage is taken OUT here and nowhere else. The standard library is
 // never instrumented — a report about a project is a report about the project's
 // own files, and counting the library's Programs into every bundle would
 // cost far more than the answer is worth. Stripping it at the door also keeps
@@ -242,7 +242,7 @@ export function withOptimiserOptions<Value>(
 	}
 }
 
-// NOTE: A value read off the standard library and kept, so that walking the
+// A value read off the standard library and kept, so that walking the
 // library again is paid once per process rather than once per file compiled in a
 // worker. It is keyed by the Stdlib OBJECT and not by a flag some caller has to
 // clear: `useStdlib` can put a DIFFERENT library in place — a test's, built from
@@ -251,7 +251,7 @@ export function withOptimiserOptions<Value>(
 // is a null check and a return once the library is in hand, so asking it on
 // every lookup costs nothing.
 //
-// NOTE: And keyed by the Optimiser Options, which decide what the prelude's
+// And keyed by the Optimiser Options, which decide what the prelude's
 // bodies come out as. One process compiles under several — a test suite turns a
 // pass off and on again, a Language Server and a build share one — so the
 // entries live side by side rather than replacing each other, and each is built
@@ -277,7 +277,7 @@ function derivedFromStdlib<Value>(
 	}
 }
 
-// NOTE: The shape a snapshot has to have before it is believed — see
+// The shape a snapshot has to have before it is believed — see
 // `isStdlib` in the loader, which guards the same door for the same reason.
 // The nodes inside are not walked: what could be wrong with them is not a shape
 // this could name, and the snapshot key is what answers for their content.
@@ -292,19 +292,19 @@ function isStdlibArtifacts(value: unknown): boolean {
 	)
 }
 
-// NOTE: The same artifacts, kept between processes as well as within one. Every
+// The same artifacts, kept between processes as well as within one. Every
 // process that emits anything pays for simplifying and optimising every
 // standard library Program, for a result that depends on the standard library
 // and the Optimiser Options and on nothing else. Both are in the key.
 //
-// NOTE: Only for the library the real sources produced. A test installs one of
+// Only for the library the real sources produced. A test installs one of
 // its own through `useStdlib`, and a snapshot keyed by what the DISK hashes to
 // would answer for it with the wrong prelude entirely — silently, because the
 // two are the same shape. The refusal is by identity rather than by comparing
 // content, which is the only comparison that could not be fooled by a synthetic
 // library that happens to look like the real one.
 //
-// NOTE: A snapshot skips the clash refusal in `buildStdlibArtifacts` — the
+// A snapshot skips the clash refusal in `buildStdlibArtifacts` — the
 // Namespace that spells a static Property exactly like a Method of its own. It
 // can only exist if that refusal passed for these exact sources under this exact
 // Compiler, which is what the key names, so what is skipped is a check that has
@@ -322,7 +322,7 @@ function snapshotStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	})
 }
 
-// NOTE: Simplifying and optimising the standard library's Programs for every
+// Simplifying and optimising the standard library's Programs for every
 // user file would be paid over and over for a result that can not differ. The
 // Namespaces and the free Functions come out of the one simplify pass, so both
 // accessors share this cache rather than each walking the library again.
@@ -332,7 +332,7 @@ export function stdlibPrelude(): Array<PreludeNamespace> {
 	return stdlibArtifacts().namespaces
 }
 
-// NOTE: The Essence-bodied free Functions — a bodied `overload function` entry
+// The Essence-bodied free Functions — a bodied `overload function` entry
 // (named `<name>__overload$N`) or a plain bodied `function` — built and cached
 // alongside the Namespace prelude. The Rewriter emits only the ones a Program
 // reaches; the rest cost nothing, exactly as an unreferenced Essence Method does.
@@ -340,18 +340,18 @@ export function stdlibFreeFunctions(): Array<PreludeFreeFunction> {
 	return stdlibArtifacts().freeFunctions
 }
 
-// NOTE: The prefix on its own, so that a finished tree can be swept for the
+// The prefix on its own, so that a finished tree can be swept for the
 // names spelled with it — the Rewriter checks that every one it emitted has a
 // const, which only holds because nothing a user writes can wear this prefix.
 export const ESSENCE_METHOD_PREFIX = "$es_"
 
-// NOTE: The emitted name of an Essence-implemented standard library Method. A
+// The emitted name of an Essence-implemented standard library Method. A
 // native Method stays a read off the plain `import * as <Namespace>`, which
 // esbuild can rewrite to a direct symbol reference and therefore tree-shake; an
 // Essence-implemented one is not a member of anything, it is its own top-level
 // const, so nothing has to materialise the module namespace object to reach it.
 //
-// NOTE: The separators are `_`, which the Lexer treats as a Symbol
+// The separators are `_`, which the Lexer treats as a Symbol
 // (`src/lexer/index.ts`) — so no user identifier can contain one, the same
 // guarantee `_self` and `_0` already rest on, and a Namespace name therefore
 // contains none either. `$` on its own would not do: it IS a legal identifier
@@ -365,7 +365,7 @@ export function essenceMethodIdentifier(
 	return `${ESSENCE_METHOD_PREFIX}${namespaceName}_${memberName}`
 }
 
-// NOTE: The emitted name of a Protocol's PROVIDED Method. The DOUBLE separator
+// The emitted name of a Protocol's PROVIDED Method. The DOUBLE separator
 // is what keeps it out of the Namespace scheme's way: `essenceMethodIdentifier`
 // joins with one `_`, and no member name can begin with one — `_` lexes as a
 // Symbol, so no user identifier holds one — which makes `$es_Integer__toString`
@@ -380,7 +380,7 @@ export function protocolMemberIdentifier(
 	return `${ESSENCE_METHOD_PREFIX}${protocolName}__${memberName}`
 }
 
-// NOTE: The set of `(Namespace, member)` pairs the prelude implements in
+// The set of `(Namespace, member)` pairs the prelude implements in
 // Essence, memoised. Both halves of a lookup are ALREADY overload-mangled by
 // the Simplifier before they reach here — the prelude's keys through
 // `simplifyMethods`, every call site through the invocation simplifiers, and a
@@ -393,7 +393,7 @@ const essenceMethodNames = derivedFromStdlib(
 	() =>
 		new Set(
 			stdlibPrelude()
-				// NOTE: A Protocol's provided Methods are reached through the
+				// A Protocol's provided Methods are reached through the
 				// Invocation's `providedBy`, never through a Namespace lookup —
 				// answering here would route a Namespace call of the same name
 				// to the Protocol's const.
@@ -406,7 +406,7 @@ const essenceMethodNames = derivedFromStdlib(
 		),
 )
 
-// NOTE: The `\u0000` join can not occur inside either name, so the pair is
+// The `\u0000` join can not occur inside either name, so the pair is
 // keyed without an escape.
 export function essenceMethodName(
 	namespaceName: string,
@@ -417,7 +417,7 @@ export function essenceMethodName(
 		: null
 }
 
-// NOTE: The `(Namespace, member)` pairs that are NATIVE and declare a default —
+// The `(Namespace, member)` pairs that are NATIVE and declare a default —
 // the third answer this module gives about a Namespace member, beside
 // "Essence-implemented" and "native". A pair here is still native: a call that
 // writes every Argument reads it straight off the imported runtime module, as it
@@ -447,7 +447,7 @@ export function nativeShimName(
 		: null
 }
 
-// NOTE: The shims a written Argument needs as much as a missing one does. A
+// The shims a written Argument needs as much as a missing one does. A
 // scalar default STANDS IN for an Argument the call left out, so a call that
 // wrote one needs no frame — which is the rule above. A RECORD default is
 // MERGED into the Argument instead: `Http.send({ url = "…" })` is a whole
@@ -479,7 +479,7 @@ export function mergingNativeShimName(
 		: null
 }
 
-// NOTE: The same answer for a static Property the prelude gives a VALUE to. It
+// The same answer for a static Property the prelude gives a VALUE to. It
 // is asked separately from the Methods, and not because the emitted name differs
 // — it is the one `essenceMethodIdentifier` spells, and a member is a Method or
 // a Property but never both (`buildStdlibArtifacts` refuses the overlap) — but
@@ -508,7 +508,7 @@ export function essencePropertyName(
 		: null
 }
 
-// NOTE: The emitted names of the NATIVE free Functions — the ones the Rewriter
+// The emitted names of the NATIVE free Functions — the ones the Rewriter
 // reaches by reading off the runtime `functions` module (`$_.<name>`) rather
 // than through a top-level const. Free Functions invert the Method default: a
 // Method is native unless the prelude implements it, whereas a free Function is

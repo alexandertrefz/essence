@@ -25,7 +25,7 @@ interface Props {
 
 let { npm, pnpm, yarn, bun, badge } = Astro.props
 
-// NOTE: One order, declared once, so a manager's tab sits in the same place in
+// One order, declared once, so a manager's tab sits in the same place in
 // every block a page shows — and so a block that omits one does not shift the
 // rest sideways.
 let managers: Array<[string, string | undefined]> = [

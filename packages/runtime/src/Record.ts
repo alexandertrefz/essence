@@ -19,7 +19,7 @@ export function createRecord(record: Record<string, AnyType>): RecordType {
 	return { [typeKeySymbol]: "Record", ...record }
 }
 
-// NOTE: `keys` is declared on the Namespace; `entries` and `values` are
+// `keys` is declared on the Namespace; `entries` and `values` are
 // runtime-only for now — their honest return Types need an `Anything` Type
 // (a Record's values have no common Type), which arrives with the JSON
 // design. They stay implemented and tested so the Dictionary work can pick
@@ -48,10 +48,10 @@ export function values(recordInstance: RecordType): ListType<AnyType> {
 	)
 }
 
-// NOTE: Records are structurally equal when they hold the same keys with
+// Records are structurally equal when they hold the same keys with
 // equal values — the order in which the keys were defined does not matter.
 //
-// NOTE: The second `Object.keys` looks like an Array built only to be counted,
+// The second `Object.keys` looks like an Array built only to be counted,
 // and counting the second Record's members with a `for…in` instead is the
 // obvious way to do without it. It is nearly FOUR TIMES SLOWER: measured on a
 // three-member Record, a million comparisons of an equal pair and a differing
@@ -83,7 +83,7 @@ export function is(
 	return createBoolean(true)
 }
 
-// NOTE: The PRINTABLE rendering rather than the structural one
+// The PRINTABLE rendering rather than the structural one
 // `Terminal.inspect` shows: a Record conforms to `Printable`, so a whole
 // Rational member prints its numerator alone, exactly as it does everywhere
 // else a value is rendered for a reader. `formatAsFraction` is what says so,

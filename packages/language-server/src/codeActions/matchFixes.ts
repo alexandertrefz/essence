@@ -10,7 +10,7 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findHandler, findMatch, findMatchHolding } from "./lookups"
 
-// NOTE: The Diagnostics a Match's SHAPE carries — a Match on values that does
+// The Diagnostics a Match's SHAPE carries — a Match on values that does
 // not end in a Case for the rest of them, a Case of one that can still decline
 // what it named, and the two Warnings about an empty container crossing over
 // into an earlier Case.
@@ -20,7 +20,7 @@ import { findHandler, findMatch, findMatchHolding } from "./lookups"
 // have, or a Guard on an arm that is not the one the Diagnostic underlines. So
 // each starts from the Node and measures the edit off that.
 
-// NOTE: Which of the two Warnings this is decides which question the Guard
+// Which of the two Warnings this is decides which question the Guard
 // asks, and the pair is written once — the Diagnostic's own wording is prose
 // this file reserves the right not to read.
 const emptyGuards: Partial<
@@ -33,7 +33,7 @@ const emptyGuards: Partial<
 	"empty-list-overlap": { method: "hasItems", container: "List" },
 }
 
-// NOTE: One of four `literal-match-shape` sites, told apart by what the
+// One of four `literal-match-shape` sites, told apart by what the
 // Diagnostic was reported AGAINST: this is the only one reported at the Match
 // itself, since it is about the Match having no last Case rather than about a
 // Case being wrong. The other three name a Handler's Matcher, which no Match
@@ -53,7 +53,7 @@ export function catchAllCaseAction(
 		return null
 	}
 
-	// NOTE: The `match` Keyword rarely opens its line — `<- match n -> …` is
+	// The `match` Keyword rarely opens its line — `<- match n -> …` is
 	// the common shape — so the arm lines up with the line's indentation rather
 	// than with the Keyword's column, exactly as `missing-case` writes its own.
 	let indentation = indentationOf(lines, match.position.start.line)
@@ -75,7 +75,7 @@ export function catchAllCaseAction(
 	}
 }
 
-// NOTE: The site that refuses a Guard on a Case naming a value, told apart from
+// The site that refuses a Guard on a Case naming a value, told apart from
 // the site beside it — which shares its Position — by the primary Label: this
 // one underlines the GUARD, and a Case that names no value underlines its
 // Matcher. Nothing else distinguishes the two, and answering the wrong one
@@ -109,7 +109,7 @@ export function dropGuardAction(
 
 	let range = { start: handler.matcher.position.end, end: guard.position.end }
 
-	// NOTE: `where` is contextual, so what says the span is a Guard is that the
+	// `where` is contextual, so what says the span is a Guard is that the
 	// word opens it — and a Guard written under its Matcher is deleted with the
 	// break that carried it.
 	if (!/^\s*where\b/.test(sliceOf(lines, range))) {
@@ -126,7 +126,7 @@ export function dropGuardAction(
 	}
 }
 
-// NOTE: The Warning is reported on the LATER Case and the edit goes on the
+// The Warning is reported on the LATER Case and the edit goes on the
 // earlier one — the secondary Label is what points at it, saying "this Case
 // runs first". Guarding the earlier Case is what stops it answering for an
 // empty container, which is the first half of what the Help asks for.
@@ -138,7 +138,7 @@ export function dropGuardAction(
 //
 // Never preferred, because it changes what the Program does.
 //
-// NOTE: It writes the trailing `case _ {}` as well, and that is not a
+// It writes the trailing `case _ {}` as well, and that is not a
 // convenience. A Guard makes the Case it is on decline the empty container, and
 // the Match then answers for nothing at all when one arrives: a WARNING's fix
 // left an ERROR behind — `missing-case`, whose own first Help is to write the
@@ -160,14 +160,14 @@ export function guardEmptyAction(
 
 	let match = findMatchHolding(program, earlier)
 
-	// NOTE: The same Warning is reported about a Method Invocation's dispatch
+	// The same Warning is reported about a Method Invocation's dispatch
 	// branches, where the secondary Label points at the receiver. There is no
 	// Match to edit there, and the lookup answering nothing is what says so.
 	if (match === null || findHandler(program, earlier) === null) {
 		return null
 	}
 
-	// NOTE: EVERY Case that names a container of this kind, not just the one the
+	// EVERY Case that names a container of this kind, not just the one the
 	// Label points at — guarding one and leaving the next reports the same
 	// Warning one Case further down, which is the loop a reader walked a Case at
 	// a time. The Matchers are told apart by what they READ: `List<…>` is a List
@@ -186,7 +186,7 @@ export function guardEmptyAction(
 			return false
 		}
 
-		// NOTE: A Guard is written between the Matcher and the body, so what has
+		// A Guard is written between the Matcher and the body, so what has
 		// to stand at the insertion point is the body's brace — read back off
 		// the buffer, as every edit here is. A Handler laid out over two lines
 		// is the one shape this turns away rather than guessing at.
@@ -201,7 +201,7 @@ export function guardEmptyAction(
 		return null
 	}
 
-	// NOTE: A Match that already ends in a wildcard has somewhere for the empty
+	// A Match that already ends in a wildcard has somewhere for the empty
 	// container to land, and a second `case _` under it would be an unreachable
 	// Case — a Warning traded for a Warning. The rest need one written, and
 	// without it a WARNING's fix leaves an ERROR: the Guards make the Match
@@ -223,7 +223,7 @@ export function guardEmptyAction(
 				indentation,
 			)
 
-	// NOTE: Half this edit is worse than none of it, so a Match whose closing
+	// Half this edit is worse than none of it, so a Match whose closing
 	// brace could not be found is left alone entirely.
 	if (!closes && arm === null) {
 		return null
@@ -237,7 +237,7 @@ export function guardEmptyAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: false,
-		// NOTE: The arm goes first and the Guards follow in source order, so
+		// The arm goes first and the Guards follow in source order, so
 		// every Position is still measured against the text it was computed
 		// from.
 		edits: [

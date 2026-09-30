@@ -18,7 +18,7 @@ import type { StringType } from "./String"
 import { createString, itemText } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: A Dictionary is a generation-stamped SHARED STORE. The store holds one
+// A Dictionary is a generation-stamped SHARED STORE. The store holds one
 // slot per key in insertion order, and each slot holds the versions its value
 // has had, each stamped with the write that made it. A box is a VIEW of that
 // store at one generation: it sees every version stamped at or below its own,
@@ -27,7 +27,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // exactly what it answered before, because the version the write pushed is
 // stamped past it.
 //
-// NOTE: The doctrine is `List.ts`'s, applied to keys rather than to items:
+// The doctrine is `List.ts`'s, applied to keys rather than to items:
 // "None of this is observable. Every Essence value is immutable and the
 // language has no way to ask whether two values are the SAME value, so a shared
 // Array is indistinguishable from a copied one for as long as every box
@@ -35,13 +35,13 @@ import { type AnyType, typeKeySymbol } from "./type"
 // that every reader — lookup, iteration, printing, equality, `keys`, `values`,
 // `entries`, `map` — reads through `liveValueOf` and through nothing else.
 //
-// NOTE: One rule bounds the history a store carries, checked on the write that
+// One rule bounds the history a store carries, checked on the write that
 // would grow it: a store whose dead versions outnumber its slots is REPACKED
 // into a fresh store holding one version per live key. A write on a box that is
 // not the store's tip repacks as well — the chain has forked, and the two
 // branches must not write into one another's future.
 //
-// NOTE: What a Program pays for a Dictionary that nothing else already carries:
+// What a Program pays for a Dictionary that nothing else already carries:
 // `keyEncoding.ts`, and behind it the 587 bytes of `bigRational`'s `reduced`
 // and the greatest common divisor it calls, which a Rational key's encoding
 // asks for. They ride in wherever a Dictionary does, whatever its keys are,
@@ -50,7 +50,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // its own so that the set-shaped List natives can rest on it without any of
 // the store below reaching a Program that only asks a List a question.
 //
-// NOTE: And one shape costs more than it reads as. A key REMOVED and then
+// And one shape costs more than it reads as. A key REMOVED and then
 // written again lands at the end, which only dropping its tombstoned slot can
 // arrange — so each such round is a repack, O(live entries), rather than the
 // two O(1) writes it looks like. A loop that takes a key out and puts it back
@@ -59,56 +59,56 @@ import { type AnyType, typeKeySymbol } from "./type"
 // on one of ten thousand. A loop that overwrites a key is not, and overwriting
 // is what a Program usually means.
 
-// NOTE: A removed key's newest version. It is a Symbol rather than a sentinel
+// A removed key's newest version. It is a Symbol rather than a sentinel
 // value of the Value Type because there is no value a Program can not store: a
 // Dictionary of Optionals holds `#Empty`, and a Dictionary of Dictionaries
 // holds the empty one, so any in-band spelling of "removed" would be a value
 // some Program means.
 export const TOMBSTONE: unique symbol = Symbol("tombstone")
 
-// NOTE: One value a key has held, and the generation of the write that gave it
+// One value a key has held, and the generation of the write that gave it
 // that value. A slot's versions ascend by generation with the newest last,
 // which is what lets `versionAt` walk back from the end and stop at the first
 // version a box can see.
 type Version<Value> = { value: Value | typeof TOMBSTONE; generation: number }
 
 export type Slot<Key, Value> = {
-	// NOTE: The original key box, held so that `keys()` and `entries()` answer
+	// The original key box, held so that `keys()` and `entries()` answer
 	// the value a Program handed over rather than something rebuilt out of its
 	// encoding. Two equal keys can be spelled differently — `3` and `3/1` under
 	// a `Number` key Type — and the one that arrived FIRST is the one the slot
 	// keeps, exactly as the first insertion keeps the slot's position.
 	key: Key
-	// NOTE: `null` means the SCAN PATH: this key is compared through the
+	// `null` means the SCAN PATH: this key is compared through the
 	// Equatable witness rather than looked up.
 	encoded: EncodedKey | null
 	versions: Array<Version<Value>>
 }
 
 export type Store<Key, Value> = {
-	// NOTE: INSERTION ORDER, and the one source of truth for iteration. A slot
+	// INSERTION ORDER, and the one source of truth for iteration. A slot
 	// is never moved and never removed: a key that is overwritten keeps its
 	// place because its slot does, and a key that is removed leaves a
 	// tombstoned slot standing where it was until a repack drops it.
 	slots: Array<Slot<Key, Value>>
-	// NOTE: Every slot of this store whose key encodes to a primitive, whether
+	// Every slot of this store whose key encodes to a primitive, whether
 	// that slot is live at a given box's generation or not. Visibility is
 	// decided by the version stamps, never by what the index holds, so the two
 	// can not disagree about what a box sees.
 	index: Map<string | number | bigint | boolean, Slot<Key, Value>>
-	// NOTE: The same, for the keys whose encoding is a text in a box. They are
+	// The same, for the keys whose encoding is a text in a box. They are
 	// apart because no one Map can hold both without a String key and a
 	// Rational, Case or Record one being able to collide — see `TextKey`.
 	texts: Map<string, Slot<Key, Value>>
-	// NOTE: The newest write the store holds. A box whose generation is this
+	// The newest write the store holds. A box whose generation is this
 	// one is the TIP and may write in place.
 	generation: number
-	// NOTE: Versions that are no longer any live key's newest — superseded
+	// Versions that are no longer any live key's newest — superseded
 	// values and tombstones — counted so the repack rule below can be asked in
 	// O(1). It is a property of the store at its TIP, which is the only view a
 	// write is ever made from.
 	dead: number
-	// NOTE: How many slots stand here with no encoding, so that a lookup which
+	// How many slots stand here with no encoding, so that a lookup which
 	// the index does not answer knows whether there is anywhere else to look.
 	// A slot has none for one of two reasons: its key is of a kind that does
 	// not encode, or the write that opened it compared keys through a witness
@@ -122,16 +122,16 @@ export type Store<Key, Value> = {
 export type DictionaryType<Key extends AnyType, Value extends AnyType> = {
 	[typeKeySymbol]: "Dictionary"
 	store: Store<Key, Value>
-	// NOTE: This box sees every version stamped at or below this generation.
+	// This box sees every version stamped at or below this generation.
 	generation: number
-	// NOTE: Live entries at that generation, carried rather than counted: a
+	// Live entries at that generation, carried rather than counted: a
 	// walk of the slots would be O(n) for a question `length()` and `isEmpty()`
 	// ask constantly, and every write already knows whether it added a key,
 	// took one away, or did neither.
 	length: number
 }
 
-// NOTE: The entry a Dictionary is written in terms of, and the one shape every
+// The entry a Dictionary is written in terms of, and the one shape every
 // callback receives — a Record of `key` and `value`, so a caller can take it
 // apart with a Pattern. Built as a literal rather than through `createRecord`
 // for its Type, exactly as `List.enumerate` and `List.pair` build theirs.
@@ -144,7 +144,7 @@ type PrintableWitness<Value extends AnyType> = {
 	toString: (value: Value) => StringType
 }
 
-// NOTE: The slot an encoding stands under, in whichever of the store's two
+// The slot an encoding stands under, in whichever of the store's two
 // indexes answers for it. The `typeof` is the routing: a boxed text is the one
 // that is an object, and every other kind's encoding is a primitive.
 function slotUnder<Key extends AnyType, Value extends AnyType>(
@@ -156,7 +156,7 @@ function slotUnder<Key extends AnyType, Value extends AnyType>(
 		: store.index.get(encoded)
 }
 
-// NOTE: A slot filed under its own encoding, or counted as one more the indexes
+// A slot filed under its own encoding, or counted as one more the indexes
 // can not answer for. Every place that opens a slot goes through here, so the
 // two indexes and the count can not drift from the slots they are about.
 function fileSlot<Key extends AnyType, Value extends AnyType>(
@@ -174,12 +174,12 @@ function fileSlot<Key extends AnyType, Value extends AnyType>(
 	}
 }
 
-// NOTE: The newest version a box at this generation can see — walked back from
+// The newest version a box at this generation can see — walked back from
 // the end, because versions ascend and the newest visible one is the last one
 // stamped at or below the box. `undefined` means the slot was opened after this
 // box was made, which is what a box sees of a key some later write added.
 //
-// NOTE: `versions.length` is read fresh rather than fixed, and that is safe for
+// `versions.length` is read fresh rather than fixed, and that is safe for
 // the same reason `List`'s runs are: a push only ever extends the Array, and
 // anything a reentrant write pushed mid-walk is stamped past this box and
 // skipped by the very test below.
@@ -200,7 +200,7 @@ function versionAt<Value>(
 	return undefined
 }
 
-// NOTE: THE LIVE VIEW, and the only rule any reader here is written on: a slot
+// THE LIVE VIEW, and the only rule any reader here is written on: a slot
 // is live at a generation when it has a version there and that version is not a
 // tombstone. Every walk in this module is the same four lines around it — the
 // slots in order, the ones this answers for — which is how a shared store stays
@@ -218,26 +218,26 @@ function liveValueOf<Value extends AnyType>(
 	return version.value
 }
 
-// NOTE: The slot a key stands in, live or tombstoned, or `undefined` when this
+// The slot a key stands in, live or tombstoned, or `undefined` when this
 // box holds no slot for it at all. Which path is taken is decided by the
 // ENCODING the caller was able to make of the key, which is to say by the
 // witness it was handed as much as by the key: an encoding means one `Map`
 // read, and no encoding means a walk asking the witness about every live slot.
 //
-// NOTE: The scan asks about EVERY live slot rather than only the ones with no
+// The scan asks about EVERY live slot rather than only the ones with no
 // encoding of their own, and the difference matters exactly where the two kinds
 // of witness meet on one store. A store written under the standard library's
 // equality holds slots that are all encoded; a later write through a witness a
 // Namespace wrote has no encoding to look them up by, and skipping them would
 // have opened a second slot for a key that is standing right there.
 //
-// NOTE: The other direction is what `store.unencoded` answers. An encoding the
+// The other direction is what `store.unencoded` answers. An encoding the
 // index does not know may still belong to a slot some witnessed write opened
 // with no encoding at all, so a miss falls through to the scan while any such
 // slot stands. Where none does — which is every ordinary Dictionary — a miss is
 // a miss in one step.
 //
-// NOTE: The visibility test is what keeps the index honest. It holds every slot
+// The visibility test is what keeps the index honest. It holds every slot
 // the store ever opened, including ones opened by writes this box is older
 // than, and a box must not find a key it was made before. On the tip that test
 // can not fail, which is where every write asks it from.
@@ -262,7 +262,7 @@ function slotHolding<Key extends AnyType, Value extends AnyType>(
 		}
 	}
 
-	// NOTE: With no witness there is no equality to ask, which is the shape the
+	// With no witness there is no equality to ask, which is the shape the
 	// empty literal arrives in — it holds no slot for the walk to reach either.
 	if (conformance === null) {
 		return undefined
@@ -286,7 +286,7 @@ function slotHolding<Key extends AnyType, Value extends AnyType>(
 	return undefined
 }
 
-// NOTE: `slotHolding` for the readers, which have no other use for the
+// `slotHolding` for the readers, which have no other use for the
 // encoding. The writers keep theirs: they may have to open a slot with it, and
 // they may have to ask a second time after a repack.
 function lookupSlot<Key extends AnyType, Value extends AnyType>(
@@ -302,19 +302,19 @@ function lookupSlot<Key extends AnyType, Value extends AnyType>(
 	)
 }
 
-// NOTE: A box's live view copied into a store of its own — one slot per live
+// A box's live view copied into a store of its own — one slot per live
 // key, one version each at generation zero, the indexes rebuilt, nothing dead.
 // Nothing of the old store is touched, so every other box over it still answers
 // what it answered.
 //
-// NOTE: Three writes reach for this. A write on a forked box, which must not
+// Three writes reach for this. A write on a forked box, which must not
 // push into a store whose tip belongs to another branch. A write on a store
 // carrying more dead versions than live slots — history that would otherwise
 // grow without bound. And a key being RE-ADDED after it was removed, because
 // the design says such a key lands at the END and only dropping its tombstoned
 // slot can put it there.
 //
-// NOTE: The box the repack was made FROM is moved onto the fresh store as well,
+// The box the repack was made FROM is moved onto the fresh store as well,
 // and this is worth stating because it is a mutation of a value somebody else
 // holds. It is unobservable — the fresh store holds exactly that box's live
 // view at generation zero, so the box answers what it answered — and what it
@@ -360,14 +360,14 @@ function repack<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, 0, slots.length)
 }
 
-// NOTE: Whether the store this box sits on is carrying more history than the
+// Whether the store this box sits on is carrying more history than the
 // entries it holds. Asked only of a box that is the tip, which is the only view
 // `dead` describes.
 function isOverloaded(store: Store<AnyType, AnyType>): boolean {
 	return store.dead > store.slots.length
 }
 
-// NOTE: A fresh box over a store that has just been written. The three fields
+// A fresh box over a store that has just been written. The three fields
 // move together — the store, the generation the write stamped, and the count
 // that write left — and writing them in one place is what keeps a write from
 // answering a box whose `length` disagrees with its own view.
@@ -379,7 +379,7 @@ function boxAt<Key extends AnyType, Value extends AnyType>(
 	return { [typeKeySymbol]: "Dictionary", store, generation, length }
 }
 
-// NOTE: The builder every construction path shares — `of`, `createDictionary`,
+// The builder every construction path shares — `of`, `createDictionary`,
 // `createDictionaryFrom`, `repack`, `map`, the filters and the sorts, and
 // `freshStore`, the door the gathering natives come through, each fill a store
 // of their own and hand it over, so `group`, `tally` and `index` reach it
@@ -400,7 +400,7 @@ function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<
 	}
 }
 
-// NOTE: The slot a key already has in a store nobody else holds yet, found the
+// The slot a key already has in a store nobody else holds yet, found the
 // three ways `slotHolding` finds one — under its encoding, by asking the
 // witness about every slot, or, after an encoding the index cannot answer for,
 // by asking it about the slots that carry no encoding of their own. There is no
@@ -408,7 +408,7 @@ function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<
 // slot is live, which is what separates this from the reader that serves the
 // boxes.
 //
-// NOTE: That third way is the one a fresh store looks like it could do without,
+// That third way is the one a fresh store looks like it could do without,
 // and may not. One witness fills the whole of such a store, but a witness may
 // cover kinds that encode and kinds that do not — a branded `Number` one covers
 // the Integer and the Rational, which encode, and the Algebraic and the
@@ -444,7 +444,7 @@ function slotInFreshStore<Key extends AnyType, Value extends AnyType>(
 		return undefined
 	}
 
-	// NOTE: Every slot for a key with no encoding, and only the unencoded ones
+	// Every slot for a key with no encoding, and only the unencoded ones
 	// for a key that has one — the same two cases, and the same one test,
 	// `slotHolding` walks its slots under.
 	let slots = store.slots
@@ -463,7 +463,7 @@ function slotInFreshStore<Key extends AnyType, Value extends AnyType>(
 	return undefined
 }
 
-// NOTE: A slot opened at the end of a store nobody else holds yet, carrying one
+// A slot opened at the end of a store nobody else holds yet, carrying one
 // version at generation zero — the shape a repack would leave it in.
 function openFreshSlot<Key extends AnyType, Value extends AnyType>(
 	store: Store<Key, Value>,
@@ -481,7 +481,7 @@ function openFreshSlot<Key extends AnyType, Value extends AnyType>(
 	fileSlot(store, slot)
 }
 
-// NOTE: One entry added to a store nobody else holds yet. A key already in it
+// One entry added to a store nobody else holds yet. A key already in it
 // wins later and keeps its place: the value is written over the version that is
 // there rather than pushed after it, which is both what `Dictionary.of` promises
 // about a duplicate key and what leaves the finished store with no dead
@@ -504,7 +504,7 @@ function addToFreshStore<Key extends AnyType, Value extends AnyType>(
 	openFreshSlot(store, key, encoded, value)
 }
 
-// NOTE: The door the Compiler's emitted Dictionary literal comes through, and
+// The door the Compiler's emitted Dictionary literal comes through, and
 // the natives that build a Dictionary from finished pairs. The Array of pairs
 // is read and not kept: the store is the box's own from the first entry on, so
 // nothing here takes ownership of anything the caller may still hold.
@@ -525,13 +525,13 @@ export function createDictionary<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, 0, store.slots.length)
 }
 
-// NOTE: The door a HOST's values come through, and the `From` of
+// The door a HOST's values come through, and the `From` of
 // `createListFrom` and `createIntegerFrom`: a constructor written for a caller
 // whose calls can not be read and checked, so what the callers inside the
 // runtime are trusted with is decided here instead. Two things are, and the
 // door above leaves both to whoever calls it.
 //
-// NOTE: The WITNESS, which the boundary has none of — a Descriptor is JSON and
+// The WITNESS, which the boundary has none of — a Descriptor is JSON and
 // a conformance is a value, so nothing that crosses carries one. The universal
 // structural comparison stands in, branded `structural` because for every kind
 // whose keys encode it decides exactly what the standard library's own `is`
@@ -542,14 +542,14 @@ export function createDictionary<Key extends AnyType, Value extends AnyType>(
 // slots that Namespace calls one. `describe.ts` says so where it describes the
 // shape, which is where a reader meets the boundary.
 //
-// NOTE: And a DUPLICATE key, which is ANSWERED rather than merged. A `Map`
+// And a DUPLICATE key, which is ANSWERED rather than merged. A `Map`
 // tells its keys apart by `===` where a Dictionary tells them apart by the key
 // Type's own equality, so `1` and `1n` are two Map keys and one Dictionary key
 // — and `Dictionary.of`'s "a later entry wins" is a rule about a List a Program
 // wrote, not about a Map a host believes it is handing over whole. Losing an
 // entry a host wrote is the one thing the boundary may not do.
 //
-// NOTE: The POSITION of the offending entry rather than a thrown Error, because
+// The POSITION of the offending entry rather than a thrown Error, because
 // the sentence that names it is the marshaller's: it knows the path the value
 // stands at — `argument 1 → [3].key` — and an Error built in here would name a
 // place no host could find. A `number` can not be mistaken for the Dictionary
@@ -579,7 +579,7 @@ export function createDictionaryFrom(
 	return boxAt(store, 0, store.slots.length)
 }
 
-// NOTE: Held at the top level rather than built per call, and free there for
+// Held at the top level rather than built per call, and free there for
 // the reason `registerDictionaryKind` is a call rather than a line at the top
 // of this file: an object literal of arrows is a side effect no bundler has to
 // keep, so a Program that never reaches the door above carries neither it nor
@@ -590,7 +590,7 @@ const boundaryEquatable: EquatableWitness<AnyType> = {
 	structural: true,
 }
 
-// NOTE: The three doors a native that GATHERS a Dictionary comes through, and
+// The three doors a native that GATHERS a Dictionary comes through, and
 // the reason they are here rather than in the module that gathers. A grouping
 // walks its source once and folds each item into the entry its key already has,
 // which no door above spells: `createDictionary` is handed the entries finished.
@@ -606,7 +606,7 @@ export function freshStore<Key extends AnyType, Value extends AnyType>(): Store<
 	return emptyStore()
 }
 
-// NOTE: One item folded into the entry its key stands at, or a new entry opened
+// One item folded into the entry its key stands at, or a new entry opened
 // at the end for a key that has none. `combine` is handed what the key holds and
 // answers what it holds next; `seed` answers what a key opens with. The two are
 // apart because a group's first item and its later ones are different questions
@@ -622,7 +622,7 @@ export function foldIntoFreshStore<Key extends AnyType, Value extends AnyType>(
 	let existing = slotInFreshStore(store, key, encoded, conformance)
 
 	if (existing !== undefined) {
-		// NOTE: Nothing in such a store is a tombstone — `remove` is the only
+		// Nothing in such a store is a tombstone — `remove` is the only
 		// thing that writes one, and it writes on a box rather than here.
 		existing.versions[0].value = combine(
 			existing.versions[0].value as Value,
@@ -641,7 +641,7 @@ export function dictionaryOverFreshStore<
 	return boxAt(store, 0, store.slots.length)
 }
 
-// NOTE: The List of entry Records a Program writes a Dictionary down as. The
+// The List of entry Records a Program writes a Dictionary down as. The
 // two runs are walked as every List native walks them, with the counts fixed
 // before the first entry is read. `sealedRunsOf` rather than `walkOf`: nothing
 // here visits the items twice, so there is no reason to trim the caller's List
@@ -670,13 +670,13 @@ export function of__overload$1<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, 0, store.slots.length)
 }
 
-// NOTE: Order-INSENSITIVE, which is what the design says two Dictionaries mean
+// Order-INSENSITIVE, which is what the design says two Dictionaries mean
 // by equal: the same keys, each with an equal value, however they were written
 // down. Equal lengths decide first and are what makes one direction enough —
 // the receiver's keys are pairwise distinct, so an injection into a set of the
 // same size is a bijection.
 //
-// NOTE: The key witness finds the entry and the value witness compares what it
+// The key witness finds the entry and the value witness compares what it
 // holds. Both are needed: a Record key is found by asking the Key Namespace,
 // and a value is compared with its own equality rather than with a structural
 // one this Module would have to choose.
@@ -721,11 +721,11 @@ export function is<Key extends AnyType, Value extends AnyType>(
 	return createBoolean(true)
 }
 
-// NOTE: What a reader sees, which is the form a Program writes a Dictionary
+// What a reader sees, which is the form a Program writes a Dictionary
 // down in: `["alex" = 39, "sam" = 25]`, and `[=]` for the empty one — the `=`
 // is what keeps that apart from the empty List's `[]`.
 //
-// NOTE: `itemText` on both sides, which is the one rule that separates this
+// `itemText` on both sides, which is the one rule that separates this
 // from a join: a String is quoted inside a structure, so `["", "a"]` as a key
 // reads as a key rather than as nothing at all, and a value that is a String
 // reads as one. Keys and values are Printable through their own Namespaces, so
@@ -791,7 +791,7 @@ export function value__overload$1<Key extends AnyType, Value extends AnyType>(
 	return held === undefined ? createEmpty() : createValue(held)
 }
 
-// NOTE: A fresh Array per answer, which is what `createList` demands of
+// A fresh Array per answer, which is what `createList` demands of
 // everything that hands it one: the List it builds takes the Array over and may
 // push onto it, and nothing in this Module may then still be holding it.
 export function keys<Key extends AnyType, Value extends AnyType>(
@@ -856,7 +856,7 @@ export function entries<Key extends AnyType, Value extends AnyType>(
 	return createList(answer)
 }
 
-// NOTE: The first entry a box holds, or `null` for a box holding none — the
+// The first entry a box holds, or `null` for a box holding none — the
 // same walk every reader here is, stopped at the first slot that answers.
 // `NonEmptyDictionary.firstEntry` reads it too, which is why it is exported:
 // its receiver's proof says the answer is never `null`, and the entry it spends
@@ -880,7 +880,7 @@ export function firstLiveEntry<Key extends AnyType, Value extends AnyType>(
 	return null
 }
 
-// NOTE: Native for what the position costs. The Essence body is
+// Native for what the position costs. The Essence body is
 // `@::entries()::firstItem()`, which builds an entry Record for every entry the
 // Dictionary holds and drops all but the first; this builds one. Ten thousand
 // readings of a thousand-entry Dictionary measured 10 ms here and 105 ms that
@@ -896,7 +896,7 @@ export function firstEntry__overload$1<
 	return entry === null ? createEmpty() : createValue(entry)
 }
 
-// NOTE: Setting a key is four decisions and then one push.
+// Setting a key is four decisions and then one push.
 //
 // The key is found first, on the receiver, because whether it is there and
 // whether it is tombstoned is what the rest turns on. Then the store the write
@@ -905,18 +905,18 @@ export function firstEntry__overload$1<
 // slot when it is live, which is what makes an overwrite keep its place, and
 // onto a slot opened at the end otherwise.
 //
-// NOTE: A key whose newest visible version is a TOMBSTONE is why the repack is
+// A key whose newest visible version is a TOMBSTONE is why the repack is
 // not only a bookkeeping measure. The design says a key removed and later
 // re-added lands at the end, and its slot is still standing where it first was
 // — so the only way to put it last is to drop the dead slot, which is what a
 // repack does.
 //
-// NOTE: `store.dead` is maintained rather than recomputed: an overwrite leaves
+// `store.dead` is maintained rather than recomputed: an overwrite leaves
 // one superseded version behind, and an opened slot leaves none. It is the
 // count of versions that are no longer any live key's newest, which is exactly
 // what the repack rule wants to compare against the number of slots.
 //
-// NOTE: And it is the only rule, which is a trade taken deliberately. A cap on
+// And it is the only rule, which is a trade taken deliberately. A cap on
 // one slot's versions was tried — eight — and it turned overwriting one key of
 // a large Dictionary into a repack of the whole thing every seventh write:
 // 10,000 overwrites of one key in a 100,000-entry Dictionary took 7.6 seconds
@@ -934,7 +934,7 @@ export function set<Key extends AnyType, Value extends AnyType>(
 	conformance: EquatableWitness<Key>,
 ): DictionaryType<Key, Value> {
 	let encoded = encodeKey(key, conformance)
-	// NOTE: `standing` is the slot the key has in this store at all, tombstoned
+	// `standing` is the slot the key has in this store at all, tombstoned
 	// or not; `live` is the same slot only when the key is still there. The two
 	// are apart because they decide different things — a standing slot that is
 	// not live is what forces the repack, and a live one is what the version is
@@ -954,7 +954,7 @@ export function set<Key extends AnyType, Value extends AnyType>(
 	) {
 		target = repack(dictionary)
 
-		// NOTE: A repack drops every dead slot, so a key that was tombstoned
+		// A repack drops every dead slot, so a key that was tombstoned
 		// has no slot in the fresh store and is opened at the end below —
 		// which is the whole point of having repacked. A key that was live has
 		// one, and it is asked for again rather than tracked through the
@@ -991,17 +991,17 @@ export function set<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, generation, target.length + 1)
 }
 
-// NOTE: A tombstone pushed where the value was, so the key stops being live at
+// A tombstone pushed where the value was, so the key stops being live at
 // the new generation while every older box goes on seeing what it saw. The slot
 // stays standing: it is dropped by the next repack, and until then it is what
 // tells a re-add of the same key that it must go to the end.
 //
-// NOTE: An absent key answers the receiver. Removing what is not there leaves
+// An absent key answers the receiver. Removing what is not there leaves
 // exactly the contents the receiver holds, and nothing in the language can ask
 // whether the answer is the same value — so there is no reason to build a box
 // to say the same thing, and no reason to stamp a generation nothing changed at.
 //
-// NOTE: `dead` grows by two: the value that was there is superseded, and the
+// `dead` grows by two: the value that was there is superseded, and the
 // tombstone that supersedes it is itself no live key's newest.
 export function remove__overload$1<Key extends AnyType, Value extends AnyType>(
 	dictionary: DictionaryType<Key, Value>,
@@ -1026,7 +1026,7 @@ export function remove__overload$1<Key extends AnyType, Value extends AnyType>(
 	) {
 		target = repack(dictionary)
 
-		// NOTE: The key is live in the view the repack copied, so the fresh
+		// The key is live in the view the repack copied, so the fresh
 		// store holds exactly one slot for it. The cast says that, rather than
 		// making the lines below carry a case that can not happen.
 		slot = slotHolding(target, key, encoded, conformance) as Slot<
@@ -1045,16 +1045,16 @@ export function remove__overload$1<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, generation, target.length - 1)
 }
 
-// NOTE: The keys are kept and only the values are transformed, so the answer
+// The keys are kept and only the values are transformed, so the answer
 // REUSES each slot's encoding rather than encoding the same keys a second time
 // — which is why this is a native at all, and why it needs no Equatable
 // witness: the receiver's keys are already known to be distinct from one
 // another, and nothing here can make two of them collide.
 //
-// NOTE: The transform receives the entry Record, as every Dictionary callback
+// The transform receives the entry Record, as every Dictionary callback
 // does, so a caller can take it apart with a Pattern.
 //
-// NOTE: The slot count is fixed before the walk, for the reason `List`'s
+// The slot count is fixed before the walk, for the reason `List`'s
 // natives fix their item counts: the transform may write to the very Dictionary
 // being walked, and a write on the tip appends to the Array this loop is
 // reading. What such a write appends is stamped past this box and would be
@@ -1102,7 +1102,7 @@ export function map<
 	return boxAt(store, 0, slots.length)
 }
 
-// NOTE: The filter and its complement, native for the reason `map` is: the
+// The filter and its complement, native for the reason `map` is: the
 // keys that pass are the receiver's own, each already distinct from the rest,
 // so the answer REUSES every kept slot's encoding rather than encoding the
 // kept keys a second time — which is what the Essence body did through
@@ -1111,13 +1111,13 @@ export function map<
 // keys collide, and a key that took the scan path on the receiver takes it on
 // the answer too, since its slot is carried over with `encoded` still `null`.
 //
-// NOTE: Measured on a thousand keys with half of them kept, best of five:
+// Measured on a thousand keys with half of them kept, best of five:
 // String keys 29 µs through `Dictionary.of` and 23 µs here, Record keys 100 µs
 // and 25 µs, payload Case keys 75 µs and 29 µs. The gap is what a kept key's
 // encoding costs, which is why it widens for a Record or a Case, whose text is
 // spelled from every part of the key.
 //
-// NOTE: The check receives the entry Record, as every Dictionary callback
+// The check receives the entry Record, as every Dictionary callback
 // does, and is asked once per live entry, in order. The slot count is fixed
 // before the walk for the reason `map` fixes its own.
 export function everyEntry<Key extends AnyType, Value extends AnyType>(
@@ -1134,7 +1134,7 @@ export function removeEvery<Key extends AnyType, Value extends AnyType>(
 	return kept(dictionary, check, false)
 }
 
-// NOTE: One walk for both: a slot is kept when the check's answer is the one
+// One walk for both: a slot is kept when the check's answer is the one
 // `accepted` names. A fresh store rather than a box over the receiver's — a
 // filter tombstoning every refused key would leave the answer sharing a store
 // with a box that still sees them all, and every later write from either
@@ -1184,26 +1184,26 @@ function kept<Key extends AnyType, Value extends AnyType>(
 	return boxAt(store, 0, slots.length)
 }
 
-// NOTE: The REORDERING the two filters above are the filtering of, and native
+// The REORDERING the two filters above are the filtering of, and native
 // for the same reason: the answer holds the receiver's own slots under another
 // order, so every key's encoding is carried over rather than spelled a second
 // time. The Essence body it replaces was
 // `Dictionary.of(@::entries()::sort(on .key, in order))`, which encodes every
 // key of the answer afresh.
 //
-// NOTE: The key is read ONCE per entry and the POSITIONS are sorted on those
+// The key is read ONCE per entry and the POSITIONS are sorted on those
 // keys, which is the shape `List.sort__overload$3` takes and for the same
 // reason: a comparison calling the key on both sides reads it 2·n·log₂n times
 // against n. Sorting positions rather than Records is also what keeps a cheap
 // key cheap — one object per entry is a heavier debit than the reads it saves.
 //
-// NOTE: Stable in either direction. A descending sort hands the same
+// Stable in either direction. A descending sort hands the same
 // comparison its pair the other way round rather than reversing the answer,
 // `Array.sort` is stable, and the positions it sorts start out in the
 // receiver's order — so two entries whose keys compare `#Equal` keep the order
 // they had whichever way the sort runs.
 //
-// NOTE: The slot count is fixed before the walk, for the reason `map` fixes
+// The slot count is fixed before the walk, for the reason `map` fixes
 // its own: the key Function may write to the very Dictionary being read.
 function reordered<
 	Key extends AnyType,
@@ -1268,7 +1268,7 @@ function reordered<
 	return boxAt(store, 0, slots.length)
 }
 
-// NOTE: The Ordering Case read by tag, mapped to the sign `Array.sort` expects
+// The Ordering Case read by tag, mapped to the sign `Array.sort` expects
 // — the same three lines `List.ts` reads its own comparisons by. It is spelled
 // again here rather than imported, because a Program holding a Dictionary need
 // not hold a List.
@@ -1309,7 +1309,7 @@ export function sort__overload$2<
 	)
 }
 
-// NOTE: The live view as pairs, for the rendering, for `equalsUniversally` and
+// The live view as pairs, for the rendering, for `equalsUniversally` and
 // `equalsByParts`, which walk one side while they search the other, and for
 // the difference a failing test writes. It is the same four lines every reader
 // here is, materialised.
@@ -1333,7 +1333,7 @@ function livePairs<Key extends AnyType, Value extends AnyType>(
 	return pairs
 }
 
-// NOTE: The rendering `Terminal.inspect` and `Record::toString` reach for when
+// The rendering `Terminal.inspect` and `Record::toString` reach for when
 // they meet a Dictionary — the written form, laid out the way the walk around
 // it lays a List out, with the entries broken over lines once the single line
 // would be too long. It is the same text `toString` above answers for the same
@@ -1351,7 +1351,7 @@ function renderDictionary(
 		return "[=]"
 	}
 
-	// NOTE: Each entry is rendered ONCE, at indent zero, and the nested layout
+	// Each entry is rendered ONCE, at indent zero, and the nested layout
 	// re-indents what the single-line one already produced — the same walk the
 	// Record and List arms take, and for the same reason: a second rendering
 	// per layout doubles the work at every level of nesting.
@@ -1372,14 +1372,14 @@ function renderDictionary(
 		.join(`,\n${contentIndent}`)}\n${" ".repeat(4 * indentLevel)}]`
 }
 
-// NOTE: Equality with no witness in hand — what the universal comparison falls
+// Equality with no witness in hand — what the universal comparison falls
 // into when it meets two Dictionaries, with `same` its own answer for whatever
 // they hold. It is not the `is` native above: there is no key witness and no
 // value witness to ask, and the structure two boxes are made of is not what a Dictionary is
 // equal by — the store is shared and stamped, so two boxes holding the very
 // same entries need not hold the same slots.
 //
-// NOTE: One side is walked and the other is looked up, which is what makes this
+// One side is walked and the other is looked up, which is what makes this
 // O(n) where a struck-out double walk was O(n²). The lookup may use the
 // canonical encoding whatever witness either store was written through, because
 // `same` here IS the standard library's own equality — that is the very claim
@@ -1397,7 +1397,7 @@ function equalsUniversally(
 		return false
 	}
 
-	// NOTE: The witness shape `slotHolding` asks through, built once per
+	// The witness shape `slotHolding` asks through, built once per
 	// comparison rather than per key. `createBoolean` answers one of two
 	// interned values, so the wrapping is a call and no allocation.
 	let witness = {
@@ -1423,7 +1423,7 @@ function equalsUniversally(
 	return true
 }
 
-// NOTE: And equality where each half of an entry is compared by a rule the
+// And equality where each half of an entry is compared by a rule the
 // descriptor names — a Case holding a `Dictionary<KeyType, ValueType>` reaches
 // this, with the two Type Parameters' witnesses standing behind `sameKey` and
 // `sameValue`. Nothing handed in is the equality the keys are organised by, so
@@ -1477,7 +1477,7 @@ function equalsByParts(
 	return true
 }
 
-// NOTE: The one registration, and the reason it is a call from every door a
+// The one registration, and the reason it is a call from every door a
 // Dictionary is built through rather than a line at the top of this module.
 // The head of every emitted Program imports every runtime module and leans on
 // esbuild to shake away the ones it does not name — and a top-level call is a
@@ -1486,7 +1486,7 @@ function equalsByParts(
 // on first use for the same reason, and says so; this is that stance applied to
 // a table rather than to a table loader.
 //
-// NOTE: A Program that holds a Dictionary at all built it here, so the
+// A Program that holds a Dictionary at all built it here, so the
 // registration is in place before anything can print, compare or diff one.
 let registered = false
 
@@ -1501,7 +1501,7 @@ function registerDictionaryKind(): void {
 		open: "[",
 		close: "]",
 		render: renderDictionary,
-		// NOTE: Each entry under its key as it prints, which is what the reader
+		// Each entry under its key as it prints, which is what the reader
 		// of a difference reads it by. Two keys of one Dictionary are never
 		// equal, so they can only render alike where a `toString` renders two
 		// different values the same.

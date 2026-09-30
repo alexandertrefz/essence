@@ -15,7 +15,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The everyday additions to `List`, `NonEmptyList` and the three
+// The everyday additions to `List`, `NonEmptyList` and the three
 // `…List` Namespaces that read numbers — the checked ends of `firstItems`,
 // `lastItems`, `removeFirst` and `removeLast`, the running fold `accumulate`
 // and the `runningTotal` on top of it, the seedless `NonEmptyList::reduce`,
@@ -23,7 +23,7 @@ import { validate } from "../validator/index"
 // `everyIndex(of:)`, the four end questions, the two new `partition` entries
 // and the filter-map `everyValue`.
 //
-// NOTE: Every claim here is about a value a run answered, not about a Type the
+// Every claim here is about a value a run answered, not about a Type the
 // Enricher handed out. A boundary read one position out is a Program that
 // prints the wrong List, and only running it says so. The Type-level claims —
 // which rung a call lands on, and which proof it spends — are the last block,
@@ -69,7 +69,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: One Program per block rather than one per claim, because each call is
+// One Program per block rather than one per claim, because each call is
 // a line of output and the pipeline runs once for all of them. Every Program
 // opens with the same three Lists, so a reader compares the answers rather
 // than the inputs.
@@ -97,7 +97,7 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// NOTE: The property runner, the shape `testingProperties.spec.ts` drives it
+// The property runner, the shape `testingProperties.spec.ts` drives it
 // in: the loaded Program's OWN `$tests`, because every Essence value carries a
 // Type key belonging to the runtime instance that built it.
 async function properties(source: string): Promise<Array<TestEvent>> {
@@ -154,7 +154,7 @@ describe("The leading and trailing runs a check accepts", () => {
 		).toEqual(['"[2, 1]"', '"[1, 3]"', '"[]"', '"[3, 1, 2, 1, 4]"'])
 	})
 
-	// NOTE: The two ends of the range of checks. A check that accepts every
+	// The two ends of the range of checks. A check that accepts every
 	// item takes the whole List one way and leaves nothing the other, and a
 	// check that accepts none does the opposite. Both are what an off-by-one
 	// boundary gets wrong.
@@ -193,7 +193,7 @@ describe("The leading and trailing runs a check accepts", () => {
 		).toEqual(['"[]"', '"[]"', '"[]"', '"[]"'])
 	})
 
-	// NOTE: The counted entries stand beside the checked ones under one name,
+	// The counted entries stand beside the checked ones under one name,
 	// so a call that writes a count has to keep reaching the entry it always
 	// did — the default on `removeFirst` and `removeLast` included.
 	it("leaves the counted entries where they were", async () => {
@@ -228,7 +228,7 @@ describe("The running fold", () => {
 		).toEqual(['"[0, 3, 4, 6, 7, 11]"', '"[0]"', '"[1, 5]"'])
 	})
 
-	// NOTE: The proof, read where it is spent. `firstItem` on a
+	// The proof, read where it is spent. `firstItem` on a
 	// `NonEmptyList` answers the item, so adding to it is only a Program at
 	// all when the answer carried the promise — and the empty receiver is the
 	// case that promise is about.
@@ -252,7 +252,7 @@ describe("The running total", () => {
 		).toEqual(['"[0, 3, 4, 6, 7, 11]"', '"[0]"'])
 	})
 
-	// NOTE: One Namespace per item Type, so the receiver decides which entry
+	// One Namespace per item Type, so the receiver decides which entry
 	// answers and which zero it opens with. The mixed entry leaves a whole
 	// total as the Rational the fold built, which prints as the Integer it
 	// equals — the difference the entry documents at its own site.
@@ -270,7 +270,7 @@ describe("The running total", () => {
 		).toEqual(['"[0, 3/2, 2, 9/2]"', '"[0, 3, 7/2, 11/2]"', '"[0]"'])
 	})
 
-	// NOTE: The proof `accumulate` hands on. Adding to `firstItem()` is only
+	// The proof `accumulate` hands on. Adding to `firstItem()` is only
 	// a Program at all where the answer carries it, and the empty receiver is
 	// the case the promise is about.
 	it("promises a total whatever the receiver", async () => {
@@ -281,7 +281,7 @@ describe("The running total", () => {
 })
 
 describe("The fold with no starting value", () => {
-	// NOTE: A written receiver is its own proof, so these reach the entry a
+	// A written receiver is its own proof, so these reach the entry a
 	// `NonEmptyList` unlocks. The same call on a List nothing proved anything
 	// about is refused, which the last block pins.
 	it("opens the fold with the first item", async () => {
@@ -325,7 +325,7 @@ describe("The extrema with no key", () => {
 		])
 	})
 
-	// NOTE: Ties keep the earlier item, which is what the keyed entries below
+	// Ties keep the earlier item, which is what the keyed entries below
 	// them promise and what the identity key carries up unchanged.
 	it("keeps the earlier item of a tie", async () => {
 		expect(
@@ -490,7 +490,7 @@ describe("The two new cuts, and the filter-map", () => {
 		])
 	})
 
-	// NOTE: The first entry keeps its own halves and its own names. Adding two
+	// The first entry keeps its own halves and its own names. Adding two
 	// entries above it would have renumbered the native it binds to, and this
 	// is what would print the wrong Record if it had.
 	it("leaves the checked partition answering accepted and refused", async () => {
@@ -535,7 +535,7 @@ describe("The two new cuts, and the filter-map", () => {
 })
 
 describe("Which rung a call lands on", () => {
-	// NOTE: The seedless fold is the proof spent, so a List nothing proved
+	// The seedless fold is the proof spent, so a List nothing proved
 	// anything about has no entry to reach. The Diagnostic names the two
 	// entries `List` does declare, which is the whole of what falls through.
 	// The two Parameters of the refused Function are then Types nothing
@@ -549,7 +549,7 @@ describe("Which rung a call lands on", () => {
 			})::toString())
 		}`)
 
-		// NOTE: The cascade is reported BEFORE the call's own refusal, because
+		// The cascade is reported BEFORE the call's own refusal, because
 		// a report that no candidate takes this many Arguments says what the
 		// call passed — and reading what each Argument came to is what enriches
 		// the literal nothing ever gave a context to. Inside out is the right
@@ -559,7 +559,7 @@ describe("Which rung a call lands on", () => {
 			"uninferable-parameter-type",
 			"no-matching-overload",
 		])
-		// NOTE: The two entries `List` declares, spelled out. A count holds
+		// The two entries `List` declares, spelled out. A count holds
 		// while the sentences under it drift into something else.
 		expect(diagnostics[2]!.notes).toEqual([
 			"'List::reduce' takes 2 Arguments: Parameter 'startingWith' is Answer, Parameter 2 is (_: Answer, _: Integer) -> Answer.",
@@ -567,7 +567,7 @@ describe("Which rung a call lands on", () => {
 		])
 	})
 
-	// NOTE: An `if` asking `hasItems` mints the proof, and the two Methods
+	// An `if` asking `hasItems` mints the proof, and the two Methods
 	// only a proven List answers are what read it back.
 	it("reaches the proven entries through a narrowing check", async () => {
 		expect(
@@ -586,7 +586,7 @@ describe("Which rung a call lands on", () => {
 		).toEqual(['"15"', '"4"'])
 	})
 
-	// NOTE: A `defaultingTo:` call on a proven receiver finds no entry on
+	// A `defaultingTo:` call on a proven receiver finds no entry on
 	// `NonEmptyList` and falls to `List`'s rung. The fallback can never be
 	// read there, which the library reports rather than runs.
 	it("warns where a proven receiver writes a fallback that can never be read", () => {
@@ -603,7 +603,7 @@ describe("Which rung a call lands on", () => {
 })
 
 describe("What holds for every List", () => {
-	// NOTE: One Program of properties rather than one per claim: the runner
+	// One Program of properties rather than one per claim: the runner
 	// draws a hundred cases for each, and the pipeline runs once for all of
 	// them. Each claim is one of the laws the new entries have to keep, and a
 	// failure names the property and the smallest List that breaks it.

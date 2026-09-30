@@ -95,7 +95,7 @@
 	color: var(--code-text);
 }
 
-/* NOTE: A plain descendant selector — the lede's code is a direct child of it. */
+/* A plain descendant selector — the lede's code is a direct child of it. */
 .prose .lede code,
 .ref__lede code {
 	color: var(--accent);
@@ -202,7 +202,7 @@
  * window's rail on top, so the name reads as the file's tab rather than as a
  * heading, and the `<pre>` inside gives its border and radius back to it.
  *
- * NOTE: `figure.code-file > pre` rather than `.code-file pre`: a guide step
+ * `figure.code-file > pre` rather than `.code-file pre`: a guide step
  * sets its fences' top margin from a scoped selector exactly as specific as
  * the shorter one, and which of the two won would come down to the order the
  * stylesheets were bundled in.

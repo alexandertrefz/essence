@@ -13,21 +13,21 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: `NonEmptyDictionary` and the bridges from a List, end to end. A
+// `NonEmptyDictionary` and the bridges from a List, end to end. A
 // refinement erases before anything runs, so half of what is claimed here is
 // about which Method a call REACHES — a question about compiling — and half is
 // about what that Method then answers. Both halves are asked the same way: the
 // Program is compiled and run, and a Method only a proven receiver can reach is
 // called where the proof is meant to be.
 //
-// NOTE: `raise(to -1)` is the discriminator throughout. `Integer::raise` answers
+// `raise(to -1)` is the discriminator throughout. `Integer::raise` answers
 // an Optional, because zero has no negative power, and `NonZeroInteger::raise`
 // answers the power bare — so a count that prints `1/2` was answered by the
 // proven entry and one that prints `Optional#Value(1/2)` was not. Nothing else
 // in the standard library tells a NonZeroInteger from an Integer at run time,
 // because a refinement is not there at run time to be told from anything.
 //
-// NOTE: `packages/compiler/src/tests/dictionaries.spec.ts` asks the same
+// `packages/compiler/src/tests/dictionaries.spec.ts` asks the same
 // questions of the unrefined Namespace, and
 // `packages/runtime/src/tests/dictionaries.spec.ts` drives the store itself.
 function generate(source: string): string {
@@ -67,7 +67,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: Every Diagnostic the front end has about a Program, from all three of
+// Every Diagnostic the front end has about a Program, from all three of
 // the stages that report one — a value that does not answer a refinement's
 // predicate is refused by the Validator, and a spec reading only the Enricher's
 // would pass on a Program the Compiler refuses.
@@ -88,7 +88,7 @@ function codesFor(source: string): Array<string> {
 
 describe("NonEmptyDictionary", () => {
 	describe("Reaching the proof", () => {
-		// NOTE: The three routes the Alias' own note names, asked one after
+		// The three routes the Alias' own note names, asked one after
 		// another: a Dictionary written down with an entry, an update that set
 		// one into a base, and `set`, which answers the proof whatever it was
 		// handed.
@@ -105,7 +105,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The same refusal an empty `[]` gets against `NonEmptyList`, and
+		// The same refusal an empty `[]` gets against `NonEmptyList`, and
 		// it has to be the same one: the empty Dictionary answers the predicate
 		// `false`, so the value does not fit where it stands and there is
 		// nothing else to say about it.
@@ -123,7 +123,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// NOTE: An update whose right side is one whole Dictionary says nothing
+		// An update whose right side is one whole Dictionary says nothing
 		// about how many entries the answer holds — both halves can be empty —
 		// so the brackets prove nothing there.
 		it("proves nothing for an update that merges a whole Dictionary", () => {
@@ -135,7 +135,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// NOTE: The `if` route. A Dictionary a Program was handed carries no
+		// The `if` route. A Dictionary a Program was handed carries no
 		// proof, and asking `hasEntries` is what puts one in its hand — the
 		// `else` of `isEmpty` proves the same thing, because a predicate written
 		// as one call on `@` IS that call.
@@ -171,7 +171,7 @@ describe("NonEmptyDictionary", () => {
 	})
 
 	describe("What the proof changes", () => {
-		// NOTE: The plainest of the five. A proven count is a `NonZeroInteger`,
+		// The plainest of the five. A proven count is a `NonZeroInteger`,
 		// which is what reaches `raise`'s bare entry; an unproven one is an
 		// Integer, and the same call answers an Optional.
 		it("counts to a NonZeroInteger, where a bare Dictionary counts to an Integer", async () => {
@@ -194,7 +194,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// NOTE: There is one key, one value and one entry for every entry the
+		// There is one key, one value and one entry for every entry the
 		// receiver holds, so each of the three answers a List with something in
 		// it — which a total `firstItem` is what reads off.
 		it("answers its three halves as Lists with something in them", async () => {
@@ -212,7 +212,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(['"a"', "2", '"a"'])
 		})
 
-		// NOTE: One transformed value for every entry, so a Dictionary with
+		// One transformed value for every entry, so a Dictionary with
 		// something in it still has something in it — and the proof survives a
 		// chain of them.
 		it("carries the proof through 'map'", async () => {
@@ -231,7 +231,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(["1/1"])
 		})
 
-		// NOTE: `set` answers the proof on `Dictionary` itself, so a proven
+		// `set` answers the proof on `Dictionary` itself, so a proven
 		// receiver reaches that entry and this Namespace declares no `set` at
 		// all. What is under test is that the answer is still proven when the
 		// receiver already was.
@@ -277,7 +277,7 @@ describe("NonEmptyDictionary", () => {
 			).toEqual(["true", "false", "false"])
 		})
 
-		// NOTE: Written on `reduce`'s early-stopping entry, so the walk stops at
+		// Written on `reduce`'s early-stopping entry, so the walk stops at
 		// the entry that decides the answer rather than offering the check
 		// every entry. The check prints the key it was handed, so what it was
 		// offered is in the output beside the answer: the first entry decides
@@ -334,7 +334,7 @@ describe("The bridges from a List", () => {
 			])
 		})
 
-		// NOTE: THE promise only a native can make. Every group holds the item
+		// THE promise only a native can make. Every group holds the item
 		// that opened it, so a group answers a first item bare rather than in an
 		// Optional.
 		it("answers groups with something in them", async () => {
@@ -364,7 +364,7 @@ describe("The bridges from a List", () => {
 			).toEqual(["[=]", "true"])
 		})
 
-		// NOTE: A key is any Equatable value, and one with no canonical
+		// A key is any Equatable value, and one with no canonical
 		// encoding is found by asking its own `is` — the scan path, which is
 		// invisible from here apart from the answer being right.
 		it("groups under a key with no canonical encoding", async () => {
@@ -385,7 +385,7 @@ describe("The bridges from a List", () => {
 			).toEqual(["[ { row = 1 } = 2, { row = 2 } = 1 ]"])
 		})
 
-		// NOTE: The List of groups the deleted `List::group(on:)` answered is
+		// The List of groups the deleted `List::group(on:)` answered is
 		// one `entries()` away, and a group is a NonEmptyList there too.
 		it("recovers the List of groups through entries", async () => {
 			expect(
@@ -417,7 +417,7 @@ describe("The bridges from a List", () => {
 			).toEqual(['[ "a" = 3, "b" = 1, "c" = 1 ]', "[=]"])
 		})
 
-		// NOTE: THE promise only a native can make here. A count is a
+		// THE promise only a native can make here. A count is a
 		// `PositiveInteger`, so it reaches an entry a bare Integer does not —
 		// and a fallback that is not above zero is refused where it stands,
 		// which is the other half of the same claim.
@@ -446,7 +446,7 @@ describe("The bridges from a List", () => {
 		})
 	})
 
-	// NOTE: The one-to-one crossing. A key met again replaces the value and
+	// The one-to-one crossing. A key met again replaces the value and
 	// keeps its place, which is what `Dictionary.of` and `set` promise about a
 	// repeated key — so the keys come out in first-met order and the values
 	// are the last item met under each.
@@ -482,7 +482,7 @@ describe("The bridges from a List", () => {
 			).toEqual(["[=]"])
 		})
 
-		// NOTE: The value is the item itself, so a lookup answers it whole and
+		// The value is the item itself, so a lookup answers it whole and
 		// the item's own members are read off the answer.
 		it("answers the item under its key", async () => {
 			expect(
@@ -501,7 +501,7 @@ describe("The bridges from a List", () => {
 		})
 	})
 
-	// NOTE: `removeDuplicates` is `tally`'s keys, so the questions asked of it
+	// `removeDuplicates` is `tally`'s keys, so the questions asked of it
 	// are the ones a tally answers: first-met order, the item's own `is`, and
 	// the proof a NonEmptyList carries across the crossing and back.
 	describe("removeDuplicates()", () => {
@@ -517,13 +517,13 @@ describe("The bridges from a List", () => {
 			).toEqual(["[ 3, 1, 2, 4 ]", "[]"])
 		})
 
-		// NOTE: The claim the rewrite rests on. A Namespace that writes its own
+		// The claim the rewrite rests on. A Namespace that writes its own
 		// `is` for a refinement of a kind the store knows how to encode hands
 		// the tally an UNBRANDED witness, so the store scans through that `is`
 		// rather than encoding — and "Ada", "ada" and "ADA" are one item to it,
 		// exactly as `contains` would say. The spelling kept is the first met.
 		//
-		// NOTE: The two sides are read as plain Strings before they are
+		// The two sides are read as plain Strings before they are
 		// compared. `namespace NonEmptyString` carries the proof through
 		// `lowercase`, so a lower-cased NonEmptyString is a NonEmptyString
 		// again — and asking IT `is` would reach this very Method, which
@@ -550,7 +550,7 @@ describe("The bridges from a List", () => {
 			).toEqual(['[ "Ada", "Grace" ]', "true"])
 		})
 
-		// NOTE: And the same over a refined Integer, so the scan path is not
+		// And the same over a refined Integer, so the scan path is not
 		// something only String's witness happens to take.
 		it("honours a written 'is' over a refined Integer", async () => {
 			expect(
@@ -582,7 +582,7 @@ describe("The bridges from a List", () => {
 		})
 	})
 
-	// NOTE: The refined twins. A List with an item in it puts that item in a
+	// The refined twins. A List with an item in it puts that item in a
 	// group, under a count, or at a key, so the Dictionary each answers holds
 	// an entry — and a receiver nothing proved anything about reaches the base
 	// entries instead, whose answer can be the empty Dictionary.
@@ -621,14 +621,14 @@ describe("The bridges from a List", () => {
 	})
 })
 
-// NOTE: `writtenValueType` in `simplifier/simplify.ts` takes the proof a written
+// `writtenValueType` in `simplifier/simplify.ts` takes the proof a written
 // value carries back off it, so the simplified Node keeps saying what it holds.
 // Six Node kinds carry one, and the update of a Dictionary is the one that is
 // not a Literal — the one to hold to the rule, because a Rewriter that told a
 // Dictionary update from a Record one by its Type would misread a refined
 // Combination as neither.
 describe("The simplified update", () => {
-	// NOTE: Every Node of a kind, found reflectively, because where the one this
+	// Every Node of a kind, found reflectively, because where the one this
 	// test wants stands in the tree is an accident and not the point.
 	function nodesOfKind(
 		root: unknown,

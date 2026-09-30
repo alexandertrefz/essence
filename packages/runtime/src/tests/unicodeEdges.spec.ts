@@ -18,7 +18,7 @@ import {
 } from "../String"
 import { typeKeySymbol } from "../type"
 
-// NOTE: The pairs that make this file worth having: the same text spelled two
+// The pairs that make this file worth having: the same text spelled two
 // ways. Normalised here rather than written as two literals, because an editor,
 // a formatter or a file round trip may quietly compose the decomposed one and
 // leave every assertion below asserting nothing — which is why the first test
@@ -28,7 +28,7 @@ const decomposed = "café".normalize("NFD")
 const composedAccent = "é".normalize("NFC")
 const decomposedAccent = "é".normalize("NFD")
 
-// NOTE: A family emoji — four people joined by zero-width joiners, ONE
+// A family emoji — four people joined by zero-width joiners, ONE
 // character to a reader.
 const family = "\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}"
 
@@ -37,7 +37,7 @@ const integer = createInteger
 const value = createValue
 const countOf = (value: string) => length(createString(value)).value
 
-// NOTE: The TEXT a position answers rather than the Optional around it. A
+// The TEXT a position answers rather than the Optional around it. A
 // character taken off an ASCII String carries the ASCII marker and the count
 // that follows from it — `asciiFastPath.spec.ts` is what holds those to
 // account — so a deep comparison against a freshly made String reads two keys
@@ -62,7 +62,7 @@ test("the two spellings really are two spellings", () => {
 	expect(composed.normalize("NFC")).toBe(decomposed.normalize("NFC"))
 })
 
-// NOTE: The ASCII fast path is what `append` propagates and what skips
+// The ASCII fast path is what `append` propagates and what skips
 // normalisation, and CR is the one ASCII unit it must decline: Unicode joins CR
 // LF into a SINGLE cluster, so a join that puts one against the other has FEWER
 // characters than the two pieces had. The marker excludes a carriage return
@@ -79,7 +79,7 @@ describe("carriage returns across a join", () => {
 		let left = string("a\r")
 		let right = string("\nb")
 
-		// NOTE: Both operands measured FIRST, so the join is asked after each
+		// Both operands measured FIRST, so the join is asked after each
 		// side has remembered its own count — the state in which a wrongly
 		// propagated count would be handed out.
 		expect(length(left).value).toBe(2)
@@ -98,7 +98,7 @@ describe("carriage returns across a join", () => {
 		expect(character(joined, integer(1n))).toEqual(value(string("\r\n")))
 	})
 
-	// NOTE: A repeat is a join of the String with ITSELF, so its every seam is
+	// A repeat is a join of the String with ITSELF, so its every seam is
 	// the same seam — a String ending in CR and beginning with LF loses one
 	// character per copy after the first.
 	test("a repeat that meets its own end is measured too", () => {
@@ -106,13 +106,13 @@ describe("carriage returns across a join", () => {
 		expect(length(repeat(string("\r\n"), integer(3n))).value).toBe(3)
 		expect(length(repeat(string("\n\r"), integer(3n))).value).toBe(4)
 		expect(repeat(string("\n\r"), integer(3n)).value).toBe("\n\r\n\r\n\r")
-		// NOTE: The ASCII case the marker is for — no seam, so the count is the
+		// The ASCII case the marker is for — no seam, so the count is the
 		// text's own length.
 		expect(length(repeat(string("ab"), integer(3n))).value).toBe(6)
 		expect(repeat(string("ab"), integer(3n)).value).toBe("ababab")
 	})
 
-	// NOTE: An ASCII join with nothing at its seam is the case the marker is
+	// An ASCII join with nothing at its seam is the case the marker is
 	// FOR — the count is the two counts added, and it has to be the count.
 	test("an ordinary ASCII join counts as the two do", () => {
 		let left = string("hello")
@@ -125,7 +125,7 @@ describe("carriage returns across a join", () => {
 	})
 })
 
-// NOTE: A combining mark is the other neighbour-decided join, and the one
+// A combining mark is the other neighbour-decided join, and the one
 // canonical equivalence is about: `e` and a combining acute ARE `é`, so the two
 // spellings count, order and compare alike.
 describe("combining marks", () => {
@@ -143,7 +143,7 @@ describe("combining marks", () => {
 		expect(orderOf(decomposed, composed)).toBe(equal)
 	})
 
-	// NOTE: The join that DOES change a cluster, and so must propagate nothing:
+	// The join that DOES change a cluster, and so must propagate nothing:
 	// a base at the end of one String and a mark at the start of the next are
 	// one character, not two.
 	test("a mark joined onto a base is one character", () => {
@@ -163,7 +163,7 @@ describe("combining marks", () => {
 		expect(anyIs(first, string(composedAccent))).toBeTrue()
 	})
 
-	// NOTE: A position Method reads the grapheme view, so it can never cut a
+	// A position Method reads the grapheme view, so it can never cut a
 	// mark away from the base it belongs to — whichever way the text is spelled.
 	// The view is taken of the NFC form, so the character it hands back is the
 	// COMPOSED spelling however the String was written: the two are one
@@ -185,7 +185,7 @@ describe("combining marks", () => {
 	})
 })
 
-// NOTE: Positions count from zero, a negative one counts back from the end, and
+// Positions count from zero, a negative one counts back from the end, and
 // an empty or inverted range is the empty String — the resolution `List.slice`
 // used to perform for these, now performed where they are.
 describe("positions", () => {
@@ -216,7 +216,7 @@ describe("positions", () => {
 		expect(slice(string("abc"), integer(5n), integer(9n)).value).toBe("")
 	})
 
-	// NOTE: A repeat below one is the empty String, which is what repeating
+	// A repeat below one is the empty String, which is what repeating
 	// into the empty List and joining it gave.
 	test("a repeat below one is the empty String", () => {
 		expect(repeat(string("ab"), integer(0n)).value).toBe("")
@@ -226,7 +226,7 @@ describe("positions", () => {
 	})
 })
 
-// NOTE: Equality is asked in BOTH directions everywhere, because a remembered
+// Equality is asked in BOTH directions everywhere, because a remembered
 // normal form is remembered on ONE of the two values and an asymmetric answer
 // would be the bug that hides in it.
 describe("normalisation-sensitive equality", () => {
@@ -241,7 +241,7 @@ describe("normalisation-sensitive equality", () => {
 		}
 	})
 
-	// NOTE: The same value asked twice — the second answer comes off the
+	// The same value asked twice — the second answer comes off the
 	// remembered form, and it has to be the first answer.
 	test("holds however often it is asked", () => {
 		let left = string(composed)
@@ -261,7 +261,7 @@ describe("normalisation-sensitive equality", () => {
 		expect(orderOf(composed, "cafe")).toBe(greater)
 	})
 
-	// NOTE: Ordering is by CODE POINT, not by code unit — an astral character
+	// Ordering is by CODE POINT, not by code unit — an astral character
 	// sorts above every character in the Basic Multilingual Plane, which is the
 	// opposite of what JavaScript's own `<` says about the surrogates spelling
 	// it.
@@ -271,7 +271,7 @@ describe("normalisation-sensitive equality", () => {
 		expect(orderOf("\u{1F600}", "\u{1F600}")).toBe(equal)
 		expect(orderOf("a\u{1F600}", "a\u{1F601}")).toBe(less)
 		expect(orderOf(family, family)).toBe(equal)
-		// NOTE: An equal prefix leaves the shorter String first, counted in
+		// An equal prefix leaves the shorter String first, counted in
 		// code POINTS — the astral character is two units and one point.
 		expect(orderOf("a\u{1F600}", "a")).toBe(greater)
 		expect(orderOf("a", "a\u{1F600}")).toBe(less)
@@ -292,7 +292,7 @@ describe("empty Strings", () => {
 	})
 })
 
-// NOTE: The one cross-kind cell of the universal equality, and the trap in
+// The one cross-kind cell of the universal equality, and the trap in
 // deciding it by tag: an Integer and a Rational spell the SAME value two ways,
 // so `1 is 1/1` holds and differing tags do NOT mean differing values. Asked in
 // both directions, bare and wrapped, because a comparison that reads the two
@@ -319,7 +319,7 @@ describe("Integer beside Rational", () => {
 		expect(anyIs(createInteger(1n), createInteger(2n))).toBeFalse()
 	})
 
-	// NOTE: Inside a Record and inside a List, which is where a lost cell shows
+	// Inside a Record and inside a List, which is where a lost cell shows
 	// up as a value that stopped being equal to its equal the moment either was
 	// wrapped.
 	test("the same value is equal wrapped as well as bare", () => {
@@ -349,7 +349,7 @@ describe("Integer beside Rational", () => {
 		).toBeTrue()
 	})
 
-	// NOTE: Records are equal by their MEMBERS, whatever order they were
+	// Records are equal by their MEMBERS, whatever order they were
 	// written in, and a Record carrying a member the other lacks is unequal
 	// however the counts fall.
 	test("Records compare by their members, in any order", () => {

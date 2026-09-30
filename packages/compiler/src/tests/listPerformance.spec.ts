@@ -13,7 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The one claim about a List that is a claim about TIME rather than about
+// The one claim about a List that is a claim about TIME rather than about
 // what it answers, and the only kind a correctness test can not make. Building
 // a List by appending or prepending used to copy the whole backing Array per
 // turn, which is quadratic: 40,000 appends measured about a second, and 60,000
@@ -25,7 +25,7 @@ import { validate } from "../validator/index"
 const TURNS = 60_000
 const CEILING_MILLISECONDS = 1_000
 
-// NOTE: The same claim for the other direction — taking a List APART one item
+// The same claim for the other direction — taking a List APART one item
 // at a time, and reading it as it goes, which is what every walk below does.
 // These are held to a RATIO rather than to a ceiling. What they claim is that a
 // Program's cost grows with the length of its List rather than with the square
@@ -42,12 +42,12 @@ const CEILING_MILLISECONDS = 1_000
 const WALK_LENGTHS = [10_000, 20_000, 40_000, 80_000]
 const GROWTH_PER_DOUBLING = 3
 
-// NOTE: Best of three at each length, because one slow run anywhere in the four
+// Best of three at each length, because one slow run anywhere in the four
 // moves a ratio twice — up at its own length and down at the next — and a guard
 // that a scheduling hiccup can fail is a guard nobody trusts.
 const ATTEMPTS = 3
 
-// NOTE: A subprocess rather than an import, because what is being measured is
+// A subprocess rather than an import, because what is being measured is
 // the Program's own wall time and a test runner's process has already paid for
 // whatever it loaded — and because a build this size allocates enough that
 // leaving it in the runner's heap would be felt by whatever runs next. The
@@ -77,7 +77,7 @@ async function millisecondsToRun(
 		let result = await spawnAndWait([process.execPath, file])
 		let elapsed = performance.now() - start
 
-		// NOTE: The Program prints the length it answered, and it is checked
+		// The Program prints the length it answered, and it is checked
 		// here — a build that threw, or one that answered a List of the wrong
 		// length, would otherwise be the fastest run of all.
 		expect(result.stderr).toBe("")
@@ -89,7 +89,7 @@ async function millisecondsToRun(
 	}
 }
 
-// NOTE: The seed carries one item so that the walk's State is a List of
+// The seed carries one item so that the walk's State is a List of
 // Integers from the first turn, and the printed length is one more than the
 // number of turns because of it.
 function buildingSource(method: string): string {
@@ -103,19 +103,19 @@ function buildingSource(method: string): string {
 }`
 }
 
-// NOTE: Every doubling held to the same ratio, rather than the whole span held
+// Every doubling held to the same ratio, rather than the whole span held
 // to one — a Program that turns quadratic only past some length fails at the
 // doubling where it does, and the message names it. Compiling happens outside
 // the figure, since the timer starts at the spawn, so asking for the same length
 // three times costs the test its own wall time and costs the measurement
 // nothing.
 //
-// NOTE: The lengths are measured one at a time and the walk STOPS at the first
+// The lengths are measured one at a time and the walk STOPS at the first
 // doubling that is too steep, which is what keeps a failure quick: a quadratic
 // Program is caught at twenty or forty thousand and is never asked for eighty,
 // where it would run for long enough to be killed by the runner's own timeout
 // and report that instead of its growth.
-// NOTE: A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
+// A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
 // its lengths are measured again — the rule `stringPerformance.spec.ts` follows,
 // for its reason. Every figure here carries a subprocess spawn, several suites
 // can share the machine, and a spawn that stalls under load moves a ratio of two
@@ -175,7 +175,7 @@ async function expectLinearGrowth(
 	expect(tooSteep).toEqual([])
 }
 
-// NOTE: The List is built by prepending, so every item of it lives in the front
+// The List is built by prepending, so every item of it lives in the front
 // run — and then it is emptied from that end, one item per turn, which is where
 // the front run pays for itself. Or it is built by appending, so every item
 // lives in the back run and the first step of the drain has to move them. The
@@ -201,7 +201,7 @@ function drainingSource(
 }`
 }
 
-// NOTE: The walk's State is a Record of what is left and what has been added
+// The walk's State is a Record of what is left and what has been added
 // up, so that one source stands for every shape of walk — the body is the whole
 // of the difference between them.
 function walkingSource(length: number, walk: string): string {
@@ -216,7 +216,7 @@ function walkingSource(length: number, walk: string): string {
 }`
 }
 
-// NOTE: The sum each walk prints, checked for the reason the drains' length is:
+// The sum each walk prints, checked for the reason the drains' length is:
 // a build that threw, or one that added up the wrong items, would otherwise be
 // the fastest run of all. The two full walks add up every item; the two-ended
 // one stops at the middle and adds up the first half.
@@ -243,7 +243,7 @@ describe("List performance", () => {
 		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
-	// NOTE: The four drains, each held to its growth rather than to a ceiling.
+	// The four drains, each held to its growth rather than to a ceiling.
 	// `remove(at 0)` on a prepend-built List shrinks the front run by one and
 	// shares both runs; on an append-built one the box upgrades itself once and
 	// the rest of the drain is windows. Both used to slice and rejoin the List at
@@ -262,7 +262,7 @@ describe("List performance", () => {
 		})
 	}
 
-	// NOTE: THE CANONICAL FUNCTIONAL WALK — take the head, go on with the tail —
+	// THE CANONICAL FUNCTIONAL WALK — take the head, go on with the tail —
 	// which is `item(at 0)` on a box `slice` has just answered a window for.
 	// Reading one item of that window used to copy the whole of it, so the walk
 	// moved n−k items a turn and was quadratic while the drains beside it, which
@@ -293,7 +293,7 @@ describe("List performance", () => {
 		}`,
 		],
 		[
-			// NOTE: Both ends a turn, which is a palindrome check's shape. The
+			// Both ends a turn, which is a palindrome check's shape. The
 			// window it asks for holds NEITHER end of the box it is cut from,
 			// and could be shared by nobody until such a box learned to move its
 			// seam into the middle of the window.

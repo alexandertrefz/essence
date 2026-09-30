@@ -12,7 +12,7 @@ import { UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
 
-// NOTE: What a project file looks like when a project has not said anything
+// What a project file looks like when a project has not said anything
 // yet. Two settings, both at their defaults, each under the sentence that says
 // what it is for — a starting point rather than an inventory: `essence help
 // test` and `essence help build` document the rest, each beside the flag it
@@ -21,13 +21,13 @@ import type { CLIContext } from "./context"
 // experimental mode, and the first file a project writes should not name a
 // setting the documentation does not explain.
 //
-// NOTE: Written as TEXT rather than stringified from an object, because the
+// Written as TEXT rather than stringified from an object, because the
 // comments are half of what makes the file worth writing: a project file is
 // where the reason behind a setting gets written down, and `JSON.stringify` can
 // not carry one. The `$schema` is first so that an editor validating the file
 // finds it before anything else it holds.
 //
-// NOTE: Exported for the website's spec. Two documentation pages show this
+// Exported for the website's spec. Two documentation pages show this
 // file as `essence init` writes it, and a copy that drifted from the template
 // would teach a file the command no longer writes.
 export function projectFileTemplate(): string {
@@ -45,7 +45,7 @@ export function projectFileTemplate(): string {
 `
 }
 
-// NOTE: The file marks the project, so where it is written is the whole
+// The file marks the project, so where it is written is the whole
 // decision: the working directory becomes a project root, and everything under
 // it is that project's — what `essence test` walks with no arguments, and what
 // the editor's Problems panel speaks for.
@@ -58,7 +58,7 @@ export async function runInit(
 	let target = path.join(directory, PROJECT_FILE_NAME)
 	let governing = context.configuration.filePath
 
-	// NOTE: Refused rather than merged or overwritten. What is in the file is a
+	// Refused rather than merged or overwritten. What is in the file is a
 	// project's own decisions, comments and all, and a command that rewrote
 	// them because it was run twice would be one nobody could run without
 	// checking first.
@@ -92,7 +92,7 @@ export async function runInit(
 		)}`,
 	)
 
-	// NOTE: A project inside a project is allowed — a monorepo package that
+	// A project inside a project is allowed — a monorepo package that
 	// runs its own tests is one — and it is also the shape of a mistake, a file
 	// written one directory too deep. So it is written and said: from here on
 	// the outer file's settings reach nothing under this directory, which is

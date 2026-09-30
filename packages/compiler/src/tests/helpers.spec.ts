@@ -130,12 +130,12 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: The three function-ish tags are one kind of value — only the
+	// The three function-ish tags are one kind of value — only the
 	// signature tells two of them apart — so all three describe as the
 	// signature a Type Annotation would spell, rather than as the bare word
 	// "Function" that named both sides of every mismatch alike.
 	describe("describeType", () => {
-		// NOTE: A Record Alias is named for the same reason a Union one is: a
+		// A Record Alias is named for the same reason a Union one is: a
 		// message about nine members spelled out is no message at all, and the
 		// name is what the reader's own Declaration says. `describeRecordShape`
 		// is what the mismatch report spells the members with.
@@ -212,7 +212,7 @@ describe("Helpers", () => {
 			expect(describeType(now)).toBe("() -> String")
 		})
 
-		// NOTE: A Method read as a value carries its receiver as the first
+		// A Method read as a value carries its receiver as the first
 		// Parameter of its Type, and it is printed there — that receiver is
 		// exactly what makes it not fit a Function of one Argument fewer.
 		it("should print a Method's receiver as its first Parameter", () => {
@@ -237,7 +237,7 @@ describe("Helpers", () => {
 			expect(describeType(readsBase)).toBe("(_: String) -> Integer")
 		})
 
-		// NOTE: An Overload set has no ONE signature to print, so it keeps the
+		// An Overload set has no ONE signature to print, so it keeps the
 		// bare word.
 		it("should leave an Overload set the bare word", () => {
 			let overloaded: OverloadedMethodType = {
@@ -740,7 +740,7 @@ describe("Helpers", () => {
 
 			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true)
 
-			// NOTE: An `Unknown` standing for the WHOLE expected Type is the
+			// An `Unknown` standing for the WHOLE expected Type is the
 			// Compiler's own answer where it had nothing better to say, and it
 			// accepts every Type including a decided container. The undecided
 			// SLOT of a container is the other question, below.
@@ -895,7 +895,7 @@ describe("Helpers", () => {
 			expect(matchesType(integerList, stringList)).toBe(false)
 		})
 
-		// NOTE: The two halves of the slot rule. An undecided item Type may be
+		// The two halves of the slot rule. An undecided item Type may be
 		// READ as bottom — that is an empty List Literal fitting every List —
 		// and a value WRITTEN into it has to decide it. Doing both at once is
 		// the hole: an expected `List<Unknown>` that accepted a `List<String>`
@@ -912,7 +912,7 @@ describe("Helpers", () => {
 			expect(matchesType(unknownList, integerList)).toBe(false)
 		})
 
-		// NOTE: Asked at every depth, because that is where a slot can hide: a
+		// Asked at every depth, because that is where a slot can hide: a
 		// `[[]]` is a List of one undecided List, and the item Type of the
 		// OUTER List is decided the moment it holds a List at all.
 		it("should refuse a write into an undecided item Type nested in one", () => {
@@ -924,7 +924,7 @@ describe("Helpers", () => {
 			)
 		})
 
-		// NOTE: An Error in the written slot is no write to refuse. Whatever
+		// An Error in the written slot is no write to refuse. Whatever
 		// produced it was reported where it came from, and `resolveUnknownSlots`
 		// declines to pin a slot to one for the same reason — so refusing it
 		// here would report that one mistake a second time, against a slot that
@@ -937,7 +937,7 @@ describe("Helpers", () => {
 			).toBe(true)
 		})
 
-		// NOTE: Per slot here too. An Error excuses the slot it stands in and
+		// Per slot here too. An Error excuses the slot it stands in and
 		// no other, so the decided keys of `Dictionary<String, Error>` are
 		// still a write the undecided ones refuse.
 		it("should refuse a decided slot beside one holding an Error", () => {
@@ -946,7 +946,7 @@ describe("Helpers", () => {
 			)
 		})
 
-		// NOTE: The same rule per slot, which is how a Dictionary is compared
+		// The same rule per slot, which is how a Dictionary is compared
 		// throughout — an empty `[=]` decides neither slot, and a Dictionary
 		// half-decided by one write is still refused over the slot that write
 		// said nothing about.
@@ -1569,7 +1569,7 @@ describe("Helpers", () => {
 				expect(matchesType(integerPrimitive, genericT)).toBe(false)
 			})
 
-			// NOTE: An opaque Generic accepts nothing but itself, yet a Union
+			// An opaque Generic accepts nothing but itself, yet a Union
 			// that HAS it as a member still accepts it — the member is the same
 			// symbol, so the value really does fit. The Union's other member is
 			// beside the point here; it is only there to make this a Union at
@@ -1586,7 +1586,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: The `hasDefault` rule one level down. A call written against the
+		// The `hasDefault` rule one level down. A call written against the
 		// expected Type leaves the members it names out of its Record Argument,
 		// and only a Function whose own default fills those members in can be
 		// substituted for it.
@@ -1636,7 +1636,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: What a `with` right-hand side has to be, and — once a Record
+	// What a `with` right-hand side has to be, and — once a Record
 	// Parameter can carry a default — what a partial Argument has to be. It is
 	// not assignability in either direction: `matchesType(whole, part)` asks
 	// whether the part answers everything the whole promises, and
@@ -1675,7 +1675,7 @@ describe("Helpers", () => {
 			).toBe(false)
 		})
 
-		// NOTE: Assignability, not identity — one arm of a Union-typed member
+		// Assignability, not identity — one arm of a Union-typed member
 		// is a value that member admits, exactly as it is at the Declaration.
 		it("admits one arm of a Union-typed member", () => {
 			const held: RecordType = {
@@ -1693,7 +1693,7 @@ describe("Helpers", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A member named after one of `Object.prototype`'s is a member
+		// A member named after one of `Object.prototype`'s is a member
 		// like any other, and the read that answers for it must not find a
 		// JavaScript function instead.
 		it("refuses a member named after one of Object.prototype's", () => {
@@ -1705,7 +1705,7 @@ describe("Helpers", () => {
 			).toBe(false)
 		})
 
-		// NOTE: The reason the context is threaded at all — a caller that is
+		// The reason the context is threaded at all — a caller that is
 		// still INFERRING can ask this, and the first occurrence of a bindable
 		// Generic binds off the member it is compared with.
 		it("binds a Generic through a member comparison", () => {
@@ -1747,7 +1747,7 @@ describe("Helpers", () => {
 			members: { retries: integer, server },
 		}
 
-		// NOTE: Written the way the Parser writes one — a member Node hanging
+		// Written the way the Parser writes one — a member Node hanging
 		// its value off `value` — which is the shape the Resolver asks about.
 		function written(members: Record<string, unknown>) {
 			return {
@@ -1806,7 +1806,7 @@ describe("Helpers", () => {
 			).toEqual({})
 		})
 
-		// NOTE: Only the TOP level of a default may be partial, so a nested
+		// Only the TOP level of a default may be partial, so a nested
 		// Literal that falls short is a Record nobody may merge into — the
 		// members it does not write would be missing from what the callee
 		// rebuilds.
@@ -1819,7 +1819,7 @@ describe("Helpers", () => {
 			).toEqual({})
 		})
 
-		// NOTE: The typed Record Literal, whose members ARE their values — the
+		// The typed Record Literal, whose members ARE their values — the
 		// shape the Simplifier asks about, which has to answer the same.
 		it("reads the typed Literal the Simplifier hands it", () => {
 			expect(
@@ -1955,7 +1955,7 @@ describe("Helpers", () => {
 				expect(context.bindings.has("T")).toBe(false)
 			})
 
-			// NOTE: When a Method forwards to another whose `infer` generic is
+			// When a Method forwards to another whose `infer` generic is
 			// spelled the same — every `List` Method binds `ItemType`, so
 			// `firstItem` calling `item` matches the callee's bindable `ItemType`
 			// against the caller's opaque `ItemType` carried by the receiver — the
@@ -1985,7 +1985,7 @@ describe("Helpers", () => {
 				expect(context.bindings.get("T")).toEqual(opaqueT)
 			})
 
-			// NOTE: A Method that forwards a same-named Generic through both its
+			// A Method that forwards a same-named Generic through both its
 			// receiver AND an Argument — `isNot(_ other: List<ItemType>)` binds
 			// `ItemType` off the receiver, then matches the SAME Generic again for
 			// `other`. The second occurrence verifies the binding, and the bound
@@ -2085,7 +2085,7 @@ describe("Helpers", () => {
 				).toBe(false)
 			})
 
-			// NOTE: A bindable Generic beside a concrete member would swallow
+			// A bindable Generic beside a concrete member would swallow
 			// whatever the concrete member was written to take — bound to
 			// `String` here, every later occurrence of `Value` would then be
 			// held to it. The concrete members are tried FIRST, so the Generic
@@ -2137,7 +2137,7 @@ describe("Helpers", () => {
 				expect(context.bindings.get("Value")).toEqual(integer)
 			})
 
-			// NOTE: The first member binds `T := String` off `left` and THEN
+			// The first member binds `T := String` off `left` and THEN
 			// fails on `right`. That binding is worth no more than the member
 			// that made it, but it used to survive the failed attempt, so the
 			// second member — which matches on its own with `T := Integer` —
@@ -2229,7 +2229,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: Every "does this Namespace target that value" question goes
+		// Every "does this Namespace target that value" question goes
 		// through `bindNamespaceTarget`, and each one alpha-renames the
 		// Namespace's Generics before it matches. The rename depends on the
 		// PATTERN alone, so doing it per question is work proportional to the
@@ -2275,7 +2275,7 @@ describe("Helpers", () => {
 					),
 				).toBe(first)
 
-				// NOTE: Asked the way the Enricher asks it — through the door,
+				// Asked the way the Enricher asks it — through the door,
 				// once per receiver — which is the path the memo sits on.
 				bindNamespaceTarget(pattern, pairOf(integer, integer))
 				bindNamespaceTarget(pattern, pairOf(string, string))
@@ -2368,7 +2368,7 @@ describe("Helpers", () => {
 					).type,
 				).toBe("ArgumentMismatch")
 
-				// NOTE: A fresh context is a fresh candidate — the previous
+				// A fresh context is a fresh candidate — the previous
 				// String binding must not survive.
 				expect(
 					matchArguments(
@@ -2382,7 +2382,7 @@ describe("Helpers", () => {
 				).toEqual({ type: "Match", omittedParameterIndices: [] })
 			})
 
-			// NOTE: A callback Parameter still waiting on an unbound Generic is
+			// A callback Parameter still waiting on an unbound Generic is
 			// matched LAST. An unannotated Function literal is typed from the
 			// Parameter it is passed to — modelled here by an Argument that
 			// echoes the expected Type back — so matched while `T` was open it
@@ -2424,7 +2424,7 @@ describe("Helpers", () => {
 					).toEqual({ type: "Match", omittedParameterIndices: [] })
 
 					expect(context.bindings.get("T")).toEqual(integer)
-					// NOTE: The Type the literal was resolved against — the
+					// The Type the literal was resolved against — the
 					// signature with the binding substituted in, which is what
 					// gives the lambda's body real Types to work with.
 					expect(expectedTypes).toEqual([
@@ -2460,7 +2460,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: The second reading a Record Parameter's default buys — an Argument
+	// The second reading a Record Parameter's default buys — an Argument
 	// that writes some of the members and leaves the rest to the default. The
 	// Argument is still an Argument: it is paired by label, it is still
 	// required, and everything the default does NOT fill in still has to be
@@ -2529,14 +2529,14 @@ describe("Helpers", () => {
 			).toBe("ArgumentMismatch")
 		})
 
-		// NOTE: A partial default leaves `hasDefault` unset, so `pairArguments`
+		// A partial default leaves `hasDefault` unset, so `pairArguments`
 		// still says the Argument is required — the whole reason the Type layer
 		// carries two keys rather than one.
 		it("should still require the Argument", () => {
 			expect(matchArguments(parameters, []).type).toBe("ArityMismatch")
 		})
 
-		// NOTE: Without a default the Argument is measured whole, and a partial
+		// Without a default the Argument is measured whole, and a partial
 		// is simply the wrong Type.
 		it("should refuse a partial where the Parameter has no default", () => {
 			expect(
@@ -2553,7 +2553,7 @@ describe("Helpers", () => {
 			).toBe("ArgumentMismatch")
 		})
 
-		// NOTE: A value typed `{ host: String }` may carry a `retries` of any
+		// A value typed `{ host: String }` may carry a `retries` of any
 		// Type at all, and the callee's `options.retries ?? 3` would take it —
 		// so only a literal, whose Type is its text, may be a partial. A WHOLE
 		// Record is admitted from any expression, exactly as before.
@@ -2777,7 +2777,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: A resolved Type is a DAG — every level of `type Nested = Box<Inner> |
+	// A resolved Type is a DAG — every level of `type Nested = Box<Inner> |
 	// Box<List<Inner>>` names the ONE Type below it from four places — so a walk
 	// that follows every reference rather than every OBJECT visits what is shared
 	// exponentially often. Each level below names the one under it three times,
@@ -2839,7 +2839,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: The cyclic Types here are built by hand, since no Program can
+	// The cyclic Types here are built by hand, since no Program can
 	// declare one: the Enricher refuses a Type declaration that names itself,
 	// so the serialisation's back-edge guard is defence. Keying a conformance
 	// for such a Type still returns, and tells two cycles apart.
@@ -2875,7 +2875,7 @@ describe("Helpers", () => {
 		})
 
 		it("keys two cycles that unfold differently apart", () => {
-			// NOTE: Both spell `{ next: { next: …, tag: String }, tag: Integer }`
+			// Both spell `{ next: { next: …, tag: String }, tag: Integer }`
 			// at every level a bare marker can see — what tells them apart is
 			// where the back-edge returns to, which is what the marker's
 			// distance carries.
@@ -2909,7 +2909,7 @@ describe("Helpers", () => {
 		})
 
 		it("serialises a shared part fully at every reach", () => {
-			// NOTE: A resolved Type is a DAG — only an object the walk is still
+			// A resolved Type is a DAG — only an object the walk is still
 			// INSIDE is a back-edge, so sharing must not put a marker where the
 			// separately built spelling has none.
 			let leaf: Type = { type: "Integer" }
@@ -2932,7 +2932,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: `buildUnion` used to answer with a canonical, Optional-SHAPED form:
+	// `buildUnion` used to answer with a canonical, Optional-SHAPED form:
 	// `Nothing` was hoisted to a single top-level member and everything else
 	// folded into one payload member beside it, so `Integer | Rational |
 	// Nothing` came out as `(Integer | Rational) | Nothing` and even an applied
@@ -2999,7 +2999,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: A named Union's name IS its spelling — flattening `Number` into
+		// A named Union's name IS its spelling — flattening `Number` into
 		// `Integer | Rational` here would cost every Hover and Diagnostic
 		// downstream the word `Number`. Assignability is unaffected either way,
 		// which is exactly why the display side gets to decide.
@@ -3010,7 +3010,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: The shape the Enricher produces for an applied generic Type
+		// The shape the Enricher produces for an applied generic Type
 		// Alias over a Union — `type Labelled<ItemType> = ItemType | String`
 		// written `Labelled<Rational>` — the members with the applied spelling
 		// carried alongside, which is what makes Hovers and Diagnostics print
@@ -3024,7 +3024,7 @@ describe("Helpers", () => {
 		it("should keep a lone applied Alias as written", () => {
 			const labelledRational = labelledOf(rational)
 
-			// NOTE: `String` says nothing the Alias does not already hold, so
+			// `String` says nothing the Alias does not already hold, so
 			// it collapses into it — and what comes back is that very Union,
 			// applied spelling and all, not an equal one rebuilt without it.
 			expect(buildUnion([labelledRational, string])).toBe(
@@ -3041,7 +3041,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: The Unknown item Type an empty List Literal carries is a
+		// The Unknown item Type an empty List Literal carries is a
 		// wildcard in BOTH directions — `List<Unknown>` accepts `List<Integer>`
 		// and is accepted by it — so the two subsume one another and whichever
 		// was collected FIRST used to survive. That made `[[], [1]]` infer
@@ -3063,7 +3063,7 @@ describe("Helpers", () => {
 			)
 		})
 
-		// NOTE: Losing the Union costs the placeholder nothing — an empty List
+		// Losing the Union costs the placeholder nothing — an empty List
 		// Literal is still assignable to every List Type, which is the whole
 		// reason Unknown is a wildcard to begin with.
 		it("should leave an empty List Literal assignable everywhere", () => {
@@ -3084,7 +3084,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: The rule these pin: every actual member of a Union has to be taken
+	// The rule these pin: every actual member of a Union has to be taken
 	// by one expected member, and a Generic takes the whole member it binds to,
 	// which still binds a compound payload in one piece as long as that payload
 	// is written as one member.
@@ -3127,7 +3127,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: A Generic does not collect the members no concrete member took.
+		// A Generic does not collect the members no concrete member took.
 		// `Integer` binds `ItemType`, `Rational` then finds no expected member
 		// left that will take it, and the match fails rather than binding
 		// `ItemType := Integer | Rational`. Written as one nested member, the
@@ -3155,7 +3155,7 @@ describe("Helpers", () => {
 			).toBe(false)
 			expect(context.bindings.get("ItemType")).toEqual(integer)
 
-			// NOTE: The binding is CHECKED against later occurrences, never
+			// The binding is CHECKED against later occurrences, never
 			// replaced by them — an actual the bound `Integer` does cover still
 			// matches, and still through that same `Integer`.
 			expect(
@@ -3169,7 +3169,7 @@ describe("Helpers", () => {
 		})
 	})
 
-	// NOTE: What a checked refinement IS, away from assignability — the
+	// What a checked refinement IS, away from assignability — the
 	// canonical key its conjuncts are compared and stored by, and the four Type
 	// walks that have to see through one. Assignability itself is pinned in
 	// `typeMatching.spec.ts`, where the direction is the subject.
@@ -3186,7 +3186,7 @@ describe("Helpers", () => {
 			return { namespaceName, methodName, args, negated }
 		}
 
-		// NOTE: `NonZeroInteger` is written `@::isNot(0)` and stored as the leaf
+		// `NonZeroInteger` is written `@::isNot(0)` and stored as the leaf
 		// that resolves to — `Integer::is(0)` negated — which is the form every
 		// reader of a conjunct sees.
 		const isNotZero = conjunct("is", ["0"], true)
@@ -3197,7 +3197,7 @@ describe("Helpers", () => {
 
 		const nonZero = refinementOf(integer)
 
-		// NOTE: A fresh one per use rather than a shared constant: a pending
+		// A fresh one per use rather than a shared constant: a pending
 		// refinement is the object a fill or a registration WRITES INTO, so a test
 		// sharing one with the test before it would be reading the other's work.
 		function pendingFilled(): RefinementType {
@@ -3212,7 +3212,7 @@ describe("Helpers", () => {
 			}
 		}
 
-		// NOTE: `applyGenericBindings` answers with a `Type`, and every copy the
+		// `applyGenericBindings` answers with a `Type`, and every copy the
 		// registry holds is a refinement — saying so once keeps the assertions below
 		// from repeating one cast.
 		function copyOf(
@@ -3229,7 +3229,7 @@ describe("Helpers", () => {
 				)
 			})
 
-			// NOTE: The spelling a leaf was written as names the question for a
+			// The spelling a leaf was written as names the question for a
 			// reader and decides nothing, so two leaves differing in nothing
 			// else are one question.
 			it("should ignore how the leaf was written", () => {
@@ -3260,13 +3260,13 @@ describe("Helpers", () => {
 				expect(keys.size).toBe(5)
 			})
 
-			// NOTE: Two predicates that spelled one key between them would
+			// Two predicates that spelled one key between them would
 			// silently accept each other's evidence, so nothing a Program can
 			// write may reach across a separator: an Argument is JSON rather
 			// than joined, and a written String keeps the quotes that tell it
 			// from the digits it may spell.
 			//
-			// NOTE: The Overload used to be part of this and no longer is —
+			// The Overload used to be part of this and no longer is —
 			// nothing resolves one where a Method's body is read — so the
 			// Arguments carry the whole burden of telling two entries of one
 			// name apart. Which is why the String below has to keep its quotes.
@@ -3316,7 +3316,7 @@ describe("Helpers", () => {
 				expect(describeType(nonZero)).toBe("NonZeroInteger")
 			})
 
-			// NOTE: Only the base can hold a Type Parameter — a conjunct is a
+			// Only the base can hold a Type Parameter — a conjunct is a
 			// key over literals — and the substitution is identity preserving,
 			// which is what keeps `matchesType`'s `lhs === rhs` fast path.
 			it("should substitute Generics inside the base", () => {
@@ -3334,7 +3334,7 @@ describe("Helpers", () => {
 				expect(applyGenericBindings(nonZero, new Map())).toBe(nonZero)
 			})
 
-			// NOTE: The applied spelling substitutes right along with the base, so
+			// The applied spelling substitutes right along with the base, so
 			// `NonEmptyList<Item>` heals into `NonEmptyList<String>` and no Hover ever
 			// reads back a Type Argument that was replaced a step earlier.
 			it("should substitute the applied spelling alongside the base", () => {
@@ -3360,7 +3360,7 @@ describe("Helpers", () => {
 				})
 			})
 
-			// NOTE: A copy of a PENDING refinement is the one soundness edge of a
+			// A copy of a PENDING refinement is the one soundness edge of a
 			// generic one. `conjuncts` is null while the Namespace answering the
 			// predicate is still on its way, and the fill writes into the object the
 			// Alias registered — so a copy nobody knows about would keep the null for
@@ -3400,7 +3400,7 @@ describe("Helpers", () => {
 				).toBe(pendingScalar)
 			})
 
-			// NOTE: Stamping the applied spelling is the OTHER place a refinement is
+			// Stamping the applied spelling is the OTHER place a refinement is
 			// copied, and it stands under the same rule for the same reason — a
 			// stamp is what a signature ends up holding, so an unregistered one
 			// would keep the null after the fill wrote the conjuncts into
@@ -3426,7 +3426,7 @@ describe("Helpers", () => {
 					closePendingRefinementCopies()
 				}
 
-				// NOTE: A resolved one is stamped without a word — its conjuncts
+				// A resolved one is stamped without a word — its conjuncts
 				// already travel by reference, so there is nothing left to finish.
 				let resolved = nonZero as RefinementType
 
@@ -3435,7 +3435,7 @@ describe("Helpers", () => {
 				).toBe(resolved.conjuncts)
 			})
 
-			// NOTE: Inside a hoist the copy is TAKEN and registered against the
+			// Inside a hoist the copy is TAKEN and registered against the
 			// object it came from, because refusing it is what deadlocks the
 			// Namespace that answers a generic Alias' predicate against the fill
 			// waiting for that Namespace. The copy is pending too — nothing has been
@@ -3461,7 +3461,7 @@ describe("Helpers", () => {
 				}
 			})
 
-			// NOTE: A pending copy is itself pending, so it may be copied again — the
+			// A pending copy is itself pending, so it may be copied again — the
 			// signature holding `NonEmptyList<Item>` is instantiated once more where
 			// it is called. The walk is keyed by the object copied FROM, so every
 			// generation is reachable from the Alias' own object and the fill misses
@@ -3492,7 +3492,7 @@ describe("Helpers", () => {
 				}
 			})
 
-			// NOTE: The registry belongs to the hoist that opened it. Nothing may
+			// The registry belongs to the hoist that opened it. Nothing may
 			// survive into the next one, or a stale entry would be handed conjuncts
 			// that answer another Program's predicate — and hoists NEST, so only the
 			// outermost close clears.
@@ -3513,7 +3513,7 @@ describe("Helpers", () => {
 				expect(pendingRefinementCopiesOf(pending)).toEqual([])
 			})
 
-			// NOTE: Inside a hoist a pending predicate is a declaration read too
+			// Inside a hoist a pending predicate is a declaration read too
 			// early, which the rounds retry. Outside one it is a Compiler bug.
 			it("should ask the rounds to retry a pending predicate read during a hoist", () => {
 				let thrownBy = (read: () => unknown): unknown => {
@@ -3545,7 +3545,7 @@ describe("Helpers", () => {
 				}
 			})
 
-			// NOTE: A crash reporter prints what it caught with `String` unless it
+			// A crash reporter prints what it caught with `String` unless it
 			// is an `Error`, and a retry that escapes the rounds is not one.
 			it("should read as its message when a retry escapes the rounds", () => {
 				let message = "Protocol 'Named' has not been hoisted yet"
@@ -3565,7 +3565,7 @@ describe("Helpers", () => {
 				expect(typeContainsUnknown(nonZero)).toBe(false)
 			})
 
-			// NOTE: The rule a write into an undecided slot follows, in the one
+			// The rule a write into an undecided slot follows, in the one
 			// place it can be spelled on its own. A refinement is evidence about
 			// the ONE value that was written, and a slot holds every value the
 			// name that owns it will ever hold — so the evidence is dropped
@@ -3598,7 +3598,7 @@ describe("Helpers", () => {
 					).toEqual({ type: "List", itemType: string })
 				})
 
-				// NOTE: A slot INSIDE the container drops its evidence too, which
+				// A slot INSIDE the container drops its evidence too, which
 				// is what makes the write after the deciding one possible:
 				// `rows = rows::append(["a"]::append("b"))` decides a List of
 				// Lists of Strings, and the `rows::append([])` written under it
@@ -3630,7 +3630,7 @@ describe("Helpers", () => {
 					})
 				})
 
-				// NOTE: Nothing was decided, so the very same Type comes back —
+				// Nothing was decided, so the very same Type comes back —
 				// the answer every caller reads as "this write pinned nothing".
 				it("should answer with the stored Type where the base decides nothing", () => {
 					expect(
@@ -3671,7 +3671,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: Refinements do not survive into the emitted Program, and this is
+		// Refinements do not survive into the emitted Program, and this is
 		// where they go. What is asserted is completeness — a refinement nested
 		// anywhere in a Type, and a Type hanging anywhere off a Node — plus the
 		// identity preservation the caches around the standard library's
@@ -3709,7 +3709,7 @@ describe("Helpers", () => {
 				})
 			})
 
-			// NOTE: A refinement over a refinement is not something a Program can
+			// A refinement over a refinement is not something a Program can
 			// write, but the walk answers it anyway — an eraser that erased one
 			// layer would be a walk that stops where it happened to be called.
 			it("should erase every layer of one", () => {
@@ -3723,7 +3723,7 @@ describe("Helpers", () => {
 				).toEqual(integer)
 			})
 
-			// NOTE: An INSTANTIATED generic refinement erases to its instantiated
+			// An INSTANTIATED generic refinement erases to its instantiated
 			// base — the Type Arguments were substituted into the base long before
 			// the Optimiser saw it, so there is nothing generic left to erase, and
 			// the applied spelling goes the way `name` and `conjuncts` do. Nested
@@ -3756,7 +3756,7 @@ describe("Helpers", () => {
 				expect(eraseRefinements(plain)).toBe(plain)
 			})
 
-			// NOTE: An erased Record is not the Alias it was written as — a
+			// An erased Record is not the Alias it was written as — a
 			// `Bag` whose `count` was a `NonZeroInteger` declares a plain
 			// Integer now — so the display spelling goes with the refinement.
 			// It is what a Matcher refusal reads to say what the emitted check
@@ -3775,7 +3775,7 @@ describe("Helpers", () => {
 				})
 			})
 
-			// NOTE: The other half of that rule: a spelling stays true as long
+			// The other half of that rule: a spelling stays true as long
 			// as the members it describes do, and a Record holding no
 			// refinement is never rebuilt at all.
 			it("should keep the spelling of a Record it does not rebuild", () => {
@@ -3788,7 +3788,7 @@ describe("Helpers", () => {
 				expect(eraseRefinements(named)).toBe(named)
 			})
 
-			// NOTE: A Union's spelling stays, unlike a Record's, and the reason
+			// A Union's spelling stays, unlike a Record's, and the reason
 			// is emission rather than truth: a Type descriptor is written into
 			// the JavaScript field by field, so dropping `name` here would
 			// change the bytes every Program with a refinement under an
@@ -3805,7 +3805,7 @@ describe("Helpers", () => {
 				expect(erased.types).toEqual([integer, string])
 			})
 
-			// NOTE: Every field of every Node, which is what a reflective walk
+			// Every field of every Node, which is what a reflective walk
 			// buys and a hand written one has to remember: a Constant's declared
 			// Type, the Type its value carries, a Match Handler's Matcher — and
 			// the same one field in a Node kind nobody has written yet.
@@ -3899,7 +3899,7 @@ describe("Helpers", () => {
 				expect(eraseRefinements(program)).toBe(program)
 			})
 
-			// NOTE: The Enricher refuses `choice Tree { Node { weight:
+			// The Enricher refuses `choice Tree { Node { weight:
 			// NonZeroInteger, children: List<Tree> } }` as
 			// `recursive-type-declaration`, so its cycle is built by hand and
 			// the two passes are defence here. What the rebuilt graph must
@@ -3954,7 +3954,7 @@ describe("Helpers", () => {
 			})
 		})
 
-		// NOTE: What a Record is CALLED never reaches the emitted Program: the
+		// What a Record is CALLED never reaches the emitted Program: the
 		// runtime has never heard of `Standing`, a descriptor carrying it would
 		// be dead bytes in every Program that matches on an Alias, and the pool
 		// would hold two spellings of one shape as two constants. So the
@@ -3978,7 +3978,7 @@ describe("Helpers", () => {
 				).toEqual({ type: "List", itemType: shape })
 			})
 
-			// NOTE: An Overload set is a list of signatures and a Record can
+			// An Overload set is a list of signatures and a Record can
 			// stand in any of them. Nothing emits one today — this is the walk
 			// answering about a shape rather than about the callers it happens
 			// to have.
@@ -4015,7 +4015,7 @@ describe("Helpers", () => {
 	})
 })
 
-// NOTE: A Parameter the expected signature says may be left out has to be one
+// A Parameter the expected signature says may be left out has to be one
 // the actual signature can answer without: a call written against the expected
 // Type leaves the Argument out, and the emitted call passes nothing (or `void
 // 0`) in its place, which only a Parameter carrying a default of its own
@@ -4043,7 +4043,7 @@ describe("Matching a signature that promises a default", () => {
 		expect(matchesType(promising, plain)).toBe(false)
 	})
 
-	// NOTE: The other direction is safe and stays allowed — a call through a
+	// The other direction is safe and stays allowed — a call through a
 	// Type that promises nothing writes every Argument, and a Function that
 	// would have filled one in never has to.
 	it("should accept a defaulted signature where none was promised", () => {
@@ -4051,7 +4051,7 @@ describe("Matching a signature that promises a default", () => {
 	})
 })
 
-// NOTE: The two-slot container, asked of the helpers directly. The whole of
+// The two-slot container, asked of the helpers directly. The whole of
 // what a second slot changes is that the two are decided, substituted and
 // compared apart, so the rules are written down here where both halves can be
 // spelled.
@@ -4115,7 +4115,7 @@ describe("Dictionary Types", () => {
 			).toBe(false)
 		})
 
-		// NOTE: The empty-Dictionary rule, which is the empty List Literal's
+		// The empty-Dictionary rule, which is the empty List Literal's
 		// rule applied to each slot on its own — an undecided slot is a slot
 		// nothing has decided, so it fits whatever the expected Type decided.
 		it("should accept a Dictionary with both slots undecided", () => {
@@ -4136,7 +4136,7 @@ describe("Dictionary Types", () => {
 			).toBe(true)
 		})
 
-		// NOTE: And the half that IS decided is still checked — which is what
+		// And the half that IS decided is still checked — which is what
 		// reading the slots apart buys. Reading them together would have taken
 		// this Dictionary for the one above.
 		it("should still check the slot the value decided", () => {
@@ -4153,7 +4153,7 @@ describe("Dictionary Types", () => {
 			expect(matchesType(bare, bare)).toBe(true)
 		})
 
-		// NOTE: The reverse does NOT hold, for the reason a bare `List` does not
+		// The reverse does NOT hold, for the reason a bare `List` does not
 		// satisfy a `List<Integer>`: a bare Dictionary promises nothing about
 		// either slot.
 		it("should refuse a bare Dictionary where an applied one is asked for", () => {
@@ -4188,7 +4188,7 @@ describe("Dictionary Types", () => {
 			).toEqual(dictionary(string, integer))
 		})
 
-		// NOTE: A Type nothing changed comes back AS ITSELF, which is what every
+		// A Type nothing changed comes back AS ITSELF, which is what every
 		// identity check downstream reads — so a half-bound Dictionary has to be
 		// a fresh object and a wholly unbound one has to not be.
 		it("should answer the very same Type when neither slot is bound", () => {
@@ -4222,7 +4222,7 @@ describe("Dictionary Types", () => {
 			expect(typeContainsUnknown(dictionary(string, integer))).toBe(false)
 		})
 
-		// NOTE: A bare Dictionary's Unknowns are DECLARED defaults rather than
+		// A bare Dictionary's Unknowns are DECLARED defaults rather than
 		// slots waiting on an answer, exactly as a bare List's are.
 		it("should not call a bare Dictionary undecided", () => {
 			expect(typeContainsUnknown(bare)).toBe(false)
@@ -4239,7 +4239,7 @@ describe("Dictionary Types", () => {
 			).toEqual(dictionary(string, integer))
 		})
 
-		// NOTE: Independently — the slot the value decided is pinned and the one
+		// Independently — the slot the value decided is pinned and the one
 		// it did not is left open, rather than both being decided or neither.
 		it("should pin one slot without touching the other", () => {
 			expect(
@@ -4295,7 +4295,7 @@ describe("Protocol identities", () => {
 	})
 })
 
-// NOTE: The rule is what decides whether a "Did you mean" is printed at all,
+// The rule is what decides whether a "Did you mean" is printed at all,
 // and every one of them carries a Quick Fix that writes the name into the
 // reader's file — so the pairs that must NOT be offered are tested beside the
 // ones that must.
@@ -4308,7 +4308,7 @@ describe("closestMatch", () => {
 		)
 	})
 
-	// NOTE: The two that started this. Both are two edits on a name too short
+	// The two that started this. Both are two edits on a name too short
 	// to spare them, and both were offered with a fix behind them.
 	it("should refuse two edits on a short name", () => {
 		expect(closestMatch("add", ["pad", "join"])).toBeNull()
@@ -4320,7 +4320,7 @@ describe("closestMatch", () => {
 		expect(closestMatch("sbtrct", ["subtract"])).toBe("subtract")
 	})
 
-	// NOTE: `uppercase` and `lowercase` are three edits apart and mean opposite
+	// `uppercase` and `lowercase` are three edits apart and mean opposite
 	// things. The length alone admits that many; the opening letter is what
 	// tells the reader's own word from its mirror image.
 	it("should refuse a far name that opens on another letter", () => {
@@ -4332,7 +4332,7 @@ describe("closestMatch", () => {
 		expect(closestMatch("bength", ["length"])).toBe("length")
 	})
 
-	// NOTE: Both candidates are one edit away, so the order they were handed in
+	// Both candidates are one edit away, so the order they were handed in
 	// would have answered — and the one the reader was looking at is the one
 	// that opens as their own spelling does.
 	it("should prefer the candidate opening as the input does", () => {

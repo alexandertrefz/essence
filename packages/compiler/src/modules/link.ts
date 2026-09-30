@@ -16,7 +16,7 @@ import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
 import type { Module, ModuleGraph } from "./graph"
 
-// NOTE: What a top level declaration was written as, which is what decides the
+// What a top level declaration was written as, which is what decides the
 // two Diagnostics that turn on the kind rather than on the Type: a Variable can
 // not be exported at all, and a Constant can not be imported across a cycle.
 // Everything else — a Function, a Namespace, a Type Alias, a Choice, a Protocol —
@@ -35,7 +35,7 @@ export type Declaration = {
 	position: common.Position
 }
 
-// NOTE: What a Module offers the Modules that import it, keyed by the name it is
+// What a Module offers the Modules that import it, keyed by the name it is
 // exported UNDER — `as` is applied here, so an importer never has to know what
 // the declaration was called at home.
 //
@@ -52,7 +52,7 @@ export type ExportSurface = {
 	declarations: Record<string, common.Position>
 	constants: Set<string>
 	kinds: Record<string, DeclaredKind>
-	// NOTE: The names an entry forwards from another Module, whose Position in
+	// The names an entry forwards from another Module, whose Position in
 	// `declarations` is one in that Module's file. A Position carries no file,
 	// so a match against this Module's own declarations skips them.
 	forwarded: Set<string>
@@ -61,18 +61,18 @@ export type ExportSurface = {
 export type LinkedModule = {
 	module: Module
 	program: common.typed.Program
-	// NOTE: This Module's own Diagnostics, in stage order: what the graph found
+	// This Module's own Diagnostics, in stage order: what the graph found
 	// about its specifiers, what linking found about its entries, what enrichment
 	// found in its body, and what the export block and the unused entries came to
 	// last. Collected per Module because the dedup key carries no file — one
 	// shared collection would swallow a second Module's identical error.
 	diagnostics: Array<common.Diagnostic>
 	surface: ExportSurface
-	// NOTE: The written annotations paired with what each resolved to — empty
+	// The written annotations paired with what each resolved to — empty
 	// unless this is the Module `annotationsFor` asked about. Only a Hover ever
 	// wants them, and only for the file under the cursor.
 	annotations: Array<common.TypeAnnotation>
-	// NOTE: What this Module's `import { … }` block BOUND, under the local name
+	// What this Module's `import { … }` block BOUND, under the local name
 	// each entry binds it as. The typed Program's own entries carry one Type
 	// apiece and no Protocol at all — see `boundEntryType` — which is enough to
 	// emit and to Hover over and not enough to say what a name in this file
@@ -83,7 +83,7 @@ export type LinkedModule = {
 	imported: ImportedNames
 }
 
-// NOTE: The three tables a Scope holds names in, narrowed to what one import
+// The three tables a Scope holds names in, narrowed to what one import
 // block put there.
 export type ImportedNames = {
 	values: Record<string, common.Type>
@@ -93,17 +93,17 @@ export type ImportedNames = {
 
 export type LinkedGraph = {
 	entryPath: string
-	// NOTE: Dependency-first, the entry last — the graph's order, kept, because
+	// Dependency-first, the entry last — the graph's order, kept, because
 	// it is the order the Module bodies run in.
 	modules: Map<string, LinkedModule>
 	diagnostics: Array<common.Diagnostic>
-	// NOTE: What every Module of the graph declares at its top level, which
+	// What every Module of the graph declares at its top level, which
 	// linking read off the AST before anything was enriched. Kept because
 	// linking ONE more Module against this graph needs the same answer — see
 	// `linkContextOf` — and reading it again is a walk per Module for something
 	// that was already computed here.
 	declarations: Map<string, Map<string, Declaration>>
-	// NOTE: Every Protocol the graph declares, by identity: the registry each
+	// Every Protocol the graph declares, by identity: the registry each
 	// Module's Scope is linked with.
 	protocols: Map<string, common.ProtocolType>
 }
@@ -120,7 +120,7 @@ function emptySurface(): ExportSurface {
 	}
 }
 
-// NOTE: A list rather than one entry, because a Declaration whose name is a
+// A list rather than one entry, because a Declaration whose name is a
 // Pattern declares as many names as the Pattern binds. This runs BEFORE the
 // Enricher, so the desugar that turns those into Constants everywhere else has
 // not happened yet and can not be waited for — which is exactly why the names
@@ -167,7 +167,7 @@ function declarationsOf(
 	}
 }
 
-// NOTE: Read off the AST rather than off the Scope, because both questions it
+// Read off the AST rather than off the Scope, because both questions it
 // answers have to be answerable before anything has been enriched: whether an
 // import collides with a declaration this file makes, and what kind a name was
 // declared as. Only the FIRST declaration of a name is kept — a second one is a
@@ -194,7 +194,7 @@ function topLevelDeclarations(
 	return declarations
 }
 
-// NOTE: The export block by the name each entry publishes under. A second entry
+// The export block by the name each entry publishes under. A second entry
 // publishing a name is dropped rather than reported: what it would collide with
 // is another entry of the same block, which the Formatter writes side by side.
 function exportedEntries(
@@ -213,7 +213,7 @@ function exportedEntries(
 	return entries
 }
 
-// NOTE: The canonical order of an import block: by specifier, then by name, then
+// The canonical order of an import block: by specifier, then by name, then
 // by the local name — never the order the entries were written in. It is the
 // order `esfmt` writes the block in (`compareGroups` and `compareEntries` in the
 // Formatter's `sections.ts`), and Namespace dispatch is seeded in it, so
@@ -242,12 +242,12 @@ function compareEntries(left: parser.ImportNode, right: parser.ImportNode) {
 type ImportBinding = {
 	entry: parser.ImportNode
 	localName: string
-	// NOTE: The canonical path the entry's specifier resolved to, or null when it
+	// The canonical path the entry's specifier resolved to, or null when it
 	// resolved to nothing at all — the graph reported that already, and this
 	// entry is left alone rather than reported about twice.
 	dependencyPath: string | null
 	state: "pending" | "bound" | "refused"
-	// NOTE: How many of the three tables the entry has bound so far — see
+	// How many of the three tables the entry has bound so far — see
 	// `tablesOffered`. Zero until it binds, and what says whether a bound entry
 	// is still missing half of what its name means.
 	boundTables: number
@@ -262,7 +262,7 @@ type ModuleState = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: Whether a name the surface publishes is one the emitted JavaScript
+// Whether a name the surface publishes is one the emitted JavaScript
 // binds. A Type Alias, a Choice and a Protocol erase — the Rewriter emits an
 // empty Statement where each was declared — so an entry naming one must carry
 // no ESM binding, or the bundle would import a name the dependency's JavaScript
@@ -275,7 +275,7 @@ function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
 	return surface !== null && surface.values[name] !== undefined
 }
 
-// NOTE: What a Hover over an entry prints — the member bound under the local
+// What a Hover over an entry prints — the member bound under the local
 // name, or the Type where only a Type came across. A name bound in both tables
 // answers with the member, which is what the name means in expression position.
 function boundEntryType(
@@ -285,7 +285,7 @@ function boundEntryType(
 	return scope.members[name] ?? scope.types[name] ?? null
 }
 
-// NOTE: The two sections as the emitted Program needs them, attached to the
+// The two sections as the emitted Program needs them, attached to the
 // typed Program linking hands back. Enrichment leaves both null: whether an
 // entry names something the JavaScript binds is read off the other Module's
 // export surface, and enrichment never sees one.
@@ -392,7 +392,7 @@ function moduleSections(
 	}
 }
 
-// NOTE: A Namespace import binds a shallow COPY carrying the local name, because
+// A Namespace import binds a shallow COPY carrying the local name, because
 // the emitted Method call reads the Namespace Type's own `name` — an alias that
 // stopped at the Scope would emit a reference to a name the bundle never binds.
 // Nothing else may key off that name.
@@ -431,13 +431,13 @@ function bindInto(
 		scope.protocols[localName] = protocol
 	}
 
-	// NOTE: The import entry, never the declaration in the other file: a
+	// The import entry, never the declaration in the other file: a
 	// Diagnostic about a use is rendered against THIS Module's source, and a
 	// Position from another file would point into the wrong text entirely.
 	scope.declarations[localName] = position
 }
 
-// NOTE: What is left of an entry that has been reported about: the local name
+// What is left of an entry that has been reported about: the local name
 // bound to an Error, so that every use of it in this Module stays quiet. Without
 // it one refused entry becomes a file's worth of `unknown-name` about a name the
 // reader can see written at the top, and the one Diagnostic that says what is
@@ -492,7 +492,7 @@ function reportDuplicateImport(
 	})
 }
 
-// NOTE: The name the dependency publishes the DECLARATION under, where that is
+// The name the dependency publishes the DECLARATION under, where that is
 // not the name it was declared with. An `as` on an export entry renames the
 // declaration for everyone, so `export { area as squareArea }` leaves `area`
 // private and an importer asking for it has to ask for the other name — telling
@@ -534,7 +534,7 @@ function reportMissingExport(
 						"declared in that Module, but private",
 					),
 				],
-				// NOTE: The `as` rule only where it is the ANSWER. A reader
+				// The `as` rule only where it is the ANSWER. A reader
 				// looking at a block that plainly lists the declaration has no
 				// other way of knowing why the name is still private here —
 				// while on a block that simply leaves it out, the sentence is
@@ -547,7 +547,7 @@ function reportMissingExport(
 								"An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.",
 							]),
 				],
-				// NOTE: Three answers, in the order they stop being wrong. A
+				// Three answers, in the order they stop being wrong. A
 				// declaration the block already publishes under another name is
 				// asked for by THAT name — adding this one would publish one
 				// function twice. A Module publishing nothing at all has no
@@ -566,7 +566,7 @@ function reportMissingExport(
 		return
 	}
 
-	// NOTE: The names the Module really publishes are in hand, so a near miss is
+	// The names the Module really publishes are in hand, so a near miss is
 	// answered rather than left to the reader — `aera` beside an exported `area`
 	// was a report with nothing in it but a spelling check.
 	let suggestion = closestMatch(source.content, Object.keys(surface.kinds))
@@ -586,7 +586,7 @@ function reportMissingExport(
 					: [`Did you mean '${suggestion}'?`]),
 				"Check the spelling, and that the specifier names the file you meant.",
 			],
-			// NOTE: The name the Module does publish, for the Quick Fix that
+			// The name the Module does publish, for the Quick Fix that
 			// writes it — the Editor has no export surface of its own to read,
 			// and this is the payload every other near miss is answered with.
 			...(suggestion === null
@@ -601,13 +601,13 @@ function reportMissingExport(
 	)
 }
 
-// NOTE: One graph is linked in ONE mode — see `CompileMode` — so every Module
+// One graph is linked in ONE mode — see `CompileMode` — so every Module
 // of it enriches the section and synthesizes the goals the run asked for.
 export type LinkOptions = CompileMode & {
-	// NOTE: The canonical path of the one Module whose written annotations
+	// The canonical path of the one Module whose written annotations
 	// are wanted alongside its typed Program — the Hover seam.
 	annotationsFor?: string
-	// NOTE: The Scope each Module is linked into, when the default is wrong.
+	// The Scope each Module is linked into, when the default is wrong.
 	// Two things make it wrong for the standard library. It must carry NO
 	// `modulePath`, because that is what names a Choice
 	// `<modulePath>#<Name>` — and a builtin Choice is named by its bare name,
@@ -622,7 +622,7 @@ export function linkModuleGraph(
 	graph: ModuleGraph,
 	options: LinkOptions = {},
 ): LinkedGraph {
-	// NOTE: Every Module's declarations up front, because a Diagnostic about an
+	// Every Module's declarations up front, because a Diagnostic about an
 	// entry has to tell "that Module does not export this" from "that Module has
 	// no such name" — and the second question is about a file the entry's own
 	// Module knows nothing else about.
@@ -665,7 +665,7 @@ export function linkModuleGraph(
 	}
 }
 
-// NOTE: What linking ONE more Module against a graph that is already linked
+// What linking ONE more Module against a graph that is already linked
 // needs of that graph, and nothing else: the export surface every Module in it
 // published, what each declares, and which Modules each names. Held apart from
 // the `LinkedGraph` itself because a caller that keeps one of these keeps Type
@@ -697,7 +697,7 @@ export function linkContextOf(linked: LinkedGraph): LinkContext {
 	}
 }
 
-// NOTE: One Module, linked against dependencies that are linked already —
+// One Module, linked against dependencies that are linked already —
 // which is what a Language Server's probe is. A probe is the document with a
 // synthetic member written into it, so its whole import block resolves to the
 // same Modules the document's did, and re-reading and re-linking those on every
@@ -725,7 +725,7 @@ export function linkModuleAgainst(
 
 	surfaces.delete(module.filePath)
 
-	// NOTE: A copy, which the Module overwrites its own entries in. An entry
+	// A copy, which the Module overwrites its own entries in. An entry
 	// it stops declaring is kept, since the surfaces are built against it.
 	return linkGroup(
 		[module],
@@ -737,7 +737,7 @@ export function linkModuleAgainst(
 	)[0]!
 }
 
-// NOTE: One group is one hoisting pass. For a lone Module every dependency is
+// One group is one hoisting pass. For a lone Module every dependency is
 // linked already and its whole import block is seeded before anything is
 // resolved; for a cycle the entries naming a Module of the same group can not be,
 // because the declaration they name has not been hoisted yet — so they are
@@ -752,7 +752,7 @@ function linkGroup(
 	options: LinkOptions,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
-	// NOTE: The Declaration rather than a yes: a name a dependency declares and
+	// The Declaration rather than a yes: a name a dependency declares and
 	// publishes under ANOTHER one is the difference between "add it to the
 	// block" and "import the name it is published as", and only the Position on
 	// the Declaration can tell the two apart.
@@ -774,7 +774,7 @@ function linkGroup(
 			diagnostics: [],
 		}
 
-		// NOTE: The builtins a fresh top level Scope binds join the registry
+		// The builtins a fresh top level Scope binds join the registry
 		// before anything of the Module's own is declared.
 		for (let protocol of Object.values(state.scope.protocols)) {
 			protocols.set(protocol.identity, protocol)
@@ -832,7 +832,7 @@ function linkGroup(
 		return bound
 	}
 
-	// NOTE: Once before the hoist, so a lone Module — whose dependencies are all
+	// Once before the hoist, so a lone Module — whose dependencies are all
 	// linked and final — has its whole block in Scope before a single declaration
 	// is resolved, and again from inside the hoist for the entries only a cycle
 	// leaves pending.
@@ -846,7 +846,7 @@ function linkGroup(
 		[...states.values()].map((state) => ({
 			program: state.module.program,
 			scope: state.scope,
-			// NOTE: Only a test compile reads it: the `@example` blocks of a `§§`
+			// Only a test compile reads it: the `@example` blocks of a `§§`
 			// block are compiled out of the file's own lines, and a value
 			// comment outside the tests is found in them.
 			source: state.module.sourceText,
@@ -894,7 +894,7 @@ function linkGroup(
 	})
 }
 
-// NOTE: Read off the Scope rather than off the surfaces the entries were bound
+// Read off the Scope rather than off the surfaces the entries were bound
 // from, so that what is reported is what the Module actually ended up with: an
 // entry the hoist rounds never bound is absent, and one whose name a
 // declaration of this Module's own took is the declaration — which is the name
@@ -927,7 +927,7 @@ function importedNames(state: ModuleState): ImportedNames {
 	return imported
 }
 
-// NOTE: The surface of a Module already linked is final and simply read back; a
+// The surface of a Module already linked is final and simply read back; a
 // Module of the group being linked is asked to build one out of whatever its
 // Scope holds right now, which is what the seeding between the hoist rounds
 // consults. `visiting` closes a re-export chain that leads back into the group —
@@ -1048,7 +1048,7 @@ function surfaceOf(
 	return surface
 }
 
-// NOTE: How many of the three tables a surface offers a name — the value, the
+// How many of the three tables a surface offers a name — the value, the
 // Type and the Protocol. One name travels across every table it is declared in:
 // a `type NonEmptyList` beside a `namespace NonEmptyList` is a Type AND a value,
 // and only both together let an importing file dispatch a `::` call through the
@@ -1062,13 +1062,13 @@ function tablesOffered(surface: ExportSurface, exportedName: string): number {
 	)
 }
 
-// NOTE: Every entry that can be bound now, bound. Answers whether anything new
+// Every entry that can be bound now, bound. Answers whether anything new
 // was — which is what keeps the hoist rounds going through a cycle. An entry that
 // names something the dependency does not export is reported and refused on the
 // first pass: that answer can not change, because an export list is read off the
 // AST rather than resolved.
 //
-// NOTE: An entry already bound is offered its dependency's surface again while
+// An entry already bound is offered its dependency's surface again while
 // that surface can still grow, which is only ever inside the group being linked —
 // a Module already linked has a final surface, read straight back. The two halves
 // of one name do not hoist in the same round: a refined Alias hoists as a
@@ -1100,7 +1100,7 @@ function seedImports(
 			continue
 		}
 
-		// NOTE: A bound entry is asked again only while the dependency is still
+		// A bound entry is asked again only while the dependency is still
 		// being linked, and only while a table it will come to offer is missing.
 		// Three is every table there is, so each entry is re-bound at most twice
 		// and the rounds still terminate.
@@ -1111,7 +1111,7 @@ function seedImports(
 			continue
 		}
 
-		// NOTE: This Module's own declarations are read off the AST rather than
+		// This Module's own declarations are read off the AST rather than
 		// off the Scope, so a collision with one is reported on the FIRST pass —
 		// before hoisting has put it in Scope, and before the import could shadow
 		// it. Refusing the entry is what keeps the report to one Diagnostic: the
@@ -1164,7 +1164,7 @@ function seedImports(
 			continue
 		}
 
-		// NOTE: A Constant does not hoist, so across a cycle there is no moment
+		// A Constant does not hoist, so across a cycle there is no moment
 		// at which its value exists and the importer has not run — the emitted
 		// ESM binding is in its temporal dead zone. Reported here rather than
 		// left to the runtime, and the name is bound as an Error so that the
@@ -1198,7 +1198,7 @@ function seedImports(
 	return bound
 }
 
-// NOTE: What is still pending once the rounds are over names something that IS
+// What is still pending once the rounds are over names something that IS
 // exported and never resolved — the Module declaring it reported why, so nothing
 // is said here a second time. The name is seeded as an Error for the same reason
 // a cyclic Constant is.
@@ -1243,7 +1243,7 @@ function reportCyclicConstantImport(entry: parser.ImportNode): void {
 	)
 }
 
-// NOTE: Whether anything in this Module writes to `name` — the whole Program,
+// Whether anything in this Module writes to `name` — the whole Program,
 // because an assignment inside a Function body is as much an assignment as one
 // at the top level, and either is what makes rewriting the Declaration to a
 // Constant a refused edit rather than a fix.
@@ -1285,7 +1285,7 @@ function isAssignedIn(module: Module, name: string): boolean {
 	return found
 }
 
-// NOTE: Both mistakes an export block can make on its own: a name this Module
+// Both mistakes an export block can make on its own: a name this Module
 // never declared, and a Variable — mutable state one Module writes and another
 // reads is not something a `from` clause can express. A re-export is checked
 // against the Module it forwards from, under the same two codes an import is.
@@ -1344,7 +1344,7 @@ function reportExportProblems(
 					notes: [
 						"An entry with no 'from' clause exports something this Module's implementation declares.",
 					],
-					// NOTE: The forwarding Help only where there is something to
+					// The forwarding Help only where there is something to
 					// forward FROM. A `from "…" { … }` group is an answer when
 					// one of this Module's dependencies exports the name — and
 					// then the specifier is in hand, so the Help spells it
@@ -1376,7 +1376,7 @@ function reportExportProblems(
 					notes: [
 						"A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.",
 					],
-					// NOTE: "Declare it as a Constant" is withheld where anything
+					// "Declare it as a Constant" is withheld where anything
 					// in this Module ASSIGNS to the name, because following it
 					// answers `constant-reassignment` at every one of those
 					// assignments — whose own Help asks for the `variable` back.
@@ -1394,7 +1394,7 @@ function reportExportProblems(
 	}
 }
 
-// NOTE: Every name this Module's body reads, over-collected on purpose. An
+// Every name this Module's body reads, over-collected on purpose. An
 // `unused-import` Warning that fires on a name the Module does use is worse than
 // one that stays silent, so a Method name that happens to be spelled like an
 // import counts as a use — while every shape that genuinely IS one is covered.
@@ -1408,11 +1408,11 @@ function reportExportProblems(
 function usedNames(
 	module: Module,
 	program: common.typed.Program,
-	// NOTE: The names the Enricher reached a conformance through in this
+	// The names the Enricher reached a conformance through in this
 	// Module's Scope, which is how a Module reads an imported name without
 	// writing it anywhere. See `collectReachedNames`.
 	reachedNames: Set<string>,
-	// NOTE: The Protocols this Module's Scope binds, by local name. The typed
+	// The Protocols this Module's Scope binds, by local name. The typed
 	// tree names a Protocol by identity, and every name bound to one is read.
 	protocols: Record<string, common.ProtocolType>,
 ): Set<string> {
@@ -1451,14 +1451,14 @@ function usedNames(
 			}
 		}
 
-		// NOTE: A Union receiver's per-member branch, and a Protocol conformance
+		// A Union receiver's per-member branch, and a Protocol conformance
 		// witness — the two shapes that name a Namespace without an Invocation of
 		// their own to hang it off.
 		if (typeof record["namespaceName"] === "string") {
 			names.add(record["namespaceName"])
 		}
 
-		// NOTE: A PROVIDED Method reads the Protocol that wrote its body, and
+		// A PROVIDED Method reads the Protocol that wrote its body, and
 		// the Invocation is named after the NAMESPACE whose conformance put it
 		// in reach — so `square::describe()` spells neither `Shape` nor
 		// `describe`'s declaration anywhere else. Reaching a provided Method
@@ -1474,7 +1474,7 @@ function usedNames(
 			names.add(record["name"])
 		}
 
-		// NOTE: A named Type the tree resolved to does not count as a use.
+		// A named Type the tree resolved to does not count as a use.
 		// Every Type object in either tree carries a name, so if it counted, an
 		// import whose Type merely flows through, `Standing` beside a `make`
 		// that answers one, would never be reported although removing the
@@ -1488,7 +1488,7 @@ function usedNames(
 	}
 
 	visit(module.program.implementation)
-	// NOTE: The PARSER's tests section, whatever the compile asked for. An
+	// The PARSER's tests section, whatever the compile asked for. An
 	// import a file uses only in its tests is used — the block is written, and
 	// a build stripping it is not the file changing its mind about needing the
 	// name. Read off the Parser's tree because that is the one that carries the
@@ -1513,14 +1513,14 @@ function reportUnusedImports(
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
-	// NOTE: And silent for a Module the Parser abandoned TEXT in. Every use this
+	// And silent for a Module the Parser abandoned TEXT in. Every use this
 	// counts is read off a tree, and a Statement the recovery dropped is in
 	// neither of them — so the one line that reads an import can go missing and
 	// leave the entry looking unread. It is the over-collection above carried
 	// one step further, and for the same reason: a Warning that fires on a name
 	// the Module does use is worse than one that stays silent.
 	//
-	// NOTE: The LINES rather than the record, because a Recovery is also
+	// The LINES rather than the record, because a Recovery is also
 	// written for a dropped Pattern binder, which abandons a NAME while the
 	// Matcher around it parses whole. No text went missing there, so no line
 	// that reads an import did either — asking whether the record exists
@@ -1567,7 +1567,7 @@ function reportUnusedImports(
 	}
 }
 
-// NOTE: The first thing this Module's body does that is not a declaration. A
+// The first thing this Module's body does that is not a declaration. A
 // hoisted declaration is in place before any body runs, and a Constant or
 // Variable is only reachable from another Module through an import, which
 // `cyclic-constant-import` answers for — everything else is a Statement that
@@ -1616,7 +1616,7 @@ function reportCyclicSideEffects(
 	)
 }
 
-// NOTE: The Namespaces this Module's dependencies export and it has not brought
+// The Namespaces this Module's dependencies export and it has not brought
 // in, which is what turns "no such Method" into "you did not import the Namespace
 // that declares it". Only the dependencies it ALREADY names are asked: their
 // specifiers are written in the file, so the help names a path the reader can
@@ -1657,7 +1657,7 @@ function unimportedNamespacesFor(
 	return candidates
 }
 
-// NOTE: The Modules this one reaches that declare a Protocol of this name, read
+// The Modules this one reaches that declare a Protocol of this name, read
 // off the declarations so that a private one is found too, or that publish one
 // they declare under this name. Only what it reaches, and by path, so that its
 // Diagnostics do not depend on the graph's entry.
@@ -1716,7 +1716,7 @@ function protocolDeclarationsFor(
 	return found
 }
 
-// NOTE: The names a Module publishes each Protocol it declares under, by the
+// The names a Module publishes each Protocol it declares under, by the
 // declared name. A linked Module's surface is matched on the declaration's
 // Position among the names it does not forward, since a standard library
 // Protocol's identity carries no path. Null for a Module that is neither linked
@@ -1770,7 +1770,7 @@ function publishedProtocols(
 	return published
 }
 
-// NOTE: The one name an import of a declaration is written with, out of those
+// The one name an import of a declaration is written with, out of those
 // its Module publishes it under: its own where that is one of them, since the
 // rest of a report spells it so, and otherwise the first the export block lists.
 function publishedName(

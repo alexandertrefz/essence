@@ -12,7 +12,7 @@ const TokenType = lexer.TokenType
 type Token = lexer.Token
 type Cursor = common.Cursor
 
-// NOTE: The Lexer's non-fatal problems — a Token it could read but that can
+// The Lexer's non-fatal problems — a Token it could read but that can
 // never be valid, like `0xFF` or an unknown escape. They are handed to the
 // caller rather than thrown, because the Token stream is intact and every later
 // Token is worth reading; the parser's TokenStream turns each into a positioned
@@ -30,7 +30,7 @@ export type LexingError = {
 		| "malformed-unicode-escape"
 		| "unicode-escape-out-of-range"
 		| "surrogate-unicode-escape"
-	// NOTE: The rest of the report, for the one family that can not be rebuilt
+	// The rest of the report, for the one family that can not be rebuilt
 	// from its code alone. A `\u{…}` can be wrong in six ways that share four
 	// codes, and each Help writes the reader's own digits back at them — which
 	// digits those are, and which mistake it was, are known only where the
@@ -40,7 +40,7 @@ export type LexingError = {
 	report?: EscapeReport
 }
 
-// NOTE: What a refused `\u{…}` says under its code — the label that sits on the
+// What a refused `\u{…}` says under its code — the label that sits on the
 // span, the Note that states the rule it broke, and the Helps, which are the
 // edits that work and are withheld when none does.
 export type EscapeReport = {
@@ -49,7 +49,7 @@ export type EscapeReport = {
 	helps: Array<string>
 }
 
-// NOTE: A String Literal that CLOSED, built where the unterminated-String
+// A String Literal that CLOSED, built where the unterminated-String
 // report asks which one it was — see `swallowedTheLinesBelow`. `spansLines` is
 // the whole reason it is asked for.
 export type ClosedString = {
@@ -58,13 +58,13 @@ export type ClosedString = {
 	spansLines: boolean
 }
 
-// NOTE: The one fatal Lexer error — after an unterminated String there is
+// The one fatal Lexer error — after an unterminated String there is
 // nothing left to lex. It carries the two Cursors the report needs: where the
 // input ran out, and where the String that never closed was opened.
 export class UnterminatedStringError extends Error {
 	endOfInput: Cursor
 	openedAt: Cursor
-	// NOTE: The String Literal that closed directly in front of this one AND
+	// The String Literal that closed directly in front of this one AND
 	// spanned lines, where there is one — the likelier culprit of the two. See
 	// `swallowedTheLinesBelow`.
 	swallower: ClosedString | null
@@ -143,14 +143,14 @@ const symbols = [
 	"#",
 ]
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-// NOTE: `\r` is here so a file with Windows line endings lexes as its Unix
+// `\r` is here so a file with Windows line endings lexes as its Unix
 // twin — the `\n` alone is the line break, and the `\r` before it is never
 // part of an Identifier, a Number or a Comment. `\uFEFF` is here for the
 // same reason: a byte order mark is invisible whitespace, not the first
 // letter of `implementation`.
 const whitespaces = [" ", "\t", "\r", "﻿"]
 
-// NOTE: The character codes the scan loops below compare against. Written as
+// The character codes the scan loops below compare against. Written as
 // names because a bare `34` in a String scanner says nothing about which
 // character it is, and taken from the same constants everything else here is,
 // so the two spellings can not drift apart.
@@ -160,25 +160,25 @@ const commentLiteralCode = commentLiteral.charCodeAt(0)
 const carriageReturnCode = "\r".charCodeAt(0)
 const backslashCode = "\\".charCodeAt(0)
 
-// NOTE: The questions the scan loops ask of every single character they read,
+// The questions the scan loops ask of every single character they read,
 // answered by one table lookup on the character's code. `endsWord` is what
 // STOPS an Identifier or a Number — whitespace, the line break, a Symbol, and
 // the Comment and String sigils, which end an Identifier exactly as a Symbol
 // does — `isDigit` is what a Number keeps, and `isSpace` is what the
 // skipping loops eat.
 //
-// NOTE: Built from the same Arrays the constants above are, so the two
+// Built from the same Arrays the constants above are, so the two
 // spellings of one character class can not drift apart.
 const endsWord = 1
 const isDigit = 2
 const isSpace = 4
-// NOTE: Hexadecimal is not a spelling the language has anywhere else — there is
+// Hexadecimal is not a spelling the language has anywhere else — there is
 // no `0xFF` Number Literal, and `invalid-number` exists to say so — so this flag
 // is read by the `\u` escape readers and by nothing else.
 const isHexDigit = 8
 
 const characterClasses = new Uint8Array(128)
-// NOTE: Every character above 127 that belongs to a class, which is the two
+// Every character above 127 that belongs to a class, which is the two
 // that do: `§` opens a Comment, and the byte order mark is whitespace.
 // Everything else up there is a letter in a name — or half of a surrogate
 // pair, which is read as the two code units it is written in, exactly as the
@@ -225,7 +225,7 @@ function classOfCode(code: number): number {
 	return wideClasses.get(code) ?? 0
 }
 
-// NOTE: WHERE a `\u{…}` holds a character that is not a hexadecimal digit,
+// WHERE a `\u{…}` holds a character that is not a hexadecimal digit,
 // rather than whether it does. `parseInt` would not say: it reads the longest
 // prefix it understands and answers for that — `parseInt("1G", 16)` is 1 — so a
 // refusal built on it would quietly become a wrong character instead.
@@ -239,7 +239,7 @@ function firstNonHexDigit(digits: string): number {
 	return -1
 }
 
-// NOTE: Whether a number names a character a String can hold. The range has two
+// Whether a number names a character a String can hold. The range has two
 // holes: nothing above U+10FFFF is a code point at all, and the surrogates are
 // the two halves UTF-16 writes an astral character in — neither names a
 // character on its own, which is why `\u{D800}` is refused and `\u{1F600}`, the
@@ -251,7 +251,7 @@ function isScalarValue(value: number): boolean {
 	)
 }
 
-// NOTE: A code point spelled the way this language spells it, which is what
+// A code point spelled the way this language spells it, which is what
 // every rewrite Help hands back. UPPER CASE, because that is how the Unicode
 // standard names a code point and how the runtime's own quoted rendering prints
 // one. A Help that merely re-brackets the reader's OWN digits keeps their case
@@ -260,7 +260,7 @@ function bracedEscape(value: number): string {
 	return `\\u{${value.toString(16).toUpperCase()}}`
 }
 
-// NOTE: The same digits with their leading zeros gone, which is what a rewrite
+// The same digits with their leading zeros gone, which is what a rewrite
 // of the reader's own text writes back: `\u001B` is offered as `\u{1B}` rather
 // than `\u{001B}`, and a file written in lower case keeps reading that way.
 function withoutLeadingZeros(digits: string): string {
@@ -273,14 +273,14 @@ function withoutLeadingZeros(digits: string): string {
 	return digits.slice(offset)
 }
 
-// NOTE: The character a surrogate pair spells, from the two halves UTF-16
+// The character a surrogate pair spells, from the two halves UTF-16
 // writes it in — the arithmetic the standard gives, written once because both
 // spellings of a pair need it.
 function characterOfPair(high: number, low: number): number {
 	return 0x10000 + ((high - firstSurrogate) << 10) + (low - firstLowSurrogate)
 }
 
-// NOTE: The one Help a surrogate ever gets, and the reason it is written here
+// The one Help a surrogate ever gets, and the reason it is written here
 // rather than at each of the two places that offer it: the Quick Fix reads the
 // spelling back OUT of this sentence (`literalFixes.ts`), so the sentence is the
 // contract between the Lexer and the Editor and two spellings of it are two
@@ -291,13 +291,13 @@ function pairedCharacterHelp(high: number, low: number): string {
 	)}'.`
 }
 
-// NOTE: The rule every malformed `\u{…}` broke, said once. Five refusals carry
+// The rule every malformed `\u{…}` broke, said once. Five refusals carry
 // it, and five spellings of one sentence is five chances for a reader to be told
 // something slightly different about the same escape.
 const unicodeEscapeRule =
 	"A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character."
 
-// NOTE: Said apart from the rule above, because a surrogate is the one refusal
+// Said apart from the rule above, because a surrogate is the one refusal
 // where the digits ARE a well-formed escape and the number itself is the
 // mistake. A reader who wrote one is a reader who knows UTF-16, and what they
 // need to hear is that Essence counts characters and not the units they are
@@ -305,7 +305,7 @@ const unicodeEscapeRule =
 const surrogateRule =
 	"U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly."
 
-// NOTE: `\u{U+1B}` — a code point written the way it is NAMED rather than the
+// `\u{U+1B}` — a code point written the way it is NAMED rather than the
 // way it is spelled. The `U+` prefix is how the standard and every chart write
 // one, so it arrives inside the braces often enough to answer for itself; the
 // digits behind it are the reader's own and are handed straight back.
@@ -333,7 +333,7 @@ function namedCodePointHelps(digits: string): Array<string> {
 	]
 }
 
-// NOTE: Seven digits or more, which is one or more leading zeros in every case
+// Seven digits or more, which is one or more leading zeros in every case
 // a reader meant — `\u{00001B}` is the JavaScript habit padded out. The zeros
 // come off where what is left names a character, and where it does not there is
 // nothing to offer: the escape is wrong twice over and the Note says the rule.
@@ -345,7 +345,7 @@ function trimmedDigitHelps(digits: string): Array<string> {
 		: []
 }
 
-// NOTE: `\u{128512}` — the code point read off a chart in DECIMAL and written
+// `\u{128512}` — the code point read off a chart in DECIMAL and written
 // into an escape that reads hexadecimal. It is worth answering for because the
 // mistake is invisible: every decimal digit is a hexadecimal digit too, so
 // nothing about the text looks wrong and the number they name is simply too
@@ -363,7 +363,7 @@ function trimmedDigitHelps(digits: string): Array<string> {
 // not someone copying a decimal off a chart. Above it, `\u{128512}` has no
 // reading as a boundary at all and the question is the only thing worth asking.
 //
-// NOTE: `isScalarValue` can not fire and stays as a belt: six digits is the
+// `isScalarValue` can not fire and stays as a belt: six digits is the
 // most this reads, the smallest of them above the top is `110000`, and its
 // decimal reading is 110,000 — past every surrogate and far below U+10FFFF. So
 // every decimal reading that reaches here already names a character. It is kept
@@ -392,7 +392,7 @@ function decimalReadingHelps(digits: string, value: number): Array<string> {
 		: []
 }
 
-// NOTE: One table lookup where a ladder of twenty string compares stood. A
+// One table lookup where a ladder of twenty string compares stood. A
 // Symbol is always one ASCII character, so it is indexed by that character's
 // code; the table doubles as the "is this a Symbol?" test, which is why there
 // is no separate predicate for it any more.
@@ -420,7 +420,7 @@ symbolTypes["_".charCodeAt(0)] = TokenType.SymbolUnderscore
 symbolTypes["#".charCodeAt(0)] = TokenType.SymbolHash
 symbolTypes["~".charCodeAt(0)] = TokenType.SymbolTilde
 
-// NOTE: The Keywords and the two Boolean Literals share one table, because
+// The Keywords and the two Boolean Literals share one table, because
 // what the Identifier scanner needs is one question — "is this word something
 // other than a name?" — and the two sets are disjoint. A word that is in
 // neither is an Identifier, which is what `undefined` says.
@@ -460,7 +460,7 @@ const wordTypes = new Map<string, lexer.TokenType>([
 	["false", TokenType.LiteralFalse],
 ])
 
-// NOTE: Guards the two tables above against a Keyword or Symbol that was added
+// Guards the two tables above against a Keyword or Symbol that was added
 // to the Arrays and forgotten here — the Lexer would silently read it as an
 // Identifier, which is the kind of thing that only shows up as a mystifying
 // parse error much later.
@@ -482,7 +482,7 @@ for (let symbol of symbols) {
 	}
 }
 
-// NOTE: The escape set every String Literal understands. A backslash before
+// The escape set every String Literal understands. A backslash before
 // anything else is an `invalid-escape` — reported, then read as the character
 // alone so the rest of the String still lexes. `\{` and `\}` are how a literal
 // brace is written now that a bare `{` opens an interpolation hole. `\u` is not
@@ -498,14 +498,14 @@ const stringEscapes: { [char: string]: string } = {
 	"}": "}",
 }
 
-// NOTE: The escape set spelled for a reader, in the order the Notes and the
+// The escape set spelled for a reader, in the order the Notes and the
 // documentation spell it. One constant, because the sentence is written into
 // three Diagnostics and getting a different list in two of them is exactly the
 // sort of drift a reader has no way to resolve.
 export const escapeSetSentence =
 	"'\\\"', '\\\\', '\\n', '\\r', '\\t', '\\{', '\\}' and '\\u{…}'"
 
-// NOTE: The highest Unicode scalar value, and the surrogate range that is not
+// The highest Unicode scalar value, and the surrogate range that is not
 // one. A lone surrogate is half of a UTF-16 pair and names no character on its
 // own, so `\u{D800}` is refused where `\u{1F600}` — the character that pair
 // stands for — is the escape to write instead.
@@ -522,38 +522,38 @@ type ChunkTerminator = "quote" | "hole" | "eof"
 
 export class Lexer {
 	protected data: string
-	// NOTE: Where the next character to read is, as an absolute offset. The
+	// Where the next character to read is, as an absolute offset. The
 	// Lexer used to re-slice the remaining source for every Token and thread
 	// the tail through every sub-lexer, which copied the rest of the file once
 	// per Token; nothing is sliced now but the text a Token actually holds.
 	protected index: number
-	// NOTE: The Cursor, carried as two mutable numbers rather than an object.
+	// The Cursor, carried as two mutable numbers rather than an object.
 	// It used to be re-allocated once per CHARACTER — twice, for the characters
 	// that were counted for a Token's start and its end — and only ever
 	// materialises now at the two ends of a Token that is really produced.
 	protected line: number
 	protected column: number
 	protected ignoreList: Set<string>
-	// NOTE: An interpolated String lexes into several Tokens at once — its head
+	// An interpolated String lexes into several Tokens at once — its head
 	// is returned, and its chunk and hole Tokens wait here to be handed out one
 	// per `next()` before any more input is read. Every other Token leaves this
 	// empty. `index`/`line`/`column` already sit past the whole String while
 	// these drain, so a queued Token advances neither.
 	protected pending: Array<Token>
-	// NOTE: How many queued Tokens have been handed out — `shift()` on every
+	// How many queued Tokens have been handed out — `shift()` on every
 	// `next()` would re-copy the queue each time.
 	protected pendingIndex: number
-	// NOTE: Collected rather than thrown — see `LexingError`. The caller reads
+	// Collected rather than thrown — see `LexingError`. The caller reads
 	// them once lexing is done; `reset` starts a new input with none.
 	public errors: Array<LexingError>
-	// NOTE: The String Literal that closed most recently, and nothing older.
+	// The String Literal that closed most recently, and nothing older.
 	// It is the one piece of evidence the unterminated-String report has about
 	// WHICH quote is the missing one — see `swallowedTheLinesBelow` — and each
 	// close overwrites it, so a plain one-line String standing between a
 	// multi-line String and an unterminated one clears the claim rather than
 	// letting it reach across.
 	//
-	// NOTE: Four numbers rather than the `ClosedString` they spell, because
+	// Four numbers rather than the `ClosedString` they spell, because
 	// every String in every file closes and only a file that FAILS ever asks.
 	// A pair of objects per closed String is an allocation on the Lexer's
 	// hottest path to answer a question almost nothing asks; the object is built
@@ -624,7 +624,7 @@ export class Lexer {
 		return { line: this.line, column: this.column }
 	}
 
-	// NOTE: The Token standing at `index`, or `undefined` at the end of the
+	// The Token standing at `index`, or `undefined` at the end of the
 	// input. Tokens an interpolated String produces beyond its head are
 	// appended to `extra` — the caller decides where they go, which is what
 	// lets a String inside an interpolation hole nest without a special case.
@@ -632,7 +632,7 @@ export class Lexer {
 		let data = this.data
 
 		while (true) {
-			// NOTE: A run of whitespace is skipped in a loop rather than by
+			// A run of whitespace is skipped in a loop rather than by
 			// recursing once per character, and never materialises a Token.
 			while (this.index < data.length) {
 				let code = data.charCodeAt(this.index)
@@ -650,7 +650,7 @@ export class Lexer {
 			}
 
 			let code = data.charCodeAt(this.index)
-			// NOTE: An ignored Token takes its own errors with it, exactly as
+			// An ignored Token takes its own errors with it, exactly as
 			// it did when its whole result was thrown away — a class nobody
 			// reads is a class nobody should be told about either. No ignorable
 			// Token produces one today; this keeps that from being a rule
@@ -658,7 +658,7 @@ export class Lexer {
 			let errorMark = this.errors.length
 			let token: Token
 
-			// NOTE: An ignored class is skipped without ever being built —
+			// An ignored class is skipped without ever being built —
 			// `Linebreak` and `Comment` are the whole of the parser's ignore
 			// list and together they are a large share of every file's Tokens.
 			if (code === linebreakCode) {
@@ -680,7 +680,7 @@ export class Lexer {
 			} else if (symbolTypes[code] !== undefined) {
 				token = this.lexSymbol(symbolTypes[code]!)
 			} else if (code === stringLiteralCode) {
-				// NOTE: A String's head Token can be an ignored type only
+				// A String's head Token can be an ignored type only
 				// never — the `Start`/`LiteralString` types are never on an
 				// ignore list — so the filter below does not apply to it, and
 				// its `extra` Tokens never need one either.
@@ -701,7 +701,7 @@ export class Lexer {
 		}
 	}
 
-	// NOTE: A Comment whose class is ignored is measured and stepped over
+	// A Comment whose class is ignored is measured and stepped over
 	// rather than built — but only once its type is known, because the second
 	// sigil is what makes it Documentation, and Documentation is on nobody's
 	// ignore list. Answers whether it was skipped.
@@ -723,7 +723,7 @@ export class Lexer {
 		return true
 	}
 
-	// NOTE: Where the Comment starting at `index` ends — at its line break,
+	// Where the Comment starting at `index` ends — at its line break,
 	// which is not part of it. A `\r` ends it too, so that a Comment on a
 	// Windows line ending does not carry one.
 	protected commentEnd(): number {
@@ -782,13 +782,13 @@ export class Lexer {
 		let end = this.commentEnd()
 		let value = this.data.slice(start, end)
 
-		// NOTE: A Comment holds no line break, so its whole span is columns.
+		// A Comment holds no line break, so its whole span is columns.
 		this.column += end - start
 		this.index = end
 
 		return {
 			value,
-			// NOTE: Doubling the sigil turns a private note into Documentation
+			// Doubling the sigil turns a private note into Documentation
 			// of whatever is declared below it. The distinction is made here
 			// rather than by a separate scanner because the two are lexed
 			// identically — only the Token type differs, and only the Parser
@@ -802,7 +802,7 @@ export class Lexer {
 		}
 	}
 
-	// NOTE: A Number Literal is digits and nothing else — Essence has no
+	// A Number Literal is digits and nothing else — Essence has no
 	// hexadecimal, binary or exponent form, so `0xFF`, `0b101` and `1e5` are all
 	// wrong. The letters are read into the Literal anyway, and reported as one
 	// malformed Number: stopping at the first letter instead would leave `FF`
@@ -811,7 +811,7 @@ export class Lexer {
 	// digits, so every later stage sees a well-formed Number and reports its own
 	// problems rather than failing on text no Number can hold.
 	//
-	// NOTE: The `.` of a decimal is a Token of its own and no business of this
+	// The `.` of a decimal is a Token of its own and no business of this
 	// scanner's. The Parser joins `0`, `.` and `75` into one Rational Literal
 	// where the three are written flush, exactly the way it joins `3`, `/` and
 	// `4` — so at this level a Number Literal really is digits and nothing else.
@@ -830,7 +830,7 @@ export class Lexer {
 			}
 
 			if ((characterClass & isDigit) === 0) {
-				// NOTE: A Number ENDS at a character another language writes an
+				// A Number ENDS at a character another language writes an
 				// operator with — `1+2` is two Numbers and a habit, not one
 				// malformed Number, and `total = 1;` is a Number with a `;`
 				// behind it. Neither ends a word for the Lexer, which has no
@@ -853,7 +853,7 @@ export class Lexer {
 			end++
 		}
 
-		// NOTE: No character of a Number is a line break — `endsWord` stops it
+		// No character of a Number is a line break — `endsWord` stops it
 		// at one — so its whole span is columns.
 		this.column += end - start
 		this.index = end
@@ -884,7 +884,7 @@ export class Lexer {
 		let startCursor = this.cursor()
 		let end = start
 
-		// NOTE: The Comment and String sigils end an Identifier exactly as a
+		// The Comment and String sigils end an Identifier exactly as a
 		// Symbol does — `name§ note` is a name and a Comment written flush
 		// against each other, not an Identifier called `name§`.
 		while (end < data.length) {
@@ -895,7 +895,7 @@ export class Lexer {
 			end++
 		}
 
-		// NOTE: As for a Number — an Identifier can hold no line break.
+		// As for a Number — an Identifier can hold no line break.
 		this.column += end - start
 		this.index = end
 
@@ -914,7 +914,7 @@ export class Lexer {
 
 	// #region Strings
 
-	// NOTE: A String that never closes takes everything found inside it with
+	// A String that never closes takes everything found inside it with
 	// it — the bad escapes, the Comments written in its holes, the Tokens its
 	// holes produced. It used to happen by itself, because all of that was
 	// gathered in locals that the throw unwound past; it is undone by hand now
@@ -936,7 +936,7 @@ export class Lexer {
 		}
 	}
 
-	// NOTE: A String Literal reads as one `LiteralString` Token when it holds
+	// A String Literal reads as one `LiteralString` Token when it holds
 	// no `{…}` hole. A hole makes it interpolated: the text before the first
 	// hole becomes a `LiteralStringStart` Token, each hole's own Tokens are
 	// lexed in place (by driving `lexToken`, so a nested String, Record or even
@@ -987,7 +987,7 @@ export class Lexer {
 			let depth = 0
 
 			while (true) {
-				// NOTE: A Comment has no place inside a hole — it would run to the
+				// A Comment has no place inside a hole — it would run to the
 				// end of the line and take the hole's `}` and the String's closing
 				// `"` with it. It is reported and read as ending at the first `}`
 				// (or the end of its line), so the String and everything after it
@@ -1003,7 +1003,7 @@ export class Lexer {
 					continue
 				}
 
-				// NOTE: Snapshotted BEFORE the Token is read, because the read
+				// Snapshotted BEFORE the Token is read, because the read
 				// walks over whatever whitespace stands in front of the end of
 				// the input and the report is about where the String ran out,
 				// not where the scan stopped.
@@ -1028,7 +1028,7 @@ export class Lexer {
 					depth--
 				}
 
-				// NOTE: A nested interpolated String appended its own tail to
+				// A nested interpolated String appended its own tail to
 				// `extra` while its head was still in hand, so the head is put
 				// back in front of it rather than after.
 				if (extra.length > extraStart) {
@@ -1067,7 +1067,7 @@ export class Lexer {
 		return head
 	}
 
-	// NOTE: Called with the String's opening Cursor the moment its closing quote
+	// Called with the String's opening Cursor the moment its closing quote
 	// has been consumed, so the Lexer's own Cursor stands just past that quote
 	// and the quote itself is the character in front of it. What is kept is the
 	// two Cursors, as four numbers; see `closedStringOpenedLine` for why.
@@ -1078,7 +1078,7 @@ export class Lexer {
 		this.closedStringClosedColumn = this.column - 1
 	}
 
-	// NOTE: Whitespace only — a line break inside a hole is a Token like any
+	// Whitespace only — a line break inside a hole is a Token like any
 	// other, and is left for `lexToken` (or for the ignore list) to decide on.
 	protected skipHoleWhitespace(): void {
 		let data = this.data
@@ -1119,13 +1119,13 @@ export class Lexer {
 		})
 	}
 
-	// NOTE: Reads one run of literal String text, decoding escapes into `value`,
+	// Reads one run of literal String text, decoding escapes into `value`,
 	// and stops at the character that ends the run: the closing `"` (`quote`), an
 	// unescaped `{` opening a hole (`hole`), or the end of the input (`eof`, which
 	// the caller turns into the fatal unterminated-String throw). The terminating
 	// character is consumed — `index` and the Cursor sit just past it.
 	//
-	// NOTE: The one place text is still built up a piece at a time, and only
+	// The one place text is still built up a piece at a time, and only
 	// where it has to be: an escape decodes to something other than what was
 	// written, so a run holding one can not be sliced out of the source whole.
 	// A run without escapes — which is nearly all of them — is one slice.
@@ -1160,7 +1160,7 @@ export class Lexer {
 			if (code === backslashCode) {
 				let escaped = data[index + 1]
 
-				// NOTE: A backslash with nothing after it is the input running
+				// A backslash with nothing after it is the input running
 				// out mid-String — let the loop fall through to the `eof`
 				// return, which the caller reports as an unterminated String.
 				if (escaped === undefined) {
@@ -1170,7 +1170,7 @@ export class Lexer {
 				decoded += data.slice(runStart, index)
 				hasEscape = true
 
-				// NOTE: The one escape that is longer than two characters, and
+				// The one escape that is longer than two characters, and
 				// the one the table above can not answer — read before the table
 				// is asked, and it reports whatever it has to report itself.
 				if (escaped === "u") {
@@ -1198,7 +1198,7 @@ export class Lexer {
 				let replacement = stringEscapes[escaped]
 
 				if (replacement === undefined) {
-					// NOTE: The character is the READER'S, and this message is
+					// The character is the READER'S, and this message is
 					// read on a terminal — a backslash before a BEL rang the
 					// bell of whoever ran the Compiler, and one before an
 					// override reordered the line it was written on. Where it
@@ -1247,7 +1247,7 @@ export class Lexer {
 		}
 	}
 
-	// NOTE: `\u{1F600}` — one to six hexadecimal digits in braces, naming ONE
+	// `\u{1F600}` — one to six hexadecimal digits in braces, naming ONE
 	// Unicode scalar value, decoded here into the character it names. It is read
 	// by hand rather than looked up in `stringEscapes` because it is the only
 	// escape whose spelling runs past two characters and because every part of
@@ -1255,13 +1255,13 @@ export class Lexer {
 	// something that is not a digit, hold too many of them, or hold a number
 	// that names no character.
 	//
-	// NOTE: A refused escape contributes NO character. There is none it could
+	// A refused escape contributes NO character. There is none it could
 	// contribute — it named none — and the two other readings are worse: the
 	// digits kept as text would put `1B` into a value whose author wrote an
 	// escape, and a replacement character would put one there that nothing in
 	// the file asked for.
 	//
-	// NOTE: WHERE THE SCAN STOPS is the whole of the recovery. Looking for the
+	// WHERE THE SCAN STOPS is the whole of the recovery. Looking for the
 	// closing brace, it stops at the characters that end the reading of the
 	// literal itself — the closing quote, the backslash that opens the next
 	// escape, a line break, and the `{` that opens a hole — and it does not
@@ -1382,7 +1382,7 @@ export class Lexer {
 		}
 
 		if (value >= firstSurrogate && value <= lastSurrogate) {
-			// NOTE: A high half with its low half directly behind it is ONE
+			// A high half with its low half directly behind it is ONE
 			// mistake and is refused as one: the report spans both escapes, the
 			// reading resumes past both, and the Help — which the Quick Fix
 			// applies to the span it underlines — rewrites the whole of what it
@@ -1429,7 +1429,7 @@ export class Lexer {
 		}
 	}
 
-	// NOTE: `\u001B` and `\u1B` — the JavaScript and JSON habit, which writes the
+	// `\u001B` and `\u1B` — the JavaScript and JSON habit, which writes the
 	// digits with no braces around them. It is a habit rather than a slip, so it
 	// is answered the way the rest of them are (`helpers/foreign.ts`): with the
 	// Essence spelling of the very character the reader wrote.
@@ -1512,7 +1512,7 @@ export class Lexer {
 		)
 	}
 
-	// NOTE: The second half of a surrogate pair standing DIRECTLY behind the
+	// The second half of a surrogate pair standing DIRECTLY behind the
 	// first, in either spelling: `\uDE00`, which is how JavaScript writes one,
 	// and `\u{DE00}`, which is how a reader who has been told the rule once
 	// writes the same mistake out the long way. Both are read here because the
@@ -1570,7 +1570,7 @@ export class Lexer {
 			: null
 	}
 
-	// NOTE: `\u{1B` — the escape was opened and the reading ran into something
+	// `\u{1B` — the escape was opened and the reading ran into something
 	// that ends the literal. The span covers what was read and stops short of
 	// that character, which is what leaves the closing quote and any hole below
 	// it to be read as themselves.
@@ -1605,7 +1605,7 @@ export class Lexer {
 		)
 	}
 
-	// NOTE: One refusal of a `\u{…}` — four codes and six shapes, but one SPAN
+	// One refusal of a `\u{…}` — four codes and six shapes, but one SPAN
 	// and one recovery: the report covers the escape exactly as far as it was
 	// read, the reading resumes at `end`, and the String is given no character.
 	// Every one of them sits on a single line, because a line break is one of the
@@ -1642,7 +1642,7 @@ export class Lexer {
 		)
 	}
 
-	// NOTE: WHICH quote is the missing one. A String Literal in Essence may span
+	// WHICH quote is the missing one. A String Literal in Essence may span
 	// lines and the line breaks are part of it, so a String opened on line 2 and
 	// closed on line 3 is a String the language has, and the one the input ended
 	// inside of is — strictly — the one that was left open. Strictly is not

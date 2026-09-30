@@ -4,7 +4,7 @@ import { report } from "../diagnostics/index"
 import { parseTestBody } from "../parser/descent/parse"
 import { documentationPrefix } from "../parser/documentation"
 
-// NOTE: `@example` blocks, turned into the tests they are. What is written
+// `@example` blocks, turned into the tests they are. What is written
 // under the tag is Essence compiled in the FILE's own scope and reported under
 // a synthetic suite called `examples`, named after the Method or the Function
 // the block documents — so an example that drifts from the code it documents
@@ -17,7 +17,7 @@ import { documentationPrefix } from "../parser/documentation"
 // about an example underlines the `§§` line it was written on, and a failed
 // `expect` inside one is reported there.
 
-// NOTE: A found example, and what to call the test it becomes. The name is the
+// A found example, and what to call the test it becomes. The name is the
 // Method's full spelling — `Standings::pointsPerGame` — because that is what a
 // reader searching a report will look for, and because two Namespaces may
 // perfectly well declare a Method of one name.
@@ -26,7 +26,7 @@ type FoundExample = {
 	example: common.DocumentationExample
 }
 
-// NOTE: Whether a file's documentation promises anything a run has to keep.
+// Whether a file's documentation promises anything a run has to keep.
 // It is asked before a compile — by `essence test`'s own discovery, which has to
 // decide whether a file with no `tests { … }` block is a file with tests.
 export function hasDocumentationExamples(program: parser.Program): boolean {
@@ -51,7 +51,7 @@ export function exampleTestsOf(
 	let counts = new Map<string, number>()
 
 	return found.flatMap((entry) => {
-		// NOTE: A Method documenting itself twice gets two tests, numbered.
+		// A Method documenting itself twice gets two tests, numbered.
 		// Their identities differ by the name, which is what everything durable
 		// is keyed by — so the second example of a Method may not silently be
 		// the first one's twin.
@@ -71,7 +71,7 @@ export function exampleTestsOf(
 	})
 }
 
-// NOTE: The synthetic `suite "examples" { … }` the tests are reported under. It
+// The synthetic `suite "examples" { … }` the tests are reported under. It
 // is written here rather than in the Parser because no source wrote it: a
 // reader who asks for a file's tests is shown the ones they wrote and, beside
 // them, the ones their documentation promises.
@@ -96,7 +96,7 @@ function exampleTest(
 ): parser.TestNode | null {
 	let { body, diagnostics } = parseTestBody(sourceOf(entry.example, lines))
 
-	// NOTE: A Diagnostic the example's own parse produced is reported into
+	// A Diagnostic the example's own parse produced is reported into
 	// whatever collection this compile opened — the parse ran in one of its
 	// own, because a collection is module state and the enrichment is already
 	// inside one.
@@ -123,7 +123,7 @@ function exampleTest(
 	}
 }
 
-// NOTE: The text the example is parsed out of: the file, with every line the
+// The text the example is parsed out of: the file, with every line the
 // example does not stand on replaced by an empty one, and every line it does
 // stand on holding its own content at its own column. Nothing is offset
 // afterwards, because nothing moved.
@@ -144,7 +144,7 @@ function sourceOf(
 	return padded.join("\n")
 }
 
-// NOTE: The same rule `parseDocumentation` reads a line by — the sigil, and one
+// The same rule `parseDocumentation` reads a line by — the sigil, and one
 // space after it if there is one. It is spelled again rather than shared
 // because what this needs is the LENGTH it removed, which is what says at which
 // column the code begins.
@@ -156,7 +156,7 @@ function stripPrefix(line: string): string {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// NOTE: Every `@example` a Program's own declarations carry, in written order,
+// Every `@example` a Program's own declarations carry, in written order,
 // paired with what to call it. A Namespace's Methods are spelled
 // `Namespace::member` whether they are static or not: that is the Method's own
 // spelling, it is unambiguous, and it is what the coverage report already says.
@@ -214,7 +214,7 @@ function findExamples(program: parser.Program): Array<FoundExample> {
 					add(name, method.signature.documentation)
 					break
 				default:
-					// NOTE: An `overload` block documents itself once, above
+					// An `overload` block documents itself once, above
 					// the block, and each entry may document itself as well.
 					add(name, method.documentation)
 

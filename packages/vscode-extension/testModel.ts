@@ -1,17 +1,17 @@
-// NOTE: Everything the Test Explorer knows, as plain data. Nothing here imports
+// Everything the Test Explorer knows, as plain data. Nothing here imports
 // `vscode`: what an `essence/testRun` batch MEANS — which tests exist, what each
 // of them last did, what to draw beside which line — is a function of the
 // payload, and a function of the payload can be tested without an extension
 // host. `testView.js` is the half that talks to VS Code, and it is deliberately
 // thin.
 //
-// NOTE: This is the one TypeScript file of the extension, and the split is the
+// This is the one TypeScript file of the extension, and the split is the
 // reason: `extension.js`, `launch.js` and `testView.js` all reach for `vscode`,
 // whose types this package does not depend on, while everything below is a
 // function of its arguments. What the Types buy is the protocol written down —
 // a client reading a wire format has no other place to say what it expects.
 //
-// NOTE: The Compiler's own fold (`@essence-lang/compiler/testing`) does the same
+// The Compiler's own fold (`@essence-lang/compiler/testing`) does the same
 // reading, and this is not it. The extension bundles into one file with no
 // `node_modules` beside it, and pulling the Compiler in to read seven event
 // kinds would ship a compiler inside an editor plugin. What this file is, is the
@@ -19,7 +19,7 @@
 
 import path from "node:path"
 
-// NOTE: The payload shape this client understands. A notification carrying any
+// The payload shape this client understands. A notification carrying any
 // other version is IGNORED — that is the protocol's own rule, and guessing at a
 // shape nobody wrote down is how a Test Explorer comes to show yesterday's
 // answers with today's confidence.
@@ -27,7 +27,7 @@ export const TEST_RUN_VERSION = 3
 
 // #region What arrives on the wire
 
-// NOTE: Positions are the Compiler's throughout: 1-based line, 1-based column.
+// Positions are the Compiler's throughout: 1-based line, 1-based column.
 // `testView.js` converts to VS Code's 0-based pair at the last moment, and
 // nothing below ever does.
 export type Cursor = { line: number; column: number }
@@ -38,7 +38,7 @@ export type TracedValue = { point: number; span: Span | null; value: string }
 export type DiffLine = { kind: "same" | "left" | "right"; text: string }
 
 export type Comparison = {
-	// NOTE: The three the runtime writes. A snapshot is a comparison like the
+	// The three the runtime writes. A snapshot is a comparison like the
 	// other two and explains itself unlike either: what it holds is a
 	// recording and what this run held.
 	kind: "is" | "isNot" | "snapshot"
@@ -56,7 +56,7 @@ export type Failure = {
 
 export type OutputChunk = { stream: string; text: string }
 
-// NOTE: What this client reads off an event, whatever kind the event is. The
+// What this client reads off an event, whatever kind the event is. The
 // stream is versioned separately from the payload — `schema` is its own — so a
 // batch may carry a kind this extension has never heard of, and every field
 // below a kind does not have is simply absent. What a batch does NOT carry is
@@ -69,7 +69,7 @@ export type TestEvent = {
 	name?: string
 	suitePath?: Array<string>
 	module?: string | null
-	// NOTE: Which row of a table test the event is about, and null for a test
+	// Which row of a table test the event is about, and null for a test
 	// that is not one. `TestSite` carries the same fact off the manifest.
 	row?: number | null
 	duration?: number
@@ -86,16 +86,16 @@ export type TestEvent = {
 	counterexample?: Array<PropertyCounterexample> | null
 }
 
-// NOTE: One test as the Compiler found it, independently of what running it
+// One test as the Compiler found it, independently of what running it
 // said — the half of a run that draws a TREE. It comes off the compiled
 // Module's own manifest, so a test a filter left out is here too, on the line
 // it was written on.
 export type TestSite = {
 	id: string
-	// NOTE: The name TEMPLATE. What a run reports is the RENDERING, which only
+	// The name TEMPLATE. What a run reports is the RENDERING, which only
 	// differs where the name interpolates.
 	name: string
-	// NOTE: Which row of a table test this is, and null for the ordinary test.
+	// Which row of a table test this is, and null for the ordinary test.
 	// `suitePath` already ends in the template the rows share, so this is only
 	// what labels a row before anything has run and worked its name out.
 	row?: number | null
@@ -103,11 +103,11 @@ export type TestSite = {
 	file: string
 	range: Range
 	keywordRange: Range
-	// NOTE: The EFFECTIVE tags — the test's own and every enclosing suite's.
+	// The EFFECTIVE tags — the test's own and every enclosing suite's.
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
-	// NOTE: Whether the item was written as a `benchmark` rather than as a
+	// Whether the item was written as a `benchmark` rather than as a
 	// `test`. The session runs without `--bench`, so one arrives deselected for
 	// the reason `bench`; this is the fact about the ITEM, which is what an
 	// Explorer draws it by. Optional, because a Server built before it existed
@@ -115,7 +115,7 @@ export type TestSite = {
 	benchmark?: boolean
 }
 
-// NOTE: What the run's counters counted, one point at a time — where it stands,
+// What the run's counters counted, one point at a time — where it stands,
 // what kind of thing it counts, what to call it and how often control reached
 // it. `scope` is the Method or Function it was written in, which is what makes
 // a "never taken" line readable without opening the file.
@@ -124,10 +124,10 @@ export type CoveragePoint = {
 	label: string
 	scope: string
 	position: Range
-	// NOTE: A branch whose condition ESTABLISHED something — the guard in front
+	// A branch whose condition ESTABLISHED something — the guard in front
 	// of a division. Both sides of one are worth looking at separately.
 	refinement: boolean
-	// NOTE: `Choice#Case` on a construction point, null on every other kind.
+	// `Choice#Case` on a construction point, null on every other kind.
 	tag: string | null
 	count: number
 }
@@ -142,7 +142,7 @@ export type MissedPoint = {
 	position: Range
 }
 
-// NOTE: One SOURCE file's coverage, which is not the file the tests are in: a
+// One SOURCE file's coverage, which is not the file the tests are in: a
 // `Foo.tests.es` runs the tests, and what its counters counted is mostly
 // `Foo.es`.
 export type FileCoverage = {
@@ -154,7 +154,7 @@ export type FileCoverage = {
 	points: Array<CoveragePoint>
 }
 
-// NOTE: A declared Choice and which of its Cases anything built. It is answered
+// A declared Choice and which of its Cases anything built. It is answered
 // across the whole run rather than per file — a Choice is declared in one
 // Module and constructed in any — which is why the Server sends the merged
 // picture rather than the cycle.
@@ -170,7 +170,7 @@ export type CoverageSummary = {
 	choices: Array<ChoiceCoverage>
 }
 
-// NOTE: `essence/testRun`, as a client must be able to READ it rather than as
+// `essence/testRun`, as a client must be able to READ it rather than as
 // the Server declares it: `version` is a number here, because the number a
 // client refuses is exactly the one it was not built for.
 export type TestRunNotification = {
@@ -190,7 +190,7 @@ export type TestRunNotification = {
 	}
 	duration: number
 	compiled: boolean
-	// NOTE: `files` is what THIS CYCLE counted and is laid over what the client
+	// `files` is what THIS CYCLE counted and is laid over what the client
 	// holds, keyed by module; `choices` is the session's whole answer and
 	// replaces what it holds. Optional because a client reads the wire, and a
 	// Server that never turns coverage on never writes the field.
@@ -201,7 +201,7 @@ export type TestRunNotification = {
 
 // #region Identity
 
-// NOTE: The same escaping the Compiler spells a structural id with, so that the
+// The same escaping the Compiler spells a structural id with, so that the
 // id of a suite is exactly the prefix every id under it starts with. A client
 // never invents an identity — a test's is handed to it — but a SUITE has none
 // of its own, because a suite is not a thing the runner selects.
@@ -242,7 +242,7 @@ export type TestRecord = {
 	failures: Array<Failure>
 	error: string | null
 	output: Array<OutputChunk>
-	// NOTE: What a property test's run of cases did, and null for every other
+	// What a property test's run of cases did, and null for every other
 	// test. It is what turns "this failed" into "this failed for THESE values"
 	// — the values a property failed on are made up by the runner, so nothing
 	// in the source says what they were.
@@ -253,7 +253,7 @@ export type PropertyCounterexample = { name: string; value: string }
 
 export type PropertyRecord = {
 	cases: number
-	// NOTE: How many cases the run was TOLD to run, which a replay has to say
+	// How many cases the run was TOLD to run, which a replay has to say
 	// back — the size a case is drawn at grows over the whole run.
 	requested: number
 	seed: string
@@ -278,17 +278,17 @@ function emptyRecord(id: string, name: string): TestRecord {
 	}
 }
 
-// NOTE: The event stream folded back into one record per test, in the order the
+// The event stream folded back into one record per test, in the order the
 // tests started. Unknown event kinds are skipped rather than refused — the
 // stream is versioned separately from the payload, and a `coverage` event this
 // extension has never heard of must not cost it the batch.
 //
-// NOTE: `probe` events are deliberately dropped. The values a run recorded are
+// `probe` events are deliberately dropped. The values a run recorded are
 // drawn by the Server, as inlay hints, at the end of the line that produced
 // them; a decoration of our own on the same line would be a second answer to one
 // question — see `README.md`.
 //
-// NOTE: So are `benchmark` events, for now. A session runs without `--bench`,
+// So are `benchmark` events, for now. A session runs without `--bench`,
 // so the only one that ever arrives is a benchmark somebody asked to run by id
 // — and what the run says about it, pass or fail, already reaches an Explorer
 // through the ordinary pair of events. Drawing the measurement beside it is
@@ -307,7 +307,7 @@ export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 			byId.set(event.id, existing)
 		}
 
-		// NOTE: The name falls back to the one already held rather than to
+		// The name falls back to the one already held rather than to
 		// nothing: a `test-start` carries it, and the kinds that end a test
 		// carry it again only because the stream is readable on its own.
 		Object.assign(
@@ -378,7 +378,7 @@ export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 			}
 			case "output":
 				byId.get(event.id)?.output.push({
-					// NOTE: `output` or `error`, which is what the runtime
+					// `output` or `error`, which is what the runtime
 					// names the two streams a test's `Terminal` writes to.
 					stream: event.stream ?? "output",
 					text: event.text ?? "",
@@ -399,7 +399,7 @@ export function foldEvents(events: Array<TestEvent>): Array<TestRecord> {
 export type FileState = {
 	sites: Array<TestSite>
 	records: Map<string, TestRecord>
-	// NOTE: Whether what is held for this file is what the buffer would produce,
+	// Whether what is held for this file is what the buffer would produce,
 	// or the last thing that ran before it stopped compiling.
 	stale: boolean
 	duration: number
@@ -407,7 +407,7 @@ export type FileState = {
 
 export type ClientState = {
 	files: Map<string, FileState>
-	// NOTE: Coverage is held APART from the per-file test results, because
+	// Coverage is held APART from the per-file test results, because
 	// those are two different sets: one cycle runs `Foo.tests.es` and counts
 	// `Foo.es`. The files a batch carries are laid over what is here, keyed by
 	// module — a cycle covers what a change reached and says nothing about the
@@ -455,17 +455,17 @@ function groupBy<Item>(
 export type AppliedBatch = {
 	kind: "start" | "end"
 	files: Array<string>
-	// NOTE: The files whose tree or results this batch actually moved, which is
+	// The files whose tree or results this batch actually moved, which is
 	// what a view redraws. A batch that found nothing for a file it could not
 	// compile moves nothing.
 	changed: Array<string>
-	// NOTE: The SOURCE files this batch has coverage for, which is a different
+	// The SOURCE files this batch has coverage for, which is a different
 	// list from `changed` for the reason `ClientState.coverage` is held apart.
 	// Empty where the session was not asked for coverage.
 	covered: Array<string>
 }
 
-// NOTE: One batch applied to what the client holds, answering which files it
+// One batch applied to what the client holds, answering which files it
 // changed. Three rules, and the second and third are the whole reason this is a
 // function rather than an assignment:
 //
@@ -497,7 +497,7 @@ export function applyBatch(
 	let sitesByFile = groupBy(notification.sites ?? [], (site) => site.file)
 	let records = foldEvents(notification.events ?? [])
 	let only = notification.files.length === 1 ? notification.files[0] : null
-	// NOTE: A record belongs to the file its test was WRITTEN in, which is what
+	// A record belongs to the file its test was WRITTEN in, which is what
 	// the events carry as `module`. The fallback is for a batch over exactly one
 	// file, where a Module that never named itself can only be that one.
 	let recordsByFile = groupBy(records, (each) => each.module ?? only)
@@ -538,7 +538,7 @@ export function applyBatch(
 	let covered: Array<string> = []
 
 	if (notification.coverage !== undefined) {
-		// NOTE: A cycle that ran everything is the whole answer, and what it
+		// A cycle that ran everything is the whole answer, and what it
 		// carries replaces what is held rather than being laid over it. The
 		// Server runs everything when a setting changes, and throws its own
 		// coverage away first — so a `settings` cycle carrying no files is the
@@ -566,13 +566,13 @@ export function applyBatch(
 	return { kind: "end", files: [...notification.files], changed, covered }
 }
 
-// NOTE: The two reasons a cycle covers every test file the workspace holds —
+// The two reasons a cycle covers every test file the workspace holds —
 // the first run of a session, and the run after a setting changed.
 function wholeRun(notification: TestRunNotification): boolean {
 	return notification.reason === "open" || notification.reason === "settings"
 }
 
-// NOTE: A file the workspace no longer holds tests for. The session stops
+// A file the workspace no longer holds tests for. The session stops
 // reporting on it rather than reporting that it is empty, so the client has to
 // be told separately — by the file being deleted, or by a batch that covered it
 // and found nothing.
@@ -589,7 +589,7 @@ export function forgetFile(state: ClientState, file: string): boolean {
 
 // #region The tree
 
-// NOTE: One node type rather than two, with `kind` saying which half of it means
+// One node type rather than two, with `kind` saying which half of it means
 // anything: a suite has children and no site, a test has a site and no children.
 // It is the shape VS Code's own TestItem has, which is what this is mapped onto,
 // and a reader walking the tree never has to ask which of two Types it is
@@ -606,7 +606,7 @@ export type TreeNode = {
 	state: TestState | "unknown"
 }
 
-// NOTE: A file's tests as a tree of suites, in the order they were written. A
+// A file's tests as a tree of suites, in the order they were written. A
 // suite stands where its FIRST test stands, which is where it was written: the
 // manifest lists tests in source order, and a suite is the path they share.
 function labelOf(site: TestSite): string {
@@ -661,7 +661,7 @@ export function treeOf(state: ClientState, file: string): Array<TreeNode> {
 		container(site.suitePath).push({
 			kind: "test",
 			id: site.id,
-			// NOTE: The rendering a run reported, and the template where
+			// The rendering a run reported, and the template where
 			// nothing has run — which is the only name an interpolated test
 			// that was never selected has. A row of a table test stands under
 			// that template already, so what it falls back to is its number.
@@ -678,7 +678,7 @@ export function treeOf(state: ClientState, file: string): Array<TreeNode> {
 	return roots
 }
 
-// NOTE: Every tag any test of the workspace carries, sorted. What it is for is
+// Every tag any test of the workspace carries, sorted. What it is for is
 // one run profile per tag — a tag nothing carries any more must stop offering
 // one, which is why this is recomputed rather than accumulated.
 export function tagsOf(state: ClientState): Array<string> {
@@ -695,7 +695,7 @@ export function tagsOf(state: ClientState): Array<string> {
 	return [...tags].sort()
 }
 
-// NOTE: What "re-run failed" runs. Ids rather than files, because a file with
+// What "re-run failed" runs. Ids rather than files, because a file with
 // one failure in forty is a file where re-running the forty is not what was
 // asked for.
 export function failedIdsOf(state: ClientState): Array<string> {
@@ -716,7 +716,7 @@ export function failedIdsOf(state: ClientState): Array<string> {
 
 // #region What a failure says
 
-// NOTE: A traced value that explains nothing: one whose rendering IS its own
+// A traced value that explains nothing: one whose rendering IS its own
 // source (a literal), and the assertion's own answer, which "this failed" has
 // already said. Both would be a line the reader has to look past. The terminal
 // report drops exactly these, for exactly this reason.
@@ -753,17 +753,17 @@ function diffLines(diff: Array<DiffLine>): Array<string> {
 
 export type Message = {
 	text: string
-	// NOTE: Filled in for `is` and for a snapshot, the two comparisons that
+	// Filled in for `is` and for a snapshot, the two comparisons that
 	// HAVE an expectation — what it was compared with, and what was recorded.
 	// VS Code draws the pair as a diff. `isNot` never makes such a claim.
 	expected: string | null
 	actual: string | null
-	// NOTE: Where to say it. Null for a body that threw, which happened to the
+	// Where to say it. Null for a body that threw, which happened to the
 	// test rather than at a Position.
 	range: Range | null
 }
 
-// NOTE: One failed assertion, said the way the terminal says it: the assertion
+// One failed assertion, said the way the terminal says it: the assertion
 // itself, then every sub-expression the lowering recorded, then what the
 // comparison held. `expected`/`actual` are filled in for `is` and for a
 // snapshot — VS Code draws those two as a diff, and "expected" is a claim
@@ -772,7 +772,7 @@ export function messagesOf(
 	record: Pick<TestRecord, "failures" | "error" | "property">,
 ): Array<Message> {
 	let messages: Array<Message> = []
-	// NOTE: What a property test failed FOR, said once above each assertion:
+	// What a property test failed FOR, said once above each assertion:
 	// every assertion of a property test failed for the same generated values,
 	// and nothing in the source says what they were.
 	let counterexample = counterexampleOf(record.property)
@@ -796,7 +796,7 @@ export function messagesOf(
 		let expected = null
 		let actual = null
 
-		// NOTE: A snapshot is not an equality that failed: what it holds is a
+		// A snapshot is not an equality that failed: what it holds is a
 		// recording and what this run held, and the difference between them is
 		// the whole explanation however short it is. It is also the one failure
 		// that IS a text diff, which is what VS Code draws `expected`/`actual`
@@ -825,7 +825,7 @@ export function messagesOf(
 				`\`${comparison.kind}\` compared ${comparison.left} with ${comparison.right}`,
 			)
 
-			// NOTE: Only a walk INTO a Record or a List says something the line
+			// Only a walk INTO a Record or a List says something the line
 			// above has not already said in full.
 			if (comparison.diff.length > 2) {
 				lines.push(
@@ -849,7 +849,7 @@ export function messagesOf(
 		})
 	}
 
-	// NOTE: A test body that THREW is a Compiler or a runtime bug rather than a
+	// A test body that THREW is a Compiler or a runtime bug rather than a
 	// failed assertion, and it has no span of its own — it is reported against
 	// the test itself.
 	if (record.error !== null) {
@@ -864,7 +864,7 @@ export function messagesOf(
 	return messages
 }
 
-// NOTE: The values a property test failed on, and how to draw them again — the
+// The values a property test failed on, and how to draw them again — the
 // same two lines the terminal's report carries, because a reader who has one
 // open should not have to learn the other.
 function counterexampleOf(property: PropertyRecord | null): Array<string> {
@@ -888,7 +888,7 @@ function counterexampleOf(property: PropertyRecord | null): Array<string> {
 	]
 }
 
-// NOTE: Everything a test's captured output said, as one block. `Terminal.print`
+// Everything a test's captured output said, as one block. `Terminal.print`
 // inside a test is held per test rather than interleaved with the run, which is
 // what makes it worth showing at all.
 export function outputOf(record: Pick<TestRecord, "output">): string {
@@ -910,13 +910,13 @@ export type Marks = {
 	expects: Array<ExpectMark>
 }
 
-// NOTE: The lines to mark, by what the test they belong to last did. It is the
+// The lines to mark, by what the test they belong to last did. It is the
 // whole of the test — `site.range` spans `test "…" { … }` — rather than the
 // keyword's line alone, because VS Code's own Testing gutter already owns that
 // one line, and a second icon on it would say the same thing twice. What it does
 // not draw is the BODY, which is what a reader is looking at.
 //
-// NOTE: A failed `expect` is marked on its own line as well, in its own colour.
+// A failed `expect` is marked on its own line as well, in its own colour.
 // The test's mark says the test failed; this one says WHERE, which the test's
 // mark could not, and which the Problems panel says in a different window.
 export function decorationsOf(state: ClientState, file: string): Marks {
@@ -966,7 +966,7 @@ export function decorationsOf(state: ClientState, file: string): Marks {
 				marks.notFocused.push(lines)
 				break
 			default:
-				// NOTE: A test a tag or a filter left out is not marked at all.
+				// A test a tag or a filter left out is not marked at all.
 				// It did not fail, it was not skipped by anything the source
 				// says, and colouring the lines of a test nobody selected is
 				// colour that answers no question.
@@ -981,17 +981,17 @@ export function decorationsOf(state: ClientState, file: string): Marks {
 
 // #region What the coverage view draws
 
-// NOTE: One line, and how often it ran. A line may carry several Statements —
+// One line, and how often it ran. A line may carry several Statements —
 // the greatest of their counts is how often the LINE ran, which is what a
 // coverage view draws beside it.
 export type CoverageLine = {
 	line: number
 	count: number
-	// NOTE: The branches standing on this line, each named as it was written:
+	// The branches standing on this line, each named as it was written:
 	// `if`, `else`, `case #Postponed`. VS Code draws them as the branch detail
 	// of the statement they are on.
 	branches: Array<CoverageBranch>
-	// NOTE: What stands on this line and never ran. Empty on a line that ran
+	// What stands on this line and never ran. Empty on a line that ran
 	// whole; on a line that ran at all it is the difference between covered
 	// and PARTLY covered — a one-line `if` whose `else` nothing took, an `if`
 	// with no `else` whose condition was never false, an arm nothing reached.
@@ -1005,7 +1005,7 @@ export type CoverageMiss = {
 	label: string
 }
 
-// NOTE: A thing that either RAN or did not, named — a Match arm, a Choice Case.
+// A thing that either RAN or did not, named — a Match arm, a Choice Case.
 // It is what VS Code calls a declaration, which is the right shape for it: an
 // arm and a Case are things the source declares, they are counted one by one,
 // and an exhaustive language can say which of them nothing reached without
@@ -1044,7 +1044,7 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 		let line = point.position.start.line
 		let entry = lineAt(line)
 
-		// NOTE: A branch and an arm count towards their line exactly as a
+		// A branch and an arm count towards their line exactly as a
 		// Statement does — they are places control arrives — and the same rule
 		// is what the ratios beside them were counted under.
 		entry.count = Math.max(entry.count, point.count)
@@ -1065,7 +1065,7 @@ export function coverageLinesOf(file: FileCoverage): Array<CoverageLine> {
 	return [...lines.values()].sort((left, right) => left.line - right.line)
 }
 
-// NOTE: What the gutter draws beside a counted file — the three answers a line
+// What the gutter draws beside a counted file — the three answers a line
 // can give, in the same shape the test marks answer in, so a caller draws both
 // the same way. A line ran or it did not; and a line that ran may still hold
 // something that never did — a one-line `if` whose `else` nothing took, an arm
@@ -1100,7 +1100,7 @@ export function coverageMarksOf(file: FileCoverage): CoverageMarks {
 	}
 }
 
-// NOTE: Adjacent lines merged into ranges, which is what makes a run of
+// Adjacent lines merged into ranges, which is what makes a run of
 // never-executed lines one thing to read rather than nine. The lines arrive
 // sorted, which `coverageLinesOf` sees to.
 function runsOf(lines: Array<number>): Array<LineRange> {
@@ -1121,7 +1121,7 @@ function runsOf(lines: Array<number>): Array<LineRange> {
 	return ranges
 }
 
-// NOTE: Every Match arm of one file, and every Case of every Choice DECLARED in
+// Every Match arm of one file, and every Case of every Choice DECLARED in
 // it — which is why the whole state is read rather than the file's own entry: a
 // Choice's Cases are counted wherever they are built, and what is declared is
 // known only where it was written.
@@ -1161,7 +1161,7 @@ export function declarationsOf(
 	return declarations
 }
 
-// NOTE: `Fixture#Forfeited` is how a tag is spelled where it is compared;
+// `Fixture#Forfeited` is how a tag is spelled where it is compared;
 // `#Forfeited` is how a Case is written.
 function caseNameOf(tag: string): string {
 	let hash = tag.lastIndexOf("#")
@@ -1169,7 +1169,7 @@ function caseNameOf(tag: string): string {
 	return hash === -1 ? `#${tag}` : `#${tag.slice(hash + 1)}`
 }
 
-// NOTE: The one line the output channel writes about a cycle's coverage — the
+// The one line the output channel writes about a cycle's coverage — the
 // two percentages and the count of what an exhaustive language can say and a
 // line counter can not.
 export function describeCoverage(coverage: CoverageSummary): string {
@@ -1185,7 +1185,7 @@ export function describeCoverage(coverage: CoverageSummary): string {
 			}),
 			{ covered: 0, total: 0 },
 		)
-	// NOTE: Rounded DOWN, exactly as the Compiler's own `percentageOf` is, so
+	// Rounded DOWN, exactly as the Compiler's own `percentageOf` is, so
 	// that 100% means every one of them: 199 of 200 rounded up would say a file
 	// with a missed branch is complete.
 	let percentage = (ratio: CoverageRatio): string =>
@@ -1211,12 +1211,12 @@ export function describeCoverage(coverage: CoverageSummary): string {
 
 // #region What to debug
 
-// NOTE: The launch configurations that step through exactly this selection.
+// The launch configurations that step through exactly this selection.
 // A debug session compiles ONE file — the bundle it steps through is that
 // file's — so a selection reaching several of them is several sessions, in the
 // order the files were first named, each carrying the ids of its own tests.
 //
-// NOTE: The ids rather than the labels. Two tests may render one name and never
+// The ids rather than the labels. Two tests may render one name and never
 // share an id, and the id is what the adapter narrows the registry by; the
 // label is only ever what the session is CALLED in the debug pane.
 export type DebugConfiguration = {
@@ -1249,7 +1249,7 @@ export function debugConfigurationsFor(
 	return [...byFile.entries()].map(([file, held]) => ({
 		type: "essence" as const,
 		request: "launch" as const,
-		// NOTE: The one test's own name where it is one, because that is what
+		// The one test's own name where it is one, because that is what
 		// the reader pressed Debug on and what the debug pane then says they
 		// are in.
 		name:
@@ -1263,7 +1263,7 @@ export function debugConfigurationsFor(
 
 // #region The counts a run reports
 
-// NOTE: One line for the output channel: what the cycle covered and what it
+// One line for the output channel: what the cycle covered and what it
 // found. The channel is the session's own story — which files, how long, what
 // would not compile — rather than a second copy of the results.
 export function describeBatch(notification: TestRunNotification): string {

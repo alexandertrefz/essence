@@ -293,7 +293,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 
 	let kindColor = reportKindColor(report.kind, config)
 
-	// NOTE: The code gets a line of its own above the header, in the same
+	// The code gets a line of its own above the header, in the same
 	// color as `Note` and `Help`, rather than sharing the kind's line and
 	// color as upstream does. It is a lookup key rather than part of the
 	// sentence, and on the header line it competes with the word that says
@@ -309,7 +309,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 	let groups = getSourceGroups(report, cache)
 
 	// Line number maximum width
-	// NOTE: The margin prints its numbers with the source's display offset
+	// The margin prints its numbers with the source's display offset
 	// applied — the same offset the header location carries — so the width has
 	// to be measured on the offset numbers too.
 	let lineNumberWidth = groups.reduce((maximum, group) => {
@@ -325,7 +325,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 	const marginCharacter = (character: string): string =>
 		paint(character, config.marginColor())
 
-	// NOTE: `displayLineOffset` shifts the printed number exactly as it shifts
+	// `displayLineOffset` shifts the printed number exactly as it shifts
 	// the header location — one report never shows two accounts of the same
 	// line. Upstream applies the offset only to the header, which leaves the
 	// gutter contradicting it; that is a bug in the feature, not a behaviour
@@ -804,7 +804,7 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 									label.label.showLines,
 						)
 
-					// NOTE: An ellipsis row takes as much room as one line, so a
+					// An ellipsis row takes as much room as one line, so a
 					// lone hidden line is shown instead. Upstream elides it.
 					if (!shouldShow && isUnlabelledLine(index + 1)) {
 						isEllipsis = true

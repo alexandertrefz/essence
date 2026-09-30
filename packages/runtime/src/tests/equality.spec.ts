@@ -10,17 +10,17 @@ import { createRecord } from "../Record"
 import { createString } from "../String"
 import { type AnyType, createCase } from "../type"
 
-// NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
+// `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
 // in `type.ts` — so a Case value is cast on the way in here exactly as the
 // runtime helpers cast it internally.
 const asValue = (value: unknown) => value as AnyType
 
-// NOTE: A Function reaches the runtime as a bare JavaScript function carrying
+// A Function reaches the runtime as a bare JavaScript function carrying
 // no Type key at all, which is why comparing one needs a cell of its own.
 const functionValue = () => asValue((value: never) => value)
 
 describe("reflexive equality", () => {
-	// NOTE: The claim the fast path rests on — a value is equal to itself — and
+	// The claim the fast path rests on — a value is equal to itself — and
 	// it has to hold for every kind, including the ones whose comparison is a
 	// recursive walk.
 	test("every value is equal to itself", () => {
@@ -47,7 +47,7 @@ describe("reflexive equality", () => {
 		}
 	})
 
-	// NOTE: A container holding a Function is the interesting one — the walk
+	// A container holding a Function is the interesting one — the walk
 	// reaches identity comparison at the leaf, which answers true for the SAME
 	// Function, so the shortcut and the walk agree here too.
 	test("a container holding a Function is equal to itself", () => {
@@ -62,7 +62,7 @@ describe("reflexive equality", () => {
 		expect(anyIs(payload, payload)).toBeTrue()
 	})
 
-	// NOTE: The shortcut must not have REPLACED the structural comparison —
+	// The shortcut must not have REPLACED the structural comparison —
 	// two values built separately still have to be walked, and still answer
 	// what they always did.
 	test("distinct values are still compared structurally", () => {
@@ -108,11 +108,11 @@ describe("reflexive equality", () => {
 			),
 		).toBeFalse()
 
-		// NOTE: Two Functions written the same are still two Functions.
+		// Two Functions written the same are still two Functions.
 		expect(anyIs(functionValue(), functionValue())).toBeFalse()
 	})
 
-	// NOTE: The comparisons that cross kinds are the ones the shortcut can not
+	// The comparisons that cross kinds are the ones the shortcut can not
 	// answer, and they keep answering false.
 	test("values of different kinds are still unequal", () => {
 		expect(anyIs(createInteger(1n), createBoolean(true))).toBeFalse()
@@ -124,14 +124,14 @@ describe("reflexive equality", () => {
 	})
 })
 
-// NOTE: The universal comparison for a Dictionary, which is the one it can not
+// The universal comparison for a Dictionary, which is the one it can not
 // answer structurally: a box reads through a SHARED store stamped with a
 // generation, so two boxes holding the very same entries need not hold the same
 // slots, versions or generation. What `anyIs` asks instead is what the design
 // says two Dictionaries mean by equal — the same key set, and an equal value
 // under each key, in whatever order they were written.
 describe("comparing two Dictionaries", () => {
-	// NOTE: The witness a hand-built Dictionary is keyed by here. `anyIs` uses
+	// The witness a hand-built Dictionary is keyed by here. `anyIs` uses
 	// no witness of its own — there is none to hand it — so it recurses through
 	// this same universal comparison, exactly as it does for a List's items.
 	const anyEquatable = {
@@ -212,7 +212,7 @@ describe("comparing two Dictionaries", () => {
 		).toBeFalse()
 	})
 
-	// NOTE: A Dictionary held INSIDE something else is where the structural
+	// A Dictionary held INSIDE something else is where the structural
 	// fallback used to answer wrongly — a Record carrying one compared its
 	// stores field by field, so a value stopped being equal to its own copy the
 	// moment it was wrapped.
@@ -229,7 +229,7 @@ describe("comparing two Dictionaries", () => {
 		).toBeTrue()
 	})
 
-	// NOTE: Keys and values compare through the very same universal comparison,
+	// Keys and values compare through the very same universal comparison,
 	// so an Integer key and the Rational spelling of it are ONE key — which is
 	// what `Number.is` promises about them everywhere else.
 	test("keys compare by value rather than by spelling", () => {

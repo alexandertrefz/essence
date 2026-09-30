@@ -3,7 +3,7 @@ import * as path from "node:path"
 import type { EssenceValue, RuntimeBridge } from "../bridge"
 import { type EssenceModule, loadModule } from "../index"
 
-// NOTE: What the marshalled door COSTS, measured against the door it was built
+// What the marshalled door COSTS, measured against the door it was built
 // beside. A host that binds `raw` and the bridge itself builds every value by
 // hand and reads every answer apart by hand; `exports` does the same walk out
 // of a Descriptor, and checks, normalises and spells a path while it goes. The
@@ -14,19 +14,19 @@ import { type EssenceModule, loadModule } from "../index"
 // `BENCH.md`. `tools/` is excluded from the publish program, so nothing here
 // ships.
 //
-// NOTE: The two calls are an embedding's own rather than a microbenchmark's: a
+// The two calls are an embedding's own rather than a microbenchmark's: a
 // nested List and its labels in and a flat List of Records out — a table being
 // laid out — and a mid-size Record edited and handed back.
 // `tests/files/Bench.es` holds them.
 //
-// NOTE: Both doors are timed over the SAME work — build the Arguments from
+// Both doors are timed over the SAME work — build the Arguments from
 // JavaScript values, call, read the answer back as JavaScript values. Timing
 // the call alone would time the Module rather than the boundary, so the call is
 // ALSO timed alone, with its Arguments already built and its answer unread:
 // that is the `body` column, it is the same in both doors, and subtracting it
 // is what leaves the door on its own.
 //
-// NOTE: What the hand-built door does not do is the point of the comparison. It
+// What the hand-built door does not do is the point of the comparison. It
 // takes every shape on trust, normalises no String, and has no path to spell
 // when something is wrong — so it is the floor the marshalled door is measured
 // against, not a second implementation of it.
@@ -39,7 +39,7 @@ const FIXTURE = path.join(
 	"Bench.es",
 )
 
-// NOTE: One node is one value the boundary VISITS in a call, counting both
+// One node is one value the boundary VISITS in a call, counting both
 // directions — every List box, every Record, every Case and every leaf. It is
 // what the per-value columns divide by, and the only honest way to compare a
 // call over 21 values with one over 8191.
@@ -52,7 +52,7 @@ function layoutNodes(rows: number, columns: number): number {
 	return 3 + rows * (columns + 5)
 }
 
-// NOTE: The three magnitudes the field measured this at — a handful of values,
+// The three magnitudes the field measured this at — a handful of values,
 // a thousand, eight thousand — as the squarest shapes that land on them. 21 is
 // the nearest a `rows × columns` table gets to the field's 22: `3 + rows ×
 // (columns + 5) = 22` has only the one-row solution, and one row is not a table.
@@ -62,7 +62,7 @@ const LAYOUT_SHAPES: Array<{ rows: number; columns: number }> = [
 	{ rows: 89, columns: 87 },
 ]
 
-// NOTE: What a Panel costs to cross: the Record itself, its five plain members,
+// What a Panel costs to cross: the Record itself, its five plain members,
 // the Case its `note` is and the String that Case carries, its `tags` List and
 // the three Strings in it — twelve values. Going in there is the Integer beside
 // it, and coming out there is not.
@@ -75,11 +75,11 @@ const WARMUP_TURNS = 20
 const SETTLE_NANOSECONDS = 20_000_000
 const SETTLE_TURNS = 50
 
-// NOTE: Both Integers a host may pass. Out is always a bigint — that is the
+// Both Integers a host may pass. Out is always a bigint — that is the
 // contract — so the kind names what goes IN.
 const KINDS: Array<Kind> = ["bigint", "number"]
 
-// NOTE: Every measured turn adds its answer here, and the total is printed at
+// Every measured turn adds its answer here, and the total is printed at
 // the end. A door whose result nothing reads is a door an optimiser is entitled
 // to stop opening — this is what keeps all of them open.
 let sink = 0
@@ -96,7 +96,7 @@ type Panel = {
 	tags: Array<string>
 }
 
-// NOTE: A List as the runtime lays one out — two runs and a view into each, the
+// A List as the runtime lays one out — two runs and a view into each, the
 // front run stored reversed. A host reading `value` alone reads neither the
 // right items nor the right number of them, so a hand-built door has to know
 // this much; `marshal-runtime.ts` says why at length.
@@ -115,11 +115,11 @@ type ListBox = {
 	}
 }
 
-// NOTE: A positional write changes a run Array IN PLACE and counts a version up,
+// A positional write changes a run Array IN PLACE and counts a version up,
 // so a box left behind on that run has to undo the writes made since it looked
 // before its items are read. `marshal-runtime.ts` says why at length, and
 // `packages/runtime/src/listWrites.ts` is the authority.
-// NOTE: Exported for the differential spec alone, which holds this copy of the
+// Exported for the differential spec alone, which holds this copy of the
 // replay against the runtime's own. Nothing else here is exported and nothing
 // ships from `tools/`.
 export function backRunSeenBy(box: ListBox): Array<unknown> {
@@ -151,7 +151,7 @@ export function backRunSeenBy(box: ListBox): Array<unknown> {
 
 type Kind = "bigint" | "number"
 
-// NOTE: One line of the table before it has been timed — what is being crossed,
+// One line of the table before it has been timed — what is being crossed,
 // and the three pieces of work that cross it.
 type Case = {
 	shape: string
@@ -162,7 +162,7 @@ type Case = {
 	marshalled: () => number
 }
 
-// NOTE: What one run answers with, and what the parent process reads back. The
+// What one run answers with, and what the parent process reads back. The
 // sink travels with it so that the answers are read by a process that prints
 // them, rather than only by one that is about to exit.
 type Measured = { layouts: Array<Row>; edits: Array<Row>; sink: number }
@@ -178,7 +178,7 @@ type Row = {
 
 // #region The data
 
-// NOTE: Deterministic, so that two runs measure the same work. The cells are
+// Deterministic, so that two runs measure the same work. The cells are
 // small on purpose — an Integer whose value fits a double is the one the hybrid
 // representation keeps as a number, and a bench built out of huge values would
 // be measuring bigint arithmetic instead of the door.
@@ -233,7 +233,7 @@ function panelOf(kind: Kind): Panel {
 
 // #region The hand-built door
 
-// NOTE: The boundary a host wrote itself, before there was one to import: the
+// The boundary a host wrote itself, before there was one to import: the
 // bridge's constructors on the way in, the runtime's own layout read straight
 // off the values on the way out. Nothing is checked, because a host writing this
 // knows what it is passing — which is exactly the assumption the marshalled door
@@ -287,7 +287,7 @@ function cellsOf(answer: unknown): Array<Cell> {
 		) as { index: { value: number | bigint }; status: { value: string } }
 
 		cells.push({
-			// NOTE: A bigint whichever of its two representations the Integer
+			// A bigint whichever of its two representations the Integer
 			// arrived in, which is the contract the marshalled door states — a
 			// host comparing the two has to be handed the same kind by both.
 			index: BigInt(item.index.value),
@@ -358,7 +358,7 @@ function panelFrom(bridge: RuntimeBridge, answer: unknown): Panel {
 
 // #region The measurement
 
-// NOTE: Warmed until the code under it has settled, then timed in batches sized
+// Warmed until the code under it has settled, then timed in batches sized
 // so that one sample is milliseconds rather than microseconds — a clock read per
 // call would be measuring the clock at the sizes that matter most. The MEDIAN of
 // the samples is reported: a mean carries whatever else the machine was doing
@@ -396,7 +396,7 @@ function measure(work: () => number): number {
 	return samples[(SAMPLES - 1) / 2]! / 1000
 }
 
-// NOTE: Every path is run before ANY of them is timed, and that is not the same
+// Every path is run before ANY of them is timed, and that is not the same
 // as the warm-up inside `measure`. All three doors of all four cases share the
 // same Functions — the same builder, the same reader, the same `fromJS` — so a
 // door timed before the others have ever run is timed against an engine that has
@@ -416,7 +416,7 @@ function settle(work: () => number): void {
 	}
 }
 
-// NOTE: The two doors are made to agree BEFORE either is timed. A comparison
+// The two doors are made to agree BEFORE either is timed. A comparison
 // between a door that answers and a door that answers something else is not a
 // comparison — and since the hand-built one is written out here rather than
 // imported, this is also what says the two readings of a runtime List are the
@@ -440,7 +440,7 @@ function agree(marshalled: unknown, raw: unknown, what: string): void {
 
 // #region The report
 
-// NOTE: What the door alone costs per value crossed, in nanoseconds — the
+// What the door alone costs per value crossed, in nanoseconds — the
 // Module's own call taken back out of the total, and what is left divided by the
 // values that crossed. The one number two shapes can be compared by.
 function perNode(total: number, body: number, nodes: number): string {
@@ -486,7 +486,7 @@ function table(rows: Array<Row>): string {
 	].join("\n")
 }
 
-// NOTE: Which commit the table below was measured at, so that a pasted one says
+// Which commit the table below was measured at, so that a pasted one says
 // so on its own — and whether the tree it was measured on was that commit. A
 // checkout without git — a published tarball — simply does not say.
 function revision(): string {
@@ -592,7 +592,7 @@ function timed(entry: Case): Row {
 	}
 }
 
-// NOTE: ONE kind of Integer per process, and the two runs are two processes.
+// ONE kind of Integer per process, and the two runs are two processes.
 // `createIntegerFrom` is one Function, and a caller that hands it both a bigint
 // and a number in the same run leaves the engine no monomorphic path to compile:
 // the number half then measures nearly THREE TIMES its own cost — 206 µs against
@@ -621,7 +621,7 @@ function isKind(value: string | undefined): value is Kind {
 	return value === "bigint" || value === "number"
 }
 
-// NOTE: The child writes its rows and nothing else — the tables are the
+// The child writes its rows and nothing else — the tables are the
 // parent's, so that both kinds are laid out under one heading whichever order
 // the runs finished in.
 async function main(): Promise<void> {
@@ -677,7 +677,7 @@ async function main(): Promise<void> {
 
 // #endregion
 
-// NOTE: Run as a tool, imported as a module. `undoReplay.spec.ts` reaches in
+// Run as a tool, imported as a module. `undoReplay.spec.ts` reaches in
 // for the one function below that is a COPY of something — the undo replay —
 // and a file that benchmarked itself on the way in would make that spec take
 // a minute rather than a millisecond.

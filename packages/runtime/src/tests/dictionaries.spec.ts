@@ -51,7 +51,7 @@ import {
 	typeKeySymbol,
 } from "../type"
 
-// NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
+// `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
 // in `type.ts` — so a Case value is cast on the way in here exactly as the
 // runtime helpers cast it internally.
 const asValue = (value: unknown) => value as AnyType
@@ -59,7 +59,7 @@ const asValue = (value: unknown) => value as AnyType
 const integer = (value: number): IntegerType => createInteger(BigInt(value))
 const text = createString
 
-// NOTE: The two spellings of one accented String, written as their code points
+// The two spellings of one accented String, written as their code points
 // so the file itself can not normalise them into each other. They are ONE
 // String to the language — `String.is` is `compare(to other)::is(#Equal)` and
 // `String.compare` reads the NFC form — so a Dictionary has to hold them under
@@ -67,14 +67,14 @@ const text = createString
 const composedAccent = "caf\u00E9"
 const decomposedAccent = "cafe\u0301"
 
-// NOTE: `anyIs` is the runtime's own structural comparison, and for every kind
+// `anyIs` is the runtime's own structural comparison, and for every kind
 // these tests use it decides exactly what the covering Namespace's `is` decides
 // — including the two cross-kind rules a key encoding has to agree with: an
 // Integer equals a whole Rational, and two canonically equivalent Strings are
 // one String. So it stands in for the conformance witness the Compiler hands a
 // bounded Method.
 //
-// NOTE: And it is BRANDED `structural`, which is the whole of what tells the
+// And it is BRANDED `structural`, which is the whole of what tells the
 // runtime it may encode a key rather than ask: the Compiler brands the standard
 // library's own equality for `String`, `Integer`, `Rational`, `Boolean` and the
 // covering `Number`, and brands nothing a Namespace wrote. This witness stands
@@ -85,7 +85,7 @@ const equality = {
 	structural: true as const,
 }
 
-// NOTE: The same equality WITHOUT the brand — what a Namespace-written `is`
+// The same equality WITHOUT the brand — what a Namespace-written `is`
 // looks like to the runtime, whatever it decides. It answers exactly what the
 // branded one does, so a Dictionary built through it holds exactly the same
 // entries; what changes is that it is asked rather than encoded, which is what
@@ -94,7 +94,7 @@ const witnessed = {
 	is: equality.is,
 }
 
-// NOTE: A witness deliberately COARSER than the encoding — two Strings are one
+// A witness deliberately COARSER than the encoding — two Strings are one
 // key when they differ only in case. It is the shape the Compiler builds for a
 // user Namespace `for NonEmptyString is Equatable`, which the Enricher accepts
 // (String's own conformance does not clash with a refinement's), and it is the
@@ -109,7 +109,7 @@ const looseText = {
 		),
 }
 
-// NOTE: The Printable witness `Record.toString` builds for itself — the same
+// The Printable witness `Record.toString` builds for itself — the same
 // walk with the fraction formatter, so a whole Rational prints its numerator
 // alone. What a String does is decided before the witness is reached:
 // `itemText` quotes one itself.
@@ -118,7 +118,7 @@ const printing = {
 		createString(getStringRepresentation(value, 0, formatAsFraction, "")),
 }
 
-// NOTE: A witness deliberately COARSER than structural equality — two keys are
+// A witness deliberately COARSER than structural equality — two keys are
 // one key when their `id` members match, whatever else they hold. A lookup that
 // compared the Records itself rather than asking the Namespace would answer
 // differently, which is what makes this a test of the scan path rather than of
@@ -137,7 +137,7 @@ const dictionary = (
 const entry = (key: AnyType, value: AnyType): EntryRecord<AnyType, AnyType> =>
 	createRecord({ key, value }) as EntryRecord<AnyType, AnyType>
 
-// NOTE: The Dictionary `createDictionaryFrom` answered with, where the test is
+// The Dictionary `createDictionaryFrom` answered with, where the test is
 // about what it built rather than about the duplicate key it can answer instead.
 const built = (
 	answer: DictionaryType<AnyType, AnyType> | number,
@@ -149,7 +149,7 @@ const built = (
 	return answer
 }
 
-// NOTE: The written form is what the order tests assert against, because it
+// The written form is what the order tests assert against, because it
 // says the two things they are about in one line — which entries are live, and
 // in what order — and it is the reader's form the design fixed.
 const writtenForm = (dictionaryInstance: DictionaryType<AnyType, AnyType>) =>
@@ -186,7 +186,7 @@ const slotFor = (
 	return found
 }
 
-// NOTE: A String-keyed Dictionary of the given size, built the way a Program
+// A String-keyed Dictionary of the given size, built the way a Program
 // builds one it grows — a chain of writes rather than one pass — so that what
 // the tests about repacking measure is the shape a real chain leaves behind.
 const chainOf = (count: number): DictionaryType<AnyType, AnyType> => {
@@ -200,7 +200,7 @@ const chainOf = (count: number): DictionaryType<AnyType, AnyType> => {
 }
 
 describe("key encoding", () => {
-	// NOTE: The claim every fast-path lookup rests on, asserted kind by kind:
+	// The claim every fast-path lookup rests on, asserted kind by kind:
 	// two keys encode to the same primitive exactly when the kind's own `is`
 	// calls them equal.
 	test("a String encodes as its NFC-normalised text", () => {
@@ -266,7 +266,7 @@ describe("key encoding", () => {
 		)
 	})
 
-	// NOTE: The encoding was a Symbol from the GLOBAL registry, which never
+	// The encoding was a Symbol from the GLOBAL registry, which never
 	// forgets one: every distinct fraction a Program ever looked a key up by
 	// held about 265 bytes for the life of the process. What says the registry
 	// is out of it is that the encoding is not a Symbol and that two encodings
@@ -281,7 +281,7 @@ describe("key encoding", () => {
 		expect(first).toEqual(second)
 	})
 
-	// NOTE: A fraction's text and a String's are in indexes of their own, which
+	// A fraction's text and a String's are in indexes of their own, which
 	// is what keeps a String key spelled `1/2` and the Rational `1/2` apart.
 	test("a Rational's encoding can not collide with a String key", () => {
 		let held = dictionary(
@@ -307,7 +307,7 @@ describe("key encoding", () => {
 		expect(encodeKey(createBoolean(false), equality)).toBe(false)
 	})
 
-	// NOTE: A Case's text opens with its tag, length-prefixed, and closes over
+	// A Case's text opens with its tag, length-prefixed, and closes over
 	// its payload members; a Record's opens with `R`. Every part inside is
 	// length-prefixed or terminated, which is what makes the text one per
 	// value — the tests further down hold it to that over drawn values.
@@ -355,7 +355,7 @@ describe("key encoding", () => {
 		)
 	})
 
-	// NOTE: A part spells what the structural comparison calls it: a whole
+	// A part spells what the structural comparison calls it: a whole
 	// Rational is the Integer it equals, a String is its NFC form, and a nested
 	// Case is its tag before its members.
 	test("a part of a composite key spells the cross-kind rules", () => {
@@ -382,7 +382,7 @@ describe("key encoding", () => {
 		).toEqual({ text: "R{5:inner=c10:Colour#Red{};};" })
 	})
 
-	// NOTE: A List spells how many items it holds and then each of them, and the
+	// A List spells how many items it holds and then each of them, and the
 	// count is what makes the text injective against its own NESTING: `[[1],
 	// [2]]` and `[[1, 2]]` open the same three heads in the same order and are
 	// told apart by the counts alone.
@@ -410,7 +410,7 @@ describe("key encoding", () => {
 		)
 	})
 
-	// NOTE: And a Record or a Case holding one encodes now too, through the very
+	// And a Record or a Case holding one encodes now too, through the very
 	// same text — what a List spells is what the universal comparison those
 	// members are read by would answer, so one spelling serves both positions.
 	test("a composite holding a List encodes through the same text", () => {
@@ -428,7 +428,7 @@ describe("key encoding", () => {
 		).toEqual({ text: "c8:Box#Full{4:item=l0:};" })
 	})
 
-	// NOTE: A Case, a Record or a List holding a part with no encoding has none
+	// A Case, a Record or a List holding a part with no encoding has none
 	// itself, because such a part is compared by a rule no text spells — a
 	// Function by identity, a Dictionary by the entries its own store organises.
 	test("everything else takes the scan path", () => {
@@ -448,7 +448,7 @@ describe("key encoding", () => {
 		).toBeNull()
 	})
 
-	// NOTE: The encoding is a claim about the STANDARD LIBRARY'S equality for a
+	// The encoding is a claim about the STANDARD LIBRARY'S equality for a
 	// kind, so it may only be made where the witness in hand is that equality.
 	// An unbranded witness — every one a Namespace wrote — takes the scan path
 	// whatever the key is, and so does the empty literal's absent witness.
@@ -471,7 +471,7 @@ describe("keys that encode alike are one key", () => {
 		)
 
 		expect(lengthOf(second).value).toBe(1)
-		// NOTE: The slot keeps the key it was OPENED with, so the answer is
+		// The slot keeps the key it was OPENED with, so the answer is
 		// still written down with the Integer the Program handed over.
 		expect(writtenForm(second)).toBe(`[3 = "rational"]`)
 	})
@@ -506,7 +506,7 @@ describe("keys that encode alike are one key", () => {
 		).toBe(2)
 	})
 
-	// NOTE: Every pairing the encoding has to agree with the comparison about,
+	// Every pairing the encoding has to agree with the comparison about,
 	// in both directions: what `anyIs` calls equal lands in one slot, and what
 	// it calls unequal lands in two. A single table so that a kind added to the
 	// encoding has one place to be answered for.
@@ -611,18 +611,18 @@ describe("keys that encode alike are one key", () => {
 	})
 })
 
-// NOTE: THE CLAIM THE COMPOSITE ENCODING RESTS ON, held over drawn values
+// THE CLAIM THE COMPOSITE ENCODING RESTS ON, held over drawn values
 // rather than over a table: two Cases or Records that the structural comparison
 // calls equal encode to one text, and two it calls unequal encode to two. The
 // values are drawn over a fixed seed, so the sequence is the same in every run,
 // and drawn SMALL, so that equal pairs turn up among the unequal ones.
 //
-// NOTE: Every drawn value is also RESPELLED — its Rationals written unreduced,
+// Every drawn value is also RESPELLED — its Rationals written unreduced,
 // its Strings decomposed, its members reordered — into a second value the
 // comparison calls equal, so that the equal side of the claim is exercised on
 // every draw and not only where two draws happen to coincide.
 describe("the composite encoding agrees with the structural comparison", () => {
-	// NOTE: Leaves drawn from a vocabulary of three or four values each, so
+	// Leaves drawn from a vocabulary of three or four values each, so
 	// that distinct draws coincide often enough to exercise the equal half of
 	// the claim on composite values, and not only on a value beside itself.
 	const oneOf = (name: string, choices: Array<AnyType>): Generator => ({
@@ -699,7 +699,7 @@ describe("the composite encoding agrees with the structural comparison", () => {
 	const textOfEncoding = (value: AnyType): string =>
 		(encodeKey(value, equality) as { text: string }).text
 
-	// NOTE: An equal value spelled differently everywhere the encoding has a
+	// An equal value spelled differently everywhere the encoding has a
 	// rule to keep: a whole Rational for an Integer and an unreduced pair for
 	// a Rational, the NFD form of a String, and the members in reverse order.
 	const respelled = (value: AnyType): AnyType => {
@@ -768,19 +768,19 @@ describe("the composite encoding agrees with the structural comparison", () => {
 			}
 		}
 
-		// NOTE: The draw is small enough that distinct draws coincide, which is
+		// The draw is small enough that distinct draws coincide, which is
 		// what makes the equal half of the claim about more than one value
 		// compared with itself.
 		expect(equalPairs).toBeGreaterThan(40)
 	})
 })
 
-// NOTE: A Record and a Case whose parts all encode are found in one step, the
+// A Record and a Case whose parts all encode are found in one step, the
 // witness never asked — which is the whole of what the `structural` brand on
 // `Record`'s witness and on a Choice's derived one buys. What decides which
 // two are one key is still exactly what the witness would have said.
 describe("composite keys", () => {
-	// NOTE: Counting the witness's calls is the deterministic guard on the
+	// Counting the witness's calls is the deterministic guard on the
 	// encoded path: a lookup that took the scan path would ask it once per live
 	// slot, and one that encoded asks it never.
 	const counting = (): {
@@ -913,7 +913,7 @@ describe("composite keys", () => {
 		expect(calls()).toBe(0)
 	})
 
-	// NOTE: A thousand Case keys, every one found without the witness — the
+	// A thousand Case keys, every one found without the witness — the
 	// shape the benchmark file measures, asserted here by instrumentation rather
 	// than by a timing.
 	test("a thousand Case keys are all found on the encoded path", () => {
@@ -950,7 +950,7 @@ describe("composite keys", () => {
 		expect(calls()).toBe(0)
 	})
 
-	// NOTE: A payload-free Case is one interned instance per tag, and its text
+	// A payload-free Case is one interned instance per tag, and its text
 	// is remembered on that instance — so the second encoding is the same
 	// String object as the first, and the memo is invisible to the members
 	// `Record::is` and the derived equality read.
@@ -966,7 +966,7 @@ describe("composite keys", () => {
 })
 
 describe("the scan path", () => {
-	// NOTE: A Dictionary is the part with no text — its entries are organised by
+	// A Dictionary is the part with no text — its entries are organised by
 	// a store of its own and equality over them is order-insensitive, which no
 	// length-prefixed spelling of what it HOLDS would answer.
 	test("a Record holding a Dictionary is found through the witness", () => {
@@ -1008,13 +1008,13 @@ describe("the scan path", () => {
 		let overwritten = setAt(held, other, integer(20), byIdentifier)
 
 		expect(lengthOf(overwritten).value).toBe(1)
-		// NOTE: An overwrite keeps the slot, and the slot keeps the key it was
+		// An overwrite keeps the slot, and the slot keeps the key it was
 		// opened with — so the `note` the second Record carried is not what the
 		// Dictionary answers.
 		expect(overwritten.store.slots[0].key).toBe(first)
 	})
 
-	// NOTE: One Record witness over Records that encode and Records that do
+	// One Record witness over Records that encode and Records that do
 	// not — a `{ id: Integer, tags: List<String> }` beside a `{ id: Integer }`
 	// under one `Record` key Type is not a Program the language admits, but
 	// a Case whose payload member is a `Number` holds an Integer in one value
@@ -1066,7 +1066,7 @@ describe("the scan path", () => {
 		).toBe("root")
 	})
 
-	// NOTE: A `Number` key Type is one witness over kinds that encode and a kind
+	// A `Number` key Type is one witness over kinds that encode and a kind
 	// that does not — an Algebraic is a Number and has no encoding — so one
 	// store holds both kinds of slot under a branded witness. A lookup for an
 	// encodable key that the index does not answer falls through to the slots
@@ -1109,7 +1109,7 @@ describe("the scan path", () => {
 	})
 })
 
-// NOTE: THE WITNESS THE COMPILER HANDS OVER IS THE ONE THE LOOKUP USES. A
+// THE WITNESS THE COMPILER HANDS OVER IS THE ONE THE LOOKUP USES. A
 // Namespace may write an `is` for a Type whose keys would otherwise encode —
 // `namespace Loose for NonEmptyString is Equatable`, which calls two Strings
 // equal when they differ only in case — and the Enricher accepts it, so it
@@ -1160,7 +1160,7 @@ describe("a witness a Namespace wrote", () => {
 		expect(lengthOf(removeAt(box, text("ADA"), looseText)).value).toBe(0)
 	})
 
-	// NOTE: A store written through BOTH kinds of witness — which is what a
+	// A store written through BOTH kinds of witness — which is what a
 	// `Dictionary<NonEmptyString, …>` flowing where a `Dictionary<String, …>`
 	// is expected would make — has to stay one Dictionary. The witnessed write
 	// scans every live slot, encoded or not, so it finds what the fast path
@@ -1212,7 +1212,7 @@ describe("a witness a Namespace wrote", () => {
 	})
 })
 
-// NOTE: `List<ItemType> is Equatable where ItemType is Equatable` is a
+// `List<ItemType> is Equatable where ItemType is Equatable` is a
 // CONDITIONAL conformance, so the Compiler can not settle its brand where it
 // emits it: the witness solving that `where` may be one forwarded into a
 // generic Function, which has no name at the Rewriter. The brand travels in the
@@ -1234,7 +1234,7 @@ describe("the brand a conditional conformance carries", () => {
 		expect(branded([witnessed]).structural).toBeUndefined()
 	})
 
-	// NOTE: The brand is lifted OUT of the map rather than curried through it.
+	// The brand is lifted OUT of the map rather than curried through it.
 	// Curried like a Method it would have become a Function, and `encodeKey`
 	// reads it with `=== true` — so every List key would have taken the scan
 	// path and the brand would have been a byte that did nothing.
@@ -1242,7 +1242,7 @@ describe("the brand a conditional conformance carries", () => {
 		expect(branded([equality]).structural).not.toBeInstanceOf(Function)
 	})
 
-	// NOTE: A map with nothing branding it keeps nothing, whatever its
+	// A map with nothing branding it keeps nothing, whatever its
 	// conditions carry — the brand is the Rewriter's claim about the `is`, and
 	// the conditions only say whether the claim survives.
 	test("an unbranded map stays unbranded under branded conditions", () => {
@@ -1251,7 +1251,7 @@ describe("the brand a conditional conformance carries", () => {
 		).toBeUndefined()
 	})
 
-	// NOTE: And the recursion, spelled out: the witness for `List<List<T>>` is
+	// And the recursion, spelled out: the witness for `List<List<T>>` is
 	// this built over itself, so a written `is` at the BOTTOM unbrands every
 	// layer above it.
 	test("a written 'is' at the bottom unbrands every layer above it", () => {
@@ -1259,12 +1259,12 @@ describe("the brand a conditional conformance carries", () => {
 	})
 })
 
-// NOTE: And what the brand buys and refuses, end to end. A List key whose items
+// And what the brand buys and refuses, end to end. A List key whose items
 // are compared by a written `is` must be found the way that `is` says, which is
 // the scan path; one whose items are compared by the standard library's own
 // equality is found under its text in one step.
 describe("a Dictionary keyed by Lists", () => {
-	// NOTE: The witness the Compiler builds for `List<NonEmptyString>` under a
+	// The witness the Compiler builds for `List<NonEmptyString>` under a
 	// `namespace Loose for NonEmptyString is Equatable` — `List.is` curried
 	// with that Namespace's `is`, and unbranded because it is.
 	const looseItems = {
@@ -1297,7 +1297,7 @@ describe("a Dictionary keyed by Lists", () => {
 		).toBe("corner")
 	})
 
-	// NOTE: `[1, 23]` and `[12, 3]` hold the same digits in the same order and
+	// `[1, 23]` and `[12, 3]` hold the same digits in the same order and
 	// are told apart by the `;` each Integer closes with; `[[1], [2]]` and
 	// `[[1, 2]]`, and `[[]]` and `[]`, by the count in each head.
 	test("keeps apart the keys a run-together text would merge", () => {
@@ -1320,7 +1320,7 @@ describe("a Dictionary keyed by Lists", () => {
 		expect(box.store.unencoded).toBe(0)
 	})
 
-	// NOTE: A String item that LOOKS like an encoded List is spelled by its own
+	// A String item that LOOKS like an encoded List is spelled by its own
 	// length-prefixed arm, so it can not be read as the List it imitates.
 	test("keeps a String item apart from the List it imitates", () => {
 		let box = dictionary(
@@ -1331,7 +1331,7 @@ describe("a Dictionary keyed by Lists", () => {
 		expect(lengthOf(box).value).toBe(2)
 	})
 
-	// NOTE: Two Lists the canonical text calls DISTINCT and the written `is`
+	// Two Lists the canonical text calls DISTINCT and the written `is`
 	// calls equal. Encoding them would have opened two slots and answered
 	// nothing for a lookup the witness holds, so the store keeps them
 	// unencoded and the scan is what finds them.
@@ -1377,11 +1377,11 @@ describe("insertion order", () => {
 
 		expect(writtenForm(without)).toBe(`["b" = 2, "c" = 3]`)
 		expect(writtenForm(again)).toBe(`["b" = 2, "c" = 3, "a" = 9]`)
-		// NOTE: And the boxes it was written from answer exactly what they did.
+		// And the boxes it was written from answer exactly what they did.
 		expect(writtenForm(held)).toBe(`["a" = 1, "b" = 2, "c" = 3]`)
 	})
 
-	// NOTE: Twelve rounds of it, each on the answer of the last, because a
+	// Twelve rounds of it, each on the answer of the last, because a
 	// re-add repacks and the round after it is then made from a box that is one
 	// generation into a store nobody else holds.
 	test("a key removed and re-added across a dozen rounds lands last every time", () => {
@@ -1420,7 +1420,7 @@ describe("insertion order", () => {
 		expect(entries.map((each) => numberOf(each.value))).toEqual([9, 2, 3])
 	})
 
-	// NOTE: `createList` TAKES OWNERSHIP of the Array it is handed, so two
+	// `createList` TAKES OWNERSHIP of the Array it is handed, so two
 	// answers may never be one Array — an append onto the first would otherwise
 	// show up in the second.
 	test("keys, values and entries answer fresh Arrays", () => {
@@ -1444,7 +1444,7 @@ describe("generations", () => {
 		expect(writtenForm(third)).toBe(`["a" = 9, "b" = 2]`)
 		expect(writtenForm(fourth)).toBe(`["a" = 9]`)
 
-		// NOTE: All four over ONE store — a tip write is a version pushed and a
+		// All four over ONE store — a tip write is a version pushed and a
 		// box over it, and nothing was copied.
 		expect(second.store).toBe(first.store)
 		expect(third.store).toBe(first.store)
@@ -1502,7 +1502,7 @@ describe("generations", () => {
 		expect(writtenForm(leftAgain)).toBe(`["a" = 10, "b" = 2, "c" = 3]`)
 		expect(writtenForm(rightAgain)).toBe(`["a" = 20]`)
 
-		// NOTE: Read again in a different order, which is what a shared store
+		// Read again in a different order, which is what a shared store
 		// makes possible to get wrong.
 		expect(writtenForm(base)).toBe(`["a" = 1, "b" = 2]`)
 		expect(writtenForm(right)).toBe(`["a" = 20, "b" = 2]`)
@@ -1529,7 +1529,7 @@ describe("generations", () => {
 })
 
 describe("repacking", () => {
-	// NOTE: `dead` is the count of versions that are no longer any live key's
+	// `dead` is the count of versions that are no longer any live key's
 	// newest: an overwrite leaves one behind, a removal leaves two (the value
 	// it replaced and the tombstone replacing it), an opened slot leaves none.
 	test("dead versions are counted as they are made", () => {
@@ -1569,13 +1569,13 @@ describe("repacking", () => {
 		expect(repacked.store.dead).toBe(1)
 		expect(repacked.store.slots.length).toBe(2)
 		expect(writtenForm(repacked)).toBe(`["a" = 4, "b" = 0]`)
-		// NOTE: The box the repack was made from answers what it answered — it
+		// The box the repack was made from answers what it answered — it
 		// was moved onto the fresh store, and its view of that store is the one
 		// the repack copied.
 		expect(writtenForm(box)).toBe(`["a" = 3, "b" = 0]`)
 	})
 
-	// NOTE: The rule the version cap used to hide. Overwriting ONE key of a
+	// The rule the version cap used to hide. Overwriting ONE key of a
 	// large Dictionary leaves one dead version per write, so the store repacks
 	// once every `slots.length` writes and no oftener — where a cap of eight
 	// versions per slot repacked every seventh write whatever the Dictionary
@@ -1595,7 +1595,7 @@ describe("repacking", () => {
 			}
 		}
 
-		// NOTE: One repack per 1,001 writes — the store carries 1,000 slots, so
+		// One repack per 1,001 writes — the store carries 1,000 slots, so
 		// the 1,001st dead version is the first to outnumber them. Ten is the
 		// arithmetic; a cap of eight versions per slot would have been 1,428.
 		expect(repacks).toBeLessThanOrEqual(10)
@@ -1643,7 +1643,7 @@ describe("repacking", () => {
 			)
 		}
 
-		// NOTE: And now WRITE on the oldest one, which has a store's worth of
+		// And now WRITE on the oldest one, which has a store's worth of
 		// somebody else's history in front of it.
 		let forked = setAt(chain[0], text("f"), integer(500), equality)
 
@@ -1659,7 +1659,7 @@ describe("repacking", () => {
 		let box = dictionary([text("a"), integer(1)], [text("b"), integer(2)])
 		let chain = [{ box, text: `["a" = 1, "b" = 2]` }]
 
-		// NOTE: Removals count TWO dead versions each, so a two-slot store is
+		// Removals count TWO dead versions each, so a two-slot store is
 		// over its limit after one of them — which is what makes this the
 		// dead-versions rule rather than a fork.
 		let next = removeAt(box, text("a"), equality)
@@ -1687,7 +1687,7 @@ describe("repacking", () => {
 			[text("c"), integer(3)],
 		)
 		let without = removeAt(held, createRational(2n, 4n), equality)
-		// NOTE: A second box over the same store is what makes the write after
+		// A second box over the same store is what makes the write after
 		// it a forked one, which repacks whatever the counters say.
 		let sibling = setAt(without, text("d"), integer(4), equality)
 		let original = without.store
@@ -1701,7 +1701,7 @@ describe("repacking", () => {
 		expect(writtenForm(sibling)).toBe(`["a" = 1, "c" = 3, "d" = 4]`)
 	})
 
-	// NOTE: A box that is written from more than once is a BASE somebody is
+	// A box that is written from more than once is a BASE somebody is
 	// deriving from, and every one of those writes forks and so repacks. The
 	// repack moves the base onto the store it built, so the second derivation
 	// copies what the base holds rather than walking the history it was left
@@ -1721,7 +1721,7 @@ describe("repacking", () => {
 
 		let derived = setAt(base, text("first"), integer(1), equality)
 
-		// NOTE: The base stands on a store of its own now: its own entries,
+		// The base stands on a store of its own now: its own entries,
 		// one version each, plus the one slot the derivation appended — which
 		// is the whole of what the next repack from it has to copy, where
 		// before it was two thousand versions on one slot.
@@ -1734,7 +1734,7 @@ describe("repacking", () => {
 		expect(lengthOf(base).value).toBe(200)
 		expect(heldNumber(valueAt(base, text("k0"), equality))).toBe(0)
 
-		// NOTE: And the thousand derivations after it each answer their own
+		// And the thousand derivations after it each answer their own
 		// entries, out of a base that never grows a history of somebody else's.
 		for (let round = 0; round < 1_000; round++) {
 			let next = setAt(base, text(`x${round}`), integer(round), equality)
@@ -1781,13 +1781,13 @@ describe("construction", () => {
 
 		expect(writtenForm(held)).toBe(`["a" = 9, "b" = 2]`)
 		expect(lengthOf(held).value).toBe(2)
-		// NOTE: A store built in one pass carries no history at all — the
+		// A store built in one pass carries no history at all — the
 		// duplicate was written OVER the version standing there rather than
 		// pushed after it.
 		expect(held.store.dead).toBe(0)
 	})
 
-	// NOTE: A List holds its items in two runs, and one built by prepending
+	// A List holds its items in two runs, and one built by prepending
 	// holds them in the FRONT run, which is read backwards. `of` has to answer
 	// the same Dictionary for either representation.
 	test("of reads a List that was built from the front", () => {
@@ -1811,7 +1811,7 @@ describe("construction", () => {
 		expect(writtenForm(held)).toBe("[=]")
 	})
 
-	// NOTE: The empty literal `[=]` is built with no witness at all, because it
+	// The empty literal `[=]` is built with no witness at all, because it
 	// holds no key for one to be asked about.
 	test("createDictionary builds the empty Dictionary with no witness", () => {
 		let held = createDictionary<AnyType, AnyType>([], null)
@@ -1857,7 +1857,7 @@ describe("construction", () => {
 		).toBe(2)
 	})
 
-	// NOTE: The door the JavaScript boundary comes through, which decides the
+	// The door the JavaScript boundary comes through, which decides the
 	// two things `createDictionary` leaves to its caller: the witness, and what
 	// a duplicate key means. A host hands over a `Map`, whose keys are told
 	// apart by `===`, and two of those can be one key here.
@@ -1870,7 +1870,7 @@ describe("construction", () => {
 		)
 
 		expect(writtenForm(held)).toBe(`["alex" = 39, "sam" = 25]`)
-		// NOTE: Encoded rather than scanned, which is what the brand on the
+		// Encoded rather than scanned, which is what the brand on the
 		// witness buys: a store built through an unbranded one carries slots
 		// with no encoding at all.
 		expect(held.store.unencoded).toBe(0)
@@ -1884,7 +1884,7 @@ describe("construction", () => {
 				[text("a"), integer(9)],
 			]),
 		).toBe(2)
-		// NOTE: The two pairs a `Map` holds apart and a Dictionary does not: an
+		// The two pairs a `Map` holds apart and a Dictionary does not: an
 		// Integer beside the whole Rational it equals, and the two spellings of
 		// one accented String.
 		expect(
@@ -1901,7 +1901,7 @@ describe("construction", () => {
 		).toBe(1)
 	})
 
-	// NOTE: A key of a kind with no encoding is found by the scan the witness
+	// A key of a kind with no encoding is found by the scan the witness
 	// answers, so a duplicate is caught there as well as where the index can
 	// see one.
 	test("createDictionaryFrom catches a duplicate the scan path finds", () => {
@@ -1938,7 +1938,7 @@ describe("lookup", () => {
 		expect(valueAt(without, text("a"), equality)[typeKeySymbol]).toBe(
 			"Optional#Empty",
 		)
-		// NOTE: And the box it was removed from still answers it, which is the
+		// And the box it was removed from still answers it, which is the
 		// whole of what a tombstone is for.
 		expect(heldNumber(valueAt(held, text("a"), equality))).toBe(1)
 	})
@@ -1994,7 +1994,7 @@ describe("printing", () => {
 		expect(writtenForm(held)).toBe("[3 = 1/2, true = Colour#Red]")
 	})
 
-	// NOTE: A Dictionary inside a Record is rendered by the walk in
+	// A Dictionary inside a Record is rendered by the walk in
 	// `Terminal.ts`, which reaches the Dictionary's own renderer through the
 	// kind registry — so the two forms have to be one text.
 	test("a nested Dictionary renders the same inside a Record as on its own", () => {
@@ -2006,7 +2006,7 @@ describe("printing", () => {
 		)
 	})
 
-	// NOTE: `Terminal.inspect` breaks a rendering over lines once the single
+	// `Terminal.inspect` breaks a rendering over lines once the single
 	// line would be too long, and pads inside the brackets — the same layout it
 	// gives a List.
 	test("a long Dictionary is inspected over lines", () => {
@@ -2134,7 +2134,7 @@ describe("equality", () => {
 		expect(dictionaryIs(first, second, equality, equality).value).toBeTrue()
 	})
 
-	// NOTE: The UNIVERSAL comparison — no witness in hand — is what a Record or
+	// The UNIVERSAL comparison — no witness in hand — is what a Record or
 	// a Case holding a Dictionary falls into, and it is answered by the kind
 	// registry rather than by a Dictionary arm inside `internalHelpers.ts`.
 	test("the universal comparison answers order-insensitively too", () => {
@@ -2179,7 +2179,7 @@ describe("equality", () => {
 		expect(anyIs(first as AnyType, second as AnyType)).toBeTrue()
 	})
 
-	// NOTE: The comparison a generic Choice reaches — the descriptor names a
+	// The comparison a generic Choice reaches — the descriptor names a
 	// witness for each half of an entry, and the Dictionary is compared through
 	// those rather than through the universal one.
 	describe("the descriptor-driven equality", () => {
@@ -2296,7 +2296,7 @@ describe("map", () => {
 		expect(writtenForm(written)).toBe(`["a" = 99, "b" = 4]`)
 		expect(writtenForm(alsoWritten)).toBe(`["a" = 2, "b" = 4, "c" = 7]`)
 
-		// NOTE: And the reverse — a write on the ORIGINAL must not reach the
+		// And the reverse — a write on the ORIGINAL must not reach the
 		// store `map` built out of its slots.
 		let afterBase = setAt(held, text("b"), integer(50), equality)
 
@@ -2312,7 +2312,7 @@ describe("map", () => {
 	})
 })
 
-// NOTE: The filter and its complement share `map`'s claim — the kept slots
+// The filter and its complement share `map`'s claim — the kept slots
 // carry the receiver's keys and encodings, and the answer is a store of its
 // own — and add one of their own: a slot that took the scan path on the
 // receiver takes it on the answer, because its `null` encoding is carried over
@@ -2408,7 +2408,7 @@ describe("everyEntry and removeEvery", () => {
 	})
 })
 
-// NOTE: Two of the natives that gather a Dictionary rather than being handed
+// Two of the natives that gather a Dictionary rather than being handed
 // one: `GroupedList.group` and `GroupedList.tally`
 // (`packages/standard-library/sources/Dictionary.es`). The third,
 // `GroupedList.index`, is held in `groupedList.spec.ts`. The two build through
@@ -2435,7 +2435,7 @@ describe("grouping a List", () => {
 		).toEqual([["apple", "avocado"], ["banana"]])
 	})
 
-	// NOTE: A List built at the FRONT holds its first items in a second run,
+	// A List built at the FRONT holds its first items in a second run,
 	// stored reversed, so a native that read the backing Array would group them
 	// backwards. What decides the order here is the logical walk.
 	test("walks a List built at both ends in its logical order", () => {
@@ -2460,7 +2460,7 @@ describe("grouping a List", () => {
 		expect(writtenForm(grouped)).toBe("[=]")
 	})
 
-	// NOTE: A key of a kind that does not encode takes the scan path, exactly
+	// A key of a kind that does not encode takes the scan path, exactly
 	// as it does for every other Dictionary native — the group is found by
 	// asking the witness about the slots standing.
 	test("groups under a key that is found by asking the witness", () => {
@@ -2494,7 +2494,7 @@ describe("grouping a List", () => {
 		expect(lengthOf(tally(createList([]), equality)).value).toBe(0)
 	})
 
-	// NOTE: Two items that are ONE item to the language are one entry here, and
+	// Two items that are ONE item to the language are one entry here, and
 	// the one that arrived first is the one the entry keeps — the same rule
 	// every other construction follows. `3` and `3/1` are the pair the
 	// cross-kind encoding is written for.
@@ -2507,7 +2507,7 @@ describe("grouping a List", () => {
 		expect(writtenForm(counted)).toBe("[3 = 2, 4 = 1]")
 	})
 
-	// NOTE: An unbranded witness is the shape a Namespace-written `is` arrives
+	// An unbranded witness is the shape a Namespace-written `is` arrives
 	// in, and it decides which two items are one item. Two Strings that differ
 	// only in case are one key to this one, so the tally counts them together
 	// and keeps the spelling that arrived first.
@@ -2520,13 +2520,13 @@ describe("grouping a List", () => {
 		expect(writtenForm(counted)).toBe(`["Ada" = 2, "Grace" = 1]`)
 	})
 
-	// NOTE: What a gathered Dictionary has to be: an ordinary one. It is built
+	// What a gathered Dictionary has to be: an ordinary one. It is built
 	// at generation zero with one version per slot, which is the shape a repack
 	// leaves a store in, so a write on it is a tip write like any other.
 	test("answers a store of its own that can be written to", () => {
 		let counted = tally(listOf(text("a"), text("b"), text("a")), equality)
 
-		// NOTE: Asked before anything is written, because `dead` is a property
+		// Asked before anything is written, because `dead` is a property
 		// of the STORE at its tip and the writes below share this one.
 		expect(counted.generation).toBe(0)
 		expect(counted.store.generation).toBe(0)
@@ -2541,21 +2541,21 @@ describe("grouping a List", () => {
 	})
 })
 
-// NOTE: THE MODEL-BASED WALK. Nothing above it asks what happens when the three
+// THE MODEL-BASED WALK. Nothing above it asks what happens when the three
 // writers — `set`, `remove` and `map` — are mixed at random over a chain that
 // forks constantly, and that is where a shared store is easiest to get wrong.
 //
-// NOTE: What it holds the store against is a plain `Map`, whose own key rules
+// What it holds the store against is a plain `Map`, whose own key rules
 // are exactly the ones the design asks for — a key written again keeps its
 // place, and a key deleted and written again goes to the end — so the model is
 // the specification rather than a second implementation of it.
 //
-// NOTE: Every write is made from a box drawn out of everything built so far,
+// Every write is made from a box drawn out of everything built so far,
 // which is what makes the chain FORK, and every box built along the way is
 // asked again at the end. A box that answered one thing and then answered
 // another after somebody else wrote is the failure this is looking for.
 describe("a random chain of writes against a Map model", () => {
-	// NOTE: mulberry32 — four lines, no dependency, and the same sequence on
+	// mulberry32 — four lines, no dependency, and the same sequence on
 	// every engine, which is the whole of what a test needs of a generator.
 	const seededRandom = (seed: number): (() => number) => {
 		let state = seed >>> 0
@@ -2576,7 +2576,7 @@ describe("a random chain of writes against a Map model", () => {
 	type Entry = { key: AnyType; value: number }
 	type Model = Map<string, Entry>
 
-	// NOTE: Keys that are EQUAL share an identifier — the composed and the
+	// Keys that are EQUAL share an identifier — the composed and the
 	// decomposed accent, the Integer and the whole Rationals, the halves and
 	// their sign spellings, the two structurally equal Records — so the model
 	// collapses them into one entry exactly where the Dictionary has to. That
@@ -2610,7 +2610,7 @@ describe("a random chain of writes against a Map model", () => {
 		{ key: createList([integer(1), integer(2)]), identifier: "[1,2]" },
 	]
 
-	// NOTE: Plain String keys with nothing interesting about them, so that the
+	// Plain String keys with nothing interesting about them, so that the
 	// linear chain below has more slots than it has writes to spend on any one
 	// of them — which is what lets one slot build a real history before the
 	// store's dead count reaches the repack rule. The interesting keys are the
@@ -2671,7 +2671,7 @@ describe("a random chain of writes against a Map model", () => {
 	const expectedText = (model: Model): string =>
 		model.size === 0 ? "[=]" : `[${expectedPieces(model).join(", ")}]`
 
-	// NOTE: The model's entries rebuilt BACKWARDS, so an equality that leant on
+	// The model's entries rebuilt BACKWARDS, so an equality that leant on
 	// the order of the slots would answer `false` for two boxes that hold
 	// exactly the same entries.
 	const rebuiltBackwards = (model: Model): DictionaryType<AnyType, AnyType> =>
@@ -2682,7 +2682,7 @@ describe("a random chain of writes against a Map model", () => {
 			equality,
 		)
 
-	// NOTE: The whole of what a box promises, asked of every box in the chain
+	// The whole of what a box promises, asked of every box in the chain
 	// after the chain is finished: how many entries, in what order, what each
 	// key it could have been written with answers, what it prints as, what it
 	// is equal to, and what Type it answers for.
@@ -2706,7 +2706,7 @@ describe("a random chain of writes against a Map model", () => {
 		for (let index = 0; index < expected.length; index++) {
 			let held = expected[index]
 
-			// NOTE: Identity, not equality — the slot has to answer the very
+			// Identity, not equality — the slot has to answer the very
 			// key box that arrived FIRST under this identity, through every
 			// overwrite, every repack and every `map`.
 			expect(keys[index]).toBe(held.key)
@@ -2727,7 +2727,7 @@ describe("a random chain of writes against a Map model", () => {
 			}
 		}
 
-		// NOTE: The printed form and the one `Terminal.inspect` writes are the
+		// The printed form and the one `Terminal.inspect` writes are the
 		// same text, which is the promise the registered renderer makes.
 		let written = expectedText(model)
 
@@ -2743,7 +2743,7 @@ describe("a random chain of writes against a Map model", () => {
 			)
 		}
 
-		// NOTE: Equality against the same entries written backwards, both
+		// Equality against the same entries written backwards, both
 		// through the witnessed `is` and through the universal comparison every
 		// Record holding one falls into.
 		let mirror = rebuiltBackwards(model)
@@ -2752,7 +2752,7 @@ describe("a random chain of writes against a Map model", () => {
 		expect(dictionaryIs(mirror, box, equality, equality).value).toBeTrue()
 		expect(anyIs(box as AnyType, mirror as AnyType)).toBeTrue()
 
-		// NOTE: The Type test walks the same live view, so a box answers for
+		// The Type test walks the same live view, so a box answers for
 		// exactly the entries it holds and nothing a later write added.
 		expect(
 			isValueOfType(
@@ -2796,7 +2796,7 @@ describe("a random chain of writes against a Map model", () => {
 		)
 	}
 
-	// NOTE: And the promises the SHAPE makes, which no reader would notice
+	// And the promises the SHAPE makes, which no reader would notice
 	// breaking until a much later write did: ascending stamps, indexes that
 	// agree with the slots they point at, one slot per key, and a `dead` count
 	// that is the whole history minus what is live at the tip.
@@ -2869,7 +2869,7 @@ describe("a random chain of writes against a Map model", () => {
 		let repacked = 0
 
 		for (let step = 0; step < 700; step++) {
-			// NOTE: Two steps in three write from the NEWEST box and one from
+			// Two steps in three write from the NEWEST box and one from
 			// somewhere in the history, so the walk both builds long linear
 			// runs — which is what gives a slot a history — and forks
 			// constantly, which is what drives the repack.
@@ -2899,7 +2899,7 @@ describe("a random chain of writes against a Map model", () => {
 				box = removeAt(source.box, candidate.key, equality)
 				model = modelRemove(source.model, candidate)
 			} else {
-				// NOTE: `map` is the third writer, and the one the sharing
+				// `map` is the third writer, and the one the sharing
 				// doctrine is easiest to break with — it copies slots and their
 				// ENCODINGS out of a store other boxes are still reading, and
 				// the store it builds is then written to.
@@ -2921,7 +2921,7 @@ describe("a random chain of writes against a Map model", () => {
 			expectAgreement(box, model, pool)
 			expectStoreInvariants(box)
 
-			// NOTE: And the box it was written FROM, immediately — a write that
+			// And the box it was written FROM, immediately — a write that
 			// pushed into a shared store has to have left every reader of that
 			// store exactly where it was.
 			expectAgreement(source.box, source.model, pool)
@@ -2930,14 +2930,14 @@ describe("a random chain of writes against a Map model", () => {
 			history.push({ box, model })
 		}
 
-		// NOTE: The walk has to have REACHED the shapes it claims to test: a
+		// The walk has to have REACHED the shapes it claims to test: a
 		// real history on a slot, a `map` that shares encodings out of a store
 		// others still read, and the repack.
 		expect(deepest).toBeGreaterThan(3)
 		expect(mapped).toBeGreaterThan(50)
 		expect(repacked).toBeGreaterThan(50)
 
-		// NOTE: The point of the whole exercise — every box built along the
+		// The point of the whole exercise — every box built along the
 		// way, asked again now that seven hundred later writes have gone past.
 		for (let { box, model } of history) {
 			expectAgreement(box, model, everyKey)
@@ -2945,7 +2945,7 @@ describe("a random chain of writes against a Map model", () => {
 		}
 	})
 
-	// NOTE: The chain above FORKS at nearly every step, so it repacks
+	// The chain above FORKS at nearly every step, so it repacks
 	// constantly and no slot in it builds much history. This one never forks —
 	// every write is made from the newest box — and it leans on one key out of
 	// forty-nine, which is what lets that key's slot carry a real history while
@@ -2962,7 +2962,7 @@ describe("a random chain of writes against a Map model", () => {
 
 		for (let step = 0; step < 600; step++) {
 			let source = history[history.length - 1]
-			// NOTE: Two writes in five go to the same key, which is the lean
+			// Two writes in five go to the same key, which is the lean
 			// that builds a history at all.
 			let candidate =
 				next() < 0.4
@@ -2995,7 +2995,7 @@ describe("a random chain of writes against a Map model", () => {
 			history.push({ box, model })
 		}
 
-		// NOTE: The chain has to have built a history longer than the cap that
+		// The chain has to have built a history longer than the cap that
 		// used to be here, or it would be passing by doing nothing the unit
 		// tests above do not already do. What bounds it is the dead-versions
 		// rule alone, and the invariants above are what say it is bounded.

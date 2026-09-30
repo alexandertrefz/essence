@@ -52,12 +52,12 @@ import {
 	walkHandler,
 } from "./lookups"
 
-// NOTE: One function per Diagnostic a Quick Fix answers, and nothing here
+// One function per Diagnostic a Quick Fix answers, and nothing here
 // decides which of them a code reaches — that is the registry in `./index`, so
 // that adding a fix is a function here and a line there rather than an edit to
 // the middle of what everybody else is editing too.
 
-// NOTE: `describeType` is a Diagnostic's spelling of a Type, not the source's
+// `describeType` is a Diagnostic's spelling of a Type, not the source's
 // — it prints an Overload set as `Function` and a Namespace as
 // `Namespace 'X'`, neither of which is anything a Matcher can be written with,
 // and a Signature under a shape the checks below turn away. A member spelled
@@ -93,7 +93,7 @@ export function missingCaseAction(
 		return null
 	}
 
-	// NOTE: Every member that CAN be written gets its own arm, and the ones
+	// Every member that CAN be written gets its own arm, and the ones
 	// that can not share a single `case _` after them — a Signature in the
 	// Union is no reason to make the reader write out the named Cases the
 	// Compiler already knows. The catch-all goes last because a `case _` above
@@ -107,7 +107,7 @@ export function missingCaseAction(
 		return null
 	}
 
-	// NOTE: The `match` keyword rarely opens its line — `<- match @ -> …` is
+	// The `match` keyword rarely opens its line — `<- match @ -> …` is
 	// the common shape — so the Handlers line up with the line's indentation
 	// rather than with the keyword's column.
 	let indentation = indentationOf(lines, match.position.start.line)
@@ -171,7 +171,7 @@ export function unreachableCaseAction(
 		isPreferred: true,
 		edits: [
 			{
-				// NOTE: Taking the line break and the indentation before the
+				// Taking the line break and the indentation before the
 				// `case` with it — deleting the Handler alone would leave the
 				// blank line it sat on behind.
 				range: {
@@ -184,7 +184,7 @@ export function unreachableCaseAction(
 	}
 }
 
-// NOTE: A near miss written back over the name that was misspelled. The fixes
+// A near miss written back over the name that was misspelled. The fixes
 // of several codes share it, since a misspelling reads the same wherever it
 // stands.
 //
@@ -227,7 +227,7 @@ export function suggestionAction(
 	}
 }
 
-// NOTE: The same near miss, one step further out: a Record Literal's member
+// The same near miss, one step further out: a Record Literal's member
 // whose name the Type does not declare. The Diagnostic stands at the member's
 // VALUE — a mismatch is reported there because a typed Record holds no Position
 // for a member's NAME — so the span to write over is found in the written AST
@@ -272,7 +272,7 @@ export function recordMemberAction(
 	}
 }
 
-// NOTE: What an import fix needs of the world: which Modules publish a name,
+// What an import fix needs of the world: which Modules publish a name,
 // and where this file is, so that a specifier can be written from one to the
 // other. Absent whenever the document is not part of a workspace — a test
 // analysing a String, or an Editor with no folder open — and every action below
@@ -284,7 +284,7 @@ export type ImportContext = {
 	program: parser.Program
 }
 
-// NOTE: One action per exporting Module rather than a guess between them. Two
+// One action per exporting Module rather than a guess between them. Two
 // Modules exporting one name is a real shape — a facade and the Module behind
 // it — and which of them a reader means is not something a Diagnostic can say.
 //
@@ -328,7 +328,7 @@ export function importActions(
 				kind: "quickfix" as const,
 				diagnosticCode: diagnostic.code,
 				diagnosticPosition: diagnostic.position,
-				// NOTE: Preferred only where there is one place it could come
+				// Preferred only where there is one place it could come
 				// from — an Editor applies the preferred fix without asking, and
 				// choosing a Module for the reader is exactly what this must not
 				// do.
@@ -339,7 +339,7 @@ export function importActions(
 	})
 }
 
-// NOTE: The import a Diagnostic NAMED, rather than one looked up from the text
+// The import a Diagnostic NAMED, rather than one looked up from the text
 // under the cursor. `unsatisfied-bound` is reported against a call, and the name
 // it asks for appears nowhere in that call's span — the Compiler found it by
 // following the Type, which carries the Module that declared it, and said so in
@@ -388,7 +388,7 @@ export function declarationImportAction(
 	}
 }
 
-// NOTE: The one fix in this file whose edit lands in a file the reader is not
+// The one fix in this file whose edit lands in a file the reader is not
 // looking at, because the mistake is not there either: the name IS declared in
 // the Module the entry names, and that Module keeps it private. Nothing about
 // the entry can be improved, so the entry is left exactly as it was written and
@@ -430,7 +430,7 @@ export function exportNameAction(
 		return null
 	}
 
-	// NOTE: A Variable is the one declaration an export block may not list, so
+	// A Variable is the one declaration an export block may not list, so
 	// listing it would answer this Diagnostic with `export-of-variable` in
 	// another file — a fix that moves the mistake rather than ending it.
 	if (declaresVariable(targetProgram, entry.name)) {
@@ -452,14 +452,14 @@ export function exportNameAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// NOTE: Preferred: there is one Module the name could be exported from,
+		// Preferred: there is one Module the name could be exported from,
 		// and publishing it is the only thing that makes the entry resolve.
 		isPreferred: true,
 		edits: [{ ...edit, filePath: targetPath }],
 	}
 }
 
-// NOTE: The other half of the same idea, from the other side: the name is
+// The other half of the same idea, from the other side: the name is
 // written in this Module's export block and this Module declares nothing under
 // it, so what the block wanted is a re-export. One action per Module that
 // publishes the name, since which of them was meant is not something the block
@@ -497,7 +497,7 @@ export function forwardExportActions(
 		let edit = insertExportEdit(
 			imports.documentText,
 			imports.program,
-			// NOTE: The `as` the entry was written with goes along: what the
+			// The `as` the entry was written with goes along: what the
 			// block publishes must not change under a fix that only answers
 			// where the name comes from.
 			{ name, alias: entry.alias?.content ?? null, specifier },
@@ -514,7 +514,7 @@ export function forwardExportActions(
 				kind: "quickfix" as const,
 				diagnosticCode: diagnostic.code,
 				diagnosticPosition: diagnostic.position,
-				// NOTE: Preferred only where there is one Module it could be
+				// Preferred only where there is one Module it could be
 				// forwarded from, for the reason an import off an unknown name
 				// is: choosing between two of them is the reader's to do.
 				isPreferred: exporters.length === 1,
@@ -530,7 +530,7 @@ export function forwardExportActions(
 	})
 }
 
-// NOTE: The entry of either Module block whose name stands at this Position,
+// The entry of either Module block whose name stands at this Position,
 // with the specifier its group carries. A bare export entry is deliberately not
 // among them: it names something this Module declares, and every Diagnostic
 // answered here is about a name another Module was asked for.
@@ -555,7 +555,7 @@ function moduleEntryAt(
 	return null
 }
 
-// NOTE: Whether the Module declares this name as a Variable — read off its own
+// Whether the Module declares this name as a Variable — read off its own
 // parse, since what an export block may hold is a question about the file the
 // name is written in and not about the file that asked for it. A Pattern
 // declares one Variable per binding, and each of them is one an entry could name.
@@ -575,7 +575,7 @@ function declaresVariable(program: parser.Program, name: string): boolean {
 	})
 }
 
-// NOTE: Read off the Diagnostic's own helps rather than worked out again here.
+// Read off the Diagnostic's own helps rather than worked out again here.
 // The Enricher knows which unimported Namespaces declare the Method AND which of
 // them target the receiver's Type — the rule dispatch is decided by — and
 // re-deriving that from a Method name alone would offer imports that would not
@@ -623,7 +623,7 @@ export function namespaceImportActions(
 	})
 }
 
-// NOTE: The whole lines, and the break that ends them — an entry list has no
+// The whole lines, and the break that ends them — an entry list has no
 // delimiters, so what is left behind by deleting the name alone is a blank line
 // in the middle of the block. The last name of a group takes the group with
 // it, since `from "./A.es" {}` imports nothing and says so on two lines. A
@@ -676,7 +676,7 @@ export function removeImportAction(
 	}
 }
 
-// NOTE: The later of two entries binding one name, removed. The Diagnostic
+// The later of two entries binding one name, removed. The Diagnostic
 // points at the entry that was being bound when the clash was found, and the
 // one already holding the name is on its second Label — so the later of the two
 // is the one underlined, which is the one to drop.
@@ -688,7 +688,7 @@ export function removeImportAction(
 // other declaration instead. `as` is the answer to those, which is what the
 // Diagnostic's Help says and what no edit can choose a name for.
 //
-// NOTE: Never preferred, even so. Two entries binding one name from two
+// Never preferred, even so. Two entries binding one name from two
 // different Modules are two different functions, and dropping the second leaves
 // every call in the file reading the FIRST — a Program that compiles and answers
 // something else, which an Editor applying a preferred fix without asking must
@@ -759,7 +759,7 @@ export function constantToVariableAction(
 		},
 	}
 
-	// NOTE: The Statement's Position starts at its keyword, but a `§§` block
+	// The Statement's Position starts at its keyword, but a `§§` block
 	// or a Declaration this Parser recovered from could move it — replacing a
 	// span that does not read `constant` would corrupt the line silently.
 	if (sliceOf(lines, keyword) !== constantKeyword) {
@@ -780,7 +780,7 @@ export function removeLabelAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: The Diagnostic spans exactly `label internalName`, so the name to
+	// The Diagnostic spans exactly `label internalName`, so the name to
 	// keep is what the span ends with — the Parser dropped the label and has
 	// no Node left that holds it.
 	let written = sliceOf(lines, diagnostic.position).match(/^\S+[ \t]+(\S+)$/)
@@ -799,7 +799,7 @@ export function removeLabelAction(
 	}
 }
 
-// NOTE: The Diagnostic spans exactly `defaultingTo <value>`, and an Argument
+// The Diagnostic spans exactly `defaultingTo <value>`, and an Argument
 // does not stand on its own — the separator beside it goes too, or the call is
 // left with a comma against a bracket. The one in FRONT is taken where there is
 // one, which is every call the Standard Library shapes, since `defaultingTo:`
@@ -814,7 +814,7 @@ export function removeFallbackAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// Read back off the buffer, as every edit here is: a Position from a
 	// stale analysis pointing at something else would delete that instead.
 	if (!/^defaultingTo\b/.test(sliceOf(lines, diagnostic.position))) {
 		return null
@@ -839,7 +839,7 @@ export function removeFallbackAction(
 	}
 }
 
-// NOTE: The Warning's own Helps, applied — the Argument wrapped in a Case that
+// The Warning's own Helps, applied — the Argument wrapped in a Case that
 // holds, which is the spelling of a reading the call did NOT take.
 //
 // A rewrite rather than a fix, and never preferred: both readings are well typed
@@ -866,7 +866,7 @@ export function wrapInHoldingCaseActions(
 		return []
 	}
 
-	// NOTE: Found on the current parse, as every edit here is: a Position from
+	// Found on the current parse, as every edit here is: a Position from
 	// a stale analysis would wrap whatever now stands in its place. An
 	// Argument's value is a Node of its own, so the Position the Warning
 	// carries is one the walk finds exactly rather than by containment.
@@ -876,7 +876,7 @@ export function wrapInHoldingCaseActions(
 		return []
 	}
 
-	// NOTE: Withheld where the Argument WRITES its Type Arguments. Wrapping
+	// Withheld where the Argument WRITES its Type Arguments. Wrapping
 	// `Optional<Optional<Integer>>#Empty` puts the outer Type inside the Case
 	// that holds it, where the INNER one goes — a rewrite that turns a Program
 	// with nothing wrong with it into `assignment-type-mismatch`. The Warning's
@@ -917,7 +917,7 @@ export function wrapInHoldingCaseActions(
 	})
 }
 
-// NOTE: A Modifier taken back out by the word it is written as — the word and
+// A Modifier taken back out by the word it is written as — the word and
 // the space in front of it, so that `test "a" focused {` becomes `test "a" {`.
 // The word is read back off the buffer and held against what the Diagnostic
 // says stands there, as every edit here is: a Position from a stale analysis
@@ -957,7 +957,7 @@ export function removeWordAction(
 	}
 }
 
-// NOTE: The Diagnostic spans exactly the `focused` Modifier, which takes no
+// The Diagnostic spans exactly the `focused` Modifier, which takes no
 // arguments — so the word is the whole of what goes.
 export function removeFocusedAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
@@ -970,7 +970,7 @@ export function removeFocusedAction(
 	})
 }
 
-// NOTE: The most mechanical fix the language has: an update written in the
+// The most mechanical fix the language has: an update written in the
 // wrong pair, and the right one is the other pair. Two edits rather than one
 // replacement of the whole span, so that everything between the brackets — a
 // key list running over ten lines, the Comments inside it — is left exactly as
@@ -1021,7 +1021,7 @@ export function updateBracketsAction(
 	}
 }
 
-// NOTE: The Diagnostic spans exactly the `::toString()`, so the fix is that
+// The Diagnostic spans exactly the `::toString()`, so the fix is that
 // same range deleted — what is left is the receiver, which is what the hole
 // interpolates either way. The span is read back off the buffer first because
 // every edit here is measured against the text as it is now: a Position from a
@@ -1047,7 +1047,7 @@ export function removeToStringAction(
 	}
 }
 
-// NOTE: `bodyDefinitelyReturns` accepts a body one of whose Statements is a
+// `bodyDefinitelyReturns` accepts a body one of whose Statements is a
 // Return or an If-Else that returns on both sides. The one failure it has a
 // mechanical answer for is a body ending in an If with no Else: every path
 // through the If returns, and the path around it is the one that falls off
@@ -1072,7 +1072,7 @@ export function elseBranchAction(
 	let indentation = indentationOf(lines, last.position.start.line)
 
 	return {
-		// NOTE: Not preferred, and honest about why: the Else it adds is
+		// Not preferred, and honest about why: the Else it adds is
 		// empty, so the Diagnostic stays until the reader fills it in. What
 		// the fix buys is a hole that is visible instead of a path that falls
 		// off the end invisibly.
@@ -1097,7 +1097,7 @@ export function elseBranchAction(
 	}
 }
 
-// NOTE: One action per candidate Namespace and none of them preferred — which
+// One action per candidate Namespace and none of them preferred — which
 // of them was meant is precisely what the Diagnostic could not decide, and an
 // Editor applies a preferred fix without asking.
 //
@@ -1146,7 +1146,7 @@ export function namespaceSpecifierActions(
 	}))
 }
 
-// NOTE: One action per Choice that declares the Case, none of them preferred —
+// One action per Choice that declares the Case, none of them preferred —
 // the Diagnostic exists because the two can not be told apart, and an Editor
 // applies a preferred fix without asking.
 //
@@ -1190,7 +1190,7 @@ export function choicePrefixActions(
 	}))
 }
 
-// NOTE: Three edits under one code, and which of them is offered is decided by
+// Three edits under one code, and which of them is offered is decided by
 // the PAIR the Compiler carried rather than by the message: a Parameter that
 // declares a label the call left out takes an insertion, one that declares a
 // different label takes a replacement of what was written, and a Parameter that
@@ -1237,7 +1237,7 @@ export function argumentLabelAction(
 		return null
 	}
 
-	// NOTE: The whitespace between the two goes with the label being dropped —
+	// The whitespace between the two goes with the label being dropped —
 	// the value keeps the one space that separated it from the bracket or the
 	// comma in front, which is where it would have stood unlabelled.
 	return label === null
@@ -1251,7 +1251,7 @@ export function argumentLabelAction(
 			})
 }
 
-// NOTE: The members the default does not fill in, written into the Literal that
+// The members the default does not fill in, written into the Literal that
 // left them out — one `name = {}` each, after everything already written there.
 // After, rather than before the closing brace, because that is what keeps the
 // Literal's own layout: one written on a line grows beside what it holds and one
@@ -1290,7 +1290,7 @@ export function missingMembersAction(
 		start: { line: tail.line, column: tail.column - 1 },
 		end: tail,
 	})
-	// NOTE: A Literal that ends on a member needs the comma that member never
+	// A Literal that ends on a member needs the comma that member never
 	// had; one that ends on its own trailing comma, or on the opening brace,
 	// already reads as a list waiting for more.
 	let separator = written === "{" || written === "," ? "" : ","
@@ -1322,7 +1322,7 @@ export function missingMembersAction(
 	}
 }
 
-// NOTE: A member per line, indented as the members already written are. Where
+// A member per line, indented as the members already written are. Where
 // the last of them shares its line with the opening brace there are none to
 // copy — a Literal that opens and closes on different lines and holds nothing
 // yet — and the closing brace's line is the anchor instead, one level in from
@@ -1344,7 +1344,7 @@ function brokenMembers(
 		.join(`\n${indentation}`)}`
 }
 
-// NOTE: Members written beside what the Literal already holds, padded as a
+// Members written beside what the Literal already holds, padded as a
 // one-line Literal is padded — a space after the opening brace and one before
 // the closing one. The space in FRONT is written unless a comma already ends the
 // line; the one behind only where the closing brace stands right there, which is
@@ -1362,7 +1362,7 @@ function oneLineMembers(
 	return `${separator} ${written}${padded}`
 }
 
-// NOTE: A static Method reached the way an instance Method is, rewritten into
+// A static Method reached the way an instance Method is, rewritten into
 // the call it was meant to be — `value::make(1)` as `Boxes.make(value, 1)` or as
 // `Boxes.make(1)`. TWO actions, because a static takes no receiver and so the
 // value the call was written on either belongs among the Arguments or does not
@@ -1429,14 +1429,14 @@ export function staticCallActions(
 		kind: "quickfix" as const,
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// NOTE: Preferred where the signature leaves only one of the two
+		// Preferred where the signature leaves only one of the two
 		// standing — there is then nothing left for the reader to choose
 		// between, and the edit is simply right.
 		isPreferred: acceptsValue !== acceptsWithoutValue,
 		edits,
 	})
 
-	// NOTE: Only the shapes the signature accepts, which the Compiler worked out
+	// Only the shapes the signature accepts, which the Compiler worked out
 	// from its arity — see `staticCallArities`. Both used to be offered whatever
 	// the arity, so a zero-Argument static answered "passing the value" with
 	// `argument-count-mismatch` and a one-Argument static answered the other one
@@ -1479,7 +1479,7 @@ export function staticCallActions(
 	]
 }
 
-// NOTE: A Type Parameter bound to a Protocol it never declared one for, bounded
+// A Type Parameter bound to a Protocol it never declared one for, bounded
 // where it was DECLARED — which is nowhere near the call the Diagnostic is
 // reported at. `is P` goes right after the name, ahead of any `= Default`,
 // because that is the order `<infer Item is Comparable = Integer>` is parsed in.
@@ -1518,7 +1518,7 @@ export function boundParameterAction(
 		return null
 	}
 
-	// NOTE: The declaration as it will READ once the bound is written, which is
+	// The declaration as it will READ once the bound is written, which is
 	// not always what the Help shows: the Help spells `infer` because that is the
 	// form nearly every Parameter is declared in, and a Function may still write
 	// `<Value>`. Whether a Parameter is inferred or applied is a second question
@@ -1545,7 +1545,7 @@ export function boundParameterAction(
 	}
 }
 
-// NOTE: The import entry a bound's fix writes beside its own edit, where the
+// The import entry a bound's fix writes beside its own edit, where the
 // file binds no name for the Protocol. Null where that entry can not be
 // written, and then there is no fix: the bound alone would name nothing.
 function protocolImportEdit(
@@ -1575,7 +1575,7 @@ function protocolImportEdit(
 			}
 }
 
-// NOTE: A bound on one of the NAMESPACE's Type Parameters, written onto the
+// A bound on one of the NAMESPACE's Type Parameters, written onto the
 // Method the call stands in — the counterpart of `boundParameterAction`, whose
 // edit goes on a declaration. Into the Method's existing `<…>` where it has one,
 // after the last entry, and as a whole `<…>` right before the Parameter list
@@ -1634,7 +1634,7 @@ export function methodBoundAction(
 	}
 }
 
-// NOTE: A Method's `<…>` entry that re-declares one of its Namespace's Type
+// A Method's `<…>` entry that re-declares one of its Namespace's Type
 // Parameters. The two shapes get the two edits their Diagnostics name: the
 // unbounded one is REMOVED, entry and separator together, and the one that
 // restates `infer` keeps the entry and loses the word.
@@ -1686,7 +1686,7 @@ export function reDeclaredParameterAction(
 	let previous = generics[index - 1]
 	let next = generics[index + 1]
 
-	// NOTE: A lone entry takes the angle brackets with it — an empty `<>` is not
+	// A lone entry takes the angle brackets with it — an empty `<>` is not
 	// a spelling — so the span removed is the LIST's own, which the Parser hands
 	// over whole. Worked out from the entry it would be wrong the moment the
 	// list is broken across lines: the `<` is then on the line above, and an
@@ -1704,7 +1704,7 @@ export function reDeclaredParameterAction(
 						end: entry.position.end,
 					}
 
-	// NOTE: A Comment inside the `<…>` is the reader's own text, and every span
+	// A Comment inside the `<…>` is the reader's own text, and every span
 	// above is a span this edit DELETES — so where one sits in it, nothing is
 	// offered. The Diagnostic's Help says the same edit in words, and a reader
 	// doing it by hand keeps what they wrote; a Quick Fix that silently drops a
@@ -1723,7 +1723,7 @@ export function reDeclaredParameterAction(
 	}
 }
 
-// NOTE: The conformance a Namespace writes a requirement of and never declared,
+// The conformance a Namespace writes a requirement of and never declared,
 // written onto its head. After the last clause where there is one, `, is P` — a
 // conformance list is comma separated — and after the target Type where there is
 // none, which is where the first `is` of a head stands.
@@ -1770,7 +1770,7 @@ export function declareConformanceAction(
 	}
 }
 
-// NOTE: The Type Parameter a `where` condition binds and the Namespace never
+// The Type Parameter a `where` condition binds and the Namespace never
 // declared, written into the Generic list — `<infer T>` after the Namespace's
 // name where there is no list, `, infer T` after the last Parameter where there
 // is. `infer` either way: a Namespace's Type Parameters are all inferred, which
@@ -1814,7 +1814,7 @@ export function declareParameterAction(
 	}
 }
 
-// NOTE: A Pattern's whole-value binder, replaced by the `@` that already names
+// A Pattern's whole-value binder, replaced by the `@` that already names
 // the same value — the Help applied. Every read of the name inside the arm is
 // rewritten and the `as name` goes, which is the whole of what the reader would
 // have done by hand.
@@ -1837,7 +1837,7 @@ export function binderToScrutineeAction(
 	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: The name comes off the BUFFER, since the binder the Parser dropped
+	// The name comes off the BUFFER, since the binder the Parser dropped
 	// is nowhere in the AST and the Help that names it is prose this Compiler
 	// reserves the right to reword.
 	let written = /^as[ \t]+(\S+)$/.exec(sliceOf(lines, diagnostic.position))
@@ -1863,7 +1863,7 @@ export function binderToScrutineeAction(
 		return null
 	}
 
-	// NOTE: The space in front of the `as` goes with it. A binder written on a
+	// The space in front of the `as` goes with it. A binder written on a
 	// line of its OWN takes the line break and the indentation instead, or what
 	// is left behind is a line of trailing whitespace.
 	let before = lineAt(lines, diagnostic.position.start.line)
@@ -1898,7 +1898,7 @@ export function binderToScrutineeAction(
 	}
 }
 
-// NOTE: Where the binder's name is read inside its arm, or null where one of
+// Where the binder's name is read inside its arm, or null where one of
 // those reads can not be rewritten — a Declaration in the body spelling the same
 // name, or a read standing somewhere `@` names something else. The two are one
 // answer because the fix is one edit or none.
@@ -1935,7 +1935,7 @@ function binderReads(
 		: reads
 }
 
-// NOTE: Whether a Statement binds that name — a Declaration written plainly, or
+// Whether a Statement binds that name — a Declaration written plainly, or
 // one that takes its value apart and binds the name as a member. Either way the
 // name means the Declaration from there on, and `@` is not what it means.
 function declaresName(node: parser.ImplementationNode, name: string): boolean {
@@ -1953,7 +1953,7 @@ function declaresName(node: parser.ImplementationNode, name: string): boolean {
 		: node.name.content === name
 }
 
-// NOTE: The spans inside one Node where `@` does NOT mean what it means around
+// The spans inside one Node where `@` does NOT mean what it means around
 // it. A nested Match rebinds it per arm — from the Matcher's end, so that the
 // guard is covered and the scrutinee the Match is written ON is not: `match name
 // -> …` still reads the outer `@`. A Function written in the body takes its
@@ -1977,13 +1977,13 @@ function reboundRegionsOf(
 	}
 }
 
-// NOTE: A `§§` block read as LINES rather than as the Documentation the Parser
+// A `§§` block read as LINES rather than as the Documentation the Parser
 // made of it. What the fixes below have to find is where a tag's text ends, and
 // a tag carries the span of its own name alone — the lines under it that
 // continue its description belong to no Node at all.
 const documentationPrefix = "§§"
 
-// NOTE: What a `§§` line says, or null where the line is not one. The one space
+// What a `§§` line says, or null where the line is not one. The one space
 // after the sigil is the separator rather than content, exactly as the grammar
 // reads it.
 function documentationBody(line: string): string | null {
@@ -1998,14 +1998,14 @@ function documentationBody(line: string): string | null {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// NOTE: The three tags the grammar knows. An `@` line naming anything else is
+// The three tags the grammar knows. An `@` line naming anything else is
 // prose the description keeps — writing about an `@address` costs nothing —
 // so it continues the tag above it rather than opening one.
 const documentationTagPattern = /^@(param|returns|example)\b/
 
 const parameterTagPattern = /^@param\b/
 
-// NOTE: The last line of the section a tag opens: it runs until the next tag
+// The last line of the section a tag opens: it runs until the next tag
 // does, or until the block ends.
 function documentationSectionEnd(
 	lines: Array<string>,
@@ -2024,7 +2024,7 @@ function documentationSectionEnd(
 	}
 }
 
-// NOTE: The line the block never wrote, put under the last `@param` it did —
+// The line the block never wrote, put under the last `@param` it did —
 // and under the lines continuing that one, since a description may run over as
 // many as it needs. The Warning underlines the PARAMETER, which is nowhere near
 // the block, so where the line goes is what the Diagnostic carries.
@@ -2043,7 +2043,7 @@ export function documentationLineAction(
 	}
 
 	let anchor = diagnostic.data.after.start
-	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// Read back off the buffer, as every edit here is: a Position from a
 	// stale analysis pointing at a line that no longer opens a `@param` would
 	// write the new one into the middle of somebody's prose.
 	let body = documentationBody(lineAt(lines, anchor.line))
@@ -2071,7 +2071,7 @@ export function documentationLineAction(
 	}
 }
 
-// NOTE: The whole `@param` line and the lines that continue it. Deleting the
+// The whole `@param` line and the lines that continue it. Deleting the
 // name alone would leave `§§ @param` describing nothing, and deleting the line
 // alone would strand its description in the prose of whatever stands above it.
 export function removeDocumentationTagAction(
@@ -2090,7 +2090,7 @@ export function removeDocumentationTagAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// NOTE: Preferred only where there is nothing else to do with the line.
+		// Preferred only where there is nothing else to do with the line.
 		// A near miss on the name is the likelier reading wherever the Compiler
 		// found one — the description was written about something, and a rename
 		// is what left the tag behind — so the fix that keeps the text stands
@@ -2109,7 +2109,7 @@ export function removeDocumentationTagAction(
 	}
 }
 
-// NOTE: A `§§` written EMPTY is the blank line of a Documentation block — it
+// A `§§` written EMPTY is the blank line of a Documentation block — it
 // separates the prose above it from the tags below. Taking the last tag out
 // strands it: the block ends on a separator with nothing behind it, which is
 // how `§§ A price in whole cents. / §§ / type Cents = Integer` was left. So the
@@ -2127,7 +2127,7 @@ function strandedSeparatorAbove(lines: Array<string>, tagLine: number): number {
 	return above?.trim() === "" && below === null ? tagLine - 1 : tagLine
 }
 
-// NOTE: `require MATCHER = EXPR matches snapshot` split in two — the require
+// `require MATCHER = EXPR matches snapshot` split in two — the require
 // left exactly as it was written, and the snapshot moved onto a line of its own
 // over a name the Matcher introduced. That is what the language has for it: the
 // require takes the value apart, and what there is to record is one of the
@@ -2153,7 +2153,7 @@ export function splitSnapshotActions(
 	let start = diagnostic.position.start
 	let indentation = indentationOf(lines, start.line)
 
-	// NOTE: Measured against the buffer rather than against the AST, because
+	// Measured against the buffer rather than against the AST, because
 	// there is no AST: the Statement was refused and dropped, so nothing records
 	// where the require ended and the snapshot began. A `require` that does not
 	// open the underlined line is a Statement written over several of them, and
@@ -2165,7 +2165,7 @@ export function splitSnapshotActions(
 		return []
 	}
 
-	// NOTE: The blanks between the value and the `matches` go with the split —
+	// The blanks between the value and the `matches` go with the split —
 	// what is left at the end of the require is the value it was written over.
 	let before = lineAt(lines, start.line).slice(0, start.column - 1)
 	let end = {
@@ -2178,7 +2178,7 @@ export function splitSnapshotActions(
 		kind: "quickfix" as const,
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// NOTE: Preferred where the Matcher introduced ONE name, which is the
+		// Preferred where the Matcher introduced ONE name, which is the
 		// shape the Help describes. Where it introduced several, choosing one
 		// of them for the reader is exactly what this must not do.
 		isPreferred: names.length === 1,
@@ -2191,13 +2191,13 @@ export function splitSnapshotActions(
 	}))
 }
 
-// NOTE: Where a moved block lands, said in terms of a line that is STAYING put:
+// Where a moved block lands, said in terms of a line that is STAYING put:
 // under the last line of the block it follows, or over the first line of the
 // block it precedes. Which of the two matters, because the blank line the move
 // carries goes on the side facing the block that is already there.
 type BlockSlot = { below: number } | { above: number }
 
-// NOTE: A block moved WHOLE. The lines it stands on are cut and written back at
+// A block moved WHOLE. The lines it stands on are cut and written back at
 // `slot`, byte for byte — the Comments inside it, the layout of its entries, the
 // indentation of every line — because the only thing wrong with the block is
 // where it stands, and retyping it would be this file inventing a layout for
@@ -2216,7 +2216,7 @@ function moveBlockEdits(
 	let cutFirst = first
 	let cutLast = last
 
-	// NOTE: The blank line BELOW where there is one, since that is the side a
+	// The blank line BELOW where there is one, since that is the side a
 	// block written at the top of a file has. Only one of the two, or the two
 	// blocks left behind would close up against each other.
 	if (last < lines.length && lineAt(lines, last + 1).trim() === "") {
@@ -2225,7 +2225,7 @@ function moveBlockEdits(
 		cutFirst = first - 1
 	}
 
-	// NOTE: A destination the block already stands at — nothing to move, and an
+	// A destination the block already stands at — nothing to move, and an
 	// edit that wrote it back where it came from would overlap its own
 	// deletion.
 	if (
@@ -2249,7 +2249,7 @@ function moveBlockEdits(
 		cursor = { line: slot.below + 1, column: 1 }
 		newText = `${blank}${text}\n`
 	} else {
-		// NOTE: A document that does not end in a break has no line below its
+		// A document that does not end in a break has no line below its
 		// last for an insertion to start at, so the break is written instead.
 		cursor = {
 			line: slot.below,
@@ -2260,12 +2260,12 @@ function moveBlockEdits(
 
 	let written = { range: { start: cursor, end: cursor }, newText }
 
-	// NOTE: In document order, which is what an Editor applying a list of edits
+	// In document order, which is what an Editor applying a list of edits
 	// against one buffer needs of them.
 	return cursor.line < cutFirst ? [written, removal] : [removal, written]
 }
 
-// NOTE: Where each section belongs, as the file itself says it: a Module reads
+// Where each section belongs, as the file itself says it: a Module reads
 // top to bottom — what it imports, what it does, what it exports, what it
 // proves. Each of the four has exactly one slot, so the destination is worked
 // out from the blocks that ARE in place rather than named by the Diagnostic.
@@ -2296,7 +2296,7 @@ function sectionSlot(
 	return { below: Math.max(implementation.end.line, exports?.end.line ?? 0) }
 }
 
-// NOTE: The `import { … }` or `export { … }` block written on the wrong side of
+// The `import { … }` or `export { … }` block written on the wrong side of
 // the implementation, put back on its own. The Parser DROPS such a block, so
 // what the Program holds is a file missing a whole section — which is why this
 // is preferred: moving it is the only reading, and the Program can not compile
@@ -2311,7 +2311,7 @@ export function moveModuleSectionAction(
 	}
 
 	let section = diagnostic.data.section
-	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// Read back off the buffer, as every edit here is: a Position from a
 	// stale analysis pointing at anything but the Keyword would cut lines that
 	// are no longer the block.
 	if (sliceOf(lines, diagnostic.position) !== section) {
@@ -2341,7 +2341,7 @@ export function moveModuleSectionAction(
 	}
 }
 
-// NOTE: The `tests { … }` block written above the implementation or above what
+// The `tests { … }` block written above the implementation or above what
 // the Module hands out, moved to the end where it belongs. The block is KEPT
 // where it stands rather than dropped, so the Program's own span for it says
 // what to cut.
@@ -2387,7 +2387,7 @@ export function moveTestsSectionAction(
 	}
 }
 
-// NOTE: The top-level Statement a use was written in, moved below the
+// The top-level Statement a use was written in, moved below the
 // Declaration it reaches for. Both are top-level: what the Diagnostic is about
 // is the order two of them RUN in, and a Statement nested in another runs when
 // that one does — so what has to move is the one the implementation block
@@ -2417,7 +2417,7 @@ export function moveDeclarationAction(
 	}
 
 	let statements = program.implementation.nodes
-	// NOTE: Matched on the buffer as well as on the Position, as every edit
+	// Matched on the buffer as well as on the Position, as every edit
 	// here is: a name that no longer reads the way the Node says it does is a
 	// Position from a stale analysis pointing at other text.
 	let declaration = statements.findIndex(

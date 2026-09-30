@@ -16,7 +16,7 @@ export const EXIT_USAGE = 2
 
 const DEFAULT_PROGRAM_NAME = "esfmt"
 
-// NOTE: The width the argument lists are given, gap included: every
+// The width the argument lists are given, gap included: every
 // description starts three spaces past the longest one that carries its
 // description on the same line. Written as that line rather than as a number
 // so that the column follows the text it is measured from.
@@ -52,7 +52,7 @@ function usage(programName: string): string {
 		},
 	]
 
-	// NOTE: A program name longer than `esfmt` — `essence format` under the
+	// A program name longer than `esfmt` — `essence format` under the
 	// unified binary — moves the description column right, but only until the
 	// longest description would end past the width this very screen says the
 	// formatter lays out to. Past that the column stops, and an argument list
@@ -133,13 +133,13 @@ function parseArguments(argv: Array<string>): Options | string {
 		} else if (argument === "--version") {
 			options.version = true
 		} else if (argument === "--help" || argument === "-h") {
-			// NOTE: Asking for help ends the parse, so that it answers rather
+			// Asking for help ends the parse, so that it answers rather
 			// than an argument written after it being rejected.
 			options.help = true
 
 			return options
 		} else if (argument === "--") {
-			// NOTE: Everything past an end-of-options marker is a file name, so
+			// Everything past an end-of-options marker is a file name, so
 			// that a path beginning with `-` is expressible at all. Reachable
 			// only through the unified binary: `esfmt -- <file>` works because
 			// bun drops a `--` sitting immediately after the script path, while
@@ -159,7 +159,7 @@ function parseArguments(argv: Array<string>): Options | string {
 
 const GLOB_CHARACTERS = /[*?[\]{}]/
 
-// NOTE: The directory a glob's walk starts in: its segments up to the first
+// The directory a glob's walk starts in: its segments up to the first
 // one that holds a pattern.
 function globBase(pattern: string): string {
 	let segments = pattern.split("/")
@@ -169,7 +169,7 @@ function globBase(pattern: string): string {
 	return path.resolve(fixed === "" && pattern.startsWith("/") ? "/" : fixed)
 }
 
-// NOTE: A glob leaves out what a walk from its base would: a match under a
+// A glob leaves out what a walk from its base would: a match under a
 // skipped directory below the base, or one the project excludes.
 function walkLeavesOut(
 	base: string,
@@ -186,12 +186,12 @@ function walkLeavesOut(
 
 async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 	let found = new Set<string>()
-	// NOTE: The project file is found from the working directory, as every
+	// The project file is found from the working directory, as every
 	// command finds it.
 	let { exclude } = readProjectConfiguration()
 
 	for (let pattern of patterns) {
-		// NOTE: A plain path is its own match: `glob` would treat characters
+		// A plain path is its own match: `glob` would treat characters
 		// like `[` in a file name as a pattern rather than as the name. A named
 		// file is taken as it is, whatever its extension and even when the
 		// project excludes it; only a directory filters, because there the
@@ -236,7 +236,7 @@ function displayPath(file: string): string {
 	return relative.startsWith("..") ? file : relative
 }
 
-// NOTE: A syntax error is the file's own problem and is reported with the
+// A syntax error is the file's own problem and is reported with the
 // position the parser gave; anything else that stops a file being formatted is
 // the formatter's, and says so plainly rather than blaming the source.
 function reportRefusal(
@@ -271,7 +271,7 @@ async function runStdin(
 	stdinFilepath: string | null,
 	programName: string,
 ): Promise<number> {
-	// NOTE: Read through the Node stream rather than `Bun.stdin`, so the
+	// Read through the Node stream rather than `Bun.stdin`, so the
 	// published formatter reads its input under either runtime.
 	let chunks: Array<Buffer> = []
 
@@ -419,7 +419,7 @@ export async function run(
 		return failed || unformatted.length > 0 ? EXIT_FAILURE : EXIT_SUCCESS
 	}
 
-	// NOTE: Silent when something was refused — the refusal has already been
+	// Silent when something was refused — the refusal has already been
 	// written to stderr, and a count of what did get formatted underneath it
 	// reads like the run succeeded.
 	if (failed) {

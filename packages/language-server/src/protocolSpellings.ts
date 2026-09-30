@@ -5,7 +5,7 @@ import type { common } from "@essence-lang/interfaces"
 import type { DocumentAnalysis } from "./analyse"
 import { typedProgramNodes } from "./sections"
 
-// NOTE: How a document names each Protocol it can, by identity: what it
+// How a document names each Protocol it can, by identity: what it
 // declares, what its import block binds, and the builtins. An alias is used
 // only where the document does not bind the declared name to that Protocol.
 export function protocolSpellings(

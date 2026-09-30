@@ -1,7 +1,7 @@
 import { editDistance } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
-// NOTE: What the tags of a whole workspace say about each other. Two questions,
+// What the tags of a whole workspace say about each other. Two questions,
 // both of which can only be asked once every file has been read — which is why
 // they are the Language Server's rather than the Compiler's: a compile sees one
 // Module, and `tagged netwrok` is perfectly well-formed inside it.
@@ -14,12 +14,12 @@ import type { common, parser } from "@essence-lang/interfaces"
 //   to catch on and did not looks like, and what a typo nothing is close enough
 //   to look like.
 
-// NOTE: Two edits, which is a typo. Three is a different word. The distance is
+// Two edits, which is a typo. Three is a different word. The distance is
 // the Compiler's own — the same one every "did you mean" in the toolchain is
 // measured by, counting the swap of two adjacent characters as one edit.
 const MAXIMUM_DISTANCE = 2
 
-// NOTE: The tag's own span, so a rename edits the word and not the Modifier.
+// The tag's own span, so a rename edits the word and not the Modifier.
 type TagSite = {
 	tag: string
 	filePath: string
@@ -28,14 +28,14 @@ type TagSite = {
 
 type TagUsage = {
 	tag: string
-	// NOTE: How many TESTS carry it, which is not how many places wrote it: a
+	// How many TESTS carry it, which is not how many places wrote it: a
 	// `suite "…" tagged slow` holding four tests is one site and four tests,
 	// and "used by exactly one test" is a claim about the tests.
 	tests: number
 	sites: Array<TagSite>
 }
 
-// NOTE: Every tag every test in this Program carries, with the place each one
+// Every tag every test in this Program carries, with the place each one
 // was written. A test's effective tags are its own plus every enclosing suite's
 // — the same rule the Enricher applies — because a tag on a suite is a tag on
 // what is under it.
@@ -89,7 +89,7 @@ function tagSitesOf(
 	return tests
 }
 
-// NOTE: One usage per tag, over every file the workspace holds.
+// One usage per tag, over every file the workspace holds.
 export function tagUsages(
 	files: Array<{ filePath: string; program: parser.Program }>,
 ): Map<string, TagUsage> {
@@ -97,7 +97,7 @@ export function tagUsages(
 
 	for (let file of files) {
 		for (let sites of tagSitesOf(file.filePath, file.program)) {
-			// NOTE: Deduplicated per TEST. A test writing `tagged slow, slow`
+			// Deduplicated per TEST. A test writing `tagged slow, slow`
 			// carries the tag once, and counting it twice would make a lonely
 			// tag look used.
 			let counted = new Set<string>()
@@ -134,7 +134,7 @@ export function tagUsages(
 	return usages
 }
 
-// NOTE: Which of two similar tags is the mistake: the one fewer tests carry,
+// Which of two similar tags is the mistake: the one fewer tests carry,
 // and where they are carried by as many, the one that sorts later — so that the
 // answer does not depend on the order the workspace happened to read its files
 // in, and a reader who fixes one is not offered the reverse next time.
@@ -193,7 +193,7 @@ function lonelyTagDiagnostic(site: TagSite): common.Diagnostic {
 	}
 }
 
-// NOTE: Every tag Diagnostic of the workspace, grouped by the file it belongs
+// Every tag Diagnostic of the workspace, grouped by the file it belongs
 // in. A file with nothing to say is not in the answer at all, which is what
 // lets the Server clear a file it published for a moment ago.
 export function tagDiagnostics(
@@ -212,7 +212,7 @@ export function tagDiagnostics(
 		}
 	}
 
-	// NOTE: One report per PAIR, on the rarer side. Three tags within two edits
+	// One report per PAIR, on the rarer side. Three tags within two edits
 	// of each other report twice on whichever is rarest, which is right: it is
 	// nearly the same as two different tags and the reader has to pick one.
 	for (let index = 0; index < usages.length; index += 1) {

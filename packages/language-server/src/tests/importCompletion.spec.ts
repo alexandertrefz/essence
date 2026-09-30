@@ -4,13 +4,13 @@ import { findCompletions } from "../completion"
 import { moduleSectionCursor } from "../importCompletion"
 import type { WorkspaceOffer } from "../workspace"
 
-// NOTE: A whole Program written as the lines it is made of, since where the
+// A whole Program written as the lines it is made of, since where the
 // cursor stands in a Module section is a question about lines.
 function source(...lines: Array<string>): string {
 	return lines.join("\n") + "\n"
 }
 
-// NOTE: The cursor just past `needle` on `line`, one-based like every Cursor.
+// The cursor just past `needle` on `line`, one-based like every Cursor.
 function past(text: string, line: number, needle: string) {
 	let column = (text.split("\n")[line - 1] ?? "").indexOf(needle)
 
@@ -146,7 +146,7 @@ describe("Completion in the Module sections", () => {
 			})
 		})
 
-		// NOTE: `from ` completed to a group must not read `from from …`.
+		// `from ` completed to a group must not read `from from …`.
 		it("replaces a from already written, space and all", () => {
 			let text = source(
 				"import {",
@@ -233,7 +233,7 @@ describe("Completion in the Module sections", () => {
 			expect(entries.every((entry) => entry.kind === "module")).toBe(true)
 		})
 
-		// NOTE: The Editor's word ends at every `.` and `/`, so the whole of
+		// The Editor's word ends at every `.` and `/`, so the whole of
 		// what was typed is what the entry replaces — else `./ma` completed to
 		// `./math/Math.es` reads `./ma./math/Math.es`.
 		it("replaces everything typed since the quote", () => {
@@ -384,7 +384,7 @@ describe("Completion in the Module sections", () => {
 			)
 			let entries = completions(text, { line: 3, column: 2 })
 
-			// NOTE: The bare `from` last is the snippet, which writes a group
+			// The bare `from` last is the snippet, which writes a group
 			// for the Modules a workspace could not offer one for — a file
 			// that is not there yet, and a workspace nobody indexed.
 			expect(entries.map((entry) => entry.label)).toEqual([

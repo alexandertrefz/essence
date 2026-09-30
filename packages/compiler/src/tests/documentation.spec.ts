@@ -11,7 +11,7 @@ const position = {
 	end: { line: 1, column: 1 },
 }
 
-// NOTE: One line per source line, numbered from 1 and starting at column 1, so
+// One line per source line, numbered from 1 and starting at column 1, so
 // that a Position reported against a tag can be read back as the line it was
 // written on and the column the offending text starts at.
 function positioned(lines: Array<string>) {
@@ -32,7 +32,7 @@ function problemsOf(lines: Array<string>) {
 	return parseDocumentation(positioned(lines), position).problems
 }
 
-// NOTE: The `@param` lines as name and text alone, which is what every reader
+// The `@param` lines as name and text alone, which is what every reader
 // of a Documentation asks for. Their Positions are checked on their own, in the
 // one test that is about them.
 function tagsOf(lines: Array<string>) {
@@ -64,7 +64,7 @@ describe("Documentation", () => {
 		expect(documentation.description).toBe("Steps:\n\n- first\n  - nested")
 	})
 
-	// NOTE: The un-separated form, which is reported but still lifted — a
+	// The un-separated form, which is reported but still lifted — a
 	// Hover must not lose a description while its source is being corrected.
 	it("should lift a tag written without a separator all the same", () => {
 		let lines = [
@@ -99,7 +99,7 @@ describe("Documentation", () => {
 	})
 
 	it("should open a new Parameter for every line, name repeated or not", () => {
-		// NOTE: Two lines are two Parameters. A `_` is written once per
+		// Two lines are two Parameters. A `_` is written once per
 		// positional Parameter, so a repeated name is the ordinary case rather
 		// than a section continued.
 		expect(
@@ -170,7 +170,7 @@ describe("Documentation", () => {
 				kind: "missing-separator",
 				tag: "param",
 				name: "other",
-				// NOTE: The text alone, which is where the missing em-dash
+				// The text alone, which is where the missing em-dash
 				// belongs — column 17 is the 'w' of 'what'.
 				position: {
 					start: { line: 1, column: 17 },
@@ -197,7 +197,7 @@ describe("Documentation", () => {
 			]),
 		).toEqual([])
 
-		// NOTE: A tag head alone has no text on its line to separate; the lines
+		// A tag head alone has no text on its line to separate; the lines
 		// below it are its text, and are not tags themselves.
 		expect(
 			problemsOf([
@@ -215,7 +215,7 @@ describe("Documentation", () => {
 			"§§ @param other — what to append",
 		])
 
-		// NOTE: The name alone — what a Diagnostic about it underlines.
+		// The name alone — what a Diagnostic about it underlines.
 		expect(documentation.parameters).toEqual([
 			{
 				name: "other",
@@ -231,7 +231,7 @@ describe("Documentation", () => {
 	})
 
 	it("should take a Parameter named after a member of Object.prototype", () => {
-		// NOTE: A list rather than an Object, so `@param toString` is a name
+		// A list rather than an Object, so `@param toString` is a name
 		// like any other. Read out of an Object literal it found the inherited
 		// function and the Parser died on it, taking `esfmt` and the Language
 		// Server down with it.
@@ -249,7 +249,7 @@ describe("Documentation", () => {
 	})
 
 	it("should leave a tag inside a fenced code block in the prose", () => {
-		// NOTE: A fence is where a tag is being SHOWN rather than written.
+		// A fence is where a tag is being SHOWN rather than written.
 		// Lifting it invents a Parameter and leaves the fence unclosed.
 		let documentation = parse([
 			"§§ Shows how to document:",
@@ -277,7 +277,7 @@ describe("Documentation", () => {
 		expect(documentation.description).toBe("First.\n\nSecond.")
 	})
 
-	// NOTE: The rule the Enricher reports against, read on its own. A Program
+	// The rule the Enricher reports against, read on its own. A Program
 	// exercises the strict half, which is what `documentationStrictness` names
 	// and what the standard library and every user file are held to; the
 	// lenient half is read here and nowhere else.

@@ -1,4 +1,4 @@
-// NOTE: The server is bundled from the `@essence-lang/language-server`
+// The server is bundled from the `@essence-lang/language-server`
 // DEPENDENCY, not from a path counted out to a sibling directory. Inside the
 // monorepo the workspace satisfies the pinned version and this resolves to
 // the TypeScript sources; anywhere else `bun install` fetches the published
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 let serverEntry = fileURLToPath(
 	import.meta.resolve("@essence-lang/language-server/serverEntry"),
 )
-// NOTE: The test session's Worker is bundled BESIDE the server rather than into
+// The test session's Worker is bundled BESIDE the server rather than into
 // it. A Worker is started from a file, and the server ships as one file with no
 // `node_modules` to resolve out of — so the file has to exist, and it has to
 // carry the Compiler and the standard library loader with it. The session looks
@@ -28,7 +28,7 @@ let stdlibEntry = fileURLToPath(
 	import.meta.resolve("@essence-lang/standard-library"),
 )
 let stdlibSources = path.resolve(path.dirname(stdlibEntry), "../sources")
-// NOTE: The runtime's TypeScript sources go beside the bundle for the same
+// The runtime's TypeScript sources go beside the bundle for the same
 // reason the standard library's `.es` sources do, and it is the same failure
 // when they do not: the Bundler writes their absolute paths into the JavaScript
 // it emits and then reads them off disk, so no bundler can see through it. The
@@ -68,7 +68,7 @@ for (let [sources, name] of [
 	rmSync(bundled, { recursive: true, force: true })
 	cpSync(sources, bundled, {
 		recursive: true,
-		// NOTE: The runtime's own specs come with its sources and are no part
+		// The runtime's own specs come with its sources and are no part
 		// of what a Program bundles. Copying them would ship a `tests/`
 		// directory into every extension and, worse, put `bun:test` imports
 		// inside the tree esbuild resolves against.

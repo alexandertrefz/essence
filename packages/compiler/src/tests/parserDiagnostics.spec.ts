@@ -6,7 +6,7 @@ import { containsErrors } from "../diagnostics/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { compiles } from "./followedHelps"
 
-// NOTE: The Diagnostics the Lexer and the Parser report about a Program that
+// The Diagnostics the Lexer and the Parser report about a Program that
 // is wrong in a way they can still read past — a Number holding letters, a
 // name defined twice. Each of these was once accepted in silence, which is
 // what makes them worth a test of their own: the Program compiled, and did
@@ -62,7 +62,7 @@ describe("Parser Diagnostics", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("invalid-number")
 
-			// NOTE: The malformed Literal ends its own Token and nothing else —
+			// The malformed Literal ends its own Token and nothing else —
 			// the Statements around it are read as written, and the Token that
 			// is left behind holds digits, so no later stage sees `1e5`.
 			let nodes = program.implementation.nodes
@@ -96,7 +96,7 @@ describe("Parser Diagnostics", () => {
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].code).toBe("invalid-escape")
 
-			// NOTE: The bad escape ends nothing — the character is read as itself
+			// The bad escape ends nothing — the character is read as itself
 			// and the Statements around it are read as written.
 			let nodes = program.implementation.nodes
 			expect(nodes).toHaveLength(2)
@@ -114,7 +114,7 @@ describe("Parser Diagnostics", () => {
 			expect(diagnostics).toEqual([])
 		})
 
-		// NOTE: The same rule where the backslash stands in front of a
+		// The same rule where the backslash stands in front of a
 		// character that acts on the terminal. `'\<BEL>' is not a valid escape`
 		// rings the bell of whoever reads the report, so the character is named
 		// rather than echoed — and the shape of the sentence changes with it,
@@ -130,7 +130,7 @@ describe("Parser Diagnostics", () => {
 			)
 		})
 
-		// NOTE: The one sentence a reader who wrote a backslash is told the
+		// The one sentence a reader who wrote a backslash is told the
 		// escape set by. It is built from `escapeSetSentence`, which the
 		// documentation and the showcase are captured from, so a set that grows
 		// grows in one place.
@@ -145,7 +145,7 @@ describe("Parser Diagnostics", () => {
 		})
 	})
 
-	// NOTE: One `\u{…}` can be wrong in six ways under four codes, and what is
+	// One `\u{…}` can be wrong in six ways under four codes, and what is
 	// tested of each is the whole of what a reader gets: the code, the span the
 	// label sits on, and the Help — which is an EDIT, so each one is written
 	// back into the probe and compiled.
@@ -169,7 +169,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The pair is the habit's other half — `😀` is how a
+		// The pair is the habit's other half — `😀` is how a
 		// language with no astral escape writes one character. Neither half is a
 		// character, so neither has a rewrite of its own and the Help offers the
 		// one escape both of them stood for.
@@ -184,7 +184,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: ONE report over BOTH halves, and the span is the whole of what
+		// ONE report over BOTH halves, and the span is the whole of what
 		// the Help rewrites. A pair reported half at a time was the bug this
 		// test was written against and did not see: following the first Help
 		// left the second half standing and the reader was refused again, which
@@ -211,7 +211,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The two halves need not be written the same way. A reader
+		// The two halves need not be written the same way. A reader
 		// rewriting a JavaScript pair one half at a time leaves exactly these
 		// behind, and each of them is still one character written in two
 		// escapes — so each is one report offering the character both halves
@@ -233,7 +233,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: What is NOT a pair, so the report that spans two escapes is
+		// What is NOT a pair, so the report that spans two escapes is
 		// held to spanning exactly the two that spell one character: halves in
 		// the wrong order, a high half in front of an ordinary escape, and a
 		// pair that something stands between. Each half is its own refusal
@@ -256,7 +256,7 @@ describe("Parser Diagnostics", () => {
 			}
 		})
 
-		// NOTE: A lone surrogate has no rewrite — there is no character it
+		// A lone surrogate has no rewrite — there is no character it
 		// stands for — so nothing is offered rather than something that would be
 		// refused on the next run.
 		it("should offer nothing for a lone surrogate", () => {
@@ -303,7 +303,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The character the message names is the READER'S, and a report
+		// The character the message names is the READER'S, and a report
 		// is read on a terminal. An override in it reorders the line the
 		// Compiler wrote; a BEL rings the bell; a byte order mark leaves
 		// `'' is not a hexadecimal digit`, which names nothing at all. Every
@@ -328,7 +328,7 @@ describe("Parser Diagnostics", () => {
 			}
 		})
 
-		// NOTE: And the character that prints as itself still prints as itself:
+		// And the character that prints as itself still prints as itself:
 		// naming every one of them would tell a reader who typed 'G' about
 		// U+0047.
 		it("should quote an offending character that prints as itself", () => {
@@ -341,7 +341,7 @@ describe("Parser Diagnostics", () => {
 			)
 		})
 
-		// NOTE: `U+1B` is how a code point is NAMED everywhere it is written
+		// `U+1B` is how a code point is NAMED everywhere it is written
 		// down, so it arrives inside the braces often enough to be answered for
 		// rather than left to the general rule.
 		it("should take the 'U+' off a code point written by name", () => {
@@ -387,7 +387,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: Every decimal digit is a hexadecimal digit too, so a code point
+		// Every decimal digit is a hexadecimal digit too, so a code point
 		// copied out of a chart in decimal looks exactly like a well-written
 		// escape and simply names a number that is too large. The Help offers
 		// the reading on a condition it writes out rather than instructing,
@@ -404,7 +404,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: And withheld where the digits are not a chart reading at all.
+		// And withheld where the digits are not a chart reading at all.
 		// `\u{110000}` is U+10FFFF plus one written in HEXADECIMAL — the top of
 		// Unicode, missed by one, by a reader who knows exactly where it is.
 		// Asking them whether they meant the decimal 110,000 (a Yi syllable)
@@ -423,7 +423,7 @@ describe("Parser Diagnostics", () => {
 			}
 		})
 
-		// NOTE: A decimal that LOOKS like it lands somewhere refusable does
+		// A decimal that LOOKS like it lands somewhere refusable does
 		// not. Six digits read as hexadecimal is at most 0xFFFFFF, and the
 		// smallest of them that is above the top is 0x110000, whose decimal
 		// reading is 110,000 — above every surrogate. So the arm of the
@@ -439,7 +439,7 @@ describe("Parser Diagnostics", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The refusal that could swallow the file, and the reason the scan
+		// The refusal that could swallow the file, and the reason the scan
 		// stops where it does. The String closes where it was written, so the
 		// Statement after it is read — and `unclosed-string` is NOT reported,
 		// because nothing is unclosed.
@@ -464,7 +464,7 @@ describe("Parser Diagnostics", () => {
 			).toBe(true)
 		})
 
-		// NOTE: And the hole below an unclosed escape is still a hole. This is
+		// And the hole below an unclosed escape is still a hole. This is
 		// the recovery `lexer.spec.ts` checks in Tokens, read here as the
 		// Program the Parser built out of them.
 		it("should leave a hole below an unclosed escape alone", () => {
@@ -501,7 +501,7 @@ describe("Parser Diagnostics", () => {
 				end: { line: 2, column: 28 },
 			})
 
-			// NOTE: The Comment ends at the hole's '}', so the String closes
+			// The Comment ends at the hole's '}', so the String closes
 			// where it was written and the Statement after it survives.
 			let nodes = program.implementation.nodes
 
@@ -513,7 +513,7 @@ describe("Parser Diagnostics", () => {
 		})
 	})
 
-	// NOTE: The Lexer reads the whole file before the Parser reads a Token of
+	// The Lexer reads the whole file before the Parser reads a Token of
 	// it, so everything the Lexer had to say stood above everything the Parser
 	// did, whatever line each of them was about — a bad escape on line 4 printed
 	// over a Number on line 2. Reading a report is reading a file.
@@ -609,7 +609,7 @@ _ 2
 			})
 		})
 
-		// NOTE: The Statement is DROPPED rather than left holding the `3` alone,
+		// The Statement is DROPPED rather than left holding the `3` alone,
 		// because a `/` behind a finished Expression on its own line is division
 		// written the way another language writes it — see `foreignTextAhead`.
 		// What the joining rule claims is unchanged: the two parts did not become
@@ -671,7 +671,7 @@ _ 2
 		})
 	})
 
-	// NOTE: A decimal is a Rational written a second way, so what these hold
+	// A decimal is a Rational written a second way, so what these hold
 	// the Parser to is the FRACTION each spelling stands for — there is no
 	// Node of its own to check, and no scale on the side: `1.50` and `1.5` are
 	// two ways of writing one value, and both reduce to it on read.
@@ -702,7 +702,7 @@ _ 2
 			})
 		})
 
-		// NOTE: `2.0` is a Rational the way `4/2` is one — the spelling says
+		// `2.0` is a Rational the way `4/2` is one — the spelling says
 		// what was written, and the runtime reduces it on read.
 		it("should read a whole decimal as a Rational", () => {
 			expect(numberOf("2.0")).toMatchObject({
@@ -712,7 +712,7 @@ _ 2
 			})
 		})
 
-		// NOTE: No scale is kept, so `1.50` and `1.5` are the same value —
+		// No scale is kept, so `1.50` and `1.5` are the same value —
 		// which is what makes `1.50::is(1.5)` true.
 		it("should keep a trailing zero out of the value", () => {
 			expect(numberOf("1.50")).toMatchObject({
@@ -730,7 +730,7 @@ _ 2
 			})
 		})
 
-		// NOTE: The numerator goes through `BigInt`, because every stage
+		// The numerator goes through `BigInt`, because every stage
 		// behind the Parser reads it as plain digits — the Optimiser folds a
 		// Literal only where it matches `/^-?[0-9]+$/`, and the Rewriter hands
 		// the string straight to `BigInt`.
@@ -774,7 +774,7 @@ _ 2
 			expect(diagnostics[0].labels[0]?.message).toBe(
 				"'/' can not follow a decimal",
 			)
-			// NOTE: The whole Literal is underlined, not the tail alone — the
+			// The whole Literal is underlined, not the tail alone — the
 			// tail is read before it is refused so that nothing is left behind
 			// to be read again as a Statement of its own.
 			expect(diagnostics[0].position).toEqual({
@@ -828,7 +828,7 @@ _ 2
 			)
 		})
 
-		// NOTE: The digits have to be flush against the point, exactly as the
+		// The digits have to be flush against the point, exactly as the
 		// denominator of `1/2` has to be flush against the `/`.
 		it("should refuse digits pushed off the point", () => {
 			let { diagnostics } = parseWithDiagnostics(
@@ -857,7 +857,7 @@ _ 2
 			}
 		})
 
-		// NOTE: The reading a decimal must not take away. A flush `.` behind
+		// The reading a decimal must not take away. A flush `.` behind
 		// an Integer opened a Lookup long before decimals existed, and it
 		// still does wherever a member name rather than digits follows it.
 		it("should still read a flush member off an Integer", () => {
@@ -882,7 +882,7 @@ _ 2
 			).toMatchObject({ nodeType: "Lookup" })
 		})
 
-		// NOTE: A `.` that opens an Expression is still a member path — the
+		// A `.` that opens an Expression is still a member path — the
 		// refusal above it reads the digits, and nothing else.
 		it("should still read a member path", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
@@ -936,7 +936,7 @@ _ 2
 			)
 		})
 
-		// NOTE: `nothing` is no longer a Literal — it is not even a Keyword —
+		// `nothing` is no longer a Literal — it is not even a Keyword —
 		// so it reaches this the same way any other bare name does, and is
 		// turned away for the same reason `expected` is above. Pinned on its
 		// own because it used to be accepted here, and a Matcher that silently
@@ -993,7 +993,7 @@ _ 2
 				"Expected an Expression but found 'protocol'.",
 			)
 
-			// NOTE: The Protocol survives the broken Statement above it —
+			// The Protocol survives the broken Statement above it —
 			// skipping it would take every `is Sizeable` in the file down with
 			// it, none of which is what went wrong.
 			let nodes = program.implementation.nodes
@@ -1107,7 +1107,7 @@ _ 2
 		})
 
 		it("should not report a Property and a Method sharing a name", () => {
-			// NOTE: They are built into two separate name-keyed Records, so
+			// They are built into two separate name-keyed Records, so
 			// neither definition is lost — the Parser has nothing to report.
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
@@ -1205,7 +1205,7 @@ function greet(subject: String) -> String { <- subject }
 			expect(diagnostics[0].helps).toEqual([
 				"Write '@param subject —' before the text.",
 			])
-			// NOTE: The text alone, rather than the whole Comment — the
+			// The text alone, rather than the whole Comment — the
 			// em-dash is missing exactly where 'who' begins.
 			expect(diagnostics[0].position).toEqual({
 				start: { line: 2, column: 19 },
@@ -1227,7 +1227,7 @@ function greet(subject: String) -> String { <- subject }
 		})
 
 		it("should report a tag it read only once", () => {
-			// NOTE: The Documentation of a Declaration inside a Namespace is
+			// The Documentation of a Declaration inside a Namespace is
 			// reached through readings the Parser abandons; the Diagnostic
 			// must survive the kept one exactly once all the same.
 			let { diagnostics } = parseWithDiagnostics(
@@ -1260,14 +1260,14 @@ greet() -> String { <- @ }
 		})
 
 		it("should not report a Diagnostic from a reading it threw away", () => {
-			// NOTE: A Record in Expression position is first tried as a typed
+			// A Record in Expression position is first tried as a typed
 			// Record Literal, which reads `{ a: Integer, a: String }` as a
 			// Record Type — duplicate and all — before failing on the missing
 			// `~>`. That reading was thrown away, so what it found about it
 			// must be thrown away with it; only the error of the reading that
 			// was kept is left.
 			//
-			// NOTE: That error is the `:` standing where a Record Literal's `=`
+			// That error is the `:` standing where a Record Literal's `=`
 			// belongs, which is a refusal of the text and travels out of the
 			// speculation rather than being given back — the duplicate the
 			// abandoned reading found is still nowhere in the report, which is
@@ -1282,7 +1282,7 @@ greet() -> String { <- @ }
 			expect(diagnostics[0].code).toBe("foreign-syntax")
 		})
 
-		// NOTE: `{ x = .5 }` is read as a Record Literal first and as a
+		// `{ x = .5 }` is read as a Record Literal first and as a
 		// Combination second, and it is the FIRST reading that meets the
 		// half-written decimal. A refusal carrying a code is a verdict about
 		// the text rather than "this reading was not the one written", so the
@@ -1323,7 +1323,7 @@ greet() -> String { <- @ }
 			}
 		})
 
-		// NOTE: The constructs a Record Literal stands inside — an Argument, a
+		// The constructs a Record Literal stands inside — an Argument, a
 		// Case payload, a typed Record Literal, an item of a List, the members
 		// of a `with` — each of which reads it through at least one
 		// speculation, and one that nests two of them, where the refusal has
@@ -1348,7 +1348,7 @@ greet() -> String { <- @ }
 			}
 		})
 
-		// NOTE: `require MATCHER = EXPR` reads its Matcher speculatively and
+		// `require MATCHER = EXPR` reads its Matcher speculatively and
 		// reads an Expression where that is not what was written, so a Record
 		// Matcher's member values stand behind a speculation too — and both
 		// readings meet the same Literal.
@@ -1366,7 +1366,7 @@ greet() -> String { <- @ }
 			expect(diagnostics[0].code).toBe("partial-decimal-literal")
 		})
 
-		// NOTE: A path is refused where it is READ, which inside a member
+		// A path is refused where it is READ, which inside a member
 		// value is inside the Record Literal reading.
 		it("should refuse a call on a path in a member value", () => {
 			for (let member of [
@@ -1382,7 +1382,7 @@ greet() -> String { <- @ }
 			}
 		})
 
-		// NOTE: The other half of the rule. A generic failure IS "this reading
+		// The other half of the rule. A generic failure IS "this reading
 		// was not the one written", so it is still given back and the readings
 		// behind it still run — and both of these are refused by the LAST of
 		// them, at the `=` of the first member, which is the Token the update
@@ -1406,7 +1406,7 @@ greet() -> String { <- @ }
 			}
 		})
 
-		// NOTE: The shapes the speculations are there for, read together so
+		// The shapes the speculations are there for, read together so
 		// that one of them turning into an error is a failure here rather than
 		// a snapshot nobody looks at twice.
 		it("should still read the shapes the speculations are there for", () => {
@@ -1442,7 +1442,7 @@ describe("Parser AST", () => {
 	})
 
 	it("should span a Combination from brace to brace", () => {
-		// NOTE: Like the Record Literal branches — the Formatter reads the
+		// Like the Record Literal branches — the Formatter reads the
 		// span as the braces it claims trailing trivia behind, so a span
 		// ending before the closing brace left a Comment on the '}' line
 		// unclaimed and made it refuse the file.
@@ -1491,7 +1491,7 @@ describe("Parser AST", () => {
 			)
 		})
 
-		// NOTE: Two colons written apart are not a `::` anywhere else in the
+		// Two colons written apart are not a `::` anywhere else in the
 		// grammar, and they are not one here either — the refusal reads the
 		// lexeme, not the Token.
 		it("should leave a spaced colon pair to the rest of the grammar", () => {
@@ -1518,13 +1518,13 @@ describe("Parser AST", () => {
 		})
 	})
 
-	// NOTE: Where several readings of one piece of text all fail, the one
+	// Where several readings of one piece of text all fail, the one
 	// reported is the one that got FURTHEST — not the last one tried, which is
 	// the fallback and by construction the reading that got least far. Each of
 	// these was answered, before that rule, at the Token the FALLBACK died on:
 	// two Tokens into a Statement whose mistake is four lines below it.
 	describe("The furthest reading", () => {
-		// NOTE: The unlabelled reading of `names::map(…)` spans the Argument and
+		// The unlabelled reading of `names::map(…)` spans the Argument and
 		// runs on to the `Terminal` of the next Statement; the labelled reading
 		// behind it takes `names` for a label and dies on the `:` of the `::`.
 		// That `:` is what a missing ')' used to be reported at.
@@ -1555,7 +1555,7 @@ describe("Parser AST", () => {
 			})
 		})
 
-		// NOTE: The Literal reading of the braces meets the stray ')' four lines
+		// The Literal reading of the braces meets the stray ')' four lines
 		// down; the update reading behind it needs a `with` where the first
 		// member's `=` stands, and that `=` is what the whole family of mistakes
 		// inside a Record used to be answered at.
@@ -1584,7 +1584,7 @@ describe("Parser AST", () => {
 			})
 		})
 
-		// NOTE: Every Diagnostic each of these produces is listed, not just the
+		// Every Diagnostic each of these produces is listed, not just the
 		// first. The third member closes the Record early, so the `}` that was
 		// meant to close it stands behind the whole Program — which is a second
 		// mistake in the same source and belongs on the page.
@@ -1618,7 +1618,7 @@ describe("Parser AST", () => {
 			}
 		})
 
-		// NOTE: The Dictionary readings share the brackets with the List one and
+		// The Dictionary readings share the brackets with the List one and
 		// are told apart by a Token of lookahead rather than by speculation, so
 		// nothing here is read twice — these are here to hold that, not to prove
 		// a swap.
@@ -1639,7 +1639,7 @@ describe("Parser AST", () => {
 			}
 		})
 
-		// NOTE: `nesting-too-deep` is given BACK by a speculation rather than
+		// `nesting-too-deep` is given BACK by a speculation rather than
 		// raised out of it, so an attempt that exhausted the budget is a reading
 		// thrown away like any other — and it is still the true account of this
 		// Record, whose member really is nested past what the Parser reads. It
@@ -1655,7 +1655,7 @@ describe("Parser AST", () => {
 			expect(diagnostics[0].code).toBe("nesting-too-deep")
 		})
 
-		// NOTE: A coded refusal is a verdict about written text and outranks a
+		// A coded refusal is a verdict about written text and outranks a
 		// reading that merely got further — it never becomes a thrown-away
 		// reading in the first place, because `refusesTheText` raises it out of
 		// the speculation instead of giving it back.
@@ -1679,7 +1679,7 @@ describe("Parser AST", () => {
 			}
 		})
 
-		// NOTE: A reading that HELD answers for the ones tried beside it. The
+		// A reading that HELD answers for the ones tried beside it. The
 		// Literal reading of these braces runs out at the `with`, four Tokens
 		// ahead of where the Combination that IS written ends — and the mistake
 		// below it is the one that has to be reported.
@@ -1695,7 +1695,7 @@ describe("Parser AST", () => {
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
 
-		// NOTE: And a Statement that was read answers for them too. Two things
+		// And a Statement that was read answers for them too. Two things
 		// hold this: the Record Literal reading of the first Statement HELD, so
 		// the update reading it replaced is dropped where every replaced
 		// reading is, and the record would have to stand further into the input
@@ -1719,7 +1719,7 @@ describe("Parser AST", () => {
 		})
 	})
 
-	// NOTE: A bracket is noticed as missing at the first Token that can not
+	// A bracket is noticed as missing at the first Token that can not
 	// carry its contents on, which is a line — or a screen — away from the
 	// bracket itself. The Label is what closes that distance, and it is written
 	// only where there IS one: a pair on a single line is under the reader's eye
@@ -1770,7 +1770,7 @@ describe("Parser AST", () => {
 			})
 		})
 
-		// NOTE: The pair written on one line keeps the Diagnostic it has always
+		// The pair written on one line keeps the Diagnostic it has always
 		// had, with one Label: the bracket is under the reader's eye already.
 		// The mistake is a second Argument written without a comma, because an
 		// operator written there — `1 + 2` — is answered by
@@ -1798,7 +1798,7 @@ describe("Parser AST", () => {
 		})
 	})
 
-	// NOTE: Helps that spell the reader's own text where it is in hand, rather
+	// Helps that spell the reader's own text where it is in hand, rather
 	// than an example. An example names something nothing in the file declares,
 	// and a reader who follows it arrives at a report about a name they never
 	// wrote. Every Help asserted here is written back into its own probe and
@@ -1821,7 +1821,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: Unannotated on purpose. A literal handed to a Method reads its
+		// Unannotated on purpose. A literal handed to a Method reads its
 		// Parameter's Type off the Argument it is passed, and the annotation
 		// this used to print named a Type nothing declares.
 		it("leaves the offered literal's Parameter unannotated", () => {
@@ -1832,7 +1832,7 @@ describe("Parser AST", () => {
 			])
 		})
 
-		// NOTE: And the Types are spelled as holes where the position hands a
+		// And the Types are spelled as holes where the position hands a
 		// literal neither of them. A path written into a Declaration is not in
 		// an Argument list, so the untyped literal offered above is refused
 		// there for having no Parameter Type — the reader followed one report
@@ -1863,7 +1863,7 @@ describe("Parser AST", () => {
 			])
 		})
 
-		// NOTE: `'(n: Integer)'` declares a LABELLED Parameter, so a reader who
+		// `'(n: Integer)'` declares a LABELLED Parameter, so a reader who
 		// followed this Help and then called what they had written was answered
 		// `This Argument is not labelled 'n'`.
 		it("writes the arrow literal's Parameter unlabelled", () => {
@@ -1883,7 +1883,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A `=>` behind a String or a Number is the hash rocket and not an
+		// A `=>` behind a String or a Number is the hash rocket and not an
 		// arrow: no language writes a Parameter list as a Literal.
 		it("answers a hash rocket as the Dictionary entry it is", () => {
 			let source = `implementation {
@@ -1904,7 +1904,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A NAME on the left is genuinely both habits at once — `x => x`
+		// A NAME on the left is genuinely both habits at once — `x => x`
 		// is a Function in one language and a key in another — so the Function
 		// literal is what stays answered there.
 		it("leaves a named left operand to the Function literal", () => {
@@ -1918,7 +1918,7 @@ describe("Parser AST", () => {
 			)
 		})
 
-		// NOTE: "or drop the key" was a dead end where the key is the ONLY one:
+		// "or drop the key" was a dead end where the key is the ONLY one:
 		// `{ config with server.{ } }` dropped down to `{ config with }`.
 		it("names the value an only descend would leave behind", () => {
 			let source = `implementation {
@@ -1940,7 +1940,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: Each report used to offer a Record holding only its OWN name, so
+		// Each report used to offer a Record holding only its OWN name, so
 		// a reader who followed one dropped every other key without being told.
 		it("gathers every bare key into the Record it offers", () => {
 			let source = `implementation {
@@ -1970,7 +1970,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The Help and the Quick Fix read one computation now. `'3/4' or
+		// The Help and the Quick Fix read one computation now. `'3/4' or
 		// '0.75'` was printed whatever was written, so `2.5/3` — five sixths —
 		// was answered with a Help that quietly changed the number while the fix
 		// beside it offered `5/6`.
@@ -1983,7 +1983,7 @@ describe("Parser AST", () => {
 			])
 		})
 
-		// NOTE: Two shapes reach one refusal. A trailing comma is dropped; a
+		// Two shapes reach one refusal. A trailing comma is dropped; a
 		// SECOND value can not be, and the Record that carries both is spelled
 		// with the Case the reader wrote rather than with `#Rectangle`.
 		it("tells a trailing comma from a second payload", () => {
@@ -2017,7 +2017,7 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The literal is often passed to nothing at all, or to a Method of
+		// The literal is often passed to nothing at all, or to a Method of
 		// the standard library — so "write the default on the Function this is
 		// passed to" was an edit in a Declaration the reader has not got. The
 		// Help is the edit the Quick Fix beside it makes.

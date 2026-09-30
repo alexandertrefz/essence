@@ -22,14 +22,14 @@ import { findSemanticTokens } from "../semanticTokens"
 import { findSignatureHelp } from "../signatureHelp"
 import { applyEdits } from "./textEdits"
 
-// NOTE: What an editor answers over the third written container. A Dictionary
+// What an editor answers over the third written container. A Dictionary
 // reaches every walk in the Language Server through a Node kind none of them
 // had before, so what is worth pinning is that the two halves of an entry are
 // REACHED — a key and a value are both Expressions, and a walk that visited
 // only one of them would go blind inside half of every Dictionary anybody
 // writes.
 //
-// NOTE: Where a List or a Record already answers the same question, the
+// Where a List or a Record already answers the same question, the
 // Dictionary's answer is written as a PAIR with theirs, so a Dictionary can not
 // quietly grow — or quietly miss — a behaviour its two sibling containers have.
 
@@ -72,7 +72,7 @@ function definitionAt(source: string, cursor: common.Cursor) {
 	return findDefinition(program, cursor, enriched.program)
 }
 
-// NOTE: Every edit applied to the buffer by hand, last one first, so an earlier
+// Every edit applied to the buffer by hand, last one first, so an earlier
 // edit does not move a later one's columns. What comes back is the renamed file
 // as an Editor would show it.
 function rename(source: string, cursor: common.Cursor, newName: string) {
@@ -105,7 +105,7 @@ function rename(source: string, cursor: common.Cursor, newName: string) {
 	return lines.join("\n")
 }
 
-// NOTE: Every Diagnostic the front end has about a Program, from all three of
+// Every Diagnostic the front end has about a Program, from all three of
 // the stages that report one — what an editor draws is the union of them.
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
@@ -131,7 +131,7 @@ function spanOf(diagnostic: common.Diagnostic): string {
 	return `${position.start.line}:${position.start.column}-${position.end.line}:${position.end.column}`
 }
 
-// NOTE: Every `wrong-update-brackets` Quick Fix a document offers, and the
+// Every `wrong-update-brackets` Quick Fix a document offers, and the
 // document with them applied. What a Quick Fix is worth is the TEXT it leaves,
 // and a title alone says nothing about that.
 function actionsFor(source: string) {
@@ -189,7 +189,7 @@ describe("Dictionary literals", () => {
 			expect(hover(source, { line: 2, column: 29 })).toBe("Integer")
 		})
 
-		// NOTE: The empty Dictionary answers with what IT says and not with what
+		// The empty Dictionary answers with what IT says and not with what
 		// the annotation above it decided — both slots undecided, exactly as
 		// `[]` answers `List<Unknown>` under a `List<Integer>`. The Declaration
 		// carries the decided Type and answers with it on its own name.
@@ -209,7 +209,7 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// NOTE: A key stands in the key slot of the expected Dictionary and a value
+	// A key stands in the key slot of the expected Dictionary and a value
 	// in the value slot, which is what puts a Choice in reach of a bare `#` in
 	// either — the same decision a List's item position makes, made twice.
 	describe("Case completion", () => {
@@ -264,7 +264,7 @@ describe("Dictionary literals", () => {
 			).toEqual(["Red", "Black"])
 		})
 
-		// NOTE: A name written inside a Dictionary is in Scope like a name
+		// A name written inside a Dictionary is in Scope like a name
 		// written anywhere else, which is what says the walk reaches BOTH
 		// halves of an entry rather than only the one a List would have.
 		it("completes a name written in either half", () => {
@@ -303,7 +303,7 @@ describe("Dictionary literals", () => {
 			})
 		})
 
-		// NOTE: Widening from a key reaches the key itself first and the whole
+		// Widening from a key reaches the key itself first and the whole
 		// literal further out — the entries are two Expressions deep where a
 		// List's items are one, and both depths have to be walked for a widen
 		// from inside an entry to stop where a reader expects.
@@ -319,7 +319,7 @@ describe("Dictionary literals", () => {
 			expect(spans).toContain("2:18-5:3")
 		})
 
-		// NOTE: And the ENTRY stands between them. A Dictionary entry is the
+		// And the ENTRY stands between them. A Dictionary entry is the
 		// one member-shaped Node in the language that has a Position of its own
 		// covering `key = value`; a Record member does not, which is why a
 		// Record can not stop there and a Dictionary can.
@@ -338,7 +338,7 @@ describe("Dictionary literals", () => {
 			expect(spans[2]).toBe("2:18-5:3")
 		})
 
-		// NOTE: An update's key list folds as its own range — it is a Node with
+		// An update's key list folds as its own range — it is a Node with
 		// a Position, and a reader collapsing a long update wants the entries
 		// gone and the base left standing.
 		it("folds a multi-line update's key list", () => {
@@ -364,7 +364,7 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// NOTE: A Dictionary's key is an Expression standing where no container put
+	// A Dictionary's key is an Expression standing where no container put
 	// one before, so every walk that reaches a value has to reach a key too.
 	// These ask that of the walks the Hover and Completion tests above do not.
 	describe("both halves of an entry", () => {
@@ -579,7 +579,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: The primary Label is the SECOND key — the one to delete — and
+		// The primary Label is the SECOND key — the one to delete — and
 		// the secondary points at the first, which is the pair
 		// `reportDuplicateDeclaration` is the model for.
 		it("squiggles the second key of a duplicate, and points at the first", () => {
@@ -607,7 +607,7 @@ describe("Dictionary literals", () => {
 			expect(secondary.position.start.column).toBe(16)
 		})
 
-		// NOTE: ONCE. The shape is wrong, so nothing inside the update is a
+		// ONCE. The shape is wrong, so nothing inside the update is a
 		// name the Program meant to write — an `unknown-name` about `port`
 		// beside it is noise that sends the reader after a Declaration nobody
 		// needs.
@@ -625,7 +625,7 @@ describe("Dictionary literals", () => {
 			expect(codes).toEqual(["wrong-update-brackets"])
 		})
 
-		// NOTE: The braced spelling of a Dictionary update is the mistake this
+		// The braced spelling of a Dictionary update is the mistake this
 		// feature invites most, and it is reached by the Parser rather than the
 		// Enricher — the value key gives the form away one Token past the
 		// `with`, where no reading of the text goes any further.
@@ -644,7 +644,7 @@ describe("Dictionary literals", () => {
 			expect(diagnostic.code).toBe("wrong-update-brackets")
 		})
 
-		// NOTE: The same rule, one Token earlier. Pinned beside the case above
+		// The same rule, one Token earlier. Pinned beside the case above
 		// so the gap that used to stand between them is visible.
 		it("tells a Dictionary literal written in braces which brackets it wants", () => {
 			let source = [
@@ -674,7 +674,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: The most mechanical fix the feature has — one pair of brackets
+		// The most mechanical fix the feature has — one pair of brackets
 		// for the other — and the padding travels with the pair, because
 		// `{ … }` pads and `[…]` does not.
 		it("offers a Quick Fix that swaps the brackets", () => {
@@ -706,7 +706,7 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// NOTE: The other direction, and both of them over an update laid out
+		// The other direction, and both of them over an update laid out
 		// on several lines — where the space beside a bracket is the INDENTATION
 		// of a closing line rather than the padding, and swapping it would leave
 		// the `]` at column one.

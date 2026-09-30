@@ -3,22 +3,22 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { primary, reportError, secondary } from "../diagnostics/index"
 import { closestMatch } from "../helpers/suggest"
 
-// NOTE: What a `test` and a `suite` may be Modified BY, and what each of those
+// What a `test` and a `suite` may be Modified BY, and what each of those
 // Modifiers means. The Parser reads a Modifier generically — a name and the
 // arguments that follow it — so that `within 2s` and `retries 3` are
 // vocabulary rather than parser work; this file is the vocabulary.
 
 // #region Modifiers
 
-// NOTE: The Modifiers, in the order a Diagnostic lists them. `across` and
+// The Modifiers, in the order a Diagnostic lists them. `across` and
 // `for any` are not Modifiers: they take a body's shape apart rather than
 // annotating it, and they come after the Modifiers.
 const MODIFIERS = ["focused", "skipped", "tagged"] as const
 
-// NOTE: The Modifiers that take bare names, which is what `regrouped` is about.
+// The Modifiers that take bare names, which is what `regrouped` is about.
 const NAME_TAKING_MODIFIERS = new Set<string>(["tagged"])
 
-// NOTE: What the Modifiers of one item established, once. Every field is what
+// What the Modifiers of one item established, once. Every field is what
 // the ITEM answers for: `mergedModifiers` folds an enclosing suite's in, so a
 // test inside a skipped suite is skipped and carries the suite's tags.
 export type TestModifiers = {
@@ -33,7 +33,7 @@ export const noModifiers: TestModifiers = {
 	focused: null,
 }
 
-// NOTE: Read off the Parser's Nodes and reported about here, so that everything
+// Read off the Parser's Nodes and reported about here, so that everything
 // downstream — the Enricher's own walk, code generation, the Language Server —
 // reads three settled fields rather than a list of names it has to interpret.
 export function resolveTestModifiers(
@@ -107,7 +107,7 @@ export function resolveTestModifiers(
 	return { tags, skipped, focused }
 }
 
-// NOTE: An item's own Modifiers over the ones covering it. A suite's cover
+// An item's own Modifiers over the ones covering it. A suite's cover
 // every test inside it, and the covering ones lose to the item's own only where
 // the item wrote its own — `skipped` on a suite skips a test that says nothing,
 // and a test can not un-skip itself, which is why `skipped` falls back rather
@@ -117,7 +117,7 @@ export function mergedModifiers(
 	covering: TestModifiers,
 ): TestModifiers {
 	return {
-		// NOTE: Outermost first and without repeats, so that two Programs that
+		// Outermost first and without repeats, so that two Programs that
 		// carry the same tags carry them in the same order.
 		tags: [...new Set([...covering.tags, ...own.tags])],
 		skipped: own.skipped ?? covering.skipped,
@@ -125,7 +125,7 @@ export function mergedModifiers(
 	}
 }
 
-// NOTE: `tagged slow focused` is read by the Parser as `tagged` taking nothing
+// `tagged slow focused` is read by the Parser as `tagged` taking nothing
 // and `slow` taking `focused`, and it has to be: a Modifier's argument list
 // opens on a bare name only where a comma or the body follows it, because
 // `A B C {` is otherwise two readings with nothing to settle them. The Parser
@@ -168,11 +168,11 @@ function regrouped(
 	return grouped
 }
 
-// NOTE: A Modifier read as taking ONE bare name that IS a Modifier is two
+// A Modifier read as taking ONE bare name that IS a Modifier is two
 // Modifiers, because no Modifier takes another one as an argument. Anything
 // with a comma in it was read unambiguously and is left alone.
 //
-// NOTE: A near-miss counts only where the HEAD is not a Modifier either, which
+// A near-miss counts only where the HEAD is not a Modifier either, which
 // is the `tagged slow focussed` shape: the Parser read `slow(focussed)`, and
 // neither name is a Modifier, so taking the pair apart is what lets `tagged`
 // adopt `slow` and the typo report itself. Where the head IS a Modifier the
@@ -216,7 +216,7 @@ function split(
 	]
 }
 
-// NOTE: A Modifier that takes bare names and was written with none takes the
+// A Modifier that takes bare names and was written with none takes the
 // next bare name — as long as that name is not a Modifier, and does not look
 // enough like one to be a typo of it.
 function adopts(
@@ -316,7 +316,7 @@ function resolveTags(modifier: parser.TestModifierNode): Array<string> {
 			continue
 		}
 
-		// NOTE: Lower case because a tag is typed on a command line and matched
+		// Lower case because a tag is typed on a command line and matched
 		// exactly there. Two spellings of one tag are two tags, and the one
 		// nobody selects is the one that quietly stops running.
 		if (argument.content !== argument.content.toLowerCase()) {
@@ -368,7 +368,7 @@ function refuseArguments(
 	}
 }
 
-// NOTE: `help` where the shared sentence would loop. "Write one reason and
+// `help` where the shared sentence would loop. "Write one reason and
 // nothing else here" is anchored on the SECOND reason — the reader is standing
 // on the thing that has to go, so writing a reason there writes a third — and
 // the only edit that answers it is a deletion. Every other caller wants a value
@@ -424,7 +424,7 @@ function refuseUnknownModifier(
 
 // #region Identity
 
-// NOTE: A test's name as it was WRITTEN, which is what its identity is keyed
+// A test's name as it was WRITTEN, which is what its identity is keyed
 // on. The rendered name is worked out per run — a table test's says which row
 // it ran for — so nothing durable can be keyed on it: a stored snapshot, a
 // counterexample, a timing baseline and the Editor's own focus all have to
@@ -451,7 +451,7 @@ export function nameTemplate(
 		.join("")
 }
 
-// NOTE: One string standing for a whole identity, for the places that need a
+// One string standing for a whole identity, for the places that need a
 // key rather than the parts — a Map, an event's `id`, a snapshot file's
 // heading. `/` separates the steps and is escaped inside them, so that two
 // different identities can never spell the same key.
@@ -465,7 +465,7 @@ export function testIdentityKey(
 	])
 }
 
-// NOTE: The same key with the Module step LEFT OFF, for what is stored beside
+// The same key with the Module step LEFT OFF, for what is stored beside
 // the source rather than across a whole run — a benchmark's baseline and a
 // failing-example corpus live in the Module's own companion directory, so
 // spelling the path inside the file as well would be the one fact written
@@ -497,7 +497,7 @@ function identityKey(steps: Array<string>): string {
 		.join("/")
 }
 
-// NOTE: The suite names the Enricher fills itself — `examples` from a file's
+// The suite names the Enricher fills itself — `examples` from a file's
 // documentation, `contracts` from a run's declarations. A written suite under
 // one of those names would share the synthesized suite's identity, and with it
 // the corpus, the seeds and the focus that identity anchors — a collision the
@@ -538,7 +538,7 @@ export function refuseReservedSuite(
 	return taken
 }
 
-// NOTE: Two tests of one suite that are called the same thing are one test
+// Two tests of one suite that are called the same thing are one test
 // twice as far as everything durable is concerned — they share an identity, so
 // they share a snapshot, a baseline and a stored counterexample. Reported per
 // scope, and per KIND: a test and a suite of one name never collide, because

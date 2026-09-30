@@ -24,7 +24,7 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
 }
 
-// NOTE: The characters a Diagnostic's Position covers — which is the text a
+// The characters a Diagnostic's Position covers — which is the text a
 // Quick Fix replaces with the suggestion the same Diagnostic carries. Spelling
 // them out is the only way to assert that a `#Case` span stops short of the
 // sigil without counting columns by hand. Single line spans only; every
@@ -44,7 +44,7 @@ function underlinedText(source: string, diagnostic: common.Diagnostic): string {
 		)
 }
 
-// NOTE: The characters one Position covers, for a test that means to say WHERE
+// The characters one Position covers, for a test that means to say WHERE
 // a synthesized Node stands rather than which columns it happens to have.
 function spanOf(source: string, position: common.Position): string {
 	return source
@@ -55,7 +55,7 @@ function spanOf(source: string, position: common.Position): string {
 		)
 }
 
-// NOTE: The typed Expression a Program's LAST Constant was declared from —
+// The typed Expression a Program's LAST Constant was declared from —
 // which is how a test asks what a call resolved to: which Namespace won, which
 // Overload, which dispatch branches, and what the Arguments were typed as. The
 // Program is required to enrich cleanly, so a test that means to assert on a
@@ -100,7 +100,7 @@ function lastConstantFunctionInvocation(
 	return value
 }
 
-// NOTE: The Type an applied `Optional<ItemType>` enriches to. It is no longer
+// The Type an applied `Optional<ItemType>` enriches to. It is no longer
 // the Union `ItemType | Nothing` an Alias expanded to, but the Union of the two
 // Cases the `Optional` Choice declares — each carrying the Type Arguments the
 // application bound, under the applied spelling as the display alias. Written
@@ -129,7 +129,7 @@ function optionalOf(itemType: common.Type): common.Type {
 	}
 }
 
-// NOTE: The LIVE Namespace of that name — the one read from `packages/standard-library/sources/*.es`
+// The LIVE Namespace of that name — the one read from `packages/standard-library/sources/*.es`
 // and handed to every Program's top level Scope. Asserting against this rather
 // than against a declaration read straight out of a source file is the point:
 // a test about which Namespace declares a Method has to ask what a Program can
@@ -148,7 +148,7 @@ function builtinNamespace(name: string): common.NamespaceType {
 	return namespace
 }
 
-// NOTE: Every Case construction in a typed subtree, in the order it was built —
+// Every Case construction in a typed subtree, in the order it was built —
 // how a test asks what a Case a Program never spelled the Type Arguments of was
 // finally decided as. A `GenericUse` left in `typeArguments` is a Type Parameter
 // nothing decided, which is exactly what such an assertion is about.
@@ -188,7 +188,7 @@ function collectCaseTypes(value: unknown): Array<common.Type> {
 	return found
 }
 
-// NOTE: Walks the typed Program collecting every resolved Conformance —
+// Walks the typed Program collecting every resolved Conformance —
 // wherever a bounded Type Parameter was satisfied, an Invocation carries the
 // `{ genericName, protocolName, source }` shape. Used to assert which Namespace
 // a bound resolved to at a call site.
@@ -304,7 +304,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("unknown-method")
 		})
 
-		// NOTE: The Help and the `data` must name the same thing — the Help is
+		// The Help and the `data` must name the same thing — the Help is
 		// what the reader is told and the `data` is what a Quick Fix writes,
 		// and a fix that inserts a different name than the Diagnostic offered
 		// is worse than no fix at all.
@@ -330,7 +330,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].data).toBeUndefined()
 		})
 
-		// NOTE: The bare name, so the Case Quick Fix replaces exactly what the
+		// The bare name, so the Case Quick Fix replaces exactly what the
 		// Diagnostic underlines — the `#` belongs to the Help's rendering.
 		it("should carry an unknown Case's near miss without its sigil", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -346,7 +346,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The bare form is the spelling this codebase prefers, so it is
+		// The bare form is the spelling this codebase prefers, so it is
 		// the one a near miss matters most for — and it is reported from its
 		// own site, which once offered nothing while the documentation
 		// promised a Quick Fix for every unknown Case.
@@ -462,7 +462,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A Partial is judged by ASSIGNABILITY, not identity — an update
+		// A Partial is judged by ASSIGNABILITY, not identity — an update
 		// sets a member to a value, and a value of one arm is enough for a
 		// Union-typed member, exactly as it is at the Declaration. Deep
 		// equality refused every one of these.
@@ -485,7 +485,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `{ config with server.port = 1 }` IS
+		// `{ config with server.port = 1 }` IS
 		// `{ config with server = { config.server with port = 1 } }`, and the
 		// Enricher is where the one becomes the other — so the Type it answers
 		// is the Type the value updated already had.
@@ -545,7 +545,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: Every level keeps the Alias it was reached under. An update
+			// Every level keeps the Alias it was reached under. An update
 			// may only write members the original already declares, so what
 			// comes back is the very Record that went in — a `Config` whose
 			// `port` is 8080 is a Config, and that is what a Diagnostic about
@@ -578,7 +578,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: The invariant the Language Server is built on: the member
+			// The invariant the Language Server is built on: the member
 			// Identifier of every synthesized Lookup stands where the step that
 			// spelled it stands, so a rename, a Hover and a semantic token all
 			// answer for a step with no code of their own.
@@ -642,7 +642,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].code).toBe("path-on-computed-value")
 			})
 
-			// NOTE: `@` is a place, and the one a Method's nested update is
+			// `@` is a place, and the one a Method's nested update is
 			// written on.
 			it("should accept a path key on '@'", () => {
 				expect(
@@ -662,7 +662,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A braced descend reaches one step in exactly as a dotted key
+			// A braced descend reaches one step in exactly as a dotted key
 			// does, and is desugared into the very same nesting.
 			it("should accept a braced descend", () => {
 				expect(
@@ -729,7 +729,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].code).toBe("path-key-outside-combination")
 			})
 
-			// NOTE: A Record Type standing over a Literal is not a value under
+			// A Record Type standing over a Literal is not a value under
 			// it — a Declaration writes its members from nothing exactly as an
 			// unannotated Literal does.
 			it("should refuse a path key under a Record annotation", () => {
@@ -743,7 +743,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: An Argument written for a defaulted Record Parameter and a Case
+		// An Argument written for a defaulted Record Parameter and a Case
 		// payload written for a defaulting Case are Literals MERGED into a value
 		// that is already there — the default's — so they carry path keys on the
 		// terms a `with` does. `{ default with argument }` is what the merge is,
@@ -786,7 +786,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The one Argument reads as the whole of the merge, so a plain
+			// The one Argument reads as the whole of the merge, so a plain
 			// key and a path key stand side by side exactly as they do after a
 			// `with`.
 			it("should admit a path key beside a plain one", () => {
@@ -799,7 +799,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The Node keeps the Type it WROTE — a partial of the member
+			// The Node keeps the Type it WROTE — a partial of the member
 			// it merges into — and the merge is what the position measures it
 			// by. An Argument whose Type claimed the whole member would claim it
 			// to the Optimiser and the emission too, where only the members
@@ -842,7 +842,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A path key inside a member's OWN Literal reaches into
+			// A path key inside a member's OWN Literal reaches into
 			// nothing — only the Literal that is merged is merged, and a member
 			// of it writes its value from nothing like any other.
 			it("should refuse a path key one level inside an Argument", () => {
@@ -926,7 +926,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: Regression test — the expected-members map was a plain object,
+		// Regression test — the expected-members map was a plain object,
 		// so a member named after one of `Object.prototype`'s found the
 		// JavaScript builtin where `??=` expected a missing entry, and the
 		// Enricher died with an Internal Compiler Error instead of enriching.
@@ -950,7 +950,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `toString` is a Method the standard library really declares over a
+		// `toString` is a Method the standard library really declares over a
 		// Record, so a Lookup of it meets the separator rule rather than a member
 		// that is not there — the inherited member this was written about is
 		// refused by the same walk either way. A prototype member that is no
@@ -971,7 +971,7 @@ describe("Enricher", () => {
 			).toEqual(["unknown-member"])
 		})
 
-		// NOTE: A bare member name is read as well as written, and a reader who
+		// A bare member name is read as well as written, and a reader who
 		// did not know the spelling was a shorthand would otherwise be told
 		// that a name they never meant to read is not declared.
 		it("should say a bare member name is read as its own value", () => {
@@ -1055,7 +1055,7 @@ describe("Enricher", () => {
 			}
 		})
 
-		// NOTE: A Function is the hole this reaches for because the answer of a
+		// A Function is the hole this reaches for because the answer of a
 		// fallible call is no longer one. `3::squareRoot()` used to be an
 		// `Integer | Algebraic | Nothing`, a bare Union belonging to no
 		// Namespace and so conforming to nothing; `Optional<ItemType>` is a
@@ -1075,7 +1075,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The receiver is computed. A written one proves its own sign,
+		// The receiver is computed. A written one proves its own sign,
 		// and `squareRoot` on a proven receiver answers no Optional at all.
 		it("should accept an Optional hole whose payload is Printable", () => {
 			expect(
@@ -1088,7 +1088,7 @@ describe("Enricher", () => {
 		})
 
 		it("should refuse an Optional hole whose payload is not Printable", () => {
-			// NOTE: The conditional half of the conformance — the Optional
+			// The conditional half of the conformance — the Optional
 			// itself is the same Type as the one accepted above, and it is the
 			// payload that decides. A List of Functions is the shortest way to
 			// hand `firstItem` a payload nothing can print, and the List is
@@ -1131,7 +1131,7 @@ describe("Enricher", () => {
 				"redundant-interpolation-to-string",
 			)
 			expect(diagnostics[0].severity).toBe("warning")
-			// NOTE: The span is the call alone — the receiver stays, and the
+			// The span is the call alone — the receiver stays, and the
 			// greyed-out range is exactly what the Quick Fix deletes.
 			expect(underlinedText(source, diagnostics[0])).toBe("::toString()")
 			expect(diagnostics[0].tags).toEqual(["unnecessary"])
@@ -1161,7 +1161,7 @@ describe("Enricher", () => {
 		})
 
 		it("should accept a 'toString' that takes an Argument", () => {
-			// NOTE: `Rational.toString(as:)` picks a form the hole would
+			// `Rational.toString(as:)` picks a form the hole would
 			// not have — dropping the call would change the String.
 			expect(
 				diagnosticsFor(`implementation {
@@ -1171,7 +1171,7 @@ describe("Enricher", () => {
 		})
 
 		it("should accept a 'toString' on a receiver that is not Printable itself", () => {
-			// NOTE: A bare structural Union belongs to no Namespace, so nothing
+			// A bare structural Union belongs to no Namespace, so nothing
 			// makes it conform — the Method resolves per member and the explicit
 			// call is the only spelling that works.
 			expect(
@@ -1374,7 +1374,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Proper` hoists with its predicate still unread, so the first
+		// `Proper` hoists with its predicate still unread, so the first
 		// round's reading of `greet("Ada")` has to wait for the fill.
 		it("should retry a declaration that reads a predicate not filled yet", () => {
 			expect(
@@ -1398,7 +1398,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Only the first read throws, so the throw is one only hoisting
+		// Only the first read throws, so the throw is one only hoisting
 		// meets and the in-order enrichment reads the Function whole.
 		it("should report a throw during hoisting where it happened", () => {
 			let program = parse(`implementation {
@@ -1438,7 +1438,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: Reading `Fits` checks the `5` against `Small`, whose predicate
+		// Reading `Fits` checks the `5` against `Small`, whose predicate
 		// is still unread when `Fits` is reached.
 		it("should read a predicate that checks a value against a refinement still pending", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
@@ -1473,7 +1473,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: `Greeter` waits on `Fits` and `Fits` on `Small`, so both have to
+		// `Greeter` waits on `Fits` and `Fits` on `Small`, so both have to
 		// be filled in the round `Greeter` is retried in. Left to the in-order
 		// enrichment instead, `Greeter` is not declared where `greeting` reads it.
 		it("should hoist a declaration waiting on a predicate that waits on another", () => {
@@ -1504,7 +1504,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Five` is read through the body of `fitsFive`, which can only be
+		// `Five` is read through the body of `fitsFive`, which can only be
 		// read once `Small` is filled, so a round that only fills `Small` still
 		// has to be followed by one that reads the body again.
 		it("should hoist a declaration waiting on a predicate read through a Method body that waits on another", () => {
@@ -1573,7 +1573,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Middle` only waits on the cycle, so it is read once the cycle
+		// `Middle` only waits on the cycle, so it is read once the cycle
 		// is reported and reports nothing itself.
 		it("should report predicates that wait on each other", () => {
 			expect(
@@ -1651,7 +1651,7 @@ describe("Enricher", () => {
 			throw new Error("No ConstantDeclarationStatement found.")
 		}
 
-		// NOTE: The answer is the item Type BARE. A written List proves it
+		// The answer is the item Type BARE. A written List proves it
 		// holds an item, so the receiver reaches `namespace NonEmptyList`,
 		// whose `firstItem` is total — and the inference under test is the
 		// same one either way, since `ItemType` is decided by the receiver.
@@ -1664,10 +1664,10 @@ describe("Enricher", () => {
 		})
 
 		it("should infer map's result Type from the callback's return", () => {
-			// NOTE: `Result` occurs only in the callback's return position and
+			// `Result` occurs only in the callback's return position and
 			// in `map`'s own return. The callback is contextually typed, so `n`
 			// needs no annotation.
-			// NOTE: Printed rather than compared whole, because a written
+			// Printed rather than compared whole, because a written
 			// receiver proves it holds items and `NonEmptyList::map` carries
 			// that proof onto the answer — the item Type is what this is about.
 			expect(
@@ -1680,7 +1680,7 @@ describe("Enricher", () => {
 		})
 
 		it("should infer reduce's result Type from the starting value", () => {
-			// NOTE: `Result` binds from `startingWith` before the callback is
+			// `Result` binds from `startingWith` before the callback is
 			// checked, so both `total` and `n` are contextually typed.
 			expect(
 				typeOfFirstConstant(`implementation {
@@ -1693,7 +1693,7 @@ describe("Enricher", () => {
 		})
 
 		it("should carry the item Type into map's callback body", () => {
-			// NOTE: `isGreaterThan` only resolves if `n` typed as Integer, so
+			// `isGreaterThan` only resolves if `n` typed as Integer, so
 			// a broken item-Type substitution fails outright here.
 			expect(
 				printType(
@@ -1721,7 +1721,7 @@ describe("Enricher", () => {
 		})
 
 		it("should infer Namespace Generics from the receiver", () => {
-			// NOTE: `firstAgain` hands `firstItem`'s answer straight back, so
+			// `firstAgain` hands `firstItem`'s answer straight back, so
 			// its return Type is written as the `Optional<Item>` that answer IS
 			// — the Choice does not widen into an `Item | Nothing` the way the
 			// Alias used to expand into one. What is asserted is unchanged: the
@@ -1741,7 +1741,7 @@ describe("Enricher", () => {
 		})
 
 		it("terminates inference for a generic reduce-step folding into an Optional", () => {
-			// NOTE: The exact shape `List.firstItem(where:)` is written in — a
+			// The exact shape `List.firstItem(where:)` is written in — a
 			// Namespace generic in `ItemType` folding with `reduce`'s
 			// early-stopping entry into an `Optional<ItemType>` Result. `reduce`'s
 			// own Namespace Generic is ALSO `ItemType`, so binding it off the
@@ -1771,7 +1771,7 @@ describe("Enricher", () => {
 		})
 
 		it("freshens callee Generics so a same-named caller Generic can not collide", () => {
-			// NOTE: `myCount`'s `State` and the general `loop`'s own `State` share a
+			// `myCount`'s `State` and the general `loop`'s own `State` share a
 			// spelling, and the Record threaded as the loop's State MENTIONS it. By
 			// name alone the callee's bindable `State` and the caller's opaque
 			// `State` are one symbol, so binding `State := { carried: State }` used
@@ -1793,7 +1793,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The same collision one rail over — this time between a CHOICE's
+		// The same collision one rail over — this time between a CHOICE's
 		// own Type Parameters and the caller's. `Step`'s first Parameter is
 		// spelled `State`, and so is `myCount`'s, and the payload handed to
 		// `#Done` is Typed as the caller's: matched by name, that payload bound
@@ -1878,7 +1878,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
-		// NOTE: A Function literal in Argument position may leave its
+		// A Function literal in Argument position may leave its
 		// annotations out and take them from the parameter it is being passed
 		// to. An unannotated Parameter takes its label from there too, which
 		// is why `(item)` and `(_ item)` mean the same thing here and neither
@@ -1915,7 +1915,7 @@ describe("Enricher", () => {
 			})
 
 			it("types the body with the inferred Parameter", () => {
-				// NOTE: `isBetween` is `Orderable`'s and a String is only
+				// `isBetween` is `Orderable`'s and a String is only
 				// `Comparable`, so this fails outright rather than subtly if
 				// the inferred Type never reaches the body's Scope.
 				expect(
@@ -1932,7 +1932,7 @@ describe("Enricher", () => {
 					constant standalone = (x) { <- x }
 				}`)
 
-				// NOTE: One Diagnostic, not two — the return Type could not be
+				// One Diagnostic, not two — the return Type could not be
 				// inferred either, but only because the Parameter it depends
 				// on could not be, which is what the reported message says.
 				expect(
@@ -1941,7 +1941,7 @@ describe("Enricher", () => {
 			})
 
 			it("reports an omitted return Type outside Argument position", () => {
-				// NOTE: The body could answer this one — every Parameter is
+				// The body could answer this one — every Parameter is
 				// written — but a Type read off a body that nothing else
 				// constrains is what makes a Program hard to follow. Only an
 				// Argument, whose Type is written down elsewhere, may omit it.
@@ -1963,7 +1963,7 @@ describe("Enricher", () => {
 			})
 
 			it("binds a Generic from an inferred return Type", () => {
-				// NOTE: The hard case, and the one `map` needs. `Item` is
+				// The hard case, and the one `map` needs. `Item` is
 				// bound by the receiver, which types the Parameter; nothing
 				// binds `Target` but this literal's own body, so the body is
 				// what `Target` is read off — String here, which then decides
@@ -1988,7 +1988,7 @@ describe("Enricher", () => {
 			})
 
 			it("unions the Types of several returns", () => {
-				// NOTE: Two returns of unrelated Types — an Integer and a
+				// Two returns of unrelated Types — an Integer and a
 				// String — is all this needs; what it is about is that the
 				// literal's return Type is read as the Union of every return
 				// its body makes, not off the first one the walk reaches.
@@ -2041,7 +2041,7 @@ describe("Enricher", () => {
 				).toEqual({ type: "String" })
 			})
 
-			// NOTE: Resolution probes EVERY Namespace declaring the Method,
+			// Resolution probes EVERY Namespace declaring the Method,
 			// including the ones it goes on to reject — an unannotated literal
 			// matches whatever Parameter Type it is probed against, so each
 			// probe resolves it differently. Only the winning Namespace's
@@ -2101,7 +2101,7 @@ describe("Enricher", () => {
 			})
 
 			it("keeps the literal typed when resolution stays ambiguous", () => {
-				// NOTE: No winner to read the literal's Types off, so the last
+				// No winner to read the literal's Types off, so the last
 				// probe's stand in — the Invocation fails either way, and a
 				// literal left with nothing recorded would report its
 				// Parameters as uninferable on top of the real Diagnostic.
@@ -2124,7 +2124,7 @@ describe("Enricher", () => {
 				).toEqual(["ambiguous-namespace"])
 			})
 
-			// NOTE: A callee with no Type Parameters infers nothing, which is
+			// A callee with no Type Parameters infers nothing, which is
 			// why its Arguments used to be handed straight back — and a literal
 			// that omitted its annotations was told it had nothing to infer
 			// from, in the very Argument position the Diagnostic's own Note
@@ -2144,7 +2144,7 @@ describe("Enricher", () => {
 			})
 
 			it("takes its return Type from a non-Generic free Function", () => {
-				// NOTE: The Parameter is written out, so only the omitted
+				// The Parameter is written out, so only the omitted
 				// `-> Type` is left to come from the expected signature.
 				expect(
 					diagnosticsFor(`implementation {
@@ -2158,7 +2158,7 @@ describe("Enricher", () => {
 			})
 
 			it("types the body with a non-Generic free Function's Parameter", () => {
-				// NOTE: `isBetween` only resolves for a Type on a line, so a
+				// `isBetween` only resolves for a Type on a line, so a
 				// Parameter Type that never reaches the body fails outright
 				// here rather than subtly.
 				expect(
@@ -2173,7 +2173,7 @@ describe("Enricher", () => {
 			})
 
 			it("threads the expected Types past a labelled Parameter", () => {
-				// NOTE: Two Parameters, the literal in front of the plain one —
+				// Two Parameters, the literal in front of the plain one —
 				// every Argument is asked for its Type against the Parameter it
 				// was written for, not just the first.
 				expect(
@@ -2193,7 +2193,7 @@ describe("Enricher", () => {
 				).toEqual({ type: "String" })
 			})
 
-			// NOTE: The same, past an Argument that does not fit: matching a
+			// The same, past an Argument that does not fit: matching a
 			// GENERIC free Function stopped at the first mismatch, so the
 			// literal behind it was left with no context and reported as
 			// uninferable — burying the Argument mismatch the Validator was
@@ -2215,7 +2215,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A callback's return position is the call's to decide, and a
+			// A callback's return position is the call's to decide, and a
 			// call decides it AFTER it has matched: nothing but this literal's
 			// own body binds `Result`, so while the literal is being matched its
 			// position still reads `Progress<State, Result>` and the body is all
@@ -2257,7 +2257,7 @@ describe("Enricher", () => {
 					}`),
 				)
 
-				// NOTE: `Integer` from the committed Overload's bindings and
+				// `Integer` from the committed Overload's bindings and
 				// `String` from the payload — neither the `State` the match was
 				// still carrying, nor the `Progress<String, String>` the Overload
 				// that lost would have decided.
@@ -2285,7 +2285,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: The same shape as the standard library spells it, which is
+			// The same shape as the standard library spells it, which is
 			// where every Program meets it: `loop`'s general entry declares its
 			// `step` as `(_: State) -> Step<State, Result>`, and a `#Done` in
 			// that callback is the construction the whole rail is about.
@@ -2308,7 +2308,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: A callback inside a callback is decided by ITS own call —
+			// A callback inside a callback is decided by ITS own call —
 			// `<-` returns from the literal it is written in, never from the walk
 			// around it, so the inner `loop`'s `#Done` carries the inner Result
 			// and the outer one's carries the outer's.
@@ -2339,7 +2339,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: The Type Parameter of the Namespace a callback is written
+			// The Type Parameter of the Namespace a callback is written
 			// INSIDE is a decision — a generic one — and the position it makes
 			// is a real one. This is `List.firstItem(where:)` spelled out: the
 			// fold's `Result` is bound by the annotated seed, so `reduce` hands
@@ -2347,7 +2347,7 @@ describe("Enricher", () => {
 			// `#Done(…)` in it is decided by that rather than by the one
 			// Parameter its own payload happens to mention.
 			//
-			// NOTE: The `#Value(item)` inside that `#Done` is the same question
+			// The `#Value(item)` inside that `#Done` is the same question
 			// one level down, and it is there because `Optional` is a Choice: a
 			// Method answering an `Optional<Item>` hands back a Case it built,
 			// never a bare `item` that widened into a Union. Both it and the
@@ -2380,7 +2380,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: What a Diagnostic from inside a callback body names is the
+			// What a Diagnostic from inside a callback body names is the
 			// committed Overload's reading of it. The Overload that lost takes a
 			// `Boolean` there and would have reported that Booleans have no
 			// `add` at all; the one that won hands the call the Integer
@@ -2445,7 +2445,7 @@ describe("Enricher", () => {
 			).toContain("Type Parameter 'T' could not be inferred")
 		})
 
-		// NOTE: An Error Type matches everything — that is what keeps a
+		// An Error Type matches everything — that is what keeps a
 		// reported mistake from being reported again at every Type it flows
 		// through — but matching a Type Parameter binds nothing, so the
 		// Invocation would go on to announce that it could not infer it. The
@@ -2453,12 +2453,12 @@ describe("Enricher", () => {
 		// that actually failed, which is the cascade poison Types exist to
 		// prevent.
 		it("should not report uninferable Type Parameters for an Error Argument", () => {
-			// NOTE: Two generic Namespaces with the same target, so the
+			// Two generic Namespaces with the same target, so the
 			// specificity order can not break the tie and the Argument really
 			// is an Error — a concrete Namespace beside the stdlib's generic
 			// one would simply win and leave nothing to cascade from.
 			//
-			// NOTE: The receiver is a bound name. A written List would prove it
+			// The receiver is a bound name. A written List would prove it
 			// holds items and reach `NonEmptyList`, which is more specific than
 			// both of these and would break the tie this test needs.
 			expect(
@@ -2502,7 +2502,7 @@ describe("Enricher", () => {
 			expect(constant.nodeType).toBe("ConstantDeclarationStatement")
 
 			if (constant.nodeType === "ConstantDeclarationStatement") {
-				// NOTE: The applied spelling sticks around as the Union's
+				// The applied spelling sticks around as the Union's
 				// display alias — assignability ignores it.
 				expect(constant.declaredType).toEqual({
 					type: "UnionType",
@@ -2552,7 +2552,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The receiver is a Function's declared `Tagged<Integer>` rather
+		// The receiver is a Function's declared `Tagged<Integer>` rather
 		// than a `firstItem()` — the stdlib no longer produces a bare Union of
 		// this shape at all. `Optional` is a Choice now, so `[1, 2]::firstItem()`
 		// is a Union of `Optional#Value` and `Optional#Empty`, and matching THAT
@@ -2699,7 +2699,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: `"use { and } carefully"` — the braces opened a HOLE, and a hole
+		// `"use { and } carefully"` — the braces opened a HOLE, and a hole
 		// holds an Expression, so the word between them is read as a name. A
 		// reader who meant the braces to print was told their prose was not
 		// declared and nothing else.
@@ -2718,7 +2718,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: And nothing is added where the hole holds a name that really is
+		// And nothing is added where the hole holds a name that really is
 		// a name — the reader meant the hole, and misspelled what goes in it.
 		it("should leave a misspelled name in a hole to the near miss", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -2758,7 +2758,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual(["Choose another name."])
 		})
 
-		// NOTE: The Note has always said that NO declaration may take the name,
+		// The Note has always said that NO declaration may take the name,
 		// and only a Type Alias and a Generic were held to it: a Choice, a
 		// Protocol and a Namespace called `Self` all compiled. Each of the three
 		// is named where a Type is named and reached the way one is, and a
@@ -2937,7 +2937,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toEqual([])
 
-			// NOTE: `List is Equatable` is CONDITIONAL — a List is equatable
+			// `List is Equatable` is CONDITIONAL — a List is equatable
 			// exactly when its items are — so the bounded `Value` is solved by
 			// List's own conformance carrying Integer's as its condition, and
 			// the nested one is collected here alongside it. The generic the
@@ -3002,7 +3002,7 @@ describe("Enricher", () => {
 		})
 
 		it("should report a concrete covering Union against the generic blanket", () => {
-			// NOTE: The one shape the specificity order leaves ambiguous where
+			// The one shape the specificity order leaves ambiguous where
 			// concreteness alone used to decide it: a Namespace for
 			// `List<Integer> | String` covers the binding without spelling it
 			// out, and `List<ItemType>` covers it without being concrete, so
@@ -3171,7 +3171,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The name as the condition wrote it, so the Quick Fix declares the
+		// The name as the condition wrote it, so the Quick Fix declares the
 		// Parameter the condition goes on reading — a list that gained any other
 		// spelling would leave the condition naming nothing all over again.
 		it("should carry that Generic's name as data", () => {
@@ -3192,7 +3192,7 @@ describe("Enricher", () => {
 		})
 
 		it("should reject a where condition on a Generic the target Type never mentions", () => {
-			// NOTE: Regression — a phantom Generic's condition can never be
+			// Regression — a phantom Generic's condition can never be
 			// witnessed at a use site, so before this Diagnostic the hidden
 			// conformance Parameter arrived as `undefined` and crashed.
 			let diagnostics = diagnosticsFor(`implementation {
@@ -3231,7 +3231,7 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A condition naming a Protocol nothing declares is refused at the
+		// A condition naming a Protocol nothing declares is refused at the
 		// Namespace and not carried, so a use site standing above the Namespace
 		// asks nothing of it either.
 		it("should stay quiet at a use site above a condition it refused", () => {
@@ -3320,7 +3320,7 @@ describe("Enricher", () => {
 			)
 
 			expect(failure).toBeDefined()
-			// NOTE: Two LEVELS, and the report is the level below the ask: the
+			// Two LEVELS, and the report is the level below the ask: the
 			// message names the `List<{ x: Integer }>` the bound was written
 			// on, and the Note names the Record that can not answer. The
 			// chain's head used to be repeated as Note 1 and is dropped where
@@ -3353,7 +3353,7 @@ describe("Enricher", () => {
 		})
 
 		it("should reject a List of a non-Comparable Type", () => {
-			// NOTE: A Record conforms only to Equatable and Printable — sorting
+			// A Record conforms only to Equatable and Printable — sorting
 			// a List of them has no item ordering to lean on. (Transcendental,
 			// which the plan first named here, in fact conforms to Comparable
 			// through the covering `Number` Namespace, so it is not a negative,
@@ -3371,7 +3371,7 @@ describe("Enricher", () => {
 	})
 
 	describe("Namespace Generic Merge", () => {
-		// NOTE: A Namespace Generic reaches a Method only when that Method's
+		// A Namespace Generic reaches a Method only when that Method's
 		// resolved signature mentions it — anything else would be a Type
 		// Parameter no call site could ever bind.
 		function methodTypeFor(
@@ -3457,7 +3457,7 @@ describe("Enricher", () => {
 				"ranked",
 			)
 
-			// NOTE: Exactly one entry, and it is the NAMESPACE's, carrying the
+			// Exactly one entry, and it is the NAMESPACE's, carrying the
 			// bound this Method wrote — there is no second `Item` for it to
 			// shadow, which is the whole of the form. `infer` stays true: the
 			// Namespace's declaration is what says where the Type comes from,
@@ -3520,7 +3520,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: Every head that writes a `<…>` gets the same words, and each
+		// Every head that writes a `<…>` gets the same words, and each
 		// one is a call site of its own — so the list below is what says the
 		// rule is the language's rather than one reader's. Two BOUNDS on one
 		// Parameter is the case that used to pass in silence: the first was
@@ -3544,7 +3544,7 @@ describe("Enricher", () => {
 			}
 		})
 
-		// NOTE: A Method's list is read apart into the Parameters it declares
+		// A Method's list is read apart into the Parameters it declares
 		// and the bounds it puts on the Namespace's, and the bounds are gone
 		// before any other reader sees them — so the repetition is caught where
 		// the written list still is. Per FORM: two Overloads may each name
@@ -3560,7 +3560,7 @@ describe("Enricher", () => {
 				}`,
 			)
 
-			// NOTE: And the body's own report beside it, which is not a
+			// And the body's own report beside it, which is not a
 			// cascade: the bound that survived is the LAST, so the sort is
 			// left wanting `Comparable` — and that report is where the
 			// Protocol the body needs is named, which is what the Help above
@@ -3608,7 +3608,7 @@ describe("Enricher", () => {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([])
 		})
 
-		// NOTE: `<infer Item>` is NOT a shadow, and the report used to say it
+		// `<infer Item>` is NOT a shadow, and the report used to say it
 		// was: with `infer` the receiver binds the entry, which is how this
 		// spelling worked before a bound could be written. It is the
 		// Namespace's own word written twice, and the edit is the removal.
@@ -3638,7 +3638,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: One Help, and the reason it is one: the second used to spell
+		// One Help, and the reason it is one: the second used to spell
 		// `'<Item is …>'`, which is not something a reader can write. What the
 		// Protocol is, is `unsatisfied-bound`'s to say once the entry is gone.
 		it("should offer one Help for a shadowing re-declaration", () => {
@@ -3705,7 +3705,7 @@ describe("Enricher", () => {
 		})
 
 		describe("Nested mentions", () => {
-			// NOTE: One case per Type shape the walk has to see through — a
+			// One case per Type shape the walk has to see through — a
 			// missed shape would silently prune a Generic that IS used, leaving
 			// it unbindable at the call site.
 			const cases: Array<[string, string]> = [
@@ -3756,7 +3756,7 @@ describe("Enricher", () => {
 		})
 
 		it("should still bound a conditional conformance's fulfilling Method", () => {
-			// NOTE: Guards the interaction with the conditional-conformance
+			// Guards the interaction with the conditional-conformance
 			// Generic weaving: `compare` uses `Item`, so it survives pruning
 			// and keeps its retrofitted bound — which is what makes the hidden
 			// conformance Parameter emitted for it.
@@ -3785,7 +3785,7 @@ describe("Enricher", () => {
 				},
 			])
 
-			// NOTE: And the typed Node agrees — its leading Generic is the same
+			// And the typed Node agrees — its leading Generic is the same
 			// bounded `Item`, so `simplifyFunctionDefinition` emits exactly one
 			// hidden conformance Parameter, first.
 			let { program } = enrichSource(source)
@@ -3801,7 +3801,7 @@ describe("Enricher", () => {
 				(compare as common.typed.SimpleMethod).method.value.generics,
 			).toMatchObject([{ name: "Item", constraint: "Comparable" }])
 
-			// NOTE: A Method that does not fulfil the conformance carries
+			// A Method that does not fulfil the conformance carries
 			// neither the Generic nor its hidden Parameter.
 			let describe = namespaceNode.methods.describe
 
@@ -3811,7 +3811,7 @@ describe("Enricher", () => {
 		})
 
 		it("should retain a bound Generic on a fulfilling Method that never mentions it", () => {
-			// NOTE: The exception to the merge rule. A `where` bound is
+			// The exception to the merge rule. A `where` bound is
 			// witnessed by `$type.boundConformance`, which curries a witness
 			// onto EVERY fulfilling Method whatever its signature mentions —
 			// so a fulfilling Method keeps the bound Namespace Generic even
@@ -3855,7 +3855,7 @@ describe("Enricher", () => {
 		})
 
 		it("should retain a bound Generic on every Overload of a fulfilling Method", () => {
-			// NOTE: Regression guard. Pruning per Overload while the
+			// Regression guard. Pruning per Overload while the
 			// conformance witness is curried per Method let one Overload emit a
 			// hidden conformance Parameter its Type never declared — the
 			// Argument then landed in the wrong slot at runtime.
@@ -3906,7 +3906,7 @@ describe("Enricher", () => {
 				(node) => node.nodeType === "NamespaceDefinitionStatement",
 			) as common.typed.NamespaceDefinitionStatementNode
 
-			// NOTE: The typed Node's Overloads carry the SAME leading bounded
+			// The typed Node's Overloads carry the SAME leading bounded
 			// `Item` — one hidden conformance Parameter each, first.
 			expect(
 				(
@@ -3925,7 +3925,7 @@ describe("Enricher", () => {
 		})
 
 		it("should still reject a call that can not bind a retained bound Generic", () => {
-			// NOTE: The other half of the same regression — with `Item`
+			// The other half of the same regression — with `Item`
 			// retained, a static call that binds nothing is the compile error
 			// it has always been, rather than a miscompile.
 			let diagnostics = diagnosticsFor(`implementation {
@@ -3985,7 +3985,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The nested `Sized` shadows the name, and is a Protocol of its
+		// The nested `Sized` shadows the name, and is a Protocol of its
 		// own, so `IntegerCounted` conforms to nothing `measure` asks for.
 		it("should refuse a bound only a nested Protocol of its name meets", () => {
 			expect(
@@ -4070,7 +4070,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("no-namespace-for-value")
 		})
 
-		// NOTE: And the cascade of the same shape, which is not the Program's
+		// And the cascade of the same shape, which is not the Program's
 		// mistake at all. A refused Invocation still types its Function literal
 		// Argument, from the last candidate it probed — otherwise the literal
 		// would be reported as uninferable on top of the refusal — so the
@@ -4239,7 +4239,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: Without `infer` the Parameter is opaque and binds to nothing, so
+		// Without `infer` the Parameter is opaque and binds to nothing, so
 		// the target Type matches no receiver and the Namespace is never found —
 		// which no Diagnostic used to say. A generic Choice made the silence
 		// dangerous: nothing declared `is`, so the DERIVED equality answered it,
@@ -4264,7 +4264,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: Bounds decide which Overload a call selects, so the SAME
+		// Bounds decide which Overload a call selects, so the SAME
 		// Overload set resolves the same way whichever order its entries were
 		// written in — an Overload whose bound the Argument can not satisfy is
 		// no candidate while another one takes the Argument. Each pair below is
@@ -4306,7 +4306,7 @@ describe("Enricher", () => {
 				}`
 			}
 
-			// NOTE: `for {}` throughout this block — a Namespace that declares
+			// `for {}` throughout this block — a Namespace that declares
 			// nothing but STATIC Methods is never reached through a receiver,
 			// so its target is beside the point and the unit Record is the
 			// shortest Type to write that no other Namespace in these sources
@@ -4353,7 +4353,7 @@ describe("Enricher", () => {
 				).toBe(0)
 			})
 
-			// NOTE: Selecting an Overload solves its bounds, and that solve is
+			// Selecting an Overload solves its bounds, and that solve is
 			// what the call carries — the Overload that wins is not solved a
 			// second time on the way out.
 			it("should carry the conformances the selected Overload was probed with", () => {
@@ -4386,7 +4386,7 @@ describe("Enricher", () => {
 				).toBe("VectorShowable")
 			})
 
-			// NOTE: No candidate's bounds hold, so the call keeps the first
+			// No candidate's bounds hold, so the call keeps the first
 			// matching candidate's own Diagnostic — which bound failed and how
 			// to satisfy it — rather than a bare "no overload accepts these
 			// Arguments" about Arguments that were accepted.
@@ -4419,7 +4419,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].message).toBe(
 					"Boolean does not conform to 'Showable'",
 				)
-				// NOTE: The kept Diagnostic whole, Note and Help included —
+				// The kept Diagnostic whole, Note and Help included —
 				// telling the reader how to satisfy the bound is the entire
 				// reason it is kept over "no Overload accepts these Arguments",
 				// so a report stripped down to its code would pass a test that
@@ -4432,7 +4432,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: A candidate whose bound could not be DECIDED must not drop
+			// A candidate whose bound could not be DECIDED must not drop
 			// out silently — the ambiguity is the reason the call fails, and
 			// probing is what would otherwise swallow the report.
 			it("should report an ambiguous conformance that failed the only matching Overload", () => {
@@ -4494,7 +4494,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].message).toBe(
 					"No overload accepts these Arguments",
 				)
-				// NOTE: Every candidate, in the order they are written — a call
+				// Every candidate, in the order they are written — a call
 				// that matched none is told what it could have passed, which is
 				// what the `::` twin has always said and what this site
 				// promised without saying it.
@@ -4505,7 +4505,7 @@ describe("Enricher", () => {
 				expect(diagnostics[0].helps).toEqual([])
 			})
 
-			// NOTE: One entry is the shape a reader is likeliest to meet — an
+			// One entry is the shape a reader is likeliest to meet — an
 			// `overload` block being grown, or a call that simply passed the
 			// wrong thing — and "no overload accepts these Arguments" about a
 			// block with a single entry says nothing at all without the Note
@@ -4530,7 +4530,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: A Namespace Generic is not something a caller wrote, so a
+			// A Namespace Generic is not something a caller wrote, so a
 			// Note that spells one leaves them to work out what it stands for.
 			// The signature is read off the Namespace SPECIALIZED against this
 			// receiver instead — `List<Integer>` is told its `prepend` takes an
@@ -4549,7 +4549,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: The free-Function half of the same site, which only the
+			// The free-Function half of the same site, which only the
 			// standard library can declare — and the half whose Notes carry the
 			// most, since an `overload function`'s entries are told apart by
 			// their Argument LABELS rather than by a receiver.
@@ -4570,7 +4570,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: Reaching past a candidate whose bound failed means typing the
+			// Reaching past a candidate whose bound failed means typing the
 			// Arguments against the candidates behind it, and an unannotated
 			// Function literal reports from inside its own body when the Parameter
 			// it is read against is not a signature at all. The literal below is
@@ -4600,7 +4600,7 @@ describe("Enricher", () => {
 				).toBe(2)
 			})
 
-			// NOTE: The same, one stage out: a Namespace that loses the specificity
+			// The same, one stage out: a Namespace that loses the specificity
 			// filter still probes its Overloads, and the Arguments it typed on the
 			// way are not the call's news either.
 			it("should keep the Arguments of a losing Namespace's Overloads from reporting", () => {
@@ -4630,7 +4630,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The other flavour of the same order-dependence, and not a bound
+			// The other flavour of the same order-dependence, and not a bound
 			// failing: a prefixed Case construction read against `Holder<Item>` can
 			// not decide its Type Arguments from a Parameter Type that mentions the
 			// call's own unsolved Type Parameter, so it types as Error — which
@@ -4689,11 +4689,11 @@ describe("Enricher", () => {
 	})
 
 	describe("Builtin Protocols", () => {
-		// NOTE: The safety net for the builtin signatures — every declared
+		// The safety net for the builtin signatures — every declared
 		// conformance must actually be fulfilled, via the same helper that
 		// drives conformance checking and conformance-value codegen.
 		//
-		// NOTE: Driven from the ACCESSORS rather than from the TypeScript
+		// Driven from the ACCESSORS rather than from the TypeScript
 		// tables, so it keeps testing whatever is live. A Namespace declared in
 		// Essence is checked at load, but only the one that is loaded — reading
 		// the tables directly would leave this asserting a property of objects
@@ -4718,7 +4718,7 @@ describe("Enricher", () => {
 
 						expect(protocol).toBeDefined()
 
-						// NOTE: A conditional conformance (List's Comparable)
+						// A conditional conformance (List's Comparable)
 						// only holds under the `where` conditions it declares —
 						// supply them as assumptions, exactly as the Enricher's
 						// declaration-side check does.
@@ -4740,7 +4740,7 @@ describe("Enricher", () => {
 							assumptions,
 						)
 
-						// NOTE: A Choice DECLARES `is Equatable` and
+						// A Choice DECLARES `is Equatable` and
 						// `is Printable` and writes neither Method — the
 						// derives fulfill both. Checking the derived Namespace
 						// instead of accepting the miss is the point: the
@@ -4839,7 +4839,7 @@ describe("Enricher", () => {
 		})
 
 		it("should sort a List of Strings, now that String is Comparable", () => {
-			// NOTE: `sort__overload$2` needs no Protocol bound — the comparator does —
+			// `sort__overload$2` needs no Protocol bound — the comparator does —
 			// but the annotation only holds if `compare` resolves on a
 			// String, which it does now that String conforms to Comparable.
 			expect(
@@ -4865,7 +4865,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The unit Record stands where `nothing` used to — a Function
+		// The unit Record stands where `nothing` used to — a Function
 		// that answers nothing useful answers `{}` now, so `{}` is the value an
 		// `is` has to keep working on. It reaches Equatable through the builtin
 		// Record Namespace like any other Record.
@@ -4933,14 +4933,14 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The ordering family is `Comparable`'s, provided over `Self` —
+		// The ordering family is `Comparable`'s, provided over `Self` —
 		// the target of the Namespace whose conformance offered it, which is
 		// the covering `Number` as much as it is `Integer`. So a comparison
 		// across two kinds falls to `Number`'s rung and is answered there,
 		// with nothing widened at the call. The annotation below says what the
 		// Constant holds and no more; every bound stays written.
 		//
-		// NOTE: `squareRoot` on a written receiver answers an
+		// `squareRoot` on a written receiver answers an
 		// `Integer | Algebraic`, which one match takes apart: the receiver
 		// proves its own sign, so there is no Optional between the call and
 		// the value. The kinds are what this is about, and both are reached.
@@ -4963,7 +4963,7 @@ describe("Enricher", () => {
 		})
 
 		it("should span the numeric tower for Integer::add", () => {
-			// NOTE: The Transcendental annotation only type-checks if
+			// The Transcendental annotation only type-checks if
 			// `1::add(π)` resolves to the new overload. The match narrows √2 to
 			// an Algebraic and adds an Integer to it — the other new overload —
 			// with `toString` keeping the handler's return a String so the test
@@ -4979,7 +4979,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: NO Namespace writes `isLessThan` for a kind other than its
+		// NO Namespace writes `isLessThan` for a kind other than its
 		// own. Integer and Rational keep the same-kind entry they always had,
 		// and each holds one entry for the other kind, but neither was widened
 		// to the irrationals — deciding a Transcendental ordering in general
@@ -4987,7 +4987,7 @@ describe("Enricher", () => {
 		// `Comparable` provides the whole family on top of. This guards against
 		// a well-meaning re-addition to a member.
 		it("keeps cross-kind comparison off the member Namespaces", () => {
-			// NOTE: The argument Types Integer::isLessThan accepts — no
+			// The argument Types Integer::isLessThan accepts — no
 			// Algebraic or Transcendental among them.
 			let integerLessThan = builtinNamespace("Integer").methods
 				.isLessThan as common.OverloadedMethodType
@@ -5004,7 +5004,7 @@ describe("Enricher", () => {
 			expect(
 				builtinNamespace("Transcendental").methods.isLessThan,
 			).toBeUndefined()
-			// NOTE: And `Number` writes none either. The covering Namespace
+			// And `Number` writes none either. The covering Namespace
 			// declares `is Orderable`, which extends `Comparable`, and that
 			// Protocol's provided `isLessThan` reads its cross-kind `compare` — so a receiver of the covering Type
 			// compares against any member of the tower without a body here.
@@ -5064,7 +5064,7 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
-		// NOTE: `Number` rather than `Ordering` — `Ordering` writes no Method
+		// `Number` rather than `Ordering` — `Ordering` writes no Method
 		// at all now, deriving `is`, `isNot` and `toString` alike, and a
 		// derived Method would make this pass for the wrong reason. `Number`
 		// covers the whole numeric Union and WRITES `toString`, while each of
@@ -5081,7 +5081,7 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
-		// NOTE: The Union is written out rather than read off `10::divide(by 0)`,
+		// The Union is written out rather than read off `10::divide(by 0)`,
 		// which used to answer a `Rational | Nothing`. That call answers an
 		// `Optional<Rational>` today, and `Optional` has a Namespace covering
 		// the whole of it — so it resolves the way `Ordering` does above, with
@@ -5208,7 +5208,7 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
-		// NOTE: The Union is written out rather than read off a `firstItem()`,
+		// The Union is written out rather than read off a `firstItem()`,
 		// which used to answer an `Item | Nothing`. That call answers an
 		// `Optional<Item>` today — one Type with a Namespace covering it, which
 		// resolves without a dispatch at all and so says nothing about the
@@ -5227,7 +5227,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The other half — an `Optional` conforms to `Printable` only
+		// The other half — an `Optional` conforms to `Printable` only
 		// when its payload does, and the payload here is a Type Parameter
 		// nothing has decided. The bound is the whole of what makes the call
 		// legal: the same body with `is Printable` dropped reports that 'Item'
@@ -5276,7 +5276,7 @@ describe("Enricher", () => {
 			).toEqual(["IntegerTag", "StringTag"])
 		})
 
-		// NOTE: Record matching is OPEN at runtime — a `{ width, height }`
+		// Record matching is OPEN at runtime — a `{ width, height }`
 		// value matches the branch for `{ width }` — so the branch for the
 		// more specific Record has to be tried first or it can never be
 		// reached. Such a Union arrives here because applying a Generic Alias
@@ -5319,7 +5319,7 @@ describe("Enricher", () => {
 			).toEqual(["Rect", "Square", "Flag"])
 		})
 
-		// NOTE: The same Union, written with its incomparable member moved.
+		// The same Union, written with its incomparable member moved.
 		// Sorting with a partial order only compared the pairs the sort
 		// happened to reach, so `Boolean` standing between the two Records was
 		// enough to leave them in declaration order — and the Program printed
@@ -5384,7 +5384,7 @@ describe("Enricher", () => {
 			expect(invocation.namespace.name).toBe("Integer")
 		})
 
-		// NOTE: An Integer against a Rational is Integer's own rung now:
+		// An Integer against a Rational is Integer's own rung now:
 		// `Integer::is` holds a Rational entry beside its Integer one, as its
 		// four inequalities do. What still falls to the covering Namespace is
 		// a bound of a kind neither rung names, which is what the second half
@@ -5420,11 +5420,11 @@ describe("Enricher", () => {
 		})
 
 		it("should prefer a concrete target over a generic one", () => {
-			// NOTE: `firstItem` is the stdlib's, declared for every
+			// `firstItem` is the stdlib's, declared for every
 			// `List<ItemType>` — a Namespace naming the item Type outright is
 			// the more specific of the two and answers the call.
 			//
-			// NOTE: The receiver is a bound name and not the `[1, 2, 3]` it
+			// The receiver is a bound name and not the `[1, 2, 3]` it
 			// once was. A written List proves it holds items, which puts
 			// `NonEmptyList` on the ladder as well — and that one is neither
 			// more nor less specific than `List<Integer>`, so the call is
@@ -5444,7 +5444,7 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "Integer" })
 		})
 
-		// NOTE: A written receiver carries its proof into dispatch, and two
+		// A written receiver carries its proof into dispatch, and two
 		// Namespaces neither of which is more specific than the other are the
 		// ambiguity they have always been — a literal receiver is exactly a
 		// Constant declared with what the literal proves, and answers the same
@@ -5470,7 +5470,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: The Help shows ONE specifier because a sentence can only lead
+		// The Help shows ONE specifier because a sentence can only lead
 		// with one; the `data` carries every candidate, because the Quick Fix
 		// offers a choice and picking for the reader is the one thing this
 		// Diagnostic must not do. The first name is the same in both, so the
@@ -5492,7 +5492,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A Union receiver reports from its own site, per member — and a
+		// A Union receiver reports from its own site, per member — and a
 		// specifier written at the call picks the candidate for every member at
 		// once, so the fix is the same one and needs the same `data`.
 		it("should carry the candidate specifiers for a Union member too", () => {
@@ -5521,7 +5521,7 @@ describe("Enricher", () => {
 		})
 
 		it("should prefer a nested generic target over a flat one", () => {
-			// NOTE: Both targets are generic, so neither is concrete — the
+			// Both targets are generic, so neither is concrete — the
 			// deeper structure is what decides: `List<List<ItemType>>` covers
 			// only nested Lists, while `List<ItemType>` covers those too. Both
 			// spell their Generic `ItemType`, which is the case the alpha-rename
@@ -5567,7 +5567,7 @@ describe("Enricher", () => {
 			).toEqual(["ambiguous-namespace"])
 		})
 
-		// NOTE: An empty List Literal is a `List<Unknown>`, and an Unknown fits
+		// An empty List Literal is a `List<Unknown>`, and an Unknown fits
 		// anything and is fit by anything — so every List target covers it, in
 		// both directions, and the order above would answer the call with the
 		// nested Namespace on the strength of a Type nothing has decided. The
@@ -5620,7 +5620,7 @@ describe("Enricher", () => {
 				expect(diagnostic.notes).toContain(
 					"'NestedTag' declares 'tag'.",
 				)
-				// NOTE: An example, and said to be one. Nothing was refused here
+				// An example, and said to be one. Nothing was refused here
 				// for holding the wrong thing, so the Type in the annotation is
 				// made up — and a Help that prints one without hedging reads as
 				// the answer rather than as the shape.
@@ -5642,7 +5642,7 @@ describe("Enricher", () => {
 			})
 
 			it("should leave a lone matching Namespace alone", () => {
-				// NOTE: Nothing was decided by the Unknown where there was
+				// Nothing was decided by the Unknown where there was
 				// nothing to decide between — the call has the one Namespace to
 				// go to whatever the receiver turns out to hold.
 				let invocation = lastConstantMethodInvocation(`implementation {
@@ -5660,7 +5660,7 @@ describe("Enricher", () => {
 			})
 
 			it("should refuse an undecided member of a Union receiver", () => {
-				// NOTE: Per-member dispatch reaches the same order, so it
+				// Per-member dispatch reaches the same order, so it
 				// refuses on the same terms — one member of the Union the
 				// callback's two returns build is the `List<Unknown>` both
 				// Namespaces match, and the refusal comes before the Integer
@@ -5697,7 +5697,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A static Method is called on its Namespace and takes no receiver.
+	// A static Method is called on its Namespace and takes no receiver.
 	// Both halves of that are load-bearing for what the Rewriter emits: the
 	// call passes only the written Arguments, and the definition is emitted
 	// without the `_self` Parameter `@` compiles to.
@@ -5716,7 +5716,7 @@ describe("Enricher", () => {
 				"Parameter 1 is 'subject'",
 			)
 			expect(diagnostics[0].helps).toEqual(["Write '@param subject'."])
-			// NOTE: The name alone is underlined, rather than the whole block
+			// The name alone is underlined, rather than the whole block
 			// or the whole Comment.
 			expect(diagnostics[0].position).toEqual({
 				start: { line: 3, column: 15 },
@@ -5725,7 +5725,7 @@ describe("Enricher", () => {
 		})
 
 		it("should match a '@param' to the Parameter at its position", () => {
-			// NOTE: Both lines name a Parameter that exists, and the first
+			// Both lines name a Parameter that exists, and the first
 			// names the second one — which is what a line left out looks like.
 			let diagnostics = diagnosticsFor(`implementation {
 				§§ Joins.
@@ -5767,7 +5767,7 @@ describe("Enricher", () => {
 		})
 
 		it("should take the label, or '_' where there is none", () => {
-			// NOTE: A positional Parameter is documented as '_', and a
+			// A positional Parameter is documented as '_', and a
 			// labelled one as its label. Nothing else names it:
 			// `documentationStrictness` is `"strict"`, so the internal name a
 			// body reads a labelled Parameter under is not a second spelling.
@@ -5811,7 +5811,7 @@ describe("Enricher", () => {
 		})
 
 		it("should report a run that stops short of the last Parameter", () => {
-			// NOTE: One line per Parameter, so the Parameter no line reached
+			// One line per Parameter, so the Parameter no line reached
 			// is reported where it is declared rather than where the run ends.
 			let diagnostics = diagnosticsFor(`implementation {
 				§§ Joins.
@@ -5832,7 +5832,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].notes).toHaveLength(1)
 		})
 
-		// NOTE: Two reports on one block — a misnamed line and a Parameter with
+		// Two reports on one block — a misnamed line and a Parameter with
 		// none — are one missing line seen from both ends, and the ORDER they
 		// are answered in shows. Writing this line first leaves the name
 		// standing twice until the misnamed one is put right, and a reader who
@@ -5858,7 +5858,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The Help and the `data` must name the same thing — the Help is
+		// The Help and the `data` must name the same thing — the Help is
 		// what the reader is told and the `data` is what a Quick Fix writes.
 		// `after` is the tag the missing line goes under, which is the only
 		// thing about the block a Warning underlining a PARAMETER carries.
@@ -5881,7 +5881,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A run two Parameters short has no mechanical answer for the
+		// A run two Parameters short has no mechanical answer for the
 		// second of them: the lines document Parameters by position, so writing
 		// a line for the last would leave a hole above it. Writing the first is
 		// what puts the second back in reach.
@@ -5899,7 +5899,7 @@ describe("Enricher", () => {
 			).toEqual(["documentation-line", undefined])
 		})
 
-		// NOTE: What the SIGNATURE writes for the Parameter rather than what a
+		// What the SIGNATURE writes for the Parameter rather than what a
 		// Hover shows for it — a tag names a Parameter by its label or by `_`,
 		// and the fix rewrites the tag.
 		it("should carry the written name of a misnamed Parameter", () => {
@@ -5953,7 +5953,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A tag past the end of a positional run names no Parameter that
+		// A tag past the end of a positional run names no Parameter that
 		// exists, near or otherwise, so the only answer is to drop the line and
 		// the Diagnostic says so rather than offering a name.
 		it("should carry no suggestion for a tag past the last Parameter", () => {
@@ -5986,7 +5986,7 @@ describe("Enricher", () => {
 		})
 
 		it("should read a Declaration's '@param' against the Function it holds", () => {
-			// NOTE: The block sits above the `constant`, and the Parameters it
+			// The block sits above the `constant`, and the Parameters it
 			// can be describing are the held Function's.
 			expect(
 				diagnosticsFor(`implementation {
@@ -6006,7 +6006,7 @@ describe("Enricher", () => {
 		})
 
 		it("should not keep a Function it warns about out of Scope", () => {
-			// NOTE: Hoisting kept a speculative resolution only when it
+			// Hoisting kept a speculative resolution only when it
 			// reported nothing at all, and every Diagnostic reachable from it
 			// used to be an error. A Warning about the `§§` block above a
 			// Function would leave that Function unhoisted, so every call
@@ -6025,7 +6025,7 @@ describe("Enricher", () => {
 		})
 
 		it("should leave a Declaration whose Parameters it cannot see unchecked", () => {
-			// NOTE: `alias` is function-valued, but its Parameters survive only
+			// `alias` is function-valued, but its Parameters survive only
 			// in a resolved Type, which keeps no internal names — so a `@param`
 			// here cannot be told from a typo. Reporting it said "takes no
 			// Parameters" about a Declaration whose Hover showed them.
@@ -6041,7 +6041,7 @@ describe("Enricher", () => {
 		})
 
 		it("should leave a Function literal in expression position undocumented", () => {
-			// NOTE: A literal in expression position is anonymous — it
+			// A literal in expression position is anonymous — it
 			// declares nothing, so no `§§` block is written about it, and the
 			// block above the line belongs to the Declaration the expression
 			// sits inside. The Parser reads Documentation by line alone, so a
@@ -6069,7 +6069,7 @@ describe("Enricher", () => {
 				}`),
 			).toEqual([])
 
-			// NOTE: An Argument's callback is the same shape without a default
+			// An Argument's callback is the same shape without a default
 			// in sight.
 			expect(
 				diagnosticsFor(`implementation {
@@ -6081,7 +6081,7 @@ describe("Enricher", () => {
 		})
 
 		it("should read a block against the signature the default is on", () => {
-			// NOTE: The other half of the rule above: the block is still
+			// The other half of the rule above: the block is still
 			// checked, and it is checked against the Method whose Parameter
 			// carries the default.
 			let diagnostics = diagnosticsFor(`implementation {
@@ -6098,7 +6098,7 @@ describe("Enricher", () => {
 		})
 
 		it("should hand a Declaration's block to the Function it holds", () => {
-			// NOTE: The block documents what the Declaration holds, so the
+			// The block documents what the Declaration holds, so the
 			// literal is HANDED it rather than reading it off the line above —
 			// which is what makes the two layouts agree. Signature Help reads
 			// the Function's own Type, and used to find the description only
@@ -6128,7 +6128,7 @@ describe("Enricher", () => {
 		})
 
 		it("should report nothing for the Documentation of a builtin", () => {
-			// NOTE: A builtin Namespace documents itself in TypeScript and the
+			// A builtin Namespace documents itself in TypeScript and the
 			// standard library's Positions are stripped as it loads, so there
 			// is no `§§` line to point at and nothing to check.
 			expect(
@@ -6156,7 +6156,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe("'make' is a static Method")
 		})
 
-		// NOTE: The Namespace the Help names, so the Quick Fix writes the call
+		// The Namespace the Help names, so the Quick Fix writes the call
 		// the reader was told to write — a static is reached through the
 		// Namespace that declares it and through nothing else.
 		it("should carry the owning Namespace as data", () => {
@@ -6170,7 +6170,7 @@ describe("Enricher", () => {
 				constant made = 5::make(7)
 			}`)
 
-			// NOTE: `make` takes exactly the one Argument the call wrote, so the
+			// `make` takes exactly the one Argument the call wrote, so the
 			// value has nowhere to go and the Help says so outright. The hedge
 			// it used to carry — "if it needs one" — was the report declining to
 			// read an arity it had in hand, and the two Quick Fixes keyed on the
@@ -6187,7 +6187,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: And the other way round — a static whose first Parameter IS the
+		// And the other way round — a static whose first Parameter IS the
 		// value the call was written on. One Argument written, two Parameters to
 		// fill, so the receiver belongs among them.
 		it("should name the shape a longer signature accepts", () => {
@@ -6212,7 +6212,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: `Integer.parse` — the Invocation type-checked against the
+		// `Integer.parse` — the Invocation type-checked against the
 		// written Arguments alone while the Simplifier prepended the receiver
 		// anyway, so every runtime Argument landed one place too far right and
 		// the Program answered with the receiver instead of erroring.
@@ -6287,7 +6287,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: An instance Method of the same Namespace binds `@` right
+		// An instance Method of the same Namespace binds `@` right
 		// beside it, which is exactly why this is an easy mistake — and why
 		// the Scope has to refuse `@` rather than merely leave it undeclared.
 		it("should reject '@' in a static Method body", () => {
@@ -6309,7 +6309,7 @@ describe("Enricher", () => {
 				"There is no '@' in a static Method",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(4)
-			// NOTE: What dropping 'static' COSTS, said out loud. It changes how
+			// What dropping 'static' COSTS, said out loud. It changes how
 			// the Method is CALLED, so a reader who takes that half without
 			// knowing lands on `argument-count-mismatch` at every existing call
 			// site — each note naming a Parameter they never wrote.
@@ -6336,7 +6336,7 @@ describe("Enricher", () => {
 			).toEqual(["at-in-static-method"])
 		})
 
-		// NOTE: A Match Handler binds its own `@` — the value that matched —
+		// A Match Handler binds its own `@` — the value that matched —
 		// and is emitted as a Function taking it, so it keeps working inside a
 		// static Method. Only the receiver `@` is gone.
 		it("should keep '@' bound in a Match Handler inside a static Method", () => {
@@ -6371,7 +6371,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: `= expression` at the end of a Parameter. The scoping rule is one
+	// `= expression` at the end of a Parameter. The scoping rule is one
 	// ordering — a default is enriched before its own Parameter is declared —
 	// and every case here is that ordering seen from a different side.
 	describe("Default Parameter Values", () => {
@@ -6399,7 +6399,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The default is enriched BEFORE its own Parameter is declared,
+		// The default is enriched BEFORE its own Parameter is declared,
 		// which is what makes a self-reference impossible; the Parameter's name
 		// is BARRED there, which is what keeps it impossible when something
 		// outside the Declaration spells the same name.
@@ -6429,7 +6429,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: The whole reason the barred names are a barrier and not a
+		// The whole reason the barred names are a barrier and not a
 		// fallback for names that resolved to nothing: this one RESOLVES, to the
 		// Constant above, and the emitted `(a = y, y)` reads the Parameter out of
 		// its own temporal dead zone rather than the Constant.
@@ -6447,7 +6447,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: A Pattern's bindings are Constants at the head of the BODY, and
+		// A Pattern's bindings are Constants at the head of the BODY, and
 		// every default is worked out before the body's first Statement runs —
 		// so a default reading one would emit a read of a `const` that does not
 		// exist yet.
@@ -6465,7 +6465,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: A Function literal written inside a default declares Parameters
+		// A Function literal written inside a default declares Parameters
 		// of its own, and they shadow the barrier exactly as they shadow
 		// everything else — the barred names belong to the list the default is
 		// written in, not to every list below it.
@@ -6521,7 +6521,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Nothing enforces this beyond the Scope a static Method's body
+		// Nothing enforces this beyond the Scope a static Method's body
 		// already is — `enrichMethodFunctionDefinition` sets the `@` barrier
 		// before it walks the Parameter list, so a default reading `@` there
 		// is refused by the rule that was already there.
@@ -6539,7 +6539,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The rule is about LABELS, not about position: a default may sit
+		// The rule is about LABELS, not about position: a default may sit
 		// anywhere so long as nothing after it answers to the same label.
 		it("should refuse an unlabelled default followed by an unlabelled Parameter", () => {
 			let diagnostics = diagnosticsFor(`implementation {
@@ -6595,7 +6595,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The call side. Pairing reads labels and `hasDefault` and never a
+		// The call side. Pairing reads labels and `hasDefault` and never a
 		// Type, so a call's shape is settled before any Argument is typed —
 		// which is what every Overload candidate, the deferred-Argument order
 		// and Completion all depend on.
@@ -6638,7 +6638,7 @@ describe("Enricher", () => {
 				expect(value.omittedParameterIndices).toEqual([])
 			})
 
-			// NOTE: The case the trailing-run rule would have forbidden. `to 3`
+			// The case the trailing-run rule would have forbidden. `to 3`
 			// carries a label `from` does not, so the walk skips `from` and
 			// pairs `to` — decided from labels alone.
 			it("should skip an interior default the next label steps over", () => {
@@ -6665,12 +6665,12 @@ describe("Enricher", () => {
 					constant value = [1, 2, 3]::upTo()
 				}`)
 
-				// NOTE: Parameter 0 is the receiver `@` lowers to, so the one
+				// Parameter 0 is the receiver `@` lowers to, so the one
 				// the source wrote is 1.
 				expect(value.omittedParameterIndices).toEqual([1])
 			})
 
-			// NOTE: An omitted Argument binds NOTHING — there is no Argument to
+			// An omitted Argument binds NOTHING — there is no Argument to
 			// read a Type off. A Type Parameter another Argument binds is bound
 			// all the same.
 			it("should bind a Type Parameter from the Argument that was written", () => {
@@ -6701,7 +6701,7 @@ describe("Enricher", () => {
 				).toContain("uninferable-type-parameter")
 			})
 
-			// NOTE: Neither end the Help used to offer exists. There is no
+			// Neither end the Help used to offer exists. There is no
 			// spelling for a Type Argument at a call — that is its own refusal
 			// — and the annotation on the binding does not reach back into the
 			// call either, which is what this pins: the Help has to name an
@@ -6725,7 +6725,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: `hasDefault` is the whole of what a TYPE says about a default
+		// `hasDefault` is the whole of what a TYPE says about a default
 		// — the expression itself stays on the Declaration's Node, because a
 		// Type is compared, cached and serialized.
 		it("should carry hasDefault on a Function's Parameter Type", () => {
@@ -6776,13 +6776,13 @@ describe("Enricher", () => {
 				throw new Error("Expected a SimpleMethod")
 			}
 
-			// NOTE: Parameter 0 is the receiver every non-static signature is
+			// Parameter 0 is the receiver every non-static signature is
 			// prefixed with — `end` is the one the source wrote.
 			expect(member.parameterTypes[0].hasDefault).toBeUndefined()
 			expect(member.parameterTypes[1].hasDefault).toBe(true)
 		})
 
-		// NOTE: `defaultMembers` is the second half of what a Type says about
+		// `defaultMembers` is the second half of what a Type says about
 		// a default, and it says it about a Record Parameter alone: which
 		// members a call may leave out of an Argument it still has to write.
 		it("should carry defaultMembers for a partial Record default", () => {
@@ -6809,7 +6809,7 @@ describe("Enricher", () => {
 			}
 
 			expect(type.parameterTypes[0].defaultMembers).toEqual(["retries"])
-			// NOTE: The Argument is still required — a partial default fills in
+			// The Argument is still required — a partial default fills in
 			// members, never the whole value.
 			expect(type.parameterTypes[0].hasDefault).toBeUndefined()
 		})
@@ -6844,7 +6844,7 @@ describe("Enricher", () => {
 			expect(type.parameterTypes[0].hasDefault).toBe(true)
 		})
 
-		// NOTE: What a default that is not written as a literal supplies can not
+		// What a default that is not written as a literal supplies can not
 		// be read off its text, so it is held to the Parameter's Type as it
 		// always was — complete, and every member omittable.
 		it("should carry every member for a default that is not a literal", () => {
@@ -6932,7 +6932,7 @@ describe("Enricher", () => {
 			expect(type.parameterTypes[0].defaultMembers).toBeUndefined()
 		})
 
-		// NOTE: A Function taken as a VALUE drops its defaults, and both keys go
+		// A Function taken as a VALUE drops its defaults, and both keys go
 		// with them — nothing a default was going to fill in is filled in any
 		// more, neither a whole Argument nor one member of one.
 		it("should drop defaultMembers where the Function is taken as a value", () => {
@@ -6964,7 +6964,7 @@ describe("Enricher", () => {
 			expect(type.parameterTypes[0].hasDefault).toBeUndefined()
 		})
 
-		// NOTE: A partial default is admitted only where its members really are
+		// A partial default is admitted only where its members really are
 		// the Parameter's, and only where they are written out — the two things
 		// `recordDefaultMembers` reads.
 		it("should refuse a Record default naming a member the Type has not", () => {
@@ -6997,7 +6997,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The typed tree carries the enriched Expression, because the
+		// The typed tree carries the enriched Expression, because the
 		// Simplifier lowers it and the Language Server's typed walkers have to
 		// reach a call written inside one.
 		it("should carry the enriched default on the typed Parameter", () => {
@@ -7022,7 +7022,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A Module's Choices are identified by its canonical path, and every
+	// A Module's Choices are identified by its canonical path, and every
 	// rail that reaches a Choice BY NAME has to keep working: the Type Scope is
 	// keyed by the name the declaration wrote, so a lookup that went looking for
 	// the identity would find nothing — and answering nothing is not a
@@ -7157,7 +7157,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: What a `where` clause on a Type Alias declares — the Type it
+	// What a `where` clause on a Type Alias declares — the Type it
 	// resolves to, the canonical conjuncts it is compared by, and every shape it
 	// is refused for. Assignability between two of them is pinned in
 	// `typeMatching.spec.ts`; this is about the Declaration.
@@ -7190,7 +7190,7 @@ describe("Enricher", () => {
 			return aliases[aliases.length - 1]
 		}
 
-		// NOTE: A GENERIC refined Alias resolves to a Generic Alias wrapping the
+		// A GENERIC refined Alias resolves to a Generic Alias wrapping the
 		// refinement — the wrapper is what applies the Type Arguments, the
 		// refinement is what carries the evidence — so its refinement is one
 		// level in.
@@ -7225,7 +7225,7 @@ describe("Enricher", () => {
 
 			expect(refinement.name).toBe("NonZero")
 			expect(refinement.base).toEqual({ type: "Integer" })
-			// NOTE: `Integer`, though `isNot` is a Protocol's PROVIDED Method —
+			// `Integer`, though `isNot` is a Protocol's PROVIDED Method —
 			// the one body every conformer shares stands on the ladder under
 			// the Namespace whose conformance put it in reach, which for an
 			// Integer receiver is Integer's own.
@@ -7254,7 +7254,7 @@ describe("Enricher", () => {
 			).toEqual({ type: "List", itemType: { type: "String" } })
 		})
 
-		// NOTE: The fourth base. `Rational` declares its own `is` and its own
+		// The fourth base. `Rational` declares its own `is` and its own
 		// four comparisons, and a bound written beside one of them is a written
 		// Rational — so the conjunct keeps a fraction where an Integer's keeps
 		// digits, and the Namespace it names is Rational's own.
@@ -7275,7 +7275,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: A conjunct is a KEY, and `0/2` and `0/1` are one question about
+		// A conjunct is a KEY, and `0/2` and `0/1` are one question about
 		// one number — so what the key holds is the number, in the lowest terms
 		// the runtime keeps it in, rather than the two runs of digits that were
 		// typed. Without this the two Aliases below would be different Types
@@ -7306,7 +7306,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: And an Integer bound written on a Rational is the same number
+		// And an Integer bound written on a Rational is the same number
 		// and so the same key. The two spellings used to be two questions —
 		// `Rational::isNot` answers a fraction while a bare `0` finds no
 		// same-kind entry and falls to the covering `Number` — so
@@ -7328,7 +7328,7 @@ describe("Enricher", () => {
 				},
 			])
 
-			// NOTE: The `spelling` is what was WRITTEN and stays apart — it is
+			// The `spelling` is what was WRITTEN and stays apart — it is
 			// the half a Diagnostic reads back — so the two are compared by
 			// everything the key is taken from.
 			let leavesOf = (source: string) =>
@@ -7347,7 +7347,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A Program's own Namespace over a Rational is left exactly as
+		// A Program's own Namespace over a Rational is left exactly as
 		// written. What `Frac::isBig` asks is the Program's question, and
 		// renaming it to Rational's own would say the standard library answers
 		// something it never declared.
@@ -7375,12 +7375,12 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: The conjunct set of a generic refinement is the point of the whole
+		// The conjunct set of a generic refinement is the point of the whole
 		// design: `hasItems` asks nothing about the items, so the key holds no Type
 		// Argument at all and `Filled<String>` differs from `Filled<Integer>`
 		// by its BASE — which `matchTypes` already compares.
 		//
-		// NOTE: A Program's OWN Alias throughout this file, under a name the
+		// A Program's OWN Alias throughout this file, under a name the
 		// standard library does not use — `NonEmptyList` is a builtin now, and
 		// declaring one over again would only be a `duplicate-type`. What is under
 		// test is the mechanism, which is the same one the builtin is declared by.
@@ -7405,7 +7405,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: A use site applies its Arguments through the wrapper, which
+		// A use site applies its Arguments through the wrapper, which
 		// substitutes them into the base and stamps the applied spelling. The
 		// conjuncts come along BY REFERENCE — the same array the Declaration
 		// resolved, because a predicate that says nothing about the items has
@@ -7451,7 +7451,7 @@ describe("Enricher", () => {
 			expect(printType(applied)).toBe("Filled<String>")
 		})
 
-		// NOTE: `isBetween` is written once, as `Orderable`'s provided Method,
+		// `isBetween` is written once, as `Orderable`'s provided Method,
 		// and it stands on the ladder under the Namespace whose conformance put
 		// it in reach — `Integer` for an Integer receiver, which is also what
 		// answers `isOdd` beside it. The conjunct records what answered, because
@@ -7500,7 +7500,7 @@ describe("Enricher", () => {
 			expect(alias.predicate?.type).toEqual({ type: "Boolean" })
 		})
 
-		// NOTE: A generic Alias too, which takes reading `@` off the base INSIDE
+		// A generic Alias too, which takes reading `@` off the base INSIDE
 		// the wrapper: read off the wrapper it was a Type taking Arguments, and the
 		// Language Server got an Error where the Compiler had a Boolean.
 		it("should carry the enriched predicate of a generic Alias too", () => {
@@ -7518,7 +7518,7 @@ describe("Enricher", () => {
 			).toBeNull()
 		})
 
-		// NOTE: Poison recovery — a refused clause leaves the Alias meaning its
+		// Poison recovery — a refused clause leaves the Alias meaning its
 		// base, so everything naming it stays about itself. What is asserted here
 		// is the underlined text of each refusal, which is the span an Editor
 		// puts the squiggle under.
@@ -7537,7 +7537,7 @@ describe("Enricher", () => {
 				}
 			}
 
-			// NOTE: A generic Alias is refined like any other, and an
+			// A generic Alias is refined like any other, and an
 			// item-dependent predicate needs no rule of its own — `Item` is
 			// opaque while the clause is read, so `@::contains(0)` is refused
 			// for the Argument it passes. Which is what keeps the conjuncts
@@ -7633,7 +7633,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: A poisoned base says nothing about the clause, so the clause
+			// A poisoned base says nothing about the clause, so the clause
 			// says nothing back — one Diagnostic about the name that is missing,
 			// and no second one about a Type nobody wrote.
 			it("should stay silent about a base that is already an Error", () => {
@@ -7650,7 +7650,7 @@ describe("Enricher", () => {
 				).toEqual(["recursive-type-declaration"])
 			})
 
-			// NOTE: And a predicate that could not be typed is a Diagnostic about
+			// And a predicate that could not be typed is a Diagnostic about
 			// the Method it named, never a second one about the clause holding it.
 			it("should stay silent about a predicate that did not type", () => {
 				expect(
@@ -7675,7 +7675,7 @@ describe("Enricher", () => {
 				expect(alias.type).toEqual({ type: "Integer" })
 			})
 
-			// NOTE: A Namespace over the Alias targets the object the refusal
+			// A Namespace over the Alias targets the object the refusal
 			// rewrites into its base, so it answers for that base afterwards,
 			// through a receiver typed by the base or by the Alias alike.
 			it("should let a Namespace over a refused Alias answer for its base", () => {
@@ -7719,7 +7719,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: A Matcher narrows by TYPE, and a refinement's predicate is
+			// A Matcher narrows by TYPE, and a refinement's predicate is
 			// not a runtime question — the emitted check could only ask about
 			// the base, and the arm would run for values the predicate refuses,
 			// typed as evidence nothing proved.
@@ -7739,7 +7739,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: The refinement need not stand at the Matcher's top level —
+			// The refinement need not stand at the Matcher's top level —
 			// `List<NonZeroInteger>` spells one inside a Type Argument, the
 			// emitted check could still only ask about `List<Integer>`, and
 			// the arm would bind items the predicate refuses.
@@ -7759,7 +7759,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: An Alias hiding a refinement in a member is just as much a
+			// An Alias hiding a refinement in a member is just as much a
 			// Matcher that can not be tested for — and beside a wildcard there
 			// is no second arm for the Validator's erased-conflict analysis to
 			// notice, so the refusal has to happen here.
@@ -7782,7 +7782,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: What the refusal offers INSTEAD has to be a Matcher the
+			// What the refusal offers INSTEAD has to be a Matcher the
 			// reader can write, and the erased Alias is not one: 'Bag' is the
 			// word they just wrote, and the shape underneath it — `count` a
 			// plain Integer — is what the emitted check could ask about.
@@ -7851,7 +7851,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A refined receiver keeps every Method its base answers — the
+		// A refined receiver keeps every Method its base answers — the
 		// bucketing that makes it so is pinned in `resolvers.spec.ts`, and this is
 		// the Declaration reaching it — and it flows into its base for free, which
 		// is what makes a body written against the base compile unchanged.
@@ -7871,7 +7871,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The refusal is reported ONCE. A refined Alias is resolved by
+		// The refusal is reported ONCE. A refined Alias is resolved by
 		// hoisting and its predicate is enriched a second time for the typed Node,
 		// so there are two readings of one clause and only one of them may speak.
 		it("should report a refusal exactly once", () => {
@@ -7882,7 +7882,7 @@ describe("Enricher", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: A refined Alias and the Namespace answering its predicate may
+		// A refined Alias and the Namespace answering its predicate may
 		// name each other — the Alias asks `isProper`, and a signature next to
 		// `isProper` takes a `Proper` — which no single hoisting round can
 		// resolve in one breath. The Alias hoists with its predicate unread and
@@ -7931,7 +7931,7 @@ describe("Enricher", () => {
 				expect(diagnosticsFor(selfAnswering("", false))).toEqual([])
 			})
 
-			// NOTE: The proof that the signature holds the REFINEMENT — a
+			// The proof that the signature holds the REFINEMENT — a
 			// clause that failed would poison the Alias to String, and this
 			// call would then pass without a word.
 			it("should still demand the evidence the signature names", () => {
@@ -7949,7 +7949,7 @@ describe("Enricher", () => {
 				).toEqual(["no-matching-overload"])
 			})
 
-			// NOTE: The same pair one turn harder. A GENERIC refined Alias can not
+			// The same pair one turn harder. A GENERIC refined Alias can not
 			// be bound by reference the way `Proper` is — applying Type Arguments
 			// substitutes them into the base, which COPIES the refinement — so the
 			// answering Namespace hoists holding copies whose predicate is still
@@ -7968,7 +7968,7 @@ describe("Enricher", () => {
 				}`
 			}
 
-			// NOTE: The Types the two applications in the Namespace resolved to,
+			// The Types the two applications in the Namespace resolved to,
 			// beside the refinement the Alias itself declares — read off the typed
 			// Nodes rather than through a Scope, because what a signature ENDED UP
 			// holding is the whole question.
@@ -8047,7 +8047,7 @@ describe("Enricher", () => {
 					},
 				])
 
-				// NOTE: The mechanism in two lines — each copy holds the very ARRAY
+				// The mechanism in two lines — each copy holds the very ARRAY
 				// the fill wrote into the Alias, which no copy taken a round too
 				// early and forgotten about could be holding.
 				expect(concrete.conjuncts).toBe(declared.conjuncts)
@@ -8063,7 +8063,7 @@ describe("Enricher", () => {
 				})
 			})
 
-			// NOTE: The other end of the same road. A predicate nothing answers is
+			// The other end of the same road. A predicate nothing answers is
 			// poisoned to its base in place, and so is every copy taken of it while
 			// it was pending — each to ITS OWN base, so a signature that applied
 			// `Filled<Integer>` goes on saying `List<Integer>` rather than borrowing
@@ -8095,7 +8095,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: The Types every use of a name is enriched to, in the order a walk
+	// The Types every use of a name is enriched to, in the order a walk
 	// over the Program finds them — which is how a test asks what a branch
 	// narrowed a binding to without reaching through the Statements around it
 	// by hand. Reflective on purpose: what the narrowed use happens to sit
@@ -8147,7 +8147,7 @@ describe("Enricher", () => {
 		return types
 	}
 
-	// NOTE: Every source that asks this puts the use it is about LAST, so that
+	// Every source that asks this puts the use it is about LAST, so that
 	// is the narrowed one.
 	function narrowedTypeOf(source: string, name: string): string {
 		let types = readTypesOf(source, name)
@@ -8159,7 +8159,7 @@ describe("Enricher", () => {
 		return types[types.length - 1]
 	}
 
-	// NOTE: What makes a doorway writable — an `if` whose condition asks a
+	// What makes a doorway writable — an `if` whose condition asks a
 	// declared refinement's question narrows the binding it asked it of. Nothing
 	// here reaches the typed tree: a narrowing is a shadow declaration in an
 	// Enricher Scope, and what it is worth is the resolution it changes.
@@ -8179,7 +8179,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// NOTE: A Rational narrows on the same rail, with the bound written as
+		// A Rational narrows on the same rail, with the bound written as
 		// the fraction `Rational::isNot` takes. The receiver is a DIFFERENCE
 		// in all four of these, which is the one operation no refinement of
 		// Rational closes over — a sum of two written positives is a
@@ -8200,7 +8200,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// NOTE: And with the bound written as a bare Integer, which is the same
+		// And with the bound written as a bare Integer, which is the same
 		// number and so the same question. It used to be a different one: a
 		// bare `0` finds no same-kind entry and falls to the covering `Number`'s
 		// rung, so this branch narrowed to nothing at all while the fraction
@@ -8220,7 +8220,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// NOTE: And the ELSE of the question turned round, which is the leaf
+		// And the ELSE of the question turned round, which is the leaf
 		// read in the other polarity: `@::is(0/1)` failing IS `@::isNot(0/1)`
 		// holding, so the branch that did not find a zero holds a
 		// `NonZeroRational`. Nothing declares the contrary Type, so the `if`
@@ -8243,7 +8243,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// NOTE: A Rational bound is read by the same ordering law an Integer
+		// A Rational bound is read by the same ordering law an Integer
 		// bound is. `isGreaterThan(0/1)` is what `PositiveRational` is written
 		// on, so the condition reaches that Alias exactly; a value above zero
 		// has also been proven not to BE zero, which is what the `reciprocal`
@@ -8268,7 +8268,7 @@ describe("Enricher", () => {
 			).toBe("PositiveRational")
 		})
 
-		// NOTE: The narrowing is worth exactly what it lets a Program write, which
+		// The narrowing is worth exactly what it lets a Program write, which
 		// is the call a bare Integer is refused by — asserted end to end in
 		// `codeGeneration.spec.ts`, where the Validator that refuses it runs.
 		it("should let a narrowed Constant reach a refined Parameter", () => {
@@ -8287,7 +8287,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Variable proven something about can be written to inside the very
+		// A Variable proven something about can be written to inside the very
 		// branch the narrowing would hold over, so the evidence would be about a
 		// value that is gone.
 		it("should not narrow a Variable", () => {
@@ -8305,7 +8305,7 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: One question spelled two ways is one question. `PositiveInteger`
+		// One question spelled two ways is one question. `PositiveInteger`
 		// is declared `@::isPositive()`, whose body is `@::isGreaterThan(0)`, so
 		// the condition below asks the very leaf the Alias is declared by and
 		// the branch has proven it. Which spelling was written decides nothing.
@@ -8324,7 +8324,7 @@ describe("Enricher", () => {
 			).toBe("PositiveInteger")
 		})
 
-		// NOTE: And the one proving the MOST wins, counted through what a leaf
+		// And the one proving the MOST wins, counted through what a leaf
 		// implies. `@::isNot(0)` proves one question and reaches the one Alias
 		// declared by it; `PositiveInteger` would have to be proven above zero.
 		it("should narrow on the leaf the refinement is declared by", () => {
@@ -8358,7 +8358,7 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: Set INCLUSION — a condition proving two things establishes a
+		// Set INCLUSION — a condition proving two things establishes a
 		// refinement asking for one of them.
 		it("should establish a refinement a conjunction includes", () => {
 			expect(
@@ -8375,7 +8375,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// NOTE: And where several qualify, the one proving the MOST wins — it is
+		// And where several qualify, the one proving the MOST wins — it is
 		// the one that forgets the least.
 		it("should prefer the refinement proving the most", () => {
 			expect(
@@ -8394,7 +8394,7 @@ describe("Enricher", () => {
 			).toBe("SmallNonZero")
 		})
 
-		// NOTE: And where several prove exactly as much as each other, the first
+		// And where several prove exactly as much as each other, the first
 		// candidate the walk reaches stands — nearest Scope first, and inside the
 		// one top-level table the builtins are declared ahead of a Program's own
 		// Aliases. Which of them wins is a spelling and nothing more (two
@@ -8419,7 +8419,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// NOTE: A conjunction proves things about each binding it names, and each
+		// A conjunction proves things about each binding it names, and each
 		// of them narrows on its own.
 		it("should narrow both bindings a conjunction names", () => {
 			let source = `implementation {
@@ -8436,7 +8436,7 @@ describe("Enricher", () => {
 			expect(narrowedTypeOf(source, "s")).toBe("NonEmptyString")
 		})
 
-		// NOTE: An `else` proves the leaf its condition proved, asked the other
+		// An `else` proves the leaf its condition proved, asked the other
 		// way round. A leaf is stored RESOLVED and carries its polarity as a
 		// flag, so the opposite of one is that flag flipped and no pair of
 		// Methods has to be declared anywhere to be each other's contraries.
@@ -8513,7 +8513,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyStrings")
 			})
 
-			// NOTE: A conjunction answering `false` says that ONE of its questions
+			// A conjunction answering `false` says that ONE of its questions
 			// failed and nothing about which.
 			it("should not narrow through a conjunction", () => {
 				expect(
@@ -8532,7 +8532,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: Including one whose OTHER half proves nothing readable. The true
+			// Including one whose OTHER half proves nothing readable. The true
 			// branch may read a conjunction leaf by leaf and ignore the rest, because
 			// each leaf it reads really is proven; the false branch may not, and a
 			// count of the conjuncts that came back could not tell the two apart.
@@ -8554,7 +8554,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: No Method is declared to be another's opposite any more.
+			// No Method is declared to be another's opposite any more.
 			// `isGreaterThanOrEqualTo` IS `isLessThan` negated — the standard
 			// library writes it that way — so the leaf the condition proves and
 			// the leaf its `else` proves are one leaf in two polarities, and the
@@ -8578,7 +8578,7 @@ describe("Enricher", () => {
 				).toBe("Small")
 			})
 
-			// NOTE: An `else if` needs nothing of its own — the nested If lives in
+			// An `else if` needs nothing of its own — the nested If lives in
 			// the `falseBody` Array and is enriched in the Scope the complement was
 			// declared in, so every branch below it inherits the narrowing.
 			it("should carry the narrowing into an else-if chain", () => {
@@ -8594,11 +8594,11 @@ describe("Enricher", () => {
 					}
 				}`
 
-				// NOTE: The nested condition's own receiver, then both of its
+				// The nested condition's own receiver, then both of its
 				// branches — the outer condition's receiver is the Integer before
 				// any of it, and is not among these three.
 				//
-				// NOTE: The last of the three is the one both `else`s reached,
+				// The last of the three is the one both `else`s reached,
 				// and between them they have proven the value is neither zero
 				// nor below it — which is what `PositiveInteger` says, and more
 				// than the `NonZeroInteger` one `else` alone proves.
@@ -8609,7 +8609,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: `isZero` is written `<- @::is(0)`, so its `else` proves the
+			// `isZero` is written `<- @::is(0)`, so its `else` proves the
 			// leaf `NonZeroInteger` is declared by. No Method names any other as
 			// its opposite anywhere; the body is what says it.
 			it("should narrow through a Method written as one call on '@'", () => {
@@ -8629,7 +8629,7 @@ describe("Enricher", () => {
 				).toBe("NonZeroInteger")
 			})
 
-			// NOTE: And `isNegative` is `<- @::isLessThan(0)`, whose contrary is
+			// And `isNegative` is `<- @::isLessThan(0)`, whose contrary is
 			// the leaf `NonNegativeInteger` is declared by — written there as
 			// `@::isGreaterThanOrEqualTo(0)`, which is that same leaf negated.
 			// Three spellings, one question.
@@ -8651,11 +8651,11 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A Program's own Method of the shape is read exactly as the
+		// A Program's own Method of the shape is read exactly as the
 		// standard library's is — one call on `@`, Arguments written out — and
 		// what it forwards to is the leaf both branches are decided by.
 		describe("a Program's own predicate alias", () => {
-			// NOTE: The bound is 5 rather than 0, which the standard library
+			// The bound is 5 rather than 0, which the standard library
 			// declares `PositiveInteger` by — two refinements proving one leaf
 			// are one Type, and the tie above would hand the branch the builtin
 			// name.
@@ -8690,7 +8690,7 @@ describe("Enricher", () => {
 				).toBe("Stocked")
 			})
 
-			// NOTE: The condition asks the leaf the alias forwards to, and the
+			// The condition asks the leaf the alias forwards to, and the
 			// branch reaches the refinement written on the alias. Which of the
 			// two names was written decides nothing.
 			it("should narrow through the leaf the alias forwards to", () => {
@@ -8729,7 +8729,7 @@ describe("Enricher", () => {
 				).toBe("Unstocked")
 			})
 
-			// NOTE: `negate` is a name until the Enricher says whose it is, and
+			// `negate` is a name until the Enricher says whose it is, and
 			// a Program may write one of its own over a Boolean. Only
 			// `Boolean::negate` is the answer the polarity flag stands for, so
 			// the peel is taken after the call resolves — `Same::negate` here
@@ -8765,7 +8765,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A Method that TAKES Arguments is read the same way, with the
+		// A Method that TAKES Arguments is read the same way, with the
 		// Arguments the body forwarded standing in for whatever a caller writes
 		// — `isLessThanOrEqualTo(_ other)` is `@::isGreaterThan(other)` negated,
 		// so a call passing 9 asks the leaf `@::isGreaterThan(9)`.
@@ -8789,7 +8789,7 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
-			// NOTE: The standard library's own `doesNot…` Methods are of this
+			// The standard library's own `doesNot…` Methods are of this
 			// shape, and String and List are two of the four bases a `where`
 			// clause may be written on. So the `else` of `contains` proves a
 			// refinement written on the contrary, over the very bound the
@@ -8832,7 +8832,7 @@ describe("Enricher", () => {
 				).toBe("Clean")
 			})
 
-			// NOTE: The bound is the CALL's, not the body's — two calls of one
+			// The bound is the CALL's, not the body's — two calls of one
 			// alias with different Arguments are two questions.
 			it("should not narrow where the bounds differ", () => {
 				expect(
@@ -8853,7 +8853,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: A Program's own reads exactly alike. `Healthy` and
+			// A Program's own reads exactly alike. `Healthy` and
 			// `Integer where @::isGreaterThanOrEqualTo(5)` are one Type, so the
 			// `else` of the sibling question reaches it.
 			const STOCK = `namespace Stock for Integer {
@@ -8911,7 +8911,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A body writing the ordering BACKWARDS is read as its
+			// A body writing the ordering BACKWARDS is read as its
 			// converse — `@ ≤ other` is what `other ≥ @` says, which is how
 			// `Integer::isLessThanOrEqualTo` answers a Rational bound. Read as
 			// written it would be a question of its own, and the `else` below
@@ -8935,7 +8935,7 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
-			// NOTE: A slot is a POSITION, and a Parameter a caller may leave
+			// A slot is a POSITION, and a Parameter a caller may leave
 			// out makes the two sides count positions differently: `n` is
 			// declared second and written first, so the leaf would take its
 			// bound from `slack` and the branch would prove a bound nobody
@@ -8965,7 +8965,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: An alias naming an alias is the leaf both of them mean, and
+		// An alias naming an alias is the leaf both of them mean, and
 		// WHICH of the two was written first decides nothing — the readings are
 		// taken together and collapsed against each other.
 		describe("a chain of aliases", () => {
@@ -9023,7 +9023,7 @@ describe("Enricher", () => {
 				).toBe("Over")
 			})
 
-			// NOTE: Three Namespaces, one chain, and every order of writing
+			// Three Namespaces, one chain, and every order of writing
 			// them down. A Namespace hoisting before what it names records the
 			// NAME, and one that hoists after records what the name had said by
 			// then, so a reading is finished where the leaf is read rather than
@@ -9064,7 +9064,7 @@ describe("Enricher", () => {
 				)
 			}
 
-			// NOTE: A refinement is read at the top of a round, and the reading
+			// A refinement is read at the top of a round, and the reading
 			// of what it names may be a round or two behind — `Relay` waits on
 			// a Type written below it. The conjuncts are written ONCE, so a
 			// leaf put down before the reading landed would stay the name it
@@ -9118,7 +9118,7 @@ describe("Enricher", () => {
 				]).toEqual(["Over", "Over", "Over", "Over", "Over", "Over"])
 			})
 
-			// NOTE: A chain is no alias at all, however short. `@::absolute()`
+			// A chain is no alias at all, however short. `@::absolute()`
 			// is an intermediate value whose evidence is nobody's to read here,
 			// so the `if` proves nothing about `d` and the refinement written
 			// on the comparison is out of reach. This is the rule that keeps
@@ -9146,7 +9146,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: Two Methods written as each other's contrary say nothing
+			// Two Methods written as each other's contrary say nothing
 			// about anything: believing either would make the other its own
 			// contrary. Both are left asking their own question, so the `else`
 			// of one proves nothing about the other.
@@ -9180,7 +9180,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A Protocol's PROVIDED body is read as it hoists, with no
+		// A Protocol's PROVIDED body is read as it hoists, with no
 		// Namespace on the leaf — a provided Method belongs to whichever
 		// conformance reaches it — and the witness fills its own in. The
 		// standard library's `isNot` and the two `…OrEqualTo` are all of this
@@ -9219,7 +9219,7 @@ describe("Enricher", () => {
 				).toBe("Above")
 			})
 
-			// NOTE: And a body of the CONFORMER's own that names a provided
+			// And a body of the CONFORMER's own that names a provided
 			// Method reaches the requirement through two readings, neither of
 			// which the other could see: the provided body names `Self::isAbove`
 			// and this one names the provided body. Both are recorded by the
@@ -9259,7 +9259,7 @@ describe("Enricher", () => {
 				).toBe("Above")
 			})
 
-			// NOTE: A leaf naming an OVERLOADED Method stops there. Which
+			// A leaf naming an OVERLOADED Method stops there. Which
 			// entry of an Overload a leaf means is the Arguments' business,
 			// and a leaf carries scalars rather than the typed, labelled
 			// Arguments an Overload is chosen by. So the requirement is as far
@@ -9313,7 +9313,7 @@ describe("Enricher", () => {
 				expect(narrowedThrough("@::isAtMost(3)", true)).toBe("Above")
 			})
 
-			// NOTE: And `Comparable`'s own provided bodies reach a witness the
+			// And `Comparable`'s own provided bodies reach a witness the
 			// same way. A String writes none of the four itself, so every one
 			// of them is the Protocol's body over `String::compare` — and
 			// `isLessThanOrEqualTo` is `isGreaterThan` negated through it.
@@ -9337,13 +9337,13 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The ordering's law is the BASE's promise, so it is read off the
+		// The ordering's law is the BASE's promise, so it is read off the
 		// base's own Namespace and off the covering `Number`, and off nothing
 		// else. A Program may spell `is`, `isLessThan` or `isNot` in a Namespace
 		// of its own and mean whatever its body means by them — reading below,
 		// above and equal off those words would rule out comparisons nobody made.
 		describe("a foreign Namespace spelling the comparisons", () => {
-			// NOTE: `Tag::is` and `Tag::isLessThan` each read a CHAIN, so each
+			// `Tag::is` and `Tag::isLessThan` each read a CHAIN, so each
 			// is a question of its own about the LENGTH, and neither excludes
 			// the other: a three-letter word answers both. Read as the
 			// trichotomy, the true branch would have proven the contrary of
@@ -9380,7 +9380,7 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// NOTE: And `isNot` is not turned into `is` negated here either. The
+			// And `isNot` is not turned into `is` negated here either. The
 			// BODY decides, and both of these bodies say "above the bound" — so
 			// each is `Integer::isGreaterThan(other)` and neither is the other's
 			// contrary. The `else` below has proven the value is NOT above zero,
@@ -9414,7 +9414,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: Which is the same rule the other way round. `Weird::isNot`
+			// Which is the same rule the other way round. `Weird::isNot`
 			// asks whether the value is above the bound, so a refinement written
 			// on it is the one written on that comparison — `PositiveInteger`,
 			// which the standard library declares. Two refinements proving one
@@ -9452,7 +9452,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The shadow lives in a WRAPPER Scope of its own, so a body that
+		// The shadow lives in a WRAPPER Scope of its own, so a body that
 		// re-declares the very name the condition narrowed is told nothing — the
 		// declaration it would collide with is one nobody wrote.
 		it("should leave a body free to re-declare the narrowed name", () => {
@@ -9470,7 +9470,7 @@ describe("Enricher", () => {
 			expect(narrowedTypeOf(source, "d")).toBe("Integer")
 		})
 
-		// NOTE: A shadow that forgets something the binding's Type already carries
+		// A shadow that forgets something the binding's Type already carries
 		// is no narrowing at all.
 		it("should not forget evidence the binding's Type already carries", () => {
 			let source = `implementation {
@@ -9490,7 +9490,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: And evidence a Type already carries counts towards what the branch
+		// And evidence a Type already carries counts towards what the branch
 		// proves, which is what lets a condition ADD to it.
 		it("should add the condition's evidence to what the Type carries", () => {
 			let source = `implementation {
@@ -9508,7 +9508,7 @@ describe("Enricher", () => {
 			expect(readTypesOf(source, "n").slice(-1)).toEqual(["SmallNonZero"])
 		})
 
-		// NOTE: A Guard proves things about `@` exactly as a condition proves them
+		// A Guard proves things about `@` exactly as a condition proves them
 		// about a Constant, and it runs before any Statement of the Handler — the
 		// Matcher's own check is ANDed in front of it — so what it proves holds
 		// throughout the body.
@@ -9531,7 +9531,7 @@ describe("Enricher", () => {
 				throw new Error("Last Constant is not a Match.")
 			}
 
-			// NOTE: Navigated rather than searched, because a Handler holds TWO
+			// Navigated rather than searched, because a Handler holds TWO
 			// `@`s — its Guard's and its body's — and only the body's is the one
 			// the Guard narrowed.
 			let returned = value.handlers[0].body[0]
@@ -9544,7 +9544,7 @@ describe("Enricher", () => {
 		})
 
 		it("should leave '@' alone where a Guard proves nothing declared", () => {
-			// NOTE: `isGreaterThan(7)` rather than `isGreaterThan(0)`, which the
+			// `isGreaterThan(7)` rather than `isGreaterThan(0)`, which the
 			// standard library declares `PositiveInteger` by. The bound is the
 			// whole of what makes this Guard prove nothing anybody named.
 			let value = lastConstantValue(`implementation {
@@ -9574,14 +9574,14 @@ describe("Enricher", () => {
 			expect(printType(returned.expression.type)).toBe("Integer")
 		})
 
-		// NOTE: A Guard proves things about the value a Handler NAMED exactly as it
+		// A Guard proves things about the value a Handler NAMED exactly as it
 		// proves them about `@` — `case #Value(item) where item::hasCharacters()` is
 		// one question about one value, and which of the two ways to spell that value
 		// it was asked of is no part of what it proved.
 		describe("a Match Handler's payload binding", () => {
 			const SHOUT = "type Shout = String where @::hasCharacters()"
 
-			// NOTE: What the Handler's body reads under a name — navigated rather than
+			// What the Handler's body reads under a name — navigated rather than
 			// searched, because a Handler holds the name three times over: the Guard's
 			// reading of it, the Constant the binding desugars to, and the body's own
 			// use, which is the only one a Guard narrowed. The body's LAST Statement
@@ -9603,7 +9603,7 @@ describe("Enricher", () => {
 				return printType(returned.expression.type)
 			}
 
-			// NOTE: The standard library's own `NonEmptyString` proves the very
+			// The standard library's own `NonEmptyString` proves the very
 			// thing `Shout` does, and it is reached first, being declared first
 			// in the one top-level table — so it is the Type the Guard
 			// establishes. `Shout` is what the sources below ask nothing of:
@@ -9650,7 +9650,7 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// NOTE: Evidence is about the name it was spelled with and about no
+			// Evidence is about the name it was spelled with and about no
 			// other. A Guard proving the very predicate the binding would need,
 			// of a different value, proves nothing about the binding.
 			it("should not narrow the binding by a Guard about another name", () => {
@@ -9674,7 +9674,7 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// NOTE: And a Variable is no narrowing receiver under a Guard either — it
+			// And a Variable is no narrowing receiver under a Guard either — it
 			// can be written to inside the very body the evidence would hold over,
 			// which is the rule a condition narrows Constants alone by.
 			it("should not narrow a Variable a Guard proved the predicate of", () => {
@@ -9698,7 +9698,7 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// NOTE: The Constant the binding desugars to is a Statement of the body,
+			// The Constant the binding desugars to is a Statement of the body,
 			// so a body declaring that name AGAIN declares it twice — which the
 			// narrowing must not quietly turn into a legal shadow, or the emitted
 			// Program would hold two Constants of one name in one block.
@@ -9725,7 +9725,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: An Error matches everything in both directions, so a poisoned
+		// An Error matches everything in both directions, so a poisoned
 		// binding would qualify for whichever refinement is declared first and walk
 		// out of the branch better typed than it went in.
 		it("should not narrow a binding whose Type is poisoned", () => {
@@ -9763,7 +9763,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A refinement over a base the binding is not of establishes nothing,
+		// A refinement over a base the binding is not of establishes nothing,
 		// however the predicate is spelled. Asked of an Integer receiver rather
 		// than of a List or a String one, because the standard library's own
 		// `NonEmptyList` and `NonEmptyString` are refinements over every List and
@@ -9787,14 +9787,14 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: A GENERIC refined Alias stands for nothing until something decides
+		// A GENERIC refined Alias stands for nothing until something decides
 		// its Type Arguments, and a branch has exactly one thing to decide them
 		// FROM: the receiver the question was asked of. So the candidate is worked
 		// out per binding — the declared base unified against the receiver's Type —
 		// and everything below it is the rule every other refinement is established
 		// by, asked of the refinement that unification built.
 		describe("a generic refinement", () => {
-			// NOTE: The standard library's own `NonEmptyList` is the generic refinement
+			// The standard library's own `NonEmptyList` is the generic refinement
 			// every `hasItems` branch establishes now, so these ask nothing of a
 			// Program-declared Alias — a second one proving the same thing is a
 			// candidate beside it, and the builtin is reached first, being declared
@@ -9819,7 +9819,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList<String>")
 			})
 
-			// NOTE: The Arguments are worked out from the receiver whatever they are
+			// The Arguments are worked out from the receiver whatever they are
 			// — a List of Lists decides `ItemType` as the inner List, and the
 			// spelling says so.
 			it("should narrow a List of Lists to the Alias applied to them", () => {
@@ -9837,7 +9837,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList<List<String>>")
 			})
 
-			// NOTE: The narrowing is worth what it lets a Program write, and what it
+			// The narrowing is worth what it lets a Program write, and what it
 			// lets a Program write is a call nothing spelled the Type of: the
 			// Parameter says `Filled<String>` and the branch worked that out from
 			// a `List<String>`. Asserted end to end in `codeGeneration.spec.ts`,
@@ -9860,7 +9860,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: `hasItems` IS `isEmpty` negated — the standard library writes
+			// `hasItems` IS `isEmpty` negated — the standard library writes
 			// it that way and the body is read — so the `else` of an `isEmpty`
 			// establishes the instantiated refinement for the same reason the
 			// true branch of a `hasItems` does. One shared helper asks both.
@@ -9881,7 +9881,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList<String>")
 			})
 
-			// NOTE: And a Match Handler's Guard, through the same helper again.
+			// And a Match Handler's Guard, through the same helper again.
 			it("should narrow '@' by a Match Handler's Guard", () => {
 				let value = lastConstantValue(`implementation {
 					constant value: List<String> | String = ["a"]
@@ -9915,7 +9915,7 @@ describe("Enricher", () => {
 				)
 			})
 
-			// NOTE: And the value a Handler NAMED, which is what the narrowing is
+			// And the value a Handler NAMED, which is what the narrowing is
 			// worth having for: `firstItem` on the binding answers the item itself
 			// rather than an Optional, so the Guard reached the total Method through a
 			// Type nobody in the Program wrote.
@@ -9969,7 +9969,7 @@ describe("Enricher", () => {
 				).toBe("List<String>")
 			})
 
-			// NOTE: A unification that leaves a Parameter undecided is no candidate:
+			// A unification that leaves a Parameter undecided is no candidate:
 			// `B` appears nowhere in the base, so no receiver could ever decide it,
 			// and a refinement whose base nobody decided would put a Type nobody
 			// wrote into the branch. The predicate is `isEmpty` so that the ONLY
@@ -9992,7 +9992,7 @@ describe("Enricher", () => {
 				).toBe("List<String>")
 			})
 
-			// NOTE: A receiver whose items are the enclosing Function's own Type
+			// A receiver whose items are the enclosing Function's own Type
 			// Parameter decides `Item` as that Parameter, which is a decision like
 			// any other — the branch inside a generic Function narrows exactly as one
 			// outside it does. It reads terse because every Argument is a Parameter,
@@ -10014,7 +10014,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList")
 			})
 
-			// NOTE: The instantiation is remembered per receiver, and a NAME is
+			// The instantiation is remembered per receiver, and a NAME is
 			// the one thing a Program may spell twice — so the two `Even`s here
 			// print alike and prove different things. Remembered by their
 			// spelling, the second receiver was handed the first one's
@@ -10052,7 +10052,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The one thing about a narrowing that DOES reach the typed tree
+		// The one thing about a narrowing that DOES reach the typed tree
 		// — the two claims a Conditional carries about what its condition
 		// established, which nothing below the Enricher could work out for
 		// itself: a narrowing is read off the typed condition and checked
@@ -10061,7 +10061,7 @@ describe("Enricher", () => {
 		// about that half, and `--mutate` reads both before it will swap two
 		// bodies.
 		describe("The claims a Conditional carries", () => {
-			// NOTE: Two claims and not the same one twice, in both directions.
+			// Two claims and not the same one twice, in both directions.
 			// `isEmpty` establishes nothing about a String where it holds and
 			// proves `NonEmptyString` where it does not, while
 			// `isGreaterThan(0)` proves `PositiveInteger` for the branch it
@@ -10107,7 +10107,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A `define` reads its arms in the Scope it stands in, and every arm
+	// A `define` reads its arms in the Scope it stands in, and every arm
 	// carries a doorway of its own: the complements of the Conditions above it,
 	// which is what reaching it proves, and its own Condition on top. The same
 	// machinery an `if` narrows through, so what is asked here is what a `define`
@@ -10116,7 +10116,7 @@ describe("Enricher", () => {
 	// The answer Type is the other half — the arrow, the position around the
 	// `define`, or the arms, in that order.
 	describe("Define Expressions", () => {
-		// NOTE: A `define` standing where nothing hands a Type down, so the arms
+		// A `define` standing where nothing hands a Type down, so the arms
 		// are what decide it. Written out per test because what the arms answer
 		// with is the point of most of them.
 		function defineTypeOf(source: string): string {
@@ -10124,7 +10124,7 @@ describe("Enricher", () => {
 		}
 
 		describe("Flow narrowing", () => {
-			// NOTE: `divide` is what the narrowing is worth: the entry taking a
+			// `divide` is what the narrowing is worth: the entry taking a
 			// NonZeroInteger answers the quotient itself, where the one taking a
 			// plain Integer answers an Optional it might be empty of. So the arm
 			// Types say which of the two the receiver reached.
@@ -10139,7 +10139,7 @@ describe("Enricher", () => {
 					}
 				}`
 
-				// NOTE: Four uses, in the order a walk meets them: the
+				// Four uses, in the order a walk meets them: the
 				// Declaration's own name, the first arm's Condition — which
 				// stands above every complement and so narrows nothing — and
 				// then the second arm's value and its Condition, both of them
@@ -10153,7 +10153,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: The value of the second arm is read in the Scope its own
+			// The value of the second arm is read in the Scope its own
 			// Condition opens, which stands on the complement above it — so the
 			// two doorways compose rather than replacing one another.
 			it("should narrow an arm by its own Condition as well", () => {
@@ -10169,7 +10169,7 @@ describe("Enricher", () => {
 				).toBe("Rational")
 			})
 
-			// NOTE: The `otherwise` arm is reached by a value every Condition
+			// The `otherwise` arm is reached by a value every Condition
 			// declined, so it holds every complement — and no positive evidence,
 			// having asked nothing of its own.
 			it("should let the otherwise arm see every complement", () => {
@@ -10187,7 +10187,7 @@ describe("Enricher", () => {
 				expect(narrowedTypeOf(source, "d")).toBe("NonZeroInteger")
 			})
 
-			// NOTE: A conjunction answering `false` says that ONE of its questions
+			// A conjunction answering `false` says that ONE of its questions
 			// failed and nothing about which, so it leaves the arms below it
 			// nothing at all. Its own arm still narrows by both halves — this is a
 			// limitation of the complement, not of the evidence.
@@ -10205,7 +10205,7 @@ describe("Enricher", () => {
 				expect(narrowedTypeOf(source, "d")).toBe("Integer")
 			})
 
-			// NOTE: Recorded per arm, because each arm asks a question of its own
+			// Recorded per arm, because each arm asks a question of its own
 			// — and only the Enricher can say so, checked refinements being erased
 			// before anything downstream sees a Program.
 			it("should record which arms narrow", () => {
@@ -10238,7 +10238,7 @@ describe("Enricher", () => {
 				}
 			})
 
-			// NOTE: The SECOND claim, and the reason it is a second one:
+			// The SECOND claim, and the reason it is a second one:
 			// `isEmpty` establishes nothing about a String where it holds and
 			// proves `NonEmptyString` where it does not, while `isGreaterThan(0)`
 			// proves `PositiveInteger` for its own arm and leaves the arm below
@@ -10286,7 +10286,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A bare `#Empty` decides no Type of its own — a Choice's Type
+		// A bare `#Empty` decides no Type of its own — a Choice's Type
 		// Parameters are applied and never inferred — so a `define` whose arms
 		// answer with one compiles exactly where the position around it hands a
 		// Type down, and nowhere else. That is what every source here asks.
@@ -10337,7 +10337,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: A Match Handler's `<-` reaches the same rail through the
+			// A Match Handler's `<-` reaches the same rail through the
 			// Match's own declared return Type.
 			it("should take it from a Match's declared return Type", () => {
 				expect(
@@ -10398,7 +10398,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: The rows of a table test are read against what the row
+			// The rows of a table test are read against what the row
 			// Parameter declared, which is the same hand-down every position
 			// above makes — asked with the tests section enriched, since that is
 			// the only mode that reads one at all.
@@ -10421,7 +10421,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// NOTE: An Argument is the one position that hands nothing down — a
+			// An Argument is the one position that hands nothing down — a
 			// call picks its Overload BY the Arguments, so no Parameter Type is
 			// decided before they are read. The arrow is what a `define` standing
 			// in one has instead, and the Diagnostic is what says so.
@@ -10436,7 +10436,7 @@ describe("Enricher", () => {
 					constant total = count(${ARMS})
 				}`)
 
-				// NOTE: All three, and in that order. The Case's own two
+				// All three, and in that order. The Case's own two
 				// Diagnostics name the Type Parameters left over and the two
 				// Choices declaring `#Value` — `Optional` and `Result` — and
 				// each offers to annotate the Declaration, which is a help
@@ -10462,7 +10462,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// NOTE: The Argument position is a CAVEAT on the second help and not
+			// The Argument position is a CAVEAT on the second help and not
 			// an account of where the `define` stands — nothing here can tell an
 			// Argument from a Declaration with no annotation, since both hand the
 			// same nothing down. Stated as a Note it read as a remark about the
@@ -10514,7 +10514,7 @@ describe("Enricher", () => {
 		})
 
 		describe("The answer Type from the arrow and the arms", () => {
-			// NOTE: The arrow is a claim about the `define` itself and the
+			// The arrow is a claim about the `define` itself and the
 			// position around it is a claim about what may stand there, so the
 			// arrow is the narrower of the two and wins.
 			it("should let the arrow beat the position", () => {
@@ -10530,7 +10530,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: The position OFFERS where the arrow claims, and an
+			// The position OFFERS where the arrow claims, and an
 			// anonymous Union offers each of its members — so what a `define`
 			// answers with is the offers its arms took. Both are taken here,
 			// which is the annotation over again.
@@ -10547,7 +10547,7 @@ describe("Enricher", () => {
 				).toBe("Integer | String")
 			})
 
-			// NOTE: A ladder of Integers under `Integer | String` answers
+			// A ladder of Integers under `Integer | String` answers
 			// Integer, and nothing is lost by that: the position said either may
 			// stand there, and an Integer is one of them. Adopting the whole
 			// offer instead is what refused a `define` in a one-member Case
@@ -10565,7 +10565,7 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// NOTE: An arm that took none of the offers disagrees with the
+			// An arm that took none of the offers disagrees with the
 			// POSITION, and every arm is held to the Type the `define` answers
 			// with — so the whole offer stands, and the Validator reports the
 			// disagreement against what the position actually said rather than
@@ -10583,7 +10583,7 @@ describe("Enricher", () => {
 				).toBe("Integer | String")
 			})
 
-			// NOTE: The `otherwise` arm's own Type is among them, being one of
+			// The `otherwise` arm's own Type is among them, being one of
 			// the answers.
 			it("should union the arms where neither says anything", () => {
 				expect(
@@ -10599,13 +10599,13 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A one-member Case's payload slot offers two spellings of one
+		// A one-member Case's payload slot offers two spellings of one
 		// payload at once — the Record the Case carries and the member's own
 		// Type — and the value settles which of them it is. A `define` that
 		// answered with BOTH settled nothing: it fitted neither spelling, and
 		// every single-member Case in the language refused one.
 		describe("The answer Type inside a Case payload", () => {
-			// NOTE: The Type the payload reached the Case with. A one-member
+			// The Type the payload reached the Case with. A one-member
 			// shorthand is wrapped into the Record the Case carries, so this is
 			// that Record either way — and `lastConstantValue` asks for a clean
 			// Program on the way past.
@@ -10652,7 +10652,7 @@ describe("Enricher", () => {
 				).toBe("{ from: Integer, to: Integer }")
 			})
 
-			// NOTE: The Record spelling written out, which the shorthand is only
+			// The Record spelling written out, which the shorthand is only
 			// a shorter way of saying — the `define` stands in the member's own
 			// position there and never sees the two spellings at all.
 			it("should read the long form as it always did", () => {
@@ -10683,7 +10683,7 @@ describe("Enricher", () => {
 				).toBe("{ item: Integer }")
 			})
 
-			// NOTE: The other direction — a `define` whose arms are bare Cases
+			// The other direction — a `define` whose arms are bare Cases
 			// answers with the Choice the position named, because a bare Case
 			// decides no Type Arguments of its own and the offer is what it is
 			// read against. Pushing the position's Type into the arms is what
@@ -10704,7 +10704,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: The doorway nobody has to write — a Match on a bare Integer or String
+	// The doorway nobody has to write — a Match on a bare Integer or String
 	// takes the VALUE apart, and its Cases are evidence in both directions:
 	// reaching the Case for the rest proves the value is none of the values named
 	// above it, and a Case that NAMES a value proves that. The Matcher itself is
@@ -10723,7 +10723,7 @@ describe("Enricher", () => {
 			return value.handlers
 		}
 
-		// NOTE: The Type `@` has where the Handler ANSWERS, read off the value it
+		// The Type `@` has where the Handler ANSWERS, read off the value it
 		// returns rather than searched for — a Handler can hold more than one `@`,
 		// and a Guard's is not the body's.
 		function selfTypesOf(source: string): Array<string> {
@@ -10770,7 +10770,7 @@ describe("Enricher", () => {
 			).toEqual(["Zero", "Integer"])
 		})
 
-		// NOTE: Every Case above contributes, so a refinement asking about two values
+		// Every Case above contributes, so a refinement asking about two values
 		// is established by the two Cases that named them — and set INCLUSION means a
 		// refinement asking about one of them is established too.
 		it("should read every value the Cases above named", () => {
@@ -10807,7 +10807,7 @@ describe("Enricher", () => {
 			).toEqual(["String", "NotBlank"])
 		})
 
-		// NOTE: The evidence is read off the Matchers alone, so it holds whatever the
+		// The evidence is read off the Matchers alone, so it holds whatever the
 		// Validator makes of the Match's shape — a Guarded value Case is refused
 		// there, and it hands nothing down here either. Asked of a Union, where such
 		// a Case is legal and the Handlers below it really do see the value it named.
@@ -10828,7 +10828,7 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// NOTE: A Guard runs AFTER the Matcher matched, not instead of it, so what the
+		// A Guard runs AFTER the Matcher matched, not instead of it, so what the
 		// Handler's own Case named still holds inside its body.
 		it("should keep the value its own Guarded Case named", () => {
 			expect(
@@ -10849,7 +10849,7 @@ describe("Enricher", () => {
 			).toBe("Zero")
 		})
 
-		// NOTE: Nothing about the Match itself changes — the Matcher is the Type the
+		// Nothing about the Match itself changes — the Matcher is the Type the
 		// runtime check is emitted from, and evidence is not a runtime question. This
 		// is the invariant that leaves the Rewriter needing no change at all.
 		it("should leave every Matcher as it was", () => {
@@ -10868,7 +10868,7 @@ describe("Enricher", () => {
 			).toEqual(["Integer", "Integer"])
 		})
 
-		// NOTE: Two questions about the same value are not the same question. A String
+		// Two questions about the same value are not the same question. A String
 		// that is not the empty one HAS content, and the Compiler has no way to know
 		// that — the same rule an `if` narrows by.
 		it("should not narrow on a differently spelled predicate", () => {
@@ -10887,7 +10887,7 @@ describe("Enricher", () => {
 			).toBe("String")
 		})
 
-		// NOTE: A Boolean is no refinable base, and a Case naming one of its two
+		// A Boolean is no refinable base, and a Case naming one of its two
 		// values proves nothing anything could be declared by.
 		it("should read no evidence out of a Boolean Case", () => {
 			expect(
@@ -10906,12 +10906,12 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A value written DOWN needs no branch in front of it — its predicate is
+	// A value written DOWN needs no branch in front of it — its predicate is
 	// decided while compiling. What the Enricher does with that is choose an
 	// Overload by it, which is what these assert; the Statements a Program writes
 	// one into are the Validator's, and `validator.spec.ts` asserts those.
 	describe("Refinement literal admission", () => {
-		// NOTE: Two entries under one name, told apart by exactly the evidence the
+		// Two entries under one name, told apart by exactly the evidence the
 		// first one demands — so which one answered says whether the Argument was
 		// admitted, with no Diagnostic and no narrowing anywhere in the source.
 		function scaled(argument: string): string {
@@ -10946,7 +10946,7 @@ describe("Enricher", () => {
 			).toBe(1)
 		})
 
-		// NOTE: The evaluator reads a value that is WRITTEN. A name is a value the
+		// The evaluator reads a value that is WRITTEN. A name is a value the
 		// Program computes, however plainly it was computed a line above — deciding
 		// that would need an interpreter, which is what the allowlist exists not to
 		// be.
@@ -10974,7 +10974,7 @@ describe("Enricher", () => {
 			).toBe(1)
 		})
 
-		// NOTE: The same two answers for a written Rational, which is as visibly
+		// The same two answers for a written Rational, which is as visibly
 		// not zero as a written Integer is. What the entry is told apart by is
 		// the value rather than the spelling: `2/4` is the number `1/2` is.
 		describe("a written Rational", () => {
@@ -11012,7 +11012,7 @@ describe("Enricher", () => {
 				).toBe(1)
 			})
 
-			// NOTE: An Integer bound standing where a Rational is compared is
+			// An Integer bound standing where a Rational is compared is
 			// the same question about the same number — `Rational::isLessThan`
 			// declares an entry for each kind, and `1/2::isLessThan(1)` asks
 			// what `1/2::isLessThan(1/1)` asks.
@@ -11048,7 +11048,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The whole reason admission answers a POSITION rather than writing
+		// The whole reason admission answers a POSITION rather than writing
 		// the refinement onto the Node: the first entry here admits the Argument it
 		// is asked about and loses anyway, on the Argument after it. Nothing it
 		// admitted may reach the entry that wins — and nothing does, because there
@@ -11085,7 +11085,7 @@ describe("Enricher", () => {
 			).toEqual(["Integer", "Integer"])
 		})
 
-		// NOTE: The RECEIVER of a Namespace over a refinement is a refinement in
+		// The RECEIVER of a Namespace over a refinement is a refinement in
 		// every entry, and it is not evidence any of them asked for — it can not
 		// tell two entries apart. Counting it put them all in one partition, which
 		// left the order they were written in, which is the one order an APPENDED
@@ -11115,7 +11115,7 @@ describe("Enricher", () => {
 			expect(printType(invocation.type)).toBe("Integer")
 		})
 
-		// NOTE: The one position where the refinement standing there is not yet a
+		// The one position where the refinement standing there is not yet a
 		// Type: a Parameter written `NonEmptyList<Item>` whose `Item` the CALL has to
 		// work out. Asked as it stands, its base is `List<Item>` and no written List
 		// is of that Type at all — so what the value is asked about is the refinement
@@ -11123,7 +11123,7 @@ describe("Enricher", () => {
 		// List's own Type. The Parameter is then bound through the base, exactly as an
 		// unrefined `List<Item>` would bind it.
 		describe("a Type Argument the call infers", () => {
-			// NOTE: The evidence is all that tells the two entries apart — the second
+			// The evidence is all that tells the two entries apart — the second
 			// one pins the items rather than inferring them, so the List that decides
 			// nothing still has an entry to fall to and the answer says which.
 			function counted(argument: string): string {
@@ -11151,7 +11151,7 @@ describe("Enricher", () => {
 				).toBe(0)
 			})
 
-			// NOTE: An empty List decides nothing — `List<Item>` accepts a
+			// An empty List decides nothing — `List<Item>` accepts a
 			// `List<Unknown>` without saying what `Item` is, and a refinement over a
 			// base nobody decided would hand the call a Type nobody wrote. So the
 			// unrefined entry answers, as it does for a List the predicate simply
@@ -11163,7 +11163,7 @@ describe("Enricher", () => {
 				).toBe(1)
 			})
 
-			// NOTE: A Type Parameter binds the BASE and never the refinement — the v1
+			// A Type Parameter binds the BASE and never the refinement — the v1
 			// rule, asked of the one Parameter a refinement is what decided. The
 			// return Type IS the binding here, and `firstItem` is total for it: the
 			// whole point of the Parameter having been admitted.
@@ -11183,7 +11183,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A RECEIVER is the one position that asks a value nothing. A
+	// A RECEIVER is the one position that asks a value nothing. A
 	// Parameter, a declared Constant, a return position and an Argument matched
 	// against a refined entry each hand a written value a question; dispatch
 	// reads whatever the receiver's Type came to and looks a Namespace up in it.
@@ -11206,7 +11206,7 @@ describe("Enricher", () => {
 			)
 		}
 
-		// NOTE: `3` proves both builtin predicates over an Integer, and
+		// `3` proves both builtin predicates over an Integer, and
 		// `PositiveInteger` is the Alias whose conjuncts are exactly the two —
 		// so the conjunction has a name to print and prints under it.
 		it("should carry every refinement the value is admitted into", () => {
@@ -11224,7 +11224,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: Where no declared Alias proves the whole conjunction, the Type
+		// Where no declared Alias proves the whole conjunction, the Type
 		// prints as the Declaration a reader would have to write for it — the
 		// conjuncts in the order they are compared, joined the way a chain is.
 		// It names the proof; like every other predicate spelling, it is not
@@ -11240,7 +11240,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A written Rational answers for itself the way a written Integer
+		// A written Rational answers for itself the way a written Integer
 		// does, and prints under the Alias whose conjuncts are exactly what it
 		// proved. A zero is not above zero and is not below it either, so it
 		// proves the weaker of the two sign Aliases.
@@ -11260,7 +11260,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A written String proves `NonEmptyString`, and the Namespace over
+		// A written String proves `NonEmptyString`, and the Namespace over
 		// that proof declares no `trim` — trimming is one of the three Methods
 		// that CAN empty a String. So the call falls to `String`'s own, which
 		// is what a refinement adding Methods and taking none away means.
@@ -11271,7 +11271,7 @@ describe("Enricher", () => {
 			expect(answerOf('constant text = "abc"::trim()')).toBe("String")
 		})
 
-		// NOTE: And where the proof IS targeted, every answer it tightens says
+		// And where the proof IS targeted, every answer it tightens says
 		// so: the count is above zero, the characters are a List with
 		// something in it, and either end is a character rather than an
 		// Optional.
@@ -11300,7 +11300,7 @@ describe("Enricher", () => {
 			).toBe("Optional<Character>")
 		})
 
-		// NOTE: A written List is counted by its BRACKETS, and an empty pair
+		// A written List is counted by its BRACKETS, and an empty pair
 		// counts nothing — so the one predicate it could have proven is false
 		// of it and the receiver stays the List it is written as. A Boolean
 		// beside it, whose Type no refinement may even be written over.
@@ -11313,7 +11313,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The other side of the same rule. A value the Program COMPUTES is
+		// The other side of the same rule. A value the Program COMPUTES is
 		// a value nothing has decided anything about, however plainly it was
 		// computed a line above — which is what keeps every unproven entry
 		// reachable. A DIFFERENCE, because it is the arithmetic no refinement
@@ -11343,7 +11343,7 @@ describe("Enricher", () => {
 			).toBe("Algebraic")
 		})
 
-		// NOTE: What the proof may never do is make an answer WIDER. A power at
+		// What the proof may never do is make an answer WIDER. A power at
 		// a non-negative exponent and a sum are whole numbers whatever the
 		// receiver proves, and each answers the tightest Integer the operands
 		// prove between them. A receiver proving only that it is not negative
@@ -11359,7 +11359,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: And where the proof tightens the answer it says so — a product
+		// And where the proof tightens the answer it says so — a product
 		// of two proven Integers is proven itself, which is what `namespace
 		// NonZeroInteger` was written to carry. Two written factors prove both
 		// halves of the sign as well, and `namespace PositiveInteger` is
@@ -11375,7 +11375,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// NOTE: The proofs the library MINTS. A count is never negative, a count
+		// The proofs the library MINTS. A count is never negative, a count
 		// of something proven non-empty is above zero, a distance from zero is
 		// never negative and a denominator in lowest terms is always positive
 		// — and each of those answers says so, so that the next call can spend
@@ -11440,7 +11440,7 @@ describe("Enricher", () => {
 			).toBe("PositiveInteger")
 		})
 
-		// NOTE: A Program's own Alias is a candidate beside the builtins, and a
+		// A Program's own Alias is a candidate beside the builtins, and a
 		// Namespace over it is reached by a written receiver exactly as the
 		// standard library's are.
 		it("should reach a Program's own refined Namespace", () => {
@@ -11458,7 +11458,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: The other half of what a proof buys. A refinement ADDS Methods and
+	// The other half of what a proof buys. A refinement ADDS Methods and
 	// takes none away, so `namespace NonEmptyList` can answer `firstItem()` bare
 	// and still not hide `List::firstItem(defaultingTo:)` — the call compiles,
 	// and the fallback beside it is text that can never run. Only a Diagnostic
@@ -11504,7 +11504,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// NOTE: A written RECEIVER is proof of the same kind, and the probe that
+		// A written RECEIVER is proof of the same kind, and the probe that
 		// erases the caller's proof erases it too — the receiver is widened past
 		// its refinement and no written value is admitted to one, so the
 		// question asked is what a caller holding nothing would have reached.
@@ -11520,7 +11520,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// NOTE: A written `2` is proof enough for `divide`'s NonZeroInteger
+		// A written `2` is proof enough for `divide`'s NonZeroInteger
 		// entry, so the quotient exists and the fallback is as dead as the
 		// receiver-side ones — the evidence is on the ARGUMENT here, which is
 		// the same rule from the other side.
@@ -11534,7 +11534,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// NOTE: The Warning has to name the Type the call already answers, or a
+		// The Warning has to name the Type the call already answers, or a
 		// reader is told to delete an Argument without being told what is left.
 		it("should name the Type the call answers without the fallback", () => {
 			let source = programWith(
@@ -11556,7 +11556,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: The label is part of the span, because the label is part of what
+		// The label is part of the span, because the label is part of what
 		// the Help asks the reader to drop.
 		it("should underline the label together with its value", () => {
 			let source = programWith(
@@ -11568,7 +11568,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The one entry the whole rule is built around — and the reason it
+		// The one entry the whole rule is built around — and the reason it
 		// re-probes rather than reading a Parameter list. `Optional::value`
 		// declares no bare `value()` at all, so the second resolution finds no
 		// winner and there is nothing to say.
@@ -11582,7 +11582,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A proven receiver is not on its own enough. `firstItem(where:)`
+		// A proven receiver is not on its own enough. `firstItem(where:)`
 		// can find nothing in a List that holds items, so the bare call still
 		// answers an Optional and the fallback is live.
 		it("should stay silent where the bare call still answers an Optional", () => {
@@ -11605,7 +11605,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Nothing in the rule is about the standard library. A Namespace a
+		// Nothing in the rule is about the standard library. A Namespace a
 		// Program declares over a refinement of its own, with the same two
 		// entries beside each other, is read exactly the same way.
 		it("should read a Program's own Namespaces by the same convention", () => {
@@ -11637,7 +11637,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// NOTE: The same Namespace with no bare entry to fall to. The fallback is
+		// The same Namespace with no bare entry to fall to. The fallback is
 		// the only way to call it, which is `Optional::value`'s shape written by
 		// a Program.
 		it("should stay silent where the Method declares no bare entry", () => {
@@ -11655,7 +11655,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A `defaultingTo` Parameter carrying a default value is filled in
+		// A `defaultingTo` Parameter carrying a default value is filled in
 		// by the callee where no Argument is written, so striking the Argument
 		// reaches the very entry the call already selected. Nothing was proven —
 		// it is one entry asked twice — and the Argument that WAS written is read
@@ -11679,7 +11679,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The same on the other rail, since both go through the one probe.
+		// The same on the other rail, since both go through the one probe.
 		it("should stay silent where a Function's Parameter was defaulted", () => {
 			expect(
 				codesFor(`implementation {
@@ -11696,7 +11696,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Striking the Argument can let an ENTIRELY different entry win, and
+		// Striking the Argument can let an ENTIRELY different entry win, and
 		// an entry that answers bare for reasons of its own proves nothing. A
 		// plain List reaches this one holding no proof at all, the written call
 		// really does read its fallback — no item is greater than 100 — and the
@@ -11722,7 +11722,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A call that resolved to nothing has no entry to have written the
+		// A call that resolved to nothing has no entry to have written the
 		// fallback for, so it is told nothing about it — the Validator is
 		// already reporting the Argument it could not place, and "drop the
 		// fallback" on top of that reads as a second, unrelated fault.
@@ -11738,7 +11738,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A re-probe enriches the Arguments it keeps, and one of those may
+		// A re-probe enriches the Arguments it keeps, and one of those may
 		// write a `defaultingTo` of its own — so the re-probe is not re-entered.
 		// The inner call still reports for itself, from the enrichment the
 		// Program commits, and the outer one stays silent because a plain List
@@ -11753,7 +11753,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// NOTE: The Warning is a Warning: the call is well typed, nothing is
+		// The Warning is a Warning: the call is well typed, nothing is
 		// refused, and what the Program does is unchanged. A reader who leaves it
 		// alone gets the same answer — which `lastConstantValue` can not be asked
 		// for, since it requires a Program that enriches silently and this one is
@@ -11774,7 +11774,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A carrier and what it holds are two levels, and `Optional::is` has an
+	// A carrier and what it holds are two levels, and `Optional::is` has an
 	// entry for each — so a written `#Empty` against an
 	// `Optional<Optional<Integer>>` fits both, the whole-carrier entry is reached
 	// because it is written first, and the call answers a question about the
@@ -11803,7 +11803,7 @@ describe("Enricher", () => {
 			return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
 		}
 
-		// NOTE: `lastConstantMethodInvocation` holds the Program to enriching
+		// `lastConstantMethodInvocation` holds the Program to enriching
 		// cleanly, and half the Programs here are the ones that warn — so the
 		// Overload slot is read from a Program that is allowed to have something
 		// to say.
@@ -11835,7 +11835,7 @@ describe("Enricher", () => {
 			).toEqual(["ambiguous-nesting-level"])
 		})
 
-		// NOTE: A `Result` of `Result`s fails with one Type at both levels, so a
+		// A `Result` of `Result`s fails with one Type at both levels, so a
 		// written `#Failure(reason)` is the Optional trap's twin: it fits the
 		// whole Result and the Result it holds, and the reader is asking about
 		// the outer failure without saying so.
@@ -11849,7 +11849,7 @@ describe("Enricher", () => {
 			).toEqual(["ambiguous-nesting-level"])
 		})
 
-		// NOTE: The Warning has to name both levels and both spellings, or a
+		// The Warning has to name both levels and both spellings, or a
 		// reader is told the call is ambiguous without being told what either
 		// reading is written as.
 		it("should name both levels and both spellings", () => {
@@ -11875,7 +11875,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: The Argument alone, since the Argument is what both Helps rewrite
+		// The Argument alone, since the Argument is what both Helps rewrite
 		// — the Method name carries the secondary Label instead.
 		it("should underline the Argument", () => {
 			let source = programWith("constant answer = nested::is(#Empty)")
@@ -11885,7 +11885,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The Warning is a Warning: nothing is refused, and the call goes
+		// The Warning is a Warning: nothing is refused, and the call goes
 		// on reaching the entry it reached. The whole-carrier entry is Overload
 		// slot 0 of `Optional::is`.
 		it("should leave the call on the entry it selected", () => {
@@ -11896,7 +11896,7 @@ describe("Enricher", () => {
 			).toBe(0)
 		})
 
-		// NOTE: The other side of the same fact. An Argument annotated at the
+		// The other side of the same fact. An Argument annotated at the
 		// item's level reaches the bare-item entry, which is slot 1 — the inner
 		// question, asked unambiguously, and nothing to warn about.
 		it("should stay silent where an annotated Constant asks about the item", () => {
@@ -11906,7 +11906,7 @@ describe("Enricher", () => {
 			expect(selectedEntryOf(source)).toBe(1)
 		})
 
-		// NOTE: And an Argument annotated at the carrier's level fits the
+		// And an Argument annotated at the carrier's level fits the
 		// whole-carrier entry only — a `#Value` holding an Optional is no
 		// Optional of Integers — so the receiver's question is asked with nothing
 		// left to read the other way.
@@ -11916,7 +11916,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The spelling Help 1 asks for. Wrapping the Argument in the Case
+		// The spelling Help 1 asks for. Wrapping the Argument in the Case
 		// that holds decides the level: the payload of an `Optional<Integer>`'s
 		// `#Value` is an Integer, and an `#Empty` is not one.
 		it("should stay silent on the wrapped spelling it recommends", () => {
@@ -11927,7 +11927,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Why Help 2 asks for a Constant rather than for the Choice written
+		// Why Help 2 asks for a Constant rather than for the Choice written
 		// in front. A Case carries its Type Arguments for display and `matchTypes`
 		// compares its MEMBERS, so a payload-free Case is one Type at every level
 		// and writing `Optional<Optional<Integer>>#Empty` decides nothing.
@@ -11953,7 +11953,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `Integer::is` takes its receiver's own Type too, and an Integer
+		// `Integer::is` takes its receiver's own Type too, and an Integer
 		// holds nothing — there is no second level for an Argument to be read at,
 		// which is the filter that keeps this off every numeric comparison in
 		// every Program.
@@ -11963,7 +11963,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: `or` and `value(defaultingTo:)` are the pair this Warning is NOT
+		// `or` and `value(defaultingTo:)` are the pair this Warning is NOT
 		// about. Each is one entry, and their Parameter Types say which level
 		// they read at — `or` takes what it answers, `value(defaultingTo:)` takes
 		// the item — so the reader picks the level by picking the Method and the
@@ -11980,7 +11980,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Nothing in the rule is about the standard library. A Choice a
+		// Nothing in the rule is about the standard library. A Choice a
 		// Program declares, with a Namespace whose Overload takes the carrier and
 		// what it holds, is read exactly the same way — down to the Case its Help
 		// asks the reader to wrap in.
@@ -12018,7 +12018,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A carrier holding one Type in TWO Cases. Both `#Labelled` and
+		// A carrier holding one Type in TWO Cases. Both `#Labelled` and
 		// `#Full` would fit the payload entry, and each of them asks a different
 		// question — `#Labelled` is not even the same Type here, which is what
 		// keeps the two apart — so the Warning names every Case that qualifies
@@ -12064,7 +12064,7 @@ describe("Enricher", () => {
 			])
 		})
 
-		// NOTE: And the Case that fits is not the first with a payload —
+		// And the Case that fits is not the first with a payload —
 		// `#Labelled` holds a String and the receiver holds a `Box<Integer>` —
 		// so this is what tells "the Case whose payload matches" from "the first
 		// Case with a payload". The mutant that takes the first names
@@ -12104,7 +12104,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: What the check COSTS, guarded by a count rather than by a clock.
+		// What the check COSTS, guarded by a count rather than by a clock.
 		// It runs on every call to an Overload whose selected entry takes the
 		// receiver's own Type — every `Optional::is` and `Optional::isNot` in
 		// the language — and probing an entry is a full match-and-solve, so a
@@ -12137,7 +12137,7 @@ describe("Enricher", () => {
 			).toBeGreaterThan(0)
 		})
 
-		// NOTE: The same Namespace with nothing nested under it. Both entries are
+		// The same Namespace with nothing nested under it. Both entries are
 		// there, and a `#Blank` fits the carrier one alone, so there are not two
 		// readings to report.
 		it("should stay silent on a Program's own carrier holding no carrier", () => {
@@ -12168,7 +12168,7 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: The Dictionary Type as a Program can reach it — the annotation, the
+	// The Dictionary Type as a Program can reach it — the annotation, the
 	// arity, assignability between two of them, and a user Namespace written for
 	// one. Every Dictionary here arrives as a Parameter, so what is asked is the
 	// Type alone.
@@ -12187,7 +12187,7 @@ describe("Enricher", () => {
 
 				expect(method?.type).toBe("SimpleMethod")
 
-				// NOTE: Parameter 0 is the injected receiver, so the one the
+				// Parameter 0 is the injected receiver, so the one the
 				// Declaration wrote is the second.
 				return printType(
 					(method as common.SimpleMethodType).parameterTypes[1]!
@@ -12198,7 +12198,7 @@ describe("Enricher", () => {
 			throw new Error("No Namespace in the Program")
 		}
 
-		// NOTE: Every plan a derived `Equatable` left on the tree. The Invocation
+		// Every plan a derived `Equatable` left on the tree. The Invocation
 		// carries it, not the Conformance beside it — `collectConformances` above
 		// looks for the other shape — so this is its own walk.
 		function derivedDescriptorsIn(
@@ -12289,7 +12289,7 @@ describe("Enricher", () => {
 			).toBe("Dictionary")
 		})
 
-		// NOTE: Two Type Arguments exactly, reported the way `List` reports one
+		// Two Type Arguments exactly, reported the way `List` reports one
 		// — the same code, the same shape, and a Type built out of whatever WAS
 		// written so the Declaration underneath does not cascade.
 		it("should report too few Type Arguments", () => {
@@ -12324,7 +12324,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: The Namespace index buckets both Dictionary spellings under one
+		// The Namespace index buckets both Dictionary spellings under one
 		// key, exactly as it buckets the two List ones — so a Namespace written
 		// `for Dictionary<Key, Value>` is a candidate for a
 		// `Dictionary<String, Integer>` receiver and its Type Parameters bind
@@ -12382,7 +12382,7 @@ describe("Enricher", () => {
 			).toBe("(_ Dictionary<String, Integer>) -> Optional<String>")
 		})
 
-		// NOTE: A Dictionary in a generic Choice's payload — the descriptor its
+		// A Dictionary in a generic Choice's payload — the descriptor its
 		// derived `Equatable` follows at run time. The two slots are described
 		// APART: `String` names no Type Parameter and compares structurally,
 		// while `Value` routes through the witness at its declaration-order
@@ -12418,7 +12418,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// NOTE: A Namespace targeting a Dictionary must not answer for a List,
+		// A Namespace targeting a Dictionary must not answer for a List,
 		// which is what buckets keyed by kind are for — the two spellings share
 		// one bucket with each other and with nothing else.
 		it("should not offer a Dictionary Namespace to a List receiver", () => {

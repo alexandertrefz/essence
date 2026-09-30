@@ -23,7 +23,7 @@ import {
 } from "@essence-lang/compiler/simplifier"
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: One invocation's Modules, read once, parsed once and linked once.
+// One invocation's Modules, read once, parsed once and linked once.
 // `esc check src/*.es` hands every file it was given as an entry, and with
 // Modules a file is routinely both an entry and somebody else's dependency:
 // loaded per entry it would be type checked as many times as it is reached, and
@@ -31,12 +31,12 @@ import type { common } from "@essence-lang/interfaces"
 // every entry's graph is merged into one set of Modules, and each connected
 // piece of that set is linked exactly once, for whichever entry asks first.
 
-// NOTE: A Module of one connected piece of the invocation's Modules. Linking
+// A Module of one connected piece of the invocation's Modules. Linking
 // runs over a piece as a whole because that is the unit `linkModuleGraph`
 // works in, and pieces share nothing: linking two of them separately answers
 // exactly what linking their union would have.
 type Component = {
-	// NOTE: The order the graphs were loaded in, which is dependency-first —
+	// The order the graphs were loaded in, which is dependency-first —
 	// every Module ahead of the ones that import it, a cycle grouped whole.
 	groups: Array<Array<Module>>
 	modules: Map<string, Module>
@@ -48,24 +48,24 @@ type SessionRead =
 	| { filePath: string; error: unknown }
 
 export type CompileSession = {
-	// NOTE: The entry's own text, and the error the filesystem gave if there is
+	// The entry's own text, and the error the filesystem gave if there is
 	// none. The graph reports an unreadable DEPENDENCY as `module-not-found`;
 	// an unreadable entry is the CLI's own to report, because it is the file
 	// the caller named on the command line.
 	read: (fileName: string) => SessionRead
-	// NOTE: Everything the entry reaches, dependency-first with the entry last —
+	// Everything the entry reaches, dependency-first with the entry last —
 	// which is both the order the Module bodies run in and the order their
 	// Diagnostics read best in.
 	modules: (fileName: string) => Array<Module>
 	linked: (fileName: string) => Array<LinkedModule>
-	// NOTE: One typed Program is reached by every entry that imports it, so
+	// One typed Program is reached by every entry that imports it, so
 	// each is simplified once and answers with the same simplified Program
 	// every time, which is what lets `optimise` key its cache on that Program.
 	simplify: (
 		program: common.typed.Program,
 		options?: SimplifyOptions,
 	) => common.typedSimple.Program
-	// NOTE: Optimising is safe to repeat — a pass is a pure function of its
+	// Optimising is safe to repeat — a pass is a pure function of its
 	// input — so this cache is only about not paying twice for one answer. It is
 	// keyed by the Options as well as by the Program: what the passes make of a
 	// Program is exactly what the Options asked for, and a Session that answered
@@ -77,7 +77,7 @@ export type CompileSession = {
 	) => common.typedSimple.Program
 }
 
-// NOTE: Reached over the edges the graph itself resolved, so that an entry that
+// Reached over the edges the graph itself resolved, so that an entry that
 // is somebody else's dependency compiles the Modules IT reaches and no more.
 // Filtering the component's own order rather than collecting during the walk
 // keeps the answer dependency-first, and leaves the entry last: anything after
@@ -106,7 +106,7 @@ function reachableModules(
 	return component.groups.flat().filter((module) => seen.has(module.filePath))
 }
 
-// NOTE: The compile MODE is the whole INVOCATION's — one run of `esc` is one
+// The compile MODE is the whole INVOCATION's — one run of `esc` is one
 // mode, so it belongs to the Session rather than to a request. It is what the
 // Session links every component under, and a linked component is cached, so a
 // Session opened in one mode may never answer for another. See `CompileMode`.
@@ -117,7 +117,7 @@ export function createCompileSession(
 	let texts = new Map<string, string>()
 	let errors = new Map<string, unknown>()
 
-	// NOTE: One read per file for the whole invocation, and the reason a read
+	// One read per file for the whole invocation, and the reason a read
 	// failed kept rather than thrown away — `esc` distinguishes a missing file
 	// from a directory from an unreadable one, and the graph's host answers
 	// `undefined` to all three.
@@ -155,7 +155,7 @@ export function createCompileSession(
 		Map<string, common.typedSimple.Program>
 	>()
 
-	// NOTE: A group already held is a group already parsed: a Strongly
+	// A group already held is a group already parsed: a Strongly
 	// Connected Component is the same set of Modules in every graph that
 	// reaches any of it, so recognising one member is recognising the group.
 	let mergeGraph = (entryPath: string): Array<string> => {
@@ -181,7 +181,7 @@ export function createCompileSession(
 		return touched
 	}
 
-	// NOTE: Which Modules belong together, answered from what was actually
+	// Which Modules belong together, answered from what was actually
 	// loaded rather than guessed at: everything one entry reaches is connected
 	// through that entry, so a load is one union and the pieces fall out of the
 	// overlaps between loads.
@@ -257,7 +257,7 @@ export function createCompileSession(
 		for (let fileName of entryFileNames) {
 			let entryPath = canonicalPath(fileName)
 
-			// NOTE: A standard library source is not a Module and can not be
+			// A standard library source is not a Module and can not be
 			// imported as one, so it never enters a graph — `esc check` on one
 			// reads it as the single declaration space it is.
 			if (isStdlibDocument(entryPath) || modules.has(entryPath)) {
@@ -270,7 +270,7 @@ export function createCompileSession(
 		assignComponents(loads)
 	}
 
-	// NOTE: A file the Session was never told about — nothing the CLI does
+	// A file the Session was never told about — nothing the CLI does
 	// today, since a run is planned before anything is compiled. It gets a
 	// piece of its own rather than an empty answer, which costs a second
 	// enrichment of whatever it shares with an entry and never a wrong one.
@@ -302,7 +302,7 @@ export function createCompileSession(
 		return components.get(filePath) ?? loadComponent(filePath)
 	}
 
-	// NOTE: A whole piece at once, entries and dependencies alike, because
+	// A whole piece at once, entries and dependencies alike, because
 	// linking is what a Module's imports are bound by and a piece is what is
 	// connected. The `entryPath` handed over is only carried through: what a
 	// bundle spells its Modules against is the entry the CALLER asked for, and
@@ -359,7 +359,7 @@ export function createCompileSession(
 			})
 		},
 
-		// NOTE: Keyed by Program identity alone, Options and all: one Program
+		// Keyed by Program identity alone, Options and all: one Program
 		// is one Module's, and the Options say what that Module's text is —
 		// which can not change while a compile holds the Program parsed from
 		// it.
@@ -401,7 +401,7 @@ export function createCompileSession(
 	}
 }
 
-// NOTE: Every `from "…"` a file spells, read out of its text rather than off a
+// Every `from "…"` a file spells, read out of its text rather than off a
 // parsed Program. This answers a SCHEDULING question and only ever that one:
 // which entries a worker should be given together, so that the graphs they load
 // overlap. A wrong answer costs a Module parsed in two workers — never a
@@ -431,7 +431,7 @@ function writtenDependencies(filePath: string): Array<string> {
 	return dependencies
 }
 
-// NOTE: The entries of an invocation, gathered into the sets whose graphs are
+// The entries of an invocation, gathered into the sets whose graphs are
 // going to overlap — one hop deep, which catches the two shapes a batch
 // actually has: an entry that imports another entry, and two entries importing
 // a third file. Workers share nothing, so entries of one set landing in one

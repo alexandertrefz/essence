@@ -6,7 +6,7 @@ import type { entryPoints, TestEvent } from "@essence-lang/runtime/Testing"
 
 import { redirectStdout, rendered } from "./running"
 
-// NOTE: Where a MUTANT runs, and the one piece of machinery `--mutate` needed
+// Where a MUTANT runs, and the one piece of machinery `--mutate` needed
 // that nothing else in the CLI had. A mutation run compiles hundreds of
 // bundles, and a bundle is a Module: `import()` can never unload one, so a run
 // that loaded them all into the command line's own process would grow a module
@@ -15,17 +15,17 @@ import { redirectStdout, rendered } from "./running"
 // the same way — see `packages/language-server/src/testWorker.ts`, whose
 // `BUNDLE_LIMIT` this is the sibling of.
 //
-// NOTE: The Worker does not COMPILE. That is the pool's, which is warm and
+// The Worker does not COMPILE. That is the pool's, which is warm and
 // parallel and already holds the Session every mutant is compiled through; what
 // crosses to here is a path and what crosses back is events, which are plain
 // data. A value an Essence Program built carries a hidden Type key that is a
 // `Symbol` of the runtime instance that built it, so nothing but events could
 // cross anyway.
 //
-// NOTE: This file is a Worker ENTRY: it starts listening the moment it is
+// This file is a Worker ENTRY: it starts listening the moment it is
 // loaded, exactly as `worker.ts` beside it does.
 
-// NOTE: How many distinct bundles one Worker loads before the driver is told to
+// How many distinct bundles one Worker loads before the driver is told to
 // start another. Half the Language Server's, because a mutation run reaches the
 // number in seconds rather than over an editing session, and a recycled Worker
 // costs one thread boot.
@@ -34,7 +34,7 @@ const BUNDLE_LIMIT = 64
 type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
-// NOTE: What every mutant of a run compares itself against, read off disk ONCE
+// What every mutant of a run compares itself against, read off disk ONCE
 // by the driver because a bundle reads nothing. They belong to the run rather
 // than to any one mutant, so they cross once per Worker rather than once per
 // bundle: a mutation run judges hundreds of mutants, and a project with a few
@@ -46,27 +46,27 @@ export type MutantStores = {
 }
 
 export type MutantWorkerRequest =
-	// NOTE: Posted by the driver the moment a Worker is booted, and before the
+	// Posted by the driver the moment a Worker is booted, and before the
 	// first mutant. Messages are handled in the order they arrive, so a `run`
 	// posted straight after this one is answered with the stores already here.
 	| ({ kind: "init" } & MutantStores)
 	| {
 			kind: "run"
-			// NOTE: Which request this answer belongs to. A driver runs one
+			// Which request this answer belongs to. A driver runs one
 			// mutant at a time, and the id is what makes that a fact the
 			// protocol states rather than one it relies on.
 			id: number
-			// NOTE: A bundle emitted into a directory of its own. Bun's resolver
+			// A bundle emitted into a directory of its own. Bun's resolver
 			// remembers what a directory held the first time it read anything
 			// out of it, so a second bundle written beside the first is
 			// invisible to `import()` — the mutant loop emits each one into a
 			// fresh directory rather than staging a copy of it afterwards.
 			bundle: string
-			// NOTE: The tests that REACH the site, by id, run one at a time so
+			// The tests that REACH the site, by id, run one at a time so
 			// that the Worker stops at the first kill. Everything else in the
 			// bundle is deselected by the same selection they go through.
 			ids: Array<string>
-			// NOTE: The run's one pinned seed, so a property test in the
+			// The run's one pinned seed, so a property test in the
 			// covering set draws exactly what it drew for the baseline. Without
 			// it a mutant would be judged by a different search than the one
 			// that established the baseline was green.
@@ -75,7 +75,7 @@ export type MutantWorkerRequest =
 	  }
 	| { kind: "close" }
 
-// NOTE: WHERE a mutant's run came apart, which is the whole of what lets the
+// WHERE a mutant's run came apart, which is the whole of what lets the
 // driver classify it rather than guess. `load` is a bundle that would not
 // import and `run` is a runner that threw — both of them a mutant the world
 // noticed, and both counted as KILLED. `answer` is this file failing to hand
@@ -83,7 +83,7 @@ export type MutantWorkerRequest =
 // which is the mutant having produced something the protocol can not carry, so
 // it is answered the way a crash is rather than as a survivor nothing supports.
 //
-// NOTE: The last two are written by the DRIVER and never by this file — a
+// The last two are written by the DRIVER and never by this file — a
 // Worker that died wrote nothing, and a Worker still spinning never will. They
 // live here because this union is the protocol, and the protocol is spelled
 // once.
@@ -94,25 +94,25 @@ export type MutantWorkerResponse =
 	| {
 			kind: "ran"
 			id: number
-			// NOTE: Everything the covering tests wrote, whole. The driver folds
+			// Everything the covering tests wrote, whole. The driver folds
 			// them: a `test-fail` among them is the kill, and the first one is
 			// the killer.
 			events: Array<TestEvent>
-			// NOTE: Why there is no answer, when there is none — a bundle that
+			// Why there is no answer, when there is none — a bundle that
 			// would not load, a runner that threw — rendered for a reader.
 			problem: string | null
-			// NOTE: Which phase the problem above came out of. Null exactly when
+			// Which phase the problem above came out of. Null exactly when
 			// `problem` is: the two are one fact written as two fields, because
 			// one of them is prose and the other is what the driver switches on.
 			phase: MutantPhase | null
-			// NOTE: Whether this Worker has loaded its last bundle. The driver
+			// Whether this Worker has loaded its last bundle. The driver
 			// terminates it and boots another rather than waiting to be told
 			// twice.
 			exhausted: boolean
 	  }
 
 let loaded = 0
-// NOTE: The run's own stores, handed over once by `init` — see `MutantStores`.
+// The run's own stores, handed over once by `init` — see `MutantStores`.
 // Empty until then, which is what a Worker nobody told would compare a snapshot
 // against: nothing, and so a first-time recording rather than a false match.
 let stores: MutantStores = { snapshots: {}, counterexamples: {} }
@@ -133,7 +133,7 @@ async function runMutant(
 		exhausted: loaded >= BUNDLE_LIMIT,
 	})
 	let restore = redirectStdout()
-	// NOTE: Which half of the work threw, kept as the work moves rather than
+	// Which half of the work threw, kept as the work moves rather than
 	// worked out from the error afterwards. A bundle that would not load and a
 	// runner that threw raise the same kinds of Error, and only the place they
 	// were raised in tells them apart.
@@ -148,7 +148,7 @@ async function runMutant(
 		loaded += 1
 		phase = "run"
 
-		// NOTE: A mutant of a Module with no tests in the graph at all. It is
+		// A mutant of a Module with no tests in the graph at all. It is
 		// not a kill and not a failure — there was nothing to ask.
 		if (tests === undefined) {
 			return answer([], null)
@@ -157,7 +157,7 @@ async function runMutant(
 		let registry = tests.registry()
 		let events: Array<TestEvent> = []
 
-		// NOTE: One test per call, in the order the driver named them, so the
+		// One test per call, in the order the driver named them, so the
 		// Worker STOPS at the first kill. Everything after a failure would be
 		// evidence for a verdict already reached, and a mutant covered by
 		// twenty tests is usually killed by the first.
@@ -201,7 +201,7 @@ function send(message: MutantWorkerResponse): void {
 	parentPort?.postMessage(message)
 }
 
-// NOTE: One request at a time, in the order they arrived. The driver never has
+// One request at a time, in the order they arrived. The driver never has
 // two mutants in flight — a mutant is compiled, run and judged before the next
 // one is compiled — and a queue is what makes that a property of this file
 // rather than a promise the driver keeps.
@@ -227,14 +227,14 @@ parentPort?.on("message", (request: MutantWorkerRequest) => {
 
 			send(await runMutant(request))
 		})
-		// NOTE: A rejection here is a `postMessage` that would not carry the
+		// A rejection here is a `postMessage` that would not carry the
 		// answer — an event payload structured clone refuses, a port already
 		// closing — and swallowing it would leave the driver waiting on a
 		// mutant that has already been decided. So the failure is ANSWERED: a
 		// minimal response carrying nothing but the problem, which is small
 		// enough that whatever the first post choked on is not in it.
 		//
-		// NOTE: And only if THAT post fails too is anything swallowed, because
+		// And only if THAT post fails too is anything swallowed, because
 		// at that point there is no channel left to say so on. The driver's own
 		// timeout and its `exit` listener are what catch it from there, which is
 		// why a swallow here is a last resort rather than a hole.
@@ -249,7 +249,7 @@ parentPort?.on("message", (request: MutantWorkerRequest) => {
 					exhausted: true,
 				})
 			} catch {
-				// NOTE: Deliberately silent — see above.
+				// Deliberately silent — see above.
 			}
 		})
 })

@@ -13,7 +13,7 @@ import { isSamePosition } from "../positions"
 import { programBodies } from "../sections"
 import { containsRange, isBefore } from "./geometry"
 
-// NOTE: Which Node of the Parser AST stands at a Position, or around it. Most
+// Which Node of the Parser AST stands at a Position, or around it. Most
 // finders a Quick Fix starts from ask the first question, since a Diagnostic
 // names the Node it was reported against. The ones a refactoring starts from
 // ask the second, since a selection sits inside what it selects, and so do the
@@ -88,7 +88,7 @@ export function findHandler(
 	return found
 }
 
-// NOTE: The Match a Matcher belongs to, for a fix whose edit is about the WHOLE
+// The Match a Matcher belongs to, for a fix whose edit is about the WHOLE
 // Match while the Diagnostic names one of its Cases — putting a Guard on a Case
 // takes values away from it, and where those values go is the Match's business.
 // `findMatch` answers for a Position that IS a Match's; this answers for one
@@ -142,7 +142,7 @@ export function findConstantDeclaration(
 	return found
 }
 
-// NOTE: The mirror of `findConstantDeclaration`, for the fix that swaps the
+// The mirror of `findConstantDeclaration`, for the fix that swaps the
 // keyword the other way. A pattern Declaration answers nothing: `variable { a,
 // b } = pair` names no single Position, and a fix reported against one name of
 // it has no keyword of its own to rewrite.
@@ -169,7 +169,7 @@ export function findVariableDeclaration(
 	return found
 }
 
-// NOTE: The Type Parameter standing at this Position, looked for on the three
+// The Type Parameter standing at this Position, looked for on the three
 // declarations that can carry one wrongly — a Choice and a Type Alias, whose
 // Parameters are applied and may not be marked `infer`, and a Namespace, whose
 // Parameters are inferred and must be. A Function's and a Method's are never
@@ -204,7 +204,7 @@ export function findTypeParameter(
 	return found
 }
 
-// NOTE: The Case construction whose PAYLOAD stands at this Position. An
+// The Case construction whose PAYLOAD stands at this Position. An
 // `unexpected-payload` is reported against the payload rather than against the
 // construction, and what has to go is the pair of parentheses around it —
 // which only the construction's own span reaches, since a Position runs one
@@ -232,7 +232,7 @@ export function findCaseValueOfPayload(
 	return found
 }
 
-// NOTE: The NAME Node of a Record Literal's member, found by the member's own
+// The NAME Node of a Record Literal's member, found by the member's own
 // name and by where its VALUE was written. A mismatch between two Records is
 // reported at the value — a typed Record keys its members by name and holds no
 // Position for one — so the name a fix writes over is recovered here, out of the
@@ -273,7 +273,7 @@ export function findRecordMemberName(
 	return found
 }
 
-// NOTE: The bracket-list entry whose KEY stands at this Position — a
+// The bracket-list entry whose KEY stands at this Position — a
 // `duplicate-key` names the key, and the whole entry is what a fix takes out.
 // The walk reaches an update's key list as well as a Literal's, because both
 // are one Node kind and an entry written twice is the same mistake in either.
@@ -302,7 +302,7 @@ export function findDictionaryEntry(
 	return found
 }
 
-// NOTE: The NAME of the static Method whose body holds this Position, and null
+// The NAME of the static Method whose body holds this Position, and null
 // where the Position stands anywhere else. The name is what a fix needs rather
 // than the Method: `static` is written directly in front of it in both forms
 // the Keyword has, the plain one and the `overload` block's.
@@ -339,7 +339,7 @@ export function findStaticMethodName(
 	return found
 }
 
-// NOTE: Whether this file writes `Namespace.name` anywhere — the spelling a
+// Whether this file writes `Namespace.name` anywhere — the spelling a
 // static Method is CALLED by, and the one thing that changes under a fix which
 // stops it being static. A Lookup is what both a call and a bare reference are
 // read as, so the one question covers the two.
@@ -372,7 +372,7 @@ export function readsNamespaceMember(
 	return found
 }
 
-// NOTE: The `is X where …` clause one of whose conditions stands at this
+// The `is X where …` clause one of whose conditions stands at this
 // Position, looked for in Protocols alone — a Namespace's conformance is the
 // one place a `where` belongs, and this answers the Diagnostic that refuses it
 // on the other.
@@ -405,7 +405,7 @@ export function findProtocolExtension(
 	return found
 }
 
-// NOTE: Where a Modifier word the Enricher reported about actually stands. The
+// Where a Modifier word the Enricher reported about actually stands. The
 // Enricher REGROUPS what the Parser read before it says anything — `tagged slow
 // focussed` is read as `tagged` and `slow(focussed)`, and the typo it reports
 // is an ARGUMENT of a Modifier in this tree rather than a Modifier of its own.
@@ -413,12 +413,12 @@ export function findProtocolExtension(
 // takes its arguments with it when it goes, and an argument goes alone.
 export type TestModifierSite = {
 	modifier: parser.TestModifierNode
-	// NOTE: Null where the Position names the Modifier itself, which is every
+	// Null where the Position names the Modifier itself, which is every
 	// Modifier the Parser and the Enricher read the same way.
 	argument: parser.TestModifierArgumentNode | null
 }
 
-// NOTE: A test and a suite are no part of `walk` — neither is a Statement,
+// A test and a suite are no part of `walk` — neither is a Statement,
 // which is what keeps every stage that walks Statements from answering for a
 // form it can never meet — so this walks the tests section itself.
 export function findTestModifierWord(
@@ -456,7 +456,7 @@ export function findTestModifierWord(
 	return found
 }
 
-// NOTE: The Node standing at exactly this Position — matched by Position rather
+// The Node standing at exactly this Position — matched by Position rather
 // than by containment, as the finders beside it are, since what a fix reported
 // against one Node needs is that Node and not whatever encloses it. Where two
 // Nodes share a span the outer one answers, which is the first the walk reaches.
@@ -479,7 +479,7 @@ export function findNodeAt(
 	return found
 }
 
-// NOTE: The Method Invocation a Position names — its own span, or its MEMBER's,
+// The Method Invocation a Position names — its own span, or its MEMBER's,
 // because the two Diagnostics that rewrite a call report against one each: an
 // ambiguous dispatch against the whole call, a static called on a value against
 // the name alone. Both then need the call around it, and one finder answering
@@ -512,7 +512,7 @@ export function findMethodInvocation(
 	return found
 }
 
-// NOTE: Matched by Position exactly rather than by containment. A
+// Matched by Position exactly rather than by containment. A
 // `missing-return` names the Node the Validator was looking at — a Function
 // Statement, a Function literal, a Method — and a Match Handler that does not
 // return reports under the Match's Position, which no Function ever shares.
@@ -541,7 +541,7 @@ export function findFunctionDefinition(
 	return found
 }
 
-// NOTE: The Handler whose Matcher ends in front of this Cursor. A redundant
+// The Handler whose Matcher ends in front of this Cursor. A redundant
 // whole-value binder is reported and then DROPPED — the Pattern the Parser kept
 // stops at its closing brace and no Node holds the `as name` the Diagnostic
 // spans — so the arm it belongs to is found by what stands in front of it
@@ -569,7 +569,7 @@ export function findHandlerBefore(
 	return found
 }
 
-// NOTE: Every Node written inside a Handler — its guard and its body, which is
+// Every Node written inside a Handler — its guard and its body, which is
 // everything the binder could have been read from. The Handler itself is not one
 // of them: what a fix over an arm rewrites is what the arm HOLDS.
 export function walkHandler(
@@ -585,7 +585,7 @@ export function walkHandler(
 	}
 }
 
-// NOTE: The Namespace a range is written inside, innermost first — what a fix
+// The Namespace a range is written inside, innermost first — what a fix
 // that edits a Namespace's HEAD starts from, since the Diagnostics that ask for
 // one are reported against a Method inside it or a condition on it rather than
 // against the Namespace itself.
@@ -607,7 +607,7 @@ export function enclosingNamespace(
 	return found
 }
 
-// NOTE: The Namespace Method a range is written inside, innermost first, with
+// The Namespace Method a range is written inside, innermost first, with
 // the Namespace around it — what a fix that writes a PER-METHOD bound starts
 // from, since `unsatisfied-bound` is reported at a call in the body rather than
 // at the head the bound goes on.
@@ -647,7 +647,7 @@ export function enclosingNamespaceMethod(
 	return method === null ? null : { namespace, method }
 }
 
-// NOTE: The `<…>` a Diagnostic's span points INTO, with the entry it points at —
+// The `<…>` a Diagnostic's span points INTO, with the entry it points at —
 // what the two fixes that rewrite one entry work from. Found by the entry's own
 // Position rather than by walking out to a Method, because the span is the
 // entry's and a Method's Position does not always reach back over its head.
@@ -658,7 +658,7 @@ export function genericEntryAt(
 	generics: Array<parser.GenericDeclarationNode>
 	index: number
 	parameterListPosition: common.Position
-	// NOTE: The span of the whole `<…>`, brackets included — what an edit
+	// The span of the whole `<…>`, brackets included — what an edit
 	// removing the last entry has to take with it, and the one thing no entry's
 	// own Position says. Null where the Parser recorded none, which is a head
 	// that wrote no list at all.
@@ -693,7 +693,7 @@ export function genericEntryAt(
 	return found
 }
 
-// NOTE: Where a Type Parameter of that name is DECLARED, looked for in every
+// Where a Type Parameter of that name is DECLARED, looked for in every
 // head a range is written under — a Function's, a Method's, the Namespace
 // around them — because an unsatisfied bound is reported at the CALL and what
 // answers it is an edit to the declaration the call stands inside. Innermost
@@ -724,7 +724,7 @@ export function findGenericDeclaration(
 	return found
 }
 
-// NOTE: The Type Parameters one Node DECLARES. A Namespace's Methods are absent
+// The Type Parameters one Node DECLARES. A Namespace's Methods are absent
 // because the walk reaches each of them as a Function value of its own and
 // answers for its own list there.
 function genericsOf(
@@ -741,7 +741,7 @@ function genericsOf(
 	}
 }
 
-// NOTE: The smallest Node whose Position CONTAINS the range. A Diagnostic
+// The smallest Node whose Position CONTAINS the range. A Diagnostic
 // names the Node it was reported against and a SELECTION does not: what a
 // reader drags over is a span inside an Expression, or one that covers it and
 // a little whitespace besides, and what an extraction lifts is the Node around
@@ -768,7 +768,7 @@ export function findInnermostNodeContaining(
 	return found
 }
 
-// NOTE: The Statement a range sits in, and the body it is one of. A refactoring
+// The Statement a range sits in, and the body it is one of. A refactoring
 // that writes a Statement — a Constant lifted out of an Expression, a Function
 // extracted from a body — has to write it SOMEWHERE, and where is always
 // "beside this one, in the body it stands in". The index is handed over with
@@ -779,7 +779,7 @@ export type EnclosingStatement = {
 	index: number
 }
 
-// NOTE: Innermost, on the same reading of the walk order that
+// Innermost, on the same reading of the walk order that
 // `findInnermostNodeContaining` takes: the bodies come outermost first, so the
 // last one holding a Statement over the range is the one no other body of the
 // list is nested in.
@@ -802,7 +802,7 @@ export function enclosingStatementOf(
 	return found
 }
 
-// NOTE: The other end of the question `enclosingStatementOf` answers. A
+// The other end of the question `enclosingStatementOf` answers. A
 // Statement lifted OUT of a Function is written beside that Function, and what
 // says which Function that is, is the Statement of a SECTION's own body the
 // range sits in — the outermost Statement holding it rather than the innermost.
@@ -825,7 +825,7 @@ export function outermostStatementOf(
 	return null
 }
 
-// NOTE: Every body of the Program, outermost first. `programSections` is depth
+// Every body of the Program, outermost first. `programSections` is depth
 // first and in source order, and the walk visits a Node before the Nodes it
 // holds, so a body written inside another is always collected after it.
 function allBodies(
@@ -840,7 +840,7 @@ function allBodies(
 	return bodies
 }
 
-// NOTE: The bodies one Node OWNS — a body being the one place a Statement can
+// The bodies one Node OWNS — a body being the one place a Statement can
 // be written, which an Expression holding other Expressions is not. A
 // Namespace's Methods are absent because the walk reaches each of them as a
 // Function value of its own, and answers for it there.
@@ -862,7 +862,7 @@ function bodiesOf(
 	}
 }
 
-// NOTE: Every Node of the Parser AST, in no particular order — the lookups
+// Every Node of the Parser AST, in no particular order — the lookups
 // above all ask "which Node is at this Position", which nothing about the
 // shape of the tree helps answer faster. Written over the Parser AST rather
 // than the typed one because a Quick Fix edits text: the typed AST erases
@@ -895,7 +895,7 @@ function walkBody(nodes: Array<parser.ImplementationNode>, visit: Visitor) {
 	return true
 }
 
-// NOTE: A Parameter's `= expression` default holds Expressions the same Quick
+// A Parameter's `= expression` default holds Expressions the same Quick
 // Fixes apply to as any body's — an unknown name inside one has the same
 // suggestion, an auto-import the same edit. Silently missed otherwise: the walk
 // below descends into bodies, and a default is not one.
@@ -909,7 +909,7 @@ function walkDefaults(parameters: Array<parser.ParameterNode>, visit: Visitor) {
 	return true
 }
 
-// NOTE: True to go on, false to stop — the answer travels back up through every
+// True to go on, false to stop — the answer travels back up through every
 // frame, so a visitor that has found what it came for costs nothing more.
 export function walkNode(
 	node: parser.ImplementationNode,
@@ -930,7 +930,7 @@ export function walkNode(
 				walkBody(node.value.body, visit)
 			)
 		case "ChoiceDeclarationStatement":
-			// NOTE: A Case payload's default holds the Expressions the same
+			// A Case payload's default holds the Expressions the same
 			// Quick Fixes apply to as any body's — an unknown name in one takes
 			// the same suggestion, an auto-import the same edit.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -957,7 +957,7 @@ export function walkNode(
 					}
 				}
 
-				// NOTE: A native signature has no body, but it may carry a
+				// A native signature has no body, but it may carry a
 				// default, which is Essence written in a `declarations` Program
 				// like any other.
 				for (let signature of nativeSignaturesOf(member)) {
@@ -1026,7 +1026,7 @@ export function walkNode(
 			}
 
 			return true
-		// NOTE: An arm holds the Expressions the same Quick Fixes apply to as
+		// An arm holds the Expressions the same Quick Fixes apply to as
 		// any body's — an unknown name in one takes the same suggestion, an
 		// auto-import the same edit.
 		case "Define":
@@ -1101,7 +1101,7 @@ export function walkNode(
 			return walkNode(node.base, visit)
 		case "CaseValue":
 			return node.value === null ? true : walkNode(node.value, visit)
-		// NOTE: A path holds no Expression of its own — its steps are member
+		// A path holds no Expression of its own — its steps are member
 		// names, and the Function it stands for is the Enricher's.
 		case "MemberPath":
 			return true

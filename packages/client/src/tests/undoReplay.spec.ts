@@ -15,7 +15,7 @@ import {
 import { backRunSeenBy as marshallerReplay } from "../marshal-runtime"
 import { backRunSeenBy as benchReplay } from "../tools/bench"
 
-// NOTE: THE UNDO REPLAY EXISTS FOUR TIMES, and nothing held the copies
+// THE UNDO REPLAY EXISTS FOUR TIMES, and nothing held the copies
 // together. A positional write changes a run Array in place and counts a
 // version up, so a box left behind on that run has to undo the writes made
 // since it looked before its items can be read — `runtime/src/listWrites.ts`
@@ -25,7 +25,7 @@ import { backRunSeenBy as benchReplay } from "../tools/bench"
 // `packages/debug-adapter/src/tests/undoReplay.spec.ts`, which is this same
 // idea pointed at those).
 //
-// NOTE: Neither copy imports the runtime's `caughtUp`, which writes the
+// Neither copy imports the runtime's `caughtUp`, which writes the
 // caught-up Array back into the box where each copy here only reads it. What
 // ties the copies together is a guard rather than a refactor, and this is it:
 // random boxes left behind in every way a chain can leave one behind, read
@@ -35,7 +35,7 @@ const integer = (value: number) => createInteger(BigInt(value))
 const integers = (values: Array<number>): ListType<IntegerType> =>
 	createList(values.map(integer))
 
-// NOTE: A counted generator rather than `Math.random`, so a seed names one
+// A counted generator rather than `Math.random`, so a seed names one
 // schedule for good — the same shape `positionalWrites.spec.ts` uses, and for
 // the same reason.
 const generatorFrom = (seed: number): (() => number) => {
@@ -51,13 +51,13 @@ const generatorFrom = (seed: number): (() => number) => {
 	}
 }
 
-// NOTE: What the runtime says the box holds — through `materialise`, which
+// What the runtime says the box holds — through `materialise`, which
 // catches a stale box up and hands back an Array whose whole length is the
 // box's view. This is the answer both copies are measured against.
 const runtimeItems = (box: ListType<IntegerType>): Array<number> =>
 	materialise(box).map((each) => Number(each.value))
 
-// NOTE: What a COPY says. Each answers the BACK run as this box sees it, so the
+// What a COPY says. Each answers the BACK run as this box sees it, so the
 // front run — which no positional write ever lands in — is walked here the way
 // each copy's own caller walks it: reversed, and then the back.
 const itemsThrough = (
@@ -81,7 +81,7 @@ const itemsThrough = (
 	return items
 }
 
-// NOTE: EVERY WAY A CHAIN CAN LEAVE A BOX BEHIND, built at random and kept:
+// EVERY WAY A CHAIN CAN LEAVE A BOX BEHIND, built at random and kept:
 // several versions of one written run, windows of a written run, boxes with a
 // front run the writes never touch, and siblings made by a tip push. What every
 // one of them has in common is that the Array it holds has moved on without it.
@@ -92,7 +92,7 @@ const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 	let kept: Array<ListType<IntegerType>> = []
 	let latest = integers(items)
 
-	// NOTE: The first write copies and attaches the log to the COPY, so every
+	// The first write copies and attaches the log to the COPY, so every
 	// box kept from here on shares one written Array.
 	latest = replace(latest, integer(items[0]!), integer(0))
 	kept.push(latest)
@@ -133,13 +133,13 @@ const copies: Array<[string, (box: never) => Array<unknown>]> = [
 
 describe("the client's copies of the undo replay", () => {
 	for (let [name, replay] of copies) {
-		// NOTE: Twelve seeds, which is a few milliseconds and covers every
+		// Twelve seeds, which is a few milliseconds and covers every
 		// shape above many times over. Written out rather than counted, so a
 		// failing one can be pulled while it is being fixed without
 		// renumbering the rest.
 		for (let seed of [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]) {
 			it(`${name} answers what the runtime answers, seed ${seed}`, () => {
-				// NOTE: The copy is asked FIRST and the runtime second,
+				// The copy is asked FIRST and the runtime second,
 				// because reading a box through the runtime REPAIRS it — ask
 				// the runtime first and every box handed to the copy is
 				// already current, which is the one state a broken replay
@@ -152,7 +152,7 @@ describe("the client's copies of the undo replay", () => {
 			})
 		}
 
-		// NOTE: And the shape the arithmetic is really about, written out
+		// And the shape the arithmetic is really about, written out
 		// rather than drawn from a seed: one run, three versions of it, every
 		// version still held.
 		it(`${name} answers each version of one written run`, () => {
@@ -169,7 +169,7 @@ describe("the client's copies of the undo replay", () => {
 			expect(itemsThrough(replay, first)).toEqual([0, 1, 2, 3, 4])
 		})
 
-		// NOTE: THE OTHER HALF OF WHAT A COPY OWES: it reads, and the runtime
+		// THE OTHER HALF OF WHAT A COPY OWES: it reads, and the runtime
 		// repairs. A box either of these has read must still be stale, so that
 		// the Module on the other side of the boundary finds it exactly as it
 		// left it.

@@ -9,7 +9,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 
-// NOTE: The Simplifier READS a typed Program and writes a new one. The typed
+// The Simplifier READS a typed Program and writes a new one. The typed
 // Program is read again after it — the Language Server holds it for every hover
 // and rename, the prelude simplifies the standard library's once per process,
 // and a contract goal shares one typed check between every entry over the same
@@ -29,7 +29,7 @@ function typedOf(source: string): common.typed.Program {
 	return enriched.program
 }
 
-// NOTE: The base of the power is COMPUTED, so that `raise` reaches the
+// The base of the power is COMPUTED, so that `raise` reaches the
 // Overload `Integer` declares rather than the lone entry a proven base has —
 // this file is about the suffix that Overload gives an emitted name.
 const SOURCE = `implementation {

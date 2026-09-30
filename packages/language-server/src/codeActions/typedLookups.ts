@@ -7,7 +7,7 @@ import { typedHandlerExpressions } from "../matchHandlerChildren"
 import { isSamePosition } from "../positions"
 import { typedProgramBodies } from "../sections"
 
-// NOTE: What the TYPED Program says about a span the source wrote. Every lookup
+// What the TYPED Program says about a span the source wrote. Every lookup
 // beside this one reads the Parser AST, because an edit is written into text
 // and the typed tree erases and rewrites what the text says — but a refactoring
 // that has to SPELL a Type has nowhere else to ask, and the Positions are the
@@ -21,7 +21,7 @@ export function typedExpressionAt(
 
 	for (let body of typedProgramBodies(program)) {
 		visitBody(body, (node) => {
-			// NOTE: The FIRST match wins, which is the outermost of the Nodes
+			// The FIRST match wins, which is the outermost of the Nodes
 			// sharing a span — a Method Invocation and its base Identifier
 			// stand at the same Position when the call has no receiver written
 			// in front of it, and what a caller asking about a span means is
@@ -44,7 +44,7 @@ function visitBody(
 	}
 }
 
-// NOTE: The same walk `findInlayHints` makes, which is the one that reaches
+// The same walk `findInlayHints` makes, which is the one that reaches
 // every Expression of a typed Program — a form missing from it is a form this
 // answers nothing about.
 function visitNode(

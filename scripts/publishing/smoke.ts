@@ -19,7 +19,7 @@ import {
 } from "./packages"
 import { stagePackages } from "./stage"
 
-// NOTE: The lesson the monorepo split taught, applied before anything is
+// The lesson the monorepo split taught, applied before anything is
 // published: a green suite proves the SOURCES, and only running the artifact
 // proves the artifact. The staged packages are copied into a scratch npm
 // workspace in the system's tmpdir — outside the repository, so a missing

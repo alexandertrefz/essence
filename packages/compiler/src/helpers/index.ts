@@ -1,4 +1,4 @@
-// NOTE: The package boundary for `@essence-lang/compiler/helpers`. The Compiler's
+// The package boundary for `@essence-lang/compiler/helpers`. The Compiler's
 // own phases import the module they actually need — `./types`, `./describe` and
 // the rest — so that a file's imports say which of these concerns it depends on.
 // This barrel exists for the packages OUTSIDE the Compiler, which have one

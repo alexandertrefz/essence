@@ -30,13 +30,13 @@ import { rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: A project on disk, in a directory of its own that is removed again. The
+// A project on disk, in a directory of its own that is removed again. The
 // files are written rather than taken from `packages/fixtures`, because what is
 // under test is resolution — which is about where files sit relative to each
 // other, and a test that has to be read alongside a directory listing
 // elsewhere is a test nobody can check.
 //
-// NOTE: The directory is canonicalised before anything is built out of it.
+// The directory is canonicalised before anything is built out of it.
 // `mkdtempSync` answers under `/var/folders/…` on macOS, which is a symlink to
 // `/private/var/folders/…`, so every path a test compares against has to be the
 // spelling the resolver answers in.
@@ -53,7 +53,7 @@ function withProject<T>(
 	}
 }
 
-// NOTE: The same, for the tests that BUILD what they wrote — bundling and
+// The same, for the tests that BUILD what they wrote — bundling and
 // running are asynchronous, and a `finally` that removed the directory around a
 // Promise would take the sources away while esbuild was still reading them.
 async function withBuiltProject<T>(
@@ -83,7 +83,7 @@ function writeProject(
 	return realpathSync.native(directory)
 }
 
-// NOTE: The other kind of host: files that are not on disk at all, which is what
+// The other kind of host: files that are not on disk at all, which is what
 // the Language Server hands over for a document the Editor holds unsaved. It
 // records what it was asked for, so that "one file is read once" is observable.
 function memoryHost(files: Record<string, string>): ModuleHost & {
@@ -149,7 +149,7 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// NOTE: Above the importer's directory is an ordinary place for a dependency
+	// Above the importer's directory is an ordinary place for a dependency
 	// to sit — `"../math/Math.es"` is in the language's own examples. There is no
 	// root a specifier may not leave: a Module names files, and a file that
 	// exists is a file that can be imported.
@@ -167,7 +167,7 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// NOTE: The Language Server resolves against documents that have never been
+	// The Language Server resolves against documents that have never been
 	// saved, so resolution may not ask whether the file exists. Whether anything
 	// can be READ there is the host's answer, and the graph's Diagnostic.
 	it("resolves a specifier naming a file that is not on disk", () => {
@@ -220,7 +220,7 @@ describe("Module Resolution", () => {
 				reason: "self-import",
 			})
 
-			// NOTE: The same file spelled the long way round. A self-import is
+			// The same file spelled the long way round. A self-import is
 			// which FILE the path lands on, not whether the two spellings look
 			// alike.
 			expect(resolveSpecifier("../src/Main.es", importer)).toEqual({
@@ -230,7 +230,7 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// NOTE: Derived from `STDLIB_DIRECTORY` rather than spelled out, so this
+	// Derived from `STDLIB_DIRECTORY` rather than spelled out, so this
 	// holds under both layouts that constant answers for — the sources in a
 	// workspace checkout, and the copy written beside the bundled Language
 	// Server in the VS Code extension. Written out, the test would quietly stop
@@ -250,7 +250,7 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// NOTE: One file reached through a symlink and directly is ONE Module. Two
+	// One file reached through a symlink and directly is ONE Module. Two
 	// spellings of one path would be parsed twice, enriched twice, and their
 	// Types would not be interchangeable — a Rectangle that is not a Rectangle.
 	it("answers with one path for a file reached through a symlink", () => {
@@ -277,7 +277,7 @@ describe("Module Resolution", () => {
 })
 
 describe("Module Graph", () => {
-	// NOTE: Dependencies first, the entry last. Every stage after this one runs
+	// Dependencies first, the entry last. Every stage after this one runs
 	// over the Modules in this order, and a Module may only be enriched once
 	// everything it imports has been.
 	it("orders a chain of Modules dependency first", () => {
@@ -311,7 +311,7 @@ ${moduleProgram()}`,
 				expect(graph.entryPath).toBe(path.join(directory, "Main.es"))
 				expect(graph.diagnostics).toEqual([])
 
-				// NOTE: Nothing is grouped — a chain is one Module per group.
+				// Nothing is grouped — a chain is one Module per group.
 				expect(groupNamesOf(directory, graph.groups)).toEqual([
 					[path.join("math", "Math.es")],
 					["Geometry.es"],
@@ -321,7 +321,7 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// NOTE: A re-export is a dependency. A facade that only forwards names never
+	// A re-export is a dependency. A facade that only forwards names never
 	// mentions the Module it forwards them from anywhere but its `export` block,
 	// and reading edges off the imports alone leaves it with none at all — the
 	// file it depends on would not be loaded, enriched, or bundled.
@@ -359,7 +359,7 @@ export {
 		)
 	})
 
-	// NOTE: The whole point of keying on the canonical path: a diamond binds one
+	// The whole point of keying on the canonical path: a diamond binds one
 	// Module, whichever importer reached it first, so its body runs once and its
 	// Types are the same Types on both sides.
 	it("reads a Module two importers name exactly once", () => {
@@ -403,7 +403,7 @@ ${moduleProgram()}`,
 		])
 	})
 
-	// NOTE: Two entries naming one Module are one dependency and one entry in
+	// Two entries naming one Module are one dependency and one entry in
 	// the resolution table, keyed by the specifier as written — which is what an
 	// Import or Export entry has in hand when it goes looking for the Module it
 	// named.
@@ -439,7 +439,7 @@ export {
 		)
 	})
 
-	// NOTE: A cycle is one group, because nothing in it can be enriched before
+	// A cycle is one group, because nothing in it can be enriched before
 	// the rest of it — the hoisting pass has to see every Module in the group at
 	// once. Which member runs first is not something the source states, which is
 	// why the group is the unit rather than an order inside it.
@@ -470,7 +470,7 @@ ${moduleProgram()}`,
 					["A.es", "B.es"],
 				])
 
-				// NOTE: The flattened order is the groups in order — a Module
+				// The flattened order is the groups in order — a Module
 				// inside a cycle is not ahead of the ones it imports, and cannot
 				// be.
 				expect(
@@ -512,7 +512,7 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// NOTE: Per Module, because the dedup key is severity, code, message and
+	// Per Module, because the dedup key is severity, code, message and
 	// Position with NO file in it — two Modules with the same mistake on the
 	// same line are two Diagnostics, and one shared collection would report the
 	// first and swallow the second.
@@ -547,7 +547,7 @@ implementation {
 					]).toEqual([name, ["invalid-number"]])
 				}
 
-				// NOTE: The source each Diagnostic is rendered against travels
+				// The source each Diagnostic is rendered against travels
 				// with the Module — a report about a dependency is printed
 				// against the dependency's own text.
 				expect(
@@ -581,7 +581,7 @@ ${moduleProgram()}`,
 					"Main.es",
 				).diagnostics
 
-				// NOTE: Two groups, two Diagnostics — one per specifier written,
+				// Two groups, two Diagnostics — one per specifier written,
 				// however many names the group holds, and the second is not
 				// deduplicated away, because each underlines its own specifier.
 				expect(
@@ -654,7 +654,7 @@ ${moduleProgram()}`,
 					expect(diagnostic.helps).not.toEqual([])
 				}
 
-				// NOTE: Nothing was reachable, so nothing else was loaded — a
+				// Nothing was reachable, so nothing else was loaded — a
 				// refused specifier is not an edge.
 				expect(
 					moduleAt(directory, graph, "Main.es").dependencies,
@@ -664,7 +664,7 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// NOTE: Appending '.es' is an answer for exactly one of the shapes that
+	// Appending '.es' is an answer for exactly one of the shapes that
 	// reaches this report. A specifier already carrying an extension names a
 	// file of another kind, and './clock.js.es' is a file nobody has — so the
 	// Help says what is true and spells no edit, which is also what keeps the
@@ -702,7 +702,7 @@ ${moduleProgram()}`,
 			"Name the file itself, ending in '.es'.",
 		)
 
-		// NOTE: One edit, one Diagnostic. A package specifier only told to begin
+		// One edit, one Diagnostic. A package specifier only told to begin
 		// with './' is sent to `./lodash`, which is refused a second time for
 		// the extension — so both halves of the path are named at once and what
 		// follows the edit is `module-not-found`, a different thing to know.
@@ -711,7 +711,7 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// NOTE: "Remove the entry" loops on both of these: they are reported on the
+	// "Remove the entry" loops on both of these: they are reported on the
 	// SPECIFIER, and an entry in this language is a NAME — a reader who deletes
 	// one is left with the same group and the same report. The export side wants
 	// the opposite edit besides, because the Module DECLARES those names and
@@ -774,7 +774,7 @@ export {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"invalid-module-specifier",
 			])
-			// NOTE: The group, for the reason the two above are: deleting the
+			// The group, for the reason the two above are: deleting the
 			// one name this entry asks for leaves `from "…" { }` behind and
 			// reports the very same thing again.
 			expect(diagnostics[0].helps[0]).toBe(
@@ -787,7 +787,7 @@ export {
 		})
 	})
 
-	// NOTE: The entry has no Program to point a Diagnostic into, so this is the
+	// The entry has no Program to point a Diagnostic into, so this is the
 	// one placeless report the stage makes — and the graph is empty rather than
 	// half-built, because there is nothing to be half-built out of.
 	it("reports an unreadable entry without a Position", () => {
@@ -807,7 +807,7 @@ export {
 		})
 	})
 
-	// NOTE: One Module, reached twice. The graph is keyed by the canonical path,
+	// One Module, reached twice. The graph is keyed by the canonical path,
 	// so a symlinked spelling of a file is the file — not a second Module
 	// declaring second Types of every name in it.
 	it("binds one Module for a file reached through a symlink", () => {
@@ -836,7 +836,7 @@ ${moduleProgram()}`,
 						relativePathsOf(directory, [...graph.modules.keys()]),
 					).toEqual([path.join("real", "Geometry.es"), "Main.es"])
 
-					// NOTE: Both spellings answer with the one Module, so an
+					// Both spellings answer with the one Module, so an
 					// entry finds it under the specifier IT wrote.
 					expect([
 						...moduleAt(directory, graph, "Main.es").resolutions,
@@ -851,7 +851,7 @@ ${moduleProgram()}`,
 						],
 					])
 				} finally {
-					// NOTE: The link is unlinked first and on its own, before
+					// The link is unlinked first and on its own, before
 					// anything recursive runs over the directory holding it.
 					rmSync(link, { force: true })
 				}
@@ -859,7 +859,7 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// NOTE: The Language Server's half of the host contract: a graph whose files
+	// The Language Server's half of the host contract: a graph whose files
 	// only ever existed in an Editor. Nothing here touches disk, and the entry
 	// is a document that has never been saved.
 	it("loads a graph entirely from a host that reads no files", () => {
@@ -889,7 +889,7 @@ ${moduleProgram()}`,
 	})
 })
 
-// NOTE: The whole stage, entry in and one linked Module per file out — the graph
+// The whole stage, entry in and one linked Module per file out — the graph
 // and the linker are never used apart, and a test that ran only half of it would
 // be testing an arrangement no caller makes.
 function linkProject(directory: string, entry: string) {
@@ -914,7 +914,7 @@ function linkedAt(
 	return module
 }
 
-// NOTE: One Module's Diagnostics once the whole graph has been analysed, which
+// One Module's Diagnostics once the whole graph has been analysed, which
 // is where the Validator has run over it too.
 function analysedAt(
 	directory: string,
@@ -931,7 +931,7 @@ function analysedAt(
 	return diagnostics
 }
 
-// NOTE: A Protocol's identity carries its Module's path, and neither what a
+// A Protocol's identity carries its Module's path, and neither what a
 // reader is shown nor a name a fix writes may. `data.modulePath` is the
 // canonical path by design.
 function expectNoPathShown(
@@ -967,7 +967,7 @@ function reportsOf(diagnostics: Array<common.Diagnostic>) {
 }
 
 describe("Module Linking", () => {
-	// NOTE: One entry carries its name across every table it is bound in, so a
+	// One entry carries its name across every table it is bound in, so a
 	// `type Shape` and a Namespace `Shape` travel as one — which is what makes
 	// `Shape.of(…)` and `shape: Shape` both work off a single import.
 	it("reads an export surface off the Module's own declarations", () => {
@@ -1031,7 +1031,7 @@ export {
 		)
 	})
 
-	// NOTE: Private by default. `hidden` is declared and reachable inside its own
+	// Private by default. `hidden` is declared and reachable inside its own
 	// Module and nowhere else, which is the whole of the visibility rule.
 	it("keeps a declaration the export block does not list out of the surface", () => {
 		withProject(
@@ -1104,7 +1104,7 @@ export {
 		)
 	})
 
-	// NOTE: A facade never binds what it forwards — `Rectangle` is not in scope
+	// A facade never binds what it forwards — `Rectangle` is not in scope
 	// inside `Facade.es` at all, and a chain of them still answers with the one
 	// Type the declaring Module made.
 	it("forwards a name through a chain of re-exports", () => {
@@ -1179,7 +1179,7 @@ export {}
 						).diagnostics,
 					),
 				).toEqual([
-					// NOTE: `absent` first, although `hidden` was written first
+					// `absent` first, although `hidden` was written first
 					// — the entries are read in canonical order.
 					[
 						"unknown-export",
@@ -1194,7 +1194,7 @@ export {}
 		)
 	})
 
-	// NOTE: Three shapes, three answers. A declaration the block publishes under
+	// Three shapes, three answers. A declaration the block publishes under
 	// ANOTHER name is asked for by that name — adding this one would publish one
 	// function twice. A Module publishing nothing has no block to add to. And a
 	// name that is no declaration at all is a near miss against what the Module
@@ -1238,7 +1238,7 @@ ${exports}`
 		])
 	})
 
-	// NOTE: And the Note says the `as` rule out loud where that rule is the
+	// And the Note says the `as` rule out loud where that rule is the
 	// answer — a reader looking at a block that plainly lists the declaration
 	// has no other way of knowing why it is still private here. A block that
 	// simply leaves the name out gets the one Note it always had.
@@ -1272,7 +1272,7 @@ export {
 		)
 	})
 
-	// NOTE: `B.es` declares `perimeter` at the Position `A.es` declares `area`
+	// `B.es` declares `perimeter` at the Position `A.es` declares `area`
 	// at, and `A.es` forwards the one while keeping the other private.
 	it("does not take a forwarded declaration for a private one at its Position", () => {
 		withProject(
@@ -1317,7 +1317,7 @@ export {
 		)
 	})
 
-	// NOTE: All three collisions are the one Diagnostic, because they are the one
+	// All three collisions are the one Diagnostic, because they are the one
 	// mistake: the name an entry binds is taken. The entry is what gives way, so
 	// whatever held the name still means what it did — a builtin stays the
 	// builtin, and the local declaration is not reported as a duplicate of the
@@ -1390,7 +1390,7 @@ export {
 				).toEqual([
 					"'String' is already declared here",
 					"'local' is already declared here",
-					// NOTE: The entry that loses is the one read LATER, which is
+					// The entry that loses is the one read LATER, which is
 					// the aliased one — `first` itself binds, and `second as
 					// first` is what collides with it.
 					"'first' is already declared here",
@@ -1399,7 +1399,7 @@ export {
 		)
 	})
 
-	// NOTE: The Rewriter emits a Method call as `<Namespace name>.method(…)`, so
+	// The Rewriter emits a Method call as `<Namespace name>.method(…)`, so
 	// an alias has to reach the emitted code: the import binds a shallow copy of
 	// the Namespace Type carrying the local name. The declaring Module's own copy
 	// keeps its own name, which is what its emission needs.
@@ -1475,7 +1475,7 @@ export {
 		)
 	})
 
-	// NOTE: The single hoisting pass over the whole group, which is the only way
+	// The single hoisting pass over the whole group, which is the only way
 	// this resolves: `A` needs `halved` typed to type `averaged`, and `B` needs
 	// `Amount` and `doubled` to type `halved`. Neither can go first, so the rounds
 	// bind the entries as the declarations they name come up.
@@ -1542,7 +1542,7 @@ export {
 		)
 	})
 
-	// NOTE: The shape every checked refinement is written in — a `type` and the
+	// The shape every checked refinement is written in — a `type` and the
 	// `namespace` targeting it, under ONE name — carried across a cycle. The two
 	// halves do not hoist in the same round: the refined Alias hoists as a
 	// skeleton, and the Namespace lands only once the predicate has been filled.
@@ -1625,7 +1625,7 @@ export {
 		)
 	})
 
-	// NOTE: `Fits` is read once `Fitting` is bound in `B.es`, and reading it
+	// `Fits` is read once `Fitting` is bound in `B.es`, and reading it
 	// checks the `5` against `Small`, whose predicate is still unread then.
 	it("fills a predicate across a cycle that waits on another one", () => {
 		withProject(
@@ -1681,7 +1681,7 @@ export {
 		)
 	})
 
-	// NOTE: `Five` is read through the body of `fitsFive`, which waits on
+	// `Five` is read through the body of `fitsFive`, which waits on
 	// `Small`. `Greeter` waits on `Five`, so it hoists only if the round that
 	// fills `Small` is followed by one that reads the body again.
 	it("hoists a declaration across a cycle that waits on a predicate read through a Method body", () => {
@@ -1750,7 +1750,7 @@ export {
 		)
 	})
 
-	// NOTE: The one kind a cycle can not carry, because it is the one kind that
+	// The one kind a cycle can not carry, because it is the one kind that
 	// does not hoist — and it is genuinely broken at runtime, not merely
 	// unsupported: the emitted binding is read in its temporal dead zone.
 	it("refuses a Constant imported across a cycle", () => {
@@ -1799,7 +1799,7 @@ export {
 					],
 				])
 
-				// NOTE: The name is bound as an Error, so the body that reads it
+				// The name is bound as an Error, so the body that reads it
 				// is not a second Diagnostic about a name the Program does
 				// declare.
 				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
@@ -1810,7 +1810,7 @@ export {
 		)
 	})
 
-	// NOTE: The same Constant, imported from OUTSIDE a cycle, is ordinary — the
+	// The same Constant, imported from OUTSIDE a cycle, is ordinary — the
 	// rule is about the cycle rather than about Constants.
 	it("allows a Constant imported down a chain", () => {
 		withProject(
@@ -1886,7 +1886,7 @@ export {
 				expect(a.diagnostics[0]?.severity).toBe("warning")
 				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
 
-				// NOTE: `B.es` declares and nothing more, so nothing there runs
+				// `B.es` declares and nothing more, so nothing there runs
 				// in an order anyone could notice.
 				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
 					[],
@@ -1939,7 +1939,7 @@ export {
 		)
 	})
 
-	// NOTE: And silent about a Module the Parser did not read whole. Every use
+	// And silent about a Module the Parser did not read whole. Every use
 	// the check counts is read off a tree, and a Statement the recovery dropped
 	// is in neither of them — so the one line reading an import can go missing
 	// and leave the entry looking unread. It only became reachable once the
@@ -1980,7 +1980,7 @@ export {
 		)
 	})
 
-	// NOTE: And the other side of that stand-down. A Recovery is also written
+	// And the other side of that stand-down. A Recovery is also written
 	// for a refused Pattern binder, which abandons a NAME while the Matcher
 	// around it parses whole — no text went missing, so every line that reads an
 	// import is still there to be counted. Asking whether the RECORD existed
@@ -2036,7 +2036,7 @@ export {
 		)
 	})
 
-	// NOTE: The case the check exists for. An imported Namespace used only through
+	// The case the check exists for. An imported Namespace used only through
 	// `shape::area()` has no Identifier occurrence anywhere in the file — the only
 	// trace of it is the Namespace name on the resolved Invocation, and reading
 	// Identifiers alone would warn about the import that makes the call resolve.
@@ -2084,7 +2084,7 @@ export {
 		)
 	})
 
-	// NOTE: A Type used only in an annotation leaves no Identifier in the TYPED
+	// A Type used only in an annotation leaves no Identifier in the TYPED
 	// tree — the annotation resolved to a Type object — so the written tree has to
 	// be read as well.
 	it("counts an annotation as a use of an imported Type", () => {
@@ -2123,7 +2123,7 @@ export {
 		)
 	})
 
-	// NOTE: The shape the Warning used to be WRONG about. `Problem` is written
+	// The shape the Warning used to be WRONG about. `Problem` is written
 	// nowhere in `Main.es` but the import entry: it reaches the file as a Type
 	// ARGUMENT of an imported Function's answer, and the `::is` below derives
 	// its Equatable off the Choice — which `choiceTypeOf` finds by looking the
@@ -2180,7 +2180,7 @@ export {
 		)
 	})
 
-	// NOTE: And the other side of it — a Type import nothing in the file reads,
+	// And the other side of it — a Type import nothing in the file reads,
 	// through an annotation or through a resolved Type, is still reported. The
 	// rule above over-collects on purpose, and this is what says it does not
 	// over-collect everything.
@@ -2231,7 +2231,7 @@ export {
 		)
 	})
 
-	// NOTE: And the shape it was wrong about in the OTHER direction. A Type
+	// And the shape it was wrong about in the OTHER direction. A Type
 	// whose values merely flow through the file — `make()` answers a `Standing`
 	// and nothing here ever names one — was counted as a use, because every
 	// resolved Type object anywhere in either tree carries a name and the rule
@@ -2322,7 +2322,7 @@ export {
 		)
 	})
 
-	// NOTE: Nothing writes to `counter` above, so rewriting the Declaration is a
+	// Nothing writes to `counter` above, so rewriting the Declaration is a
 	// real answer and the Help offers it. The moment something does, it stops
 	// being one: `constant-reassignment` answers every assignment and asks for
 	// the `variable` back, which closes a loop between the two codes with the
@@ -2346,7 +2346,7 @@ export {
 			"Declare it as a Constant, or export a Function that answers with its value.",
 		])
 
-		// NOTE: Inside a Function body, which is an assignment as much as one at
+		// Inside a Function body, which is an assignment as much as one at
 		// the top level is — and the shape a Module that publishes a counter
 		// actually has.
 		expect(
@@ -2356,7 +2356,7 @@ export {
 		).toEqual(["Export a Function that answers with its value."])
 	})
 
-	// NOTE: A `from "…" { … }` group is an answer only where there is something
+	// A `from "…" { … }` group is an answer only where there is something
 	// to forward FROM — and then the specifier is in hand, so it is spelled
 	// rather than left as a `…` the reader has to fill from nowhere.
 	it("offers forwarding only where a dependency has the name", () => {
@@ -2403,7 +2403,7 @@ export {
 					`Forward it from the Module that declares it: 'from "./Money.es" { Money }'.`,
 				])
 
-				// NOTE: No Module in reach declares it, so forwarding would name
+				// No Module in reach declares it, so forwarding would name
 				// a file that does not exist.
 				expect(diagnostics[1]?.helps).toEqual([
 					"Declare 'nowhere' in this Module, or remove the entry.",
@@ -2412,7 +2412,7 @@ export {
 		)
 	})
 
-	// NOTE: The canonical order — by specifier, then by name — rather than the
+	// The canonical order — by specifier, then by name — rather than the
 	// written one, which is exactly the order `esfmt` writes the block in. The
 	// "searched Namespaces" listing is where that order is observable, and it is
 	// the same order Completion dedupes members in.
@@ -2463,7 +2463,7 @@ export {
 					(diagnostic) => diagnostic.code === "unknown-method",
 				)
 
-				// NOTE: The builtins come first — they are the parent of every
+				// The builtins come first — they are the parent of every
 				// import — and `Alpha` precedes `Zulu` although `Zulu` was
 				// written first. Only the Namespaces an Integer can actually
 				// reach are listed: `Optional` used to appear here as well,
@@ -2472,7 +2472,7 @@ export {
 				// `Integer | Nothing`. Now that `Optional` is a nominal Choice
 				// an Integer is not one, so its Namespace is not searched.
 				//
-				// NOTE: The receiver is a written `2`, which proves it is
+				// The receiver is a written `2`, which proves it is
 				// neither zero nor negative — so the refined Namespaces are in
 				// the search too, in the same table order the rest are in.
 				// `Scalar` and `Number` are the two Union Namespaces an Integer
@@ -2485,7 +2485,7 @@ export {
 		)
 	})
 
-	// NOTE: The Diagnostic a forgotten Namespace import produces on its own says
+	// The Diagnostic a forgotten Namespace import produces on its own says
 	// only that no Method of that name exists, which is indistinguishable from a
 	// typo. The graph knows better, and the help is what the auto-import Quick Fix
 	// keys off.
@@ -2535,7 +2535,7 @@ export {
 		)
 	})
 
-	// NOTE: Every JavaScript object answers `valueOf`, and a Namespace that
+	// Every JavaScript object answers `valueOf`, and a Namespace that
 	// declares no such Method must not be offered as the one that does.
 	it("names no unimported Namespace for a Method none of them declares", () => {
 		withProject(
@@ -2583,7 +2583,7 @@ export {
 		)
 	})
 
-	// NOTE: A single file compile has no graph at all, and its Diagnostics must be
+	// A single file compile has no graph at all, and its Diagnostics must be
 	// the ones it always had — no help about a Namespace nobody could import.
 	it("says nothing about unimported Namespaces where there is no graph", () => {
 		withProject(
@@ -2609,7 +2609,7 @@ export {
 		)
 	})
 
-	// NOTE: `Main.es` binds no name for either Protocol, so the registry is the
+	// `Main.es` binds no name for either Protocol, so the registry is the
 	// only way back to them from an identity.
 	it("registers a private Protocol and a nested one by their identities", () => {
 		withProject(
@@ -2657,7 +2657,7 @@ export {
 		)
 	})
 
-	// NOTE: `measure` is bounded by `Sized`, and `IntegerSized` is what makes an
+	// `measure` is bounded by `Sized`, and `IntegerSized` is what makes an
 	// Integer conform to it.
 	const sizedModule = `implementation {
 	protocol Sized {
@@ -2682,7 +2682,7 @@ export {
 }
 `
 
-	// NOTE: `measure`'s bound is the Protocol `Sized.es` resolved, so `Main.es`
+	// `measure`'s bound is the Protocol `Sized.es` resolved, so `Main.es`
 	// needs the Namespace that conforms to it and no name for the Protocol.
 	it("calls a Function bounded by a Protocol the calling Module never imported", async () => {
 		await withBuiltProject(
@@ -2738,7 +2738,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Big`'s body asks for `extra`, which a witness for `Sized` does not
+	// `Big`'s body asks for `extra`, which a witness for `Sized` does not
 	// hold, and neither Protocol is imported where the witness is built.
 	it("runs another Module's provided body with its own Protocol's witness", async () => {
 		await withBuiltProject(
@@ -2800,7 +2800,7 @@ export {
 		)
 	})
 
-	// NOTE: `Ranked`'s body hands the `Self` its Function literal is given to
+	// `Ranked`'s body hands the `Self` its Function literal is given to
 	// `sort`, which reads `compare` off the witness, and `Sized` holds none.
 	it("runs another Module's provided body whose Function literal sorts its `Self`", async () => {
 		await withBuiltProject(
@@ -2892,7 +2892,7 @@ export {
 		)
 	})
 
-	// NOTE: `B.es` restates the `z` of `A.es`'s Protocol with another Type and is
+	// `B.es` restates the `z` of `A.es`'s Protocol with another Type and is
 	// refused there. `Main.es` is judged on its own, so what that breaks in it
 	// is reported in it, with a Note naming the refusal.
 	const restatingModules = {
@@ -3025,7 +3025,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Halved` provides a `z` answering a Number and `Counted` one
+	// `Halved` provides a `z` answering a Number and `Counted` one
 	// answering an Integer, and `Main.es` hands a value bounded by an extension
 	// of one or both on to a bound on `Halved`.
 	const apartProtocols = (
@@ -3190,7 +3190,7 @@ implementation {
 		})
 	}
 
-	// NOTE: `Other.es` declares a `Sized` of its own, which the graph reaches
+	// `Other.es` declares a `Sized` of its own, which the graph reaches
 	// from `Entry.es` and which is no concern of `measure`'s bound.
 	it("resolves a bound alike whichever entry the graph was loaded from", () => {
 		withProject(
@@ -3249,7 +3249,7 @@ export {
 		)
 	})
 
-	// NOTE: A `where` condition is solved in the caller's Scope under the
+	// A `where` condition is solved in the caller's Scope under the
 	// Protocol its Namespace resolved, so `Main.es` needs `IntegerWeighed` and
 	// no name for `Weighed`.
 	it("calls a Function whose conformance has a condition the caller never names", async () => {
@@ -3315,7 +3315,7 @@ export {
 		)
 	})
 
-	// NOTE: `IntegerSized` is what the call needs, and `Main.es` names the Module
+	// `IntegerSized` is what the call needs, and `Main.es` names the Module
 	// that exports it, so importing it is the edit rather than a second Namespace.
 	it("offers the import of a Namespace that makes a refused bound hold", () => {
 		withProject(
@@ -3347,7 +3347,7 @@ implementation {
 		)
 	})
 
-	// NOTE: The call is refused for want of `IntegerWeighed`, and `ListSized` is
+	// The call is refused for want of `IntegerWeighed`, and `ListSized` is
 	// the Namespace it would conform through, so its entry is not one to remove.
 	it("counts the Namespace a refused call would have used", () => {
 		withProject(
@@ -3430,7 +3430,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Main.es` declares the bound itself without importing `Sized`, which
+	// `Main.es` declares the bound itself without importing `Sized`, which
 	// is `unknown-protocol` there. The refused bound asks nothing of the call.
 	it("stays quiet at a call to a Function whose bound its own Module refused", () => {
 		withProject(
@@ -3457,7 +3457,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `outer`'s own bound is refused where it is written, so its `Item`
+	// `outer`'s own bound is refused where it is written, so its `Item`
 	// asks nothing of `measure`, directly or through the `where` of `ListSized`.
 	it("stays quiet at a call made with a Type Parameter whose bound was refused", () => {
 		withProject(
@@ -3504,7 +3504,7 @@ implementation {
 		)
 	})
 
-	// NOTE: A bound is resolved where it is written, so `Main.es` has to import a
+	// A bound is resolved where it is written, so `Main.es` has to import a
 	// Protocol it names itself, and the Module that declares one is the answer.
 	it("names the Module that declares a Protocol a bound names unimported", () => {
 		withProject(
@@ -3535,7 +3535,7 @@ implementation {
 		)
 	})
 
-	// NOTE: An import under the declared name would collide with the Type this
+	// An import under the declared name would collide with the Type this
 	// file declares.
 	it("asks for a name of its own for a Protocol whose name a Type here takes", () => {
 		let main = (entry: string, bound: string) => `import {
@@ -3585,7 +3585,7 @@ export {
 		)
 	})
 
-	// NOTE: `Measure.es` bounds `measure` by a `Sized` it never imported, which
+	// `Measure.es` bounds `measure` by a `Sized` it never imported, which
 	// is its own mistake to fix. `Main.es` reaches a `Sized` in another file,
 	// and a Help asking to import that one here would send the edit astray.
 	it("stays quiet about a call into a dependency that refused its bound", () => {
@@ -3623,7 +3623,7 @@ export {
 		)
 	})
 
-	// NOTE: The same for a `where` condition: `Sized.es` names a `Weighed` it
+	// The same for a `where` condition: `Sized.es` names a `Weighed` it
 	// never imported, and the condition it refused asks nothing of the call.
 	it("stays quiet about a conformance whose condition its Module refused", () => {
 		withProject(
@@ -3693,7 +3693,7 @@ export {
 		)
 	})
 
-	// NOTE: `Measurable` is only how `Measure.es` spells the `Sized` that
+	// `Measurable` is only how `Measure.es` spells the `Sized` that
 	// `Sized.es` declares, so the conformance `Main.es` holds meets the bound.
 	it("accepts a call bounded by a Protocol the callee imported under an alias", async () => {
 		await withBuiltProject(
@@ -3734,7 +3734,7 @@ export {
 		)
 	})
 
-	// NOTE: Per Module, because the dedup key is severity, code, message and
+	// Per Module, because the dedup key is severity, code, message and
 	// Position with NO file in it — the two files below make the same mistake on
 	// the same line, and one shared collection would report the first and swallow
 	// the second.
@@ -3769,7 +3769,7 @@ export {
 				let other = linkedAt(directory, linked, "Other.es")
 				let main = linkedAt(directory, linked, "Main.es")
 
-				// NOTE: The same code, the same message and the same Position in
+				// The same code, the same message and the same Position in
 				// both files — which is exactly what one shared collection would
 				// deduplicate down to a single report.
 				for (let module of [other, main]) {
@@ -3795,7 +3795,7 @@ export {
 		)
 	})
 
-	// NOTE: An entry naming something that IS exported and could not be typed
+	// An entry naming something that IS exported and could not be typed
 	// binds an Error rather than nothing. The Module that declares it has said
 	// what is wrong with it; leaving the name unbound would bury that under one
 	// `unknown-name` per use, in a file whose author can see the import written
@@ -3838,7 +3838,7 @@ export {
 		)
 	})
 
-	// NOTE: A facade that only forwards names did not compile when what it
+	// A facade that only forwards names did not compile when what it
 	// forwards did not, so the file importing it through the facade is told so.
 	it("reports a broken Module through a facade that re-exports it", () => {
 		withProject(
@@ -3892,7 +3892,7 @@ export {
 		)
 	})
 
-	// NOTE: Every file on the chain is told about the one import it can follow
+	// Every file on the chain is told about the one import it can follow
 	// towards the mistake, however far down the mistake is.
 	it("reports a broken Module on every file of a chain of imports", () => {
 		withProject(
@@ -3976,7 +3976,7 @@ export {
 		)
 	})
 
-	// NOTE: `Loop.es` is the broken one. Its failure comes back to it round the
+	// `Loop.es` is the broken one. Its failure comes back to it round the
 	// cycle through `Circle.es`, which is no second mistake for it to fix, while
 	// the file importing the cycle from above is told.
 	it("reports a broken member of a cycle to the cycle's importers alone", () => {
@@ -4046,7 +4046,7 @@ export {
 		)
 	})
 
-	// NOTE: `Ping.es` fails only because `Pong.es` does, so `Pong.es` is told
+	// `Ping.es` fails only because `Pong.es` does, so `Pong.es` is told
 	// about `Broken.es` and not about `Ping.es` as well.
 	it("reports a cycle member only the imports that reach a mistake past it", () => {
 		withProject(
@@ -4120,7 +4120,7 @@ export {
 		)
 	})
 
-	// NOTE: What the Module's canonical path is FOR: a Choice takes its nominal
+	// What the Module's canonical path is FOR: a Choice takes its nominal
 	// identity from the Module that declares it, so two files each declaring
 	// `choice Outcome` declare two Types — and linking is where that path is
 	// supplied. Without it the two would be interchangeable at compile time and
@@ -4167,7 +4167,7 @@ export {
 				).toEqual([])
 				expect(main.diagnostics).toEqual([])
 
-				// NOTE: Same spelling, same Case, two Types — because the two
+				// Same spelling, same Case, two Types — because the two
 				// declarations are in two Modules. Unqualified they would be
 				// interchangeable here AND carry the same runtime tag. A free
 				// Function's Arguments are the Validator's stage, which is a
@@ -4180,7 +4180,7 @@ export {
 		)
 	})
 
-	// NOTE: The fixtures the rest of the Modules work is verified against, linked
+	// The fixtures the rest of the Modules work is verified against, linked
 	// end to end — five files, a cycle among them, every Diagnostic stage run.
 	// They are the one Module Programs in the repository that are meant to be
 	// clean, so this is where "clean" is pinned.
@@ -4223,7 +4223,7 @@ export {
 	})
 })
 
-// NOTE: Every Module of a linked graph, through the stages the CLI runs after
+// Every Module of a linked graph, through the stages the CLI runs after
 // linking. A Module that reported anything fails HERE, naming itself, rather
 // than emitting JavaScript nobody can account for.
 function generateModules(linked: LinkedGraph): ModuleSources {
@@ -4247,7 +4247,7 @@ function generateModules(linked: LinkedGraph): ModuleSources {
 	)
 }
 
-// NOTE: Bundles the whole graph and imports the result, so its top-level
+// Bundles the whole graph and imports the result, so its top-level
 // `Terminal` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
 // Program, and both doors are held for the same reason: `inspect` ends its line
 // through `console.log`, `print` writes its own to the stream, and a harness
@@ -4294,7 +4294,7 @@ async function runBundle(
 }
 
 describe("Module Code Generation", () => {
-	// NOTE: The end of the road for the fixtures: five files, a cycle among
+	// The end of the road for the fixtures: five files, a cycle among
 	// them, an aliased Constant, a re-export and a Namespace reached only
 	// through implicit dispatch — compiled into ONE standalone bundle and run.
 	// The three lines are the ones the fixture annotates itself with.
@@ -4304,7 +4304,7 @@ describe("Module Code Generation", () => {
 		)
 		let sources = generateModules(linked)
 
-		// NOTE: A rename travels as an ESM `as`, on either side — the emitted
+		// A rename travels as an ESM `as`, on either side — the emitted
 		// name is always the one the DECLARATION wrote, so the two Modules
 		// agree without either having to know what the other called it.
 		expect(sources.sources.get("essence:./math/Math.es")).toContain(
@@ -4312,7 +4312,7 @@ describe("Module Code Generation", () => {
 		)
 		expect(sources.sources.get("essence:./Main.es")).toContain("PI as Pi")
 
-		// NOTE: A re-export is forwarded straight from the Module it names, not
+		// A re-export is forwarded straight from the Module it names, not
 		// bound here and exported again: `Rectangle` is never a binding of
 		// `Main.es`.
 		expect(sources.sources.get("essence:./Main.es")).toContain(
@@ -4328,7 +4328,7 @@ describe("Module Code Generation", () => {
 		})
 	})
 
-	// NOTE: A Module whose every exported name ERASES still has to run. There
+	// A Module whose every exported name ERASES still has to run. There
 	// is nothing to import from it — a Type Alias is no binding — so the edge
 	// that orders the two bodies would be gone with it, and the dependency
 	// would run wherever the bundler happened to place it, or not at all. A
@@ -4380,7 +4380,7 @@ export {
 		)
 	})
 
-	// NOTE: A Protocol's PROVIDED Method is one const for the whole graph, and
+	// A Protocol's PROVIDED Method is one const for the whole graph, and
 	// it belongs in the shared prelude Module for the reason a standard library
 	// Method does: a copy per Module would be a bundle carrying as many
 	// `describe` bodies as there are Modules that reach it. Two Modules conform
@@ -4869,7 +4869,7 @@ export {
 		)
 	})
 
-	// NOTE: A Module body runs ONCE, on first import, however many Modules
+	// A Module body runs ONCE, on first import, however many Modules
 	// reach it — which is what an emitted ESM graph gives for free and a
 	// concatenation of the bodies would not. The diamond is what makes it
 	// observable: `Shared.es` is named by both arms and by the entry, and its
@@ -4947,13 +4947,13 @@ export {
 		)
 	})
 
-	// NOTE: What the Module-qualified nominal identity buys, run rather than
+	// What the Module-qualified nominal identity buys, run rather than
 	// type checked: two Modules each declaring `choice Colour { Red, Green }`
 	// are two Types, so a value of one must not be claimed by a check written
 	// for the other. Unqualified they carried the same runtime tag, and this
 	// Program printed "mine" twice with no Diagnostic anywhere.
 	//
-	// NOTE: The check is `$type.isValueOfType` against the emitted Case
+	// The check is `$type.isValueOfType` against the emitted Case
 	// descriptors, which is the same comparison an `is` makes — and the one
 	// place the tag a value was stamped with and the tag a descriptor names have
 	// to agree, both being rendered against the entry's directory.
@@ -5008,7 +5008,7 @@ export {
 				)
 				let sources = generateModules(linked)
 
-				// NOTE: The two tags differ by the Module they were declared
+				// The two tags differ by the Module they were declared
 				// in, and neither names the machine that compiled.
 				expect(sources.sources.get("essence:./Main.es")).toContain(
 					'$type.createCase("./Main.es#Colour#Red")',
@@ -5025,7 +5025,7 @@ export {
 		)
 	})
 
-	// NOTE: The reason a Case payload's default travels on the Case Type, and the
+	// The reason a Case payload's default travels on the Case Type, and the
 	// reason it is held to a literal: the merge happens where the Case is BUILT,
 	// and that may be a Module that never named the Choice — `Main.es` below
 	// imports one Function and no Type at all. There is no import to hang a value
@@ -5071,7 +5071,7 @@ export {
 				)
 				let sources = generateModules(linked)
 
-				// NOTE: The filled member is emitted INTO the construction, in
+				// The filled member is emitted INTO the construction, in
 				// the Module that wrote it — the only import is the Function,
 				// and the default's `0` is pooled with `Main.es`'s own
 				// constants, which is what a copy per site buys.
@@ -5096,7 +5096,7 @@ export {
 		)
 	})
 
-	// NOTE: What a path key reaches into is a fact about the DEFAULT, so it has
+	// What a path key reaches into is a fact about the DEFAULT, so it has
 	// to travel the way every other fact about one does — on the Type. A Module
 	// that merges into a default declared elsewhere is the only place that can
 	// go wrong, and it is the place a Record Parameter's merge happens at the
@@ -5174,7 +5174,7 @@ export {
 		)
 	})
 
-	// NOTE: A Case payload default may name a Constant of the Module the Choice
+	// A Case payload default may name a Constant of the Module the Choice
 	// is declared in, and what travels is the VALUE — resolved there, baked into
 	// the Case Type as data. This is the test that says so: the Module that
 	// constructs the Case imports the Choice and never the Constant, and gets the
@@ -5212,7 +5212,7 @@ export { Fetch }
 				)
 				let sources = generateModules(linked)
 
-				// NOTE: `Fetch#Get`, with no Module in front of it. The tag
+				// `Fetch#Get`, with no Module in front of it. The tag
 				// carries the Module that declares the Choice and a structural
 				// rendering no longer prints it — see `caseText` in the
 				// runtime's `registry.ts`. What this test is about is the baked
@@ -5224,7 +5224,7 @@ export { Fetch }
 		)
 	})
 
-	// NOTE: The other direction, and the reason the rule is written about the
+	// The other direction, and the reason the rule is written about the
 	// DECLARING Module: a Type crosses an import edge, an Expression does not, so
 	// the Module writing the Choice has the imported Constant's Type in hand and
 	// nothing to bake.
@@ -5264,7 +5264,7 @@ export { standardHeaders }
 	})
 })
 
-// NOTE: A provided Method is emitted once, in the bundle's band above every
+// A provided Method is emitted once, in the bundle's band above every
 // Module, where no Namespace a Module declares or imports is bound.
 describe("What a provided body reaches", () => {
 	function refusalsIn(
@@ -5405,7 +5405,7 @@ export {
 		])
 	})
 
-	// NOTE: `X`'s body answers `R`'s `m() -> String` with an Integer, so `Y`'s
+	// `X`'s body answers `R`'s `m() -> String` with an Integer, so `Y`'s
 	// is the one that fulfils it.
 	const fulfillingProtocols = `protocol X {
 		m() -> Integer {
@@ -5746,7 +5746,7 @@ implementation {
 		).toEqual(refusal)
 	})
 
-	// NOTE: A Namespace a Function literal declares is a class of the literal's
+	// A Namespace a Function literal declares is a class of the literal's
 	// block, so the body around it still reads the Program's of that name.
 	const besideLiteral = (
 		declarations: string,
@@ -5916,7 +5916,7 @@ implementation {
 	})
 })
 
-// NOTE: A Protocol is known by the Module that declares it and its name. An
+// A Protocol is known by the Module that declares it and its name. An
 // import alias is only a spelling, and two Modules' `Sized` are two Protocols.
 describe("Protocol identity", () => {
 	const sizedModule = `implementation {
@@ -6054,7 +6054,7 @@ export {
 		)
 	})
 
-	// NOTE: `Main.es` meets `measure`'s bound only through its own `Sized`,
+	// `Main.es` meets `measure`'s bound only through its own `Sized`,
 	// which asks for `count` where the bound's asks for `size`.
 	it("refuses a call whose bound only another Protocol of its name meets", () => {
 		withProject(
@@ -6204,7 +6204,7 @@ export {
 		)
 	})
 
-	// NOTE: Two names for one Protocol offer its provided Method once.
+	// Two names for one Protocol offer its provided Method once.
 	it("reaches a provided Method of a Protocol bound under two names", async () => {
 		await withBuiltProject(
 			{
@@ -6312,7 +6312,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Sized.es` names `Sized` from a cycle partner, whose import is bound
+	// `Sized.es` names `Sized` from a cycle partner, whose import is bound
 	// only after the hoist has read its clauses. `Main.es` holds the Namespaces
 	// through its own imports, which share what the settling writes.
 	it("settles a clause and a condition naming a Protocol from a cycle partner", async () => {
@@ -6389,7 +6389,7 @@ export {
 		)
 	})
 
-	// NOTE: `IntegerSized` is what meets `measure`'s bound, and `Main.es`'s own
+	// `IntegerSized` is what meets `measure`'s bound, and `Main.es`'s own
 	// `Sized` is no concern of it.
 	it("calls a Function whose bound another Protocol of its name does not meet", async () => {
 		await withBuiltProject(
@@ -6471,7 +6471,7 @@ export {
 		)
 	})
 
-	// NOTE: `Main.es` and `Sized.es` import each other, which is what the one
+	// `Main.es` and `Sized.es` import each other, which is what the one
 	// Warning says; the bound needs nothing more.
 	it("calls a Function bounded by a cycle partner's Protocol", async () => {
 		await withBuiltProject(
@@ -6554,7 +6554,7 @@ export {
 		)
 	})
 
-	// NOTE: `Item` carries the `Sized` that `SizedBox` demands, private to
+	// `Item` carries the `Sized` that `SizedBox` demands, private to
 	// `Box.es`, and `weigh` wants a `Weighed`. The one-bound rule is what is
 	// left to say, and `Other.es`'s `Sized` has no part in it.
 	it("reports a bound a Type Parameter carrying a private bound can not meet", () => {
@@ -6757,7 +6757,7 @@ export {
 		)
 	})
 
-	// NOTE: The witness `Main.es` hands `big` carries `isBig`, which `Sized`
+	// The witness `Main.es` hands `big` carries `isBig`, which `Sized`
 	// provides, although `Main.es` has no name for `Sized`.
 	it("hands a witness the provided Methods of a Protocol the caller never imports", async () => {
 		await withBuiltProject(
@@ -6838,7 +6838,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Item` is bounded by the `Sized` this file declares, which asks
+	// `Item` is bounded by the `Sized` this file declares, which asks
 	// for what the other one asks for and is still another Protocol.
 	it("tells a Type Parameter's bound from another Protocol of its name", () => {
 		withProject(
@@ -6883,7 +6883,7 @@ export {
 		)
 	})
 
-	// NOTE: `Sized` here is the file's own Type, so no bound written here can
+	// `Sized` here is the file's own Type, so no bound written here can
 	// name the Protocol `measure` asks for.
 	it("tells a bound's Protocol from a Type of its name", () => {
 		withProject(
@@ -6962,7 +6962,7 @@ implementation {
 		)
 	})
 
-	// NOTE: Both Modules are called `Sized.es`, so each is named by the
+	// Both Modules are called `Sized.es`, so each is named by the
 	// specifier this file would import it by.
 	it("tells two Protocols apart whose Modules share a file name", () => {
 		withProject(
@@ -6996,7 +6996,7 @@ implementation {
 		)
 	})
 
-	// NOTE: The Type Parameter can take the Protocol as its bound, which is what
+	// The Type Parameter can take the Protocol as its bound, which is what
 	// the Help writes, so no Note tells the two apart.
 	it("leaves a Type Parameter of the bound's name unsaid", () => {
 		withProject(
@@ -7032,7 +7032,7 @@ export {
 		)
 	})
 
-	// NOTE: The report spells the bound's Protocol by the alias, so the file's
+	// The report spells the bound's Protocol by the alias, so the file's
 	// own `Sized` is no reading of it, while its conformer is still worth naming.
 	it("leaves a namesake unsaid where the report spells the bound by an alias", () => {
 		withProject(
@@ -7143,7 +7143,7 @@ export {
 		)
 	})
 
-	// NOTE: `Main.es` binds no name for `Sized`, so the bound can be written
+	// `Main.es` binds no name for `Sized`, so the bound can be written
 	// only beside an import of it, and the fix carries that import.
 	it("carries the import a Type Parameter's bound needs", () => {
 		withProject(
@@ -7219,7 +7219,7 @@ export {
 		)
 	})
 
-	// NOTE: `Sized.es` publishes `Sized` as `Measurable`, which is the name an
+	// `Sized.es` publishes `Sized` as `Measurable`, which is the name an
 	// import of it writes and so the name the bound is written with.
 	it("writes a bound by the name its Protocol is exported under", async () => {
 		let main = (entries: string, bound: string) => `import {
@@ -7315,7 +7315,7 @@ implementation {
 		)
 	})
 
-	// NOTE: `Other.es` declares its Protocol at the Position `Sized.es` declares
+	// `Other.es` declares its Protocol at the Position `Sized.es` declares
 	// its own at, and `Sized.es` forwards `Other` while keeping `Sized` private.
 	it("does not take a forwarded Protocol for a private one declared at its Position", () => {
 		withProject(
@@ -7444,7 +7444,7 @@ implementation {
 		)
 	})
 
-	// NOTE: The file's own `Sized` takes the name, so the other one can be
+	// The file's own `Sized` takes the name, so the other one can be
 	// named here only under an alias, which no fix chooses.
 	it("asks for an aliased import where another Protocol takes its name", () => {
 		withProject(
@@ -7482,7 +7482,7 @@ export {
 		)
 	})
 
-	// NOTE: The file's `type Sized` takes the name an import would bind, so a
+	// The file's `type Sized` takes the name an import would bind, so a
 	// bound or a Namespace can name the Protocol only under an alias.
 	it("asks for an aliased import where a Type of the file takes a Protocol's name", () => {
 		withProject(
@@ -7915,7 +7915,7 @@ implementation {
 		)
 	})
 
-	// NOTE: Whether the import needs a name of its own is asked of the name it
+	// Whether the import needs a name of its own is asked of the name it
 	// binds, `Measurable`, and not of the declared one, which a Type here may
 	// take without colliding with anything.
 	it("asks for the import of a provided Method's Protocol by the name it is exported under", async () => {
@@ -7974,7 +7974,7 @@ implementation {${declared}
 		)
 	})
 
-	// NOTE: No import names a Protocol its Module keeps private, so the Help
+	// No import names a Protocol its Module keeps private, so the Help
 	// asks for the export first.
 	it("asks for the export of a provided Method's Protocol its Module keeps private", async () => {
 		let main = (entries: string, declared: string) => `import {
@@ -8002,7 +8002,7 @@ implementation {${declared}
 			},
 		)
 
-		// NOTE: The Protocol `Sized.es` forwards is declared at the Position of
+		// The Protocol `Sized.es` forwards is declared at the Position of
 		// its own, and is a different one.
 		withProject(
 			{

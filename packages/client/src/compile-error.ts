@@ -5,7 +5,7 @@ import {
 import type { DiagnosticGroup } from "@essence-lang/compiler/embed"
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: The one failure that is the COMPILER's to report, kept apart from the
+// The one failure that is the COMPILER's to report, kept apart from the
 // three in `errors.ts` for exactly that reason: rendering a Diagnostic takes
 // the Compiler's own renderer, and `errors.ts` is imported by the half of this
 // package that runs where no Compiler exists. A marshalling refusal is a
@@ -13,7 +13,7 @@ import type { common } from "@essence-lang/interfaces"
 // of a source file with an underline under it, and only a machine that has the
 // sources can draw one.
 
-// NOTE: The message IS the report — the same Ariadne output `esc` prints, one
+// The message IS the report — the same Ariadne output `esc` prints, one
 // block per file against that file's own source. Rendering it here rather than
 // handing back a list is what makes a bare `throw` out of `loadModule` as
 // readable as the command line: a host that does nothing at all still shows the
@@ -26,7 +26,7 @@ export class EssenceCompileError extends Error {
 	constructor(
 		entryPath: string,
 		diagnosticGroups: Array<DiagnosticGroup>,
-		// NOTE: Plain by default. An Error's message is read out of a log, a
+		// Plain by default. An Error's message is read out of a log, a
 		// serialised crash report and a test assertion at least as often as it is
 		// read off a terminal, and escape codes are noise in all three. A host
 		// that knows it is writing to a terminal renders the groups again.
@@ -41,7 +41,7 @@ export class EssenceCompileError extends Error {
 			(group) => group.diagnostics,
 		)
 
-		// NOTE: Readable, and not printed. Bun and Node print an uncaught
+		// Readable, and not printed. Bun and Node print an uncaught
 		// Error's own enumerable properties under its message, and these three
 		// are the whole report a second time as objects — every Diagnostic and
 		// every source text — under the report as it was meant to be read. A
@@ -52,11 +52,11 @@ export class EssenceCompileError extends Error {
 	}
 }
 
-// NOTE: The blocks run together with the trailing newline trimmed, because what
+// The blocks run together with the trailing newline trimmed, because what
 // this becomes is a `message` — whatever prints it adds the line break, and a
 // message ending in one prints a blank line under every stack trace.
 //
-// NOTE: Both the renderer and the rule a file is NAMED under are the Compiler's
+// Both the renderer and the rule a file is NAMED under are the Compiler's
 // own, so a host reading this report reads the one `esc` prints, down to how the
 // path above each excerpt is spelled.
 export function renderGroups(

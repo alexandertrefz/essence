@@ -10,13 +10,13 @@ import {
 } from "@essence-lang/compiler/configuration"
 import GithubSlugger from "github-slugger"
 
-// NOTE: The site serves the JSON Schema for `essence.json` at the URL the
+// The site serves the JSON Schema for `essence.json` at the URL the
 // file's `$schema` names, so an editor anywhere can validate a project file
 // against what the toolchain actually reads. The copy is generated from the
 // reader's catalogue; this spec re-renders and compares, and NEVER writes — a
 // drifted copy is fixed by `bun run generate:schema`.
 //
-// NOTE: Beside the file it holds to account, in the package that ships it,
+// Beside the file it holds to account, in the package that ships it,
 // rather than in the compiler's tests counting `../`s towards it.
 const SERVED_COPY = path.resolve(
 	import.meta.dirname,
@@ -47,12 +47,12 @@ describe("the served project-file Schema", () => {
 	})
 })
 
-// NOTE: The same catalogue, held against the page that documents it. A setting
+// The same catalogue, held against the page that documents it. A setting
 // the reader gains has no address on the site until the page gives it an entry,
 // and an entry for a setting the reader dropped documents a key that is now a
 // Warning — so both directions fail here.
 //
-// NOTE: The catalogue's keys the page gives no entry of its own. `test.contracts`
+// The catalogue's keys the page gives no entry of its own. `test.contracts`
 // switches an experimental test mode, which the site documents nowhere.
 // `$schema` is not a setting — Essence reads nothing from it — and the page
 // says so under "The file format" rather than beside the settings.
@@ -69,7 +69,7 @@ function settingKeys(setting: Setting, prefix = ""): Array<string> {
 	)
 }
 
-// NOTE: The address a `###` is reached by. A dotted key cannot be its own
+// The address a `###` is reached by. A dotted key cannot be its own
 // heading's slug — the slugger drops the dots — so the page writes the address
 // in a `<span id>` inside the heading. A key without a dot is the heading's own
 // text, and its slug is the address.
@@ -86,7 +86,7 @@ function entryIds(page: string): Array<string> {
 	})
 }
 
-// NOTE: The file a page shows `essence init` writing: the first `jsonc` fence
+// The file a page shows `essence init` writing: the first `jsonc` fence
 // after the transcript that runs the command.
 function initBlock(page: string): string {
 	let command = page.indexOf("$ essence init")
@@ -113,7 +113,7 @@ describe("the project-file reference", () => {
 	})
 
 	it("leaves out only keys the catalogue still has", () => {
-		// NOTE: A named exception outlives the key it excused otherwise, and
+		// A named exception outlives the key it excused otherwise, and
 		// then silently excuses whatever is next given that name.
 		let keys = new Set(settingKeys(projectSettings))
 

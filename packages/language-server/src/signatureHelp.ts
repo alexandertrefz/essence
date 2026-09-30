@@ -23,7 +23,7 @@ import { probeSourcesFor, stripNoise } from "./probe"
 import { documentProtocolSpellings } from "./protocolSpellings"
 import { typedProgramNodes } from "./sections"
 
-// NOTE: Signature Help resolves the enclosing invocation the same way
+// Signature Help resolves the enclosing invocation the same way
 // Completion resolves a receiver: the document text up to the cursor is
 // padded back into a valid Program (`probe.ts`), enriched, and the smallest
 // FunctionInvocation or MethodInvocation node that now contains the padded
@@ -67,7 +67,7 @@ export function findSignatureHelp(
 	cursor: common.Cursor,
 	documentPath?: string,
 	analysis: DocumentAnalysis | null = null,
-	// NOTE: Told of a Compiler throw the help is answered around, so the Server
+	// Told of a Compiler throw the help is answered around, so the Server
 	// can log it.
 	onInternalError: (error: unknown) => void = () => {},
 ): SignatureHelpInfo | null {
@@ -89,7 +89,7 @@ function signatureHelpAt(
 	analysis: DocumentAnalysis | null,
 	onInternalError: (error: unknown) => void,
 ): SignatureHelpInfo | null {
-	// NOTE: The same reading Completion makes, for the same reason; see
+	// The same reading Completion makes, for the same reason; see
 	// `findCompletions`.
 	let document =
 		analysis ??
@@ -101,7 +101,7 @@ function signatureHelpAt(
 		(lines[cursor.line - 1] ?? "").slice(0, cursor.column - 1),
 	].join("\n")
 
-	// NOTE: The searched point is the end of `headText`, not the requested
+	// The searched point is the end of `headText`, not the requested
 	// cursor — that is where the Probe's padding starts, and the two differ
 	// whenever the requested column runs past the end of its own line.
 	let headLines = headText.split("\n")
@@ -113,11 +113,11 @@ function signatureHelpAt(
 
 	let invocation: Invocation | null = null
 
-	// NOTE: A call written inside a Parameter's `= expression` default is one of
+	// A call written inside a Parameter's `= expression` default is one of
 	// the readings — see `probeSourcesFor`, which is what makes a Declaration
 	// whose head the cursor sits in parse at all.
 	for (let probeSource of probeSourcesFor(headText)) {
-		// NOTE: The probe types the `tests { … }` block too — a call being
+		// The probe types the `tests { … }` block too — a call being
 		// written inside a test body is a call, and a Program enriched without
 		// the tests holds no Node for it at all.
 		let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
@@ -141,13 +141,13 @@ function signatureHelpAt(
 	}
 
 	let activeParameter = countArguments(headText, invocation.arguments.length)
-	// NOTE: The labels the call has written so far — what tells a defaulted
+	// The labels the call has written so far — what tells a defaulted
 	// Parameter that was skipped from one that is being typed. A Method
 	// Invocation's receiver is not among them, which is exactly how
 	// `signaturesOf` hands the signature over.
 	let writtenLabels = invocation.arguments.map((argument) => argument.name)
 
-	// NOTE: A Static Method is invoked through a Lookup (`Thing.show(…)`), so
+	// A Static Method is invoked through a Lookup (`Thing.show(…)`), so
 	// the callee is not always a plain Function Type.
 	if (invocation.nodeType === "FunctionInvocation") {
 		let signatures = signaturesOf(invocation.name.type)
@@ -166,7 +166,7 @@ function signatureHelpAt(
 		)
 	}
 
-	// NOTE: `namespace.name` is empty exactly when resolution failed (see
+	// `namespace.name` is empty exactly when resolution failed (see
 	// `resolveFailedMethodInvocation` in the Enricher) — the common case
 	// while Arguments are still incomplete.
 	if (invocation.namespace.name !== "") {
@@ -224,7 +224,7 @@ function signatureHelpAt(
 		return null
 	}
 
-	// NOTE: Several Namespaces can offer the same Method for one receiver, and
+	// Several Namespaces can offer the same Method for one receiver, and
 	// `1::<Thing>string(…)` is how a call site picks between them — so the
 	// label is qualified the same way, but only while the choice is open.
 	let isAmbiguous =
@@ -278,7 +278,7 @@ function help(
 	}
 }
 
-// NOTE: A comma count is a Parameter index only while nothing may be left out.
+// A comma count is a Parameter index only while nothing may be left out.
 // Once a Parameter carries a default, the Nth Argument a call writes need not be
 // the Nth Parameter: `cut(to 3)` writes one Argument and it stands at the SECOND
 // Parameter, because the label it wrote stepped over the first. So the count is
@@ -318,7 +318,7 @@ function activeParameterFor(
 		index++
 	}
 
-	// NOTE: And the Argument being typed steps over the defaults its OWN label
+	// And the Argument being typed steps over the defaults its OWN label
 	// rules out, which it can only do once one has been written — a call that
 	// has typed nothing but the comma stands at the next Parameter, whatever it
 	// turns out to be.
@@ -331,7 +331,7 @@ function activeParameterFor(
 	return Math.min(index, Math.max(parameters.length - 1, 0))
 }
 
-// NOTE: A Parameter's own text is shown next to that Parameter, so the
+// A Parameter's own text is shown next to that Parameter, so the
 // signature's own Documentation is reduced to its description — repeating the
 // `@param` sections underneath would say everything twice. An Overload
 // without text of its own falls back to whatever documents the set.
@@ -355,7 +355,7 @@ function signatureInfo(
 	}
 }
 
-// NOTE: A Record Parameter whose default fills some of its members in says so
+// A Record Parameter whose default fills some of its members in says so
 // beside the Argument being typed, which is the moment the writer needs it. The
 // `?` in the signature label is untouched: it marks a Parameter the whole
 // Argument may be left out of, and a partial default grants nothing of the sort.
@@ -374,7 +374,7 @@ function withOmittableMembers(
 		.join(", ")} out of this Record.`
 	let reaching = Object.keys(parameter?.defaultNesting ?? {})
 
-	// NOTE: And which of them a path key may reach INTO, which is the other
+	// And which of them a path key may reach INTO, which is the other
 	// half of the same fact: the default writes those out member by member, so
 	// `server.port = 1` merges into what it wrote rather than replacing it.
 	if (reaching.length > 0) {
@@ -386,7 +386,7 @@ function withOmittableMembers(
 	return documentation === null ? sentence : `${documentation}\n\n${sentence}`
 }
 
-// NOTE: An Overload the Arguments already resolved to stays active, but only
+// An Overload the Arguments already resolved to stays active, but only
 // while it still has room for the Argument being typed — resolution runs on
 // the half written call, so `combine(2, ` resolves to the one Parameter
 // Overload that the second Argument has already ruled out. Otherwise the
@@ -407,7 +407,7 @@ function activeSignatureOf(
 		}
 	}
 
-	// NOTE: An arm whose REQUIRED count also reaches this Argument is preferred
+	// An arm whose REQUIRED count also reaches this Argument is preferred
 	// over one that only reaches it by counting Parameters a call may leave out
 	// — a call that has written this many Arguments has plainly not left those
 	// out. Falls back to the old test, so an Overload set with no default in it
@@ -429,7 +429,7 @@ function activeSignatureOf(
 	return match === -1 ? 0 : match
 }
 
-// NOTE: Static Methods are called through a Lookup, so the callee's name is
+// Static Methods are called through a Lookup, so the callee's name is
 // the path written at the call site rather than a single Identifier.
 function calleeName(node: common.typed.ImplementationNode): string {
 	switch (node.nodeType) {
@@ -442,7 +442,7 @@ function calleeName(node: common.typed.ImplementationNode): string {
 	}
 }
 
-// NOTE: Counts top level commas only — nested calls, Lists and Records
+// Counts top level commas only — nested calls, Lists and Records
 // balance their own brackets so a comma inside them does not advance the
 // active Parameter of the outer call. String and Comment content is blanked
 // out first, so that a comma or an unbalanced bracket inside a String
@@ -510,7 +510,7 @@ function findEnclosingInvocation(
 			return
 		}
 
-		// NOTE: A cursor sitting exactly at an Invocation's end has just closed
+		// A cursor sitting exactly at an Invocation's end has just closed
 		// it — `outer(first inner(value 1)` with the caret after the inner `)`.
 		// That Invocation is finished, so what is still being written is the
 		// call AROUND it, which is what typing `)` has to leave on screen.
@@ -526,7 +526,7 @@ function findEnclosingInvocation(
 		}
 	}
 
-	// NOTE: `= cut(from 1` IS a call being written, so a cursor inside a
+	// `= cut(from 1` IS a call being written, so a cursor inside a
 	// Parameter's default has a signature to help with exactly as one in a body
 	// does.
 	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
@@ -598,7 +598,7 @@ function findEnclosingInvocation(
 			case "ReturnStatement":
 				visitNode(node.expression)
 				return
-			// NOTE: `expect greet(` IS a call being written, so a cursor inside
+			// `expect greet(` IS a call being written, so a cursor inside
 			// an assertion has a signature to help with exactly as one in a
 			// body does.
 			case "ExpectStatement":
@@ -647,7 +647,7 @@ function findEnclosingInvocation(
 				}
 
 				return
-			// NOTE: `as total(` IS a call being written, so a cursor inside an
+			// `as total(` IS a call being written, so a cursor inside an
 			// arm has a signature to help with exactly as one in a body does.
 			case "Define":
 				for (let expression of defineExpressions(node)) {
@@ -693,7 +693,7 @@ function findEnclosingInvocation(
 
 				return
 			case "ChoiceDeclarationStatement":
-				// NOTE: A Case payload's default may hold a call, and the
+				// A Case payload's default may hold a call, and the
 				// cursor inside its Arguments wants the same Signature Help a
 				// call in a body gets.
 				for (let defaultValue of caseDefaults(node.cases)) {

@@ -6,7 +6,7 @@ import { defineConfig } from "astro/config"
 import { readSampleMarker } from "./src/lib/samples.ts"
 import { SITE_URL } from "./src/lib/site.ts"
 
-// NOTE: Read rather than `import … with { type: "json" }` so the grammar stays
+// Read rather than `import … with { type: "json" }` so the grammar stays
 // a plain file read — the TextMate grammar lives in another package and is the
 // editor extension's own, not something this package may re-declare.
 function readJson(relativePath: string): any {
@@ -21,7 +21,7 @@ let essenceGrammar = readJson(
 let essenceLight = readJson("./src/lib/shiki/essence-light.json")
 let essenceDark = readJson("./src/lib/shiki/essence-dark.json")
 
-// NOTE: The file a `§ file: Name.es` block names, carried from the hook that
+// The file a `§ file: Name.es` block names, carried from the hook that
 // reads the marker to the hook that draws the caption. Keyed by the hooks'
 // `meta`, the one object Shiki hands every hook of a single block — the
 // `options` beside it is copied between them.
@@ -31,7 +31,7 @@ export default defineConfig({
 	site: SITE_URL,
 	output: "static",
 
-	// NOTE: A port of its own, and a refusal to drift off it. Astro's default
+	// A port of its own, and a refusal to drift off it. Astro's default
 	// is to step to the next free port when 4321 is taken, which lands the dev
 	// server on whatever origin happens to be going — and a browser caches a
 	// 301 per origin, so a redirect left behind by another project on that port
@@ -42,7 +42,7 @@ export default defineConfig({
 	integrations: [mdx()],
 	vite: {
 		build: {
-			// NOTE: Load-bearing. The CSS minifier drops a `-webkit-` prefix it
+			// Load-bearing. The CSS minifier drops a `-webkit-` prefix it
 			// believes the target no longer needs, and its default target is new
 			// enough to think that of `-webkit-backdrop-filter` — which silently
 			// un-frosted the header, mobile menu, TOC bar and search overlay on
@@ -56,13 +56,13 @@ export default defineConfig({
 	markdown: {
 		shikiConfig: {
 			langs: [{ ...essenceGrammar, name: "essence", aliases: ["es"] }],
-			// NOTE: `defaultColor: false` emits both themes as CSS variables and
+			// `defaultColor: false` emits both themes as CSS variables and
 			// no inline colour, so `prefers-color-scheme` picks the palette —
 			// see `src/styles/shiki.css`. It also means an unthemed token has no
 			// colour at all, which is why both themes set a bare `foreground`.
 			themes: { light: essenceLight, dark: essenceDark },
 			defaultColor: false,
-			// NOTE: A sample's marker line is written for the docs-examples
+			// A sample's marker line is written for the docs-examples
 			// gate, not for the reader — see `src/lib/samples.ts`, which both
 			// of them read it through. It is dropped before highlighting, and a
 			// file's name becomes the block's caption, so a page that splits a

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-// NOTE: WHICH runtime modules import each other in a circle, written down. A
+// WHICH runtime modules import each other in a circle, written down. A
 // cycle here is not an error — several of them are load-bearing, and the two
 // groups below have been there since the numeric tower was built — but it is
 // never a detail either: the bundler orders a chunk by the graph, so a cycle
@@ -11,13 +11,13 @@ import { dirname, join } from "node:path"
 // read at module scope across a new edge is a `undefined is not a function` in
 // a Program nobody changed.
 //
-// NOTE: So this is a LEDGER rather than a refusal. It asserts the exact set of
+// So this is a LEDGER rather than a refusal. It asserts the exact set of
 // mutually-importing groups, which means an edge that joins two of them, or
 // opens a third, fails here and is read before it is merged rather than after.
 // Adding to the ledger is allowed; doing it without saying why in the commit is
 // not.
 //
-// NOTE: `import type` is NOT an edge. TypeScript erases a type-only import
+// `import type` is NOT an edge. TypeScript erases a type-only import
 // before the bundler ever sees it, so `Terminal` naming `RecordType` costs
 // nothing and orders nothing — which is exactly the difference between the
 // cycle this file would report and the one a reader counting `import` lines
@@ -25,7 +25,7 @@ import { dirname, join } from "node:path"
 // way and is left out for the same reason.
 const runtimeDirectory = dirname(import.meta.dir)
 
-// NOTE: A named import, a namespace import and a default one. The runtime
+// A named import, a namespace import and a default one. The runtime
 // writes only the first today; the other two are read all the same, because a
 // reader adding one would otherwise add an edge this ledger could not see. The
 // source is read as LINES rather than parsed: what is being checked is what the
@@ -51,7 +51,7 @@ function valueImportsOf(source: string): Array<string> {
 			.map((specifier) => specifier.trim())
 			.filter((specifier) => specifier.length > 0)
 
-		// NOTE: `import { type RecordType, isRecord }` is an edge and
+		// `import { type RecordType, isRecord }` is an edge and
 		// `import { type RecordType }` is not — the erasure is per specifier,
 		// so the question is whether ANY of them survives it.
 		if (specifiers.every((specifier) => specifier.startsWith("type "))) {
@@ -81,7 +81,7 @@ function runtimeImportGraph(): Map<string, Array<string>> {
 	return graph
 }
 
-// NOTE: Tarjan's, which answers the groups rather than the paths: two modules
+// Tarjan's, which answers the groups rather than the paths: two modules
 // are in one group exactly when each can reach the other, so a group IS the
 // circle whatever route it is walked by. Listing paths instead would print
 // thirty-four lines for these two groups and would change whenever an edge
@@ -150,7 +150,7 @@ function mutuallyImportingGroups(
 }
 
 describe("the runtime's own import graph", () => {
-	// NOTE: TWO groups, and each is one idea. The numbers are one web because
+	// TWO groups, and each is one idea. The numbers are one web because
 	// every numeric Type answers a String and every String is read back as a
 	// number: `Integer` formats through `String`, `String` parses through
 	// `Integer`, `Rational` is built of Integers and prints like one, and
@@ -159,7 +159,7 @@ describe("the runtime's own import graph", () => {
 	// about each member, and `anyIs` asks `Record.is` about a member that is a
 	// Record.
 	//
-	// NOTE: `Terminal` is NOT in the second group, though `internalHelpers`
+	// `Terminal` is NOT in the second group, though `internalHelpers`
 	// calls its renderer and `Record` does too. Terminal names `Record` for its
 	// TYPE alone, which is erased, so the printer sits below both of them and
 	// the bundle orders it there.
@@ -178,7 +178,7 @@ describe("the runtime's own import graph", () => {
 		])
 	})
 
-	// NOTE: The reading itself, on a source this file writes — because the test
+	// The reading itself, on a source this file writes — because the test
 	// above passes just as well when the reader finds nothing at all, and a
 	// graph with no edges has no cycles in it.
 	test("an import is read as an edge unless every specifier is erased", () => {

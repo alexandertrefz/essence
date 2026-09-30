@@ -47,7 +47,7 @@ import {
 } from "../Testing"
 import { type AnyType, createCase, typeKeySymbol } from "../type"
 
-// NOTE: The test runtime, asked the way the emitted JavaScript asks it. Nothing
+// The test runtime, asked the way the emitted JavaScript asks it. Nothing
 // here compiles anything — a Module's manifest is plain data and its `run` is a
 // Function of the context, so the whole of what a compiled `tests` section IS
 // can be written out by hand and driven exactly as one.
@@ -55,7 +55,7 @@ import { type AnyType, createCase, typeKeySymbol } from "../type"
 const integer = (value: number) => createInteger(BigInt(value))
 const string = (value: string) => createString(value)
 
-// NOTE: The keys handed in here are distinct Strings, so the witness
+// The keys handed in here are distinct Strings, so the witness
 // `createDictionary` asks about them never decides anything — a Dictionary of
 // distinct keys does not depend on what it answers, and
 // `dictionaries.spec.ts` is where equality itself is asked.
@@ -65,7 +65,7 @@ const dictionary = (...pairs: Array<[string, AnyType]>) =>
 		{ is: () => createBoolean(false) },
 	) as unknown as AnyType
 
-// NOTE: A Case value is deliberately not part of `AnyType` — its `[typeKey]:
+// A Case value is deliberately not part of `AnyType` — its `[typeKey]:
 // string` would defeat the tag narrowing every runtime helper rests on — so a
 // spec that hands one to a helper says so here rather than at every site.
 const caseValue = (tag: string, payload?: Record<string, AnyType>): AnyType =>
@@ -97,7 +97,7 @@ function manifest(
 		skipped: null,
 		benchmark: false,
 		cases: null,
-		// NOTE: The id doubles as the key here the way it doubles as the name:
+		// The id doubles as the key here the way it doubles as the name:
 		// a spec that cares about the real spelling overrides it.
 		key: id,
 		position: nowhere,
@@ -248,7 +248,7 @@ describe("The per-test context", () => {
 		})
 	})
 
-	// NOTE: What the measurement batches turn off. Recording is bookkeeping;
+	// What the measurement batches turn off. Recording is bookkeeping;
 	// what a `require` DOES — end the run where it failed — is not, and holds
 	// whatever the flag says.
 	test("writes nothing down while recording is off, but still unwinds", () => {
@@ -339,7 +339,7 @@ describe("The structural diff", () => {
 		])
 	})
 
-	// NOTE: A Dictionary is walked BY ITS KEYS rather than by position, because
+	// A Dictionary is walked BY ITS KEYS rather than by position, because
 	// that is what it is read by — so a value that moved is shown under the key
 	// that holds it, and a key only one side has arrives on a line of its own.
 	// The `key = value` shape inside brackets is the written form, which is what
@@ -397,7 +397,7 @@ describe("The structural diff", () => {
 		])
 	})
 
-	// NOTE: A Program's own Choice, whose tag carries the Module that declares
+	// A Program's own Choice, whose tag carries the Module that declares
 	// it. A failure report is read by a person, so it says `Shape#Square` — and
 	// a snapshot holding one stops moving when the file is renamed. Both halves
 	// have to agree: the bracket this walk writes itself and the whole-value
@@ -531,7 +531,7 @@ describe("Selection", () => {
 		).toEqual(["run", "tag", "tag"])
 	})
 
-	// NOTE: What a reader types is what a reader SAW, and what a reader saw is
+	// What a reader types is what a reader SAW, and what a reader saw is
 	// the rendered name — a row of a table test, or a name with a hole in it.
 	// The template still matches, so a filter written against the source works
 	// as well.
@@ -579,7 +579,7 @@ describe("Selection", () => {
 		).toEqual(["run", "filter"])
 	})
 
-	// NOTE: Two suites may hold a test of the same name, and a baseline is
+	// Two suites may hold a test of the same name, and a baseline is
 	// headed by its suites and its name joined by `/`, so that spelling is what
 	// names exactly one of them.
 	test("filters on the suite path joined to the name", async () => {
@@ -651,7 +651,7 @@ describe("Selection", () => {
 		expect(matched).toBe(1)
 	})
 
-	// NOTE: The rows of a table share their suites and their name, so only the
+	// The rows of a table share their suites and their name, so only the
 	// key a row's baseline is headed with tells them apart. Given whole, it
 	// names that row, and row 1's key does not also pick row 10.
 	test("filters on the whole key a row is stored under", async () => {
@@ -686,7 +686,7 @@ describe("Selection", () => {
 		expect(await states("sizes/doubles")).toEqual(["run", "run", "run"])
 	})
 
-	// NOTE: A key escapes a `/` inside a step, and the plain spelling still
+	// A key escapes a `/` inside a step, and the plain spelling still
 	// matches the joined names.
 	test("filters on the key of a name holding a slash", async () => {
 		let registry = registryOf([
@@ -989,7 +989,7 @@ describe("The event stream", () => {
 		let registry = registryOf([
 			module([manifest("/a")], (context) => {
 				entry(context, 0, null, () => {
-					// NOTE: The arrow stands for the one shape an early return
+					// The arrow stands for the one shape an early return
 					// could not have ended — a `match` used as an Expression,
 					// emitted as a call to a Function of its own.
 					;(() => {
@@ -1034,7 +1034,7 @@ describe("The event stream", () => {
 		expect(started).toMatchObject({ name: "2–0 is a win" })
 	})
 
-	// NOTE: A brace is an ordinary character in a plain name, and a run that
+	// A brace is an ordinary character in a plain name, and a run that
 	// read one as a hole would evaluate the whole section once for nothing.
 	test("does not enumerate a Module whose names only look interpolated", async () => {
 		let evaluations = 0
@@ -1091,7 +1091,7 @@ describe("The event stream", () => {
 	})
 })
 
-// NOTE: A clock that ticks with the WORK rather than with the wall: a fixed
+// A clock that ticks with the WORK rather than with the wall: a fixed
 // number of milliseconds per run of the body, and nothing at all between two
 // runs. What comes out of a measurement read off it is exactly what the
 // arithmetic says, so every assertion below is about the RUNNER — a spec that
@@ -1146,7 +1146,7 @@ async function measure(
 	}
 }
 
-// NOTE: One Module holding one benchmark whose body costs the clock one tick.
+// One Module holding one benchmark whose body costs the clock one tick.
 // The calibration doubles until a batch takes five milliseconds, which is eight
 // runs of a one-millisecond body — so a measurement of it is one million
 // nanoseconds, every time, on every machine.
@@ -1211,7 +1211,7 @@ describe("Benchmarks", () => {
 		expect(summary.deselected).toBe(0)
 	})
 
-	// NOTE: The one door a measurement has without a flag. An Editor's "run this
+	// The one door a measurement has without a flag. An Editor's "run this
 	// one" names a test by its id, and naming a benchmark is asking for it.
 	test("measures one somebody named, whatever the run asked for", async () => {
 		let { clock, tick } = workClock(1)
@@ -1277,7 +1277,7 @@ describe("Benchmarks", () => {
 		expect(summary.failed).toBe(1)
 		expect(summary.failedIds).toEqual(["/bench"])
 
-		// NOTE: The stream's copy of the reason. A consumer is told to ignore
+		// The stream's copy of the reason. A consumer is told to ignore
 		// the `benchmark` kind it may not know, so a regression that left
 		// `error` empty would be a failure with no stated reason anywhere a
 		// stranger reads.
@@ -1289,7 +1289,7 @@ describe("Benchmarks", () => {
 		).toContain("slower than its baseline")
 	})
 
-	// NOTE: Faster is news rather than a problem, and the baseline stands until
+	// Faster is news rather than a problem, and the baseline stands until
 	// somebody says to move it — a run that quietly recorded every improvement
 	// would ratchet a benchmark down to whatever the fastest machine reached.
 	test("passes a measurement that got faster, and says so", async () => {
@@ -1339,7 +1339,7 @@ describe("Benchmarks", () => {
 		expect(summary.failed).toBe(0)
 	})
 
-	// NOTE: Timing something that is wrong measures the wrong thing, and the
+	// Timing something that is wrong measures the wrong thing, and the
 	// number would go into a baseline as if it meant something. The body runs
 	// exactly twice: once to be judged, and once to leave the recordings the
 	// report is built from.
@@ -1367,7 +1367,7 @@ describe("Benchmarks", () => {
 		)
 	})
 
-	// NOTE: A focus left on a benchmark silences nothing while the run is not
+	// A focus left on a benchmark silences nothing while the run is not
 	// measuring — it would otherwise take a whole project's tests away over
 	// something that was never going to run.
 	test("does not silence the tests with a focus nobody is running", async () => {
@@ -1394,7 +1394,7 @@ describe("Benchmarks", () => {
 		).toEqual(["deselected", "run"])
 	})
 
-	// NOTE: Seven batches of a body that takes seconds is a minute nobody
+	// Seven batches of a body that takes seconds is a minute nobody
 	// asked to wait — and the editor's run-by-id door has a session deadline
 	// behind it. The tiers are arithmetic over the injected clock, like
 	// everything else here.
@@ -1422,7 +1422,7 @@ describe("Benchmarks", () => {
 		expect(measured[0]).toMatchObject({ iterations: 1, samples: 1 })
 	})
 
-	// NOTE: A coverage run counts every branch the body takes, so a
+	// A coverage run counts every branch the body takes, so a
 	// measurement of it would be about the counters — and a baseline recorded
 	// off one would fail the first uninstrumented run. The body still runs
 	// once, as a test's would, so its lines are covered.
@@ -1448,7 +1448,7 @@ describe("Benchmarks", () => {
 		expect(summary.passed).toBe(1)
 	})
 
-	// NOTE: Every row is a benchmark in its own right, held to a baseline of its
+	// Every row is a benchmark in its own right, held to a baseline of its
 	// own — the rows share one body and one key, so an entry they overwrote in
 	// turn could only ever match the last row that ran.
 	test("keeps one stored entry per row of a table benchmark", async () => {
@@ -1496,7 +1496,7 @@ describe("Benchmarks", () => {
 	})
 })
 
-// NOTE: The counters as the emitted JavaScript uses them: one call per Module
+// The counters as the emitted JavaScript uses them: one call per Module
 // answering a Function, and that Function called wherever control arrives.
 // Nothing here compiles anything — a coverage table is plain data.
 describe("The coverage counters", () => {
@@ -1529,7 +1529,7 @@ describe("The coverage counters", () => {
 		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
 	})
 
-	// NOTE: A point touched before the first run began — a top-level Statement
+	// A point touched before the first run began — a top-level Statement
 	// running as the Module loads — is credited to no test's span, but it did
 	// run. `beginCoverageRun` freezes that as the baseline, and the report names
 	// those points apart so a consumer mapping a change to its tests knows an
@@ -1550,7 +1550,7 @@ describe("The coverage counters", () => {
 		expect(report?.loaded).toEqual([0, 2])
 	})
 
-	// NOTE: Absolutes, because a span RESETS — that is the whole design: what
+	// Absolutes, because a span RESETS — that is the whole design: what
 	// a case reaches is measured from the start of its own test, not from
 	// whatever the process has touched before.
 	test("counts a span's new ground once, however often it is walked", () => {
@@ -1574,7 +1574,7 @@ describe("The coverage counters", () => {
 
 		expect(touchedGround()).toBe(2)
 
-		// NOTE: A new span starts from nothing, and the SAME points count as
+		// A new span starts from nothing, and the SAME points count as
 		// fresh ground again — reached is a fact about the span, not about the
 		// bundle.
 		beginCoverageSpan()
@@ -1586,7 +1586,7 @@ describe("The coverage counters", () => {
 		expect(touchedGround()).toBe(1)
 	})
 
-	// NOTE: The inverse of the affected-set map, per test: the run copies the
+	// The inverse of the affected-set map, per test: the run copies the
 	// counts around each test and says which points moved. Only where it was
 	// asked — the copy is every counter, per test.
 	test("says which points each test touched, where the run asked", async () => {
@@ -1665,7 +1665,7 @@ describe("The coverage counters", () => {
 			points: [point(1)],
 			choices: [],
 		})
-		// NOTE: A holder rather than a bare binding, so that TypeScript does
+		// A holder rather than a bare binding, so that TypeScript does
 		// not narrow it to what it was initialised with — the write happens
 		// inside a closure it does not follow.
 		let seen: { count: number | undefined } = { count: undefined }
@@ -1682,7 +1682,7 @@ describe("The coverage counters", () => {
 
 		await runTests(registryOf([one]), { sink: () => {}, now: () => 0 })
 
-		// NOTE: Asked from INSIDE the test, while it is running — coverage is
+		// Asked from INSIDE the test, while it is running — coverage is
 		// not a thing that is only dumped when everything is over.
 		expect(seen.count).toBe(1)
 	})
@@ -1720,7 +1720,7 @@ describe("The coverage counters", () => {
 		expect(reported.some((event) => event.module === "/Reported.es")).toBe(
 			true,
 		)
-		// NOTE: Before the run is declared over, so a consumer folding the
+		// Before the run is declared over, so a consumer folding the
 		// stream has every Module's counts in hand by then.
 		expect(kinds(loud).indexOf("coverage")).toBeLessThan(
 			kinds(loud).indexOf("run-end"),
@@ -1738,7 +1738,7 @@ describe("The coverage counters", () => {
 				.find((each) => each.module === "/Twice.es")
 				?.points.map((each) => each.count)
 
-		// NOTE: What a Module's top-level Statements did as it was evaluated.
+		// What a Module's top-level Statements did as it was evaluated.
 		count(0)
 
 		beginCoverageRun()
@@ -1748,7 +1748,7 @@ describe("The coverage counters", () => {
 
 		beginCoverageRun()
 
-		// NOTE: The load's count survives; the run's does not. A Module is
+		// The load's count survives; the run's does not. A Module is
 		// evaluated once however many times its tests are run, and zeroing what
 		// it did would report every top-level Statement as never executed.
 		expect(countsOf()).toEqual([1, 0])
@@ -1788,7 +1788,7 @@ describe("Terminal capture", () => {
 	})
 })
 
-// NOTE: A host whose input holds `text`, staged as Deno's for as long as the
+// A host whose input holds `text`, staged as Deno's for as long as the
 // run waits, so that a read the runner left unstaged reaches it rather than
 // this process's own descriptor.
 async function withHostInput<Value>(
@@ -1847,7 +1847,7 @@ describe("Terminal input", () => {
 						seen.push(lineOf(readLine()))
 					})
 
-					// NOTE: A read after the test's own wait, where a source
+					// A read after the test's own wait, where a source
 					// put back when the call returned would no longer apply.
 					await entry(context, 1, null, async () => {
 						await Promise.resolve()
@@ -1869,7 +1869,7 @@ describe("Terminal input", () => {
 })
 
 describe("The made-up seed", () => {
-	// NOTE: The eight hexadecimal characters are the contract `--seed` reads
+	// The eight hexadecimal characters are the contract `--seed` reads
 	// back, so the format is pinned here even though the word inside it is the
 	// machine's.
 	test("answers eight hexadecimal characters", () => {
@@ -1877,7 +1877,7 @@ describe("The made-up seed", () => {
 	})
 })
 
-// NOTE: The failing-example corpus, driven the way the emitted JavaScript
+// The failing-example corpus, driven the way the emitted JavaScript
 // drives it: a property test is `properties` standing where it was written, and
 // what a run was told about the values it has failed on before is one more
 // member of `RunOptions`.
@@ -1890,7 +1890,7 @@ describe("The failing-example corpus", () => {
 		return BigInt((value as unknown as { value: number | bigint }).value)
 	}
 
-	// NOTE: One property test whose body decides for itself whether the case
+	// One property test whose body decides for itself whether the case
 	// held, so that no assertion below depends on which value was drawn.
 	function property(
 		holds: (value: AnyType) => boolean,
@@ -1953,7 +1953,7 @@ describe("The failing-example corpus", () => {
 		return { "/Season.es": entries }
 	}
 
-	// NOTE: THE point of a corpus. A value a search found once is the first
+	// THE point of a corpus. A value a search found once is the first
 	// thing the next run asks about, so the regression is caught before any
 	// randomness is spent — and reported as the value that is known to find it
 	// rather than as whatever a fresh hundred cases turn up.
@@ -1980,7 +1980,7 @@ describe("The failing-example corpus", () => {
 		expect(kinds(events)).toContain("test-fail")
 	})
 
-	// NOTE: Still shrunk, rather than reported as it was stored: the code has
+	// Still shrunk, rather than reported as it was stored: the code has
 	// changed since the entry was written down, and it may now fail on
 	// something smaller than what broke it the first time.
 	test("shrinks a replayed failure the way it shrinks a drawn one", async () => {
@@ -2042,7 +2042,7 @@ describe("The failing-example corpus", () => {
 		expect(seen.map(wholeOf)).toEqual([7n, 9n])
 	})
 
-	// NOTE: The Types moved under the entry — here a Parameter that is a String
+	// The Types moved under the entry — here a Parameter that is a String
 	// now and held an Integer when it was written down. It is not a
 	// counterexample and not a failure: it is an entry the runner drops.
 	test("says which stored entries no longer read back", async () => {
@@ -2110,7 +2110,7 @@ describe("The failing-example corpus", () => {
 		)
 	})
 
-	// NOTE: A Namespace's own generator says how to BUILD a value and nothing
+	// A Namespace's own generator says how to BUILD a value and nothing
 	// about what one is made of, so there is nothing to write down — and one
 	// such Parameter costs the whole test its corpus, because half a case is
 	// not a case.
@@ -2137,7 +2137,7 @@ describe("The failing-example corpus", () => {
 		expect(event.encoded).toBeNull()
 	})
 
-	// NOTE: The key is the Compiler's, read off the manifest — the runtime
+	// The key is the Compiler's, read off the manifest — the runtime
 	// derives nothing, so the escaping exists in exactly one place and the
 	// event repeats what the entry already said.
 	test("names an entry by the key the Compiler spelled for it", async () => {
@@ -2153,7 +2153,7 @@ describe("The failing-example corpus", () => {
 		expect(event.key).toBe("table/a\\/b/2")
 	})
 
-	// NOTE: The entry's own budget — a synthesized goal's — loses to an
+	// The entry's own budget — a synthesized goal's — loses to an
 	// explicit `--cases` and beats the silent default, in that order.
 	test("runs an entry's own case budget unless the run named one", async () => {
 		let budgeted = property(() => true, { overrides: { cases: 7 } })
@@ -2177,7 +2177,7 @@ describe("The failing-example corpus", () => {
 	})
 })
 
-// NOTE: The coverage-guided search, driven the way the emitted JavaScript
+// The coverage-guided search, driven the way the emitted JavaScript
 // drives it: a property test is `properties` standing where it was written, and
 // an instrumented bundle is one whose Module asked for `counters` and whose body
 // calls them. There is no flag to turn any of this on — a bundle that counts
@@ -2190,7 +2190,7 @@ describe("The coverage-guided search", () => {
 		return BigInt((value as unknown as { value: number | bigint }).value)
 	}
 
-	// NOTE: The guards are written as residues so that how OFTEN one holds is
+	// The guards are written as residues so that how OFTEN one holds is
 	// the same whatever size the case was drawn at — the size ramp would
 	// otherwise make an early case and a late one two different experiments.
 	const MODULUS = 60n
@@ -2210,7 +2210,7 @@ describe("The coverage-guided search", () => {
 		} as const
 	}
 
-	// NOTE: ONE property over two Parameters that fails only where BOTH of them
+	// ONE property over two Parameters that fails only where BOTH of them
 	// are inside a narrow guard — a case a blind search has to meet at once and
 	// a guided one climbs to, holding whichever guard a kept case already met.
 	//
@@ -2262,7 +2262,7 @@ describe("The coverage-guided search", () => {
 		})
 	}
 
-	// NOTE: The seed and the case budget are PINNED, and the numbers below are
+	// The seed and the case budget are PINNED, and the numbers below are
 	// pinned to them: they were found by running the three modules over a sweep
 	// of seeds and keeping one where the guided search finds the conjunction
 	// well inside the budget and neither control finds it at all. Any change to
@@ -2296,7 +2296,7 @@ describe("The coverage-guided search", () => {
 		}
 	}
 
-	// NOTE: Instrumentation on its own is not guidance. Both modules here count,
+	// Instrumentation on its own is not guidance. Both modules here count,
 	// and only the one whose counter depends on a VALUE ever reaches ground a
 	// case can be credited with — so only that one fills the pool, and only that
 	// one finds the conjunction. Asserted through the search's OUTCOME, because
@@ -2313,7 +2313,7 @@ describe("The coverage-guided search", () => {
 		expect(ungated.cases).toBe(BUDGET)
 	})
 
-	// NOTE: THE value proof. The identical property, once in a Module that
+	// THE value proof. The identical property, once in a Module that
 	// counts and once in a Module that does not — which is the control the
 	// no-flag design gives away for free, since a bundle with no counters in it
 	// can not fill a pool however the driver is written. Same seed, same budget,
@@ -2329,7 +2329,7 @@ describe("The coverage-guided search", () => {
 		expect(blind.cases).toBe(BUDGET)
 	})
 
-	// NOTE: A stored counterexample is asked before anything is drawn, and one
+	// A stored counterexample is asked before anything is drawn, and one
 	// that reaches new ground is exactly the neighbourhood worth searching — so
 	// the corpus does not only catch the bug it was written for, it hands the
 	// search a place to start. Here the guard on `a` is a single value no draw
@@ -2367,14 +2367,14 @@ describe("The coverage-guided search", () => {
 
 		expect(seeded.found).toBe(true)
 		expect(seeded.cases).toBe(510)
-		// NOTE: The same run without the corpus. Nothing ever draws the value
+		// The same run without the corpus. Nothing ever draws the value
 		// the guard names, so the gated point is never counted, the pool never
 		// holds a case worth searching around, and the conjunction is never met.
 		expect(control.found).toBe(false)
 		expect(control.cases).toBe(BUDGET)
 	})
 
-	// NOTE: The coin, the pick and the neighbour are all drawn from the test's
+	// The coin, the pick and the neighbour are all drawn from the test's
 	// own seeded source, so `--seed` replays a guided run exactly — which is
 	// what the command a failure prints promises.
 	test("draws the same guided run twice for one seed", async () => {

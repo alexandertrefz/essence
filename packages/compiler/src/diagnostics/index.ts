@@ -2,13 +2,13 @@ import { isDeepStrictEqual } from "node:util"
 
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: The active Diagnostic list is module state so that the Enricher and
+// The active Diagnostic list is module state so that the Enricher and
 // Validator do not have to thread a collector through every function. Both
 // stages run synchronously, so there is never more than one collection active
 // per nesting level.
 let activeDiagnostics: Array<common.Diagnostic> = []
 
-// NOTE: A few Nodes are still typed more than once within one enrichment — a
+// A few Nodes are still typed more than once within one enrichment — a
 // Function definition's signature is resolved both for its own Type and while
 // its typed body is built. Deduplication keeps those repeated resolutions from
 // reporting the same Diagnostic twice.
@@ -22,7 +22,7 @@ function isDuplicate(diagnostic: common.Diagnostic): boolean {
 	)
 }
 
-// NOTE: Label constructors rather than object literals, so that the common
+// Label constructors rather than object literals, so that the common
 // case — a primary Label on the Diagnostic's own Position — stays one short
 // line at every report site and the `kind` is never left to a default.
 export function primary(
@@ -45,7 +45,7 @@ export function report(diagnostic: common.Diagnostic): void {
 	}
 }
 
-// NOTE: `code` and `labels` are required; `notes` and `helps` default to
+// `code` and `labels` are required; `notes` and `helps` default to
 // empty, because writing `notes: []` at a site that has nothing to add is
 // noise while omitting a Label never is — see the invariant on
 // `common.Diagnostic`.
@@ -57,7 +57,7 @@ type DiagnosticDetails = {
 	data?: common.DiagnosticData
 }
 
-// NOTE: The overloads are what carry the invariant down to the call sites: a
+// The overloads are what carry the invariant down to the call sites: a
 // Diagnostic with a Position must name at least one Label, a placeless one
 // must name none. A site holding a `Position | null` matches neither and has
 // to branch — which is the point, because the two cases genuinely produce
@@ -121,7 +121,7 @@ export function reportWarning(
 	report(buildDiagnostic("warning", message, position, details))
 }
 
-// NOTE: The quietest of the three, and the one nothing has to act on: a remark
+// The quietest of the three, and the one nothing has to act on: a remark
 // about what the Compiler DID, where a reader who never reads it still has a
 // correct Program. Everything about the shape is a Warning's — a code, a
 // primary Label, notes and helps — because a remark a reader can not look up
@@ -144,7 +144,7 @@ export function reportInformation(
 	report(buildDiagnostic("information", message, position, details))
 }
 
-// NOTE: For the Diagnostics that are about the Compiler run rather than about
+// For the Diagnostics that are about the Compiler run rather than about
 // a Program — a file that could not be read, a bundle that failed. They have
 // no source to point into, which is exactly the placeless half of the
 // `Diagnostic` union.
@@ -168,7 +168,7 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
-// NOTE: Reading a report is reading a file, so the Diagnostics come out in the
+// Reading a report is reading a file, so the Diagnostics come out in the
 // order the lines do — whichever stage found each of them. Left alone a report
 // is ordered by STAGE, because each stage reads the file whole before the next
 // one starts: the Lexer's bad escape on line 6 printed above the Parser's `let`
@@ -208,7 +208,7 @@ export function inSourceOrder(
 		.map(({ diagnostic }) => diagnostic)
 }
 
-// NOTE: Whether a verdict of this code already stands about this line — and,
+// Whether a verdict of this code already stands about this line — and,
 // where `message` is given, that verdict and no other. The one question a report
 // asks about the ones made in front of it, and it has two callers.
 //
@@ -234,7 +234,7 @@ export function reportedOnLine(
 	)
 }
 
-// NOTE: A savepoint in the active collection, for speculative work that is
+// A savepoint in the active collection, for speculative work that is
 // abandoned far more often than it is kept — the parser backtracks on nearly
 // every Expression, and a fresh collection per attempt is a per-Expression
 // allocation. Marking costs a length read; rewinding drops exactly the
@@ -248,7 +248,7 @@ export function rewindDiagnostics(mark: number): void {
 	activeDiagnostics.length = mark
 }
 
-// NOTE: Collections nest — Diagnostics reported inside `work` are captured
+// Collections nest — Diagnostics reported inside `work` are captured
 // into a fresh list and do not leak into the surrounding collection. This
 // allows speculative resolution whose Diagnostics are only committed (via
 // `report`) when the speculation is kept.

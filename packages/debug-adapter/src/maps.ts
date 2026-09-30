@@ -4,7 +4,7 @@ import * as path from "node:path"
 import type { RawSourceMap } from "source-map"
 import { SourceMapConsumer } from "source-map"
 
-// NOTE: The bundle's map, wrapped in the two questions a session asks of it:
+// The bundle's map, wrapped in the two questions a session asks of it:
 // where a source line landed in the bundle (breakpoints) and where a bundle
 // position came from (stacks, stops). Conventions are pinned HERE and nowhere
 // else: `.es` lines are 1-based and columns 0-based — the source-map library's
@@ -30,7 +30,7 @@ export class BundleMap {
 		this.sources = [...raw.sources]
 	}
 
-	// NOTE: Null when the bundle carries no map beside it — a session without
+	// Null when the bundle carries no map beside it — a session without
 	// one still runs; it just binds no breakpoints and maps no frames.
 	static load(bundlePath: string): BundleMap | null {
 		try {
@@ -44,7 +44,7 @@ export class BundleMap {
 		}
 	}
 
-	// NOTE: The map's sources are the compiler's canonical absolute paths; a
+	// The map's sources are the compiler's canonical absolute paths; a
 	// client may spell the same file its own way, so the lookup normalises
 	// before it compares.
 	sourceFor(clientPath: string): string | null {
@@ -61,7 +61,7 @@ export class BundleMap {
 		source: string,
 		line: number,
 	): GeneratedPosition | null {
-		// NOTE: A breakpoint on a blank or comment line should slide to the
+		// A breakpoint on a blank or comment line should slide to the
 		// next mapped statement, which is what LEAST_UPPER_BOUND answers; the
 		// GREATEST_LOWER_BOUND retry catches a line after the last statement.
 		for (let bias of [
@@ -103,7 +103,7 @@ export class BundleMap {
 		}
 	}
 
-	// NOTE: Every mapping of the bundle, generated side, 0-based — what the
+	// Every mapping of the bundle, generated side, 0-based — what the
 	// stepping logic derives its blackboxed ranges from.
 	eachMapping(
 		visit: (mapping: {

@@ -36,7 +36,7 @@ function outgoing(source: string, cursor: common.Cursor) {
 	return findOutgoingCalls(program, cursor, enrichedProgram)
 }
 
-// NOTE: Who calls whom, and how often — the grouping is what the expectations
+// Who calls whom, and how often — the grouping is what the expectations
 // below are about; the individual call Positions are asserted where they carry
 // the point of the test.
 function summarise(calls: Array<CallHierarchyCalls>) {
@@ -62,7 +62,7 @@ describe("Call Hierarchy", () => {
 			name: "helper",
 			kind: "function",
 			container: null,
-			// NOTE: The whole Statement, so that an Editor can reveal the
+			// The whole Statement, so that an Editor can reveal the
 			// Function as it is written.
 			range: {
 				start: { line: 2, column: 2 },
@@ -177,7 +177,7 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: `add` is a standard library Method — it has no Declaration in
+		// `add` is a standard library Method — it has no Declaration in
 		// this document, so there is nothing to expand and it is left out.
 		expect(summarise(outgoing(source, { line: 12, column: 11 }))).toEqual([
 			{ name: "helper", kind: "function", container: null, calls: 1 },
@@ -236,7 +236,7 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: Both Overloads share one name and therefore one Declaration —
+		// Both Overloads share one name and therefore one Declaration —
 		// one item, both calls, exactly as renaming treats them.
 		let calls = incoming(source, { line: 3, column: 12 })
 
@@ -367,14 +367,14 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The dispatched call resolves per member Type, and its
+		// The dispatched call resolves per member Type, and its
 		// `namespace` is a placeholder — see the NOTE on the Method Invocation
 		// case in `callHierarchy.ts`.
 		expect(incoming(source, { line: 3, column: 3 })).toEqual([])
 	})
 })
 
-// NOTE: `= @::length()` IS a call, made by the Declaration the default is
+// `= @::length()` IS a call, made by the Declaration the default is
 // written on — so it is an outgoing call of that Method exactly as one written
 // in the body is.
 describe("Call Hierarchy of a call written in a default", () => {
@@ -403,7 +403,7 @@ describe("Call Hierarchy of a call written in a default", () => {
 	})
 })
 
-// NOTE: A `define` is Expressions and nothing else, so a Function called only
+// A `define` is Expressions and nothing else, so a Function called only
 // from an arm would be reported as called by nobody by a walk with no case for
 // one.
 describe("Call Hierarchy inside a define", () => {
@@ -444,7 +444,7 @@ describe("Call Hierarchy inside a define", () => {
 	})
 })
 
-// NOTE: Every call that answers work is written under one of the two Keywords,
+// Every call that answers work is written under one of the two Keywords,
 // so a walk with no case for them reports the Functions asynchrony is written
 // with as called by nobody.
 describe("Call Hierarchy through start and complete", () => {

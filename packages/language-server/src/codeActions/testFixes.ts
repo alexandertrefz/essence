@@ -5,13 +5,13 @@ import { isWordBounded, removeLinesEdit, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findTestModifierWord } from "./lookups"
 
-// NOTE: The Diagnostics a test's or a suite's MODIFIERS carry. Each of them is
+// The Diagnostics a test's or a suite's MODIFIERS carry. Each of them is
 // answered by taking a Modifier back out — the vocabulary is three words and
 // the Enricher is what knows them, so nothing here decides what a Modifier
 // means; it decides what a word plus its arguments occupies, which is what an
 // edit needs.
 
-// NOTE: A Modifier's name and what it was written with. The Parser reads a
+// A Modifier's name and what it was written with. The Parser reads a
 // Modifier generically — a name and the arguments that follow it — so the two
 // halves are told apart here by the same rule, off the buffer, rather than by
 // asking the Enricher to hand its reading back.
@@ -19,7 +19,7 @@ const modifierParts = /^([A-Za-z][A-Za-z0-9]*)[ \t]*([\s\S]*)$/
 const bareWord = /^[A-Za-z][A-Za-z0-9]*$/
 const tagged = "tagged"
 
-// NOTE: The Diagnostic spans the NAME, and what has to go is the Modifier — a
+// The Diagnostic spans the NAME, and what has to go is the Modifier — a
 // name the Parser read arguments into takes them with it, or `test "a" retries
 // 3 {}` is left holding a `3` that opens nothing. Where the Enricher's
 // regrouping reported about an ARGUMENT instead, the word goes alone, which is
@@ -55,7 +55,7 @@ export function removeModifierAction(
 	})
 }
 
-// NOTE: Both readings, and neither preferred — which of `skipped` and `focused`
+// Both readings, and neither preferred — which of `skipped` and `focused`
 // was meant is not something the source says, and that is the whole of what the
 // Diagnostic has to report. `skipped` is offered first because it is the one
 // that stops the test from running at all.
@@ -96,7 +96,7 @@ export function contradictoryModifierActions(
 	return entries
 }
 
-// NOTE: The Diagnostic spans the SECOND Modifier and points back at the first,
+// The Diagnostic spans the SECOND Modifier and points back at the first,
 // and both spans are read off the buffer rather than looked up: the Enricher
 // regroups what the Parser read before it reports, so `tagged slow` may be one
 // Modifier made of two the Parser kept apart, and no Node here spans it.
@@ -126,7 +126,7 @@ export function mergeModifierAction(
 		return null
 	}
 
-	// NOTE: And both spans have to stand on whole words. Two spans that slid by
+	// And both spans have to stand on whole words. Two spans that slid by
 	// the SAME column read as the same word as readily as two that did not —
 	// `ocused` out of `focused focused`, once the line lost its indentation —
 	// so the agreement above says nothing on its own, and what is asked here is
@@ -140,7 +140,7 @@ export function mergeModifierAction(
 
 	let removal = removeLinesEdit(lines, diagnostic.position)
 
-	// NOTE: A `tagged` naming no tags is refused by a Diagnostic of its own, and
+	// A `tagged` naming no tags is refused by a Diagnostic of its own, and
 	// merging one in would write `tagged, slow`. So the merge asks that both
 	// halves name something, and the removal answers everything else.
 	if (second[1] !== tagged || second[2] === "" || earlier[2] === "") {
@@ -160,7 +160,7 @@ export function mergeModifierAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		// NOTE: In document order, since the two never overlap — the first
+		// In document order, since the two never overlap — the first
 		// Modifier is above the second by the order they were seen in.
 		edits: [
 			{

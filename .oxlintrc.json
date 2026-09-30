@@ -28,7 +28,7 @@
 				"max-lines": "off"
 			}
 		},
-		// NOTE: Each file below is over a size limit and is held to its worst
+		// Each file below is over a size limit and is held to its worst
 		// offence, so nothing in it may grow.
 		{
 			"files": ["packages/ariadne/src/write.ts"],

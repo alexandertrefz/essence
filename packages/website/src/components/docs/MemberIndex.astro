@@ -96,7 +96,7 @@ let rows: Row[] = manifest.groups.map((group) => {
 	return { label: group.label, href: `#${group.id}`, names }
 })
 
-// NOTE: The id `github-slugger` gives a section heading, for the two rows whose
+// The id `github-slugger` gives a section heading, for the two rows whose
 // heading is prose rather than a name. It is the whole of what the slugger does
 // to a label of words and spaces, and the `anchors` check below is what says so:
 // a label this got wrong falls back to the first member's own id rather than

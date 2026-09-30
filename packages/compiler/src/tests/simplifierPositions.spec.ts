@@ -7,7 +7,7 @@ import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { simplify } from "../simplifier/index"
 
-// NOTE: Positions must survive simplification for the Rewriter to map what it
+// Positions must survive simplification for the Rewriter to map what it
 // emits back onto the source — while a node the Simplifier synthesizes, which
 // no source was written for, must stay position-less, so it emits no mapping.
 function simplifyWithTyped(source: string): {
@@ -61,7 +61,7 @@ describe("Simplifier Positions", () => {
 		)
 	})
 
-	// NOTE: A default is an Expression written where it stands, and it keeps the
+	// A default is an Expression written where it stands, and it keeps the
 	// Position it was written at — so stepping into a call that took one stops
 	// on the `= …` in the source, which is where the work is happening. The
 	// filler an interior omission emits is the other half: no source wrote it,
@@ -90,7 +90,7 @@ describe("Simplifier Positions", () => {
 		expect(simplifiedDefault.position).toEqual(typedDefault.position)
 	})
 
-	// NOTE: A Record default carries no JavaScript default at all — it opens the
+	// A Record default carries no JavaScript default at all — it opens the
 	// body with a merge instead — and that Statement takes the Parameter's own
 	// Position, so a step into the Function stops on the Parameter that was
 	// defaulted rather than on Compiler glue the Debug Adapter would step out
@@ -149,7 +149,7 @@ describe("Simplifier Positions", () => {
 		expect(filler.position).toBeUndefined()
 	})
 
-	// NOTE: A member path's Function is synthesized, but every span in it was
+	// A member path's Function is synthesized, but every span in it was
 	// WRITTEN — the step's own for the Lookup that reads it, the path's for the
 	// Parameter and the Return. That is what a step into the callback stops on,
 	// and what the Language Server renames and colours.
@@ -205,7 +205,7 @@ describe("Simplifier Positions", () => {
 		})
 	})
 
-	// NOTE: A body promising unit, the empty Record `{}`, may fall off its end,
+	// A body promising unit, the empty Record `{}`, may fall off its end,
 	// and the Simplifier appends the `<- {}` the Signature promised. No source
 	// was written for that Return, so it carries no position.
 	it("leaves the synthesised trailing Return position-less", () => {

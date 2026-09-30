@@ -122,7 +122,7 @@ import {
 } from "./testFixes"
 import { bareCaseAction, removeEntryAction } from "./valueFixes"
 
-// NOTE: Every edit here is computed from the text handed in and the analysis of
+// Every edit here is computed from the text handed in and the analysis of
 // that text, never from a Diagnostic the client echoed back. Published
 // Diagnostics are debounced, so the Positions the client holds belong to a
 // buffer that may be several keystrokes old, while an edit is applied to the
@@ -130,17 +130,17 @@ import { bareCaseAction, removeEntryAction } from "./valueFixes"
 // attach the originating one to the action it produced.
 
 export type CodeActionEdit = {
-	// NOTE: An insertion is a zero-width range — `start` and `end` at the
+	// An insertion is a zero-width range — `start` and `end` at the
 	// same Cursor — so there is one edit shape rather than two.
 	range: common.Position
 	newText: string
-	// NOTE: Absent for the document the request was made on, which is where
+	// Absent for the document the request was made on, which is where
 	// nearly every edit goes. An action that reaches a SECOND file — a name
 	// moved to the Module that should export it, an import written into the
 	// file that will need it — names that file by absolute path, and the
 	// Server groups the edits per file on the way out.
 	filePath?: string
-	// NOTE: Set by the one action that writes a file that is not there yet. A
+	// Set by the one action that writes a file that is not there yet. A
 	// text edit can not create the file it edits — the protocol says creating
 	// one as a resource operation, which is a different shape of Workspace Edit
 	// — so the Server needs to be told, and only this says so.
@@ -149,7 +149,7 @@ export type CodeActionEdit = {
 
 export type CodeActionEntry = {
 	title: string
-	// NOTE: The LSP kind strings themselves, since these are exactly the kinds
+	// The LSP kind strings themselves, since these are exactly the kinds
 	// this Server offers and inventing a second spelling for them would only
 	// mean a table to keep in step. What each of them promises is the reason
 	// they are told apart at all: a `quickfix` answers a Diagnostic, a
@@ -162,14 +162,14 @@ export type CodeActionEntry = {
 		| "refactor.inline"
 		| "refactor.move"
 		| "source.organizeImports"
-	// NOTE: Null for an action that answers no Diagnostic — the Type
+	// Null for an action that answers no Diagnostic — the Type
 	// annotation refactor is offered on correct code. The pair is what lets
 	// the server find the client's own Diagnostic for this action again.
 	diagnosticCode: common.DiagnosticCode | null
 	diagnosticPosition: common.Position | null
 	isPreferred: boolean
 	edits: Array<CodeActionEdit>
-	// NOTE: A command for the CLIENT to run once the edits have landed. An
+	// A command for the CLIENT to run once the edits have landed. An
 	// extraction ends by opening rename on the name it just invented, and no
 	// edit can do that — putting a cursor somewhere is the Editor's to do.
 	// Handed through untouched as the LSP `CodeAction.command`.
@@ -180,7 +180,7 @@ export type CodeActionEntry = {
 	}
 }
 
-// NOTE: What a Code Action offers depends on the document, not on where in it
+// What a Code Action offers depends on the document, not on where in it
 // the cursor stands — and the Editor asks on every cursor move, which used to be
 // a full compile per keystroke of navigation through a file nobody has edited.
 // The analysis is therefore handed in: the Workspace holds one per file and
@@ -196,12 +196,12 @@ export function findCodeActions(
 	documentPath?: string,
 	workspace?: Workspace,
 	cached: Analysis | null = null,
-	// NOTE: Diagnostics that no compile produced and that a quick fix answers
+	// Diagnostics that no compile produced and that a quick fix answers
 	// all the same — a workspace-wide `similar-tags`, which one Module can not
 	// see. Handed in rather than recomputed, so the lightbulb and the squiggle
 	// are offered on the very same Diagnostic.
 	extra: Array<common.Diagnostic> = [],
-	// NOTE: The kinds the request narrowed itself to, as `context.only` spells
+	// The kinds the request narrowed itself to, as `context.only` spells
 	// them. Answered HERE rather than by filtering what came out: `"editor.
 	// codeActionsOnSave": { "source.organizeImports": true }` sends one request
 	// per save, over the whole document, asking for one kind — and computing
@@ -210,7 +210,7 @@ export function findCodeActions(
 	// drawing a lightbulb sends.
 	only?: Array<string>,
 ): Array<CodeActionEntry> {
-	// NOTE: ONE run of the pipeline per request — the analysis hands back both
+	// ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
 	// annotation refactors read. Parsing the same text again would be a second
 	// full compile for one lightbulb.
@@ -218,7 +218,7 @@ export function findCodeActions(
 		cached ??
 		analyseDocument(documentText, documentPath, {
 			host: workspace?.host,
-			// NOTE: As the Server's own Workspace has it — a Quick Fix offered
+			// As the Server's own Workspace has it — a Quick Fix offered
 			// inside a `tests { … }` block answers a Diagnostic only a compile
 			// that asked for the tests ever reports.
 			tests: true,
@@ -232,7 +232,7 @@ export function findCodeActions(
 
 	let lines = documentText.split("\n")
 	let entries: Array<CodeActionEntry> = []
-	// NOTE: What this request answers about — the compile's own Diagnostics and
+	// What this request answers about — the compile's own Diagnostics and
 	// the ones no compile produced, read as one list. The registry below takes
 	// the ones the requested range touches; a `source.*` action takes them all.
 	let reported = [...diagnostics, ...extra]
@@ -248,7 +248,7 @@ export function findCodeActions(
 
 	let wanted = (kind: CodeActionEntry["kind"]) => isRequestedKind(kind, only)
 
-	// NOTE: Every provider in the registry answers a Diagnostic, so the whole
+	// Every provider in the registry answers a Diagnostic, so the whole
 	// loop stands down where a Quick Fix is not what was asked for.
 	for (let diagnostic of wanted("quickfix") ? reported : []) {
 		if (
@@ -272,7 +272,7 @@ export function findCodeActions(
 		}
 	}
 
-	// NOTE: And each refactoring below is asked for by the kind it offers,
+	// And each refactoring below is asked for by the kind it offers,
 	// rather than computed and dropped. They are grouped by kind so that a
 	// request naming one walks the Program for that one alone.
 	if (wanted("refactor.rewrite")) {
@@ -359,7 +359,7 @@ export function findCodeActions(
 	return entries
 }
 
-// NOTE: What the request asked for. An Editor opening its Refactor menu asks
+// What the request asked for. An Editor opening its Refactor menu asks
 // for `refactor` and one drawing the lightbulb over a squiggle asks for
 // `quickfix`, and answering both with everything puts the fixes in the
 // Refactor menu and the rewrites under the lightbulb. A kind is a dotted
@@ -380,7 +380,7 @@ export function isRequestedKind(
 	)
 }
 
-// NOTE: The rename index, built at most once per request and only where an
+// The rename index, built at most once per request and only where an
 // action actually reaches for it. Indexing a Program costs what a Rename costs,
 // a Code Action request fires on every cursor move, and the Nodes the
 // refactorings that ask for it are written on are not in every file — so it is
@@ -424,7 +424,7 @@ function heldIndex(
 	return workspace.indexOf(documentFilePath(documentPath))
 }
 
-// NOTE: Everything a fix is allowed to read: the Diagnostic it answers, the
+// Everything a fix is allowed to read: the Diagnostic it answers, the
 // Parser AST its edits are measured against, the enriched Program and what the
 // import block bound for a fix that has to name a Type or a Protocol, the
 // buffer's lines, and what an import can be written from. One shape rather than
@@ -441,12 +441,12 @@ export type FixContext = {
 
 export type FixProvider = (context: FixContext) => Array<CodeActionEntry>
 
-// NOTE: A misspelling reads the same wherever it is written, so the codes that
+// A misspelling reads the same wherever it is written, so the codes that
 // carry a `suggestion` share one provider rather than one arm each.
 const spellingFix: FixProvider = ({ diagnostic, lines }) =>
 	listed(suggestionAction(diagnostic, lines, (suggestion) => suggestion))
 
-// NOTE: And the same again for a Record Literal's misspelled member, which
+// And the same again for a Record Literal's misspelled member, which
 // every mismatch code can carry: one Literal is refused by a return, an
 // assignment, an Argument, a payload and a table row alike, and a member spelled
 // wrong is wrong the same way in each. The asynchrony fix sits beside it rather
@@ -458,7 +458,7 @@ const mismatchFixes: FixProvider = ({ diagnostic, program, lines }) => [
 	...listed(recordMemberAction(diagnostic, program, lines)),
 ]
 
-// NOTE: An unknown name has two answers and nothing in the Diagnostic chooses
+// An unknown name has two answers and nothing in the Diagnostic chooses
 // between them: it is either misspelled, or spelled right and imported
 // nowhere. Both are offered, and the order is part of the offer — the imports
 // stand above the spelling, since an import is the answer that leaves what the
@@ -468,7 +468,7 @@ const importOrSpellingFix: FixProvider = (context) => [
 	...spellingFix(context),
 ]
 
-// NOTE: An unknown name has a third answer that the two above can not reach: it
+// An unknown name has a third answer that the two above can not reach: it
 // is the name of a Case, written without the `#` that makes one. The Diagnostic
 // says so with a payload of its own, so this stands FIRST — a name the Compiler
 // has matched to a Case in scope is a better answer than a near miss by edit
@@ -478,7 +478,7 @@ const bareCaseOrImportOrSpellingFix: FixProvider = (context) => [
 	...importOrSpellingFix(context),
 ]
 
-// NOTE: A `@param` suggestion is the Parameter's NAME and the span it is
+// A `@param` suggestion is the Parameter's NAME and the span it is
 // written over is that name alone, so the title spells the whole tag back while
 // the edit rewrites only what the tag named.
 const documentationSpellingFix: FixProvider = ({ diagnostic, lines }) =>
@@ -490,7 +490,7 @@ const documentationSpellingFix: FixProvider = ({ diagnostic, lines }) =>
 		),
 	)
 
-// NOTE: One provider per Diagnostic code, looked up rather than switched on.
+// One provider per Diagnostic code, looked up rather than switched on.
 // A code that has more than one answer keeps a provider that concatenates them,
 // in the order they are offered in. The table is what makes a Quick Fix a
 // self-contained addition: a fix is a function in one of the `*Fixes` modules
@@ -505,7 +505,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		wrapInHoldingCaseActions(diagnostic, program),
 	"argument-label-mismatch": ({ diagnostic, lines }) =>
 		listed(argumentLabelAction(diagnostic, lines)),
-	// NOTE: Every Type mismatch code shares `mismatchFixes`, and what picks the
+	// Every Type mismatch code shares `mismatchFixes`, and what picks the
 	// asynchrony ones out is the `data` the Validator carried on the report:
 	// `waitForValueAction` answers nothing where there is none. An Argument is
 	// where a reader meets this most: `show(work)` is the shape a missing
@@ -557,14 +557,14 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(missingMembersAction(diagnostic, lines)),
 	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>
 		listed(removeInferAction(diagnostic, program, lines)),
-	// NOTE: A hole holding a Future is a forgotten `complete` like any other,
+	// A hole holding a Future is a forgotten `complete` like any other,
 	// and is told from every other unprintable hole by the same `data` — which
 	// the Enricher carries only where the word may be written.
 	"interpolation-not-printable": ({ diagnostic }) =>
 		listed(waitForValueAction(diagnostic)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
-	// NOTE: `unicodeEscapeActions` answers the Unicode escape codes whose Help
+	// `unicodeEscapeActions` answers the Unicode escape codes whose Help
 	// can spell a rewrite to apply: this one, `surrogate-unicode-escape` and
 	// `unbraced-unicode-escape`. `unicode-escape-out-of-range` has no entry:
 	// its Help, where it has one, is a decimal reading, which stays the
@@ -575,7 +575,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		moduleSpecifierActions(diagnostic, lines),
 	"literal-in-require": ({ diagnostic, lines }) =>
 		listed(compareWrittenValueAction(diagnostic, lines)),
-	// NOTE: Four sites report this code and two of them have a mechanical
+	// Four sites report this code and two of them have a mechanical
 	// answer. Each fix tells its own site apart from the rest by what the
 	// Diagnostic was reported against, and the two that are left — a Case
 	// naming no value, and one naming a value of another Type — are offered
@@ -607,7 +607,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(dropKeywordAction(diagnostic, program, lines)),
 	"needless-start": ({ diagnostic, program, lines }) =>
 		listed(dropKeywordAction(diagnostic, program, lines)),
-	// NOTE: A call that picked no Overload is most often a call with the wrong
+	// A call that picked no Overload is most often a call with the wrong
 	// value in it, and has no mechanical answer — except for the one shape the
 	// Enricher marks with `data`: an Argument that describes work where the work's
 	// answer is wanted.
@@ -647,7 +647,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(documentationLineAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
-	// NOTE: What stands after the end of a Program is text to delete, and the
+	// What stands after the end of a Program is text to delete, and the
 	// span is the one the report already underlines — so the removal is the
 	// same `essence-spelling` edit a stray `;` carries.
 	"unexpected-token": ({ diagnostic, lines }) =>
@@ -655,7 +655,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"ungeneratable-type": makeGeneratableAction,
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
 		listed(inferParameterAction(diagnostic, program, lines)),
-	// NOTE: A suggestion is the Case's NAME and the span it is written over is
+	// A suggestion is the Case's NAME and the span it is written over is
 	// that name ALONE — every site reports against `caseName.position`, which
 	// is the name with no sigil in front of it. So the `#` is written into the
 	// title, where the reader reads the Case back as they would write it, and
@@ -668,7 +668,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 				(suggestion) => `#${suggestion}`,
 			),
 		),
-	// NOTE: A tag naming nothing is either misspelled or about a Parameter that
+	// A tag naming nothing is either misspelled or about a Parameter that
 	// is gone, and nothing in the Diagnostic chooses between them. The
 	// suggestion stands above the removal, since keeping the description is the
 	// answer that throws nothing away.
@@ -678,7 +678,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 			removeDocumentationTagAction(context.diagnostic, context.lines),
 		),
 	],
-	// NOTE: The near miss the LINKER found, against the names a dependency
+	// The near miss the LINKER found, against the names a dependency
 	// really publishes — a surface the Editor holds none of its own, so the
 	// candidate travels on the Diagnostic exactly as every other one does.
 	"unknown-export": spellingFix,
@@ -691,7 +691,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		unicodeEscapeActions(diagnostic),
 	"unbraced-unicode-escape": ({ diagnostic }) =>
 		unicodeEscapeActions(diagnostic),
-	// NOTE: A Modifier that is not one has two answers and the Diagnostic says
+	// A Modifier that is not one has two answers and the Diagnostic says
 	// which: a near miss is a misspelling, and anything else is a word that
 	// belongs in the body or nowhere. The spelling stands above the removal
 	// where there is one, since it is what leaves the reader's intent alone.
@@ -714,7 +714,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(unreachableCaseAction(diagnostic, program, lines)),
 	"unreachable-define-arm": ({ diagnostic, program, lines }) =>
 		unreachableDefineArmActions(diagnostic, program, lines),
-	// NOTE: Two shapes under one code, and the data says which: a Type Parameter
+	// Two shapes under one code, and the data says which: a Type Parameter
 	// in want of a bound is an edit to its declaration, and a Type this Module
 	// never imported is an edit to the import block. Neither answers the other's
 	// data, so the pair is a concatenation rather than a choice.
@@ -746,7 +746,7 @@ function actionsFor(context: FixContext): Array<CodeActionEntry> {
 	return fixesByCode[context.diagnostic.code]?.(context) ?? []
 }
 
-// NOTE: Whether the very same action already stands in the list — the same
+// Whether the very same action already stands in the list — the same
 // title writing the same text over the same range. SEVERAL Diagnostics can have
 // one answer: a `where` clause on a Protocol extension is refused once per
 // condition and what goes is the clause, so a request covering two conditions

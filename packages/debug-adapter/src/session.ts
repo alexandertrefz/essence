@@ -40,7 +40,7 @@ import {
 	toCallArgument,
 } from "./variables"
 
-// NOTE: Module-level and exported, so the spec can read what the adapter
+// Module-level and exported, so the spec can read what the adapter
 // promises without starting one — the same shape `serverCapabilities` has in
 // the Language Server.
 export const adapterCapabilities: DebugProtocol.Capabilities = {
@@ -63,13 +63,13 @@ export const adapterCapabilities: DebugProtocol.Capabilities = {
 	],
 }
 
-// NOTE: The object group every handle the Variables view mints in the debuggee
+// The object group every handle the Variables view mints in the debuggee
 // belongs to. A row expands through one `callFunctionOn` that BUILDS an array
 // over there, and `Runtime.getProperties` wraps what it answers in the group of
 // the object it was asked about — so naming the group on that one call is what
 // puts the entry Records read back off the array into it too.
 //
-// NOTE: It is the Dictionary path this is really about. A List's items are the
+// It is the Dictionary path this is really about. A List's items are the
 // Program's OWN values, reachable from the box a reader is looking at whether
 // the debugger holds a handle to them or not; a Dictionary's entries are minted
 // by `essenceDictionaryEntries` and nothing but the handle holds them. Released
@@ -78,7 +78,7 @@ export const adapterCapabilities: DebugProtocol.Capabilities = {
 const VARIABLE_OBJECT_GROUP = "essence-variables"
 
 export type AdapterOptions = {
-	// NOTE: What compiling means is the host's to say — `essence dap` injects
+	// What compiling means is the host's to say — `essence dap` injects
 	// its in-process pipeline, `bin/esdap` a spawn of the CLI. Absent, a
 	// launch that names no precompiled `artifact` fails with a clear message.
 	compile?: CompileFunction
@@ -86,7 +86,7 @@ export type AdapterOptions = {
 
 type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	program?: string
-	// NOTE: A precompiled bundle, its `.map` beside it — the way to debug
+	// A precompiled bundle, its `.map` beside it — the way to debug
 	// without compiling, and the way a host without a compiler still works.
 	artifact?: string
 	args?: Array<string>
@@ -96,7 +96,7 @@ type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	keepArtifacts?: boolean
 	glueFrames?: "hide" | "subtle"
 	runtimeExecutable?: string
-	// NOTE: The structural ids of the tests to debug. Present at all — the
+	// The structural ids of the tests to debug. Present at all — the
 	// empty Array included, which means every test of the file — the `program`
 	// is compiled WITH its `tests { … }` block and the session launches a
 	// runner that asks the bundle for those tests. Absent, a launch is what it
@@ -104,7 +104,7 @@ type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	tests?: Array<string>
 }
 
-// NOTE: The emitted bundle runs on one thread; DAP still speaks in thread
+// The emitted bundle runs on one thread; DAP still speaks in thread
 // ids, so there is exactly one, and it is this.
 const MAIN_THREAD_ID = 1
 
@@ -112,7 +112,7 @@ type Debuggee = {
 	child: ChildProcess
 	cdp: CdpConnection
 	bundlePath: string
-	// NOTE: The URL Node knows the bundle's script under — what a CDP
+	// The URL Node knows the bundle's script under — what a CDP
 	// breakpoint is addressed to.
 	bundleUrl: string
 	map: BundleMap | null
@@ -127,7 +127,7 @@ type PausedParameters = {
 	data?: unknown
 }
 
-// NOTE: What a `variablesReference` stands for: a scope's bindings, an
+// What a `variablesReference` stands for: a scope's bindings, an
 // object's own members, or a List or a Dictionary — whose items and entries are
 // the ones its view holds, which the debuggee has to be asked for.
 type VariableContainer = {
@@ -150,7 +150,7 @@ export class EssenceDebugSession extends DebugSession {
 
 		this.compile = options.compile ?? null
 
-		// NOTE: The debuggee side speaks CDP, which is 0-based on both axes —
+		// The debuggee side speaks CDP, which is 0-based on both axes —
 		// the base class's convert helpers translate to whatever the client
 		// declared in `initialize`.
 		this.setDebuggerLinesStartAt1(false)
@@ -169,7 +169,7 @@ export class EssenceDebugSession extends DebugSession {
 		response: DebugProtocol.LaunchResponse,
 		args: EssenceLaunchArguments,
 	): Promise<void> {
-		// NOTE: "Run Without Debugging" arrives as `noDebug` — the program
+		// "Run Without Debugging" arrives as `noDebug` — the program
 		// still runs under the adapter, but nothing pauses it: the client
 		// sends no breakpoints, and exceptions and `stopOnEntry` stand down
 		// here.
@@ -194,7 +194,7 @@ export class EssenceDebugSession extends DebugSession {
 		try {
 			let launched = await launchProgram({
 				runtime: args.runtimeExecutable ?? "node",
-				// NOTE: What is LAUNCHED and what is MAPPED are two files when
+				// What is LAUNCHED and what is MAPPED are two files when
 				// the launch names tests: the runner beside the bundle is the
 				// entry, and the bundle is what breakpoints are addressed to.
 				// They are the same file for every other launch.
@@ -230,7 +230,7 @@ export class EssenceDebugSession extends DebugSession {
 
 		let { child, cdp } = this.debuggee
 
-		// NOTE: The exit path is wired before anything can run. `ExitedEvent`
+		// The exit path is wired before anything can run. `ExitedEvent`
 		// carries the code, `TerminatedEvent` ends the session — and both are
 		// sent exactly once, however the program went down.
 		child.on("exit", (code, signal) => {
@@ -245,7 +245,7 @@ export class EssenceDebugSession extends DebugSession {
 			this.onPaused(params),
 		)
 
-		// NOTE: A finished program does not exit while an inspector client is
+		// A finished program does not exit while an inspector client is
 		// attached — Node prints "Waiting for the debugger to disconnect..."
 		// and holds the process for exactly that. The context being destroyed
 		// IS the program's end, so the disconnect is answered here, which lets
@@ -254,7 +254,7 @@ export class EssenceDebugSession extends DebugSession {
 			cdp.close()
 		})
 
-		// NOTE: The moment the bundle's script exists, everything its map
+		// The moment the bundle's script exists, everything its map
 		// does not cover is declared blackboxed — V8 then carries every step
 		// over the prelude and the runtime natively, and the manual loop in
 		// `onPaused` is only the safety net.
@@ -284,7 +284,7 @@ export class EssenceDebugSession extends DebugSession {
 			},
 		)
 
-		// NOTE: The entry pause: `--inspect-brk` holds the program before its
+		// The entry pause: `--inspect-brk` holds the program before its
 		// first statement, and the engine only starts once
 		// `Runtime.runIfWaitingForDebugger` is sent — so the pause that
 		// follows it is awaited HERE, and never surfaces as a stop. It is the
@@ -312,12 +312,12 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
-	// NOTE: Which pauses reach the client: the entry pause is the adapter's
+	// Which pauses reach the client: the entry pause is the adapter's
 	// own and `configurationDone` decides what becomes of it, so it is
 	// swallowed here — `lastPause` is only ever a pause the program earned.
 	private entryPauseSeen = false
 
-	// NOTE: The manual smart step, alive between a step request and the stop
+	// The manual smart step, alive between a step request and the stop
 	// it earns. Blackboxing does most of the carrying; this loop covers what
 	// it cannot — a landing in unmapped code is stepped onwards, a `next`
 	// that lands on the SAME `.es` line goes again (one source line can be
@@ -370,7 +370,7 @@ export class EssenceDebugSession extends DebugSession {
 			step.budget -= 1
 
 			if (original === null) {
-				// NOTE: Unmapped ground. A step-in keeps drilling forward; a
+				// Unmapped ground. A step-in keeps drilling forward; a
 				// next or step-out climbs back out of the glue it landed in.
 				this.debuggee?.cdp
 					.send(
@@ -456,7 +456,7 @@ export class EssenceDebugSession extends DebugSession {
 	): Promise<void> {
 		if (this.debuggee !== null) {
 			if (this.stopOnEntry) {
-				// NOTE: The raw entry pause sits at the bundle's first
+				// The raw entry pause sits at the bundle's first
 				// statement — runtime glue. "Stop on entry" means the first
 				// statement the AUTHOR wrote, so the entry is a smart step:
 				// blackboxing carries it over the glue, and the pending step's
@@ -488,7 +488,7 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
-	// NOTE: What is currently set per client source — DAP's `setBreakpoints`
+	// What is currently set per client source — DAP's `setBreakpoints`
 	// REPLACES a source's set wholesale, so the previous CDP breakpoints are
 	// removed before the new ones are planted.
 	private breakpointLedger = new Map<string, Array<string>>()
@@ -557,7 +557,7 @@ export class EssenceDebugSession extends DebugSession {
 
 				identifiers.push(result.breakpointId)
 
-				// NOTE: V8 may itself slide the breakpoint to the nearest
+				// V8 may itself slide the breakpoint to the nearest
 				// breakable position; where THAT came from is the line the
 				// red dot belongs on.
 				let actual = result.locations[0]
@@ -630,7 +630,7 @@ export class EssenceDebugSession extends DebugSession {
 			return
 		}
 
-		// NOTE: Presented once per stop and kept — a frame's DAP id is its
+		// Presented once per stop and kept — a frame's DAP id is its
 		// index in here, which is what `scopes` resolves back to the raw CDP
 		// frame whose chain it reads.
 		this.presentedFrames = presentFrames(
@@ -653,7 +653,7 @@ export class EssenceDebugSession extends DebugSession {
 						id: start + offset,
 						name: frame.name,
 						line: frame.source?.line ?? 0,
-						// NOTE: The map speaks 0-based columns, the client
+						// The map speaks 0-based columns, the client
 						// 1-based ones.
 						column:
 							frame.source === null ? 0 : frame.source.column + 1,
@@ -742,13 +742,13 @@ export class EssenceDebugSession extends DebugSession {
 				},
 			)
 		} else if (container.kind === "members") {
-			// NOTE: The tag rides on a symbol — reported by `getProperties`
+			// The tag rides on a symbol — reported by `getProperties`
 			// as a `Symbol($type)` row — and the display already spelled it.
 			entries = (await this.ownProperties(container.objectId)).filter(
 				(entry) => !entry.name.startsWith("Symbol("),
 			)
 		} else {
-			// NOTE: A List's items are NOT its inner array's, and a
+			// A List's items are NOT its inner array's, and a
 			// Dictionary's entries are not its store's slots. Both hold a
 			// structure SHARED with the other boxes of their chain: a List's
 			// array can run past what this box views and a box that was
@@ -774,7 +774,7 @@ export class EssenceDebugSession extends DebugSession {
 					/^\d+$/.test(entry.name),
 				)
 
-				// NOTE: The array was built for this one expansion and the
+				// The array was built for this one expansion and the
 				// items are held by their own handles now, so the debuggee is
 				// told to let it go. Nothing else here leaves an object behind
 				// — every other call answers by value — and a session that
@@ -849,7 +849,7 @@ export class EssenceDebugSession extends DebugSession {
 		}
 	}
 
-	// NOTE: The box, handed to itself as the call's argument, answers a fresh
+	// The box, handed to itself as the call's argument, answers a fresh
 	// array of what its view holds — a List's items, a Dictionary's entries —
 	// kept over there, by reference, so that every one of them is still the
 	// live value the row below it expands.
@@ -880,7 +880,7 @@ export class EssenceDebugSession extends DebugSession {
 		}
 	}
 
-	// NOTE: Everything this pane pinned over there, let go where the handles
+	// Everything this pane pinned over there, let go where the handles
 	// naming it are dropped — a new pause and a resume, which are the two
 	// moments a `variablesReference` stops meaning anything. The array itself is
 	// released as soon as it has been read; what this is for is what was read
@@ -891,7 +891,7 @@ export class EssenceDebugSession extends DebugSession {
 				objectGroup: VARIABLE_OBJECT_GROUP,
 			})
 			.catch(() => {
-				// NOTE: A debuggee that has minted nothing yet, or a session
+				// A debuggee that has minted nothing yet, or a session
 				// closing under us. There is nothing to let go either way.
 			})
 	}
@@ -906,12 +906,12 @@ export class EssenceDebugSession extends DebugSession {
 		try {
 			await debuggee.cdp.send("Runtime.releaseObject", { objectId })
 		} catch {
-			// NOTE: A handle the debuggee has already dropped, or a session
+			// A handle the debuggee has already dropped, or a session
 			// closing under us. Either way there is nothing left to release.
 		}
 	}
 
-	// NOTE: One round trip per container: every value goes over as a live
+	// One round trip per container: every value goes over as a live
 	// argument, one JSON answer comes back. A scope object sometimes refuses
 	// to be a call target, so the first member that IS an object stands in;
 	// and a batch that fails entirely degrades to default descriptions, never
@@ -954,7 +954,7 @@ export class EssenceDebugSession extends DebugSession {
 					) as Array<DescribedValue>
 				}
 			} catch {
-				// NOTE: Fall through to the next target, then to defaults.
+				// Fall through to the next target, then to defaults.
 			}
 		}
 
@@ -971,7 +971,7 @@ export class EssenceDebugSession extends DebugSession {
 				: undefined
 		let description = data?.description ?? "An exception was thrown."
 
-		// NOTE: A thrown Error's `description` is its message with V8's OWN
+		// A thrown Error's `description` is its message with V8's OWN
 		// stack behind it — bundle positions, glue and all. The first line is
 		// the message (`noCaseMatched`'s is already Essence-phrased and comes
 		// through untouched); the stack shown in details is the SESSION's,
@@ -1040,7 +1040,7 @@ export class EssenceDebugSession extends DebugSession {
 
 		let result = await evaluate(args.expression)
 
-		// NOTE: The console speaks JavaScript over the compiled frame — that
+		// The console speaks JavaScript over the compiled frame — that
 		// is documented — but a single identifier deserves one mercy: a name
 		// the emitted Program binds differently (`ok?`, `new`) is retried
 		// under its emitted spelling before the failure is reported.
@@ -1128,7 +1128,7 @@ export class EssenceDebugSession extends DebugSession {
 		this.variableHandles.reset()
 		this.releaseVariableObjects()
 		await this.debuggee?.cdp.send("Debugger.resume").catch(() => {
-			// NOTE: A resume can race the program's own exit; the exit path
+			// A resume can race the program's own exit; the exit path
 			// already reports what happened.
 		})
 	}
@@ -1143,11 +1143,11 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendEvent(new TerminatedEvent())
 	}
 
-	// NOTE: What `launch` runs: the named `artifact` verbatim, or the program
+	// What `launch` runs: the named `artifact` verbatim, or the program
 	// compiled into a scratch directory that lives exactly as long as the
 	// session (`keepArtifacts` keeps it for reading, and says where it is).
 	//
-	// NOTE: `entryPath` is what node is pointed at and `bundlePath` what the
+	// `entryPath` is what node is pointed at and `bundlePath` what the
 	// map describes. They differ for one launch: a session debugging a test
 	// launches a runner beside the bundle, because a test bundle publishes its
 	// registry and runs nothing on its own. Absent, the bundle is the entry.
@@ -1180,14 +1180,14 @@ export class EssenceDebugSession extends DebugSession {
 			}
 		}
 
-		// NOTE: Canonicalised the moment it exists. On macOS the temporary
+		// Canonicalised the moment it exists. On macOS the temporary
 		// directory is a symlink — `/var/folders/…` for `/private/var/…` — and
 		// Node registers the script under its REAL path, so a breakpoint
 		// addressed to the symlinked spelling would never match its URL.
 		let scratchDirectory = realpathSync(
 			mkdtempSync(path.join(tmpdir(), "essence-dap-")),
 		)
-		// NOTE: `.mjs` for a test bundle, `.js` for everything else. A runner
+		// `.mjs` for a test bundle, `.js` for everything else. A runner
 		// importing the bundle beside it is read as the module it is only if
 		// the extension says so, and the extension is the one thing about the
 		// name that is free to change.
@@ -1229,7 +1229,7 @@ export class EssenceDebugSession extends DebugSession {
 			return { bundlePath: compiled.bundlePath, scratchDirectory }
 		}
 
-		// NOTE: Beside the bundle, in the directory that goes with the session.
+		// Beside the bundle, in the directory that goes with the session.
 		// The runner imports the bundle by name, so the two must be siblings —
 		// and being a second file is what keeps the bundle byte for byte the
 		// file its map describes.
@@ -1271,7 +1271,7 @@ export class EssenceDebugSession extends DebugSession {
 		if (debuggee.child.exitCode === null) {
 			debuggee.child.kill()
 
-			// NOTE: A program that ignores SIGTERM would outlive its session;
+			// A program that ignores SIGTERM would outlive its session;
 			// the escalation is unreferenced so a clean exit is not held open
 			// by a live timer.
 			let escalation = setTimeout(() => {

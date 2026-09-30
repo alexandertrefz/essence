@@ -16,12 +16,12 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: What a `tests { … }` block becomes, and what it does when it runs. The
+// What a `tests { … }` block becomes, and what it does when it runs. The
 // two halves are here together on purpose: a golden that says what was emitted
 // proves nothing on its own, and a run that passes says nothing about the shape
 // somebody has to read when it stops passing.
 
-// NOTE: The stages the CLI runs, with the tests asked for — `simplify` is
+// The stages the CLI runs, with the tests asked for — `simplify` is
 // handed the source because the span table carries the text of every
 // instrumented point.
 function generate(source: string): string {
@@ -37,7 +37,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program, { source })))
 }
 
-// NOTE: The same, with the tests left alone — what `essence build` emits.
+// The same, with the tests left alone — what `essence build` emits.
 function build(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 	let enriched = enrich(parsed.program)
@@ -45,7 +45,7 @@ function build(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: Everything from `$testing.register(` on, which is the whole of what a
+// Everything from `$testing.register(` on, which is the whole of what a
 // tests section emits. Snapshotting the file would snapshot the standard
 // library prelude with it, and every unrelated change to that would rewrite
 // this golden.
@@ -59,11 +59,11 @@ function registration(javaScript: string): string {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// NOTE: Writes the emitted Program to a throwaway module and imports it, the
+// Writes the emitted Program to a throwaway module and imports it, the
 // way `codeGeneration.spec.ts` does — the emitted imports are absolute paths
 // into this repo's runtime, so the module resolves from anywhere.
 //
-// NOTE: The run is driven through the bundle's OWN `$tests`, never through this
+// The run is driven through the bundle's OWN `$tests`, never through this
 // package's copy of the test runtime. Every Essence value carries a hidden Type
 // key that is a `Symbol` of the runtime instance that built it, so a diff or a
 // rendering asked from outside would read `undefined` off every value it was
@@ -88,7 +88,7 @@ type Run = {
 	summary: Awaited<ReturnType<typeof entryPoints.run>>
 }
 
-// NOTE: An emitted `.ts` program imports the runtime by its absolute path, which
+// An emitted `.ts` program imports the runtime by its absolute path, which
 // is the very module this spec file imports — so every program loaded ANYWHERE
 // in this process registers into ONE array, and a run has to be given the
 // Modules its own program put there. The count is read immediately before the
@@ -96,7 +96,7 @@ type Run = {
 // process registers into the same array and would otherwise be run by this one.
 // A bundle has no such trouble: esbuild inlines a runtime of its own.
 
-// NOTE: Essence source in, the events its tests emitted out — the whole
+// Essence source in, the events its tests emitted out — the whole
 // pipeline, then the run, which is the only way to be sure the emitted shape
 // asserted on above is a shape that WORKS.
 async function run(
@@ -110,7 +110,7 @@ async function run(
 	let before = registry().modules.length
 	let { loaded, dispose } = await load(generate(source))
 	let modules = loaded.$tests.registry().modules
-	// NOTE: `registryOf` only indexes what it is handed — no Essence value is
+	// `registryOf` only indexes what it is handed — no Essence value is
 	// read — so this spec's copy of it answers for a Module whichever runtime
 	// instance registered it. The RUN goes through the loaded program's own
 	// `$tests`, which is where the values belong.
@@ -264,7 +264,7 @@ describe("Test codegen — the emitted shape", () => {
 			}
 		}`)
 
-		// NOTE: One call rather than a guarded early return — the runtime
+		// One call rather than a guarded early return — the runtime
 		// unwinds a failed `require`, so the Constants the Matcher binds below
 		// it are never reached however deep in the lowering the assertion
 		// stands.
@@ -274,7 +274,7 @@ describe("Test codegen — the emitted shape", () => {
 		expect(javaScript).not.toContain("!$testing.required")
 	})
 
-	// NOTE: An assertion's Matcher is a Match Handler standing on its own, so
+	// An assertion's Matcher is a Match Handler standing on its own, so
 	// `compile-type-tests` has to reach it where it stands — the same question
 	// asked the general way here and the cheap way in the `match` this is
 	// spelled like is exactly the drift the shared node was for.
@@ -346,7 +346,7 @@ describe("Test codegen — the emitted shape", () => {
 		)
 	})
 
-	// NOTE: The indices are the half-open run of the manifest the suite holds,
+	// The indices are the half-open run of the manifest the suite holds,
 	// and a nested one is inside its parent's run — which is what lets a run
 	// step over a whole branch of the tree at its head.
 	it("carries the run of tests every suite holds, nested ones included", () => {
@@ -385,7 +385,7 @@ describe("Test codegen — the emitted shape", () => {
 		])
 	})
 
-	// NOTE: The one place the two forms part company. A benchmark is the same
+	// The one place the two forms part company. A benchmark is the same
 	// call with the key its baseline is stored under wedged in before the body,
 	// which is what says the runtime is to TIME the body rather than run it once.
 	it("emits a benchmark as the sibling of the entry call", () => {
@@ -584,7 +584,7 @@ describe("Test codegen — running what was emitted", () => {
 		})
 	})
 
-	// NOTE: A `define` is the one construct written IN expression position that
+	// A `define` is the one construct written IN expression position that
 	// asks questions of its own, and an assertion is exactly where one will be
 	// written — so a reader is shown what each Condition answered and what the
 	// arm that held answered with, the same as if they had been written beside
@@ -621,7 +621,7 @@ describe("Test codegen — running what was emitted", () => {
 			["grade(95)", '"A"'],
 			['grade(95)::is("A")', "true"],
 			["grade(85)", '"B"'],
-			// NOTE: The ladder's own value, which the assertion records the way
+			// The ladder's own value, which the assertion records the way
 			// it records any asserted Expression — spelled across the four
 			// lines it was written on.
 			[
@@ -632,7 +632,7 @@ describe("Test codegen — running what was emitted", () => {
 		])
 	})
 
-	// NOTE: `require MATCHER = EXPR` asserts a Matcher's test over a value held
+	// `require MATCHER = EXPR` asserts a Matcher's test over a value held
 	// under a name, so there is no expression tree at the assertion to take
 	// apart — the subject is the Statement in front of it, and that is what is
 	// instrumented. Without it a failed Matcher explained itself with nothing
@@ -829,7 +829,7 @@ describe("Test codegen — running what was emitted", () => {
 		).toEqual(["/one", "/two"])
 	})
 
-	// NOTE: "Fresh evaluation of the bindings a test can SEE" — a suite's setup
+	// "Fresh evaluation of the bindings a test can SEE" — a suite's setup
 	// is not one of them for a test written beside it. Printing is again the
 	// one thing that can tell, and it is also what made this visible: a test
 	// outside the suite was shown the suite's output as its own.
@@ -864,7 +864,7 @@ describe("Test codegen — running what was emitted", () => {
 	})
 
 	it("keeps a Constant nothing but a test reads", async () => {
-		// NOTE: `eliminate-dead-code` decides what a Program READS, and a test
+		// `eliminate-dead-code` decides what a Program READS, and a test
 		// body is where the only read of `shipped` is. A pass that did not walk
 		// the section would drop the Constant out from under the test that
 		// names it, and the run below would be a `ReferenceError` rather than a
@@ -942,7 +942,7 @@ describe("Test codegen — running what was emitted", () => {
 	})
 })
 
-// NOTE: A test body may `complete` whatever it likes, and the runner waits for
+// A test body may `complete` whatever it likes, and the runner waits for
 // it — which is the whole of what makes asynchrony testable in the language it
 // is written in. What these ask is that the wait is really waited for: that a
 // value only a completed future can hold reaches an `expect`, that output
@@ -1051,7 +1051,7 @@ describe("Test codegen — a test that completes", () => {
 		expect(summary.failed).toBe(0)
 	})
 
-	// NOTE: A test may walk away from a run — `unobserved-started` is an
+	// A test may walk away from a run — `unobserved-started` is an
 	// Information — and what it walks away from is stopped when the test ends.
 	// Without that, the work goes on into the NEXT test: what it prints is
 	// captured under that test's sink and reported against the wrong test, and
@@ -1197,7 +1197,7 @@ describe("Test codegen — a graph of Modules", () => {
 		}
 	})
 
-	// NOTE: Both Modules' tests blocks declare a `Tagged`, so the two provided
+	// Both Modules' tests blocks declare a `Tagged`, so the two provided
 	// consts are told apart as any two Protocols of one name are.
 	it("runs a provided Method each Module's tests block declares", async () => {
 		let directory = mkdtempSync(join(tmpdir(), "essence-graph-"))
@@ -1324,7 +1324,7 @@ describe("Test codegen — the Tests.es fixture", () => {
 		let source = readFileSync(fixturePath("Tests.es"), "utf8")
 		let { events, summary } = await run(source)
 
-		// NOTE: The fixture writes one `focused` test, so a plain run of it
+		// The fixture writes one `focused` test, so a plain run of it
 		// runs exactly that one and reports the rest as not focused — which is
 		// the whole of what `focused` promises.
 		expect(summary).toMatchObject({
@@ -1491,7 +1491,7 @@ tests {
 		expect(eventsOf(events, "probe")).toHaveLength(0)
 	})
 
-	// NOTE: The one a compile can not answer. Everything above is written
+	// The one a compile can not answer. Everything above is written
 	// inside the section, which is where a value comment records; one written
 	// outside it records nothing, and used to say nothing about that either.
 	it("refuses one written outside the tests section", () => {
@@ -1587,7 +1587,7 @@ tests {
 		])
 	})
 
-	// NOTE: A row that is not the one running costs nothing but its own value —
+	// A row that is not the one running costs nothing but its own value —
 	// the body is one closure, and the name is worked out for the row being
 	// enumerated or run.
 	it("evaluates one row's body per test", async () => {
@@ -1686,7 +1686,7 @@ tests {
 		)
 	})
 
-	// NOTE: One entry per ROW. The rows share a body, so one name would be one
+	// One entry per ROW. The rows share a body, so one name would be one
 	// entry they overwrite in turn — the first run would store the last row's
 	// value and every run after would report the others as differing, for ever.
 	it("keeps a table's stored snapshot per row", async () => {

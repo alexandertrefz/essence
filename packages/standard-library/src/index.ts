@@ -1,13 +1,13 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-// NOTE: Where the standard library's Essence sources live. Resolved off this
+// Where the standard library's Essence sources live. Resolved off this
 // module's own location rather than the working directory, so `esc` finds them
 // from any cwd. Computed HERE, in the package that owns the files, rather than
 // by a consumer counting `../`s towards them: whoever holds the sources is the
 // one who can answer where they are.
 //
-// NOTE: Two layouts, because this module is read in two situations that do not
+// Two layouts, because this module is read in two situations that do not
 // look alike. Run from the workspace — `esc`, `esls`, the test suite — it sits
 // in `packages/standard-library/src/` and the sources are its sibling. Run from a BUNDLE
 // it does not: the Language Server inside the VS Code extension is one file,
@@ -33,11 +33,11 @@ export type StdlibFile = {
 	sourceText: string
 }
 
-// NOTE: Sorted, so that the order files are hoisted and enriched in is the
+// Sorted, so that the order files are hoisted and enriched in is the
 // same on every machine — hoisting is order-independent by design, but a
 // Diagnostic's file attribution should not depend on directory iteration order.
 //
-// NOTE: Reading is separated from parsing because parsing needs the Parser,
+// Reading is separated from parsing because parsing needs the Parser,
 // and the Parser is the Compiler. This package holds the `.es` files and knows
 // where they are; what they mean is the Compiler's question. No count here:
 // nothing checks one, and the number went stale across three waves.
@@ -48,7 +48,7 @@ export function readStdlibFiles(): Array<StdlibFile> {
 				.sort()
 		: []
 
-	// NOTE: Loud, because the quiet version of this cost a shipped release.
+	// Loud, because the quiet version of this cost a shipped release.
 	// Answering with no sources is not a degraded standard library, it is no
 	// standard library — every Type and every Method a Program can reach is
 	// declared in these files. What the user then sees is not "the standard

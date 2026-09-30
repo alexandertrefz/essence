@@ -7,14 +7,14 @@ import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { loadStdlib } from "../enricher/stdlib"
 import { renderNativesModule } from "../tools/generateNatives"
 
-// NOTE: The checked-in native contract, `@essence-lang/runtime`'s `natives.generated.ts`,
+// The checked-in native contract, `@essence-lang/runtime`'s `natives.generated.ts`,
 // is produced by `renderNativesModule` off the loaded standard library. This
 // test re-renders and compares, and NEVER writes — a drifted file is a failure
 // the developer fixes by running `bun run generate:natives`, not something a
 // test run silently repairs.
 const GENERATED_PATH = path.join(RUNTIME_DIRECTORY, "natives.generated.ts")
 
-// NOTE: A first-differing-line report — enough to see WHAT drifted without a
+// A first-differing-line report — enough to see WHAT drifted without a
 // full diff library, and it always ends on the one action that fixes it.
 function describeDrift(expected: string, actual: string): string {
 	let expectedLines = expected.split("\n")

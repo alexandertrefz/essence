@@ -3,12 +3,12 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteExpressions } from "../walk"
 
-// NOTE: `{ base with x = 1 }` was `Object.assign({}, base, Record.createRecord({
+// `{ base with x = 1 }` was `Object.assign({}, base, Record.createRecord({
 // x: 1 }))` — an empty object, a Record built to be read once, and a copy of
 // both into a third. JavaScript spells the whole of that as one object literal:
 // `{ ...base, x: 1 }`.
 //
-// NOTE: The two are the same operation on the values this language has.
+// The two are the same operation on the values this language has.
 // `Object.assign` copies own enumerable properties, Symbol keys included, in
 // their own order, with a later source overwriting an earlier one — and object
 // spread copies exactly the same set in exactly the same order. Neither form
@@ -18,7 +18,7 @@ import { rewriteExpressions } from "../walk"
 // chain, and the target is a fresh object literal in both forms. So the
 // combined Record holds the same members, keyed in the same order.
 //
-// NOTE: What neither form may do is copy the right-hand side WHOLE when it is
+// What neither form may do is copy the right-hand side WHOLE when it is
 // not a literal. Record assignability is width subtyping, so a value the
 // checker admitted as `{ port: Integer }` may carry members of its own that the
 // answer's Type does not declare — and copying those in put a value of the
@@ -26,7 +26,7 @@ import { rewriteExpressions } from "../walk"
 // The names its Type does declare ride along on the Node instead, and the
 // Rewriter reads exactly those off it.
 //
-// NOTE: What the two forms do NOT share is where the hidden Type key comes
+// What the two forms do NOT share is where the hidden Type key comes
 // from. `Object.assign({}, lhs, rhs)` copied it from whichever source carried
 // it last — the right-hand side, a Record built for the occasion — so the
 // answer was branded no matter what the left-hand side was. A spread of `lhs`
@@ -48,14 +48,14 @@ function collapse(
 		return node
 	}
 
-	// NOTE: The brand the answer carries is the left-hand side's, so a
+	// The brand the answer carries is the left-hand side's, so a
 	// left-hand side that is not statically a Record keeps the `Object.assign`
 	// emission, which brands from the right instead and is right either way.
 	if (node.lhs.type.type !== "Record") {
 		return node
 	}
 
-	// NOTE: A right-hand side written as a Record literal is inlined, member by
+	// A right-hand side written as a Record literal is inlined, member by
 	// member. Both spellings of one are recognised — the Simplifier's own
 	// `RecordValue` and the `direct-record` `collapse-construction` leaves —
 	// because a pass may not assume another one ran, and this pass is registered
@@ -76,7 +76,7 @@ function collapse(
 		}
 	}
 
-	// NOTE: Every other right-hand side is projected to the members its Type
+	// Every other right-hand side is projected to the members its Type
 	// names, so the Type has to be a Record to name them. The Enricher refuses
 	// a Combination whose right-hand side is anything else
 	// ('uncombinable-types'), so this is the same kind of guard as the one

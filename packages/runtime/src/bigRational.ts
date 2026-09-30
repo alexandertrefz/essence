@@ -2,7 +2,7 @@ import type { IntegerType } from "./Integer"
 import type { RationalType } from "./Rational"
 import { typeKeySymbol } from "./type"
 
-// NOTE: The exact bigint-rational core the numeric tower is built on: a plain
+// The exact bigint-rational core the numeric tower is built on: a plain
 // `{ numerator, denominator }` pair, treated as immutable everywhere. The
 // module is side-effect-free and its one value import is the Type key from
 // `type.ts`, which every Program carries anyway, so a Program only carries the
@@ -11,11 +11,11 @@ import { typeKeySymbol } from "./type"
 // zero has exactly one lowest-terms form, `0/1`.
 export type BigRational = { numerator: bigint; denominator: bigint }
 
-// NOTE: Euclid's, through a temporary rather than a destructured swap: the
+// Euclid's, through a temporary rather than a destructured swap: the
 // swap allocated an Array per turn, and this loop is what every reduction runs
 // — several turns for every arithmetic operation on a Rational.
 //
-// NOTE: `b > 0n` rather than `b !== 0n`, which is the same question of the
+// `b > 0n` rather than `b !== 0n`, which is the same question of the
 // bigints this is written for — `b` is an absolute value and a remainder of
 // one, so it is never negative — and the same single comparison to make. What
 // the two are not the same about is a pair that is no pair of bigints at all.
@@ -26,7 +26,7 @@ export type BigRational = { numerator: bigint; denominator: bigint }
 // The next hole of that kind is a wrong answer somebody can read rather than a
 // run that stops responding.
 //
-// NOTE: Exported because `Integer::greatestCommonDivisor` and
+// Exported because `Integer::greatestCommonDivisor` and
 // `leastCommonMultiple` are this Function under those names. The reduction
 // every Rational already runs is the algorithm both of them want, and a second
 // copy in `Integer.ts` would be one more thing to keep in step.
@@ -112,7 +112,7 @@ export function rationalSign(rational: BigRational): -1n | 0n | 1n {
 }
 
 export function bigRationalOf(value: IntegerType | RationalType): BigRational {
-	// NOTE: THE boundary between the hybrid Integer and the numeric tower.
+	// THE boundary between the hybrid Integer and the numeric tower.
 	// Everything past here — Rational, Algebraic, Transcendental — is written
 	// on pairs of bigints, and an Integer that may be holding a number is
 	// normalised into one here, so the arithmetic past it needs to know

@@ -8,7 +8,7 @@ import { operatorNote } from "../helpers/foreign"
 import { parseWithDiagnostics } from "../parser/index"
 import { compiles } from "./followedHelps"
 
-// NOTE: What a reader arriving from another language writes, and what the
+// What a reader arriving from another language writes, and what the
 // Compiler says about it. One spec for the whole family, because the family is
 // held together by the answer rather than by the stage: `a && b` is refused by
 // the Parser and `!a` by the Enricher, and a reader who wrote either is owed the
@@ -54,7 +54,7 @@ function onlyDiagnostic(source: string): common.Diagnostic {
 	return diagnostics[0]
 }
 
-// NOTE: The characters a Position covers — the only way to say that a fix
+// The characters a Position covers — the only way to say that a fix
 // rewrites the `.` and not the member beside it without counting columns by
 // hand. Single line spans only; every payload asked this covers one.
 function spanOf(source: string, position: common.Position): string {
@@ -66,14 +66,14 @@ function spanOf(source: string, position: common.Position): string {
 		)
 }
 
-// NOTE: The text the one Diagnostic a Program carries underlines. A Position is
+// The text the one Diagnostic a Program carries underlines. A Position is
 // nullable for the few Diagnostics that stand for a whole file rather than for
 // something written in one; every refusal asked here stands at a span.
 function refusedSpan(source: string): string {
 	return spanOf(source, onlyDiagnostic(source).position as common.Position)
 }
 
-// NOTE: Written as one line per Statement with a real tab, so a span read back
+// Written as one line per Statement with a real tab, so a span read back
 // out of the source is read out of the text a reader would have written.
 function program(...lines: Array<string>): string {
 	return ["implementation {", ...lines.map((line) => `\t${line}`), "}"].join(
@@ -114,7 +114,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: `add` takes an Argument, so the parentheses a fix would write
+		// `add` takes an Argument, so the parentheses a fix would write
 		// answer a Method that needs one — the Help says so with its ellipsis and
 		// the payload leaves the call out.
 		it("leaves the parentheses to the reader where the Method takes an Argument", () => {
@@ -171,7 +171,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["method-called-with-dot"])
 		})
 
-		// NOTE: A Record HAS members, so the question is only asked for a name
+		// A Record HAS members, so the question is only asked for a name
 		// that is not one of them — and answered by the Namespace written over it,
 		// which is where `unknown-member` used to stop.
 		it("answers for a Record whose Namespace declares the Method", () => {
@@ -204,7 +204,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: The Method is not there, so nothing is offered as a fix — what is
+		// The Method is not there, so nothing is offered as a fix — what is
 		// added is the sentence that gets the reader to `unknown-method`, which
 		// lists what the value does answer.
 		it("keeps type-without-members where no Method of the name exists", () => {
@@ -220,7 +220,7 @@ describe("Foreign syntax", () => {
 			expect(onlyDiagnostic(source).data).toBeUndefined()
 		})
 
-		// NOTE: One mistake, one report. `w.length` inside a literal handed to
+		// One mistake, one report. `w.length` inside a literal handed to
 		// `map` was answered three times — the `.` it is about, and then
 		// `uninferable-return-type` and `uninferable-type-parameter`, which
 		// restate it in vaguer words about a Type that could not be read off a
@@ -242,7 +242,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: Said for a member READ too, where a value has no members at all.
+		// Said for a member READ too, where a value has no members at all.
 		// `n.toFixed` used to be answered with the rule and nothing to do about
 		// it: an Integer is not a Record, so whatever stands behind the `.` is
 		// not a member under any reading, and a Method is the only thing it can
@@ -274,7 +274,7 @@ describe("Foreign syntax", () => {
 	})
 
 	describe("a binding declared in another language", () => {
-		// NOTE: THE point of reading the Statement on rather than dropping it: a
+		// THE point of reading the Statement on rather than dropping it: a
 		// dropped declaration leaves the name undeclared, and one mistake becomes
 		// one Diagnostic per line that reads it.
 		it("reports 'const' once and declares the Constant anyway", () => {
@@ -302,7 +302,7 @@ describe("Foreign syntax", () => {
 				"foreign-syntax",
 				"foreign-syntax",
 			])
-			// NOTE: Both Helps the table carries, not the first of them. A
+			// Both Helps the table carries, not the first of them. A
 			// binding nothing reassigns is a `constant`, and a reader who wrote
 			// `let` out of habit has no way to know that from the fix alone.
 			expect(helpsOf(source)).toEqual([
@@ -313,7 +313,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: Rust writes two words where this language writes one, so the two
+		// Rust writes two words where this language writes one, so the two
 		// are one habit here: reported over the span they cover, fixed by one
 		// edit, and read on as the Variable they declare. Answered word by word
 		// they were four Diagnostics, and the fix for the first of them left a
@@ -386,7 +386,7 @@ describe("Foreign syntax", () => {
 			expect(spanOf(source, data.position)).toBe("const")
 		})
 
-		// NOTE: The words are names, and a Program that declares one keeps it.
+		// The words are names, and a Program that declares one keeps it.
 		it("leaves the words alone where they are declared", () => {
 			expect(
 				codesOf(
@@ -476,7 +476,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: The shape is the whole of the test — two Identifiers and a brace —
+		// The shape is the whole of the test — two Identifiers and a brace —
 		// so a Program that declares one of the words keeps it.
 		it("leaves a value named 'class' alone", () => {
 			expect(
@@ -484,7 +484,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The four shapes a block is opened in — see
+		// The four shapes a block is opened in — see
 		// `foreignBlockBraceOffset`. Each of them used to end in `Expected
 		// 'with' but found '}'`, which is the Record Literal reading of the
 		// block, reported a screen below the word that opened it.
@@ -537,7 +537,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["'try' opens no block in Essence"])
 		})
 
-		// NOTE: A block whose `}` never arrives is not read past — the Tokens
+		// A block whose `}` never arrives is not read past — the Tokens
 		// stay where they are, so nothing a later reading needs is swallowed by
 		// a count that could never have balanced. It is still answered once, at
 		// the word, and nothing is said about what stands inside it.
@@ -553,7 +553,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["'try' opens no block in Essence"])
 		})
 
-		// NOTE: The words the other four languages people arrive from write.
+		// The words the other four languages people arrive from write.
 		// Each is an ordinary name here, so each is answered exactly where an
 		// `unknown-name` would have been.
 		it("answers the words Python, Rust, Go, Swift and Ruby write", () => {
@@ -604,7 +604,7 @@ describe("Foreign syntax", () => {
 			}
 		})
 
-		// NOTE: `println!` is keyed with its `!`, which is what a reader wrote
+		// `println!` is keyed with its `!`, which is what a reader wrote
 		// and what the Lexer hands over — a `!` ends no name. Every rule under
 		// the table would have taken the `!` off the end and answered about
 		// that: the postfix habits first, and the operators behind them.
@@ -694,7 +694,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Did you mean 'total'?"])
 		})
 
-		// NOTE: The three shapes where the guess is withheld — see
+		// The three shapes where the guess is withheld — see
 		// `reportBareCaseName`. Each of them used to write an edit that the
 		// reader would have had to undo.
 		it("says nothing where an APPLIED name matches a Case that takes nothing", () => {
@@ -740,7 +740,7 @@ describe("Foreign syntax", () => {
 			})
 		})
 
-		// NOTE: `{ Red }` is a Record Literal's shorthand, where the name is the
+		// `{ Red }` is a Record Literal's shorthand, where the name is the
 		// member AND its value — so the sigil written over the name alone leaves
 		// `{ #Red }`, which is not a Record Literal at all but `Expected 'with'`.
 		// The member is spelled out instead.
@@ -825,7 +825,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: The whole family, in the four places one is written: between two
+		// The whole family, in the four places one is written: between two
 		// Literals and between two names, as a whole Statement and inside a
 		// call. The call with NAMES in it is where six of the fourteen used to
 		// fall through to `Expected ')' but found 'tax'` — `total` read as an
@@ -885,7 +885,7 @@ describe("Foreign syntax", () => {
 			}
 		})
 
-		// NOTE: The other half of the rule above: a name in front of an operator
+		// The other half of the rule above: a name in front of an operator
 		// is no label, and a name in front of a VALUE still is. `-` is the one
 		// lexeme of the family that opens a value of this language, so a label
 		// stands in front of it and a negative Number follows.
@@ -919,7 +919,7 @@ describe("Foreign syntax", () => {
 			).toEqual([`Write '"hi"'.`])
 		})
 
-		// NOTE: There are no grouping parentheses, so a `(` in Expression
+		// There are no grouping parentheses, so a `(` in Expression
 		// position opens a Function literal's Parameter list — which read `a` as
 		// a label and `+` as the name it labelled, and answered with
 		// `redundant-parameter-label` about a Parameter nobody wrote.
@@ -950,7 +950,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["operator-not-supported"])
 		})
 
-		// NOTE: `!ready` is one Identifier — a `!` ends no name — so it is the
+		// `!ready` is one Identifier — a `!` ends no name — so it is the
 		// Enricher that meets it, and the operand is in hand there. The table's
 		// own Help is the same sentence with a placeholder standing where the
 		// name goes, so it is REPLACED rather than printed under it.
@@ -964,7 +964,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'ready::negate()'."])
 		})
 
-		// NOTE: The name is offered as the thing to negate only where it IS the
+		// The name is offered as the thing to negate only where it IS the
 		// thing being negated. `- tree::hasItems()` negates the call, and
 		// `tree::negate()` is an edit about something else.
 		it("says the rule rather than the name where the '-' leads a call", () => {
@@ -986,7 +986,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'count = count::add(1)'."])
 		})
 
-		// NOTE: The binding and the amount are the reader's own. `count` and `1`
+		// The binding and the amount are the reader's own. `count` and `1`
 		// used to be printed whatever was written, so `tally += 5` was answered
 		// with two names nothing declares and an amount nobody asked for.
 		it("spells a compound assignment with the operands that were written", () => {
@@ -1001,7 +1001,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: `count++` is one Identifier, so it is the Enricher that meets it
+		// `count++` is one Identifier, so it is the Enricher that meets it
 		// and the binding is in hand there too. The amount is in the operator
 		// rather than in the text, which is why nothing is read behind it.
 		it("spells the binding a postfix increment counts", () => {
@@ -1014,7 +1014,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: And the same habit written on a MEMBER. `box.hits++` is a
+		// And the same habit written on a MEMBER. `box.hits++` is a
 		// Lookup whose member is `hits++` — a `.` ends a name and a `+` does
 		// not — so it used to be answered "'{ hits: Integer }' has no member
 		// 'hits++'. Did you mean 'hits'?", which is a Help that drops what the
@@ -1038,7 +1038,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A member name that merely ENDS in punctuation is not the
+		// A member name that merely ENDS in punctuation is not the
 		// habit — what says it is one is that the name without it IS a member.
 		it("leaves a member nothing declares to the member report", () => {
 			let source = program(
@@ -1049,7 +1049,7 @@ describe("Foreign syntax", () => {
 			expect(codesOf(source)).toEqual(["unknown-member"])
 		})
 
-		// NOTE: The right operand is spelled only where it is one Token and the
+		// The right operand is spelled only where it is one Token and the
 		// whole of what is left of the Statement. Anything longer is an
 		// Expression of the reader's own, and half of one printed back is worse
 		// than the `…` that says theirs goes here.
@@ -1064,7 +1064,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'tally = tally::add(…)'."])
 		})
 
-		// NOTE: What is written here is a REASSIGNMENT, so the Help has to
+		// What is written here is a REASSIGNMENT, so the Help has to
 		// answer an Integer: `divide(by:)` answers a fraction, and the counter
 		// it would be written back into is not one.
 		it("offers a whole answer for a compound division", () => {
@@ -1085,7 +1085,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: There is no Method to offer for these four, and a Help that
+		// There is no Method to offer for these four, and a Help that
 		// says so is a rule wearing an action's clothes. The rule is a Note.
 		it("answers a bitwise operator with a Note and no Help", () => {
 			let source = program("constant masked = 6 & 3")
@@ -1098,7 +1098,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: Built from the two operands the line already holds, like every
+		// Built from the two operands the line already holds, like every
 		// other Help in this family. The table's own sentence spells `x` and
 		// `d` — a reader looking at `held ?? fallback` had to work out which of
 		// their two names each stood for, and the sentence is only reached now
@@ -1126,7 +1126,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// NOTE: A Statement ends at the end of its Expression, so a `-` opening
+		// A Statement ends at the end of its Expression, so a `-` opening
 		// the next line is a negative Number and not a subtraction anybody wrote.
 		it("leaves a Statement that opens on the next line alone", () => {
 			expect(
@@ -1184,7 +1184,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: A `;` ends no name, so `total;` is ONE Identifier and it is the
+		// A `;` ends no name, so `total;` is ONE Identifier and it is the
 		// Enricher that meets it, while `1;` is two Tokens and the Parser does.
 		// Both read one account — see `semicolonAccount` — because a reader who
 		// wrote both was being told two different things about them.
@@ -1207,7 +1207,7 @@ describe("Foreign syntax", () => {
 			expect(labelsOf(afterName)).toEqual(labelsOf(afterNumber))
 		})
 
-		// NOTE: The Statement in front of the habit is whole, so it is kept —
+		// The Statement in front of the habit is whole, so it is kept —
 		// see `swallowForeignTail`. A file written with a ';' on every line is
 		// one report per line and not one per line plus one per reader of what
 		// each line declared.
@@ -1256,7 +1256,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["A Comment is written with '§'"])
 		})
 
-		// NOTE: A '*/' that never arrives is refused where the '/*' stands
+		// A '*/' that never arrives is refused where the '/*' stands
 		// rather than read past: what a reading past it would swallow is the
 		// rest of the file.
 		it("refuses a block Comment that never closes", () => {
@@ -1292,7 +1292,7 @@ describe("Foreign syntax", () => {
 			expect(messagesOf(source)).toEqual([
 				"A call writes no Type Arguments",
 			])
-			// NOTE: ONE Help, and it is the edit: take the brackets out. Where
+			// ONE Help, and it is the edit: take the brackets out. Where
 			// the Arguments decide nothing a reader goes to the Declaration
 			// instead, and that is said as a Note — the Parser has not seen the
 			// signature and can not know which of the two a reader is in.
@@ -1321,7 +1321,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: A template literal is NOT one Token — a `{` ends a name, so the
+		// A template literal is NOT one Token — a `{` ends a name, so the
 		// holes break the run into a name, a `$`, a Record Literal and a quote
 		// standing on its own, and each of the four was answered as a name
 		// nothing declares. One String, one report.
@@ -1344,7 +1344,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// NOTE: A run that closed on its own quote is ONE edit, so it keeps its
+		// A run that closed on its own quote is ONE edit, so it keeps its
 		// fix; a run broken into pieces is a String the reader has to write out,
 		// and offering to rewrite the first piece of it would write a String
 		// holding a third of what they wrote.
@@ -1366,7 +1366,7 @@ describe("Foreign syntax", () => {
 			).toBeUndefined()
 		})
 
-		// NOTE: `#Red` and `# Red` are both Essence, so what makes a `#` a
+		// `#Red` and `# Red` are both Essence, so what makes a `#` a
 		// Comment is the WORDS behind the Case: a Case carries its payload in
 		// brackets, and no Statement of this language stands behind another on
 		// one line.
@@ -1425,7 +1425,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["Essence has no '?' after a value"])
 		})
 
-		// NOTE: The member is what the reader was reaching FOR, and the Lookup
+		// The member is what the reader was reaching FOR, and the Lookup
 		// around the name is the only thing that has it — see `enrichLookupBase`.
 		it("names the member a postfix habit was reaching for", () => {
 			expect(
@@ -1440,7 +1440,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// NOTE: And the `map` clause is WITHHELD where there is none. `.member`
+		// And the `map` clause is WITHHELD where there is none. `.member`
 		// used to stand in for it, which is a path into a member of that name:
 		// on an `Optional<Integer>` following it reached `path-step-not-a-record`
 		// — a second report, about a word the Help itself had made up.
@@ -1458,7 +1458,7 @@ describe("Foreign syntax", () => {
 		})
 	})
 
-	// NOTE: `primes[0]` — the one habit in the family that is a SHAPE rather
+	// `primes[0]` — the one habit in the family that is a SHAPE rather
 	// than a lexeme: every character of it is Essence, and what is foreign is a
 	// value standing flush in front of a List. Written apart it is two
 	// Statements and compiles, which is why the mistake used to surface a line
@@ -1481,7 +1481,7 @@ describe("Foreign syntax", () => {
 			expect(refusedSpan(source)).toBe("[0]")
 		})
 
-		// NOTE: The whole of the recovery, and the reason the refusal is
+		// The whole of the recovery, and the reason the refusal is
 		// reported rather than thrown. Dropping the Statement leaves `first`
 		// undeclared and answers one mistake at every line that reads the name;
 		// keeping `primes` as its value makes `first` a List and answers
@@ -1513,7 +1513,7 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// NOTE: A String key says the collection is a Dictionary and says it
+		// A String key says the collection is a Dictionary and says it
 		// loudly — a List and a String are read by POSITION, and a position is
 		// an Integer and nothing else — so the Dictionary's Method leads and
 		// the two position Methods are never handed the String.
@@ -1547,7 +1547,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// NOTE: The receiver is spelled back out where the Parser holds its
+		// The receiver is spelled back out where the Parser holds its
 		// text — a name, or a path of them. `collection` stands in where it does
 		// not, and it is not `value` on purpose: one of the three Methods offered
 		// is itself called `value`, and `'value::value(at 0)'` reads as a rule
@@ -1578,7 +1578,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// NOTE: Anything but a single written value falls back to the schema.
+		// Anything but a single written value falls back to the schema.
 		// What stood between the brackets is never parsed — `items.length` is a
 		// member read and the `-` an operator, and each would be refused in its
 		// own right for a reader who has not written the call yet.
@@ -1595,7 +1595,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// NOTE: One habit written twice over. The second `[` stands flush
+		// One habit written twice over. The second `[` stands flush
 		// against the first's `]`, which is the rule that made the first an
 		// index, so the whole run is read past and answered once.
 		it("answers a run of brackets once", () => {
@@ -1640,7 +1640,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["foreign-syntax"])
 		})
 
-		// NOTE: In Argument position the name in front of the brackets used to
+		// In Argument position the name in front of the brackets used to
 		// read as a LABEL and the brackets as the List it labelled, so the
 		// report was `argument-label-mismatch` about a label nobody wrote. The
 		// `[` joins `#` and `.` in `argumentIsLabelled`: written flush it
@@ -1744,7 +1744,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["foreign-syntax"])
 		})
 
-		// NOTE: The brackets with an `=` behind them, which is a WRITE and was
+		// The brackets with an `=` behind them, which is a WRITE and was
 		// answered as two reports — the refusal, and then `Expected an
 		// Expression but found '='` from the Statement loop reading what was
 		// left — with three Helps between them, every one of them about a
@@ -1793,7 +1793,7 @@ describe("Foreign syntax", () => {
 				])
 			})
 
-			// NOTE: The value is read off the Token for the reason the key is,
+			// The value is read off the Token for the reason the key is,
 			// and only where it is the whole of what is left of the Statement.
 			// Anything longer is the reader's own Expression, and a Help that
 			// quoted half of it would print something nobody wrote.
@@ -1809,7 +1809,7 @@ describe("Foreign syntax", () => {
 				).toBe("Write 'primes = primes::replace(…, at 0)' for a List.")
 			})
 
-			// NOTE: `==` is two Tokens and another habit entirely, so it is
+			// `==` is two Tokens and another habit entirely, so it is
 			// left to the operator table — the brackets are still read, and the
 			// comparison is answered on its own.
 			it("leaves a comparison to the operator it is written with", () => {
@@ -1843,7 +1843,7 @@ describe("Foreign syntax", () => {
 			})
 		})
 
-		// NOTE: A `[` whose `]` never arrives is left where it stands. Reading
+		// A `[` whose `]` never arrives is left where it stands. Reading
 		// past it would swallow the rest of the file to answer a habit, and the
 		// List Literal that was never closed is what wants reporting there.
 		it("leaves a bracket that never closes to the List Literal", () => {
@@ -1857,7 +1857,7 @@ describe("Foreign syntax", () => {
 			).toEqual(["syntax-error"])
 		})
 
-		// NOTE: The one shape this rule takes away. `contentsOf[3, 4]` compiled
+		// The one shape this rule takes away. `contentsOf[3, 4]` compiled
 		// before it and does not after, and that is the rule `#` and `.` have
 		// always been read by: a label stands a SPACE in front of its value,
 		// and written flush it carries the name on instead. `esfmt` writes the
@@ -1880,7 +1880,7 @@ describe("Foreign syntax", () => {
 		})
 	})
 
-	// NOTE: The other half of every rule above — the Essence that is written in
+	// The other half of every rule above — the Essence that is written in
 	// the same characters, which none of them may touch. Each of these compiled
 	// before the family was written and has to compile after it.
 	describe("the Essence written in the same characters", () => {
@@ -1973,7 +1973,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Function literal is the shape the `=>` refusal stands next to,
+		// A Function literal is the shape the `=>` refusal stands next to,
 		// and it is written in the same characters as one — a Parameter list, an
 		// arrow and a block.
 		it("keeps a Function literal in every position one is written", () => {
@@ -1989,7 +1989,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A `-` signs a Number Literal, and every one of these is a place
+		// A `-` signs a Number Literal, and every one of these is a place
 		// where a Number stands and nothing carries an Expression on.
 		it("keeps a negative Number wherever one is written", () => {
 			expect(
@@ -2012,7 +2012,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Record Type is written inline wherever a Type is, and each of
+		// A Record Type is written inline wherever a Type is, and each of
 		// these is a `{ … : … }` that no Record Literal rule may claim.
 		it("keeps an inline Record Type in every position one is written", () => {
 			expect(
@@ -2034,7 +2034,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: `~>` is written flush against neither side in the standard
+		// `~>` is written flush against neither side in the standard
 		// library and against both here, so the lexeme is read as one either way.
 		it("keeps a typed Record Literal written without its spaces", () => {
 			expect(
@@ -2048,7 +2048,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Every place a `[` is written behind a value in this repository,
+		// Every place a `[` is written behind a value in this repository,
 		// swept over the standard library, the fixtures, the examples and every
 		// Essence sample in the documentation: a labelled Argument and the rows
 		// of a table test, each of them written with the space. Nothing there
@@ -2088,7 +2088,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The three bracket forms that are not a List at all, and a List
+		// The three bracket forms that are not a List at all, and a List
 		// opening a Statement of its own on the line under a value — which is
 		// the reading the index rule leaves untouched, since nothing carries an
 		// Expression across a line break.
@@ -2109,7 +2109,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// NOTE: Every word in the foreign table is an ordinary name, and a
+		// Every word in the foreign table is an ordinary name, and a
 		// Program that declares one keeps it — the table is consulted for a name
 		// that resolved to NOTHING and never for one that resolved.
 		it("keeps the foreign words a Program declares as names", () => {

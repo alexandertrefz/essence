@@ -8,7 +8,7 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { EXIT_SUCCESS } from "../actions"
 
-// NOTE: `Terminal.readLine`, `readAll` and `ask` read descriptor 0, and nothing
+// `Terminal.readLine`, `readAll` and `ask` read descriptor 0, and nothing
 // short of a real process has one. So this file compiles a Program once and
 // then RUNS it, as a child with its input piped in — the only place in the
 // suite where what a Program reads is what a person at a keyboard would have
@@ -17,7 +17,7 @@ import { EXIT_SUCCESS } from "../actions"
 // is pinned here is that a compiled Program on a real host reads the same
 // lines, and that the CLI hands its own input over.
 
-// NOTE: A cache of this run's own, passed to the child rather than assigned
+// A cache of this run's own, passed to the child rather than assigned
 // into this process — `cli.spec.ts` runs in the same process and owns the
 // assignment there, and two specs assigning one variable is a race whichever
 // order they load in.
@@ -31,13 +31,13 @@ afterAll(() => {
 
 const binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
 
-// NOTE: The environment is handed over rather than inherited: Bun does not
+// The environment is handed over rather than inherited: Bun does not
 // carry a `process.env` a spec assigned into a child.
 function childEnvironment(): NodeJS.ProcessEnv {
 	return { ...process.env, ESSENCE_CLI_CACHE: bundleCache }
 }
 
-// NOTE: Compiled ONCE, in `beforeAll`, and run per test. A compile is most of a
+// Compiled ONCE, in `beforeAll`, and run per test. A compile is most of a
 // second and the reading is none of it, so a build per case would spend a
 // dozen seconds saying the same thing about the same bundle.
 async function build(name: string, source: string): Promise<string> {
@@ -71,7 +71,7 @@ async function run(bundle: string, input: string): Promise<Run> {
 	}
 }
 
-// NOTE: Every line, one per line of output, and the count after them — so a
+// Every line, one per line of output, and the count after them — so a
 // case says both what the lines were and where the input ended.
 const LINES = [
 	"implementation {",
@@ -107,7 +107,7 @@ describe("a Program reading its input", () => {
 		expect(finished.code).toBe(EXIT_SUCCESS)
 	})
 
-	// NOTE: A text an editor wrote without a final newline still ends in a
+	// A text an editor wrote without a final newline still ends in a
 	// line, and the count is what says the line was not dropped.
 	it("reads a last line that ends without a break", async () => {
 		expect((await run(lines, "alpha\nbeta")).out).toBe(
@@ -125,7 +125,7 @@ describe("a Program reading its input", () => {
 		expect((await run(lines, "")).out).toBe("lines: 0\n")
 	})
 
-	// NOTE: The break a Windows host writes is one break, not a line ending in
+	// The break a Windows host writes is one break, not a line ending in
 	// a stray carriage return — which is what a Program comparing a line
 	// against a written String would otherwise find.
 	it("reads a Windows break as one break", async () => {
@@ -134,7 +134,7 @@ describe("a Program reading its input", () => {
 		)
 	})
 
-	// NOTE: Larger than the buffer the runtime reads with, so that the answer
+	// Larger than the buffer the runtime reads with, so that the answer
 	// depends on the pieces being joined rather than on one crossing having
 	// held the whole input.
 	it("reads an input longer than one read of the host", async () => {
@@ -163,7 +163,7 @@ describe("a Program reading everything at once", () => {
 		)
 	})
 
-	// NOTE: Unchanged, break at the end included — a Program that reads its
+	// Unchanged, break at the end included — a Program that reads its
 	// input and writes it back writes what it was given.
 	it("answers the text exactly", async () => {
 		expect((await run(all, "alpha\nbeta\n")).out).toBe(
@@ -193,7 +193,7 @@ describe("a Program asking a question", () => {
 		)
 	})
 
-	// NOTE: The prompt carries no newline of its own, so the answer a person
+	// The prompt carries no newline of its own, so the answer a person
 	// types lands on the line the question is on — which is why `ask` is a
 	// `write` rather than a `print`.
 	it("writes the prompt with no newline, then reads the answer", async () => {
@@ -205,7 +205,7 @@ describe("a Program asking a question", () => {
 	})
 })
 
-// NOTE: A read is an effect, and the Optimiser's purity table is an allowlist
+// A read is an effect, and the Optimiser's purity table is an allowlist
 // that `Terminal` is deliberately absent from. Two reads in one Expression look
 // alike to any pass comparing Expressions, and they are not alike: the first
 // answers one line and the second the next. `terminal.spec.ts` pins that both
@@ -234,7 +234,7 @@ describe("two reads in one Expression", () => {
 	})
 })
 
-// NOTE: The CLI runs a Program as a child of its own with the streams
+// The CLI runs a Program as a child of its own with the streams
 // inherited, so a Program reading its input is reading whatever the CLI was
 // given. Under --json the report is alone on stdout and the Program's own
 // output goes to stderr, and the input still arrives — which is the pairing a

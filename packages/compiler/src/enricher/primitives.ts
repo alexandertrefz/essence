@@ -1,13 +1,13 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: The bare Type tags — the handful of Types that have no declaration
+// The bare Type tags — the handful of Types that have no declaration
 // anywhere, because they ARE what a declaration bottoms out in. A standard
 // library file writes `Boolean`, `String`, `Integer` in its signatures; these
 // are what those names resolve to, and there is nowhere else they could come
 // from: `packages/standard-library/sources/Boolean.es` declares the Boolean
 // NAMESPACE, and writes `Boolean` in its own signatures.
 //
-// NOTE: This is the ONLY TypeScript left that describes a Type of the language.
+// This is the ONLY TypeScript left that describes a Type of the language.
 // A Type belongs here if and only if no `type`, `choice` or `protocol`
 // declaration could produce it — `Number` and `Irrational` are Unions and live
 // in `packages/standard-library/sources/Number.es`, `Optional` and `Ordering`
@@ -22,19 +22,19 @@ const algebraicType: common.AlgebraicType = { type: "Algebraic" }
 const transcendentalType: common.TranscendentalType = {
 	type: "Transcendental",
 }
-// NOTE: The source a property test generates its values from. It has no
+// The source a property test generates its values from. It has no
 // declaration anywhere for the reason the tags above have none: nothing a
 // `type`, `choice` or `protocol` could say produces a value that carries state
 // only the runtime can read.
 const randomnessType: common.RandomnessType = { type: "Randomness" }
-// NOTE: The two asynchronous containers, and the one pair of tags that holds
+// The two asynchronous containers, and the one pair of tags that holds
 // another Type. A `Future` describes work that will answer with its `valueType`
 // and a `Started` is one execution of such a description already in flight;
 // neither has a declaration anywhere, for the reason the source above has none
 // — nothing a `type`, `choice` or `protocol` could say produces a value the
 // runtime alone can build, run and wait for.
 //
-// NOTE: What the NAME resolves to is the applied shape with its slot left
+// What the NAME resolves to is the applied shape with its slot left
 // Unknown, rather than a second Type the way `GenericList` is a second Type
 // beside `List`. What `GenericList` exists for is the empty List Literal, which
 // has to be assignable to every List; no Expression builds a Future out of
@@ -54,20 +54,20 @@ const startedType: common.StartedType = {
 	valueType: { type: "Unknown" },
 }
 
-// NOTE: The open Record Type — `{}` members, which every Record is assignable
+// The open Record Type — `{}` members, which every Record is assignable
 // to. It is the receiver Type the Record Namespace targets, and it is also the
 // UNIT Type: a Function that answers nothing useful promises a Record with no
 // members, and there is nothing to read off one. See `isUnitType`.
 export const recordType: common.RecordType = { type: "Record", members: {} }
 
-// NOTE: `List` names the unapplied List Type — `List<Item>` applies it. The
+// `List` names the unapplied List Type — `List<Item>` applies it. The
 // default keeps a bare `List` annotation meaningful.
 const genericListType: common.GenericListType = {
 	type: "GenericList",
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 }
 
-// NOTE: The same for `Dictionary`, which `Dictionary<Key, Value>` applies. Both
+// The same for `Dictionary`, which `Dictionary<Key, Value>` applies. Both
 // defaults are Unknown and are decided SEPARATELY — a bare `Dictionary` has
 // decided neither slot, and nothing may read one from the other.
 const genericDictionaryType: common.GenericDictionaryType = {
@@ -78,7 +78,7 @@ const genericDictionaryType: common.GenericDictionaryType = {
 	],
 }
 
-// NOTE: The Type Scope a standard library file starts from, before a single
+// The Type Scope a standard library file starts from, before a single
 // line of it has been read.
 export const primitiveTypes: Record<string, common.Type> = {
 	Boolean: booleanType,

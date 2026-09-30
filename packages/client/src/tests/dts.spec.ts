@@ -18,7 +18,7 @@ function clientFixture(name: string): string {
 	return path.join(import.meta.dirname, "files", name)
 }
 
-// NOTE: What a plugin hands `generateDeclarations`: the Descriptor the wrapper
+// What a plugin hands `generateDeclarations`: the Descriptor the wrapper
 // marshals by, and the Types the Module named. Described against the entry, the
 // way the bundle beside it is emitted — a Case tag is entry-relative, and a
 // declaration file that disagreed with its own bundle would name Cases nothing
@@ -50,7 +50,7 @@ async function declarationsOf(
 	})
 }
 
-// NOTE: The declarations as a consumer reads them — the `javascript` view, with
+// The declarations as a consumer reads them — the `javascript` view, with
 // `EssenceRational` imported by path. A temporary directory has no
 // `node_modules` above it, so the package name would not resolve there.
 async function declarationsFor(entryPath: string): Promise<string> {
@@ -79,7 +79,7 @@ export declare function square(p0: bigint | number): bigint
 		)
 	})
 
-	// NOTE: `Rectangle` is a Type Alias AND the Namespace of that name, so it is
+	// `Rectangle` is a Type Alias AND the Namespace of that name, so it is
 	// declared twice — as a Type and as a value. TypeScript keeps the two in
 	// separate declaration spaces for exactly this.
 	it("declares a Type and the Namespace that shares its name", async () => {
@@ -102,12 +102,12 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: By object identity, which the Enricher makes true: an Alias resolves
+	// By object identity, which the Enricher makes true: an Alias resolves
 	// to ONE Type and every mention of it is that same object. Spelling the shape
 	// out instead would read nothing like the source it came from, and would say
 	// nothing about two Parameters being the same Type.
 	//
-	// NOTE: Going IN, a Type holding an Integer is wider than its declaration —
+	// Going IN, a Type holding an Integer is wider than its declaration —
 	// a safe number is taken there — so the name is kept and wrapped in the
 	// package's `Input<…>`, which widens exactly the leaves the interpreter does.
 	it("names an exported Type rather than spelling its shape", async () => {
@@ -136,7 +136,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A `Map` at every key Type, with the key widened on the way in
+	// A `Map` at every key Type, with the key widened on the way in
 	// exactly as any other Integer position is — and a Type Alias holding one
 	// still named rather than spelled out, since a Map crosses the same way in
 	// both directions.
@@ -160,7 +160,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A unit Choice's Case is its own name here as everywhere else, so a
+	// A unit Choice's Case is its own name here as everywhere else, so a
 	// Dictionary keyed by one reads as the enumeration it is.
 	it("declares a bare Case key as the union of its names", async () => {
 		expect(await declarationsOf(clientFixture("Marshal.es"))).toContain(
@@ -168,7 +168,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: The tag `toJS` writes — the Choice as it was DECLARED and the Case.
+	// The tag `toJS` writes — the Choice as it was DECLARED and the Case.
 	// Never the path of the machine that compiled it, which is what the Case's
 	// identity carries and what a declaration file must not.
 	it("spells a Case with the tag the Marshaller writes", async () => {
@@ -181,14 +181,14 @@ export declare const Rectangle: {
 		expect(text).not.toContain(clientFixture("Marshal.es"))
 	})
 
-	// NOTE: A Type Parameter is a shape that has not been decided yet, and a
+	// A Type Parameter is a shape that has not been decided yet, and a
 	// value going in has to be BUILT against a shape — so there is nothing to
 	// build one against and the boundary says so, in the words it would throw
 	// them in. Declaring the Parameter `ItemType` would typecheck
 	// `firstOf([1n])`, which throws; `never` typechecks `firstOf([])`, which is
 	// exactly the call that works.
 	//
-	// NOTE: And no `<ItemType>` on the Function either. A Descriptor carries the
+	// And no `<ItemType>` on the Function either. A Descriptor carries the
 	// shapes a value crosses AS, and a Type Parameter never is one — a
 	// declaration that bound the name would promise a caller a Type to apply on
 	// a call that can not be made.
@@ -203,7 +203,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A callback Parameter is the Function the MODULE will call, so it is
+	// A callback Parameter is the Function the MODULE will call, so it is
 	// declared as the call the host has to be ready for: its Parameters are the
 	// Module's own values coming out — a `bigint`, always — and its answer is a
 	// value going in, which a safe number satisfies. The direction turns around
@@ -219,7 +219,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A Type Alias holding a callback is named in BOTH directions, because
+	// A Type Alias holding a callback is named in BOTH directions, because
 	// what it holds reads the same either way — the Alias is declared once, and
 	// naming it at a Parameter is the claim that it does.
 	it("names a Type whose members cross the same way in both directions", async () => {
@@ -233,7 +233,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: And spelled out where it does not. `Nest` holds an Optional inside
+	// And spelled out where it does not. `Nest` holds an Optional inside
 	// an Optional: coming out that is `bigint | undefined`, and going in it is
 	// nothing at all — so a Parameter naming the Alias would typecheck the call
 	// that always throws, and the `never` goes on the member that is the
@@ -249,7 +249,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A Function crossing OUT is wrapped by the Marshaller, so the
+	// A Function crossing OUT is wrapped by the Marshaller, so the
 	// callable signature printed here is the one a caller really calls.
 	it("declares a Function that comes back as callable", async () => {
 		let text = await declarationsOf(clientFixture("Calls.es"))
@@ -262,12 +262,12 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A Choice is declared twice under one name, and TypeScript keeps the
+	// A Choice is declared twice under one name, and TypeScript keeps the
 	// two apart: the Type is what a value of it IS, and the const is how a host
 	// spells one. A Case with a payload is a call and one without is the value —
 	// there is nothing to pass to `Blank`.
 	//
-	// NOTE: A constructor is a spelling that marshals nothing — it writes the tag
+	// A constructor is a spelling that marshals nothing — it writes the tag
 	// onto the payload it was handed — so it is declared as exactly that: any
 	// payload the boundary would take, answered with the tag on it and its own
 	// Types kept. `Shape.Circle({ radius: 3n })` is therefore a `Shape`, and
@@ -282,7 +282,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: And where a Namespace already holds the name, they are members of it
+	// And where a Namespace already holds the name, they are members of it
 	// — one name binds one thing, and `namespace Colour for Colour` is how a
 	// Choice is given its Methods.
 	it("declares them on the Namespace of the same name", async () => {
@@ -295,7 +295,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: And where the Namespace declares a member of a Case's own name, the
+	// And where the Namespace declares a member of a Case's own name, the
 	// Case is left out — `bindNamespace` writes the constructors first exactly so
 	// that what the Module declares overwrites them, so declaring both would name
 	// one member twice and promise a constructor nothing binds.
@@ -309,7 +309,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A Choice all of whose Cases are payload-less crosses as the bare Case
+	// A Choice all of whose Cases are payload-less crosses as the bare Case
 	// name, so its Type is the union of those names as string literals — which is
 	// what a TypeScript enumeration looks like, and the whole reason the spelling
 	// exists. `Ordering` says the same thing without being declared by the
@@ -326,7 +326,7 @@ export declare const Rectangle: {
 		expect(text).not.toContain(`{ $case: "Direction#Up" }`)
 	})
 
-	// NOTE: And the const under the same name is the table of those strings, so
+	// And the const under the same name is the table of those strings, so
 	// that `Direction.Up` and `"Up"` are one value written two ways. `readonly`
 	// because the table is frozen and a bare string is the one member here a
 	// reader might take for somewhere to keep one.
@@ -336,11 +336,11 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: At every position a Descriptor is WALKED to rather than met at — an
+	// At every position a Descriptor is WALKED to rather than met at — an
 	// `Optional`'s item, a List's item, a Record's member — because the fact is
 	// on the Case and the walk is the same walk as ever.
 	//
-	// NOTE: And by NAME at a Parameter, unwrapped — a unit Choice carries no
+	// And by NAME at a Parameter, unwrapped — a unit Choice carries no
 	// Integer, so it is not one of the Types whose in-form is wider than its
 	// declaration, and `Input<Direction>` would be the same Type spelled twice.
 	it("carries the spelling wherever a bare Case is reached", async () => {
@@ -358,7 +358,7 @@ export declare const Rectangle: {
 		expect(text).toContain("export type Marker = { direction: Direction }")
 	})
 
-	// NOTE: And where a constant is all that names it. `heading` was annotated,
+	// And where a constant is all that names it. `heading` was annotated,
 	// so it is the Choice by name; `plus` was not, so its Type is the one Case
 	// alone — which prints as that Case's own string and nothing else, the
 	// narrowest true thing to say about a value that can only ever be `"Plus"`.
@@ -369,7 +369,7 @@ export declare const Rectangle: {
 		expect(text).toContain(`export declare const plus: "Plus"`)
 	})
 
-	// NOTE: `never`, because printing the arms honestly is what can not be done:
+	// `never`, because printing the arms honestly is what can not be done:
 	// TypeScript reads `"Up" | string` as `string`, so a declaration that named
 	// both would promise a position taking any string at all while the
 	// interpreter refuses every value there. The refusal is the interpreter's own
@@ -386,7 +386,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: And spells the ones that do have one. The collision is per CASE NAME
+	// And spells the ones that do have one. The collision is per CASE NAME
 	// — `Direction | Sign` share none — and per bare Case: a Choice with a
 	// payload crosses as a `$case` object, which no string is, so `Shape` stands
 	// beside a bare name perfectly well.
@@ -401,7 +401,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: `EssenceRational` is this package's name and a name a Module may
+	// `EssenceRational` is this package's name and a name a Module may
 	// export. Both spelled plainly, the import and the declaration are one name
 	// declared twice — which TypeScript refuses, taking the whole file with it —
 	// so the borrowed one steps aside.
@@ -415,7 +415,7 @@ export declare const Rectangle: {
 		expect(text).toContain("export declare const ratio: $EssenceRational")
 	})
 
-	// NOTE: An `Optional` standing between a bare Case and a String hides
+	// An `Optional` standing between a bare Case and a String hides
 	// nothing, in either of the two places it can stand. Beside the pair, the
 	// collision is the Union's own and the whole position is `never`. Around
 	// the pair, `undefined` is still a spelling the position has — absence is
@@ -435,7 +435,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: `fromJS` refuses EVERY value for a nested Optional — both levels
+	// `fromJS` refuses EVERY value for a nested Optional — both levels
 	// would be `undefined` — so the Parameter has to refuse every call, exactly
 	// as the callback and Type Parameter positions already do. Coming out, only
 	// the collapse is deduplicated: `bigint | undefined`, not the inner Union
@@ -466,7 +466,7 @@ export declare const Rectangle: {
 		).toContain("export type Measurable = unknown")
 	})
 
-	// NOTE: A `never` rather than the Overloads' signatures. Which Overload a call
+	// A `never` rather than the Overloads' signatures. Which Overload a call
 	// means is decided by the Argument Types, which a JavaScript value does not
 	// carry — so `exports` binds the name to a refusal, and declaring the
 	// signatures would typecheck a call that throws.
@@ -481,7 +481,7 @@ export declare const Rectangle: {
 		)
 	})
 
-	// NOTE: A module may name an export with a string literal, which is the only
+	// A module may name an export with a string literal, which is the only
 	// way `ok?` reaches TypeScript at all. Leaving it out would say the Module
 	// does not export it.
 	it("exports a name JavaScript can not spell under a string", async () => {
@@ -519,7 +519,7 @@ export declare function square(p0: EssenceValue): EssenceValue
 		)
 	})
 
-	// NOTE: The names the bundle actually binds. An Overload set binds none of its
+	// The names the bundle actually binds. An Overload set binds none of its
 	// own, and a Type, a Choice and a Protocol are erased before a byte is
 	// emitted — a declaration for one would name an export that is not there.
 	it("declares each Overload under the name the bundle binds", async () => {
@@ -534,7 +534,7 @@ export declare function square(p0: EssenceValue): EssenceValue
 		expect(text).not.toContain("export type Colour")
 	})
 
-	// NOTE: A class refuses a static member named `prototype` or `constructor`,
+	// A class refuses a static member named `prototype` or `constructor`,
 	// so the Rewriter mangles the two — a declaration spelling the written name
 	// would promise a member the bundle does not have.
 	it("declares the two member names a class refuses as the Rewriter emits them", async () => {
@@ -552,7 +552,7 @@ export declare function square(p0: EssenceValue): EssenceValue
 export declare function $user_ok_3f_(p0: EssenceValue): EssenceValue`)
 	})
 
-	// NOTE: A unit Choice's bare-name spelling is the MARSHALLED door's, and this
+	// A unit Choice's bare-name spelling is the MARSHALLED door's, and this
 	// view is the other one: behind the wrapper a `Direction` is the Essence Case
 	// object itself, which no string is. So nothing here changes — not the
 	// spelling, and not the refusal either, since a Union with no unambiguous
@@ -572,7 +572,7 @@ export declare function $user_ok_3f_(p0: EssenceValue): EssenceValue`)
 })
 
 describe("Asynchronous work in the declarations", () => {
-	// NOTE: One position and one spelling: a call's ANSWER, as a `Promise` of
+	// One position and one spelling: a call's ANSWER, as a `Promise` of
 	// what the work answers with. A callback declared to answer a Future reads
 	// the same way — it is an answer too, one the host writes — and every other
 	// position is `never` with the sentence the boundary would have thrown, so
@@ -605,7 +605,7 @@ export declare const work: never /* a Future<Integer> is work rather than a valu
 		)
 	})
 
-	// NOTE: The bundle view says nothing about any of it, as it says nothing
+	// The bundle view says nothing about any of it, as it says nothing
 	// about every other shape: what the emitted Module binds is an Essence value
 	// under the name the Rewriter emitted it as, and a Future there is a value
 	// like the rest.
@@ -621,7 +621,7 @@ export declare const work: never /* a Future<Integer> is work rather than a valu
 })
 
 describe("A consumer of the generated declarations", () => {
-	// NOTE: The asynchrony door as a reader meets it: a call is awaited, and a
+	// The asynchrony door as a reader meets it: a call is awaited, and a
 	// callback declared to answer work is an ordinary `async` Function. Both
 	// halves have to typecheck for the door to be worth having — a declaration
 	// that only the marshaller agreed with would be a door nobody could open.
@@ -655,7 +655,7 @@ export async function tried(): Promise<string> {
 		expect(run.code).toBe(0)
 	})
 
-	// NOTE: And the position that is refused, refused at the line that writes
+	// And the position that is refused, refused at the line that writes
 	// it. `never` is what makes that happen: a call the marshaller would throw
 	// on does not compile.
 	it("is refused work handed in", async () => {
@@ -695,7 +695,7 @@ export let ratio: string = third.toString()
 		expect(run.code).toBe(0)
 	})
 
-	// NOTE: A `Map` the consumer built is what the Parameter takes, and the
+	// A `Map` the consumer built is what the Parameter takes, and the
 	// widening on the way in reaches the KEY — `Input` names a Map before the
 	// mapped Type below it would have walked the Map's own Methods and widened
 	// nothing at all.
@@ -735,7 +735,7 @@ export let wrong = ages(new Map([["alex", "39"]]))
 		expect(run.output).toContain("consumer.ts")
 	})
 
-	// NOTE: The other half of the claim. Declarations that admit everything
+	// The other half of the claim. Declarations that admit everything
 	// typecheck every consumer, so a passing consumer says nothing on its own.
 	it("is refused an Argument of the wrong Type", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
@@ -754,7 +754,7 @@ export let wrong = box({ width: "3", height: 4n })
 		)
 	})
 
-	// NOTE: The interpreter takes a safe `number` for an Integer going IN and
+	// The interpreter takes a safe `number` for an Integer going IN and
 	// hands it to the runtime's own canonicaliser, so a declaration that made a
 	// caller write `BigInt(3)` there would be refusing a call the Module answers.
 	// What comes OUT is a `bigint` at every size, and the declaration says that
@@ -789,7 +789,7 @@ export let width: number = box({ width: 3, height: 4 }).width
 		)
 	})
 
-	// NOTE: The generic constructor keeps the caller's own Types, and the two
+	// The generic constructor keeps the caller's own Types, and the two
 	// annotations a host would reach for both hold: `Shape` where the payload was
 	// bigints, `Input<Shape>` where it was numbers — and a payload of the wrong
 	// shape is refused at the constructor rather than at the crossing.
@@ -822,13 +822,13 @@ export let wrong = Shape.Circle({ radius: "3" })
 		expect(refused.output).toContain("consumer.ts")
 	})
 
-	// NOTE: The two spellings a host reaches for, both of which have to hold: the
+	// The two spellings a host reaches for, both of which have to hold: the
 	// bare string, which is what the boundary really carries, and the Case off
 	// the Choice, which is what a reader coming from the object form writes. They
 	// are one value — `Direction.Up` IS `"Up"` — so the declaration has to say so
 	// rather than only admit both.
 	//
-	// NOTE: And a name the Choice does not have is refused, which is the half
+	// And a name the Choice does not have is refused, which is the half
 	// that makes the rest worth having. A declaration printing `string` there
 	// would typecheck `"Left"` and throw at the crossing.
 	it("takes a bare Case as its own name or off the Choice", async () => {
@@ -856,7 +856,7 @@ export let wrong: Direction = "Left"
 		expect(run.code).toBe(0)
 	})
 
-	// NOTE: And the refused positions refuse, at the call rather than at the
+	// And the refused positions refuse, at the call rather than at the
 	// crossing — which is the whole reason they are declared `never` instead of
 	// being spelled out as the arms they hold.
 	it("is refused a Union a bare Case has no spelling in", async () => {
@@ -891,7 +891,7 @@ export let twelve: bigint = $$integer
 		expect(run.code).toBe(0)
 	})
 
-	// NOTE: The view the plugin writes, checked the same way — and it imports
+	// The view the plugin writes, checked the same way — and it imports
 	// nothing, which is the point of declaring `EssenceValue` in the file rather
 	// than importing it: these sit beside a `.es` file in somebody else's
 	// project.
@@ -905,7 +905,7 @@ export let twelve: bigint = $$integer
 
 		let run = await typecheck({
 			"Math.d.es.ts": declarations,
-			// NOTE: The value goes in as one of the Module's own — opaque, and
+			// The value goes in as one of the Module's own — opaque, and
 			// built by the runtime the build resolved for both of them. What
 			// this view promises is that the names are there and that nothing
 			// but an Essence value fits, which is what a consumer can check
@@ -921,7 +921,7 @@ export let squared = square(PI)
 	})
 })
 
-// NOTE: `= expression` defaults, at the JavaScript boundary. `?` is the first
+// `= expression` defaults, at the JavaScript boundary. `?` is the first
 // thing this generator ever writes that TypeScript restricts the ORDER of, and
 // the restriction is stricter than Essence's own rule — so the two forms of a
 // call say different things about the same Parameter.
@@ -964,11 +964,11 @@ export declare function scaled(p0: bigint | number, by?: bigint | number): bigin
 		)
 	})
 
-	// NOTE: A Record Parameter whose default fills SOME of its members in. The
+	// A Record Parameter whose default fills SOME of its members in. The
 	// Argument itself is required — `using` carries no `?` — and the members the
 	// default supplies carry one each.
 	//
-	// NOTE: Spelled out at the Parameter rather than by the name `Options` is
+	// Spelled out at the Parameter rather than by the name `Options` is
 	// declared under, which is the rule a Type whose two directions differ
 	// already lives by: one going IN may leave `retries` out, one coming out
 	// never lacks it, and the `?` belongs on this position rather than on every

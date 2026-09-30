@@ -4,13 +4,13 @@ import { commaAfter, commaBefore, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findCaseValueOfPayload, findDictionaryEntry } from "./lookups"
 
-// NOTE: The Diagnostics a written VALUE carries — a payload handed to a Case
+// The Diagnostics a written VALUE carries — a payload handed to a Case
 // that holds none, a key written twice in one bracket list. Both are answered by
 // taking something out, and in both the span that goes is wider than the one the
 // Diagnostic underlines, which is why each starts from the Node rather than from
 // the Position.
 
-// NOTE: The Diagnostic names the payload, and what goes is the payload TOGETHER
+// The Diagnostic names the payload, and what goes is the payload TOGETHER
 // with the parentheses around it — `#Done(1)` becomes `#Done`, which is the only
 // spelling a unit Case has. The construction's own Position is what reaches the
 // closing bracket, since a Position runs one past what it ends on.
@@ -34,7 +34,7 @@ export function bareCaseAction(
 		end: construction.position.end,
 	}
 
-	// NOTE: Read back off the buffer, as every edit here is: a span that does
+	// Read back off the buffer, as every edit here is: a span that does
 	// not open on a bracket and close on one is a stale analysis pointing at
 	// something the reader has since rewritten.
 	if (!/^[ \t]*\([\s\S]*\)$/.test(sliceOf(lines, range))) {
@@ -51,7 +51,7 @@ export function bareCaseAction(
 	}
 }
 
-// NOTE: The Diagnostic names the KEY and the whole entry is what has to go —
+// The Diagnostic names the KEY and the whole entry is what has to go —
 // a key deleted on its own would leave `= 2` standing. The separator beside it
 // goes too, or the list is left with a comma against a bracket: the one in
 // FRONT wherever there is one, which is every duplicate, since a key written

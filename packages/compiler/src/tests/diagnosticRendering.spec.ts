@@ -39,7 +39,7 @@ function expectOutput(actual: string, expected: string): void {
 	expect(removeTrailing(actual)).toBe(dedent(expected))
 }
 
-// NOTE: A positioned Diagnostic always carries at least one Label — the type
+// A positioned Diagnostic always carries at least one Label — the type
 // makes it so — and the Label's message is what the arrow says. These tests
 // are about the layout around it, so they all use the same short one.
 function diagnostic(
@@ -390,7 +390,7 @@ describe("diagnostic rendering", () => {
 			"Test.es",
 		)
 
-		// NOTE: Ariadne colors a Label's underline and arrow, not its message
+		// Ariadne colors a Label's underline and arrow, not its message
 		// text, so the assertion is about the arrows: the primary one in the
 		// severity color, the secondary one in a generated 8-bit color.
 		let lines = output.split("\n")

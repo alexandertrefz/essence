@@ -16,7 +16,7 @@ import {
 	type SpecifierResolver,
 } from "./resolve"
 
-// NOTE: One file, parsed once, named by the one canonical spelling of its path.
+// One file, parsed once, named by the one canonical spelling of its path.
 // `sourceText` travels with the Module because every Diagnostic rendered against
 // it needs the exact text it was parsed from — a Module the Language Server
 // holds unsaved can not be read back off disk to render an excerpt.
@@ -24,17 +24,17 @@ export type Module = {
 	filePath: string
 	sourceText: string
 	program: parser.Program
-	// NOTE: This Module's parse Diagnostics and the resolution Diagnostics of
+	// This Module's parse Diagnostics and the resolution Diagnostics of
 	// its own entries, and nothing else. Collected per Module because the dedup
 	// key is severity, code, message and Position with no file: one shared
 	// collection would silently swallow a second Module's identical error at the
 	// same line.
 	diagnostics: Array<common.Diagnostic>
-	// NOTE: Canonical paths, in the order the entries first name them. Both
+	// Canonical paths, in the order the entries first name them. Both
 	// sections contribute — a facade whose only mention of a Module is a
 	// re-export still depends on it.
 	dependencies: Array<string>
-	// NOTE: Keyed by the specifier exactly as it was written, so an Import or
+	// Keyed by the specifier exactly as it was written, so an Import or
 	// Export entry finds the Module it names without resolving a second time. A
 	// specifier that named no Module at all is absent.
 	resolutions: Map<string, string>
@@ -42,24 +42,24 @@ export type Module = {
 
 export type ModuleGraph = {
 	entryPath: string
-	// NOTE: Dependency-first — insertion order IS the order, and the entry comes
+	// Dependency-first — insertion order IS the order, and the entry comes
 	// last, because everything reachable is something it depends on. Every
 	// Module a Module names is ahead of it, except across a cycle, where the
 	// group is the unit and the order inside it is not something the source
 	// states.
 	modules: Map<string, Module>
-	// NOTE: The same Modules, grouped into Strongly Connected Components. A group
+	// The same Modules, grouped into Strongly Connected Components. A group
 	// holds more than one Module exactly when those Modules import each other,
 	// and that group is what the single hoisting pass has to run over as a whole
 	// — nothing inside a cycle can be enriched before the rest of it.
 	groups: Array<Array<Module>>
-	// NOTE: What belongs to no Module: the entry itself could not be read. Every
+	// What belongs to no Module: the entry itself could not be read. Every
 	// other Diagnostic here is positioned in some Module's own source and lives
 	// on that Module.
 	diagnostics: Array<common.Diagnostic>
 }
 
-// NOTE: The group a specifier was written on, rather than the specifier alone:
+// The group a specifier was written on, rather than the specifier alone:
 // what a refused one has to say depends on which SECTION it stands in and on
 // the names under it — an entry an import block can simply drop is one an export
 // block has to keep, under another spelling.
@@ -69,7 +69,7 @@ type WrittenSpecifier = {
 	names: Array<string>
 }
 
-// NOTE: Both sections, imports first, in written order — one specifier per
+// Both sections, imports first, in written order — one specifier per
 // group, since a group writes its specifier once however many names it holds,
 // and a refused one is refused once.
 function specifiersOf(program: parser.Program): Array<WrittenSpecifier> {
@@ -87,7 +87,7 @@ function specifiersOf(program: parser.Program): Array<WrittenSpecifier> {
 	]
 }
 
-// NOTE: The extensions a reader reaches for when they mean a file this language
+// The extensions a reader reaches for when they mean a file this language
 // can not import. Essence reads `.es` and nothing else, and the interop runs the
 // OTHER way — a JavaScript Program embeds a built Essence one — so `./clock.js`
 // is not one edit away from compiling and no Help may pretend it is.
@@ -102,7 +102,7 @@ const javaScriptExtensions = [
 	".tsx",
 ]
 
-// NOTE: Anything else written behind a dot. A specifier naming one is not a
+// Anything else written behind a dot. A specifier naming one is not a
 // Module either, and `Write '<specifier>.es'` would name a file that could only
 // ever be `./data.json.es` — so the extensionless spelling is the one case that
 // Help is certainly right for, and the only one it is offered for.
@@ -160,7 +160,7 @@ function reportRejection(
 					notes: [
 						"Package specifiers are reserved: today a Module names its dependencies by where they sit relative to it, and nothing is searched for.",
 					],
-					// NOTE: The second branch says '.es' out loud, because the
+					// The second branch says '.es' out loud, because the
 					// specifier that gets here without one is a PACKAGE name —
 					// `lodash` — and a Help that asks only for a './' sends the
 					// reader to `./lodash`, which is refused again for the
@@ -190,7 +190,7 @@ function reportRejection(
 					notes: [
 						"A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.",
 					],
-					// NOTE: One answer per shape, because appending '.es' is right
+					// One answer per shape, because appending '.es' is right
 					// for exactly one of them. A path ending in '/' names a
 					// directory, and the Help asks for the file. A specifier that
 					// already carries an extension names a file of some other
@@ -228,7 +228,7 @@ function reportRejection(
 				notes: [
 					"The standard library is one shared declaration space rather than a graph of Modules, and everything it declares is already in scope in every Program.",
 				],
-				// NOTE: The GROUP rather than "the entry". This Diagnostic is
+				// The GROUP rather than "the entry". This Diagnostic is
 				// reported on the specifier, and an entry in this language is a
 				// NAME — so a reader who deletes one is left with the same
 				// `from "…" { }` and the same report. What has to go is the
@@ -253,7 +253,7 @@ function reportRejection(
 				notes: [
 					"Everything a Module declares is in scope inside it already, whether or not it is exported.",
 				],
-				// NOTE: The two sections want opposite things. An import group
+				// The two sections want opposite things. An import group
 				// naming this file asks for names that are in scope already, so
 				// the whole group goes. An export group naming this file is
 				// PUBLISHING names this Module declares, which is something it
@@ -288,7 +288,7 @@ function reportMissingModule(
 	})
 }
 
-// NOTE: One resolution per distinct specifier text, but one Diagnostic per
+// One resolution per distinct specifier text, but one Diagnostic per
 // written specifier: two groups naming the same unreachable Module are two
 // mistakes to underline, and Diagnostics dedup by Position, so each is reported
 // once.
@@ -335,7 +335,7 @@ function resolveDependencies(
 	return dependencies
 }
 
-// NOTE: Tarjan's algorithm, over the edges each Module resolved. An SCC is only
+// Tarjan's algorithm, over the edges each Module resolved. An SCC is only
 // closed once every Module reachable from it has been, so the groups come out
 // dependency-first — which is both the order they have to be enriched in and
 // the order their bodies run in. That holds per root and across roots, so
@@ -368,7 +368,7 @@ function groupModules(
 			}
 
 			if (indices.has(dependencyPath)) {
-				// NOTE: A dependency that is done and off the stack belongs to a
+				// A dependency that is done and off the stack belongs to a
 				// group of its own that is already closed — it is reachable from
 				// here, but this Module is not reachable from it, so it says
 				// nothing about where this group ends.
@@ -407,7 +407,7 @@ function groupModules(
 				}
 			}
 
-			// NOTE: Reversed, so a group reads in the order the cycle was walked
+			// Reversed, so a group reads in the order the cycle was walked
 			// in — the Module that was reached first ahead of the ones it
 			// reached — rather than in the order the stack unwound.
 			groups.push(group.reverse())
@@ -423,7 +423,7 @@ function groupModules(
 	return groups
 }
 
-// NOTE: Every file reachable from the entry, parsed once and ordered. The host
+// Every file reachable from the entry, parsed once and ordered. The host
 // is asked for each file exactly once, so a Module reached from two importers is
 // one Module, and a diamond is not read twice.
 export function loadModuleGraph(
@@ -472,7 +472,7 @@ export function loadModuleGraph(
 	let entryModule = readModule(entry)
 
 	if (entryModule === null) {
-		// NOTE: The one placeless Diagnostic this stage reports. There is no
+		// The one placeless Diagnostic this stage reports. There is no
 		// source to point into: the file the caller named is the file that could
 		// not be read.
 		return {
@@ -503,7 +503,7 @@ export function loadModuleGraph(
 	}
 }
 
-// NOTE: A work list rather than a recursive descent, so that a Module's entries
+// A work list rather than a recursive descent, so that a Module's entries
 // are resolved inside its OWN Diagnostic collection. Resolving a dependency's
 // entries from inside its importer's collection would nest the two, and
 // per-Module collection is what keeps two Modules' identical errors from
@@ -535,7 +535,7 @@ function resolveAll(
 	}
 }
 
-// NOTE: A graph over Programs that are already parsed and already in memory,
+// A graph over Programs that are already parsed and already in memory,
 // with a resolver of the caller's choosing — the standard library, which is read
 // and parsed by its own package before the Compiler ever sees it, resolves a
 // specifier against that set by name rather than against the file system.

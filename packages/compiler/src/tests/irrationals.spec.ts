@@ -30,7 +30,7 @@ const bigRational = (numerator: bigint, denominator = 1n) => ({
 	denominator,
 })
 
-// NOTE: √d, as a value — createAlgebraic can legitimately return a Rational,
+// √d, as a value — createAlgebraic can legitimately return a Rational,
 // so the tests that need an Algebraic assert the tag on the way through.
 const radical = (radicand: bigint): algebraic.AlgebraicType => {
 	const value = algebraic.createAlgebraic(
@@ -44,7 +44,7 @@ const radical = (radicand: bigint): algebraic.AlgebraicType => {
 	return value as algebraic.AlgebraicType
 }
 
-// NOTE: Every fallible native answers an `Optional` now — `Optional#Value`
+// Every fallible native answers an `Optional` now — `Optional#Value`
 // around the answer, or `Optional#Empty`. The tests below still care about the
 // tag of the ANSWER (Rational versus Algebraic), so this asserts the value Case
 // once and hands the payload on, rather than repeating the wrapper check at
@@ -64,7 +64,7 @@ function diagnosticsFor(source: string) {
 	)
 }
 
-// NOTE: The same runner `rationals.spec.ts` has: a Program compiled through the
+// The same runner `rationals.spec.ts` has: a Program compiled through the
 // whole pipeline and run, its printed lines collected. The direct tests above
 // reach the runtime by the names it happens to export; this reaches the Essence
 // bodies — `Algebraic::is` is written on `compare` — the way a Program does.
@@ -101,7 +101,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: Primes just past the trial-division bound of `extractSquarePart`
+// Primes just past the trial-division bound of `extractSquarePart`
 // (2^16), so that a radicand `p²·q` built from two of them is one the
 // normalisation leaves as written. Each was checked prime by trial division
 // when the list was made.
@@ -118,7 +118,7 @@ const primesPastTheBound = [
 	65599n,
 ]
 
-// NOTE: A deterministic pseudo-random sequence — a linear congruential step —
+// A deterministic pseudo-random sequence — a linear congruential step —
 // so the property tests draw the same cases on every run and a failure names
 // a case that can be re-run.
 function* deterministicNumbers(seed: number): Generator<number> {
@@ -131,7 +131,7 @@ function* deterministicNumbers(seed: number): Generator<number> {
 	}
 }
 
-// NOTE: The five rounding rules under the names the tests read them by, so a
+// The five rounding rules under the names the tests read them by, so a
 // table-driven case names its rule rather than reaching into the module.
 const roundings = {
 	nearest: rounding.nearest,
@@ -141,7 +141,7 @@ const roundings = {
 	towardZero: rounding.towardZero,
 }
 
-// NOTE: `p/q` as the pair the test compares against — `approximate` builds its
+// `p/q` as the pair the test compares against — `approximate` builds its
 // answer through `createRational`, which normalises a zero numerator's
 // denominator to 1, so the width can not be read back off the answer.
 function boundsOf(
@@ -213,7 +213,7 @@ describe("Irrationals", () => {
 					integer.squareRoot__overload$1(integer.createInteger(2n)),
 				)[typeKeySymbol],
 			).toBe("Algebraic")
-			// NOTE: A negative has no real root, so the root is missing rather
+			// A negative has no real root, so the root is missing rather
 			// than being some other kind of number.
 			expect(
 				integer.squareRoot__overload$1(integer.createInteger(-1n))[
@@ -247,7 +247,7 @@ describe("Irrationals", () => {
 			)
 
 			expect(product[typeKeySymbol]).toBe("Rational")
-			// NOTE: `Number.is` (√2·√2 is 2) is Essence now, covered by the golden harness.
+			// `Number.is` (√2·√2 is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("combines pure radicals across radicands — √2·√3 is √6", () => {
@@ -280,7 +280,7 @@ describe("Irrationals", () => {
 		})
 
 		it("orders exactly across different radicands", () => {
-			// NOTE: 1 + √2 ≈ 2.414 versus √6 ≈ 2.449 — close enough that a
+			// 1 + √2 ≈ 2.414 versus √6 ≈ 2.449 — close enough that a
 			// float would need care; the symbolic comparison is exact.
 			const onePlusRootTwo = algebraic.add(
 				radical(2n),
@@ -298,7 +298,7 @@ describe("Irrationals", () => {
 			)
 		})
 
-		// NOTE: `integerSquareRoot` is what the perfect-square test and the
+		// `integerSquareRoot` is what the perfect-square test and the
 		// enclosure rest on, so it is pinned at the edges: 0 and 1 are their
 		// own roots, a square answers its root exactly, and the number below
 		// a square answers one less.
@@ -317,7 +317,7 @@ describe("Irrationals", () => {
 			)
 		})
 
-		// NOTE: Trial division stops at 2^16, and the remainder is tested for
+		// Trial division stops at 2^16, and the remainder is tested for
 		// being a perfect square outright — so a square factor PAST the bound
 		// is still found whenever it is all that is left once the small factors
 		// are out. 65537 is the first prime past the bound.
@@ -337,7 +337,7 @@ describe("Irrationals", () => {
 			expect(whole[typeKeySymbol]).toBe("Rational")
 		})
 
-		// NOTE: The trade-off the bound makes: a radicand `p²·q` with p AND q
+		// The trade-off the bound makes: a radicand `p²·q` with p AND q
 		// past 2^16 is neither smooth nor a square, so it stays as written. The
 		// promise that survives is that it is still the same NUMBER as its
 		// normalised spelling — equal, ordered the same against everything, and
@@ -425,7 +425,7 @@ describe("Irrationals", () => {
 						.radicalCoefficientNumerator,
 				).toBe(2n * p)
 
-				// NOTE: √(p²q) · p√q = p²·q, a Rational — the product of one
+				// √(p²q) · p√q = p²·q, a Rational — the product of one
 				// radical with itself.
 				const product = unwrap(
 					algebraic.multiplyWithAlgebraic(written, normalised),
@@ -447,7 +447,7 @@ describe("Irrationals", () => {
 				expect((difference as rational.RationalType).numerator).toBe(0n)
 			})
 
-			// NOTE: Two un-normalised radicands over genuinely different
+			// Two un-normalised radicands over genuinely different
 			// radicals go through the two-radical squaring, which asks nothing
 			// of them being squarefree. A double is precise enough to say
 			// which way each pair falls, since the pairs are kept apart.
@@ -499,7 +499,7 @@ describe("Irrationals", () => {
 				expect(decided).toBeGreaterThan(100)
 			})
 
-			// NOTE: The same pair the way a Program meets it. `Algebraic::is` is
+			// The same pair the way a Program meets it. `Algebraic::is` is
 			// written on `compare`, the inequalities are `Comparable`'s provided
 			// bodies over it, and a Union receiver reaches `Number::is` and the
 			// sixteen-cell `Number.compare` — every one of those has to read
@@ -557,7 +557,7 @@ describe("Irrationals", () => {
 				])
 			})
 
-			// NOTE: The same pair one level down, which is where the
+			// The same pair one level down, which is where the
 			// universal comparison decides instead of `Algebraic::is`: a
 			// Record member, a List item, and the key of a Dictionary. That
 			// comparison used to read the five stored fields, so the pair was
@@ -592,7 +592,7 @@ describe("Irrationals", () => {
 			})
 		})
 
-		// NOTE: The zero branch of the linear sign — |a| = |b|·√d with the signs
+		// The zero branch of the linear sign — |a| = |b|·√d with the signs
 		// opposed — is exactly `a + b·√d = 0`, and answers 0 instead of throwing.
 		// The gateway never builds a radicand it could fire on, so the only way
 		// to reach it is by hand.
@@ -613,7 +613,7 @@ describe("Irrationals", () => {
 			).toBe(0n)
 		})
 
-		// NOTE: The one claim here about TIME. Unbounded trial division walks up
+		// The one claim here about TIME. Unbounded trial division walks up
 		// to the root of the radicand, so a sixteen-digit prime measured 2488 ms
 		// and a twenty-five-digit one would be hours; bounded at 2^16 with a
 		// perfect-square test on the remainder, the same root measured 1.25 ms,
@@ -641,7 +641,7 @@ describe("Irrationals", () => {
 			expect(best).toBeLessThan(50)
 		})
 
-		// NOTE: The quadratic slice is a FIELD, so it is closed under Integer
+		// The quadratic slice is a FIELD, so it is closed under Integer
 		// powers in both directions. The golden ratio is the case that shows
 		// it: φⁿ is `(Lₙ + Fₙ·√5) / 2` over the Lucas and Fibonacci numbers,
 		// so φ¹⁰ is `(123 + 55·√5) / 2` and a wrong power would be visible at
@@ -668,7 +668,7 @@ describe("Irrationals", () => {
 					5n,
 				),
 			)
-			// NOTE: φ⁻¹ is φ − 1, which is the identity the golden ratio is
+			// φ⁻¹ is φ − 1, which is the identity the golden ratio is
 			// named for, and the one case where the reciprocal branch is
 			// checked against something a reader knows.
 			expect(power(number.GoldenRatio, -1n)).toEqual(
@@ -680,7 +680,7 @@ describe("Irrationals", () => {
 			)
 		})
 
-		// NOTE: Square-and-multiply, so the claim is that a large exponent
+		// Square-and-multiply, so the claim is that a large exponent
 		// costs a logarithm of it. φ to the ten-thousandth is a 2090-digit
 		// pair; the same walk one product at a time is ten thousand products
 		// on numbers that long.
@@ -701,7 +701,7 @@ describe("Irrationals", () => {
 			expect(best).toBeLessThan(50)
 		})
 
-		// NOTE: The enclosure `scaledIntervalOf` answers is refined until both
+		// The enclosure `scaledIntervalOf` answers is refined until both
 		// of its ends round alike at the width asked for, so what is checked
 		// here is that the answer IS the step the exact value rounds to — not
 		// that it is close to one. √2 is 1.41421356…, so the digits below are
@@ -770,7 +770,7 @@ describe("Irrationals", () => {
 				)
 			})
 
-			// NOTE: `round` is the same decision at no places, answering an
+			// `round` is the same decision at no places, answering an
 			// Integer rather than a Rational — the rung a `Number` receiver
 			// reaches.
 			it("answers the same step through round", () => {
@@ -786,7 +786,7 @@ describe("Irrationals", () => {
 				).toBe(-2)
 			})
 
-			// NOTE: The property the §§ block promises: the answer is within
+			// The property the §§ block promises: the answer is within
 			// one unit of the last place of the value itself. It is asserted
 			// through `compare`, which is exact, so nothing here rests on a
 			// second approximation.
@@ -842,13 +842,13 @@ describe("Irrationals", () => {
 			)
 
 			expect(doubled[typeKeySymbol]).toBe("Transcendental")
-			// NOTE: `anyIs` compares the canonical form, the same form the
+			// `anyIs` compares the canonical form, the same form the
 			// native `Transcendental.is` compares.
 			expect(anyIs(doubled, number.Tau)).toBeTrue()
 		})
 
 		it("collapses cancelling π-parts to a Rational", () => {
-			// NOTE: `Transcendental.subtract` is written in Essence now
+			// `Transcendental.subtract` is written in Essence now
 			// (packages/standard-library/sources/Transcendental.es) as `add(other::negate())` — this
 			// is that composition, and the still-native gateway is what
 			// collapses the cancelled π-part.
@@ -866,7 +866,7 @@ describe("Irrationals", () => {
 			)
 
 			expect(quotient[typeKeySymbol]).toBe("Rational")
-			// NOTE: `Number.is` (Tau/π is 2) is Essence now, covered by the golden harness.
+			// `Number.is` (Tau/π is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("answers nothing for non-proportional quotients", () => {
@@ -884,7 +884,7 @@ describe("Irrationals", () => {
 		})
 
 		it("orders π exactly against tight rational bounds", () => {
-			// NOTE: 22/7 and 355/113 are the classic over-approximations;
+			// 22/7 and 355/113 are the classic over-approximations;
 			// 333/106 under-approximates. All three are decided exactly.
 			expect(
 				number.compare(number.Pi, rational.createRational(22n, 7n)),
@@ -898,7 +898,7 @@ describe("Irrationals", () => {
 		})
 
 		it("orders π against Algebraics", () => {
-			// NOTE: √10 ≈ 3.162 > π > √9 — and √9 collapses, so use √8.
+			// √10 ≈ 3.162 > π > √9 — and √9 collapses, so use √8.
 			expect(number.compare(number.Pi, radical(10n))).toEqual(
 				ordering.less,
 			)
@@ -935,7 +935,7 @@ describe("Irrationals", () => {
 		})
 
 		it("orders e exactly against tight rational bounds", () => {
-			// NOTE: 2718/1000 < e < 2719/1000 — decided exactly through the
+			// 2718/1000 < e < 2719/1000 — decided exactly through the
 			// single-base threshold, no cutoff in sight.
 			expect(
 				number.compare(number.E, rational.createRational(2719n, 1000n)),
@@ -951,7 +951,7 @@ describe("Irrationals", () => {
 				ordering.greater,
 			)
 
-			// NOTE: π + e against 2·π is e against π in disguise — the
+			// π + e against 2·π is e against π in disguise — the
 			// difference carries both bases, so this walks the refinement.
 			expect(
 				number.compare(
@@ -965,7 +965,7 @@ describe("Irrationals", () => {
 		})
 
 		it("orders e against Algebraics", () => {
-			// NOTE: √8 ≈ 2.828 > e > √7 ≈ 2.646.
+			// √8 ≈ 2.828 > e > √7 ≈ 2.646.
 			expect(number.compare(number.E, radical(8n))).toEqual(ordering.less)
 			expect(number.compare(number.E, radical(7n))).toEqual(
 				ordering.greater,
@@ -981,7 +981,7 @@ describe("Irrationals", () => {
 		})
 
 		it("refuses an unregistered base at the gateway", () => {
-			// NOTE: γ — Euler–Mascheroni — is not even known to be irrational,
+			// γ — Euler–Mascheroni — is not even known to be irrational,
 			// so no enclosure of it could promise single-base totality. The
 			// gateway is what keeps the invariant "every registered base is
 			// provably transcendental" true.
@@ -993,7 +993,7 @@ describe("Irrationals", () => {
 		})
 
 		it("distinguishes forms that differ only in a later term", () => {
-			// NOTE: π + e against π + 2·e — the rational part and the π term
+			// π + e against π + 2·e — the rational part and the π term
 			// agree, so only a walk over the WHOLE term list can tell them
 			// apart. The hand-written six-field equality this replaces went
 			// blind past the fields it named; the term walk cannot.
@@ -1012,7 +1012,7 @@ describe("Irrationals", () => {
 		})
 
 		it("divides proportional mixed forms exactly", () => {
-			// NOTE: (1 + π + e) / (2 + 2·π + 2·e) = 1/2 — proportionality is
+			// (1 + π + e) / (2 + 2·π + 2·e) = 1/2 — proportionality is
 			// componentwise across all three parts.
 			const mixedForm = transcendental.createTranscendental(
 				bigRational(1n),
@@ -1039,7 +1039,7 @@ describe("Irrationals", () => {
 				"1/2 + 1/2·√5",
 			)
 
-			// NOTE: φ² = φ + 1, the defining identity — exact, structural.
+			// φ² = φ + 1, the defining identity — exact, structural.
 			const squared = unwrap(
 				algebraic.multiplyWithAlgebraic(
 					number.GoldenRatio,
@@ -1053,7 +1053,7 @@ describe("Irrationals", () => {
 
 			expect(anyIs(squared, incremented)).toBeTrue()
 
-			// NOTE: 1618/1000 < φ < 1619/1000.
+			// 1618/1000 < φ < 1619/1000.
 			expect(
 				number.compare(
 					number.GoldenRatio,
@@ -1068,7 +1068,7 @@ describe("Irrationals", () => {
 			).toEqual(ordering.less)
 		})
 
-		// NOTE: The bounded comparison's promise, in both directions: two
+		// The bounded comparison's promise, in both directions: two
 		// values a unit of the last place or more apart are told apart, and
 		// empty is answered only for two closer than that. π and e are 0.42
 		// apart, so one decimal place decides them; a value 1/1156 above π that
@@ -1109,7 +1109,7 @@ describe("Irrationals", () => {
 				)
 			})
 
-			// NOTE: Pinned behaviour rather than a promise, as the note above
+			// Pinned behaviour rather than a promise, as the note above
 			// says: what is promised is that no pair a unit or more apart lands
 			// here.
 			it("answers empty only for two values closer than that", () => {
@@ -1141,7 +1141,7 @@ describe("Irrationals", () => {
 				)
 			})
 
-			// NOTE: The width promise has to survive a large coefficient, since
+			// The width promise has to survive a large coefficient, since
 			// a base's enclosure is scaled by it: 1000·π against 1000·e + 423
 			// differ by about 0.31, so one place decides them where the plain
 			// enclosure, a dozen units wide before the guard digits, would not.
@@ -1169,7 +1169,7 @@ describe("Irrationals", () => {
 			})
 		})
 
-		// NOTE: The sign, which `absolute` already decided inside itself and
+		// The sign, which `absolute` already decided inside itself and
 		// which no Method of this Namespace could ask before. A value over one
 		// base is signed exactly; a value over several refines an interval,
 		// and 1000·e − 2718 is the case that needs more than the first
@@ -1213,7 +1213,7 @@ describe("Irrationals", () => {
 			).toBeTrue()
 		})
 
-		// NOTE: The same refinement `compare` runs, read for digits rather
+		// The same refinement `compare` runs, read for digits rather
 		// than for a sign: the enclosure is narrowed until both of its ends
 		// round alike at the width asked for. π is 3.14159265358979…, e is
 		// 2.718281828459…, and their sum is 5.859874482048…, so the answers
@@ -1267,7 +1267,7 @@ describe("Irrationals", () => {
 				)
 			})
 
-			// NOTE: The claim the refinement loop exists for. A value a
+			// The claim the refinement loop exists for. A value a
 			// thirty-first of a decimal place above a half can not be decided
 			// by the first enclosure, which is eight digits wide, so the guard
 			// doubles until it is. Built as π plus the rational that carries π
@@ -1301,7 +1301,7 @@ describe("Irrationals", () => {
 				).toBe("0/1")
 			})
 
-			// NOTE: The property the §§ block promises, asserted through
+			// The property the §§ block promises, asserted through
 			// `signRelativeTo`, which is the exact ordering against a Rational.
 			it("lands within a unit of the last place, for any value", () => {
 				const numbers = deterministicNumbers(20260908)
@@ -1348,7 +1348,7 @@ describe("Irrationals", () => {
 	})
 
 	describe("Number cross-kind semantics", () => {
-		// NOTE: The reason the grid family is spelled the same way on all four
+		// The reason the grid family is spelled the same way on all four
 		// kinds. A `Number` reaches a Method only where every member Namespace
 		// declares one of the signature, so this is what the `approximate`
 		// rungs on `Integer` and `Rational` and the `toward:` on the
@@ -1399,7 +1399,7 @@ describe("Irrationals", () => {
 			])
 		})
 
-		// NOTE: `Number.lowest`/`highest` gained a widest entry, kept behind
+		// `Number.lowest`/`highest` gained a widest entry, kept behind
 		// the four kind-preserving ones so that two Integers still answer an
 		// Integer. It is the only entry an irrational reaches, because it is
 		// written on the covering `Number`'s ordering rather than on a kind's
@@ -1423,7 +1423,7 @@ describe("Irrationals", () => {
 	})
 
 	describe("Structural equality", () => {
-		// NOTE: `anyIs` used to be what every List operation compared with. It
+		// `anyIs` used to be what every List operation compared with. It
 		// branched on the type tag for the other kinds and fell through to
 		// `false` for Algebraic and Transcendental, so a List could not find a
 		// value it held. The List Methods are bounded by `Equatable` now and
@@ -1470,7 +1470,7 @@ describe("Irrationals", () => {
 		})
 
 		it("keeps kinds apart", () => {
-			// NOTE: An Algebraic is irrational by construction and a
+			// An Algebraic is irrational by construction and a
 			// Transcendental is provably not algebraic, so no cross-kind pair
 			// is ever equal — the same rule `Number::is` states.
 			expect(anyIs(radical(2n), number.Pi)).toBeFalse()
@@ -1480,11 +1480,11 @@ describe("Irrationals", () => {
 	})
 
 	describe("Enricher", () => {
-		// NOTE: Both halves of the split. A receiver the Program COMPUTED might
+		// Both halves of the split. A receiver the Program COMPUTED might
 		// be negative, so `squareRoot` answers an Optional there; a written one
 		// proves its own sign and reaches `namespace NonNegativeInteger`, whose
 		// entry answers the two kinds bare.
-		// NOTE: The receiver is a DIFFERENCE, which is the one operation no
+		// The receiver is a DIFFERENCE, which is the one operation no
 		// refinement of Integer closes over — a sum of two written Integers
 		// answers a `PositiveInteger` and reaches the total root beside it.
 		it("types squareRoot as Optional<Integer | Algebraic>", () => {
@@ -1552,7 +1552,7 @@ describe("Irrationals", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The List Methods that search by value are bounded by
+		// The List Methods that search by value are bounded by
 		// `Equatable` now, so a List of irrationals only keeps them if the
 		// covering `Number` Namespace's conformance is what solves the bound.
 		// This is the gate on that: no Diagnostic means the witness was found.
@@ -1569,7 +1569,7 @@ describe("Irrationals", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The gate is the `Algebraic` arm: `1::divide(by @)` there answers
+		// The gate is the `Algebraic` arm: `1::divide(by @)` there answers
 		// an `Algebraic | Rational` and NOT an `Optional` of one, because an
 		// irrational is never zero. If division by an Algebraic ever became
 		// fallible the arm would answer an `Optional<…>`, `toString` would not
@@ -1588,7 +1588,7 @@ describe("Irrationals", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Union receiver dispatches only where EVERY member Namespace
+		// A Union receiver dispatches only where EVERY member Namespace
 		// declares the Method, so this is the check that `round(toward:)` now
 		// has all four rungs — Integer's and Rational's were already written,
 		// and the two irrationals gained one each. It is written through a
@@ -1609,7 +1609,7 @@ describe("Irrationals", () => {
 			).toEqual(["3", "2", "2", "7"])
 		})
 
-		// NOTE: The four questions a `Number` receiver could not ask before,
+		// The four questions a `Number` receiver could not ask before,
 		// each of which needed a rung on both irrationals. `isZero` and
 		// `isWholeNumber` answer `false` for every irrational, which is the
 		// mirror of `Integer::isWholeNumber` answering `true` for every
@@ -1631,7 +1631,7 @@ describe("Irrationals", () => {
 			).toEqual(["true", "true", "false", "false", "true", "true"])
 		})
 
-		// NOTE: The decimal rendering, which is `approximate` under a name a
+		// The decimal rendering, which is `approximate` under a name a
 		// reader reaches for. The entry with no count is capped where a
 		// Rational's non-terminating expansion is capped, at eighty digits.
 		// Rounding at the eightieth left π with two trailing zeroes, and a
@@ -1654,7 +1654,7 @@ describe("Irrationals", () => {
 			).toEqual([`"3.1416"`, `"π"`, `"-3.14"`, `"1.414214"`, "80"])
 		})
 
-		// NOTE: The other two formats, and the direction the count entry takes.
+		// The other two formats, and the direction the count entry takes.
 		// Each arm reads the value at the width its own writing needs: a
 		// decimal at the count, a percentage two digits deeper so the shift by
 		// a hundred stays exact, and a scientific form as many digits past the
@@ -1689,7 +1689,7 @@ describe("Irrationals", () => {
 			])
 		})
 
-		// NOTE: The region the eightieth-digit reading used to fabricate. A
+		// The region the eightieth-digit reading used to fabricate. A
 		// `#Scientific` count is a count of MANTISSA digits, so the value has
 		// to be read as many places past it as its own power of ten falls
 		// below zero — `decimalExponent` is what answers that, and the last
@@ -1737,7 +1737,7 @@ describe("Irrationals", () => {
 			])
 		})
 
-		// NOTE: The count a `#Scientific` mantissa is written at is not the
+		// The count a `#Scientific` mantissa is written at is not the
 		// depth the value is read at, so a count past the eightieth digit is
 		// answered from a reading that deep. The digits from the eighty-first
 		// are the true expansion of √2, which is what a fixed eightieth-place
@@ -1757,7 +1757,7 @@ describe("Irrationals", () => {
 			])
 		})
 
-		// NOTE: A `#Percent` count below one rounds to a whole percentage, and
+		// A `#Percent` count below one rounds to a whole percentage, and
 		// the shift by a hundred spends two decimal places whatever the count
 		// is. So the reading is never shallower than those two — reading at
 		// the bare `count + 2` answers 140% for √2 at one place below zero,
@@ -1789,11 +1789,11 @@ describe("Irrationals", () => {
 			])
 		})
 
-		// NOTE: The whole point of the approximation API, written the way a
+		// The whole point of the approximation API, written the way a
 		// Program writes it: an exact area, then digits asked for once at the
 		// end.
 		//
-		// NOTE: `inspect` shows a Rational in lowest terms, so `4·π` over four
+		// `inspect` shows a Rational in lowest terms, so `4·π` over four
 		// places reads `7854/625` rather than the `125664/10000` the grid is
 		// built on. The two are one number; the direct tests above read the
 		// unreduced pair off the answer, which is what makes the digits

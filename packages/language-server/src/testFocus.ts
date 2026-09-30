@@ -1,16 +1,16 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-// NOTE: A `focused` test silences every other test of the run, which is exactly
+// A `focused` test silences every other test of the run, which is exactly
 // what it is for while somebody is iterating and exactly what must not be left
 // behind. The command line refuses a plain run that still holds one; an Editor
 // can not refuse anything, so it says so where the word is written — a warning
 // on the Modifier itself, with the one edit that answers it.
 //
-// NOTE: Per file and per parse, unlike the tag Diagnostics next door: whether a
+// Per file and per parse, unlike the tag Diagnostics next door: whether a
 // test is focused is something its own source says, and no other file can
 // change the answer.
 
-// NOTE: A `focused` that is also `skipped` narrows nothing — the test does not
+// A `focused` that is also `skipped` narrows nothing — the test does not
 // run either way — and is not what has to go. The command line reads it the
 // same way.
 function isSkipped(modifiers: Array<parser.TestModifierNode>): boolean {
@@ -50,7 +50,7 @@ function focusDiagnostic(
 			"A focused test silences every other test of the run, so a run " +
 				"nobody narrowed has not answered the question it was asked.",
 		],
-		// NOTE: Single quotes, as every other Help here spells a keyword and a
+		// Single quotes, as every other Help here spells a keyword and a
 		// flag. Backticks are Markdown, and a Diagnostic is read in a terminal.
 		helps: [
 			"Remove 'focused' before this lands, or narrow the run with " +
@@ -59,7 +59,7 @@ function focusDiagnostic(
 	}
 }
 
-// NOTE: Every `focused` written in one file's tests section, in source order.
+// Every `focused` written in one file's tests section, in source order.
 export function focusDiagnostics(
 	program: parser.Program,
 ): Array<common.Diagnostic> {

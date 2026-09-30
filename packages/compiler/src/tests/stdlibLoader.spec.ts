@@ -53,7 +53,7 @@ function namespaceNodeIn(
 	throw new Error(`no typed Namespace '${name}' in the Program`)
 }
 
-// NOTE: The emitted Method names for one Namespace of a synthetic standard
+// The emitted Method names for one Namespace of a synthetic standard
 // library, which is where the `__overload$N` numbering becomes observable.
 function emittedMethodNames(stdlib: Stdlib, name: string): Array<string> {
 	let simplified = simplify(stdlib.typedPrograms[0]!)
@@ -70,7 +70,7 @@ function emittedMethodNames(stdlib: Stdlib, name: string): Array<string> {
 	throw new Error(`no simplified Namespace '${name}' in the Program`)
 }
 
-// NOTE: The three Overload spellings the numbering has to survive — one bound
+// The three Overload spellings the numbering has to survive — one bound
 // to the runtime, two written in Essence with signatures that can be told
 // apart.
 const overloadEntries = {
@@ -97,7 +97,7 @@ ${entries.map((entry) => overloadEntries[entry]).join("\n")}
 	])
 }
 
-// NOTE: The same three spellings for a free Function's `overload` block. A free
+// The same three spellings for a free Function's `overload` block. A free
 // Function has no receiver, so the entries are told apart by their Argument
 // LABEL — which is what a call site picks the overload by.
 const freeOverloadEntries = {
@@ -122,7 +122,7 @@ ${entries.map((entry) => freeOverloadEntries[entry]).join("\n")}
 	])
 }
 
-// NOTE: The typed Nodes a bodied `overload function` block leaves behind, by the
+// The typed Nodes a bodied `overload function` block leaves behind, by the
 // name each answers to. A free Function is its own top-level Node rather than an
 // entry in a Namespace's table, so the numbering is observable directly on the
 // typed Program — no simplification needed, the Enricher already named them.
@@ -133,7 +133,7 @@ function typedFunctionNames(stdlib: Stdlib): Array<string> {
 }
 
 describe("Standard Library Loader", () => {
-	// NOTE: The whole point of the `declarations { … }` form — a signature with
+	// The whole point of the `declarations { … }` form — a signature with
 	// no body IS the declaration. Every shape the Enricher needs of a builtin
 	// Namespace has to come out of a signature alone: the Method Types, the
 	// Type Parameters, the Documentation, and the record of which entries are
@@ -158,7 +158,7 @@ describe("Standard Library Loader", () => {
 				}
 			}`,
 			],
-			// NOTE: `Optional` is declared in Essence now — a nominal Choice
+			// `Optional` is declared in Essence now — a nominal Choice
 			// with a `Value` payload and an `Empty` Case — so a synthetic
 			// library that uses it has to bring its own, and name the file it
 			// comes from.
@@ -189,7 +189,7 @@ describe("Standard Library Loader", () => {
 		expect(firstItem.type).toBe("SimpleMethod")
 
 		if (firstItem.type === "SimpleMethod") {
-			// NOTE: The receiver Parameter is injected, exactly as for a bodied
+			// The receiver Parameter is injected, exactly as for a bodied
 			// Method, and the Namespace Generic the signature mentions is
 			// merged in.
 			expect(firstItem.parameterTypes).toHaveLength(1)
@@ -199,7 +199,7 @@ describe("Standard Library Loader", () => {
 			expect(firstItem.documentation?.description).toBe(
 				"The first item, if there is one.",
 			)
-			// NOTE: A builtin has no file to point at — neither for the block
+			// A builtin has no file to point at — neither for the block
 			// as a whole nor for the `@param` lines inside it.
 			expect(firstItem.documentation?.position).toBeNull()
 			expect(
@@ -227,7 +227,7 @@ describe("Standard Library Loader", () => {
 			properties: { emptyCount: true },
 		})
 
-		// NOTE: A native has no body, so there is nothing for the Rewriter to
+		// A native has no body, so there is nothing for the Rewriter to
 		// emit — the Namespace is in the Type tables and absent from the tree.
 		let typed = namespaceNodeIn(stdlib.typedPrograms[0]!, "Boxes")
 
@@ -235,7 +235,7 @@ describe("Standard Library Loader", () => {
 		expect(Object.keys(typed.properties)).toEqual([])
 	})
 
-	// NOTE: An `overload` block may mix the two — one Overload bound to the
+	// An `overload` block may mix the two — one Overload bound to the
 	// runtime, the next written in Essence. Order is load-bearing: the index
 	// picks the `__overload$N` export name, so a native must still occupy its
 	// slot in the resolved Type even though nothing is emitted for it.
@@ -272,7 +272,7 @@ describe("Standard Library Loader", () => {
 			false,
 		])
 
-		// NOTE: Only the bodied Overload reaches the typed tree.
+		// Only the bodied Overload reaches the typed tree.
 		let typed = namespaceNodeIn(stdlib.typedPrograms[0]!, "Mixed")
 		let typedCombine = typed.methods["combine"]!
 
@@ -286,7 +286,7 @@ describe("Standard Library Loader", () => {
 		}
 	})
 
-	// NOTE: The `__overload$N` suffix is the Overload's position in the Method
+	// The `__overload$N` suffix is the Overload's position in the Method
 	// TYPE, not in the filtered typed Node — a call site resolves its index
 	// against the full Type, and the slot a native occupies is already taken by
 	// the runtime export it binds to. Emitting a bodied Overload under a
@@ -336,7 +336,7 @@ describe("Standard Library Loader", () => {
 			])
 		})
 
-		// NOTE: The failure this numbering exists to prevent. A native's
+		// The failure this numbering exists to prevent. A native's
 		// runtime export answers to the name its slot gives it; a bodied
 		// definition emitted under the same name would silently replace the
 		// implementation of a DIFFERENT Overload.
@@ -364,7 +364,7 @@ describe("Standard Library Loader", () => {
 			}
 		})
 
-		// NOTE: The other half of the invariant. Where nothing is native the
+		// The other half of the invariant. Where nothing is native the
 		// indices are the identity, and an ordinary Program relies on it —
 		// every `overload` block a user writes takes this path, and a
 		// mis-numbered one emits definitions no call site names.
@@ -398,7 +398,7 @@ describe("Standard Library Loader", () => {
 		expect(stdlib.nativeBindings["Constants"]!.properties["PI"]).toBe(true)
 	})
 
-	// NOTE: Across a file boundary through an IMPORT — a standard library file
+	// Across a file boundary through an IMPORT — a standard library file
 	// is a Module like any other, and says what it uses. The two are hoisted as
 	// one group, so the Protocol still need not be declared before the Namespace
 	// conforming to it; what changed is that the conforming file has to name the
@@ -432,7 +432,7 @@ describe("Standard Library Loader", () => {
 		])
 	})
 
-	// NOTE: The hoist spans every file, so it runs before any of their
+	// The hoist spans every file, so it runs before any of their
 	// collections is open — and the recursive Type pre-pass reports from inside
 	// it. Unrouted, those Diagnostics landed in whatever collection surrounded
 	// the LOAD: the standard library loads lazily inside the first compile of a
@@ -461,11 +461,11 @@ describe("Standard Library Loader", () => {
 			]),
 		)
 
-		// NOTE: Nothing at all in the surrounding collection — the one that
+		// Nothing at all in the surrounding collection — the one that
 		// would be the user's Program.
 		expect(diagnostics).toEqual([])
 
-		// NOTE: The `unknown-type` comes from the re-resolve that runs AFTER the
+		// The `unknown-type` comes from the re-resolve that runs AFTER the
 		// hoist rounds, which is routed the same way the pre-pass is.
 		expect(
 			result.map((enriched) =>
@@ -489,7 +489,7 @@ describe("Standard Library Loader", () => {
 		])
 	})
 
-	// NOTE: The same routing for what the hoist ROUNDS report. A Warning does
+	// The same routing for what the hoist ROUNDS report. A Warning does
 	// not disqualify a speculative resolution — the Type hoists — and since a
 	// hoisted Type is reused rather than resolved a second time, the round is
 	// the only place that Warning is ever seen. Unrouted it landed in whatever
@@ -528,7 +528,7 @@ describe("Standard Library Loader", () => {
 			),
 		).toEqual([[], ["misnamed-documentation-parameter"]])
 
-		// NOTE: Positioned in the file it came from, which is the whole point
+		// Positioned in the file it came from, which is the whole point
 		// of handing it over per Node.
 		expect(result[1].diagnostics[0].severity).toBe("warning")
 		expect(result[1].diagnostics[0].position).toEqual({
@@ -537,12 +537,12 @@ describe("Standard Library Loader", () => {
 		})
 	})
 
-	// NOTE: A Method with a body survives into the typed tree — that is what
+	// A Method with a body survives into the typed tree — that is what
 	// the prelude the Rewriter emits is built out of.
 	it("keeps a bodied Method's typed Node", () => {
 		let stdlib = load([
 			"Bodied.es",
-			// NOTE: The bodied Method calls a NATIVE sibling declared in the
+			// The bodied Method calls a NATIVE sibling declared in the
 			// same synthetic file rather than a builtin like
 			// `Integer::multiply`. A synthetic standard library is
 			// enriched against the bare Type tags plus these sources ALONE —
@@ -578,7 +578,7 @@ describe("Standard Library Loader", () => {
 		}
 	})
 
-	// NOTE: A native Method has only TWO of the three views the retention
+	// A native Method has only TWO of the three views the retention
 	// invariant is about — the resolved Method Type and the witnesses
 	// `boundConformance` curries on. There is no typed Node, because there is
 	// no body to emit. The Type view must still carry the bound Namespace
@@ -602,7 +602,7 @@ describe("Standard Library Loader", () => {
 				}
 			}`,
 			],
-			// NOTE: `Comparable` and `Ordering` are declared in Essence now. The
+			// `Comparable` and `Ordering` are declared in Essence now. The
 			// conforming file is linked in the same group as the one declaring
 			// the Protocol it conforms to, so the conformance still resolves
 			// whichever is hoisted first.
@@ -638,13 +638,13 @@ describe("Standard Library Loader", () => {
 			Comparable: [{ generic: "Item", protocol: "Comparable" }],
 		})
 
-		// NOTE: The third view is simply absent — nothing to keep in step.
+		// The third view is simply absent — nothing to keep in step.
 		let typed = namespaceNodeIn(stdlib.typedPrograms[0]!, "Boxes")
 
 		expect(Object.keys(typed.methods)).toEqual([])
 	})
 
-	// NOTE: A refined Alias and the Namespace answering its predicate may name
+	// A refined Alias and the Namespace answering its predicate may name
 	// each other — the exact shape `NonZeroInteger` and `namespace Integer`
 	// stand in, with `divide(by NonZeroInteger)` beside the `isNot` the
 	// predicate asks — and no single hoisting round can resolve the pair in one
@@ -675,7 +675,7 @@ describe("Standard Library Loader", () => {
 			throw new Error("'NonZero' did not load as a refinement")
 		}
 
-		// NOTE: `isNot` is declared here with NO body, so it asks its own
+		// `isNot` is declared here with NO body, so it asks its own
 		// question. The standard library's own is `Equatable`'s, whose provided
 		// body is the `if` that spells out `is`, and resolves to that.
 		expect(alias.conjuncts).toEqual([
@@ -699,7 +699,7 @@ describe("Standard Library Loader", () => {
 		expect(halve.parameterTypes[1]?.type).toBe(alias)
 	})
 
-	// NOTE: The same deadlock one turn harder. A GENERIC refined Alias hoists as a
+	// The same deadlock one turn harder. A GENERIC refined Alias hoists as a
 	// Generic Alias WRAPPING the pending refinement, and a signature naming
 	// `NonEmptyList<Integer>` can not bind that object by reference the way
 	// `NonZero` was bound above — applying Type Arguments substitutes them into
@@ -752,7 +752,7 @@ describe("Standard Library Loader", () => {
 			itemType: { type: "GenericUse", name: "Item" },
 		})
 		expect(declared.conjuncts).toEqual([
-			// NOTE: `hasItems` is declared here WITHOUT a body, so it is a leaf
+			// `hasItems` is declared here WITHOUT a body, so it is a leaf
 			// of its own. The standard library's own writes it as
 			// `@::isEmpty()::negate()` and resolves to that.
 			{
@@ -788,7 +788,7 @@ describe("Standard Library Loader", () => {
 		expect(instantiated.conjuncts).toBe(declared.conjuncts)
 		expect(printType(instantiated)).toBe("NonEmptyList<Integer>")
 
-		// NOTE: The Namespace targets the Alias applied to its own Parameter, which
+		// The Namespace targets the Alias applied to its own Parameter, which
 		// is the same instantiation with nothing bound — the evidence is there, and
 		// the spelling stays terse because `NonEmptyList<Item>` would only echo the
 		// header.
@@ -806,7 +806,7 @@ describe("Standard Library Loader", () => {
 		expect(printType(target)).toBe("NonEmptyList")
 	})
 
-	// NOTE: The deadlock at its tightest, and the shape `List.append(_ item) ->
+	// The deadlock at its tightest, and the shape `List.append(_ item) ->
 	// NonEmptyList<ItemType>` needs. The Namespace that ANSWERS the predicate is the
 	// one applying the Alias, so no ordering of the rounds can put a resolved
 	// predicate in front of it: refusing the copy would send `namespace List` back
@@ -852,7 +852,7 @@ describe("Standard Library Loader", () => {
 		let declared = alias.aliasedType
 
 		expect(declared.conjuncts).toEqual([
-			// NOTE: `hasItems` is declared here WITHOUT a body, so it is a leaf
+			// `hasItems` is declared here WITHOUT a body, so it is a leaf
 			// of its own. The standard library's own writes it as
 			// `@::isEmpty()::negate()` and resolves to that.
 			{
@@ -908,7 +908,7 @@ describe("Standard Library Loader", () => {
 		expect(printType(numbers)).toBe("NonEmptyList<Integer>")
 	})
 
-	// NOTE: A Diagnostic in the standard library is a Compiler developer's
+	// A Diagnostic in the standard library is a Compiler developer's
 	// error — there is no user Program in sight, and every stage downstream
 	// would run against a half-built Scope. It is thrown, rendered exactly as
 	// the CLI would print it.
@@ -930,7 +930,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/standard library failed to enrich/)
 	})
 
-	// NOTE: The files share one declaration Scope, so a mistake in the file that
+	// The files share one declaration Scope, so a mistake in the file that
 	// DECLARES something surfaces as a Diagnostic in every file that USES it.
 	// Reporting only the first failure in sorted order reliably shows the
 	// cascade and hides the cause.
@@ -960,7 +960,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/Nonexistent/)
 	})
 
-	// NOTE: A Diagnostic has to be rendered against the text of the file it was
+	// A Diagnostic has to be rendered against the text of the file it was
 	// found in. The files are handed over in file-name order and linked in
 	// dependency order, and here those two disagree on purpose: `Alpha.es` sorts
 	// first and is linked LAST, because it imports the file that is broken.
@@ -998,7 +998,7 @@ describe("Standard Library Loader", () => {
 		expect(load).not.toThrow(/Alpha\.es:[\s\S]*?Nonexistent/)
 	})
 
-	// NOTE: The shape of the graph is frozen, and `refuseUnexpectedCycles` is
+	// The shape of the graph is frozen, and `refuseUnexpectedCycles` is
 	// what freezes it — see the standard library's DEVELOPMENT.md. Every other
 	// developer throw in `loadStdlibFrom` is driven here, and this one was not:
 	// the guard is armed against a real third cycle, which every load of the
@@ -1062,7 +1062,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/Found 1:\n  Aye\.es, Bee\.es/)
 	})
 
-	// NOTE: The other half of the gate, and what keeps every other case in this
+	// The other half of the gate, and what keeps every other case in this
 	// file loadable: the frozen set is a fact about the files in
 	// `packages/standard-library/sources`, not about the loader, so a library
 	// assembled anywhere else may have whatever shape its test wants.
@@ -1070,7 +1070,7 @@ describe("Standard Library Loader", () => {
 		expect(() => load(...CYCLE_SOURCES)).not.toThrow()
 	})
 
-	// NOTE: `Terminal.es` is reachable from nothing — no standard library file
+	// `Terminal.es` is reachable from nothing — no standard library file
 	// imports `Terminal`, and it imports only `String` and `Printable`. A graph
 	// walked from a single entry would leave it out and the language would
 	// quietly lose printing altogether, with every other test still green.
@@ -1078,7 +1078,7 @@ describe("Standard Library Loader", () => {
 		expect(Object.keys(loadStdlib().members)).toContain("Terminal")
 	})
 
-	// NOTE: The point of `Prelude.es`. A name reaches the language by being
+	// The point of `Prelude.es`. A name reaches the language by being
 	// re-exported there and by nothing else, so a Namespace the library needs
 	// and the language should not grow simply stays off the list — exported by
 	// its own file, imported by its siblings, invisible to every Program. There
@@ -1127,14 +1127,14 @@ describe("Standard Library Loader", () => {
 			],
 		)
 
-		// NOTE: The helper resolved — `quadrupled` is written on it, and the
+		// The helper resolved — `quadrupled` is written on it, and the
 		// load throws on any Diagnostic, so reaching here at all proves the
 		// import bound.
 		expect(Object.keys(stdlib.members)).toContain("Public")
 		expect(Object.keys(stdlib.members)).not.toContain("Internal")
 	})
 
-	// NOTE: The real library's prelude and its files have to agree. A name
+	// The real library's prelude and its files have to agree. A name
 	// exported by a file and forgotten in the prelude is invisible with no
 	// Diagnostic anywhere, and the failure it causes is at a use site in some
 	// user's Program rather than here.
@@ -1187,7 +1187,7 @@ describe("Standard Library Loader", () => {
 		}
 	})
 
-	// NOTE: The bare Type tags are held on a PARENT Scope, and this is the test
+	// The bare Type tags are held on a PARENT Scope, and this is the test
 	// that says why. `isTaken` — the linker's "is this name already spoken for?"
 	// — reads a Scope's own tables and does not walk to its parent. With the
 	// tags seeded into the Module's own table, this import would collide with
@@ -1222,7 +1222,7 @@ describe("Standard Library Loader", () => {
 		expect(namespaceNamed(stdlib, "Counting").methods["size"]).toBeDefined()
 	})
 
-	// NOTE: The cycle search runs per Scope, and it skips a declaration whose
+	// The cycle search runs per Scope, and it skips a declaration whose
 	// name is already in the Scope's OWN Type table. Seeding a Module's table
 	// from `builtinTypes()` rather than from a parent holding only the bare tags
 	// would make it skip every declaration the file writes — the search would
@@ -1241,7 +1241,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/recursive/i)
 	})
 
-	// NOTE: A native Property IS its annotation, so without one there is
+	// A native Property IS its annotation, so without one there is
 	// nothing to declare. Resolving it to Error in silence would let the
 	// zero-Diagnostic gate wave through a Property of no Type at all.
 	it("rejects a static Property with neither a value nor a Type", () => {
@@ -1261,7 +1261,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/PI/)
 	})
 
-	// NOTE: The value band's counterpart of the Namespace naming itself: a
+	// The value band's counterpart of the Namespace naming itself: a
 	// bodied Property reads one written above it in its own Namespace, and the
 	// Rewriter's topological order emits the two consts in that order.
 	it("loads a static Property that reads one written above it in its own Namespace", () => {
@@ -1285,7 +1285,7 @@ describe("Standard Library Loader", () => {
 		})
 	})
 
-	// NOTE: A Property's value is the one Expression enriched while the hoist
+	// A Property's value is the one Expression enriched while the hoist
 	// rounds are still running, which makes it the one place a half-built Scope
 	// is observable. The memoised "which Namespaces can this Scope see" answer
 	// was recorded there, from the Namespaces hoisted SO FAR, and nothing in the
@@ -1329,7 +1329,7 @@ describe("Standard Library Loader", () => {
 		})
 	})
 
-	// NOTE: The consts are emitted in the order the Properties are written, so a
+	// The consts are emitted in the order the Properties are written, so a
 	// read of one below is a read of a const that does not exist yet. The
 	// Validator refuses it, and the standard library's zero-Diagnostic gate
 	// turns that into a load that fails rather than a `ReferenceError` at import.
@@ -1355,7 +1355,7 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/Constants\.BASE/)
 	})
 
-	// NOTE: `NumberList.es` calls `@::sort()`, which is bounded by `Comparable`,
+	// `NumberList.es` calls `@::sort()`, which is bounded by `Comparable`,
 	// and does not import it: a bound is the Protocol its callee's Module
 	// resolved.
 	it("loads a file whose bounded calls name a Protocol it does not import", () => {
@@ -1371,7 +1371,7 @@ describe("Standard Library Loader", () => {
 		expect(() => loadStdlibFrom(sources)).not.toThrow()
 	})
 
-	// NOTE: A standard library Protocol's identity carries no path, and the
+	// A standard library Protocol's identity carries no path, and the
 	// file that declares it publishes it all the same.
 	it("names the file that declares a Protocol a bound names unimported", () => {
 		let load = () =>
@@ -1407,7 +1407,7 @@ declarations {
 		expect(load).toThrow("'Sized' is declared in A.es — import it here.")
 	})
 
-	// NOTE: Every Documentation a consumer can reach has to be sourceless — a
+	// Every Documentation a consumer can reach has to be sourceless — a
 	// Position pointing into a standard library file is a Position with no file
 	// attached, as far as every consumer of these tables is concerned.
 	it("strips the Documentation Position off a top level Function too", () => {
@@ -1446,7 +1446,7 @@ declarations {
 		).toThrow(/standard library failed to parse/)
 	})
 
-	// NOTE: An `implementation { … }` file can not declare a native at all, so
+	// An `implementation { … }` file can not declare a native at all, so
 	// accepting one would silently produce a Namespace missing exactly the
 	// Methods the file was written to add.
 	it("rejects an implementation Program", () => {
@@ -1464,7 +1464,7 @@ declarations {
 		).toThrow(/must open with 'declarations/)
 	})
 
-	// NOTE: The member table is listed in ONE canonical order, stated in
+	// The member table is listed in ONE canonical order, stated in
 	// `builtinMemberOrder`, not in the order the files happened to sort in. A
 	// source declaration is enriched INTO the Scope and lands where insertion
 	// put it, so renaming `List.es` would otherwise reorder the Completion list
@@ -1475,13 +1475,13 @@ declarations {
 		).toEqual([
 			"Terminal",
 			"String",
-			// NOTE: The one Namespace a proven String can reach besides
+			// The one Namespace a proven String can reach besides
 			// `String`, listed after it for the same reason `NonZeroInteger`
 			// is listed after `Integer` — see `builtinMemberOrder`.
 			"NonEmptyString",
 			"Boolean",
 			"Integer",
-			// NOTE: The three Namespaces a proven Integer can reach besides
+			// The three Namespaces a proven Integer can reach besides
 			// `Integer`, listed after it for the same reason `NestedList` is
 			// listed after `List`, and the one holding both proofs after the
 			// two it narrows — see `builtinMemberOrder`.
@@ -1489,7 +1489,7 @@ declarations {
 			"NonNegativeInteger",
 			"PositiveInteger",
 			"Rational",
-			// NOTE: The three Namespaces a proven Rational can reach besides
+			// The three Namespaces a proven Rational can reach besides
 			// `Rational`, listed after it for the same reason — see
 			// `builtinMemberOrder`.
 			"NonZeroRational",
@@ -1500,14 +1500,14 @@ declarations {
 			"Transcendental",
 			"Number",
 			"Optional",
-			// NOTE: The one Namespace an Optional value can reach besides
+			// The one Namespace an Optional value can reach besides
 			// `Optional`, listed after it for the same reason `NestedList` is
 			// listed after `List` — see `builtinMemberOrder`. `Optional` has to
 			// be searched FIRST for an `Optional<Optional<…>>` receiver, so
 			// that `NestedOptional::flatten` reads as the extra a nested
 			// Optional has.
 			"NestedOptional",
-			// NOTE: The carrier that says WHY, and the Namespace beside it,
+			// The carrier that says WHY, and the Namespace beside it,
 			// after the plainer pair for the reason `NonZeroInteger` follows
 			// `Integer` — see `builtinMemberOrder`.
 			"Result",
@@ -1522,30 +1522,30 @@ declarations {
 			"Division",
 			"SortOrder",
 			"Stream",
-			// NOTE: And the two Choices a request is written in, with the mode
+			// And the two Choices a request is written in, with the mode
 			// Choices because every Method of each is derived — see
 			// `builtinMemberOrder`.
 			"HttpMethod",
 			"Redirects",
 			"Record",
 			"List",
-			// NOTE: The two Namespaces a List value can reach besides `List`,
+			// The two Namespaces a List value can reach besides `List`,
 			// listed after it — see `builtinMemberOrder`. `List` has to be
 			// searched FIRST for a `List<List<…>>` receiver and for a proven
 			// one, so that the narrow Namespace reads as the extra it is.
 			"NestedList",
-			// NOTE: And the Namespace a List of Optionals reaches, beside it
+			// And the Namespace a List of Optionals reaches, beside it
 			// and for the same reason — see `builtinMemberOrder`.
 			"OptionalList",
-			// NOTE: And the Namespace a List of Results reaches, beside it and
+			// And the Namespace a List of Results reaches, beside it and
 			// for the same reason — see `builtinMemberOrder`.
 			"ResultList",
 			"NonEmptyList",
-			// NOTE: And the Namespace a List reaches only with both proofs in
+			// And the Namespace a List reaches only with both proofs in
 			// hand, after both of the Namespaces it narrows — see
 			// `builtinMemberOrder`.
 			"NonEmptyNestedList",
-			// NOTE: The six Namespaces a List of Numbers reaches besides
+			// The six Namespaces a List of Numbers reaches besides
 			// `List`, listed after it for the same reason — see
 			// `builtinMemberOrder`.
 			"IntegerList",
@@ -1554,22 +1554,22 @@ declarations {
 			"NonEmptyIntegerList",
 			"NonEmptyRationalList",
 			"NonEmptyNumberList",
-			// NOTE: And the keyed aggregates last, though their target is the
+			// And the keyed aggregates last, though their target is the
 			// widest List there is — see `builtinMemberOrder`.
 			"KeyedNumberList",
 			"NonEmptyKeyedNumberList",
-			// NOTE: The second container, listed after the first one whole —
+			// The second container, listed after the first one whole —
 			// see `builtinMemberOrder`.
 			"Dictionary",
-			// NOTE: And the Namespace a Dictionary reaches with the proof in
+			// And the Namespace a Dictionary reaches with the proof in
 			// hand, after the one it narrows — see `builtinMemberOrder`.
 			"NonEmptyDictionary",
-			// NOTE: And the bridge from the first container to the second,
+			// And the bridge from the first container to the second,
 			// with its proven twin after it — see `builtinMemberOrder`.
 			"GroupedList",
 			"GroupedNonEmptyList",
 			"Randomness",
-			// NOTE: And the Namespaces the language's asynchrony is written
+			// And the Namespaces the language's asynchrony is written
 			// in, after every Namespace of a value a Program HOLDS, each
 			// narrower target after the one it narrows — see
 			// `builtinMemberOrder`.
@@ -1579,10 +1579,10 @@ declarations {
 			"NonEmptyFutureList",
 			"ResultFutureList",
 			"Started",
-			// NOTE: And the Namespace a future comes FROM, last of those —
+			// And the Namespace a future comes FROM, last of those —
 			// see `builtinMemberOrder`.
 			"Async",
-			// NOTE: And the door to a host after every one of them, with what
+			// And the door to a host after every one of them, with what
 			// it answers and the reason it sometimes answers nothing — see
 			// `builtinMemberOrder`.
 			"Http",
@@ -1591,7 +1591,7 @@ declarations {
 		])
 	})
 
-	// NOTE: The size of the declared surface, which is what the library costs
+	// The size of the declared surface, which is what the library costs
 	// to LOAD. Every Program pays that cost before its own first line: these
 	// sources measure about 200 ms to enrich cold and 21 ms warm, and the
 	// figure follows the number of entries rather than anything a Program
@@ -1601,7 +1601,7 @@ declarations {
 	// the way the golden capture is recaptured. `DEVELOPMENT.md` holds the
 	// timings and the rule beside the member order.
 	//
-	// NOTE: One entry per Overload, plus the free Functions, which is the
+	// One entry per Overload, plus the free Functions, which is the
 	// count `README.md` states in its own prose.
 	it("counts the declared entries a load pays for", () => {
 		let stdlib = loadStdlib()
@@ -1625,7 +1625,7 @@ declarations {
 		expect(entries).toBe(750)
 	})
 
-	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the
+	// The other half of the ordering rule. `builtinMemberOrder` is the
 	// SOLE source of order — there is no second table whose key order could
 	// stand in for it. A name listed that no longer exists is dead weight that
 	// reads as intent; a member that exists but is unlisted is appended LAST,
@@ -1641,7 +1641,7 @@ declarations {
 		).toEqual([])
 	})
 
-	// NOTE: The same for the Type table, which two surfaces read in order:
+	// The same for the Type table, which two surfaces read in order:
 	// `closestMatch` breaks a tie on the first candidate, so "did you mean …?"
 	// would name a different Type, and Completion of a Type annotation ships
 	// these unsorted. A conversion moves a name between the halves; neither
@@ -1657,7 +1657,7 @@ declarations {
 		).toEqual([])
 	})
 
-	// NOTE: A standard library Choice is identified by its BARE name. A Module
+	// A standard library Choice is identified by its BARE name. A Module
 	// names its Choices `<modulePath>#<Name>` so that two Modules declaring
 	// `choice Colour` stay distinct; a Program that is no Module passes no path
 	// and keeps the bare name. Nothing else asserts this directly, and the
@@ -1707,7 +1707,7 @@ declarations {
 		}
 	})
 
-	// NOTE: The Protocol table is the one of the three with no order list to
+	// The Protocol table is the one of the three with no order list to
 	// cross-check it against, so this states the order outright. It is read in
 	// order wherever a conformance is searched, and the two ordering Protocols
 	// must stay last — `Comparable` is the first whose signature names a Type
@@ -1723,7 +1723,7 @@ declarations {
 		])
 	})
 
-	// NOTE: A standard library Protocol is known by its bare name, which holds
+	// A standard library Protocol is known by its bare name, which holds
 	// only while no two files declare a Protocol of one name.
 	it("declares every Protocol under a name no other file declares", () => {
 		let declared = readStdlibFiles().flatMap(({ filePath, sourceText }) =>
@@ -1745,7 +1745,7 @@ declarations {
 		).toEqual(Object.keys(protocols))
 	})
 
-	// NOTE: The order lists above check NAMES. They say nothing about the
+	// The order lists above check NAMES. They say nothing about the
 	// values, and a name bound to `{ type: "Error" }` — what an unresolvable
 	// import is bound to, so that one bad entry does not cascade — passes every
 	// one of them while making the builtin useless at every call site. No
@@ -1762,7 +1762,7 @@ declarations {
 		}
 	})
 
-	// NOTE: The shared Scope, proven on the REAL standard library rather than a
+	// The shared Scope, proven on the REAL standard library rather than a
 	// synthetic one. Sorted order hoists `Boolean.es` first, `Ordering.es`
 	// fourth and `Protocols.es` fifth, so each of these resolves a name that a
 	// file OTHER than its own declares — and two of them resolve one declared
@@ -1774,12 +1774,12 @@ declarations {
 		expect(compare.type).toBe("SimpleMethod")
 
 		if (compare.type === "SimpleMethod") {
-			// NOTE: The SAME object the `choice Ordering` in `Ordering.es`
+			// The SAME object the `choice Ordering` in `Ordering.es`
 			// declared, not a structural twin left behind by a table.
 			expect(compare.returnType).toBe(stdlib.types["Ordering"]!)
 		}
 
-		// NOTE: `Boolean.es` declares no Protocol and is hoisted before the
+		// `Boolean.es` declares no Protocol and is hoisted before the
 		// files that do. `Comparable` arrives from the third of them, which
 		// `Boolean.es` names for its own ordering.
 		expect(namespaceNamed(stdlib, "Boolean").conformsTo).toEqual([
@@ -1792,12 +1792,12 @@ declarations {
 		)
 	})
 
-	// NOTE: A free Function belongs to no Namespace, so its nativeness is kept in
+	// A free Function belongs to no Namespace, so its nativeness is kept in
 	// `functionBindings` rather than `nativeBindings` — one flag per entry in
 	// written order, the same shape a Method's overloads carry, and the same
 	// `__overload$N` index. `loop` is the one the real library ships.
 	describe("free Functions", () => {
-		// NOTE: A user Program enriched against a scope that holds one synthetic
+		// A user Program enriched against a scope that holds one synthetic
 		// free Function and the primitive Type tags — enough for the call sites
 		// below to resolve against the declared member without pulling in the real
 		// standard library.
@@ -1823,7 +1823,7 @@ declarations {
 			return result!.program
 		}
 
-		// NOTE: Every FunctionInvocation Node anywhere in a Program, typed or
+		// Every FunctionInvocation Node anywhere in a Program, typed or
 		// simplified — walked structurally so the same helper reads the callee's
 		// `content` (typed) or `name` (simplified) off whatever it finds.
 		function functionInvocations(program: {
@@ -1863,7 +1863,7 @@ declarations {
 			return found
 		}
 
-		// NOTE: The standalone body-less `function` form left the language with
+		// The standalone body-less `function` form left the language with
 		// `__print` — a native free Function exists only as an `overload
 		// function` entry now, so the loader refuses the signature form at
 		// parse.
@@ -1879,7 +1879,7 @@ declarations {
 			).toThrow()
 		})
 
-		// NOTE: A bodied free Function is a single `false` — Essence-implemented,
+		// A bodied free Function is a single `false` — Essence-implemented,
 		// not bound to the runtime.
 		it("collects a bodied free Function as one non-native flag", () => {
 			let stdlib = load([
@@ -1895,7 +1895,7 @@ declarations {
 			expect(stdlib.functionBindings["identity"]).toEqual([false])
 		})
 
-		// NOTE: An `overload function` block keeps its entries in written order,
+		// An `overload function` block keeps its entries in written order,
 		// one native flag each, resolving to an `OverloadedStaticMethod` — the
 		// same Type a Namespace's static overload set resolves to, which is why
 		// `resolveFunctionInvocation` already picks the overload for it.
@@ -1929,11 +1929,11 @@ declarations {
 				})
 			}
 
-			// NOTE: Nothing is emitted for it — the block is all native.
+			// Nothing is emitted for it — the block is all native.
 			expect(stdlib.typedPrograms[0]!.implementation.nodes).toEqual([])
 		})
 
-		// NOTE: The two halves the mechanism exists for. The Enricher picks the
+		// The two halves the mechanism exists for. The Enricher picks the
 		// overload from the Argument LABEL — `first` against the Integer entry,
 		// `second` against the String — and the Simplifier mangles the bare
 		// Identifier callee to the `__overload$N` name that overload's index gives
@@ -1973,7 +1973,7 @@ declarations {
 			).toEqual(["combine__overload$1", "combine__overload$2"])
 		})
 
-		// NOTE: The free-Function twin of the Method numbering above, and the
+		// The free-Function twin of the Method numbering above, and the
 		// reason it needs its own proof: a bodied entry becomes a top-level
 		// `FunctionStatement` of its own, named by its position in the FUNCTION
 		// TYPE rather than by its position among the bodied entries. A native
@@ -2024,7 +2024,7 @@ declarations {
 				])
 			})
 
-			// NOTE: The Node carries the Type of the slot it was NUMBERED for, not
+			// The Node carries the Type of the slot it was NUMBERED for, not
 			// of the first overload nor of the filtered position — the Type a call
 			// site that resolved to that index has already committed to.
 			it("gives the Node the Type of its own slot", () => {
@@ -2044,7 +2044,7 @@ declarations {
 				}
 			})
 
-			// NOTE: The failure the numbering exists to prevent, stated over the
+			// The failure the numbering exists to prevent, stated over the
 			// mixed shapes: no bodied entry ever takes a native entry's name, and
 			// exactly the bodied ones are emitted.
 			it("never emits a definition under a native's export name", () => {
@@ -2071,7 +2071,7 @@ declarations {
 				}
 			})
 
-			// NOTE: The other half of the invariant: where nothing is native the
+			// The other half of the invariant: where nothing is native the
 			// indices are the identity.
 			it("numbers an all bodied block from one, in order", () => {
 				let stdlib = overloadFunction(["bodiedString", "bodiedBoolean"])
@@ -2087,7 +2087,7 @@ declarations {
 			})
 		})
 
-		// NOTE: A bare reference to an overloaded free Function names every
+		// A bare reference to an overloaded free Function names every
 		// overload at once, which no later invocation could disambiguate — the
 		// Validator refuses it in value position.
 		it("refuses an overloaded free Function used as a value", () => {
@@ -2121,7 +2121,7 @@ declarations {
 			).toBe(true)
 		})
 
-		// NOTE: Every Documentation a consumer reaches must be sourceless — an
+		// Every Documentation a consumer reaches must be sourceless — an
 		// overloaded free Function's set-level and per-overload Documentation
 		// alike, exactly as an `overload` Method block's are.
 		it("strips the Documentation Positions off an overloaded free Function", () => {
@@ -2155,14 +2155,14 @@ declarations {
 		})
 	})
 
-	// NOTE: Enriched once per process — every consumer reads the same object,
+	// Enriched once per process — every consumer reads the same object,
 	// so the library is parsed, hoisted and validated exactly once no matter
 	// how many files are compiled.
 	it("caches the loaded standard library", () => {
 		expect(loadStdlib()).toBe(loadStdlib())
 	})
 
-	// NOTE: What the load cost, in the shape the CLI's Timeline can take.
+	// What the load cost, in the shape the CLI's Timeline can take.
 	it("reports its own timing", () => {
 		let stdlib = loadStdlib()
 
@@ -2172,7 +2172,7 @@ declarations {
 		expect(stdlib.timing.total).toBeGreaterThanOrEqual(0)
 	})
 
-	// NOTE: The CENSUS. Every Method the standard library writes that answers a
+	// The CENSUS. Every Method the standard library writes that answers a
 	// Boolean, split into the ones read as another Method's question and the
 	// ones that ask their own — with the leaf each alias resolves to spelled
 	// out, `#0` standing for the Argument a caller writes at that position.
@@ -2261,7 +2261,7 @@ declarations {
 
 		for (let [name, protocol] of Object.entries(stdlib.protocols)) {
 			for (let [methodName, method] of Object.entries(protocol.methods)) {
-				// NOTE: A Protocol's table holds its ancestors' entries too, so
+				// A Protocol's table holds its ancestors' entries too, so
 				// `Orderable` carries the four bodies `Comparable` wrote. Each
 				// body is one row, under the Protocol that WROTE it — the same
 				// rule `protocolsProviding` reads a call by, and what keeps a
@@ -2279,7 +2279,7 @@ declarations {
 			}
 		}
 
-		// NOTE: Sorted and deduplicated, because two Overloads of one name that
+		// Sorted and deduplicated, because two Overloads of one name that
 		// ask one question are one row: `Integer::isLessThanOrEqualTo` takes an
 		// Integer bound and a Rational one, and both are `isGreaterThan`
 		// negated over the bound they were handed.
@@ -2310,7 +2310,7 @@ declarations {
 			"Result::hasFailed -> not Result::hasValue()",
 			"Result::isNot -> not Result::is(#0)",
 			"String::doesNotContain -> not String::contains(#0)",
-			// NOTE: The folding entry of each pair, which is a row of its own
+			// The folding entry of each pair, which is a row of its own
 			// rather than a second spelling of the one above it: the template
 			// carries the Arguments the CALL writes, and a call naming a
 			// `CaseSensitivity` asks a different question from one that does
@@ -2332,7 +2332,7 @@ declarations {
 			"Algebraic::is",
 			"Algebraic::isNegative",
 			"Algebraic::isPositive",
-			// NOTE: Both answer a literal rather than a call, so neither is a
+			// Both answer a literal rather than a call, so neither is a
 			// question of another. They stand for the reason
 			// `Integer::isWholeNumber` does: a Union receiver reaches a Method
 			// only where every member Namespace declares one.
@@ -2342,14 +2342,14 @@ declarations {
 			"Boolean::is",
 			"Boolean::negate",
 			"Boolean::or",
-			// NOTE: The quantified entry of `hasEntries`, whose Argument is a
+			// The quantified entry of `hasEntries`, whose Argument is a
 			// Function — the bare entry beside it is the alias above.
 			"Dictionary::hasEntries",
-			// NOTE: A chain, so it is a question of its own — `hasKey` asks
+			// A chain, so it is a question of its own — `hasKey` asks
 			// the Optional a lookup answers whether it holds anything, and
 			// `hasValue` asks the List of values whether it contains one.
 			"Dictionary::hasKey",
-			// NOTE: The universal quantifier, whose Argument is a Function of
+			// The universal quantifier, whose Argument is a Function of
 			// its own rather than the one the caller wrote — the empty
 			// quantifier beside it forwards its own and is the alias above.
 			"Dictionary::hasOnlyEntries",
@@ -2365,7 +2365,7 @@ declarations {
 			"Integer::isWholeNumber",
 			"List::contains",
 			"List::ends",
-			// NOTE: Both entries are native, so there is no body to read a
+			// Both entries are native, so there is no body to read a
 			// question off. Neither is `removeDuplicates()::length()`
 			// compared against the receiver's, which is what would have made
 			// it a chain.
@@ -2374,7 +2374,7 @@ declarations {
 			"List::hasOnlyItems",
 			"List::is",
 			"List::isEmpty",
-			// NOTE: `isSorted` is native, so there is no body to read a
+			// `isSorted` is native, so there is no body to read a
 			// question off. The two ends of a List are chains instead: each
 			// cuts an end off the receiver and compares it against the List
 			// the call wrote, as `String`'s own pair below does.
@@ -2389,7 +2389,7 @@ declarations {
 			"Rational::isLessThan",
 			"Rational::isWholeNumber",
 			"Record::is",
-			// NOTE: A chain, so it is a question of its own — `isSuccessful`
+			// A chain, so it is a question of its own — `isSuccessful`
 			// asks the STATUS whether it lies between two bounds, and nothing
 			// else names that range.
 			"Response::isSuccessful",
@@ -2397,7 +2397,7 @@ declarations {
 			"Result::is",
 			"String::contains",
 			"String::ends",
-			// NOTE: The four character classes, native, so there is no body to
+			// The four character classes, native, so there is no body to
 			// read a question off — each asks the host for one Unicode class
 			// and nothing else names it.
 			"String::hasOnlyDigits",
@@ -2406,14 +2406,14 @@ declarations {
 			"String::hasOnlyWhitespace",
 			"String::is",
 			"String::isEmpty",
-			// NOTE: A chain, so it is a question of its own — `isOneCharacter`
+			// A chain, so it is a question of its own — `isOneCharacter`
 			// asks the LENGTH whether it is one, and the `Character` Type is
 			// written on it. The literal evaluator holds a row for it, because
 			// a written `"a"` is what proves a Character at a call site.
 			"String::isOneCharacter",
 			"String::starts",
 			"Transcendental::is",
-			// NOTE: Native, so there is no body to read a question off — the
+			// Native, so there is no body to read a question off — the
 			// sign of a form is a primitive of the runtime. `isNegative` is
 			// this one negated, and is in the alias list above.
 			"Transcendental::isPositive",
@@ -2426,12 +2426,12 @@ declarations {
 		])
 	})
 
-	// NOTE: A standard library file is the WHOLE of what the Namespace it
+	// A standard library file is the WHOLE of what the Namespace it
 	// declares contains. No member is merged in from anywhere else — a name the
 	// sources do not write is a name a Program can not reach, which is what
 	// makes `packages/standard-library/sources/*.es` readable as the definition of the language.
 	//
-	// NOTE: The file name and the Namespace name are both taken from a REAL
+	// The file name and the Namespace name are both taken from a REAL
 	// standard library file, which is what makes the claim worth pinning: the
 	// loader is given one synthetic `Boolean.es` and answers with exactly the
 	// one Method that file writes. `negate`, `is`, `isNot`, `and`, `or`,

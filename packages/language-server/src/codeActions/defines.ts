@@ -4,7 +4,7 @@ import { indentationOf, overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk, walkNode } from "./lookups"
 
-// NOTE: An if/else whose every branch does nothing but answer IS a definition
+// An if/else whose every branch does nothing but answer IS a definition
 // by cases, written the other way round — the branch first and the case after
 // it, rather than the case first and the branch after. Both spellings say the
 // same thing and the Compiler makes the same Program of them, so the rewrite
@@ -24,14 +24,14 @@ import { walk, walkNode } from "./lookups"
 
 type Arm = {
 	value: parser.ExpressionNode
-	// NOTE: Null on the arm that answers where nothing above it did — the
+	// Null on the arm that answers where nothing above it did — the
 	// `otherwise`, and the last `else`.
 	condition: parser.ExpressionNode | null
 }
 
 type Reading = {
 	arms: Array<Arm>
-	// NOTE: What the Nodes above say their span is written as, whitespace
+	// What the Nodes above say their span is written as, whitespace
 	// removed — the shape the live text is measured against.
 	written: string
 }
@@ -42,7 +42,7 @@ export function defineActions(
 	range: common.Position,
 ): Array<CodeActionEntry> {
 	let entries: Array<CodeActionEntry> = []
-	// NOTE: Built on the first if/else that gets this far and not before — the
+	// Built on the first if/else that gets this far and not before — the
 	// Nodes this answers about are rare, and walking every Function of a
 	// Program to find the one a Statement stands in is not work to do on a
 	// request that offers nothing.
@@ -52,7 +52,7 @@ export function defineActions(
 	> | null = null
 	let answeredType = (node: parser.ImplementationNode) =>
 		(answers ??= answeredTypes(program)).get(node) ?? null
-	// NOTE: The `else if`s of a cascade the outermost `if` already answers for.
+	// The `else if`s of a cascade the outermost `if` already answers for.
 	// Every one of them is an if/else of its own and would offer a `define` of
 	// its own — the same rewrite, one arm shorter, under the same title. The
 	// walk reaches a Node before the Nodes it holds, so the outer one is always
@@ -119,7 +119,7 @@ export function defineActions(
 	return entries
 }
 
-// NOTE: The arms an if/else cascade spells out, or null where one of its
+// The arms an if/else cascade spells out, or null where one of its
 // branches does anything other than answer. An `else if` is read recursively,
 // which is what turns a cascade into one flat list of arms — the shape a
 // `define` is written in.
@@ -162,7 +162,7 @@ function readIfElse(
 
 	let rest = readIfElse(only, lines)
 
-	// NOTE: `head` ends on the `else` and the reading below opens on its `if`,
+	// `head` ends on the `else` and the reading below opens on its `if`,
 	// so the two meet as `} else if` — the chained form, and the only one this
 	// admits. `else { if … }` is the same AST written with two more braces, and
 	// the comparison against the buffer is what tells them apart.
@@ -171,7 +171,7 @@ function readIfElse(
 		: { arms: [opening, ...rest.arms], written: head + rest.written }
 }
 
-// NOTE: The arms of a `define`, which are already the shape an if/else is
+// The arms of a `define`, which are already the shape an if/else is
 // written from. An arm answering with a `define` of its own is left alone: the
 // inner ladder would have to be written as the answer of one branch, on lines
 // of its own, at an indentation this rewrite has no way to correct.
@@ -222,7 +222,7 @@ function readDefine(
 	}
 }
 
-// NOTE: One arm to a line, at one indent inside the block, exactly as the
+// One arm to a line, at one indent inside the block, exactly as the
 // `missing-case` fix writes its Handlers. The column the Formatter draws every
 // arm's `if` through is deliberately not written here: which arms share one is
 // settled against the room left on the page when the run is reached, which is
@@ -239,7 +239,7 @@ function writtenDefine(
 	lines: Array<string>,
 	indentation: string,
 ): string | null {
-	// NOTE: A return Type laid out over several lines can not be copied into
+	// A return Type laid out over several lines can not be copied into
 	// the one the `define` is written on, and leaving it out is not the same
 	// rewrite — an arm answering with a bare `#Case` has nothing left to read
 	// its Choice off. Nothing is offered rather than something that may not
@@ -264,7 +264,7 @@ function writtenDefine(
 	return `<- define${answered} {\n${written}${indentation}}`
 }
 
-// NOTE: One block per arm, joined by the `else` between them — an arm with a
+// One block per arm, joined by the `else` between them — an arm with a
 // Condition writes its `if` in front of its block and the `otherwise` writes
 // none, so the cascade falls out as `if … {} else if … {} else {}`. `else if`
 // is one written form rather than a block holding an `if`, which is what keeps
@@ -293,7 +293,7 @@ function writtenIfElse(
 		.join(" else ")
 }
 
-// NOTE: What a branch of exactly one Return answers with, and null for every
+// What a branch of exactly one Return answers with, and null for every
 // other branch — a branch that declares something, that answers in two places,
 // or that falls off its end has no arm to become.
 function onlyReturn(
@@ -308,7 +308,7 @@ function onlyReturn(
 	return only.expression
 }
 
-// NOTE: The `else if` rungs below one if/else — everything an offered rewrite
+// The `else if` rungs below one if/else — everything an offered rewrite
 // takes with it, and so everything that must not be offered again on its own.
 function chainOf(
 	node: parser.IfElseStatementNode,
@@ -322,7 +322,7 @@ function chainOf(
 	return [only, ...chainOf(only)]
 }
 
-// NOTE: What a `<-` written at each Statement of the Program ANSWERS, which is
+// What a `<-` written at each Statement of the Program ANSWERS, which is
 // what a `define` standing in for one has to be annotated with. Not the
 // enclosing Function's return Type: a Match Handler's body answers the MATCH,
 // which carries a `-> Type` of its own, and a `define` written there with the
@@ -388,7 +388,7 @@ function rewrite(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// NOTE: Never, for the reason the path rewrite is not: the two
+		// Never, for the reason the path rewrite is not: the two
 		// spellings mean one thing, and an Editor applying one of them unasked
 		// would be deciding a matter of taste for the reader.
 		isPreferred: false,

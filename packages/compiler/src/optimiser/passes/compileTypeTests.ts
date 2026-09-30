@@ -9,7 +9,7 @@ import {
 } from "../residual"
 import { rewriteNodes } from "../walk"
 
-// NOTE: A Match asks the runtime which Type a value has, and it asked in the
+// A Match asks the runtime which Type a value has, and it asked in the
 // most general way there is: `$type.isValueOfType(_self, { type: "Case",
 // choice: "Optional", name: "Value", members: { value: { type: "Integer" } } })`
 // builds a descriptor tree at every test, hands it to a function that walks its
@@ -20,19 +20,19 @@ import { rewriteNodes } from "../walk"
 //
 //   _self[$type.typeKeySymbol] === "Optional#Value"
 //
-// NOTE: The saving is not only the call. A List Matcher's descriptor check
+// The saving is not only the call. A List Matcher's descriptor check
 // walks EVERY ITEM of the List — `isValueOfType` is what a `List<Integer>`
 // descriptor means — so `case List` over a ten thousand item List was ten
 // thousand Type checks to answer a question the tag answers in one. That is the
 // difference between O(n) and O(1) per Handler tested, and a Match inside a loop
 // pays it per turn.
 //
-// NOTE: What decides is `residual.ts`, which is where the erasure rules live and
+// What decides is `residual.ts`, which is where the erasure rules live and
 // which `elide-final-match-test` and (later) `compile-union-dispatch` ask as
 // well. This pass is the emission half: it takes a residual of `tag` and writes
 // the test, and leaves every other answer exactly as the Simplifier stated it.
 //
-// NOTE: A Handler with a LITERAL Matcher (`case 0`, `case "beta"`) has no Type
+// A Handler with a LITERAL Matcher (`case 0`, `case "beta"`) has no Type
 // check to replace — `anyIs(_self, 0)` is the whole test, and it answers false
 // across differing Types on its own. What it has instead is a call into the
 // universal structural equality to decide something two scalars decide with an
@@ -52,11 +52,11 @@ import { rewriteNodes } from "../walk"
 // that pass emits them: two Strings are equal when their CHARACTERS are, which
 // is a comparison of canonically normalised forms.
 //
-// NOTE: Member literals and Guards are untouched, for the opposite reason: they
+// Member literals and Guards are untouched, for the opposite reason: they
 // are ANDed onto whichever test the Matcher produced, so replacing the Matcher's
 // half leaves them saying what they said.
 //
-// NOTE: `memberTypes` — what a Case Matcher's payload Pattern requires — IS
+// `memberTypes` — what a Case Matcher's payload Pattern requires — IS
 // compiled, because it is a Type check like the Matcher's own and was the one
 // left asking the runtime the general question. Each requirement is decided by
 // the same `residual.ts` rules against the Type the value declares AT that
@@ -65,7 +65,7 @@ import { rewriteNodes } from "../walk"
 // constants` can hoist out of the test. Nothing about WHICH values the Handler
 // accepts changes; only how it is asked.
 
-// NOTE: A `require #Value(first) = x` is a Handler standing on its own, and it
+// A `require #Value(first) = x` is a Handler standing on its own, and it
 // is compiled by the same reading a Match's Handler is — otherwise the identical
 // question would be asked the general way in a test and the cheap way in the
 // `match` the test is spelled like.
@@ -120,7 +120,7 @@ function compileHandler(
 			: { ...handler, memberTests }
 	}
 
-	// NOTE: A literal Matcher's test IS the comparison, so the compiled form of
+	// A literal Matcher's test IS the comparison, so the compiled form of
 	// it goes where a Type check's compiled form goes — the Rewriter reads
 	// `typeTest` first and falls back to `anyIs` over the literal where there is
 	// none. The `literal` itself stays: it is what `elide-final-match-test`
@@ -150,7 +150,7 @@ function compileHandler(
 	}
 }
 
-// NOTE: The scalar kinds a literal Matcher can be compiled for, and null for
+// The scalar kinds a literal Matcher can be compiled for, and null for
 // everything else. BOTH Types must be exactly the kind: the matched value's,
 // because a Union-typed scrutinee may hold a value of any member and reading
 // `.value` off it decides nothing, and the literal's, because the two have to be
@@ -181,7 +181,7 @@ function literalTest(
 	}
 }
 
-// NOTE: One compiled check per requirement, under the spine that reaches it.
+// One compiled check per requirement, under the spine that reaches it.
 // The value each is asked OF is the member read, not `_self` — the Rewriter
 // builds the same read from `memberTypes`, and building it here instead is what
 // puts the descriptor somewhere `pool-constants` can see.
@@ -216,7 +216,7 @@ function compileMemberTests(
 	return tests
 }
 
-// NOTE: The read the requirement is asked of — `_self.payload.origin` — built
+// The read the requirement is asked of — `_self.payload.origin` — built
 // from the spine the Enricher keyed it by, through the same helper
 // `compile-record-members` builds its member reads with. A member name can hold
 // no dot, so splitting on one can not mistake anything else for a spine.
@@ -234,11 +234,11 @@ function declaredTypeAtPath(
 	return steps.reduce(memberTypeAt, valueType)
 }
 
-// NOTE: `_self` is the name the Rewriter binds the matched value to, and the
+// `_self` is the name the Rewriter binds the matched value to, and the
 // name `@` lowers to inside a Handler's body — one value under one name, so a
 // test written here reads what the body reads.
 //
-// NOTE: No Position, deliberately. A Handler's Type check is not a thing anyone
+// No Position, deliberately. A Handler's Type check is not a thing anyone
 // wrote: the source says `case #Value(count)`, and the span of that is the
 // Handler, whose body carries its own Positions. Mapping the test to the whole
 // Match — the only Position in reach — would put every Handler's `if` on the
@@ -251,7 +251,7 @@ function tagTest(
 	return tagTestOf(matchedValue(valueType), tag)
 }
 
-// NOTE: The same check asked of an arbitrary read rather than of `_self` — what
+// The same check asked of an arbitrary read rather than of `_self` — what
 // a payload requirement needs, since it is about a member of the matched value
 // and not the value itself.
 function tagTestOf(
@@ -269,7 +269,7 @@ function tagTestOf(
 	}
 }
 
-// NOTE: The check the runtime performs, written out where the Matcher stood.
+// The check the runtime performs, written out where the Matcher stood.
 // The BYTES are what they were — this is the same call over the same
 // descriptor, which is what the Rewriter emits for a Handler this pass left
 // alone — and what changes is where the descriptor sits: in an Expression

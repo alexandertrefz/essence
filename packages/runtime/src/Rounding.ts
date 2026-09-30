@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `Rounding` is a builtin Choice, like `Side` and `NumberFormat` — its
+// `Rounding` is a builtin Choice, like `Side` and `NumberFormat` — its
 // values carry Case tags (`"Rounding#Nearest"`) exactly as user-declared Cases
 // do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method
@@ -22,7 +22,7 @@ export type RoundingType =
 	| UpType
 	| TowardZeroType
 
-// NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
+// Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
 export const nearest: NearestType = { [typeKeySymbol]: "Rounding#Nearest" }
 export const nearestEven: NearestEvenType = {

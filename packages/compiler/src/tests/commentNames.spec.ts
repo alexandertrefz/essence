@@ -4,7 +4,7 @@ import * as path from "node:path"
 
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
-// NOTE: A comment that names code by a name nothing declares sends its reader
+// A comment that names code by a name nothing declares sends its reader
 // looking for a Function, a Type or a Method label that is not there. A rename
 // leaves such names behind: the code moves on and the note above it keeps the
 // old spelling. So every name a comment quotes in backticks is looked for in the
@@ -29,11 +29,11 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
 
-// NOTE: This file's own code is left out of what counts as present. Its lists
+// This file's own code is left out of what counts as present. Its lists
 // and its examples spell every name they allow, which would make each one so.
 const THIS_FILE = path.relative(REPOSITORY_ROOT, import.meta.path)
 
-// NOTE: Names from outside this repository, quoted as the platform, a protocol
+// Names from outside this repository, quoted as the platform, a protocol
 // or a tool spells them. Each is a name the code has no reason to write.
 const OUTSIDE_NAMES = new Map([
 	["AsyncLocalStorage", "Node's `node:async_hooks` class"],
@@ -54,7 +54,7 @@ const OUTSIDE_NAMES = new Map([
 	["mapError", "Elm's name for the transform on a failure"],
 ])
 
-// NOTE: Names a comment writes for what the code does NOT have: an alternative
+// Names a comment writes for what the code does NOT have: an alternative
 // a design note weighs and turns down, a slip a Diagnostic is shown, a name in
 // an example Program. An entry written as a selector allows that one label.
 // What the code USED TO have is not one of these. A note says why the code is
@@ -83,7 +83,7 @@ const ABSENT_NAMES = new Map([
 	["quadrupledValue", "the example Program's Method in `rewrite.ts`"],
 ])
 
-// NOTE: One run of Comment lines: a block, or `//` lines one under another, or
+// One run of Comment lines: a block, or `//` lines one under another, or
 // `§` or `§§` lines one under another. A name in backticks can break across
 // two of its lines, so a run is read as one text.
 type CommentRun = {
@@ -96,7 +96,7 @@ type Scanned = {
 	code: string
 }
 
-// NOTE: What a `/` after this token starts. After a value it divides, and
+// What a `/` after this token starts. After a value it divides, and
 // anywhere else it opens a regular expression, whose text is code.
 const regexpAfterWords = new Set([
 	"return",
@@ -124,10 +124,10 @@ export function scanScript(file: string, source: string): Scanned {
 	let index = 0
 	let line = 1
 	let codeStart = 0
-	// NOTE: The brace depth each open template hole returns to its template at.
+	// The brace depth each open template hole returns to its template at.
 	let holes: Array<number> = []
 	let depth = 0
-	// NOTE: Whether the token before a `/` ends a value, which makes the `/` a
+	// Whether the token before a `/` ends a value, which makes the `/` a
 	// division rather than the start of a regular expression.
 	let afterValue = false
 	let lastRun: { run: CommentRun; line: number } | null = null
@@ -149,7 +149,7 @@ export function scanScript(file: string, source: string): Scanned {
 		code.push(source.slice(codeStart, end), " ")
 	}
 
-	// NOTE: An escape skips the character after it, which can be a line break.
+	// An escape skips the character after it, which can be a line break.
 	let skipEscape = () => {
 		if (source[index + 1] === "\n") {
 			line++
@@ -309,7 +309,7 @@ export function scanScript(file: string, source: string): Scanned {
 				end++
 			}
 
-			// NOTE: A line that never closes it was a division after all.
+			// A line that never closes it was a division after all.
 			if (source[end] === "/") {
 				index = end + 1
 
@@ -361,7 +361,7 @@ export function scanScript(file: string, source: string): Scanned {
 	return { runs, code: code.join("") }
 }
 
-// NOTE: An Essence source. `§` opens a Comment that runs to the end of its line,
+// An Essence source. `§` opens a Comment that runs to the end of its line,
 // and a String runs from `"` to `"` with its interpolation holes in between,
 // whose code can hold a String of its own.
 export function scanEssence(file: string, source: string): Scanned {
@@ -470,7 +470,7 @@ export function scanEssence(file: string, source: string): Scanned {
 	return { runs, code: code.join("") }
 }
 
-// NOTE: An Astro component is TypeScript between its `---` fences and inside
+// An Astro component is TypeScript between its `---` fences and inside
 // its `<script>` elements, and markup everywhere else. The markup's comments are
 // the `/* */` blocks its expressions and styles hold; the rest of it is read as
 // code, because its expressions name the frontmatter's bindings.
@@ -516,7 +516,7 @@ export function scanAstro(file: string, source: string): Scanned {
 
 const scannedExtensions = /\.(?:[cm]?[jt]sx?|es|astro)$/
 
-// NOTE: A generated file's comments are written by its generator, whose own
+// A generated file's comments are written by its generator, whose own
 // comments are the ones to hold; its code still counts, since other files'
 // comments name what it declares.
 const generatedFile = /\.generated\.ts$/
@@ -566,7 +566,7 @@ async function readRepository(): Promise<Repository> {
 	let fileCount = 0
 
 	for (let file of files) {
-		// NOTE: A file's name is a name too: `bun test stdlibProse` names one.
+		// A file's name is a name too: `bun test stdlibProse` names one.
 		words.add(path.basename(file).split(".")[0]!)
 
 		let absolute = path.join(REPOSITORY_ROOT, file)
@@ -598,15 +598,15 @@ async function readRepository(): Promise<Repository> {
 	return repository
 }
 
-// NOTE: One name a comment quotes, as it is written and where.
+// One name a comment quotes, as it is written and where.
 type Quoted = {
 	file: string
 	line: number
 	span: string
-	// NOTE: The words the name is joined from, each with the labels a
+	// The words the name is joined from, each with the labels a
 	// selector gives it. `null` where no selector is written.
 	parts: Array<{ word: string; labels: Array<string> | null }>
-	// NOTE: `validate…` and `hasOnly*` name a family by its opening, and
+	// `validate…` and `hasOnly*` name a family by its opening, and
 	// `*Natives` by its ending. The word is then matched against the start or
 	// the end of the names in the code.
 	family: "prefix" | "suffix" | null
@@ -670,13 +670,13 @@ export function quotedNames(run: CommentRun): Array<Quoted> {
 	return quoted
 }
 
-// NOTE: Written the way code names are: letters only, with a capital and a
+// Written the way code names are: letters only, with a capital and a
 // lowercase letter both in it.
 function looksLikeCode(word: string): boolean {
 	return /^[A-Za-z]+$/.test(word) && /[a-z]/.test(word) && /[A-Z]/.test(word)
 }
 
-// NOTE: The labels each named Method is declared or called with. A label is
+// The labels each named Method is declared or called with. A label is
 // the first word of an Argument followed by the value or Parameter it labels,
 // as in `slice(from 0)` or `(from start: Integer)`. A first word followed by a
 // comma, a colon or an operator is a value, or a TypeScript Parameter, and says
@@ -756,7 +756,7 @@ export function labelsOf(
 	return labels
 }
 
-// NOTE: The top-level Arguments of the parenthesised list opening at `open`,
+// The top-level Arguments of the parenthesised list opening at `open`,
 // and where it closes. Brackets nest and Strings are stepped over whole.
 function argumentsAt(
 	code: string,
@@ -815,7 +815,7 @@ type Report = {
 	quotedCount: number
 	checkedCount: number
 	selectorCount: number
-	// NOTE: The allowed names some comment still quotes and the code still
+	// The allowed names some comment still quotes and the code still
 	// lacks. An entry outside this set has nothing left to allow.
 	allowedInUse: Set<string>
 }
@@ -921,7 +921,7 @@ function commentsOf(scanned: Scanned): Array<string> {
 }
 
 describe("Names Comments Quote", () => {
-	// NOTE: The scanners decide what is a comment and what is code, so every
+	// The scanners decide what is a comment and what is code, so every
 	// other check here is only as good as they are.
 	describe("scanners", () => {
 		it("should read a comment marker inside a String as code", () => {
@@ -1056,7 +1056,7 @@ describe("Names Comments Quote", () => {
 	})
 
 	it("should find names to check", async () => {
-		// NOTE: A guard on the scanners. The checks that follow pass on an
+		// A guard on the scanners. The checks that follow pass on an
 		// empty report, so a scanner that read no file, or that found no
 		// comment in the files it read, would make this whole file a no-op
 		// that nobody notices.
@@ -1073,7 +1073,7 @@ describe("Names Comments Quote", () => {
 		expect(reportOf((await danglingNames()).findings)).toBe("")
 	})
 
-	// NOTE: An allowed name no comment quotes any more, or one the code now
+	// An allowed name no comment quotes any more, or one the code now
 	// writes, allows nothing, and it would allow the next stale reference
 	// that happened to spell it.
 	it("should allow only names a comment quotes and the code lacks", async () => {

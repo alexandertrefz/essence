@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: Whether every path through a body reaches a `<-`. Two stages need the
+// Whether every path through a body reaches a `<-`. Two stages need the
 // same answer and must never disagree: the Validator refuses a body that
 // promises a value and can fall off its end, and the Simplifier gives the
 // bodies that may fall off — the ones returning unit — the `return` that says

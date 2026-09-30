@@ -11,7 +11,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: A bound Type Parameter is answered by a WITNESS handed in beside the
+// A bound Type Parameter is answered by a WITNESS handed in beside the
 // Arguments, and a conditional conformance's witness is `boundConformance(<map>,
 // [<witnesses>])` — one level per container. So a call binding `Key :=
 // List<Item>` owes exactly one level, and a level too many hands `List::is` two
@@ -33,7 +33,7 @@ import { validate } from "../validator/index"
 // the same question asked with no generics at all — which is the oracle,
 // because the shapes this file is about all used to answer wrongly.
 //
-// NOTE: Two of the guards here are stronger than the rest, and deliberately so.
+// Two of the guards here are stronger than the rest, and deliberately so.
 // A Dictionary reads a List key through the canonical encoding rather than
 // through the witness, so a Program using only the standard library's `is`
 // answers RIGHT even under a wrong witness — the encoding routes past the
@@ -55,7 +55,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// NOTE: The emitted module is written to a throwaway file and imported, as in
+// The emitted module is written to a throwaway file and imported, as in
 // `hybridIntegers.spec.ts` — what is asserted is what the Program PRINTS.
 async function outputOf(source: string): Promise<Array<string>> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-witness-"))
@@ -88,7 +88,7 @@ async function outputOf(source: string): Promise<Array<string>> {
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
-// NOTE: One emitted Function, from its `function <name>(` line to the `}` that
+// One emitted Function, from its `function <name>(` line to the `}` that
 // closes it in column one — the witness Expression is written across several
 // lines, so counting on a single line would miss the second level exactly where
 // it matters.
@@ -109,7 +109,7 @@ function levelsIn(body: string): number {
 	return body.split("boundConformance").length - 1
 }
 
-// NOTE: A written `is` that READS its value, so a witness handed the wrong kind
+// A written `is` that READS its value, so a witness handed the wrong kind
 // of value does not quietly answer `true` — it dies in the String runtime, which
 // is what master does with the `nestedDistinct` shape.
 const byLength = [
@@ -136,7 +136,7 @@ function program(body: string): string {
 	return `implementation {\n${body}\n}`
 }
 
-// NOTE: The Namespace, the three values and the calls all live inside a
+// The Namespace, the three values and the calls all live inside a
 // Function, because a Namespace written for a refinement has to be declared
 // where it is used.
 function inRun(body: string): string {
@@ -158,7 +158,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 			].join("\n"),
 		)
 
-		// NOTE: `distinct`'s item Type is `List<Item>`, so the witness owed is
+		// `distinct`'s item Type is `List<Item>`, so the witness owed is
 		// `boundConformance(List, [Item__conformance])` — ONE level. Read off
 		// the emitted text rather than off the answer, because the answer can
 		// be right for the wrong reason: a branded witness routes a List key
@@ -172,7 +172,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 		})
 	})
 
-	// NOTE: The whole bug in two lines. `sameName` and `otherName` are the same
+	// The whole bug in two lines. `sameName` and `otherName` are the same
 	// Function under two spellings of one Type Parameter, and only the spelling
 	// that collides with the callee's used to answer wrongly.
 	describe("a caller whose Type Parameter is spelled like the callee's", () => {
@@ -204,7 +204,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the depth the Type Parameter stands at", () => {
-		// NOTE: One, two and three containers between the Parameter and the
+		// One, two and three containers between the Parameter and the
 		// item — each level is a `boundConformance` the call has to curry, and
 		// the fault multiplied them rather than counting them.
 		it("should answer alike one, two and three deep", async () => {
@@ -242,7 +242,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("a witness forwarded before it is used", () => {
-		// NOTE: Through one more Function, through two, and captured in a
+		// Through one more Function, through two, and captured in a
 		// closure — each hop re-solves the bound, so a hop that wrapped the
 		// witness once would wrap it again.
 		it("should answer alike through one hop, two hops and a closure", async () => {
@@ -305,7 +305,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("a written witness whose answer differs from the structural one", () => {
-		// NOTE: `ByLength` says "ab" is "cd" and is not "c". A witness one
+		// `ByLength` says "ab" is "cd" and is not "c". A witness one
 		// level too deep hands it a List where it expects a String and dies
 		// reading the String's characters — on master this Program does not
 		// finish. The last pair is the same question with no generics, which is
@@ -346,7 +346,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the container the Type Parameter is bound to", () => {
-		// NOTE: Every generic shape the language has, each holding the
+		// Every generic shape the language has, each holding the
 		// `ByLength` String so a wrong witness shows as a wrong count rather
 		// than as two values that happen to compare equal. The last pair is the
 		// oracle: the same two values, no generics anywhere.
@@ -495,7 +495,7 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the Protocol the bound names", () => {
-		// NOTE: Equatable is not the only conditional conformance a container
+		// Equatable is not the only conditional conformance a container
 		// carries. `Backwards` orders "a" above "b" and `Shout` renders a
 		// String as its own uppercase, so `sort`, `highestItem`, `join` and an
 		// interpolation each answer something the structural witness never

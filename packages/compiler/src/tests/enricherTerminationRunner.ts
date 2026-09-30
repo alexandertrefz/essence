@@ -1,4 +1,4 @@
-// NOTE: The child half of `enricherTermination.spec.ts` — one job in on stdin,
+// The child half of `enricherTermination.spec.ts` — one job in on stdin,
 // one word out. It exists so the spec can put a WALL CLOCK around work that
 // might not come back: a run that does not terminate can not be caught in the
 // process that started it, and a `bun test` that inherits the spin reports

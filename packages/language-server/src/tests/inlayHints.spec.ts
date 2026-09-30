@@ -18,7 +18,7 @@ function allHintsOf(source: string) {
 	return findInlayHints(enrichedProgram)
 }
 
-// NOTE: What a Hint SHOWS. The `textEdit` every Hint carries is asserted on
+// What a Hint SHOWS. The `textEdit` every Hint carries is asserted on
 // its own further down rather than repeated in each expectation here.
 function hintsOf(source: string) {
 	return allHintsOf(source).map((hint) => ({
@@ -28,7 +28,7 @@ function hintsOf(source: string) {
 	}))
 }
 
-// NOTE: Applied back to front, so that an earlier insertion on a line does not
+// Applied back to front, so that an earlier insertion on a line does not
 // shift the column a later one was measured at.
 function applyHints(source: string): string {
 	let lines = source.split("\n")
@@ -77,7 +77,7 @@ describe("Inlay Hints", () => {
 	})
 
 	it("should not annotate a Function literal that annotates itself", () => {
-		// NOTE: The literal already spells the whole signature out on the same
+		// The literal already spells the whole signature out on the same
 		// line — repeat it beside the name is noise the width of a Type.
 		let source = [
 			"implementation {",
@@ -98,7 +98,7 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)[0].label).toBe(": { firstName: String }")
 	})
 
-	// NOTE: A Hint is offered as an applied EDIT, so what it shows has to parse
+	// A Hint is offered as an applied EDIT, so what it shows has to parse
 	// back as what it says — `Standing` does, wherever the Alias is in scope,
 	// and it is what a reader would have written.
 	it("should annotate a Record reached through its Alias by name", () => {
@@ -167,7 +167,7 @@ describe("Inlay Hints", () => {
 		])
 	})
 
-	// NOTE: Parameter name hints are deliberately absent — a labelled
+	// Parameter name hints are deliberately absent — a labelled
 	// Parameter requires its label at the call site, and a label-less one has
 	// no name to show, so a hint could only ever repeat what is already there.
 	it("should not annotate Arguments of a labelled call", () => {
@@ -193,7 +193,7 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
-	// NOTE: A contextually typed Function literal shows neither its Parameter
+	// A contextually typed Function literal shows neither its Parameter
 	// Types nor its return Type anywhere in the source — they come from the
 	// signature it is passed to — which is exactly what a Hint is for.
 	describe("Contextual Function literals", () => {
@@ -295,7 +295,7 @@ describe("Inlay Hints", () => {
 			expect(labels).toContain(": Number | String")
 		})
 
-		// NOTE: A Guard is where a contextually typed literal is hardest to
+		// A Guard is where a contextually typed literal is hardest to
 		// read back — `@` is narrowed by the Matcher, so the literal's Types
 		// come from a signature the line does not mention.
 		it("should annotate a Function literal inside a Match Guard", () => {
@@ -349,7 +349,7 @@ describe("Inlay Hints", () => {
 			)
 		})
 
-		// NOTE: The divisor is COMPUTED, deliberately — a written `2` is its
+		// The divisor is COMPUTED, deliberately — a written `2` is its
 		// own proof of not being zero and reaches `divide`'s total entry, whose
 		// Hint is the `NonZeroRational` asserted alongside — neither operand
 		// is zero, so the quotient is not either. It is computed with
@@ -390,7 +390,7 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should not resolve `value(defaultingTo:)` on a flat spelled-out Union", () => {
-			// NOTE: `Optional` is a nominal Choice, and `value(defaultingTo:)` is a Method
+			// `Optional` is a nominal Choice, and `value(defaultingTo:)` is a Method
 			// of that Choice and of nothing else. No SHAPE of Union reaches it:
 			// a Method called on a Union has to be a Method of every member,
 			// and neither `Integer` nor `Rational` has one — so `sure` is left
@@ -420,7 +420,7 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should not resolve `value(defaultingTo:)` on a named member of a wider Union", () => {
-			// NOTE: This test used to be about a `Nothing` BURIED inside a
+			// This test used to be about a `Nothing` BURIED inside a
 			// named Alias: `type MaybeInt = Integer | Nothing` as a member of
 			// `MaybeInt | Rational`, where a remainder fallback let the
 			// `Nothing` an `value(defaultingTo:)` expected claim the buried one and typed
@@ -451,7 +451,7 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should keep an `Optional` branch whole in a Union inferred from mixed branches", () => {
-			// NOTE: One branch returns `Optional<Rational>`, the other a bare
+			// One branch returns `Optional<Rational>`, the other a bare
 			// Integer, and the inferred Union keeps the two side by side — the
 			// Optional stays ONE nested member. Back when `Optional<X>` was an
 			// Alias for a Union, the two branches dissolved into each other
@@ -462,7 +462,7 @@ describe("Inlay Hints", () => {
 			// `value(defaultingTo:)` to call — `sure` gets no Type and no Hint. A value
 			// that is fallible has to say so by being an `Optional` the whole
 			// way out.
-			// NOTE: The divisor is COMPUTED (`4::subtract(2)`),
+			// The divisor is COMPUTED (`4::subtract(2)`),
 			// deliberately — a written `2` is its own proof of not being zero
 			// and reaches `divide`'s total entry, and this branch has to stay
 			// fallible for the Union to carry an `Optional` at all. A
@@ -505,11 +505,11 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should keep a compound payload whole — and `value(defaultingTo:)` collapses it", () => {
-			// NOTE: The stdlib spells mixed fallible results as one nested
+			// The stdlib spells mixed fallible results as one nested
 			// payload (`Optional<Integer | Rational>`), which is what lets
 			// `value(defaultingTo:)` bind the payload in one piece.
 			//
-			// NOTE: The base is COMPUTED, with the difference no refinement of
+			// The base is COMPUTED, with the difference no refinement of
 			// Integer closes over. A written one proves it is not zero, and a
 			// power is empty only where a zero base meets a negative exponent
 			// — so a written base answers the payload without a wrapper and
@@ -530,7 +530,7 @@ describe("Inlay Hints", () => {
 		})
 	})
 
-	// NOTE: A Hint's label is the annotation the source left out, and the Hint
+	// A Hint's label is the annotation the source left out, and the Hint
 	// sits where that annotation belongs — which is what makes accepting one a
 	// plain insertion rather than an inference of its own.
 	describe("Accepting a Hint", () => {
@@ -607,7 +607,7 @@ describe("Inlay Hints", () => {
 	})
 })
 
-// NOTE: The anchor an inferred-Type Hint sits at is the end of a Parameter's
+// The anchor an inferred-Type Hint sits at is the end of a Parameter's
 // Position, and that Position stops at the TYPE and never covers a default —
 // `codeActions` offers the same span as an APPLIED edit, so a Hint written after
 // `= 1` would produce source that does not parse. The two can not actually meet
@@ -657,7 +657,7 @@ describe("Inlay Hints beside a default", () => {
 	})
 })
 
-// NOTE: A Hint IS an applied edit — `codeActions` offers every one of them as
+// A Hint IS an applied edit — `codeActions` offers every one of them as
 // "Add explicit Type annotation" — so its text has to parse back as the Type it
 // names. A Method taken as a value has no defaults to print (the Enricher drops
 // them: only a direct call reaches the frame that fills one in) and `printType`
@@ -686,7 +686,7 @@ describe("An Inlay Hint for a defaulted signature read as a value", () => {
 			},
 		])
 
-		// NOTE: Applied where it is offered, and parsed — the one thing a Hint
+		// Applied where it is offered, and parsed — the one thing a Hint
 		// that is also an edit has to survive. A `?` on `by` would parse as a
 		// Parameter LABELLED `by?` and then fail against the value it annotates.
 		let annotated = source.replace(
@@ -698,7 +698,7 @@ describe("An Inlay Hint for a defaulted signature read as a value", () => {
 	})
 })
 
-// NOTE: An arm declares nothing to annotate, but a contextually typed Function
+// An arm declares nothing to annotate, but a contextually typed Function
 // literal written as an arm's value shows its Types nowhere in the source —
 // which is exactly the case a Hint answers.
 describe("Inlay Hints inside a define", () => {
@@ -719,7 +719,7 @@ describe("Inlay Hints inside a define", () => {
 	})
 })
 
-// NOTE: What a Constant holding work is — the difference between `Started<…>`
+// What a Constant holding work is — the difference between `Started<…>`
 // and the value it will answer with is the whole reason to read one — and the
 // Function literal written under the Keyword, which shows its Types nowhere in
 // the source and is reached by nothing where the walk has no case for `start`.
@@ -751,7 +751,7 @@ describe("Inlay Hints around start and complete", () => {
 	})
 })
 
-// NOTE: A Hint's LABEL and its EDIT are two different sentences about one Type,
+// A Hint's LABEL and its EDIT are two different sentences about one Type,
 // and this is where they part company: the label names the Alias the Type was
 // declared under wherever the reader is standing, and the edit may only write a
 // name the position can resolve. Every one of these applies the edit and
@@ -784,7 +784,7 @@ describe("Inlay Hints that write a name", () => {
 		return (name: string) => canonicalPath(path.join(root, name))
 	}
 
-	// NOTE: The Hints of a LINKED Module, which is the only way the import
+	// The Hints of a LINKED Module, which is the only way the import
 	// block's own Types are in the Program at all — a Hint over `origin()`
 	// names a Record another file declares, and whether this file can write
 	// that name is a question about what came across.
@@ -880,7 +880,7 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// NOTE: A Union Alias goes the same way and always did — its arms are Types
+	// A Union Alias goes the same way and always did — its arms are Types
 	// in their own right, so the pipe list is a spelling this file can read.
 	it("should apply a Union Alias it can not write as its arms", () => {
 		let main = [
@@ -907,7 +907,7 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// NOTE: A Choice has no shape underneath it — its arms are Cases, and a
+	// A Choice has no shape underneath it — its arms are Cases, and a
 	// Case is not a Type a Declaration writes — so where its name is out of
 	// reach there is nothing to write at all. The Hint still SHOWS what the
 	// value is, which is the same bargain a Function Type's Hint strikes.
@@ -933,7 +933,7 @@ describe("Inlay Hints that write a name", () => {
 		expect(hints[0]?.textEdit).toBeNull()
 	})
 
-	// NOTE: The name that DID come across is written as the reader would write
+	// The name that DID come across is written as the reader would write
 	// it. Spelling the shape here instead would answer an Alias this file names
 	// with the members it was declared to stand for.
 	it("should write an imported Alias that is in scope", () => {
@@ -964,7 +964,7 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// NOTE: One file, two Declarations, one word: the inner `Box` is what `Box`
+	// One file, two Declarations, one word: the inner `Box` is what `Box`
 	// names inside that body, so the Hint over a value of the OUTER one has to
 	// write the shape there and the name outside it. A scope check that only
 	// asked whether the word is declared SOMEWHERE would write `Box` in both

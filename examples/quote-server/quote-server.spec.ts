@@ -6,7 +6,7 @@ import * as path from "node:path"
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { Subprocess } from "bun"
 
-// NOTE: The pricing rules are tested where they are written — `Pricing.es`,
+// The pricing rules are tested where they are written — `Pricing.es`,
 // `Money.es` and `Catalog.es` each carry a `tests { … }` section, and
 // `essence test` runs them. What is left here is what only a bun spec can say:
 // that the BOUNDARY carries those answers out — the JSON a client sends
@@ -17,7 +17,7 @@ const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
-// NOTE: A bundle cache of this run's own, so that a spec compiling the rules
+// A bundle cache of this run's own, so that a spec compiling the rules
 // neither answers out of the user's cache nor fills it — and a result cache
 // beside it, for the same reason and one more: this spec runs `essence test` in
 // the example's OWN directory, so an answer left in the user's store would be
@@ -100,7 +100,7 @@ describe("examples/quote-server", () => {
 		expect(products.map((product) => product.sku)).toContain("BEAN-250")
 	})
 
-	// NOTE: The same order `Pricing.es` prices in its own tests, asked for
+	// The same order `Pricing.es` prices in its own tests, asked for
 	// over HTTP — so what is being checked here is that every member of the
 	// Case survives the crossing, not that the arithmetic is right.
 	it("carries a price out as plain JSON, member for member", async () => {

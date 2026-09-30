@@ -1,12 +1,12 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: `common.Diagnostic` requires a code, a labelled span and explicit
+// `common.Diagnostic` requires a code, a labelled span and explicit
 // notes and helps — deliberately, so that no Diagnostic in the Compiler can
 // skip them. Tests about *rendering* and *plumbing* care about one field at a
 // time, so they build theirs through this instead of restating the whole
 // shape. Nothing in `src` outside the tests may use it: the point of the
 // required fields is that a report site has to make each decision.
-// NOTE: The parameter is spelled out rather than `Partial<common.Diagnostic>`
+// The parameter is spelled out rather than `Partial<common.Diagnostic>`
 // — `Partial` of a union distributes, and the distributed form rejects a
 // `Position | null` for `position`, which is exactly what a test that covers
 // both halves needs to pass.

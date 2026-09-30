@@ -5,13 +5,13 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { SnapshotRecord } from "./index"
 
-// NOTE: The STORED half of `matches snapshot` — the entries a
+// The STORED half of `matches snapshot` — the entries a
 // `matches snapshot from "name"` compares against, and the file they live in.
 // The runtime never touches any of this: a bundle may be running in a browser,
 // so whoever starts a run reads the file and hands the entries over, and writes
 // back whatever the run says it recorded.
 
-// NOTE: Beside the source rather than in one directory at the root of the
+// Beside the source rather than in one directory at the root of the
 // project, so that a snapshot travels with the file it belongs to — a file that
 // moves takes its recorded output with it, and a file that is deleted leaves
 // nothing behind that nothing names.
@@ -25,7 +25,7 @@ export function snapshotFileOf(modulePath: string): string {
 	)
 }
 
-// NOTE: One file's entries, keyed by the name written after `from`.
+// One file's entries, keyed by the name written after `from`.
 export type SnapshotStore = Record<string, string>
 
 const HEADER = [
@@ -36,7 +36,7 @@ const HEADER = [
 
 const ENTRY = /^snapshot "((?:[^"\\]|\\.)*)"$/
 
-// NOTE: THE FORMAT, and the whole of it:
+// THE FORMAT, and the whole of it:
 //
 //   • Lines above the first entry are a comment, and are written afresh every
 //     time the file is written.
@@ -89,7 +89,7 @@ export function parseSnapshotFile(text: string): SnapshotStore {
 	return entries
 }
 
-// NOTE: A file whose EVERY newline is a CRLF was written by a tool that
+// A file whose EVERY newline is a CRLF was written by a tool that
 // rewrote the line endings, and its `\r`s are that tool's rather than the
 // recorded value's. One that mixes them has `\r`s that a value put there — the
 // format writes `\n` and only `\n` — so they are left exactly where they are.
@@ -123,7 +123,7 @@ function unescapeName(name: string): string {
 	return name.replaceAll(/\\(.)/g, "$1")
 }
 
-// NOTE: Reading the stored entries a run compares against, and writing back
+// Reading the stored entries a run compares against, and writing back
 // whatever it recorded. It is here rather than in the command line because the
 // Language Server's session does the very same thing — a snapshot accepted
 // through a Code Lens has to land where `essence test --update` would put it.
@@ -146,7 +146,7 @@ export type InlineWriter = (
 	documentPath: string,
 ) => InlineWrite
 
-// NOTE: A source a run would rewrite, and what it would become. The command
+// A source a run would rewrite, and what it would become. The command
 // line writes it; the Language Server hands it to the Editor as an edit, so
 // that an unsaved buffer is not written round.
 export type SourceRewrite = { module: string; text: string; applied: number }
@@ -165,7 +165,7 @@ export const noWrites: SnapshotWrites = {
 	sources: [],
 }
 
-// NOTE: The stored snapshots of every Module of the run, keyed by the Module's
+// The stored snapshots of every Module of the run, keyed by the Module's
 // canonical path — the shape the runtime's `RunOptions.snapshots` takes. A
 // Module with no companion file has an empty entry rather than none, so that
 // naming one is always a lookup and never a question about the disk.
@@ -174,7 +174,7 @@ export async function readSnapshots(
 ): Promise<Record<string, SnapshotStore>> {
 	let stores: Record<string, SnapshotStore> = {}
 
-	// NOTE: Fanned out rather than awaited one at a time — the files are
+	// Fanned out rather than awaited one at a time — the files are
 	// independent, and a project of hundreds of Modules pays this sweep at the
 	// head of every run.
 	await Promise.all(
@@ -194,7 +194,7 @@ async function readSnapshotFile(filePath: string): Promise<SnapshotStore> {
 	}
 }
 
-// NOTE: Everything a run recorded, written where it belongs. A `matched`
+// Everything a run recorded, written where it belongs. A `matched`
 // snapshot is not written — nothing about it changed — and a `mismatched` one
 // is the failure the report already carries.
 //
@@ -206,7 +206,7 @@ export async function writeSnapshots(options: {
 	snapshots: Array<SnapshotRecord>
 	sources: Map<string, string>
 	stored: Record<string, SnapshotStore>
-	// NOTE: A FUNCTION that answers with the writer rather than the writer:
+	// A FUNCTION that answers with the writer rather than the writer:
 	// rewriting a source goes through the Formatter, which both callers reach
 	// lazily, and a run with no inline snapshot in it must not load one.
 	inline: () => Promise<InlineWriter>
@@ -299,7 +299,7 @@ export async function writeSnapshots(options: {
 	return { recorded, files, problems, sources: rewrites }
 }
 
-// NOTE: The whole companion file is written afresh, entries in name order — the
+// The whole companion file is written afresh, entries in name order — the
 // ones this run recorded laid over the ones it read. An entry no test names any
 // more is KEPT: a run narrowed by `--filter` or by a tag has not visited every
 // test, and deleting what it did not visit would lose a snapshot for the price

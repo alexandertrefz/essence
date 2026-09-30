@@ -1,4 +1,4 @@
-// NOTE: The builtin Namespaces that have a runtime module in
+// The builtin Namespaces that have a runtime module in
 // `@essence-lang/runtime`, in the order their imports are emitted. Every one is
 // imported unconditionally by a lone Program, under its own name, and a
 // Namespace no Program references costs nothing — esbuild shakes an unused
@@ -9,7 +9,7 @@
 // a runtime module, or declared in `packages/standard-library/sources` but missing here,
 // emits a call to `undefined`.
 //
-// NOTE: A file of its own, rather than a const in the Rewriter that owns it,
+// A file of its own, rather than a const in the Rewriter that owns it,
 // because the Optimiser asks the same question and asking it through
 // `rewriter/rewrite` would close a cycle: the Rewriter reads the standard library
 // prelude, the prelude is optimised, and the Optimiser would read the Rewriter.

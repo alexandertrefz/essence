@@ -67,7 +67,7 @@ import {
 } from "./snippets"
 import type { WorkspaceOffer } from "./workspace"
 
-// NOTE: Completion's modes are told apart by the text immediately before the
+// Completion's modes are told apart by the text immediately before the
 // cursor:
 //
 // - Inside an `import { … }` or `export { … }` block: the specifiers and names
@@ -88,13 +88,13 @@ import type { WorkspaceOffer } from "./workspace"
 // synthetic member carries the receiver's Type in `base.type`, at the Scope the
 // cursor is actually in (its enclosing Function's Parameters, `@`, and so on).
 
-// NOTE: Every rename Declaration kind plus `case`, `keyword`, `module` and
+// Every rename Declaration kind plus `case`, `keyword`, `module` and
 // `snippet` — none is a lexical Declaration (a Case resolves through its
 // Choice, never a Scope; a Keyword is not a name at all; a Module is a file; a
 // snippet is a body rather than a name), so none ever appears in the rename
 // index, but all four are offered and need a kind of their own.
 //
-// NOTE: A snippet and a Keyword deliberately share labels — `test` is both the
+// A snippet and a Keyword deliberately share labels — `test` is both the
 // word and the block written around it — and the kind is what tells them apart
 // in the list, since an Editor draws an icon per kind.
 export type CompletionKind =
@@ -104,12 +104,12 @@ export type CompletionKind =
 	| "module"
 	| "snippet"
 
-// NOTE: An Editor sorts a Completion list on `sortText` rather than on the
+// An Editor sorts a Completion list on `sortText` rather than on the
 // order it was handed, so the ranking is carried by every entry: what is
 // nearest the cursor's own Scope first, what is merely part of the language
 // last.
 //
-// NOTE: Single digits, and they have to be: `sortText` is compared as TEXT, so
+// Single digits, and they have to be: `sortText` is compared as TEXT, so
 // a tenth tier would sort between the first and the second.
 const completionTiers = {
 	local: 1,
@@ -117,11 +117,11 @@ const completionTiers = {
 	document: 3,
 	builtin: 4,
 	keyword: 5,
-	// NOTE: Under the bare Keyword that shares its label, because the word is
+	// Under the bare Keyword that shares its label, because the word is
 	// what a reader typing `test` most often means and the block is the second
 	// reading of it.
 	snippet: 6,
-	// NOTE: Last, and by a rule rather than by taste: everything above is
+	// Last, and by a rule rather than by taste: everything above is
 	// already reachable where the cursor is, while accepting one of these edits
 	// the file's import block as well. An offer that changes two places belongs
 	// below every offer that changes one.
@@ -132,35 +132,35 @@ export type CompletionEntry = {
 	label: string
 	kind: CompletionKind
 	detail: string | null
-	// NOTE: The description alone — a Completion list has no room for the
+	// The description alone — a Completion list has no room for the
 	// tagged sections, and Signature Help shows them the moment the call is
 	// actually being written.
 	documentation?: string | null
-	// NOTE: The call as it must be written, in LSP snippet syntax, labels and
+	// The call as it must be written, in LSP snippet syntax, labels and
 	// all. Null wherever no signature resolved — the normal state halfway
 	// through a keystroke — and the Editor falls back to the bare name.
 	snippet?: string | null
-	// NOTE: Only set where a label alone would be ambiguous: the Overloads of
+	// Only set where a label alone would be ambiguous: the Overloads of
 	// one Method share a label on purpose, so their signature tails are what
 	// tell them apart.
 	labelDetail?: string | null
 	tier: number
 	preselect?: boolean
-	// NOTE: What accepting the entry changes ELSEWHERE — the `import { … }`
+	// What accepting the entry changes ELSEWHERE — the `import { … }`
 	// entry that makes the name resolve at all. The Editor applies these
 	// together with the insertion at the cursor, in one undo step.
 	additionalEdits?: Array<ImportEdit>
-	// NOTE: The text accepting the entry writes, in LSP snippet syntax, where
+	// The text accepting the entry writes, in LSP snippet syntax, where
 	// it is not the label — a group opened with the cursor inside its braces.
 	// Unlike `snippet` it makes no call, so nothing asks for parameter hints.
 	insertText?: string
-	// NOTE: What the insertion replaces, where the Editor's own word would be
+	// What the insertion replaces, where the Editor's own word would be
 	// the wrong span — a specifier is one word to the block and three to the
 	// Editor, which ends a word at every `.` and `/`.
 	replaces?: common.Position
 }
 
-// NOTE: What a Module the document has not imported offers, and the Namespace
+// What a Module the document has not imported offers, and the Namespace
 // Types behind the ones that are Namespaces — the second is what a Method
 // Completion matches against a receiver, and it costs an enrichment per
 // exporting Module, so the two are asked for separately. `specifiers` is every
@@ -175,11 +175,11 @@ export type WorkspaceCompletions = {
 	specifiers?: Array<string>
 }
 
-// NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols the
+// Must be a valid Identifier on its own — `_` and `-` are Symbols the
 // Lexer never puts inside a name, so a plain camelCase name is used.
 const probeMemberName = "lspProbeMember"
 
-// NOTE: The name the dotted-KEY reading writes, kept apart from the member
+// The name the dotted-KEY reading writes, kept apart from the member
 // probe's on purpose: `{ config with server.<cursor> }` has to be read as the
 // key it is, and the SAME text read as an ordinary member access — a Lookup on
 // whatever `server` happens to name in Scope — would answer a Record that has
@@ -187,35 +187,35 @@ const probeMemberName = "lspProbeMember"
 // answered by a key.
 const probeKeyName = "lspProbeKey"
 
-// NOTE: The characters `forbiddenIdentifierCharacters` in rename.ts lists, less
+// The characters `forbiddenIdentifierCharacters` in rename.ts lists, less
 // `#`: anything the Lexer would not produce as part of a single Identifier
 // Token, except that a `#` does not end the word here.
 const identifierTail = /[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 const identifierCharacter = /[^\s"§(){}[\]<>|/@,.:=~_-]/
-// NOTE: A whole `is` Token rather than the tail of an Identifier — `axis`
+// A whole `is` Token rather than the tail of an Identifier — `axis`
 // ends in the same two characters and means nothing of the sort.
 const trailingIsPattern = /(?:^|[\s"§(){}[\]<>|/@,.:=~_-])is$/
 const methodTriggerPattern = /::(?:<([^>]*)>)?[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 const memberTriggerPattern = /\.[^\s"§(){}[\]<>|/@,.:=~_-]*$/
-// NOTE: The name a base that could name a TYPE is written as. `identifierTail`
+// The name a base that could name a TYPE is written as. `identifierTail`
 // with `#` excluded as well, so that the Case of `Colour#Red` is read as its
 // own word and the `#` in front of it is what turns the reading away.
 const namedBaseTail = /[^\s"§(){}[\]<>|/@,.:=~_#-]*$/
-// NOTE: A Namespace specifier that is still being typed — the closing `>` is
+// A Namespace specifier that is still being typed — the closing `>` is
 // missing, so `methodTriggerPattern` cannot match it yet.
 const specifierTriggerPattern = /::<[^\s"§(){}[\]<>|/@,.:=~_-]*$/
-// NOTE: A Case reference being typed — the `#` sigil, optionally preceded by a
+// A Case reference being typed — the `#` sigil, optionally preceded by a
 // Choice name specifier (`Colour#`), and the Case name so far. The character
 // class also excludes `#` itself, so the specifier is a clean Identifier and
 // the trigger locks onto the final `#`.
 const caseTriggerPattern =
 	/([^\s"§(){}[\]<>|/@,.:=~_#-]*)#[^\s"§(){}[\]<>|/@,.:=~_#-]*$/
-// NOTE: A valid Case name that no real Choice is expected to declare — the
+// A valid Case name that no real Choice is expected to declare — the
 // stand-in a probe writes where the in-progress `#name` was, so the document
 // parses and its expected Type and Choices in scope can be read back.
 const probeCaseName = "LspProbeCase"
 
-// NOTE: The Keywords offered where a Statement starts: the declaration and `if`
+// The Keywords offered where a Statement starts: the declaration and `if`
 // Keywords `parseImplementationNode` dispatches on, `match`, and the two that
 // open a block of their own, `static` inside a Namespace body and
 // `implementation` around the whole Program.
@@ -234,10 +234,10 @@ const statementKeywords = [
 	"implementation",
 ]
 
-// NOTE: What `parsePrimaryExpression` accepts as the start of an Expression —
+// What `parsePrimaryExpression` accepts as the start of an Expression —
 // every other Keyword it reads there is an Identifier in disguise.
 //
-// NOTE: `as` and `otherwise` are absent, and not for the reason the Keywords
+// `as` and `otherwise` are absent, and not for the reason the Keywords
 // below are offered where they will not parse. Those all START something; these
 // two are the middle and the end of an arm, and no cursor this list is asked at
 // is ever waiting for one. Offering them would need a reading of what block the
@@ -248,7 +248,7 @@ const statementKeywords = [
 // already answered: it is offered by whatever declared it, the way every other
 // name in Scope is.
 //
-// NOTE: `start` and `complete` are Identifiers as well, and Keywords only where
+// `start` and `complete` are Identifiers as well, and Keywords only where
 // an Expression follows them. They are offered all the same: a word offered
 // where it was wanted as a name is accepted and typed on, since accepting it
 // writes the same word either way.
@@ -267,7 +267,7 @@ export function findCompletions(
 	documentPath?: string,
 	workspace: WorkspaceCompletions = { offers: [], namespaces: [] },
 	analysis: DocumentAnalysis | null = null,
-	// NOTE: Told of a Compiler throw the list is answered around, so the Server
+	// Told of a Compiler throw the list is answered around, so the Server
 	// can log it.
 	onInternalError: (error: unknown) => void = () => {},
 ): Array<CompletionEntry> {
@@ -295,7 +295,7 @@ function completionsAt(
 	let currentLine = lines[cursor.line - 1] ?? ""
 	let beforeCursor = currentLine.slice(0, cursor.column - 1)
 
-	// NOTE: The Module sections first, and on their own: nothing the modes
+	// The Module sections first, and on their own: nothing the modes
 	// below offer is an answer inside `import { … }`, and a name in Scope
 	// written there is a parse error.
 	let sectionCursor = moduleSectionCursor(lines, cursor)
@@ -310,7 +310,7 @@ function completionsAt(
 				workspace.specifiers ?? [],
 				workspace.offers,
 			),
-			// NOTE: Only where a GROUP is written. Inside a group's braces the
+			// Only where a GROUP is written. Inside a group's braces the
 			// answer is the names that Module exports, and inside a specifier
 			// it is the files of the workspace — a snippet is an answer to
 			// neither, and the block already offers the group of every Module
@@ -326,7 +326,7 @@ function completionsAt(
 		]
 	}
 
-	// NOTE: The Workspace holds the document's own analysis for every open file
+	// The Workspace holds the document's own analysis for every open file
 	// and hands it in. Anything else derives it here, once for every listing
 	// below; a Module is linked so its imported names reach the probes.
 	//
@@ -336,7 +336,7 @@ function completionsAt(
 	let document =
 		analysis ??
 		documentAnalysisOf(documentText, documentPath, onInternalError)
-	// NOTE: What every probe of this document is read against — null wherever
+	// What every probe of this document is read against — null wherever
 	// the document is no Module, which is where a probe enriches alone.
 	let moduleView = document?.module ?? null
 
@@ -355,7 +355,7 @@ function completionsAt(
 			beforeCursor.slice(0, match.index),
 		].join("\n")
 
-		// NOTE: A `::` cursor is probed as a METHOD call and a `.` cursor as a
+		// A `::` cursor is probed as a METHOD call and a `.` cursor as a
 		// member Lookup, because a receiver answers a different Type in the two
 		// positions: a written value proves what it can about itself where a
 		// Method is looked up on it, and `4::` offers `namespace
@@ -367,7 +367,7 @@ function completionsAt(
 				? `::${probeMemberName}()`
 				: `.${probeMemberName}`
 
-		// NOTE: The dotted-KEY reading is tried first, and only where a `.`
+		// The dotted-KEY reading is tried first, and only where a `.`
 		// triggered this: `{ config with server.<cursor> }` names a member of
 		// the value being UPDATED, and reading `server` as a name in Scope
 		// would answer whatever else happens to be called that. It answers only
@@ -384,7 +384,7 @@ function completionsAt(
 					)) ??
 			resolveProbedBase(headText, documentPath, suffix, moduleView)
 
-		// NOTE: And the same probe with the document's own TAIL behind it,
+		// And the same probe with the document's own TAIL behind it,
 		// which is the only reading that can see what is declared BELOW the
 		// cursor. Every reading above drops the rest of the file and closes
 		// what is left, so a `namespace` or a `choice` written under the line
@@ -409,7 +409,7 @@ function completionsAt(
 				) ?? base
 		}
 
-		// NOTE: And the base that names a TYPE rather than a value — a Choice
+		// And the base that names a TYPE rather than a value — a Choice
 		// nobody wrote a Namespace for, and a Protocol-bounded Type Parameter.
 		// Both read their members off a Namespace nobody declared, and the
 		// Enricher answers that rail only for a member that Namespace OFFERS —
@@ -456,7 +456,7 @@ function completionsAt(
 				)
 	}
 
-	// NOTE: A `#` offers Cases rather than Scope names — the two never share a
+	// A `#` offers Cases rather than Scope names — the two never share a
 	// position, so this is checked before the Scope fallback and only when no
 	// `::` or `.` trigger claimed the cursor first.
 	let caseMatch = caseTriggerPattern.exec(beforeCursor)
@@ -477,7 +477,7 @@ function completionsAt(
 	let headText = [...lines.slice(0, cursor.line - 1), beforeCursor].join("\n")
 	let space = detectSymbolSpace(headText)
 
-	// NOTE: Built before the contextual list rather than beside it, because a
+	// Built before the contextual list rather than beside it, because a
 	// Record member that a binding of the same name is in reach of is a whole
 	// member on its own — `{ port }` is `{ port = port }` — and this list is
 	// already exactly the names in reach. Deriving it twice would be the same
@@ -491,11 +491,11 @@ function completionsAt(
 		document,
 	)
 
-	// NOTE: Record member names and Argument labels are offered *alongside*
+	// Record member names and Argument labels are offered *alongside*
 	// the names in Scope — both are valid at those positions, since a member
 	// is written `name = value` and a labelled Argument `label value`.
 	//
-	// NOTE: Keywords and snippets are offered here and nowhere else — after a
+	// Keywords and snippets are offered here and nowhere else — after a
 	// `.`, a `::` or a `#` the language allows nothing but a name — and only in
 	// the value space, since neither a Keyword nor a snippet names a Type.
 	return [
@@ -524,7 +524,7 @@ function completionsAt(
 	]
 }
 
-// NOTE: The names a bare Identifier resolves to where the cursor is. Only the
+// The names a bare Identifier resolves to where the cursor is. Only the
 // kinds that name a VALUE, since that is what a shorthand member reads, and
 // only the ones already in reach — a workspace offer is not, and accepting one
 // writes an `import` entry the shorthand would not.
@@ -557,7 +557,7 @@ function contextualCompletions(
 	cursor: common.Cursor,
 	documentPath: string | undefined,
 	moduleView: ModuleView | null,
-	// NOTE: See `bindingsInReach`. Empty is not "nothing is in reach" but "do
+	// See `bindingsInReach`. Empty is not "nothing is in reach" but "do
 	// not say anything about the shorthand" — the offers themselves are the
 	// same either way.
 	bindings: Set<string> = new Set(),
@@ -570,7 +570,7 @@ function contextualCompletions(
 	let context: ArgumentContext | null = null
 
 	for (let probeSource of probeSourcesFor(headText)) {
-		// NOTE: The probe types the `tests { … }` block too — an Argument being
+		// The probe types the `tests { … }` block too — an Argument being
 		// written inside a test body is an Argument, and a Program enriched
 		// without the tests holds no Node for it.
 		let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
@@ -595,7 +595,7 @@ function contextualCompletions(
 	}
 
 	if (context.kind === "record") {
-		// NOTE: A member a binding of the same name is in reach of says so,
+		// A member a binding of the same name is in reach of says so,
 		// rather than being offered a second time: the two would insert the
 		// very same characters, since a bare name IS the whole member. What is
 		// new is the sentence, which is the only place the reader learns that
@@ -604,7 +604,7 @@ function contextualCompletions(
 		// `context.shorthand` is false inside an update's key list, where a
 		// bare name is refused outright — see `shorthand-in-combination`.
 		//
-		// NOTE: A member the callee's own default fills in says so instead, and
+		// A member the callee's own default fills in says so instead, and
 		// ranks below the ones the call still HAS to write — the writer is being
 		// shown what is missing, and a member somebody else supplies is not
 		// missing in the same sense. The same wording and the same demotion a
@@ -629,7 +629,7 @@ function contextualCompletions(
 			})
 	}
 
-	// NOTE: A label a call may leave out is offered like any other, marked as
+	// A label a call may leave out is offered like any other, marked as
 	// what it is and ranked below the ones the call still HAS to write — the
 	// writer is being shown what is missing, and a Parameter with a default is
 	// not missing in the same sense.
@@ -661,7 +661,7 @@ function contextualCompletions(
 /* Probing for the receiver Type */
 /*********************************/
 
-// NOTE: The enriched probe Program is handed back alongside the Type it
+// The enriched probe Program is handed back alongside the Type it
 // resolved — a Namespace Type carries no `§§` documentation for its
 // Properties, only the declaration Node does, and the probe already holds
 // every declaration above the cursor.
@@ -687,7 +687,7 @@ function resolveProbedBase(
 	return null
 }
 
-// NOTE: One probe source, enriched, and the Type its invented member was
+// One probe source, enriched, and the Type its invented member was
 // looked up on. Null where the source does not parse or holds no probe at all:
 // a reading that does not explain the cursor is simply not the reading — the
 // next one is tried, and a cursor no reading explains answers with nothing.
@@ -709,19 +709,19 @@ function probeReading(
 			? null
 			: { type: baseType, program: enrichedProgram }
 	} catch {
-		// NOTE: A reading the search itself could not finish is no reading
+		// A reading the search itself could not finish is no reading
 		// either — a Completion list that throws is a Completion list that
 		// stops appearing, and the next reading may well answer.
 		return null
 	}
 }
 
-// NOTE: The base of a `.` that names a TYPE, resolved from the NAME alone.
+// The base of a `.` that names a TYPE, resolved from the NAME alone.
 // Asked only where the probe answered nothing or an Error, which is what a base
 // that names no value leaves behind — so a value of the name still WINS, the
 // order the Enricher reads the two in.
 //
-// NOTE: The document's OWN Program is read first and the probe's second. The
+// The document's OWN Program is read first and the probe's second. The
 // Workspace holds the first enriched already, and it carries the whole file's
 // Scopes rather than the part standing above the cursor; the probe's is what
 // answers where the document as a whole parses into no Scope covering the
@@ -762,7 +762,7 @@ function namedTypeBase(
 	return null
 }
 
-// NOTE: The one bare Identifier a `.` stands on, or null where the base is
+// The one bare Identifier a `.` stands on, or null where the base is
 // anything else: a Type is named by a NAME and never reached through a member,
 // a Method or a Case, so `shape.corner.`, `sides()::first.` and `Colour#Red.`
 // are none of this rail's business.
@@ -792,7 +792,7 @@ function findProbeReceiver(
 	return null
 }
 
-// NOTE: A `= expression` default is an Expression position a writer types in, so
+// A `= expression` default is an Expression position a writer types in, so
 // the probe has to be findable there — `= person.|` inside a Parameter list
 // asked for a member and got nothing at all, because this walk reached bodies
 // and a default is not one.
@@ -850,7 +850,7 @@ function findProbeReceiverInNode(
 				}
 			}
 
-			// NOTE: A native Method has no body, and the frame the Compiler
+			// A native Method has no body, and the frame the Compiler
 			// synthesizes for its defaults is where its Expressions live — the
 			// standard library's own sources are edited through this Server.
 			for (let shim of node.nativeShims) {
@@ -879,12 +879,12 @@ function findProbeReceiverInNode(
 		}
 		case "ReturnStatement":
 			return findProbeReceiverInNode(node.expression)
-		// NOTE: Neither Keyword opens a body — the operand is read where the
+		// Neither Keyword opens a body — the operand is read where the
 		// Keyword stands — so the probe is looked for straight through it.
 		case "Start":
 		case "Complete":
 			return findProbeReceiverInNode(node.expression)
-		// NOTE: And straight through a refused value, for the same reason: what
+		// And straight through a refused value, for the same reason: what
 		// stands in front of the brackets was read where it stands, and a
 		// reader completing inside it is asking about the value they wrote
 		// rather than about the brackets it was refused at.
@@ -910,13 +910,13 @@ function findProbeReceiverInNode(
 			}
 
 			return null
-		// NOTE: No path-key reading for a Method's Arguments, for the reason
+		// No path-key reading for a Method's Arguments, for the reason
 		// `argumentContext` reads none of their Record members either: the
 		// probe truncates the call at the cursor, and a Method resolved off
 		// half its Arguments has no signature to name a Parameter's Type with.
 		// A free Function's callee is an Expression whose Type stands whatever
 		// follows it, which is why the one below can be asked at all.
-		// NOTE: The probe a `::` cursor writes, and the Type it is asked for is
+		// The probe a `::` cursor writes, and the Type it is asked for is
 		// the RECEIVER's — the one Method resolution reads, refinements and all.
 		case "MethodInvocation":
 			if (node.member.name === probeMemberName) {
@@ -945,7 +945,7 @@ function findProbeReceiverInNode(
 
 			return findProbeReceiverInNode(node.base)
 		case "Combination":
-			// NOTE: A dotted KEY carries no Lookup of its own to find — the
+			// A dotted KEY carries no Lookup of its own to find — the
 			// probe stands as a KEY of the level the Enricher wrote out, and
 			// the value that level updates is what its members belong to. Read
 			// before the operands, and under a name of its own so that a
@@ -970,7 +970,7 @@ function findProbeReceiverInNode(
 			}
 
 			for (let handler of node.handlers) {
-				// NOTE: The Matcher and its Guard come before the body in the
+				// The Matcher and its Guard come before the body in the
 				// source, so they are searched first — the probe is looked for
 				// where it was typed.
 				for (let expression of typedHandlerExpressions(handler)) {
@@ -991,7 +991,7 @@ function findProbeReceiverInNode(
 			return null
 		}
 		case "Define": {
-			// NOTE: Searched in the order the arms were WRITTEN — `as VALUE if
+			// Searched in the order the arms were WRITTEN — `as VALUE if
 			// CONDITION` — because the probe is looked for where it was typed,
 			// not where it is evaluated.
 			for (let expression of defineExpressions(node)) {
@@ -1054,7 +1054,7 @@ function findProbeReceiverInNode(
 
 			return null
 		}
-		// NOTE: And this is what a leading dot completes through. `.|` probes as
+		// And this is what a leading dot completes through. `.|` probes as
 		// `.lspProbeMember`, which the Enricher desugars into the Function that
 		// path stands for — a Lookup chain whose base is the Parameter Type the
 		// position named. So the probe finds an ordinary member Lookup off an
@@ -1071,7 +1071,7 @@ function findProbeReceiverInNode(
 				return null
 			}
 
-			// NOTE: A payload is merged into the Case's own default, so a path
+			// A payload is merged into the Case's own default, so a path
 			// key inside one reaches into the Case's Record exactly as an
 			// Argument's reaches into the Parameter's it was written for.
 			return (
@@ -1083,7 +1083,7 @@ function findProbeReceiverInNode(
 					: null) ?? findProbeReceiverInNode(node.value)
 			)
 		case "ChoiceDeclarationStatement": {
-			// NOTE: A `.` inside a Case payload's default probes the same way
+			// A `.` inside a Case payload's default probes the same way
 			// one inside a Parameter's does — the member list of whatever the
 			// dot follows, wherever the dot was typed.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -1096,7 +1096,7 @@ function findProbeReceiverInNode(
 
 			return null
 		}
-		// NOTE: What an assertion asserts, and the values its Matcher compares
+		// What an assertion asserts, and the values its Matcher compares
 		// against. Where a Matcher was written, as in `require { points = 3 } =
 		// standing.|`, the asserted Expression is a synthesized name and the
 		// Expression itself is the Statement in front of this one, which this
@@ -1132,7 +1132,7 @@ function findProbeReceiverInNode(
 	}
 }
 
-// NOTE: The Record a path key inside a merged Literal reaches into — the answer
+// The Record a path key inside a merged Literal reaches into — the answer
 // `{ config with server.<cursor> }` reads straight off the value being updated,
 // asked of an Argument or a payload, which have no such value written beside
 // them. What they merge into is the Parameter's Type, or the Case's, and each
@@ -1149,7 +1149,7 @@ function findProbeKeyInMerged(
 	}
 
 	for (let [name, member] of Object.entries(value.members)) {
-		// NOTE: `Object.hasOwn` before the read — a member named after one of
+		// `Object.hasOwn` before the read — a member named after one of
 		// `Object.prototype`'s would otherwise find a JavaScript function.
 		if (!isMergedLevel(member) || !Object.hasOwn(into.members, name)) {
 			continue
@@ -1171,7 +1171,7 @@ function findProbeKeyInMerged(
 	return null
 }
 
-// NOTE: The same, for the Arguments of one call — each Argument against the
+// The same, for the Arguments of one call — each Argument against the
 // Parameter it was written for, which is a question about LABELS once anything
 // may be left out. `pairedParameters` is the walk Completion already reads a
 // Record Literal's expected members through, so a path key inside one is held
@@ -1225,7 +1225,7 @@ function findProbeReceiverInArguments(
 function memberCompletions(
 	baseType: common.Type,
 	program: common.typed.Program,
-	// NOTE: Whether the base SPELLED a Type rather than a value of one, which is
+	// Whether the base SPELLED a Type rather than a value of one, which is
 	// what the fallback probe above answers and nothing about the Type itself
 	// can say: `Colour.` and `red.` are the same Type at this point, and only
 	// one of them reaches a static.
@@ -1257,7 +1257,7 @@ function memberCompletions(
 			})
 		}
 
-		// NOTE: And the Case listing the Enricher derives for a Namespace over
+		// And the Case listing the Enricher derives for a Namespace over
 		// a Choice whose Cases carry no payload — `Side.cases()` is answered by
 		// nobody's Method, so a listing built from the written members alone
 		// would offer less than the Namespace answers. Appended after
@@ -1284,7 +1284,7 @@ function memberCompletions(
 		return entries
 	}
 
-	// NOTE: And a base that names a TYPE rather than a value — a Choice whose
+	// And a base that names a TYPE rather than a value — a Choice whose
 	// `cases` is derived, and a Protocol-bounded Type Parameter whose members
 	// are its bound's. Both read off a Namespace nobody declared, which is the
 	// spelling `/docs/language/protocols` teaches, and both compiled, ran and
@@ -1318,7 +1318,7 @@ function memberCompletions(
 	return entries
 }
 
-// NOTE: The `§§` block above each Property, keyed by name. A Namespace Type
+// The `§§` block above each Property, keyed by name. A Namespace Type
 // keeps only the Property's Type, so this reads the declaration Node instead —
 // the probe stops at the cursor, and a Namespace whose members are being
 // looked up is necessarily declared above it.
@@ -1362,7 +1362,7 @@ function namespacePropertyDocumentation(
 	return documented
 }
 
-// NOTE: One entry PER OVERLOAD, all sharing a label — the Overloads of a
+// One entry PER OVERLOAD, all sharing a label — the Overloads of a
 // Method differ in exactly the Argument labels the snippet inserts, so a
 // single "primary" entry would write the wrong call half the time. The
 // signature tail in `labelDetail` is what tells them apart in the list. With
@@ -1412,7 +1412,7 @@ function methodDeclarationKind(method: common.MethodType): DeclarationKind {
 	return isStaticMethod(method) ? "staticMethod" : "method"
 }
 
-// NOTE: Static Methods take no receiver — they are not invocable through `::`,
+// Static Methods take no receiver — they are not invocable through `::`,
 // only through `.` on the Namespace itself.
 function isStaticMethod(method: common.MethodType): boolean {
 	return (
@@ -1425,7 +1425,7 @@ function isStaticMethod(method: common.MethodType): boolean {
 /* Method completion */
 /*********************/
 
-// NOTE: Overlapping Namespaces declare the same Method name — a user
+// Overlapping Namespaces declare the same Method name — a user
 // `for List<Integer>` beside the builtin `for List<ItemType>` — and the one
 // listed first is not the one the call resolves to: the Enricher dispatches to
 // the most specific target. Completion runs the same shared order per Method
@@ -1456,7 +1456,7 @@ function methodCompletions(
 	}> = [],
 	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
-	// NOTE: The Namespaces in scope are offered first and the unimported ones
+	// The Namespaces in scope are offered first and the unimported ones
 	// after them, so a Method that resolves today wins the name over one that
 	// would need an entry added — the same first-wins dedupe, ordered by what
 	// costs the reader least.
@@ -1487,7 +1487,7 @@ function methodCompletions(
 	]
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
-	// NOTE: One parse for the whole loop. Every offering Namespace wants an
+	// One parse for the whole loop. Every offering Namespace wants an
 	// import edit built against the document as it is now, which is the same
 	// document for all of them — asking for it per offer re-parsed the whole
 	// file once per Namespace, on a request the editor fires per keystroke.
@@ -1545,7 +1545,7 @@ function methodCompletions(
 	return entries
 }
 
-// NOTE: Built against the document as it is now, like every other edit this
+// Built against the document as it is now, like every other edit this
 // Server hands out. Null where the block already holds the entry, which is what
 // an offer whose name is somehow already bound would produce — the offer is not
 // dropped for it, since the Method IS reachable once the entry is there.
@@ -1561,7 +1561,7 @@ function importEditFor(
 	})
 }
 
-// NOTE: Inside `::<…>` only Namespaces that could actually disambiguate the
+// Inside `::<…>` only Namespaces that could actually disambiguate the
 // call are useful — the same set `::` itself draws its Methods from.
 function specifierCompletions(
 	documentText: string,
@@ -1600,7 +1600,7 @@ function specifierCompletions(
 	return entries
 }
 
-// NOTE: A Completion's detail is a single line next to its label, so an
+// A Completion's detail is a single line next to its label, so an
 // Overload set shows its first signature and counts the rest — Signature Help
 // and the Hover are where every Overload is spelled out.
 function printInvokedSignature(method: common.MethodType): string {
@@ -1611,7 +1611,7 @@ function printInvokedSignature(method: common.MethodType): string {
 /* Case completion */
 /*******************/
 
-// NOTE: `#` completion offers the Cases a Case reference could name at the
+// `#` completion offers the Cases a Case reference could name at the
 // cursor. An annotated position (`constant step: Step<Integer, String> = #…`, a
 // labelled Argument, a Function's return at `<-`) pins the Choice down to one
 // applied Union — its Cases come back instantiated, so the payload detail shows
@@ -1629,7 +1629,7 @@ function caseCompletions(
 	documentPath: string | undefined,
 	moduleView: ModuleView | null,
 ): Array<CompletionEntry> {
-	// NOTE: The in-progress `#name` is swapped for a synthetic Case reference so
+	// The in-progress `#name` is swapped for a synthetic Case reference so
 	// the whole document parses — later Choice declarations stay in view, and
 	// the expected Type at the `#` and the Choices in scope both read off one
 	// enriched Program.
@@ -1660,7 +1660,7 @@ function caseCompletions(
 				)
 			: []
 
-	// NOTE: An expectation names ONE Choice, so the list is complete and
+	// An expectation names ONE Choice, so the list is complete and
 	// ordered as the Choice declared it — the first Case is preselected, which
 	// the prefix-less scan over every Choice in scope has no basis for.
 	if (expectedCases.length > 0) {
@@ -1690,7 +1690,7 @@ function caseEntries(
 
 		seen.add(key)
 
-		// NOTE: The `#` is already typed, so the label is the bare Case name —
+		// The `#` is already typed, so the label is the bare Case name —
 		// selecting it completes `#name`. The detail spells the payload out, and
 		// its `Choice#Case` head tells apart two Choices that share a Case name
 		// in the prefix-less scan.
@@ -1706,7 +1706,7 @@ function caseEntries(
 	return entries
 }
 
-// NOTE: One pass over the probe's enriched Program: it threads the expected
+// One pass over the probe's enriched Program: it threads the expected
 // Type down to the synthetic Case reference (mirroring `argumentContext`, plus
 // a Function's return Type at a `<-`) and, along the way, records every Choice
 // declaration's Cases. The expected Type is only meaningful once it reaches the
@@ -1727,7 +1727,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 		}
 	}
 
-	// NOTE: A default is read against its own Parameter's Type, which is what
+	// A default is read against its own Parameter's Type, which is what
 	// makes `= #|` inside a Parameter list offer that Parameter's Choice. Walked
 	// per Parameter rather than through `parameterDefaults`, because the
 	// expected Type is the half of the pair the flat enumeration drops.
@@ -1778,7 +1778,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 					)
 				}
 
-				// NOTE: Read against the payload it fills, which is what makes
+				// Read against the payload it fills, which is what makes
 				// `= { item = #| }` inside a Case offer that member's Choice.
 				// Walked per Case rather than through `caseDefaults`, because
 				// the expected Type is the half the flat enumeration drops.
@@ -1868,7 +1868,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "ReturnStatement":
 				visitNode(node.expression, expectedType)
 				return
-			// NOTE: `expect outcome::is(#|)` offers the Cases of what the
+			// `expect outcome::is(#|)` offers the Cases of what the
 			// Method expects, exactly as a call written anywhere else does.
 			case "ExpectStatement":
 			case "RequireStatement":
@@ -1896,7 +1896,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "Lookup":
 				visitNode(node.base, null)
 				return
-			// NOTE: Nothing of the position travels through: what the Keyword
+			// Nothing of the position travels through: what the Keyword
 			// stands under is a Future or a Started, and no Case is either — so a
 			// bare `#` written there is offered nothing rather than the Cases of
 			// what the whole Expression answers with.
@@ -1904,7 +1904,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "Complete":
 				visitNode(node.expression, null)
 				return
-			// NOTE: The position expects what the brackets would have read,
+			// The position expects what the brackets would have read,
 			// not the value they were written after, so no Type travels in.
 			case "RefusedValue":
 				visitNode(node.base, null)
@@ -1925,7 +1925,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 				}
 
 				return
-			// NOTE: Every arm's value answers the whole `define`, so each is
+			// Every arm's value answers the whole `define`, so each is
 			// read against the Type the position expects of it — which is what
 			// puts a Choice in reach of a bare `#` in an arm. A Condition is a
 			// Boolean and expects nothing of its own, exactly as a Guard does.
@@ -1940,7 +1940,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			case "RecordValue":
-				// NOTE: Each member is read against the Type the position
+				// Each member is read against the Type the position
 				// EXPECTS of it, exactly as a List's items are: the
 				// literal's own Type says what was written, which for a
 				// half-typed `#Sta` is an Error and no Choice at all. It is
@@ -1966,7 +1966,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			}
-			// NOTE: Each half against the SLOT it stands in, which is what puts
+			// Each half against the SLOT it stands in, which is what puts
 			// a Choice in reach of a bare `#` in either — the Cases of
 			// `Dictionary<Suit, Integer>`'s key Type in a key, and of its value
 			// Type in a value. The same decision a List's item position makes,
@@ -2012,7 +2012,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 /* Scope completion */
 /********************/
 
-// NOTE: Which symbol space an offer belongs in, by what the other Module
+// Which symbol space an offer belongs in, by what the other Module
 // declared it as. A Type Alias, a Choice and a Protocol are only nameable where
 // a Type is; everything else is a value. A name bound in both tables at home —
 // a `type Foo` beside a `namespace Foo` — is one entry either way, so offering
@@ -2042,7 +2042,7 @@ function scopeCompletions(
 	offers: Array<WorkspaceOffer> = [],
 	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
-	// NOTE: The unmodified document, parsed, enriched and indexed by the
+	// The unmodified document, parsed, enriched and indexed by the
 	// Workspace or derived once by `findCompletions`. Null only where its text
 	// does not parse.
 	let program =
@@ -2060,7 +2060,7 @@ function scopeCompletions(
 
 	while (searchScope !== null) {
 		for (let [name, declaration] of searchScope[space]) {
-			// NOTE: Constants and Variables do not hoist, so they must not be
+			// Constants and Variables do not hoist, so they must not be
 			// offered before their declaring Statement — accepting them would
 			// produce a Program the Enricher rejects. Skipping an invisible
 			// inner Declaration also lets an outer one of the same name
@@ -2076,7 +2076,7 @@ function scopeCompletions(
 				continue
 			}
 
-			// NOTE: The rename index is lexical and knows no Types; the
+			// The rename index is lexical and knows no Types; the
 			// enriched Program has the Types but no Scopes. A Declaration's
 			// name Position is what joins the two, and both sides read the
 			// same Parser Positions, so the key is exact rather than a range
@@ -2087,7 +2087,7 @@ function scopeCompletions(
 					: (described.get(positionKey(declaration.definition)) ??
 						null)
 
-			// NOTE: Only the top level Scope has no parent, and it holds the
+			// Only the top level Scope has no parent, and it holds the
 			// builtins beside the document's own top level Declarations — so
 			// the depth tells a local apart from a document-wide name, and
 			// `builtin` tells the two halves of the top level apart.
@@ -2103,7 +2103,7 @@ function scopeCompletions(
 		searchScope = searchScope.parent
 	}
 
-	// NOTE: After the whole Scope chain, and only for names nothing in it
+	// After the whole Scope chain, and only for names nothing in it
 	// already answers with — an offer that shadows something reachable would
 	// insert an entry the Compiler refuses as a duplicate.
 	for (let offer of offers) {
@@ -2137,7 +2137,7 @@ function scopeEntries(
 	info: DeclarationInfo | null,
 	tier: number,
 ): Array<CompletionEntry> {
-	// NOTE: Only a `function` Declaration is invoked by writing its name — a
+	// Only a `function` Declaration is invoked by writing its name — a
 	// Constant or a Parameter may hold a Function Value just as well, but
 	// there the name is as often passed on as it is called, so nothing is
 	// inserted for it.
@@ -2156,7 +2156,7 @@ function scopeEntries(
 	})
 }
 
-// NOTE: A Namespace and a Choice both print as their own name, which the label
+// A Namespace and a Choice both print as their own name, which the label
 // beside the detail already says. A Namespace's target Type is what a single
 // line can add instead; a Choice has nothing to add, so it stays bare.
 function declarationDetail(
@@ -2183,7 +2183,7 @@ type DeclarationInfo = {
 	documentation: string | null
 }
 
-// NOTE: Every Declaration the enriched Program can say something about, keyed
+// Every Declaration the enriched Program can say something about, keyed
 // by where its name was written. Kept deliberately close to the rename index's
 // own idea of a Declaration: the same Statements, plus the Parameters that
 // only a Function's inner Scope offers.
@@ -2206,7 +2206,7 @@ function describeDeclarations(
 					parameter.internalName?.type ??
 					parameter.externalName?.type ??
 					null,
-				// NOTE: A Parameter's `@param` text lives on the enclosing
+				// A Parameter's `@param` text lives on the enclosing
 				// callable's `§§` block, on the line standing at the
 				// Parameter's own position.
 				documentation: documentation?.parameters[index]?.text ?? null,
@@ -2436,7 +2436,7 @@ function positionKey(position: common.Position): string {
 /* Reading the cursor  */
 /**********************/
 
-// NOTE: The Parser only ever reads a Type after one of these: a `:`
+// The Parser only ever reads a Type after one of these: a `:`
 // annotation, a `->` return, a `<` Generic application, an `is` bound or
 // conformance clause, or a `|` — `parseType` is the only place a Pipe is
 // consumed at all, so one can never be anything else.
@@ -2467,7 +2467,7 @@ function detectSymbolSpace(headText: string): SymbolSpace {
 	return "values"
 }
 
-// NOTE: The bracket the cursor is innermost inside. A `<` counts as one only
+// The bracket the cursor is innermost inside. A `<` counts as one only
 // where the Parser reads it as a bracket — a Generic application or a Generic
 // list opens directly against the name it belongs to, so a `<` with anything
 // else before it is the `<-` of a return or the `::<` of a Namespace
@@ -2498,7 +2498,7 @@ function innermostOpener(text: string): string | null {
 	return stack[stack.length - 1] ?? null
 }
 
-// NOTE: Statement start is read off the text alone — nothing but a block
+// Statement start is read off the text alone — nothing but a block
 // boundary before the cursor on its line. Everything else is inside an
 // Expression: the value half of a declaration, an Argument, a `<-`.
 function isAtStatementStart(headText: string): boolean {
@@ -2509,14 +2509,14 @@ function isAtStatementStart(headText: string): boolean {
 	return trimmed === "" || trimmed.endsWith("{") || trimmed.endsWith("}")
 }
 
-// NOTE: No legality analysis happens here. `static` is only meaningful in a
+// No legality analysis happens here. `static` is only meaningful in a
 // Namespace body, `overload` only in a `declarations` Program, `implementation`
 // only at the very top, and none of that is checked. A Keyword offered where it
 // will not parse costs one Parser Diagnostic on the next keystroke; the
 // alternative is a second, approximate model of where each Keyword may stand,
 // which would be wrong in subtler ways.
 //
-// NOTE: `start` and `complete` are offered where a Statement starts as well. A
+// `start` and `complete` are offered where a Statement starts as well. A
 // Statement opening with either is an ordinary Expression Statement, and both
 // are legal there: `complete f()` analyses clean and `start f()` is the
 // deliberate Information.
@@ -2533,7 +2533,7 @@ function keywordCompletions(headText: string): Array<CompletionEntry> {
 	}))
 }
 
-// NOTE: The snippets do take the analysis the Keywords above decline, and the
+// The snippets do take the analysis the Keywords above decline, and the
 // reason is what being wrong costs: a Keyword offered where it will not parse
 // is one word the reader deletes, while a snippet is four lines of scaffold
 // written into a block that can not hold it. `snippetContextAt` is what answers
@@ -2553,7 +2553,7 @@ function snippetCompletions(scope: {
 			label: snippet.prefix,
 			kind: "snippet" as const,
 			detail: snippet.description,
-			// NOTE: The head of the body as it will be written, so that the
+			// The head of the body as it will be written, so that the
 			// list says what a prefix expands to without expanding it — which
 			// is the one thing the label can not carry.
 			labelDetail: renderPlaceholders(snippet.body[0] ?? ""),
@@ -2562,7 +2562,7 @@ function snippetCompletions(scope: {
 		}))
 }
 
-// NOTE: The document's own Program, which `findCompletions` hands in unless
+// The document's own Program, which `findCompletions` hands in unless
 // its text does not parse; the tree rather than the Types is what this reads.
 function snippetContextOf(
 	documentText: string,

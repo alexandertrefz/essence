@@ -1,12 +1,12 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `Stream` is a builtin Choice, like `Side` and `Ordering` — its values
+// `Stream` is a builtin Choice, like `Side` and `Ordering` — its values
 // carry Case tags (`"Stream#Output"`) exactly as user-declared Cases do. The
 // Methods that READ a Stream belong to the Namespace that declares them, so
 // `Terminal.write`'s native is in `Terminal.ts` and nothing but the tags lives
 // here.
 //
-// NOTE: No shared instances, unlike `Side` and `Ordering`. Nothing native
+// No shared instances, unlike `Side` and `Ordering`. Nothing native
 // ANSWERS with a Stream — a Stream only ever travels from a call site into
 // `write` — so singletons like the ones `Ordering` keeps for its `compare`
 // Methods would have no caller here. The Compiler builds the value at the site

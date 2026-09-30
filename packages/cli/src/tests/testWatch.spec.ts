@@ -14,7 +14,7 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { createDependentsIndex, createSourceWatcher } from "../watcher"
 
-// NOTE: The live half of `essence test`. The affected-set computation and the
+// The live half of `essence test`. The affected-set computation and the
 // file watching are unit tested here because they are what "re-run only what a
 // change reached" MEANS; the session itself is driven as a child process,
 // because a watch never returns and every part of it — the debounce, the
@@ -26,7 +26,7 @@ const essence = fileURLToPath(
 )
 
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-watch-cache-"))
-// NOTE: A watching session reads no result cache — it holds the bundles it has
+// A watching session reads no result cache — it holds the bundles it has
 // already loaded — but the sessions here are CHILD processes and inherit this
 // environment, so the variable is pointed somewhere harmless all the same.
 let resultCache = mkdtempSync(path.join(tmpdir(), "essence-watch-results-"))
@@ -122,7 +122,7 @@ describe("The affected set", () => {
 	})
 })
 
-// NOTE: A report is WAITED FOR, never slept through. The platform delivers a
+// A report is WAITED FOR, never slept through. The platform delivers a
 // directory event when it delivers it: on an idle machine that is a few
 // milliseconds, and on one running three test suites at once it was measured
 // past the 400 ms these tests once slept — so they failed while the watcher
@@ -154,7 +154,7 @@ function within(
 	})
 }
 
-// NOTE: Under the per-test budget `scripts/testBudget.ts` sets, and
+// Under the per-test budget `scripts/testBudget.ts` sets, and
 // deliberately so. A deadline that fires after the test has timed out rejects
 // a Promise nobody is waiting on, which bun reports as an unattributed
 // "unhandled error between tests": a second failure for the price of one.
@@ -182,13 +182,13 @@ describe("The source watcher", () => {
 		try {
 			await watcher.watch([changed, still])
 
-			// NOTE: The signature is `mtimeMs:size`, so the text has to differ
+			// The signature is `mtimeMs:size`, so the text has to differ
 			// in length for a save landing inside one millisecond to count.
 			writeFileSync(changed, "one and a half")
 
 			await within(DEADLINE, arrived, "the change")
 
-			// NOTE: One more debounce window, so that a file that did NOT
+			// One more debounce window, so that a file that did NOT
 			// change has had every chance to be reported wrongly. This wait
 			// can only make the test fail for a watcher that is wrong, never
 			// for a machine that is slow.
@@ -231,7 +231,7 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// NOTE: The timer is the fallback for an event the platform never delivers
+	// The timer is the fallback for an event the platform never delivers
 	// — measured, not imagined; see the NOTE atop watcher.ts. A directory
 	// watcher that reports nothing stands in for that platform here, so what
 	// these two prove is the timer on its own.
@@ -303,7 +303,7 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// NOTE: An idle tick must report nothing: a session that heard "something
+	// An idle tick must report nothing: a session that heard "something
 	// happened" every half second would rebuild for ever.
 	it("says nothing from a tick where nothing changed", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
@@ -334,7 +334,7 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// NOTE: The timer is closed with the watchers; `poll` is short here so a
+	// The timer is closed with the watchers; `poll` is short here so a
 	// tick that outlived `close` would be caught inside the wait.
 	it("says nothing once it is closed", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
@@ -365,7 +365,7 @@ describe("The source watcher", () => {
 	})
 })
 
-// NOTE: One session driven as a child process, with `--json` so that what it
+// One session driven as a child process, with `--json` so that what it
 // did is readable rather than drawn. Every assertion waits for a NUMBER of
 // completed runs rather than for a length of time: a compile takes as long as
 // the machine takes, and a test that sleeps for it is a test that fails on a
@@ -375,7 +375,7 @@ type Session = {
 	runs: () => Array<Array<TestEvent>>
 	waitForRuns: (count: number) => Promise<Array<Array<TestEvent>>>
 	waitForEvent: (kind: TestEvent["kind"]) => Promise<boolean>
-	// NOTE: Awaited rather than fired and forgotten. A watch session that
+	// Awaited rather than fired and forgotten. A watch session that
 	// outlives its test goes on compiling in the background, and the suites
 	// running after it are the ones that pay for it. One the signal does not
 	// end in time is killed, and answers null.
@@ -470,7 +470,7 @@ function startSession(
 		async stop(signal: NodeJS.Signals = "SIGTERM"): Promise<number | null> {
 			child.kill(signal)
 
-			// NOTE: What `exited` answers rather than `exitCode`, which is null
+			// What `exited` answers rather than `exitCode`, which is null
 			// for a process the signal's default action ended.
 			let code = await Promise.race([
 				child.exited,
@@ -595,7 +595,7 @@ describe("essence test --watch", () => {
 					expect(first).toBeDefined()
 					expect(namesOf(first!).sort()).toEqual(["adds", "doubles"])
 
-					// NOTE: A Module only the reader imports. What has to
+					// A Module only the reader imports. What has to
 					// happen is that the reader's test runs again and the
 					// other file's does not.
 					writeFileSync(
@@ -642,7 +642,7 @@ describe("essence test --watch", () => {
 		})
 	}, 60_000)
 
-	// NOTE: A focus silences every other test of the RUN, across files. So the
+	// A focus silences every other test of the RUN, across files. So the
 	// answer changing is the one edit whose consequences reach further than the
 	// module graph does, and everything has to run again.
 	it("re-runs everything when a focus appears", async () => {
@@ -675,12 +675,12 @@ describe("essence test --watch", () => {
 		)
 	}, 60_000)
 
-	// NOTE: A watching coverage run is incremental for free — an entry nothing
+	// A watching coverage run is incremental for free — an entry nothing
 	// reached keeps the events it had, coverage among them — so what is worth
 	// pinning is exactly that: the cycle carries only what it re-ran, and the
 	// file it did not touch is still in the picture the report draws.
 	//
-	// NOTE: A `Foo.tests.es` of imports and tests has nothing to count and
+	// A `Foo.tests.es` of imports and tests has nothing to count and
 	// reports nothing; what a coverage run is ABOUT is the implementation
 	// Modules its tests reach.
 	it("counts only the files a cycle re-ran", async () => {
@@ -770,7 +770,7 @@ describe("essence test --watch", () => {
 		})
 	}, 60_000)
 
-	// NOTE: A session ends by a signal as often as by a keypress: a closing
+	// A session ends by a signal as often as by a keypress: a closing
 	// terminal sends SIGHUP and a supervisor sends SIGTERM. The session stages
 	// into a temporary directory of the test's own, so what is there is its.
 	for (let [signal, status] of [
@@ -810,7 +810,7 @@ describe("essence test --watch", () => {
 		}, 60_000)
 	}
 
-	// NOTE: The tests run on the session's own thread, and a handler waits for
+	// The tests run on the session's own thread, and a handler waits for
 	// the thread, so a test that never yields leaves a signal its default
 	// action. What that leaves behind, the next session sweeps.
 	it("stops on SIGTERM while a test spins, and the next session sweeps its staging", async () => {

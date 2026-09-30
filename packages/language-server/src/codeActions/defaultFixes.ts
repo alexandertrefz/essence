@@ -3,7 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { defaultEqualsBefore, readsAsWrittenValue } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// NOTE: The three places a `= value` parses and can never fire — a Case with no
+// The three places a `= value` parses and can never fire — a Case with no
 // payload to fill in, a Function literal called through a Type that fixes its
 // Argument count, and a Protocol requirement, which says which calls a Type must
 // answer rather than how one of them answers. All three are the same edit, and
@@ -13,7 +13,7 @@ export function removeDefaultAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: The span is the default's VALUE, and the Parser drops that value the
+	// The span is the default's VALUE, and the Parser drops that value the
 	// moment it reports — a Case left `defaultValue: null`, a Parameter the
 	// same — so there is no Node left to measure the deletion off and the
 	// buffer is the only witness there is. What it is asked is whether the span

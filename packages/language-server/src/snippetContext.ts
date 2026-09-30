@@ -5,7 +5,7 @@ import { contains, isSmaller } from "./positions"
 import { programSections } from "./sections"
 import type { ModuleSection, SnippetContext } from "./snippets"
 
-// NOTE: Which block a cursor stands in, which is the whole of what says WHICH
+// Which block a cursor stands in, which is the whole of what says WHICH
 // snippets are an answer there: `static` parses in a Namespace body and nowhere
 // else, `expect` in a test body and nowhere else, and offering either anywhere
 // else is offering a Parser Diagnostic.
@@ -27,7 +27,7 @@ import type { ModuleSection, SnippetContext } from "./snippets"
 type Block = {
 	position: common.Position
 	context: SnippetContext
-	// NOTE: Whether the block is a Namespace Method's or a provided Protocol
+	// Whether the block is a Namespace Method's or a provided Protocol
 	// Method's body, which is the one thing an EXPRESSION position needs to
 	// know about the blocks around it: `{ @ with … }` means something there and
 	// raises `at-outside-method` anywhere else. Read from every containing
@@ -36,7 +36,7 @@ type Block = {
 	method?: boolean
 }
 
-// NOTE: `atStatementStart` is the reading `keywordCompletions` already takes
+// `atStatementStart` is the reading `keywordCompletions` already takes
 // off the text, handed in rather than taken again. It is what tells the two
 // halves of one block apart — a fresh line inside a `match`'s braces is where a
 // Handler is written, and the same braces halfway through `case X { <- ` are
@@ -47,7 +47,7 @@ export function snippetContextAt(
 	cursor: common.Cursor,
 	atStatementStart: boolean,
 ): SnippetContext {
-	// NOTE: A document that does not parse still has a cursor in it. The text
+	// A document that does not parse still has a cursor in it. The text
 	// reading alone is what is left, and it can tell a value position from a
 	// Statement one — so the ordinary Statement snippets are offered, and the
 	// ones that need to know they stand in a Namespace or a test are not.
@@ -55,7 +55,7 @@ export function snippetContextAt(
 		return atStatementStart ? "implementation" : "expression"
 	}
 
-	// NOTE: Ahead of everything below, and on their own: the Module sections
+	// Ahead of everything below, and on their own: the Module sections
 	// take no Expression and no Statement at all, so neither the block walk nor
 	// the text reading has anything to say about a cursor inside one.
 	if (
@@ -74,7 +74,7 @@ export function snippetContextAt(
 
 	let block = blockAt(program, cursor)
 
-	// NOTE: A Parameter list is the one block that answers for BOTH readings.
+	// A Parameter list is the one block that answers for BOTH readings.
 	// What stands between those brackets is a name, a Type and a default, and
 	// the text reading calls all of it a value position — so `function f(` is
 	// offered every Record, Dictionary and `match` there is, none of which
@@ -83,7 +83,7 @@ export function snippetContextAt(
 		return "parameters"
 	}
 
-	// NOTE: Otherwise a value position is a value position whatever block it
+	// Otherwise a value position is a value position whatever block it
 	// stands in — what may be written after an `=` inside a test is what may be
 	// written after an `=` inside a Method. The one exception is a Method's own
 	// body, where `@` names something; `method` is that reading, and it offers
@@ -95,7 +95,7 @@ export function snippetContextAt(
 	return block.method ? "method" : "expression"
 }
 
-// NOTE: The sections the file already WRITES. A Module has one of each, so a
+// The sections the file already WRITES. A Module has one of each, so a
 // section snippet is an answer only where the section it opens is missing —
 // accepting `tests` in a file that has a tests block writes a second one, which
 // is `misplaced-tests-section` and a reader deleting four lines.
@@ -149,7 +149,7 @@ function blockAt(
 			method = true
 		}
 
-		// NOTE: Ties keep the block found first, which is the outer one: the
+		// Ties keep the block found first, which is the outer one: the
 		// walk visits a Node before the Nodes it holds.
 		if (innermost !== null && !isSmaller(block.position, innermost)) {
 			continue
@@ -162,7 +162,7 @@ function blockAt(
 	return { context, method }
 }
 
-// NOTE: The section the cursor stands in, which is the block every Statement
+// The section the cursor stands in, which is the block every Statement
 // walk below falls back to. `programSections` is depth first and outermost
 // first, so the LAST section containing the cursor is the innermost one — and
 // taking the last is what settles the tie a file that is nothing but tests
@@ -175,7 +175,7 @@ function sectionAt(
 	let section: SnippetContext = "top"
 
 	for (let candidate of programSections(program)) {
-		// NOTE: A section the file does not WRITE still has a Position — the
+		// A section the file does not WRITE still has a Position — the
 		// Parser recovers an empty file into a Program whose implementation
 		// spans `1:1` to `1:1` — and a zero-width span holds every Cursor that
 		// touches it. So a new file would be read as standing inside an
@@ -205,7 +205,7 @@ function sectionAt(
 	return section
 }
 
-// NOTE: Every block a Statement or a value may be written in, other than the
+// Every block a Statement or a value may be written in, other than the
 // sections themselves. The ones carrying `base` are the blocks that RE-OPEN a
 // Statement body inside something that is not one — a Method's body inside a
 // Namespace, a Handler's body inside a `match` — and they carry the section's
@@ -219,7 +219,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 			case "NamespaceDefinitionStatement":
 				blocks.push({ position: node.position, context: "namespace" })
 
-				// NOTE: An `overload` group holds signatures and nothing else,
+				// An `overload` group holds signatures and nothing else,
 				// so every snippet the Namespace around it offers writes a
 				// Parser Diagnostic there. It carries no body to walk into —
 				// each entry is a Function literal the walk reaches on its own
@@ -238,7 +238,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 					}
 				}
 
-				// NOTE: And the bodies `@` means something in — an INSTANCE
+				// And the bodies `@` means something in — an INSTANCE
 				// Method's, never a static one's, where `@` is refused outright.
 				for (let body of instanceBodies(node)) {
 					blocks.push({
@@ -264,7 +264,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 					}
 				}
 
-				// NOTE: `walk` reaches a provided Method's body on its own; what
+				// `walk` reaches a provided Method's body on its own; what
 				// is said here is whether `@` names the receiver in it.
 				for (let body of providedBodies(node)) {
 					blocks.push({
@@ -275,7 +275,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				}
 
 				return
-			// NOTE: A Choice's body is a list of Cases and nothing else, so
+			// A Choice's body is a list of Cases and nothing else, so
 			// every Statement the section around it offers is a Diagnostic
 			// there. Like the `overload` group above, it earns its place by
 			// what it refuses.
@@ -285,7 +285,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 			case "Match":
 				blocks.push({ position: node.position, context: "match" })
 
-				// NOTE: A Handler carries no Position of its own, so its body
+				// A Handler carries no Position of its own, so its body
 				// is spanned by the Statements written in it — and an EMPTY one
 				// spans nothing, which used to leave a reader who had just
 				// opened a Handler and pressed Enter being offered the `case`
@@ -303,7 +303,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 			case "Define":
 				blocks.push({ position: node.position, context: "define" })
 
-				// NOTE: An arm is one Expression from `as` to the end of its
+				// An arm is one Expression from `as` to the end of its
 				// Condition — nothing inside it is a Statement, and the two
 				// halves are both values.
 				for (let arm of node.arms) {
@@ -319,7 +319,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				})
 
 				return
-			// NOTE: Every Function literal — a Namespace Method, a callback, a
+			// Every Function literal — a Namespace Method, a callback, a
 			// `step` — opens a Statement body of its own. Its Parameter list is
 			// neither a Statement nor a value: what may be written between
 			// those brackets is a name, a Type and a default, and every value
@@ -343,7 +343,7 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 	return blocks
 }
 
-// NOTE: The Parameter list, and the DEFAULTS written inside it — a default is
+// The Parameter list, and the DEFAULTS written inside it — a default is
 // a value like any other, and the one thing between those brackets that a
 // value snippet belongs in. Each default is a smaller span than the list around
 // it, so the innermost rule hands it back.
@@ -402,7 +402,7 @@ function providedBodies(
 	return bodies
 }
 
-// NOTE: The Function literals of a Namespace's INSTANCE Methods — the bodies
+// The Function literals of a Namespace's INSTANCE Methods — the bodies
 // `@` names the receiver in. A static Method's body is not one of them: `@`
 // there is `at-in-static-method`.
 function instanceBodies(
@@ -427,7 +427,7 @@ function instanceBodies(
 	return bodies
 }
 
-// NOTE: Where a Handler that wrote no Statement stands — from the end of what
+// Where a Handler that wrote no Statement stands — from the end of what
 // it matches on to the start of the Handler below it, or to the Match's own
 // closing brace where it is the last. A Position runs one past what it ends
 // on, so the Match's end is one past the brace and the brace itself is where

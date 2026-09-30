@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-// NOTE: The `= expression` defaults a Parameter list holds, in order — the one
+// The `= expression` defaults a Parameter list holds, in order — the one
 // enumeration of "the Expressions a Declaration owns that are not in its body".
 // A default was wired into the Validator, the Optimiser's walk and nine
 // Language Server walkers one `if (defaultValue !== null)` at a time, and each
@@ -14,7 +14,7 @@ export function parameterDefaults<ExpressionNode>(
 	return writtenDefaults(parameters)
 }
 
-// NOTE: The `= { … }` defaults a Choice's Case list holds, in order — the
+// The `= { … }` defaults a Choice's Case list holds, in order — the
 // second position an Expression stands in outside every body, and reached by
 // the same shape rather than by another round of `if (defaultValue !== null)`
 // per walker. Named apart from `parameterDefaults` so a call site says which
@@ -40,12 +40,12 @@ function writtenDefaults<ExpressionNode>(
 	return defaults
 }
 
-// NOTE: The members a Record Parameter's default fills in — what
+// The members a Record Parameter's default fills in — what
 // `Parameter.defaultMembers` carries, and what `enrichParameterDefault` decides
 // a partial default by. Null where the question does not arise: a Parameter
 // with no default, or one whose Type is not a Record.
 //
-// NOTE: Read off what was WRITTEN and not off the default's Type, because a
+// Read off what was WRITTEN and not off the default's Type, because a
 // Parameter's Type is built by the resolver while a default is an expression
 // only the enricher ever types — two passes, and the Type is what every call
 // site is checked against. A Record LITERAL says in its own text which members
@@ -57,7 +57,7 @@ function writtenDefaults<ExpressionNode>(
 //
 // Sorted, so two structurally equal signatures carry equal member lists.
 //
-// NOTE: Written over the two fields it reads rather than over a Node type,
+// Written over the two fields it reads rather than over a Node type,
 // because the Parser's Record Literal, the typed one and the simplified one all
 // carry them — the Resolver asks this of the first, the Simplifier of the second
 // and Hover of the second again, and one answer is what keeps a Type, an
@@ -82,14 +82,14 @@ export function recordDefaultMembers(
 		return declared.sort()
 	}
 
-	// NOTE: Filtered through the declared members rather than read straight off
+	// Filtered through the declared members rather than read straight off
 	// the literal — a literal that writes a member the Parameter's Type does not
 	// declare is refused as `default-type-mismatch`, and until it is, what this
 	// answers has to stay a subset of the Type it describes.
 	return declared.filter((name) => Object.hasOwn(written, name)).sort()
 }
 
-// NOTE: The Record Literal a written member holds, whichever of the two shapes
+// The Record Literal a written member holds, whichever of the two shapes
 // this walk was handed. A TYPED member IS its value and carries `nodeType`; a
 // Parser member is a Node of its own that hangs its value off `value`. One
 // discriminator, so the Resolver can ask this of the written AST and the
@@ -111,7 +111,7 @@ function writtenMemberValue(
 	return value as { nodeType: string; members?: Record<string, unknown> }
 }
 
-// NOTE: The members a Record default writes as a Record Literal of their own,
+// The members a Record default writes as a Record Literal of their own,
 // and what THOSE write, recursively — `Parameter.defaultNesting`, and the same
 // answer for a Case payload's default. A member listed here is one a caller may
 // reach into with a path key: the callee rebuilds it member by member out of
@@ -148,7 +148,7 @@ export function recordDefaultNesting(
 	}
 
 	let written = defaultValue.members
-	// NOTE: A null prototype, because these are the SOURCE's member names — a
+	// A null prototype, because these are the SOURCE's member names — a
 	// member called 'toString' would otherwise be looked up on
 	// Object.prototype.
 	let nesting: Record<string, common.DefaultNesting> = Object.create(null)
@@ -180,7 +180,7 @@ export function recordDefaultNesting(
 	return nesting
 }
 
-// NOTE: The Argument list a call passes, with a hole where a Parameter took its
+// The Argument list a call passes, with a hole where a Parameter took its
 // default. `leading` is the receiver a Method Invocation passes first;
 // `omittedParameterIndices` is indexed over the whole list, receiver included,
 // which is the list the signature's Parameters line up with; `trailing` is the

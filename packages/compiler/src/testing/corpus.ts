@@ -7,7 +7,7 @@ import type {
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 
-// NOTE: The store's shape is the RUNTIME's, re-exported here rather than
+// The store's shape is the RUNTIME's, re-exported here rather than
 // spelled again — unlike `SnapshotStore`, which is one alias of `Record<string,
 // string>` and costs nothing to write twice. What a counterexample looks like is
 // nested and typed, and two spellings of it would drift apart in silence.
@@ -17,19 +17,19 @@ export type {
 	StoredValue,
 } from "@essence-lang/runtime/Testing"
 
-// NOTE: The STORED half of a property test — every value it has ever failed on,
+// The STORED half of a property test — every value it has ever failed on,
 // kept so that the next run asks about them before it draws anything. It is the
 // same arrangement `matches snapshot` has next door, for the same reason: the
 // runtime never touches a file, so whoever starts a run reads the entries and
 // hands them over, and writes back whatever the run said about them.
 //
-// NOTE: What makes this worth keeping at all is that a random search does not
+// What makes this worth keeping at all is that a random search does not
 // find the same value twice. A seed would replay the case the search STARTED
 // from rather than the one it shrank to, and the printed counterexample does
 // not read back — so the only durable answer is the shrunk value written down
 // as data, which is what `encode` in the runtime's `Generators` answers with.
 
-// NOTE: Beside the source and a sibling of `__snapshots__`, so that a
+// Beside the source and a sibling of `__snapshots__`, so that a
 // counterexample travels with the file it belongs to — a file that moves takes
 // the values that broke it with it, and a file that is deleted leaves nothing
 // behind that nothing names.
@@ -43,20 +43,20 @@ export function corpusFileOf(modulePath: string): string {
 	)
 }
 
-// NOTE: The one version this file has. A file written by a later Compiler is
+// The one version this file has. A file written by a later Compiler is
 // read as empty rather than half-understood: a corpus is an optimisation on top
 // of a search that still works without it, so the worst a wrong version can
 // cost is the values it held.
 export const CORPUS_SCHEMA = 1
 
-// NOTE: How many failing values one test keeps. Ten is enough that a property
+// How many failing values one test keeps. Ten is enough that a property
 // with several distinct bugs holds a case for each, and few enough that a suite
 // re-running its whole corpus still runs while a reader waits. Beyond it the
 // oldest go: a value that has been re-run and held on every run for ten
 // failures is a value the search is no longer learning anything from.
 export const CORPUS_LIMIT = 10
 
-// NOTE: THE FORMAT, and the whole of it: JSON, one object of entries keyed by
+// THE FORMAT, and the whole of it: JSON, one object of entries keyed by
 // the test's identity without its Module step, each holding its
 // counterexamples newest FIRST. It is JSON rather than the `.snap` format
 // beside it because what is stored is DATA rather than text a value printed —
@@ -64,7 +64,7 @@ export const CORPUS_LIMIT = 10
 // nobody has to learn.
 export type CorpusFile = { schema: number; entries: CorpusStore }
 
-// NOTE: Null for a file that is not a corpus at all — mangled JSON, a merge
+// Null for a file that is not a corpus at all — mangled JSON, a merge
 // conflict, the wrong schema. It is an answer rather than an empty store
 // because the two must never be confused: an empty store is a file the next
 // write may lay a value over, and a mangled one is a file the next write must
@@ -93,7 +93,7 @@ export function parseCorpusFile(text: string): CorpusStore | null {
 	for (let [key, stored] of Object.entries(file.entries)) {
 		let kept = readCounterexamples(stored)
 
-		// NOTE: A key whose every entry was refused is left out rather than
+		// A key whose every entry was refused is left out rather than
 		// written back empty: an entry nothing can read is an entry nothing can
 		// replay, and the next write is what takes it off the disk.
 		if (kept.length > 0) {
@@ -104,7 +104,7 @@ export function parseCorpusFile(text: string): CorpusStore | null {
 	return entries
 }
 
-// NOTE: Only the shape a replay needs — a List of named values. What is INSIDE
+// Only the shape a replay needs — a List of named values. What is INSIDE
 // each of them is the generator's business: `decode` is what says whether the
 // data still describes a value of the Type, and it answers nothing rather than
 // throwing wherever it does not.
@@ -130,7 +130,7 @@ function readCounterexamples(stored: unknown): Array<StoredCounterexample> {
 	})
 }
 
-// NOTE: Printed with tab indentation and its keys in name order so that
+// Printed with tab indentation and its keys in name order so that
 // recording one twice writes the same bytes: a diff then shows what changed
 // rather than what moved.
 export function printCorpusFile(entries: CorpusStore): string {
@@ -151,7 +151,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-// NOTE: What a read found, in two halves: the stores a run consults, and the
+// What a read found, in two halves: the stores a run consults, and the
 // Modules whose companion EXISTS but could not be read — which the run treats
 // as holding nothing, and the writer refuses to touch. A missing file is an
 // empty store, not an unreadable one: absence is the ordinary state of a
@@ -161,7 +161,7 @@ type CorpusReading = {
 	unreadable: Array<{ module: string; problem: string }>
 }
 
-// NOTE: The stored counterexamples of every Module of the run, `stores` keyed
+// The stored counterexamples of every Module of the run, `stores` keyed
 // by the Module's canonical path — the shape the runtime's
 // `RunOptions.counterexamples` takes. A Module with no companion file has an
 // empty entry rather than none, so that looking one up is always a lookup and
@@ -172,7 +172,7 @@ export async function readCorpus(
 	let stores: Record<string, CorpusStore> = {}
 	let unreadable: Array<{ module: string; problem: string }> = []
 
-	// NOTE: Fanned out, exactly as the snapshots beside them are. The
+	// Fanned out, exactly as the snapshots beside them are. The
 	// unreadable list is ordered afterwards so two runs report in one order
 	// whatever the disk answered first.
 	await Promise.all(
@@ -185,7 +185,7 @@ export async function readCorpus(
 			} catch (error) {
 				stores[module] = {}
 
-				// NOTE: Only absence is ordinary. A file that is there and
+				// Only absence is ordinary. A file that is there and
 				// cannot be read is a file the writer must not rewrite from
 				// nothing.
 				if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -219,7 +219,7 @@ export async function readCorpus(
 	return { stores, unreadable }
 }
 
-// NOTE: One counterexample to write down, under the Module and key the run
+// One counterexample to write down, under the Module and key the run
 // said it belongs to.
 export type CorpusAddition = {
 	module: string
@@ -227,7 +227,7 @@ export type CorpusAddition = {
 	values: StoredCounterexample["values"]
 }
 
-// NOTE: One entry the run could no longer read back, by its index in the list
+// One entry the run could no longer read back, by its index in the list
 // as it was READ — which is why every removal of a key is applied before any
 // addition to it, and why nothing else may reorder a list in between.
 export type CorpusRemoval = { module: string; key: string; index: number }
@@ -251,7 +251,7 @@ export const noCorpusWrites: CorpusWrites = {
 	problems: [],
 }
 
-// NOTE: Everything a run said about the values it failed on, read out of the
+// Everything a run said about the values it failed on, read out of the
 // event stream. A failure that could be written down is a value to keep; an
 // entry the generators no longer read back is one to drop. Both are on the
 // `property` event, which carries the Module and the key so that nothing out
@@ -281,13 +281,13 @@ export function collectCorpusChanges(events: Array<TestEvent>): CorpusChanges {
 	return { additions, removals }
 }
 
-// NOTE: The changes a run reported, laid over the entries it read. A new
+// The changes a run reported, laid over the entries it read. A new
 // counterexample goes at the FRONT — the most recent failure is the one most
 // worth asking about first — and one the file already holds is not written
 // twice, because a property that fails on the same value on ten runs would
 // otherwise fill its own corpus with one value.
 //
-// NOTE: A key the file holds that no test of this run claimed is KEPT, exactly
+// A key the file holds that no test of this run claimed is KEPT, exactly
 // as an unvisited snapshot is. A run narrowed by `--filter` or by a tag has not
 // visited every test, and deleting what it did not visit would lose a
 // regression for the price of a filter. Only an entry the run READ and could
@@ -310,7 +310,7 @@ export async function writeCorpus(options: {
 		return noCorpusWrites
 	}
 
-	// NOTE: A companion the read could not make sense of is never written
+	// A companion the read could not make sense of is never written
 	// over: the store this run held for it was EMPTY, and laying one new value
 	// over empty would rewrite the file whole — every counterexample a mangled
 	// file still holds in its bytes, gone for one merge conflict. The file
@@ -368,7 +368,7 @@ function layOver(
 	let dropped = 0
 	let recorded = 0
 
-	// NOTE: The removals first, and from the back — every index is into the
+	// The removals first, and from the back — every index is into the
 	// list as it was read, and taking one out from the front would move every
 	// index after it.
 	for (let key of new Set(removals.map((removal) => removal.key))) {
@@ -398,7 +398,7 @@ function layOver(
 		let stored = store[addition.key] ?? []
 		let written = JSON.stringify(addition.values)
 
-		// NOTE: By the DATA rather than by the printed value. Two values that
+		// By the DATA rather than by the printed value. Two values that
 		// write down the same way are one value, and two that do not are two
 		// however alike they read.
 		if (stored.some((entry) => JSON.stringify(entry.values) === written)) {
@@ -415,7 +415,7 @@ function layOver(
 	return { store, recorded, dropped, changed: recorded + dropped }
 }
 
-// NOTE: The whole companion file written afresh, or taken away where the write
+// The whole companion file written afresh, or taken away where the write
 // left nothing in it. Only the FILE goes: the directory may hold a companion of
 // another Module, and a directory left empty is not litter anybody sees.
 async function writeStored(

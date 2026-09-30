@@ -1,7 +1,7 @@
 import { glob } from "astro/loaders"
 import { defineCollection, z } from "astro:content"
 
-// NOTE: The section a page belongs to is a closed set rather than a free
+// The section a page belongs to is a closed set rather than a free
 // string, because it is also the sidebar's grouping and its fixed order —
 // a typo in frontmatter would otherwise silently invent a group nobody
 // navigates to.
@@ -61,7 +61,7 @@ let docs = defineCollection({
 			/** Protocols the type conforms to, with the `where` clause when conditional. */
 			conformsTo: z.array(z.string()).default([]),
 		})
-		// NOTE: A key the schema does not name is an error, not a silent extra,
+		// A key the schema does not name is an error, not a silent extra,
 		// so a field the schema drops can not linger in frontmatter doing nothing.
 		.strict()
 		.transform((data) => ({

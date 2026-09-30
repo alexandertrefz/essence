@@ -1,7 +1,7 @@
 import type { BundleMap, OriginalPosition } from "./maps"
 import { demangleName } from "./names"
 
-// NOTE: How a CDP stack becomes the one the user reads. Three kinds of frame
+// How a CDP stack becomes the one the user reads. Three kinds of frame
 // come up from the debuggee: `user` frames that map to a `.es` line, standard
 // library frames — unmapped, but named `$es_<Namespace>_<member>` — and glue:
 // dispatch trampolines, the inlined runtime, module bootstrap. Glue is hidden
@@ -13,7 +13,7 @@ export type CdpCallFrame = {
 	callFrameId: string
 	functionName: string
 	location: { scriptId: string; lineNumber: number; columnNumber?: number }
-	// NOTE: Carried by every real pause and read by `scopes`; the frame
+	// Carried by every real pause and read by `scopes`; the frame
 	// presentation itself never looks inside.
 	scopeChain?: Array<{
 		type: string
@@ -23,13 +23,13 @@ export type CdpCallFrame = {
 }
 
 export type PresentedFrame = {
-	// NOTE: Which raw CDP frame this presents — `scopes` reads the frame's
+	// Which raw CDP frame this presents — `scopes` reads the frame's
 	// scope chain off it, so a merged frame keeps the INNER index, whose
 	// chain holds the handler's own bindings.
 	callFrameIndex: number
 	name: string
 	kind: "user" | "stdlib" | "glue"
-	// NOTE: 1-based line, 0-based column — the map's own conventions; the
+	// 1-based line, 0-based column — the map's own conventions; the
 	// session converts for the client.
 	source: OriginalPosition | null
 }
@@ -65,7 +65,7 @@ export function presentFrames(
 		}
 	})
 
-	// NOTE: The match merge. A `match` lowers to an immediately-invoked
+	// The match merge. A `match` lowers to an immediately-invoked
 	// function, so pausing inside a handler shows an anonymous frame over the
 	// enclosing function — one construct, two frames. The anonymous frame
 	// absorbs its caller's NAME while keeping its own position and scope
@@ -103,7 +103,7 @@ export function presentFrames(
 		(frame) => glueFrames === "subtle" || frame.kind !== "glue",
 	)
 
-	// NOTE: What is left anonymous after the merge is one of two things: a
+	// What is left anonymous after the merge is one of two things: a
 	// module's own top level — the LAST user frame there is, best named after
 	// its file — or a match sitting over glue, which reads as the construct
 	// it is.

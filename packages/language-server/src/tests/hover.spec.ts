@@ -6,7 +6,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { findHover } from "../hover"
 
-// NOTE: Both Programs and the annotation index, which is what the Language
+// Both Programs and the annotation index, which is what the Language
 // Server hands `findHover` for every document — see `connection.onHover`.
 function hoverInfo(source: string, cursor: common.Cursor) {
 	let { program } = parseWithDiagnostics(source)
@@ -29,7 +29,7 @@ function hoverDocumentation(
 }
 
 describe("Hover", () => {
-	// NOTE: A step a dotted key reaches THROUGH answers as the member it names,
+	// A step a dotted key reaches THROUGH answers as the member it names,
 	// which is the invariant the desugar carries: the synthesized Lookup's
 	// member Identifier stands where the step was written.
 	it("should answer a path key's step with the member it names", () => {
@@ -51,7 +51,7 @@ describe("Hover", () => {
 		expect(hover(source, { line: 10, column: 39 })).toBe("tls: Tls")
 	})
 
-	// NOTE: A path key in a Literal MERGED into a default has no synthesized
+	// A path key in a Literal MERGED into a default has no synthesized
 	// Lookup under it — the levels are the Record Literals the merge is made
 	// of — so a step answers with the level it is a key of, exactly as a plain
 	// key of a Literal answers with the Literal it belongs to.
@@ -107,7 +107,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: Callables read back as their declaration rather than as a
+		// Callables read back as their declaration rather than as a
 		// name bound to a Function Type.
 		expect(hover(source, { line: 2, column: 11 })).toBe(
 			"function greet(subject: String) -> String",
@@ -135,7 +135,7 @@ describe("Hover", () => {
 		].join("\n")
 
 		expect(hover(source, { line: 2, column: 15 })).toBe("Integer")
-		// NOTE: A decimal is one Rational Literal rather than an Integer and a
+		// A decimal is one Rational Literal rather than an Integer and a
 		// member path, so a cursor past the dot answers the same as one before
 		// it — which is what a Hover over `0.75` would get wrong if the dot
 		// still opened an access.
@@ -155,7 +155,7 @@ describe("Hover", () => {
 		expect(hover(source, { line: 4, column: 19 })).toBe("something: Value")
 	})
 
-	// NOTE: The split a Record Alias gets: the name where a VALUE of one is
+	// The split a Record Alias gets: the name where a VALUE of one is
 	// hovered, and the members where the cursor is on the word itself — on the
 	// Declaration, on an annotation naming it, and on the import entry that
 	// bound it. `Standing: Standing` is what naming it would answer there.
@@ -180,7 +180,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: One level only — `team` stays `Team`, since expanding it here
+		// One level only — `team` stays `Team`, since expanding it here
 		// would answer a Declaration the cursor is not on.
 		expect(hover(source, { line: 3, column: 8 })).toBe(
 			"Standing: { team: Team, points: Integer }",
@@ -240,7 +240,7 @@ describe("Hover", () => {
 	})
 
 	it("should print a wide anonymous Union exactly as written", () => {
-		// NOTE: `buildUnion` dedupes and flattens, it does not regroup: an
+		// `buildUnion` dedupes and flattens, it does not regroup: an
 		// anonymous Union is stored as the members the source spelled, in the
 		// order it spelled them, however many there are. So a three-member
 		// Union reads back flat rather than as some canonical nesting of a
@@ -258,7 +258,7 @@ describe("Hover", () => {
 	})
 
 	it("should keep a named Alias by name inside a wider Union", () => {
-		// NOTE: The counterpart to the test above — flattening a nested Union
+		// The counterpart to the test above — flattening a nested Union
 		// into its parent is only ever done to ANONYMOUS ones. A member that
 		// carries a name of its own stays whole, so the reader is shown the
 		// name they wrote instead of having the Alias smeared out into the
@@ -277,7 +277,7 @@ describe("Hover", () => {
 	})
 
 	it("should keep `Number` by name inside a Union Type", () => {
-		// NOTE: `Number` is itself a named Union from the standard library, so
+		// `Number` is itself a named Union from the standard library, so
 		// this is the same claim as the test above made about a userland
 		// Alias, made about a builtin one.
 		let source = [
@@ -320,7 +320,7 @@ describe("Hover", () => {
 	})
 
 	it("should keep an untouched `Number` by name when a wildcard narrows", () => {
-		// NOTE: The wildcard's `@` is the scrutinee minus everything the
+		// The wildcard's `@` is the scrutinee minus everything the
 		// Handlers above it already claimed. `String` is claimed and `Number`
 		// is not, and what is left is shown under the name the source wrote —
 		// not spelled out as the members `Number` is a Union of.
@@ -344,7 +344,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: Self is stripped from the signature — `append` takes two
+		// Self is stripped from the signature — `append` takes two
 		// Strings internally, but a call site only passes one.
 		expect(hover(source, { line: 2, column: 29 })).toBe(
 			"append(_ String) -> String",
@@ -378,7 +378,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The cursor is on `label` itself, which the Namespace also
+		// The cursor is on `label` itself, which the Namespace also
 		// contains — the Method's name is the smaller node, so it wins.
 		expect(hover(source, { line: 3, column: 4 })).toBe(
 			"label(_ String) -> String",
@@ -437,7 +437,7 @@ describe("Hover", () => {
 		)
 	})
 
-	// NOTE: A Method the Compiler DERIVES has no declaration to read a `§§`
+	// A Method the Compiler DERIVES has no declaration to read a `§§`
 	// off, so the Protocol's own requirement documents it — which is the very
 	// signature the derive is built from.
 	it("should describe a Choice's derived Case listing", () => {
@@ -455,7 +455,7 @@ describe("Hover", () => {
 		)
 	})
 
-	// NOTE: The base of that Lookup is the Choice the author named, not the
+	// The base of that Lookup is the Choice the author named, not the
 	// Namespace the Compiler fabricated to read the Method off — a reader
 	// hovering `Side` has never heard of `Choice_Enumerable`. The same holds
 	// for the Type Parameter a bounded body calls the static on.
@@ -491,7 +491,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The Arguments pick the first Overload, so only that one is
+		// The Arguments pick the first Overload, so only that one is
 		// shown — the others are noise once the call resolved.
 		expect(hover(source, { line: 12, column: 23 })).toBe(
 			"combine(_ Integer) -> Integer",
@@ -531,7 +531,7 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: Hovering the argument literal must not show the invocation.
+		// Hovering the argument literal must not show the invocation.
 		expect(hover(source, { line: 2, column: 39 })).toBe("String")
 	})
 
@@ -549,7 +549,7 @@ describe("Hover", () => {
 		)
 	})
 
-	// NOTE: A callee's Generics are alpha-renamed for the span of one
+	// A callee's Generics are alpha-renamed for the span of one
 	// invocation, so a caller's same-named Generic can not collide with them —
 	// `T` is matched as `T`, a zero-width space and a counter. One that never
 	// binds stays under that fresh name in the Types stamped onto the
@@ -578,13 +578,13 @@ describe("Hover", () => {
 	})
 })
 
-// NOTE: A line's margins have no hover — its indentation, the blank after its
+// A line's margins have no hover — its indentation, the blank after its
 // last character, a blank line — while a space BETWEEN two tokens belongs to
 // whatever spans them and answers as that.
 describe("Hover in a line's margins", () => {
 	const source = [
 		"implementation {",
-		// NOTE: Three trailing spaces after the call.
+		// Three trailing spaces after the call.
 		"\tconstant total = 1::add(2)   ",
 		"\tconstant person = {",
 		'\t\tname = "Ada Lovelace",',
@@ -612,7 +612,7 @@ describe("Hover in a line's margins", () => {
 	})
 
 	it("answers between two tokens with what spans them", () => {
-		// NOTE: The space between `constant` and `total` is in the
+		// The space between `constant` and `total` is in the
 		// declaration's head, and the head answers for it.
 		expect(hover(source, { line: 2, column: 10 })).toBe(
 			"total: PositiveInteger",
@@ -621,7 +621,7 @@ describe("Hover in a line's margins", () => {
 	})
 })
 
-// NOTE: The typed AST erases annotations, since a resolved Type carries no
+// The typed AST erases annotations, since a resolved Type carries no
 // Position, so these are answered from the annotations the Enricher lists
 // beside the Program. Without them the enclosing declaration would answer,
 // whatever the cursor is aimed at.
@@ -637,7 +637,7 @@ describe("Hover of Type annotations", () => {
 
 		expect(hover(source, { line: 2, column: 27 })).toBe("String")
 		expect(hover(source, { line: 2, column: 38 })).toBe("String")
-		// NOTE: The Parameter's own name still wins over the annotation beside
+		// The Parameter's own name still wins over the annotation beside
 		// it — the index adds candidates, it does not outrank the typed tree.
 		expect(hover(source, { line: 2, column: 20 })).toBe("subject: String")
 	})
@@ -690,7 +690,7 @@ describe("Hover of Type annotations", () => {
 		expect(hover(source, { line: 5, column: 42 })).toBe("Ordering")
 	})
 
-	// NOTE: These four are the reason the collector is opened ONCE around the
+	// These four are the reason the collector is opened ONCE around the
 	// whole enrichment rather than per speculative hoisting round. `enrichStatement`
 	// reuses the hoisted Type for every one of these declarations, so their
 	// annotations are resolved ONLY inside a speculation and a per-round
@@ -709,22 +709,22 @@ describe("Hover of Type annotations", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: A Union annotation, and each of its members on its own.
+		// A Union annotation, and each of its members on its own.
 		expect(hover(source, { line: 2, column: 16 })).toBe("Integer")
 		expect(hover(source, { line: 2, column: 26 })).toBe("String")
 		expect(hover(source, { line: 2, column: 23 })).toBe("Integer | String")
-		// NOTE: A Protocol requirement's return Type — the Protocol's body is
+		// A Protocol requirement's return Type — the Protocol's body is
 		// otherwise entirely opaque to Hover.
 		expect(hover(source, { line: 4, column: 14 })).toBe("Integer")
-		// NOTE: A generic Choice's payload member.
+		// A generic Choice's payload member.
 		expect(hover(source, { line: 7, column: 21 })).toBe("Item")
 	})
 })
 
-// NOTE: All of these had a Position in the typed AST already — Hover simply
+// All of these had a Position in the typed AST already — Hover simply
 // never offered them as candidates, so the enclosing declaration answered.
 describe("Hover of declaration parts", () => {
-	// NOTE: One declaration, one answer. The keyword and the name are two
+	// One declaration, one answer. The keyword and the name are two
 	// places to point at the same Constant, and they used to disagree about a
 	// Record Alias: the Statement carries the shape the Alias stands for and
 	// the binding carries the Alias, so `constant` said `{ name: String }` and
@@ -765,12 +765,12 @@ describe("Hover of declaration parts", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: The bare `_` binds no name, so there is no Identifier under the
+		// The bare `_` binds no name, so there is no Identifier under the
 		// cursor — the Parameter itself is what answers.
 		expect(hover(source, { line: 2, column: 45 })).toBe("List<Item>")
 	})
 
-	// NOTE: The requirement and the four inequalities `Comparable` provides over
+	// The requirement and the four inequalities `Comparable` provides over
 	// it, which a Hover lists exactly as it lists a Namespace's members.
 	const COMPARABLE_HOVER = [
 		"protocol Comparable",
@@ -827,7 +827,7 @@ describe("Hover of declaration parts", () => {
 	})
 })
 
-// NOTE: A declaration is anchored to its HEAD, not to its whole Position. Every
+// A declaration is anchored to its HEAD, not to its whole Position. Every
 // one of these used to answer with the enclosing declaration, so moving the
 // mouse across the indentation of a long Namespace popped its whole head up.
 describe("Hover inside a declaration's body", () => {
@@ -845,14 +845,14 @@ describe("Hover inside a declaration's body", () => {
 			"}",
 		].join("\n")
 
-		// NOTE: A blank line inside the body, at any column.
+		// A blank line inside the body, at any column.
 		expect(hover(source, { line: 3, column: 1 })).toBeNull()
 		expect(hover(source, { line: 7, column: 4 })).toBeNull()
-		// NOTE: The indentation before a Statement, and a nested block's own
+		// The indentation before a Statement, and a nested block's own
 		// closing brace — neither of which the Function should answer for.
 		expect(hover(source, { line: 4, column: 2 })).toBeNull()
 		expect(hover(source, { line: 6, column: 3 })).toBeNull()
-		// NOTE: The head itself still answers, which is the point of keeping one.
+		// The head itself still answers, which is the point of keeping one.
 		expect(hover(source, { line: 2, column: 3 })).toBe(
 			"function f(n: Integer) -> Integer",
 		)
@@ -877,7 +877,7 @@ describe("Hover inside a declaration's body", () => {
 	})
 })
 
-// NOTE: A Handler is not only its body — the value a literal Matcher compares
+// A Handler is not only its body — the value a literal Matcher compares
 // against, a Record Matcher's by-value members and the Guard are Expressions
 // like any other, and every one of them used to answer with the whole Match.
 describe("Hover inside a Match Handler", () => {
@@ -906,10 +906,10 @@ describe("Hover inside a Match Handler", () => {
 	})
 
 	it("should describe a Guard's scrutinee and the Method it invokes", () => {
-		// NOTE: `@` is narrowed to what the Matcher established, which is what
+		// `@` is narrowed to what the Matcher established, which is what
 		// makes the Guard's Method resolve at all.
 		//
-		// NOTE: And to `NonZeroInteger` rather than to a bare Integer, because the
+		// And to `NonZeroInteger` rather than to a bare Integer, because the
 		// Case above named `0` — so a value reaching this Handler is an Integer
 		// that is not zero, which is exactly what the standard library's
 		// refinement is declared by. The Hover says the name the evidence has.
@@ -920,7 +920,7 @@ describe("Hover inside a Match Handler", () => {
 	})
 })
 
-// NOTE: A Protocol's requirements and a Choice's payload members survive
+// A Protocol's requirements and a Choice's payload members survive
 // enrichment as plain Type Records with no Position in them, so every name
 // inside either declaration used to answer with the declaration itself. Inside
 // a Protocol that was EVERY column.
@@ -944,7 +944,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 5, column: 13 })).toBe("to: Integer")
 		expect(hover(source, { line: 5, column: 17 })).toBe("Integer")
 		expect(hover(source, { line: 5, column: 29 })).toBe("Self")
-		// NOTE: The declaration itself still reads back whole, on its head.
+		// The declaration itself still reads back whole, on its head.
 		expect(hover(source, { line: 2, column: 3 })).toBe(
 			"protocol Sizable\nsize() -> Integer\nresize(_ Integer) -> Self",
 		)
@@ -1003,7 +1003,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 2, column: 36 })).toBe("String")
 	})
 
-	// NOTE: A checked refinement reads back as its BASE on its own Declaration —
+	// A checked refinement reads back as its BASE on its own Declaration —
 	// `NonZero: NonZero` is what naming it would say there, and the
 	// predicate is on the line the cursor is already on — while a value of it
 	// reads back as the NAME, because that is the Type the value has and the
@@ -1025,7 +1025,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 5, column: 7 })).toBe("n: NonZero")
 	})
 
-	// NOTE: A GENERIC refined Alias is a Generic Alias WRAPPING the refinement, so
+	// A GENERIC refined Alias is a Generic Alias WRAPPING the refinement, so
 	// its Declaration has to look one level further in to read back the base —
 	// otherwise the very substitution above answered `Filled: Filled`. A value
 	// of one reads back APPLIED, because `Filled` alone names half the Type the
@@ -1050,7 +1050,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		)
 	})
 
-	// NOTE: And the standard library's own, which nothing in the source names: a
+	// And the standard library's own, which nothing in the source names: a
 	// List that answered `hasItems` reads back as the applied `NonEmptyList`, and the
 	// Method the branch made reachable reads back answering an ITEM rather than
 	// the Optional `List` answers outside it — as DECLARED, which is what a
@@ -1075,7 +1075,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		)
 	})
 
-	// NOTE: A predicate that TAKES Arguments is read off its body like every
+	// A predicate that TAKES Arguments is read off its body like every
 	// other one, so a refinement written on a Program's own reads back as the
 	// name it was given — and the ELSE branch of the Method written as its
 	// contrary is where a value has it. Neither Method was declared to be the
@@ -1111,7 +1111,7 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 19, column: 21 })).toBe("units: Healthy")
 	})
 
-	// NOTE: And a PROTOCOL's provided body is read where it is written, with
+	// And a PROTOCOL's provided body is read where it is written, with
 	// the conformer filling in what it asks — `Rank` answers `isAbove` with a
 	// comparison, so the `else` of `isAtMost` proves the refinement written on
 	// that comparison rather than one written on the Protocol's own name.
@@ -1168,7 +1168,7 @@ describe("Hover of conformance clauses", () => {
 		)
 	})
 
-	// NOTE: The receiver is BOUND to a `List` Type. A written List proves it
+	// The receiver is BOUND to a `List` Type. A written List proves it
 	// holds items and reaches `namespace NonEmptyList`, whose `sort` is the one
 	// that carries the proof onward — a signature of its own, and not the one
 	// this case is about.
@@ -1186,7 +1186,7 @@ describe("Hover of conformance clauses", () => {
 	})
 })
 
-// NOTE: Boolean stands in for the standard library as a whole here
+// Boolean stands in for the standard library as a whole here
 // (`packages/standard-library/sources/Boolean.es`). What an Editor shows for a builtin comes from the
 // `§§` block in that source and nowhere else — the documentation an Essence
 // declaration carries has to reach Hover intact.
@@ -1207,9 +1207,9 @@ describe("Hover of a standard library Method", () => {
 		)
 	})
 
-	// NOTE: A `@param` reaches Hover as a section of its own.
+	// A `@param` reaches Hover as a section of its own.
 	//
-	// NOTE: A DELIBERATE decision, and the convention for every standard
+	// A DELIBERATE decision, and the convention for every standard
 	// library Method. The name in that section is the Parameter's INTERNAL one —
 	// `other`, which no call site can write, since `_ other: Boolean` takes
 	// its Argument positionally and Signature Help labels it `_`. Naming it
@@ -1286,7 +1286,7 @@ describe("Hover of a standard library Method", () => {
 	})
 })
 
-// NOTE: A Pattern's bindings read off a Constant the Compiler named, and that
+// A Pattern's bindings read off a Constant the Compiler named, and that
 // Identifier stands at the Pattern's own span — so a hover anywhere in
 // `{ width, height }` answered with `$pattern_2_11`, a name no source wrote.
 describe("Hover of a Pattern", () => {
@@ -1310,7 +1310,7 @@ describe("Hover of a Pattern", () => {
 		expect(hover(source, { line: 2, column: 13 })).toBe("width: Integer")
 	})
 
-	// NOTE: A Parameter taken apart by a Pattern has a Compiler-made internal
+	// A Parameter taken apart by a Pattern has a Compiler-made internal
 	// name over the Pattern's span; the label is what a reader wrote there.
 	it("answers for a Parameter Pattern with its label", () => {
 		expect(hover(source, { line: 4, column: 18 })).toBe(
@@ -1319,7 +1319,7 @@ describe("Hover of a Pattern", () => {
 	})
 })
 
-// NOTE: A default is an Expression written where it stands, so the cursor
+// A default is an Expression written where it stands, so the cursor
 // inside one is answered by what it reads rather than by the Parameter the
 // `=` hangs off.
 describe("Default Parameter Values", () => {
@@ -1352,7 +1352,7 @@ describe("Default Parameter Values", () => {
 	})
 })
 
-// NOTE: A derived Method carries documentation nobody wrote — the Compiler
+// A derived Method carries documentation nobody wrote — the Compiler
 // fabricates the Namespace and the `§§` text with it. Hover is where that text
 // has to arrive, or a reader meets a Method with nothing said about it at all.
 describe("Hover of a Choice's derived 'toString'", () => {
@@ -1451,7 +1451,7 @@ describe("Hover of a Protocol-provided Method", () => {
 		)
 	})
 
-	// NOTE: The Namespace spelling reads the same Method off the Namespace
+	// The Namespace spelling reads the same Method off the Namespace
 	// whose conformance put it in reach, so the reader still needs the Protocol
 	// named — the Namespace it is written on declares nothing of the sort.
 	it("should say which Protocol provided it on the Namespace spelling", () => {
@@ -1484,7 +1484,7 @@ describe("Hover of a Protocol-provided Method", () => {
 	})
 })
 
-// NOTE: The signature line marks a Parameter `?` only where the WHOLE Argument
+// The signature line marks a Parameter `?` only where the WHOLE Argument
 // may be left out, so a partial Record default has nowhere to say what it fills
 // in — the prose under the Parameter is the one place a reader is told.
 describe("A Record Parameter with a default", () => {
@@ -1510,7 +1510,7 @@ describe("A Record Parameter with a default", () => {
 		expect(hover(source, { line: 4, column: 19 })).toBe("using: Options")
 	})
 
-	// NOTE: And which of them a path key may reach INTO, which is the other
+	// And which of them a path key may reach INTO, which is the other
 	// half of the same fact — the default writes those out member by member, so
 	// an Argument may merge into them rather than replace them.
 	it("should say which members a path key may reach into", () => {
@@ -1532,7 +1532,7 @@ describe("A Record Parameter with a default", () => {
 		)
 	})
 
-	// NOTE: Whichever of the three offers a Parameter makes is under the
+	// Whichever of the three offers a Parameter makes is under the
 	// cursor — the span as written, the label, or the name the body reads it
 	// under — the sentence is the same.
 	it("should say it under the internal name too", () => {
@@ -1556,7 +1556,7 @@ describe("A Record Parameter with a default", () => {
 	})
 })
 
-// NOTE: A Case payload's `= { … }` is written outside every body, so a walk
+// A Case payload's `= { … }` is written outside every body, so a walk
 // that stops at bodies answers the cursor inside one with the whole Choice
 // declaration instead of with what is actually under it.
 describe("Hover inside a Case payload default", () => {
@@ -1572,7 +1572,7 @@ describe("Hover inside a Case payload default", () => {
 		expect(hover(source, { line: 3, column: 55 })).toBe("Integer")
 	})
 
-	// NOTE: A default that NAMES a Constant is baked into the Case Type as that
+	// A default that NAMES a Constant is baked into the Case Type as that
 	// Constant's value, and a Hover here answers with the NAME all the same —
 	// a default is an Expression written where it stands, and pointing at one is
 	// pointing at what was written, exactly as it is on a Parameter's default.
@@ -1594,7 +1594,7 @@ describe("Hover inside a Case payload default", () => {
 		)
 	})
 
-	// NOTE: A member path is a Function literal the Compiler wrote. What a
+	// A member path is a Function literal the Compiler wrote. What a
 	// reader may point at is the path as a whole and each step it spells; the
 	// Parameter the Compiler named is never an answer, and a test that let it
 	// become one would be a test that let `_0` reach a tooltip.
@@ -1627,7 +1627,7 @@ describe("Hover inside a Case payload default", () => {
 	})
 })
 
-// NOTE: A written value proves what it can about itself where a Method is
+// A written value proves what it can about itself where a Method is
 // looked up on it, and the Hover over that value is where a reader can see
 // WHY the call came back the way it did — the receiver names the proof, and
 // the Method beside it names the entry the proof reached.
@@ -1657,7 +1657,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: A written String proves `NonEmptyString`, and the Namespace over
+	// A written String proves `NonEmptyString`, and the Namespace over
 	// that proof declares no `trim` — so the Hover names the proof and the
 	// call still reaches `String`'s own Method, which is what a refinement
 	// adding Methods and taking none away looks like from here.
@@ -1674,7 +1674,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: And the entry the proof DOES reach, under the Namespace that
+	// And the entry the proof DOES reach, under the Namespace that
 	// spends it.
 	it("names the entry a String's proof reaches", () => {
 		let source = [
@@ -1689,7 +1689,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: Where no declared Alias proves the whole conjunction, the Hover
+	// Where no declared Alias proves the whole conjunction, the Hover
 	// spells the Declaration a reader would have to write for it.
 	it("spells a conjunction no declared name covers", () => {
 		let source = [
@@ -1706,7 +1706,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: And each conjunct is spelled the way the reader WROTE it, not the
+	// And each conjunct is spelled the way the reader WROTE it, not the
 	// way it resolved. `@::isAtLeast(5)` is a Program's own predicate over a
 	// forwarded bound, and what it asks is `@::isLessThan(5)` negated —
 	// `@::isGreaterThanOrEqualTo(0)` beside it is the standard library's own
@@ -1732,7 +1732,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: A proof standing as a Type ARGUMENT is spelled where it stands, and
+	// A proof standing as a Type ARGUMENT is spelled where it stands, and
 	// the Method it makes reachable reads back as DECLARED. The receiver's own
 	// Hover is the whole of what a reader needs to see the item Type is proven:
 	// the answer of `firstItem` is `ItemType`, and only the receiver says what
@@ -1753,7 +1753,7 @@ describe("Hover over a written receiver", () => {
 		)
 	})
 
-	// NOTE: The other side of it. A value the Program computed proves nothing,
+	// The other side of it. A value the Program computed proves nothing,
 	// so the name it was bound to hovers as the Type it was written with. A
 	// difference, because a sum of two written Integers is a `PositiveInteger`
 	// and carries that proof to the next call.
@@ -1769,7 +1769,7 @@ describe("Hover over a written receiver", () => {
 	})
 })
 
-// NOTE: A `define` in a nested position rather than at a `<-`: the enclosing
+// A `define` in a nested position rather than at a `<-`: the enclosing
 // Statement then answers with a Type of its own, so an assertion here is about
 // what this walk reaches rather than about what happens to span the cursor.
 describe("Hover inside a define", () => {
@@ -1786,7 +1786,7 @@ describe("Hover inside a define", () => {
 		"}",
 	].join("\n")
 
-	// NOTE: The whole Expression answers with one Type, so the Keyword says
+	// The whole Expression answers with one Type, so the Keyword says
 	// what it produces — the same answer a `match` gives.
 	it("should answer the Keyword with the Type the arms produce", () => {
 		expect(hover(source, { line: 3, column: 19 })).toBe("Integer")
@@ -1807,7 +1807,7 @@ describe("Hover inside a define", () => {
 	})
 })
 
-// NOTE: Both Keywords answer with what they PRODUCE, which is the reading a
+// Both Keywords answer with what they PRODUCE, which is the reading a
 // Return's `<-` already takes: `complete` hovers as the Value it waited for and
 // `start` as the `Started` it put in flight. The operand keeps its own Hover —
 // it is the smaller span — so the future and the value it answers with are one
@@ -1840,7 +1840,7 @@ describe("Hover over start and complete", () => {
 		)
 	})
 
-	// NOTE: What the walk is for — a name written inside the operand, which is
+	// What the walk is for — a name written inside the operand, which is
 	// answered by nothing at all where the Keyword is not descended into.
 	it("should reach a name written under the Keyword", () => {
 		expect(hover(source, { line: 3, column: 51 })).toBe("value: Integer")

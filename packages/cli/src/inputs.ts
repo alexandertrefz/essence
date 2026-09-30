@@ -4,11 +4,11 @@ import * as path from "node:path"
 import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 
-// NOTE: Shells expand globs themselves, but not all of them, not on every
+// Shells expand globs themselves, but not all of them, not on every
 // platform, and not when the pattern is quoted to stop them from trying. The
 // patterns that survive to here are expanded so that `esc build "src/*.es"`
 // behaves the same everywhere.
-// NOTE: Exported beside `looksLikeGlob` for the one caller that needs WHERE the
+// Exported beside `looksLikeGlob` for the one caller that needs WHERE the
 // pattern turns magic rather than whether it does — `--mutate` reads a pattern
 // down to its literal head. Two spellings of what a glob character is would be
 // two ideas of which files a run was pointed at.
@@ -94,7 +94,7 @@ export function defaultOutputFor(inputFileName: string): string {
 	return path.join(directory, `${base}.js`)
 }
 
-// NOTE: With one input `--out` names a file; with several it can only name a
+// With one input `--out` names a file; with several it can only name a
 // directory, since several sources cannot share one output path. A trailing
 // separator, or an existing directory, makes it a directory in either case.
 export async function resolveOutputFiles(
@@ -137,7 +137,7 @@ export async function resolveOutputFiles(
 		}
 	}
 
-	// NOTE: Compiling several sources into one directory flattens them, so two
+	// Compiling several sources into one directory flattens them, so two
 	// inputs with the same base name would silently overwrite each other.
 	let claimed = new Map<string, string>()
 

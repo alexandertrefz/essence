@@ -1,6 +1,6 @@
 import { typeKeySymbol } from "./type"
 
-// NOTE: `CaseSensitivity` is a builtin Choice, like `Side` — its values carry
+// `CaseSensitivity` is a builtin Choice, like `Side` — its values carry
 // Case tags (`"CaseSensitivity#Sensitive"`) exactly as user-declared Cases do,
 // and `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/String.es` declares the conformances

@@ -1,5 +1,5 @@
 {
-	// NOTE: The publish build — the one tsc invocation that EMITS. The
+	// The publish build — the one tsc invocation that EMITS. The
 	// workspace itself never builds; this program exists so the published
 	// packages can carry compiled JavaScript and declarations for consumers
 	// that are not running Bun over TypeScript sources. It is one program over

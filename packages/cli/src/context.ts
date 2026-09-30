@@ -19,15 +19,15 @@ import {
 	type Theme,
 } from "./theme"
 
-// NOTE: Everything a command needs that is not its own arguments: where to
+// Everything a command needs that is not its own arguments: where to
 // write, how it may be styled, and how loud it should be. Resolved once at
 // startup so that no two parts of a run can disagree about whether colour is
 // available.
 
-// NOTE: Read from package.json rather than duplicated here, so that
+// Read from package.json rather than duplicated here, so that
 // `esc --version` can not drift away from the version that was published.
 //
-// NOTE: IMPORTED rather than read off a path counted out from this module.
+// IMPORTED rather than read off a path counted out from this module.
 // It was read, and the path was `../../package.json` — correct while this
 // file sat one directory deeper, and silently wrong the moment it moved: the
 // read failed, the `catch` answered "unknown", and `esc --version` said so to
@@ -40,7 +40,7 @@ export type CLIContext = {
 	theme: Theme
 	palette: Palette
 	options: OptionValues
-	// NOTE: The project's own settings, read once for the whole invocation —
+	// The project's own settings, read once for the whole invocation —
 	// see `projectOptions`. Every command reads them here rather than from the
 	// disk, so that the two commands a run reaches (`test` and the compile
 	// under it) can not answer to two different files.
@@ -72,7 +72,7 @@ export function createContext(
 	terminal: Terminal = createTerminal(),
 	configuration: ProjectConfiguration = defaultConfiguration(),
 ): CLIContext {
-	// NOTE: Colour support is decided from stderr rather than stdout, because
+	// Colour support is decided from stderr rather than stdout, because
 	// stderr is where the human-facing output goes when stdout is a pipe.
 	let theme = createTheme(
 		supportsColor(colorChoiceFor(options), terminal.stderr) &&

@@ -1,12 +1,12 @@
 import { reduced } from "@essence-lang/runtime/bigRational"
 
-// NOTE: A Rational as JavaScript holds it. `1/3` has no JavaScript number, so
+// A Rational as JavaScript holds it. `1/3` has no JavaScript number, so
 // what crosses the boundary is the pair the runtime itself holds — two bigints,
 // in lowest terms with the sign on the numerator. `reduced` is the runtime's own
 // canonicaliser rather than a second copy of it, so `2/4`, `1/2` and `-1/-2` are
 // one value here for exactly the reasons they are one value in Essence.
 //
-// NOTE: A class rather than a plain pair, because `fromJS` has to tell a
+// A class rather than a plain pair, because `fromJS` has to tell a
 // Rational apart from a Record that happens to have a `numerator` and a
 // `denominator`, and `instanceof` is the only test that does not confuse the
 // two. The cost is realms: two copies of this package in one process mint two
@@ -16,7 +16,7 @@ export class EssenceRational {
 	readonly numerator: bigint
 	readonly denominator: bigint
 
-	// NOTE: The parts are checked before `reduced` ever sees them, because
+	// The parts are checked before `reduced` ever sees them, because
 	// `reduced` is the RUNTIME's canonicaliser — typed code that trusts the
 	// Enricher, and the one thing a host reaches that was never written to be
 	// handed a value from outside the language. Given a number where a bigint
@@ -43,7 +43,7 @@ export class EssenceRational {
 		this.denominator = parts.denominator
 	}
 
-	// NOTE: The EXACT value of a double, not the value its decimal spelling
+	// The EXACT value of a double, not the value its decimal spelling
 	// suggests. Every finite double IS a dyadic rational — a significand times a
 	// power of two — so reading its bits apart answers with no rounding at all,
 	// where `0.1` by way of `"0.1"` would answer `1/10` and quietly claim a
@@ -63,10 +63,10 @@ export class EssenceRational {
 		let raw = bits.getBigUint64(0)
 		let exponent = Number((raw >> 52n) & 0x7ffn)
 		let mantissa = raw & 0xf_ffff_ffff_ffffn
-		// NOTE: A subnormal carries no implicit leading bit and shares the
+		// A subnormal carries no implicit leading bit and shares the
 		// smallest normal's exponent, which is what the zero case is.
 		let significand = exponent === 0 ? mantissa : mantissa | (1n << 52n)
-		// NOTE: 1075 is the 52 bits of the fraction plus the 1023 the exponent
+		// 1075 is the 52 bits of the fraction plus the 1023 the exponent
 		// is biased by — the power of two the significand, read as an integer,
 		// has to be scaled by.
 		let scale = (exponent === 0 ? 1 : exponent) - 1075
@@ -77,7 +77,7 @@ export class EssenceRational {
 			: new EssenceRational(signed, 1n << BigInt(-scale))
 	}
 
-	// NOTE: The nearest double, which is an approximation by definition — this
+	// The nearest double, which is an approximation by definition — this
 	// is the lossy door, offered because a host that wants one usually knows it.
 	// The division is done on the parts where a double holds them EXACTLY, and
 	// on a scaled quotient everywhere else — parts that are merely finite as
@@ -97,7 +97,7 @@ export class EssenceRational {
 		return negative ? -magnitude : magnitude
 	}
 
-	// NOTE: How Essence itself prints a Rational, which is what
+	// How Essence itself prints a Rational, which is what
 	// `Rational::toString` answers: `1/3`, and a whole one as its numerator
 	// alone. The parts are still the pair — `Terminal.inspect` is the one
 	// reader that shows the structural `2/1`, and it is a different question.
@@ -107,7 +107,7 @@ export class EssenceRational {
 			: `${this.numerator}/${this.denominator}`
 	}
 
-	// NOTE: Both sides are in lowest terms with the sign on the numerator, so
+	// Both sides are in lowest terms with the sign on the numerator, so
 	// equality is the pair — no cross-multiplication, and no pair of unequal
 	// spellings of one value to be caught out by.
 	equals(other: EssenceRational): boolean {
@@ -118,10 +118,10 @@ export class EssenceRational {
 	}
 }
 
-// NOTE: One part of a Rational as the pair holds it, which is a bigint and
+// One part of a Rational as the pair holds it, which is a bigint and
 // nothing else.
 //
-// NOTE: A plain number is admitted where it is exactly a whole one a double
+// A plain number is admitted where it is exactly a whole one a double
 // holds — `new EssenceRational(1, 2)` is the pair a host would write, and
 // asking it for `1n` and `2n` would be a ceremony that buys nothing. Every
 // other finite number is refused rather than rounded: `1.5` is not a whole
@@ -140,7 +140,7 @@ function rationalPart(value: bigint | number, role: string): bigint {
 			return BigInt(value)
 		}
 
-		// NOTE: `NaN` and the infinities are turned away before the pointer
+		// `NaN` and the infinities are turned away before the pointer
 		// below, on the ground `fromNumber` turns them away on and with the
 		// Error it uses. There is no Rational of them at all, so sending a host
 		// to the door that answers what a double holds would be sending it to
@@ -162,7 +162,7 @@ function rationalPart(value: bigint | number, role: string): bigint {
 	)
 }
 
-// NOTE: What the value IS, for the second half of that Error — its kind and
+// What the value IS, for the second half of that Error — its kind and
 // never the value itself, which is the sort of thing that turns out to be a
 // megabyte of JSON, or a Symbol that throws on being spelled at all.
 function kindOf(value: unknown): string {
@@ -179,12 +179,12 @@ function kindOf(value: unknown): string {
 		: `a ${typeof value}`
 }
 
-// NOTE: The largest integer every one of whose neighbours a double still tells
+// The largest integer every one of whose neighbours a double still tells
 // apart. Two parts at most this large divide in ONE hardware rounding, which
 // IEEE 754 requires to be correct — the fast path.
 const EXACT_LIMIT = 1n << 53n
 
-// NOTE: `numerator / denominator` for positive parts, correctly rounded to
+// `numerator / denominator` for positive parts, correctly rounded to
 // nearest-even. Everything past the fast path rounds exactly once: the
 // quotient is taken to 64 bits with the truncated remainder folded into the
 // low bit — round-to-odd, which any later rounding of 53 bits or fewer reads
@@ -218,7 +218,7 @@ function dividedMagnitude(numerator: bigint, denominator: bigint): number {
 		}
 	}
 
-	// NOTE: The floor of the answer's exponent. At `-1023` and below the answer
+	// The floor of the answer's exponent. At `-1023` and below the answer
 	// is subnormal — its ulp is `2 ** -1074` however few bits that leaves — so
 	// the 64-bit quotient is rounded to multiples of that ulp here, half to
 	// even, and what remains converts and scales exactly.
@@ -234,7 +234,7 @@ function dividedMagnitude(numerator: bigint, denominator: bigint): number {
 	return scaledByPowerOfTwo(Number(scaled), -shift)
 }
 
-// NOTE: `value >> shift`, rounded to nearest with ties to even — the rounding
+// `value >> shift`, rounded to nearest with ties to even — the rounding
 // `Number(…)` would have done, at a coarser width than it would have done it.
 // The tie can not lie: a truncated quotient was already marked odd, so an
 // exact-looking half really is one.
@@ -254,19 +254,19 @@ function bitLength(value: bigint): number {
 	return (value < 0n ? -value : value).toString(2).length
 }
 
-// NOTE: The largest power of two a double holds. `2 ** 1024` is `Infinity` and
+// The largest power of two a double holds. `2 ** 1024` is `Infinity` and
 // `2 ** -1075` is `0`, so anything past this has to be applied in more than one
 // multiplication.
 const POWER_STEP = 1023
 
-// NOTE: `value * 2 ** exponent`, in steps a double's own exponent can hold.
+// `value * 2 ** exponent`, in steps a double's own exponent can hold.
 // Done in one multiplication it is wrong at both ends: `1/2 ** 1024` scales back
 // by `2 ** -1088`, which IS `0` — so the answer is `0` rather than the perfectly
 // ordinary subnormal `5.56e-309` the Rational actually is. Stepping keeps every
 // intermediate in range, and each step is exact until the last one, which is the
 // single rounding a conversion to a double is allowed.
 //
-// NOTE: The loop stops early on `0` and on `Infinity` because both are fixed
+// The loop stops early on `0` and on `Infinity` because both are fixed
 // points — a Rational of a million-bit numerator would otherwise multiply
 // `Infinity` by `2 ** 1023` a thousand times to reach the same answer.
 function scaledByPowerOfTwo(value: number, exponent: number): number {

@@ -5,7 +5,7 @@ import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
-// NOTE: The three things a test about a Help does — report a probe, read the
+// The three things a test about a Help does — report a probe, read the
 // Help off it, and COMPILE what it printed. They were written inside
 // `knownAnswers.spec.ts`, which is where the first reporters to earn them were
 // tested; the Help audit needs the same three from every spec it wrote, so they
@@ -21,13 +21,13 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 // success. `compiles` runs every stage, through `analyseSource`, while
 // `firstOf` and `enrichedDiagnosticsFor` stop after the Enricher.
 
-// NOTE: Not exported: `firstOf` below is what a spec reaches for, and an export
+// Not exported: `firstOf` below is what a spec reaches for, and an export
 // nobody imports is a promise to keep a reader for.
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
 }
 
-// NOTE: Throws rather than answering null, and names every code that WAS
+// Throws rather than answering null, and names every code that WAS
 // reported: a probe that stopped reporting what it was written for is a test
 // that has to say what it got instead, or the next reader spends the afternoon
 // finding out.
@@ -50,7 +50,7 @@ export function firstOf(
 	return found
 }
 
-// NOTE: What a Help promises, checked by compiling it. A test passes here its
+// What a Help promises, checked by compiling it. A test passes here its
 // own probe with the Help's spelling written into it, so a Help that stops
 // compiling fails the test that prints it rather than a reader's afternoon.
 //
@@ -64,7 +64,7 @@ export function compiles(
 	return !containsErrors(analysedDiagnosticsFor(source, options))
 }
 
-// NOTE: The Parser and the Enricher, for the reports that never reach the
+// The Parser and the Enricher, for the reports that never reach the
 // Validator: a probe whose point is a Type error stops there, and running the
 // Validator over a Program the Enricher gave up on only adds what it could not
 // judge.
@@ -76,7 +76,7 @@ export function enrichedDiagnosticsFor(
 	return [...parsed.diagnostics, ...enrich(parsed.program).diagnostics]
 }
 
-// NOTE: Every stage, for the Helps the VALIDATOR writes — a Match's Cases, a
+// Every stage, for the Helps the VALIDATOR writes — a Match's Cases, a
 // bounded Function stored as a value. The Enricher reports none of them, so a
 // test that asked it alone would find nothing and say the reporter had stopped.
 //
@@ -90,7 +90,7 @@ export function analysedDiagnosticsFor(
 	return analyseSource(source, undefined, options).diagnostics
 }
 
-// NOTE: `firstOf` over the whole pipeline, with the same insistence on naming
+// `firstOf` over the whole pipeline, with the same insistence on naming
 // what WAS reported when the probe stops reporting what it was written for.
 export function firstAnalysed(
 	source: string,
@@ -110,7 +110,7 @@ export function firstAnalysed(
 	return found
 }
 
-// NOTE: Every code one source is refused with, in the order a reader meets them
+// Every code one source is refused with, in the order a reader meets them
 // — the same list `esc` prints and the editor underlines. A cascade is tested by
 // writing the whole list down, so a report that comes back is a failure rather
 // than something the next reader finds.
@@ -123,7 +123,7 @@ export function codesOfSource(
 	)
 }
 
-// NOTE: The Helps of the first report carrying this code, which is `firstAnalysed`
+// The Helps of the first report carrying this code, which is `firstAnalysed`
 // with the one thing a spec about a Help wants off it.
 export function helpsOfCode(
 	source: string,
@@ -132,7 +132,7 @@ export function helpsOfCode(
 	return firstAnalysed(source, code).helps ?? []
 }
 
-// NOTE: The codes whose Helps are COMPILED somewhere — the registry the Help
+// The codes whose Helps are COMPILED somewhere — the registry the Help
 // specs maintain between them, and the one thing `helpCoverage.spec.ts` can not
 // work out for itself. A Help that spells an edit the reader is told to WRITE is
 // a promise, and the only way to keep it is to write that spelling into the

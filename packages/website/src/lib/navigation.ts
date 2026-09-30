@@ -22,7 +22,7 @@ export interface Section {
 /**
  * The one place the sidebar's order lives.
  *
- * NOTE: The ids mirror the `section` enum in `src/content.config.ts`, but the
+ * The ids mirror the `section` enum in `src/content.config.ts`, but the
  * order is this file's alone — it is the sidebar's order and the prev/next
  * chain's. Adding a section there without adding it here is a type error at
  * every call site rather than a silently missing group.
@@ -96,7 +96,7 @@ export interface SidebarSection extends Section {
 	 * The same pages split into their labelled runs, or empty for a section
 	 * whose pages name no group. Laid end to end, the groups' items are `items`.
 	 *
-	 * NOTE: Beside the flat list rather than instead of it, and a label laid
+	 * Beside the flat list rather than instead of it, and a label laid
 	 * over the order rather than a sort of its own. The reading chain, the
 	 * breadcrumbs, the hub and search each put a section's pages in `order`
 	 * without ever seeing a group, so a grouping that moved a page in the rail
@@ -150,7 +150,7 @@ const FENCE = /^(`{3,}|~{3,})/
  * A guide's on-this-page list: its steps and its own headings, in the order the
  * page takes them.
  *
- * NOTE: A step's title is a component's `<h2>`, not Markdown, so it is not
+ * A step's title is a component's `<h2>`, not Markdown, so it is not
  * among the `headings` Astro collects — and a guide is read by its steps, so a
  * list without them would name only what comes before and after the work. The
  * steps are read off the page's source instead, and the collected headings are
@@ -289,7 +289,7 @@ function topLevelIn(
  * A section's top-level pages as labelled runs, in the order they already
  * have: each run is the pages next to one another that name the same `group`.
  *
- * NOTE: A section groups every one of its top-level pages or none of them, and
+ * A section groups every one of its top-level pages or none of them, and
  * a label names one run. Breaking either throws rather than drawing something,
  * because what would be drawn looks deliberate: a page without a group would
  * sit under the heading of whichever run it followed, and a label that came
@@ -359,7 +359,7 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 				continue
 			}
 
-			// NOTE: A page written under another is drawn under it, whatever
+			// A page written under another is drawn under it, whatever
 			// run its parent is in, so a `group` of its own would do nothing —
 			// and frontmatter that does nothing is refused, as the schema
 			// refuses a key it does not name.

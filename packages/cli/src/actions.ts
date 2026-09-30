@@ -17,7 +17,7 @@ export const EXIT_SUCCESS = 0
 export const EXIT_FAILURE = 1
 export const EXIT_USAGE = 2
 
-// NOTE: The same 2 a usage error exits with, deliberately. `essence test`
+// The same 2 a usage error exits with, deliberately. `essence test`
 // leaving a `focused` modifier behind is a run that did not do what it was
 // asked to — it ran two tests out of forty — and that is what a usage error is
 // as well: the invocation and the answer do not match. A third number would
@@ -94,7 +94,7 @@ export async function runBuild(
 		return EXIT_SUCCESS
 	}
 
-	// NOTE: `--execute` on a batch would interleave the output of several
+	// `--execute` on a batch would interleave the output of several
 	// programs with no way to tell them apart, so only a single build runs.
 	if (result.outcomes.length !== 1) {
 		throw new UsageError(
@@ -121,14 +121,14 @@ export async function runCheck(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	// NOTE: WITH the tests section, which no other command outside `essence
+	// WITH the tests section, which no other command outside `essence
 	// test` reads. `check` is the command that answers "is this file correct?",
 	// and a file whose tests do not compile is not — a build drops the section
 	// and would have said nothing, which left the one command a CI runs to be
 	// told about its code silent about a third of the file. It is also what the
 	// editor already types, so the two agree.
 	//
-	// NOTE: WITHOUT the contract goals, which `essence test --contracts` is
+	// WITHOUT the contract goals, which `essence test --contracts` is
 	// what asks for. A goal is a test to RUN, and synthesizing one costs a
 	// speculative enrichment per Method and a remark about every Method that
 	// could not have one — none of which says anything about whether the file
@@ -161,7 +161,7 @@ export async function runRun(
 		)
 	}
 
-	// NOTE: Without --out the compiled file is scratch work rather than a build
+	// Without --out the compiled file is scratch work rather than a build
 	// artefact, and it has no name of its own: it goes into the bundle cache,
 	// under the name that means these exact sources. That leaves the source tree
 	// untouched exactly as a temporary directory did, and it is what makes a
@@ -169,7 +169,7 @@ export async function runRun(
 	// file it would have produced is already sitting there.
 	let cacheOutput = context.options.out === undefined
 
-	// NOTE: The bundle outlives the run and the directory it sits in is shared,
+	// The bundle outlives the run and the directory it sits in is shared,
 	// so a map written beside it would be a second file nobody clears up — asked
 	// for a map, `run` rides it inside the bundle instead. `--out` names a place
 	// the user chose and keeps the linked default.
@@ -181,7 +181,7 @@ export async function runRun(
 
 	printCompilationResult(context, result)
 
-	// NOTE: --json changes how the compilation is reported, not what `run`
+	// --json changes how the compilation is reported, not what `run`
 	// does — the program still executes, and the exit code is still its own,
 	// exactly as the command documents.
 	if (context.options.json) {
@@ -192,7 +192,7 @@ export async function runRun(
 		return EXIT_FAILURE
 	}
 
-	// NOTE: `--out` may name a directory, and without one the name is the
+	// `--out` may name a directory, and without one the name is the
 	// cache's — so what runs is the bundle the Compiler actually wrote, which is
 	// what the outcome reports. An emit that succeeded always reports one, which
 	// is what the failures above have already established.

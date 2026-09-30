@@ -22,7 +22,7 @@ import {
 	coverageReportFormats,
 } from "./testing/coverageReports"
 
-// NOTE: A project's settings live in ONE file at its root, `essence.json`, and
+// A project's settings live in ONE file at its root, `essence.json`, and
 // everything that walks or builds the project reads them there: `essence
 // test`, `essence build`, the Language Server's discovery walk, the Editor's
 // live test session. The file is JSON with comments and trailing commas, the
@@ -31,7 +31,7 @@ import {
 // a source — and a format that forbids that is a format people annotate in a
 // README nobody opens.
 //
-// NOTE: Where the file is IS the project root. The old arrangement, settings
+// Where the file is IS the project root. The old arrangement, settings
 // under an `essence` key of the nearest `package.json` that had one, gave a
 // project two roots — the settings were found by walking up while every walk
 // started at the working directory — and two spellings of the same list, one
@@ -40,12 +40,12 @@ import {
 // is what every tool reads. The `essence` key of a manifest is no longer read,
 // and is reported as moved when one is found.
 //
-// NOTE: Read synchronously, because the two walks that need the answer are
+// Read synchronously, because the two walks that need the answer are
 // themselves synchronous — the Language Server's discovery walk runs inside a
 // request — and one implementation that both can call is worth more than the
 // asynchrony. It is a handful of small files, once, at the start of a run.
 //
-// NOTE: A mistake in the file is a WARNING with a span, never a refusal: a
+// A mistake in the file is a WARNING with a span, never a refusal: a
 // project should not fail to run its tests because a key it added is the wrong
 // shape, and silence would leave the author believing a filter is in force
 // when it is not. The setting falls back to its default and the Diagnostic
@@ -54,7 +54,7 @@ import {
 
 export const PROJECT_FILE_NAME = "essence.json"
 
-// NOTE: The directories a discovery walk never descends into, wherever the walk
+// The directories a discovery walk never descends into, wherever the walk
 // is written. `node_modules` is the one that matters: a walk that does not stop
 // there spends all of its time in it, and nothing under it is a Module of THIS
 // project. Held here, with the exclusions, because the Compiler's walk and the
@@ -71,23 +71,23 @@ export const skippedDirectories = new Set([
 
 export type TestConfiguration = {
 	skipTags: Array<string>
-	// NOTE: Whether every run of this project also tests what its declarations
+	// Whether every run of this project also tests what its declarations
 	// promise — see `--contracts`. A project whose goals are worth running is a
 	// project whose goals are worth running every time, and `--contracts` is
 	// then the flag for asking about a project that did not say so. The two are
 	// a union: either one turns the goals on.
 	contracts: boolean
-	// NOTE: How many values a property test draws. Null when the project did
+	// How many values a property test draws. Null when the project did
 	// not say, so that the runner's own default stays spelled in one place —
 	// the runner — rather than here as well.
 	cases: number | null
 	coverage: {
-		// NOTE: The report a `--coverage` run writes. Null when the project did
+		// The report a `--coverage` run writes. Null when the project did
 		// not ask for one; collecting coverage is a choice about a run and stays
 		// a flag, while the format and the directory are facts about the
 		// project and live here.
 		report: CoverageReportFormat | null
-		// NOTE: Absolute, resolved against the project file. Null when the
+		// Absolute, resolved against the project file. Null when the
 		// project did not say, which the runner answers with `coverage/` under
 		// the working directory as it always has.
 		out: string | null
@@ -95,7 +95,7 @@ export type TestConfiguration = {
 }
 
 export type BuildConfiguration = {
-	// NOTE: Absolute, resolved against the project file. Null for the default,
+	// Absolute, resolved against the project file. Null for the default,
 	// which is next to each source file.
 	out: string | null
 	sourcemap: boolean
@@ -105,7 +105,7 @@ export type BuildConfiguration = {
 	withoutOptimisations: Array<string>
 }
 
-// NOTE: One file's worth of problems — the file, its text and the Diagnostics
+// One file's worth of problems — the file, its text and the Diagnostics
 // read out of it — which is exactly what a renderer needs to show them. A
 // configuration may carry more than one: the project file's own, and a
 // `package.json` that still spells the old key.
@@ -116,14 +116,14 @@ export type ProjectProblems = {
 }
 
 export type ProjectConfiguration = {
-	// NOTE: The project file the settings were read from, for `--verbose` and
+	// The project file the settings were read from, for `--verbose` and
 	// for the Diagnostics. Null when no project file governs the path asked
 	// about, in which case every setting is at its default.
 	filePath: string | null
-	// NOTE: The directory holding the project file — what a run walks. Null
+	// The directory holding the project file — what a run walks. Null
 	// exactly when `filePath` is.
 	root: string | null
-	// NOTE: Absolute paths a discovery walk never descends into, resolved
+	// Absolute paths a discovery walk never descends into, resolved
 	// against the project file that named them. A file NAMED on the command
 	// line is still compiled and still reported, and a file OPENED in the
 	// editor still gets its Diagnostics: what this excludes is the walk, which
@@ -131,13 +131,13 @@ export type ProjectConfiguration = {
 	exclude: Array<string>
 	test: TestConfiguration
 	build: BuildConfiguration
-	// NOTE: What was written but could not be read as a setting, as Diagnostics
+	// What was written but could not be read as a setting, as Diagnostics
 	// against the file that holds it. Warnings, every one — see the head of
 	// this file.
 	problems: Array<ProjectProblems>
 }
 
-// NOTE: THE spelling of the defaults — every path that could not read a value
+// THE spelling of the defaults — every path that could not read a value
 // falls back to these, so a field added here can not default differently on
 // the path that could not read the file.
 export function defaultConfiguration(): ProjectConfiguration {
@@ -163,7 +163,7 @@ export function defaultConfiguration(): ProjectConfiguration {
 	}
 }
 
-// NOTE: Whether a path is one the project said to stay out of. Compared as a
+// Whether a path is one the project said to stay out of. Compared as a
 // path rather than as text, so that `fixtures/broken` excludes everything under
 // it and `fixtures/brokenish` beside it stays.
 export function isExcludedPath(
@@ -182,7 +182,7 @@ export function isExcludedPath(
 	)
 }
 
-// NOTE: Every `.es` file under a directory, leaving out skipped directories and
+// Every `.es` file under a directory, leaving out skipped directories and
 // what `exclude` covers. A symlinked directory is read as a file rather than
 // descended into, so a link back up the tree can not send the walk round.
 export async function essenceFilesUnder(
@@ -227,7 +227,7 @@ export async function essenceFilesUnder(
 // The catalogue
 // ---------------------------------------------------------------------------
 
-// NOTE: Every setting the file may hold, as data: its shape, what it is for,
+// Every setting the file may hold, as data: its shape, what it is for,
 // and what happens when it can not be read. The reader walks the file against
 // this, so an unknown key, a wrong shape and the "did you mean" all come from
 // one place; the JSON Schema an Editor validates the file with is GENERATED
@@ -245,10 +245,10 @@ export type SettingShape =
 export type Setting = {
 	shape: SettingShape
 	description: string
-	// NOTE: What a run does when the setting could not be read — the note the
+	// What a run does when the setting could not be read — the note the
 	// Diagnostic ends on, so the reader knows what is in force meanwhile.
 	fallback: string
-	// NOTE: One valid value, spelled as it would be written, for the Help.
+	// One valid value, spelled as it would be written, for the Help.
 	example: string
 }
 
@@ -377,7 +377,7 @@ export const projectSettings: Setting = table(
 	"{ }",
 )
 
-// NOTE: The names a `list` holds, for the messages and the Schema.
+// The names a `list` holds, for the messages and the Schema.
 const listItemNames: Record<"path" | "tag" | "pass", string> = {
 	path: "paths",
 	tag: "tag names",
@@ -451,7 +451,7 @@ function schemaOf(setting: Setting): JsonSchema {
 	}
 }
 
-// NOTE: The Schema, generated from the catalogue rather than written beside
+// The Schema, generated from the catalogue rather than written beside
 // it. The checked-in copies — the one the VS Code extension ships and the one
 // the website serves — are compared against this by a spec, so a setting
 // added above is a Schema change the suite insists on.
@@ -468,7 +468,7 @@ export function projectSchema(): JsonSchema {
 // Reading one file
 // ---------------------------------------------------------------------------
 
-// NOTE: Offsets to Cursors, for the Diagnostics. Lines and columns are
+// Offsets to Cursors, for the Diagnostics. Lines and columns are
 // one-based, as the Lexer's are, so a Position in this file renders and
 // underlines exactly like one in a source.
 function cursorsOf(text: string): (offset: number) => common.Cursor {
@@ -559,7 +559,7 @@ function keyPathOf(parents: Array<string>, name: string): string {
 	return [...parents, name].join(".")
 }
 
-// NOTE: `"test.cases": 200` — a setting written FLAT, the way a command-line
+// `"test.cases": 200` — a setting written FLAT, the way a command-line
 // flag or a dotted property spells one. The catalogue is a TREE, so a key like
 // this names a real setting and names it whole; what is missing is the object
 // around it. Null for every key that is not one, which is what lets both the
@@ -596,7 +596,7 @@ function nestedSettingPath(keyPath: Array<string>): Array<string> | null {
 	return null
 }
 
-// NOTE: The path spelled as the object it is — `"test": { "cases": 200 }` — so
+// The path spelled as the object it is — `"test": { "cases": 200 }` — so
 // that what the Help prints is the text a reader writes rather than a
 // description of it.
 function nestedSpelling(parts: Array<string>, value: unknown): string {
@@ -609,7 +609,7 @@ function nestedSpelling(parts: Array<string>, value: unknown): string {
 	)
 }
 
-// NOTE: The one Diagnostic every wrong shape gets. It names the setting, says
+// The one Diagnostic every wrong shape gets. It names the setting, says
 // what was written instead, spells one right value, and ends on what is in
 // force meanwhile — the last being the point: a setting that did not read is a
 // setting the author believes is in force.
@@ -620,7 +620,7 @@ function wrongShape(
 	node: JsonNode,
 	written: string = describeNode(node),
 ): void {
-	// NOTE: The value that WAS written, written the way the setting takes it.
+	// The value that WAS written, written the way the setting takes it.
 	// The example is the CATALOGUE's and never the author's, so printing it as
 	// the answer said something the file did not: `"minify": "false"` was
 	// answered `Write it as true or false: true`, which turns minification ON,
@@ -651,7 +651,7 @@ function wrongShape(
 	)
 }
 
-// NOTE: What the author wrote, read as the value they meant, or null where the
+// What the author wrote, read as the value they meant, or null where the
 // text says nothing about it — `"cases": "many"` is not a number in a String,
 // it is a word, and `"out": ["dist"]` is a list where a path goes with no
 // telling whether the rest of the list was meant to go too.
@@ -663,7 +663,7 @@ function coercedSettingValue(
 	node: JsonNode,
 ): string | null {
 	if (shape.kind === "boolean") {
-		// NOTE: `0` and `1` and nothing else among the numbers. Every other
+		// `0` and `1` and nothing else among the numbers. Every other
 		// number is truthy in the language this habit comes from and means
 		// nothing in this one.
 		if (node.type === "number") {
@@ -683,7 +683,7 @@ function coercedSettingValue(
 
 		let written = Number(node.value)
 
-		// NOTE: And only where reading it back gives the digits that were
+		// And only where reading it back gives the digits that were
 		// written. `Number` rounds past 2^53 — "99999999999999999999" comes
 		// back as 100000000000000000000 — and a Help that offers a number
 		// nobody wrote is a Help that changes what the file says, which is the
@@ -695,11 +695,11 @@ function coercedSettingValue(
 		return written >= shape.atLeast ? String(written) : null
 	}
 
-	// NOTE: One String where a list of them goes is a list of one. The items
+	// One String where a list of them goes is a list of one. The items
 	// are names rather than paths in two of the three, and neither is checked
 	// here: what this answers is the SHAPE, and a name that is not a pass or a
 	// tag is the list reader's own report to make once the brackets are there.
-	// NOTE: An EMPTY String is not a list of one: `"skipTags": ""` says the
+	// An EMPTY String is not a list of one: `"skipTags": ""` says the
 	// author wants nothing skipped, and `[""]` is a tag no test can carry.
 	// Offered as the example instead, which is what says out loud that the
 	// brackets are the missing part.
@@ -712,7 +712,7 @@ function coercedSettingValue(
 	return null
 }
 
-// NOTE: The keys of a `property` node: `[key, value]`. A property with no value
+// The keys of a `property` node: `[key, value]`. A property with no value
 // — `"a": ` and then the closing brace — parses with one child, and is a shape
 // the walk reports rather than reads.
 function propertyOf(node: JsonNode): { key: JsonNode; value: JsonNode } | null {
@@ -820,7 +820,7 @@ function readChoice(
 	return node.value
 }
 
-// NOTE: A list is read item by item: one item of the wrong shape is reported
+// A list is read item by item: one item of the wrong shape is reported
 // on that item and left out, and the rest are kept. A whole list dropped over
 // one typo would be a project with no exclusions and a Problems panel full of
 // its corpus, which is the failure this file exists to prevent.
@@ -886,7 +886,7 @@ function readList(
 	return items
 }
 
-// NOTE: The keys that USED to be read somewhere else, and where they went.
+// The keys that USED to be read somewhere else, and where they went.
 // Reported rather than silently unknown, because the symptom of a key in the
 // wrong place is a setting the author believes is in force — a Problems panel
 // full of a corpus a project deliberately keeps broken reads as the editor
@@ -895,7 +895,7 @@ const movedSettings: Record<string, string> = {
 	"test.exclude": "exclude",
 }
 
-// NOTE: Every member of a table that is not one of the table's settings. The
+// Every member of a table that is not one of the table's settings. The
 // only place an unknown key is reported, so the message is uniform: what the
 // table holds, and the nearest of them if the key is a near miss.
 function readTable(
@@ -958,7 +958,7 @@ function readTable(
 					`The settings ${where} are ${names.map((each) => `"${each}"`).join(", ")}.`,
 					"Nothing was read from this key.",
 				],
-				// NOTE: Three answers, in the order they are likely. A key that
+				// Three answers, in the order they are likely. A key that
 				// spells a PATH is a setting written flat and is nested; a key
 				// one edit from a real one is a misspelling; and a key that is
 				// neither is a key nothing reads, which is worth saying as an
@@ -1079,14 +1079,14 @@ function readTable(
 	}
 }
 
-// NOTE: The edit jsonc's own verdict names, where it names one. More than half
+// The edit jsonc's own verdict names, where it names one. More than half
 // of these errors say exactly which Token was expected at the offset, and what
 // a reader does about that is write it — one Help per shape, spelling the
 // character. Empty for the verdicts that say a character can not stand where it
 // does rather than that one is missing: what to write in its place is not
 // something the parser knows.
 //
-// NOTE: And only for the FIRST refusal of the file. jsonc recovers generously,
+// And only for the FIRST refusal of the file. jsonc recovers generously,
 // and what it says after the first is about text it has already lost track of:
 // `{ test: 1 }` is one unquoted key, and its third error asks for "the value the
 // key holds" at the `}`, with the value written two characters to the left. One
@@ -1122,7 +1122,7 @@ function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
 	}
 }
 
-// NOTE: What jsonc-parser says about a syntax error, as a sentence. Its codes
+// What jsonc-parser says about a syntax error, as a sentence. Its codes
 // are `PropertyNameExpected` and the like — readable, but not to a reader who
 // did not write the parser.
 function describeParseError(error: ParseError): string {
@@ -1164,7 +1164,7 @@ function describeParseError(error: ParseError): string {
 	}
 }
 
-// NOTE: Pure: text in, configuration out. The Language Server reads an unsaved
+// Pure: text in, configuration out. The Language Server reads an unsaved
 // buffer through this, and the tests read a String; `readProjectConfiguration`
 // is this plus the disk.
 export function parseProjectConfiguration(
@@ -1183,7 +1183,7 @@ export function parseProjectConfiguration(
 	configuration.filePath = resolvedPath
 	configuration.root = directory
 
-	// NOTE: An empty file is a project with nothing to say, which is allowed:
+	// An empty file is a project with nothing to say, which is allowed:
 	// the file still marks the root. Answered before the parse, which would
 	// otherwise report the value it did not find.
 	if (sourceText.trim() === "") {
@@ -1196,7 +1196,7 @@ export function parseProjectConfiguration(
 		disallowComments: false,
 	})
 
-	// NOTE: A file that does not parse is a file whose every setting is at its
+	// A file that does not parse is a file whose every setting is at its
 	// default, said once per error at the place it happened. What DID parse is
 	// deliberately not read: jsonc-parser recovers generously, and a setting
 	// read out of the half of a file before a missing brace is a setting the
@@ -1217,13 +1217,13 @@ export function parseProjectConfiguration(
 				describeParseError(error),
 				[
 					"Every setting is at its default until the file reads.",
-					// NOTE: The rule, moved out of the Help it used to be.
+					// The rule, moved out of the Help it used to be.
 					// "The file is JSON with comments allowed" is not an edit
 					// anybody makes; it is what a reader has to know to make
 					// one, which is what a Note is for.
 					"The file is JSON with comments and trailing commas allowed, as tsconfig.json is.",
 				],
-				// NOTE: And the edit is the Token jsonc says it expected, at
+				// And the edit is the Token jsonc says it expected, at
 				// the offset the Label already points at.
 				parseErrorHelp(error, error === errors[0]),
 			)
@@ -1301,7 +1301,7 @@ export function parseProjectConfiguration(
 // Editing the file
 // ---------------------------------------------------------------------------
 
-// NOTE: What a reader could DO about a setting this file got wrong, as text —
+// What a reader could DO about a setting this file got wrong, as text —
 // the Diagnostic it answers, named by the span that Diagnostic was reported at,
 // and the smallest change to the file that answers it.
 //
@@ -1316,17 +1316,17 @@ export type SettingEdit = {
 		common.DiagnosticCode,
 		"unknown-setting" | "moved-setting" | "setting-shape"
 	>
-	// NOTE: The Diagnostic this answers, by the span it was reported at — which
+	// The Diagnostic this answers, by the span it was reported at — which
 	// is what lets an Editor find its own copy of that Diagnostic again.
 	position: common.Position
-	// NOTE: The span that has to change and what it becomes. One replacement
+	// The span that has to change and what it becomes. One replacement
 	// rather than a list, because a MOVE is two changes at two places in the
 	// file and the text between them has to survive both: the whole run from the
 	// first change to the last is written back, and nothing outside it is
 	// touched.
 	range: common.Position
 	newText: string
-	// NOTE: What the setting is called once the edit has landed, which is what
+	// What the setting is called once the edit has landed, which is what
 	// tells two of these apart in a list.
 	setting: string
 }
@@ -1373,7 +1373,7 @@ export function settingEdits(
 	return edits
 }
 
-// NOTE: A property with the key path it stands under, and its two halves
+// A property with the key path it stands under, and its two halves
 // already taken apart — a property whose halves can not be read is not one this
 // collects, so nothing below has to ask twice.
 type KeyedProperty = {
@@ -1391,7 +1391,7 @@ function settingEdit(
 	properties: Array<KeyedProperty>,
 	cursorAt: (offset: number) => common.Cursor,
 ): SettingEdit | null {
-	// NOTE: A near miss is a rename of the key and nothing else — the value it
+	// A near miss is a rename of the key and nothing else — the value it
 	// was written with is what the reader meant either way. The span is the key
 	// with its quotes, so the quotes are written back with it.
 	if (
@@ -1407,7 +1407,7 @@ function settingEdit(
 		}
 	}
 
-	// NOTE: A shape the written value can be read as is one span rewritten —
+	// A shape the written value can be read as is one span rewritten —
 	// `"false"` becomes `false`, `"50"` becomes `50`, `"wip"` becomes
 	// `["wip"]`. The payload is only there where the coercion held, so a
 	// setting whose value says nothing about what was meant carries no edit.
@@ -1439,7 +1439,7 @@ function settingEdit(
 		return null
 	}
 
-	// NOTE: `"test.cases": 200` — a setting written FLAT, which is the same
+	// `"test.cases": 200` — a setting written FLAT, which is the same
 	// EDIT a moved one is: the property comes out and goes back in at the path
 	// its name spells. The near-miss rename above has already answered every
 	// unknown key that is one, so what reaches here is a key that is a path or
@@ -1462,7 +1462,7 @@ function settingEdit(
 
 	let movedTo = movedSettings[found.keyPath.join(".")]
 
-	// NOTE: Only the keys this table moved. The `essence` key of a
+	// Only the keys this table moved. The `essence` key of a
 	// `package.json` carries the same code and is not one of them — what moved
 	// there is the whole object, into a different FILE, which is no edit to the
 	// file being read at all.
@@ -1481,7 +1481,7 @@ function settingEdit(
 	)
 }
 
-// NOTE: One property out and back in at another path — the whole of what both a
+// One property out and back in at another path — the whole of what both a
 // moved setting and a flat one need doing to them. Shared so that the two can
 // not drift: they are one edit, differing in how the destination was worked out.
 function movedPropertyEdit(
@@ -1493,7 +1493,7 @@ function movedPropertyEdit(
 	destination: Array<string>,
 	cursorAt: (offset: number) => common.Cursor,
 ): SettingEdit | null {
-	// NOTE: Withheld where the key it would move to is already written. Both
+	// Withheld where the key it would move to is already written. Both
 	// values are the author's and only one of them can survive the move, so the
 	// choice between them is theirs rather than an Editor's.
 	if (findNodeAtLocation(tree, destination) !== undefined) {
@@ -1520,7 +1520,7 @@ function movedPropertyEdit(
 	}
 }
 
-// NOTE: One property taken out of the document, with the comma that separated
+// One property taken out of the document, with the comma that separated
 // it from its neighbours and the line it stood on. Hand-written rather than
 // `modify`, which is what writes the other half of a move: jsonc's own removal
 // reaches back to the previous sibling — or to the opening brace where there is
@@ -1532,7 +1532,7 @@ function withoutProperty(sourceText: string, property: JsonNode): string {
 	let end = property.offset + property.length
 	let following = /^[ \t]*,/.exec(sourceText.slice(end))
 
-	// NOTE: The separator in FRONT is taken only where there is none behind —
+	// The separator in FRONT is taken only where there is none behind —
 	// the property was written last, and the one before it now is. The break
 	// between the two goes with it, since the comma it follows is the end of the
 	// line the property that keeps it stands on.
@@ -1548,14 +1548,14 @@ function withoutProperty(sourceText: string, property: JsonNode): string {
 	let lineBreak = sourceText.indexOf("\n", end)
 	let lineEnd = lineBreak === -1 ? sourceText.length : lineBreak
 
-	// NOTE: A property that had a line to itself takes the line, since what is
+	// A property that had a line to itself takes the line, since what is
 	// left of it otherwise is an empty one nothing wrote.
 	if (sourceText.slice(lineStart, start).trim() === "") {
 		if (sourceText.slice(end, lineEnd).trim() === "") {
 			start = lineStart
 			end = lineBreak === -1 ? sourceText.length : lineBreak + 1
 		} else {
-			// NOTE: A Comment behind it keeps the indentation the property had,
+			// A Comment behind it keeps the indentation the property had,
 			// rather than being pushed one space along by the blank the
 			// separator left.
 			end += /^[ \t]*/.exec(sourceText.slice(end))?.[0].length ?? 0
@@ -1565,7 +1565,7 @@ function withoutProperty(sourceText: string, property: JsonNode): string {
 	return sourceText.slice(0, start) + sourceText.slice(end)
 }
 
-// NOTE: The property holding the table this one is the last thing IN, where
+// The property holding the table this one is the last thing IN, where
 // moving it out would leave `"test": { }` behind — the table goes with it then,
 // rather than staying as an empty pair of braces nothing reads. Null where the
 // table holds anything else, a COMMENT included: a note written beside a setting
@@ -1599,7 +1599,7 @@ function emptiedBy(
 	return /^[\s,]*$/.test(inside) ? owner : null
 }
 
-// NOTE: How the file indents, so that what is written into it indents the same
+// How the file indents, so that what is written into it indents the same
 // way. Read off the first line that indents at all; a file with none takes the
 // tab every `essence init` writes.
 function indentationOf(sourceText: string): {
@@ -1613,7 +1613,7 @@ function indentationOf(sourceText: string): {
 		: { tabSize: indented.length, insertSpaces: true }
 }
 
-// NOTE: The two rewrites reduced to the one span they disagree over — the run
+// The two rewrites reduced to the one span they disagree over — the run
 // from the first character that differs to the last. Everything a `modify` left
 // alone is identical on both sides and stays out of the edit, so a Comment or a
 // setting far from the change is never rewritten to the text it already holds.
@@ -1651,7 +1651,7 @@ function replacement(
 	}
 }
 
-// NOTE: Every property of the document with the key path it stands under, which
+// Every property of the document with the key path it stands under, which
 // is what a table of moved keys is looked up by. Collected in one walk rather
 // than searched for per Diagnostic: the file is small and the walk is the same
 // one either way.
@@ -1697,7 +1697,7 @@ function readText(filePath: string): string | null {
 	}
 }
 
-// NOTE: The nearest project file at or above a directory, or null. The walk
+// The nearest project file at or above a directory, or null. The walk
 // stops at the filesystem root, which is its own parent — comparing the two is
 // how the walk knows it.
 export function findProjectFile(from: string): string | null {
@@ -1720,7 +1720,7 @@ export function findProjectFile(from: string): string | null {
 	}
 }
 
-// NOTE: The manifests between a directory and a root, nearest first — the
+// The manifests between a directory and a root, nearest first — the
 // files that used to hold the settings and may still spell them. With a
 // project file, the walk stops at the project root: a manifest above it
 // belongs to something else. Without one, it goes to the filesystem root, the
@@ -1743,7 +1743,7 @@ function manifestsAbove(from: string, root: string | null): Array<string> {
 	}
 }
 
-// NOTE: An `essence` key in a `package.json`, reported as moved on the key
+// An `essence` key in a `package.json`, reported as moved on the key
 // itself. It is looked for in every manifest the old walk would have read, so
 // the report appears wherever the old setting would have been in force.
 function movedManifestProblems(
@@ -1805,7 +1805,7 @@ function movedManifestProblems(
 	return problems
 }
 
-// NOTE: The configuration governing a directory: the nearest project file at
+// The configuration governing a directory: the nearest project file at
 // or above it, read, with any manifest that still spells the old key reported
 // beside it. This is the one entry point for a caller that reads once — the
 // commands. A caller that asks per file, the Language Server's walk, holds a
@@ -1832,7 +1832,7 @@ export function readProjectConfiguration(
 	return configuration
 }
 
-// NOTE: A configuration per directory, answered once and held. A walk over a
+// A configuration per directory, answered once and held. A walk over a
 // project asks for every directory it enters, and a Language Server asks for
 // every file it reports on; both would otherwise read the same handful of
 // files thousands of times. Directories under one project file share ONE
@@ -1845,7 +1845,7 @@ export function readProjectConfiguration(
 export type ConfigurationCache = {
 	forDirectory(directory: string): ProjectConfiguration
 	forFile(filePath: string): ProjectConfiguration
-	// NOTE: Every distinct configuration read so far — one per project file
+	// Every distinct configuration read so far — one per project file
 	// met, plus the one default for directories no file governs — which is
 	// what a caller reporting the problems asks for.
 	known(): Array<ProjectConfiguration>
@@ -1856,7 +1856,7 @@ export function createConfigurationCache(): ConfigurationCache {
 	let byDirectory = new Map<string, ProjectConfiguration>()
 	let unconfigured: ProjectConfiguration | null = null
 
-	// NOTE: A manifest in THIS directory that still spells the old key is
+	// A manifest in THIS directory that still spells the old key is
 	// reported against the configuration that governs the directory, whichever
 	// file that is — or the default, when none — and only once per manifest.
 	function addManifestProblems(

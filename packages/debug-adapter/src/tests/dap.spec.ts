@@ -17,7 +17,7 @@ const adapterBinary = path.resolve(
 	"esdap",
 )
 
-// NOTE: A session compiles with the real CLI and runs under a real Node — the
+// A session compiles with the real CLI and runs under a real Node — the
 // generous timeout carries the cold start of both.
 async function startedClient(): Promise<DebugClient> {
 	let client = new DebugClient("bun", adapterBinary, "essence")
@@ -35,7 +35,7 @@ async function startedClient(): Promise<DebugClient> {
 	return client
 }
 
-// NOTE: The real thing over real stdio — `DebugClient` spawns `bun bin/esdap`
+// The real thing over real stdio — `DebugClient` spawns `bun bin/esdap`
 // and speaks DAP at it, which is exactly how a `DebugAdapterExecutable` will.
 describe("the DAP handshake", () => {
 	let client: DebugClient | null = null
@@ -119,7 +119,7 @@ describe("a debug session", () => {
 
 		await initialized
 
-		// NOTE: Line 4 is `variable message = …`, the first statement of
+		// Line 4 is `variable message = …`, the first statement of
 		// `greet` — a statement the map carries.
 		let breakpointResponse = await client.setBreakpointsRequest({
 			source: { path: programPath },
@@ -129,7 +129,7 @@ describe("a debug session", () => {
 		expect(breakpointResponse.body.breakpoints[0]!.verified).toBe(true)
 		expect(breakpointResponse.body.breakpoints[0]!.line).toBe(4)
 
-		// NOTE: Subscribed BEFORE configurationDone — the stop lands moments
+		// Subscribed BEFORE configurationDone — the stop lands moments
 		// after the resume, and an event nobody was listening for is gone.
 		let stopped = client.waitForEvent("stopped")
 
@@ -138,7 +138,7 @@ describe("a debug session", () => {
 
 		expect((await stopped).body.reason).toBe("breakpoint")
 
-		// NOTE: The paused stack must speak Essence: the author's function on
+		// The paused stack must speak Essence: the author's function on
 		// the author's line, in the author's file — not a bundle position.
 		let stack = await client.stackTraceRequest({ threadId: 1 })
 		let top = stack.body.stackFrames[0]!
@@ -147,7 +147,7 @@ describe("a debug session", () => {
 		expect(top.source?.path).toBe(programPath)
 		expect(top.line).toBe(4)
 
-		// NOTE: The Variables view must speak Essence too — the paused
+		// The Variables view must speak Essence too — the paused
 		// `greet("")` holds its Parameter as a quoted String, not as a tagged
 		// object's innards.
 		let scopes = await client.scopesRequest({ frameId: top.id })
@@ -164,7 +164,7 @@ describe("a debug session", () => {
 
 		expect(greetee?.value).toBe('""')
 
-		// NOTE: The console is JavaScript over the compiled frame, but an
+		// The console is JavaScript over the compiled frame, but an
 		// Essence value it answers still renders as one.
 		let evaluated = await client.evaluateRequest({
 			expression: "greetee",
@@ -174,7 +174,7 @@ describe("a debug session", () => {
 
 		expect(evaluated.body.result).toBe('""')
 
-		// NOTE: One step over `variable message = …` lands on the `if` two
+		// One step over `variable message = …` lands on the `if` two
 		// source lines down — the interpolation glue between them is carried
 		// over, and never surfaces as a landing place.
 		let steppedStop = client.waitForEvent("stopped")
@@ -187,7 +187,7 @@ describe("a debug session", () => {
 		expect(steppedStack.body.stackFrames[0]!.name).toBe("greet")
 		expect(steppedStack.body.stackFrames[0]!.line).toBe(6)
 
-		// NOTE: `greet` runs three times; clearing the breakpoint before
+		// `greet` runs three times; clearing the breakpoint before
 		// resuming is what lets one continue reach the end of the program.
 		await client.setBreakpointsRequest({
 			source: { path: programPath },
@@ -219,7 +219,7 @@ describe("a debug session", () => {
 
 		expect((await stopped).body.reason).toBe("entry")
 
-		// NOTE: Line 17 is `Terminal.print(greet(""))` — the entry's first
+		// Line 17 is `Terminal.print(greet(""))` — the entry's first
 		// statement. The raw entry pause sits in runtime glue far above it;
 		// the user never sees that.
 		let stack = await client.stackTraceRequest({ threadId: 1 })
@@ -233,7 +233,7 @@ describe("a debug session", () => {
 		])
 	}, 60_000)
 
-	// NOTE: The three faces a List box wears once its runs are shared, all
+	// The three faces a List box wears once its runs are shared, all
 	// bound at one pause: `start` still names a box whose inner Array `held`'s
 	// first append grew past it, `held` was then prepended to and holds its
 	// first item in a second run stored backwards, and `grown` views the whole
@@ -243,7 +243,7 @@ describe("a debug session", () => {
 	it("shows a List by the items it views, however it holds them", async () => {
 		client = await startedClient()
 
-		// NOTE: Canonicalised for the reason `prepareBundle` canonicalises its
+		// Canonicalised for the reason `prepareBundle` canonicalises its
 		// scratch directory — on macOS the temporary directory is a symlink,
 		// and a breakpoint addressed to the symlinked spelling of a file the
 		// map names by its real one binds to nothing.
@@ -277,7 +277,7 @@ describe("a debug session", () => {
 
 			await initialized
 
-			// NOTE: Line 9 is `Terminal.print("paused")`, the first statement
+			// Line 9 is `Terminal.print("paused")`, the first statement
 			// after all three bindings have taken their final values.
 			await client.setBreakpointsRequest({
 				source: { path: programPath },
@@ -309,7 +309,7 @@ describe("a debug session", () => {
 			expect(shown("held").value).toBe("[ 0, 1 ]")
 			expect(shown("grown").value).toBe("[ 1, 2 ]")
 
-			// NOTE: And expanding the row answers those same items, one live
+			// And expanding the row answers those same items, one live
 			// value per row — not the positions of the Array underneath.
 			let items = (
 				await client.variablesRequest({
@@ -328,7 +328,7 @@ describe("a debug session", () => {
 		}
 	}, 60_000)
 
-	// NOTE: The same hazard a Dictionary wears instead. Its store is shared by
+	// The same hazard a Dictionary wears instead. Its store is shared by
 	// every box of its chain and separated by a STAMP rather than by a copy, so
 	// the four bound at this pause view four generations of one structure:
 	// `ages` was made before both writes and still answers 39 for a key the
@@ -369,7 +369,7 @@ describe("a debug session", () => {
 
 			await initialized
 
-			// NOTE: Line 8 is `Terminal.print("paused")`, the first statement
+			// Line 8 is `Terminal.print("paused")`, the first statement
 			// after all four bindings have taken their values.
 			await client.setBreakpointsRequest({
 				source: { path: programPath },
@@ -402,7 +402,7 @@ describe("a debug session", () => {
 			expect(shown("older").value).toBe('[ "alex" = 40, "sam" = 25 ]')
 			expect(shown("fewer").value).toBe('[ "alex" = 39 ]')
 
-			// NOTE: And expanding the row answers those same entries, in
+			// And expanding the row answers those same entries, in
 			// insertion order, each the Record `{ key, value }` the language
 			// writes an entry as — not the store, the generation and the count
 			// the box is made of.
@@ -417,7 +417,7 @@ describe("a debug session", () => {
 				'{ key = "sam", value = 25 }',
 			])
 
-			// NOTE: And an entry opens onto the LIVE key and the live value,
+			// And an entry opens onto the LIVE key and the live value,
 			// which is what makes a nested one worth expanding again.
 			let entry = (
 				await client.variablesRequest({
@@ -430,7 +430,7 @@ describe("a debug session", () => {
 				["value", "40"],
 			])
 
-			// NOTE: The entry Records above were MINTED in the debuggee for
+			// The entry Records above were MINTED in the debuggee for
 			// this expansion — nothing the Program holds reaches them — so they
 			// are released with the handles that named them, at the next pause
 			// and at every resume. What the DAP can see of that is the pause
@@ -484,7 +484,7 @@ describe("a debug session", () => {
 		}
 	}, 60_000)
 
-	// NOTE: The other thing a launch can be: a test rather than a Program. The
+	// The other thing a launch can be: a test rather than a Program. The
 	// bundle is compiled WITH the `tests { … }` block a build drops, and a
 	// runner beside it asks the registry for the tests named — so what is
 	// launched and what a breakpoint is addressed to are two different files,
@@ -524,7 +524,7 @@ describe("a debug session", () => {
 
 		try {
 			let initialized = client.waitForEvent("initialized")
-			// NOTE: The empty Array is every test of the file, which is what a
+			// The empty Array is every test of the file, which is what a
 			// "Debug" on the section asks for. A named id runs that one.
 			let launched = client.launch({
 				program: programPath,
@@ -533,7 +533,7 @@ describe("a debug session", () => {
 
 			await initialized
 
-			// NOTE: Line 9 is `constant doubled = double(21)` — a statement of
+			// Line 9 is `constant doubled = double(21)` — a statement of
 			// the TEST's body, which is in the bundle at all only because the
 			// launch asked for the tests.
 			let bound = await client.setBreakpointsRequest({
@@ -565,7 +565,7 @@ describe("a debug session", () => {
 		}
 	}, 60_000)
 
-	// NOTE: Exercised through the `artifact` door with a hand-built bundle: a
+	// Exercised through the `artifact` door with a hand-built bundle: a
 	// Diagnostic-clean Essence program has no deterministic uncaught throw to
 	// offer — the one failure it can earn, a stack overflow, is the one V8
 	// cannot pause on, there being no stack left to pause with.
