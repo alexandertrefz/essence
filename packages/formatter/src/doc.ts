@@ -1,54 +1,23 @@
-// A Wadler-style document algebra. The printer never decides where a
-// line break goes — it describes the shape of the code as a Doc, and this
-// module picks the layout that fits the target width. That split is what keeps
-// the per-node printing rules readable: they say "these parts belong together,
-// and if they do not fit, break here", not "if the column is past 80 then …".
+// A Wadler-style document algebra. The Printer describes the shape of the code
+// as a `Doc`, and `printDoc` picks the layout that fits the width.
+// See "The document algebra" in DEVELOPMENT.md.
 
-// Indentation is emitted as tabs, but width has to be measured in
-// columns, so a tab counts as this many. It is the width the corpus is written
-// against and the one the editors are configured for.
 export const TAB_WIDTH = 4
 
-// The columns a line is laid out to. `printDoc` is handed the width it
-// works to rather than reading this — the algebra itself has no opinion about
-// how wide a page is — and this is the width the corpus is written to, which is
-// why it sits beside the tab it is measured in. The printer reads it to answer
-// the one question that is about the line rather than about the column: whether
-// something is too wide to be written on one WHEREVER it stands.
+// The columns a line is laid out to, which `printDoc` takes as an argument. The
+// command line's help screen is laid out to it too.
 export const WIDTH = 80
 
-// One line's share of an alignment run: how wide it reads left of the
-// column the run lines up on, and how wide the whole of it reads flat.
-//
-// `fitWidth` is what says whether the padding is worth writing at the column
-// the run turns out to stand at — a line whose padded width runs past the page
-// breaks, and a line that breaks may put the very thing the column is drawn
-// through onto a line of its own, or, as a `match` Handler's `{` does, open a
-// block the column has no business running through. It is null where a break
-// changes nothing about the column: an assignment's `=` is written after its
-// head wherever that head ends, and only what follows it is ever moved down,
-// so it holds its column however far the line runs on.
+// One line of an alignment run. Its `fitWidth` is null where breaking the line
+// leaves the column in place. See "Alignment runs" in DEVELOPMENT.md.
 export type AlignmentItem = {
 	headWidth: number
 	fitWidth: number | null
 }
 
-// A run of sibling lines lining one column up, resolved by the renderer
-// rather than by whoever built it: how much padding each line carries is a
-// question about the column the run STANDS at, and nothing knows that column
-// until the run is reached.
-//
-// `maxSpan` is the most padding a line is worth carrying to reach its block's
-// column; `resolved` remembers the answer per amount of room the run was
-// reached with, because the renderer asks for it once to measure a line and
-// again to write it.
-//
-// `partedByBreaks` is whether a line the run takes out for breaking parts it:
-// the lines above that one and the lines below it line up among themselves,
-// and never with each other. A `match` Handler that breaks opens a block, and
-// a column carried across a block would run through two tables — so a `match`
-// is parted where a `define` is not, since a `define` arm that breaks moves
-// its `if` down and opens nothing.
+// Sibling lines lining up one column, resolved when the renderer reaches them.
+// The padding is kept per room, since the renderer asks once to measure a line
+// and again to write it.
 type AlignmentRun = {
 	items: Array<AlignmentItem>
 	maxSpan: number
@@ -56,10 +25,8 @@ type AlignmentRun = {
 	resolved: Map<number, Array<number>>
 }
 
-// The padding one line carries to its run's column. It is handed to the
-// printer before anyone knows whether the line joins a run at all, and
-// `joinAlignment` is what puts it in one — a slot that joined none is written
-// as nothing, the way an unpadded line always was.
+// The padding one line carries to its run's column. A slot that joins no run
+// is written as nothing.
 export type AlignDoc = {
 	kind: "align"
 	run: AlignmentRun | null
@@ -69,22 +36,13 @@ export type AlignDoc = {
 export type Doc =
 	| { kind: "text"; value: string; verbatim: boolean }
 	| { kind: "concat"; parts: Array<Doc> }
-	// One node covers all three break kinds. `soft` renders as nothing
-	// rather than a space when the group is flat; `hard` never renders flat at
-	// all and forces every group enclosing it to break.
+	// `soft` prints nothing rather than a space when flat. `hard` never prints
+	// flat and breaks every group around it.
 	| { kind: "line"; soft: boolean; hard: boolean }
 	| { kind: "breakParent" }
-	// `expandable` marks the one group of an Argument that gives way
-	// when the Argument is hugged — a Function literal's body, a Record's or
-	// a List's brackets. Measured inside an `expand`, such a group is taken to
-	// break, so the measure ends at its first line, while every other group
-	// in there is measured whole and flat.
-	//
-	// `breakIfTailFits` holds back the break unless it helps: when set, a group
-	// that does not fit flat still stays flat if the line it opens on is
-	// already past the width, or if the line its break would end on —
-	// `breakIfTailFits` itself, at the group's indent, followed by everything
-	// after the group — would not fit either.
+	// In a hugged Argument, the `expandable` group gives way, such as a Function
+	// literal's body. A `breakIfTailFits` holds back a break that would not help.
+	// See "Hugging" in DEVELOPMENT.md.
 	| {
 			kind: "group"
 			contents: Doc
@@ -94,56 +52,38 @@ export type Doc =
 	  }
 	| { kind: "indent"; contents: Doc }
 	| { kind: "ifBreak"; broken: Doc; flat: Doc }
-	// Several layouts for one thing, tried in order: the first is
-	// offered flat, every later one is taken if its FIRST line fits, and the
-	// last is the fallback. A hard break inside one state does not force the
-	// groups around it to break — that is the point of it: a trailing
-	// callback Argument brings its own block, and the call around it must
-	// still be free to stay on one line.
+	// Layouts for one thing, measured in order. The first that fits prints,
+	// and the last is the fallback. See "Hugging" in DEVELOPMENT.md.
 	| { kind: "conditional"; states: Array<Doc> }
-	// Contents laid out in their expanded form: printed in break mode
-	// (what is inside still fits itself flat where it can), and measured up
-	// to the first line of the first `expandable` group in them. This is how
-	// a hugged trailing Argument is measured — `xs::map((n) {` and no further
-	// — without deciding the enclosing call on what the body holds.
+	// Contents printed broken and measured up to the first line of their first
+	// `expandable` group, as a hugged trailing Argument is.
 	| { kind: "expand"; contents: Doc }
-	// Text written at the end of the current line but never measured
-	// against the width — a trailing Comment. Its length is the author's
-	// business, not the layout's, so it must not be what tears the code in
-	// front of it apart.
+	// Text at the end of the line that is never measured, since a trailing
+	// Comment's length must not break the code before it.
 	| { kind: "lineSuffix"; value: string }
-	// Items separated by `line`s that break one at a time rather than
-	// all at once: as many items as fit share a line, and only the separator
-	// after the item that runs out is broken. `parts` alternates item,
-	// separator, item, … — the separators are `line`s or things holding one.
+	// Items whose separators break one at a time, so as many items as fit share
+	// a line. `parts` alternates item and separator.
 	| { kind: "fill"; parts: Array<Doc> }
-	// Zero width until the renderer reaches it, which is the whole point
-	// of it: the run it belongs to is resolved against the room the line was
-	// reached with, and no one holding a Doc knows that room.
+	// Zero width until the renderer reaches it and knows the room of its line.
 	| AlignDoc
 
-// `hug` and `expand` are measuring modes only, never modes the renderer
-// prints in. A `conditional` measures its first state in `hug` mode, which is
-// flat except that the `expand` inside it switches to `expand` mode: nested
-// groups are measured flat there unless they are `expandable`, which are taken
-// to break. Measured from outside — by a group around it asking whether IT
-// fits — the same state is plain flat, and an `expand` is transparent.
+// `hug` and `expand` only measure, and the renderer never prints in them.
+// See "Hugging" in DEVELOPMENT.md.
 type Mode = "flat" | "break" | "hug" | "expand"
 
 type Command = [indent: number, mode: Mode, doc: Doc]
 
-// One piece of output, remembering whether it came from verbatim text —
-// which is what the line-end trimming has to know to leave a multi-line String
-// Literal's spaces alone.
+// A piece of output, and whether it is verbatim text, which the line-end trim
+// leaves alone.
 type Segment = { value: string; verbatim: boolean }
 
 export function text(value: string): Doc {
 	return { kind: "text", value, verbatim: false }
 }
 
-// Text the renderer hands through untouched — a String Literal sliced
-// back out of the source, or a Comment. Trailing spaces in it are characters
-// of the file rather than layout, so the line-end trimming stops at it.
+// Text printed untouched, such as a String Literal sliced from the source or a
+// Comment. Its trailing spaces belong to the file, so the line-end trim keeps
+// them.
 export function verbatim(value: string): Doc {
 	return { kind: "text", value, verbatim: true }
 }
@@ -156,11 +96,8 @@ export const line: Doc = { kind: "line", soft: false, hard: false }
 export const softline: Doc = { kind: "line", soft: true, hard: false }
 export const hardline: Doc = { kind: "line", soft: false, hard: true }
 
-// Renders as nothing and forces every enclosing group to break, the way
-// a hard line does without spending a line break of its own. A Comment runs to
-// the end of its line, so nothing may ever be laid out after one — this is
-// what takes the flat shape off the table for a block whose last Statement
-// carries a trailing Comment, without deciding where the break goes.
+// Prints nothing and breaks every group around it, as a hard line does. The
+// Printer puts one after a trailing Comment, since nothing may follow it.
 export const breakParent: Doc = { kind: "breakParent" }
 
 export function group(
@@ -204,8 +141,8 @@ export function fill(parts: Array<Doc>): Doc {
 	return { kind: "fill", parts }
 }
 
-// Named, and mutable, for the reason `text` is: a line is laid out
-// before it is known which run it belongs to, or whether it belongs to one.
+// Mutable, since a line is laid out before it is known which run it joins, if
+// any.
 export function alignmentSlot(): AlignDoc {
 	return { kind: "align", run: null, index: -1 }
 }
@@ -217,9 +154,8 @@ export function alignmentRun(
 	return { items: [], maxSpan, partedByBreaks, resolved: new Map() }
 }
 
-// Puts one line in a run, which is what gives its slot a padding to
-// write. Everything a run needs is settled while the Doc is built; nothing
-// here is touched again once the renderer has started.
+// Puts a line in a run, which gives its slot a padding. A run's lines all join
+// it before rendering starts.
 export function joinAlignment(
 	run: AlignmentRun,
 	slot: AlignDoc,
@@ -231,30 +167,8 @@ export function joinAlignment(
 	run.items.push(item)
 }
 
-// How much padding each line of a run carries when the run is reached
-// with `room` columns left of the page — the width of the page, less the
-// indentation the run stands at.
-//
-// A line whose padded width runs past that room breaks, and a line that breaks
-// need not keep the thing the column is drawn through on its head's line: a
-// `define` arm writes its `if` below, where no column reaches it, while every
-// sibling is padded out to a column it no longer stands in. Such a line is
-// taken out of the run, and the lines either side of it line up without it —
-// with each other, or, in a run that is `partedByBreaks`, each side on its
-// own. This is what can not be settled where the run is built: whether a line
-// fits is a question about the column it starts at.
-//
-// Taking one line out never widens another line's block on its own, but it
-// does join the two lines either side of it into one, which can — so the pass
-// runs again until nothing more comes out. It always ends: a line is only ever
-// taken out, never put back.
-//
-// Blocks are greedy left to right rather than optimal, because a greedy pass
-// is stable under a second run and an optimal partition need not be: a block
-// is a maximal stretch of adjacent lines whose heads span no more than
-// `maxSpan` — the widest minus the narrowest — measured that way rather than
-// against the neighbour above, which would let a slow ramp of widths pad the
-// first line far past the budget. A block of one is left unpadded.
+// The padding of each line of a run reached with `room` columns, the width
+// less the run's indentation. See "Alignment runs" in DEVELOPMENT.md.
 function resolveAlignment(run: AlignmentRun, room: number): Array<number> {
 	let remembered = run.resolved.get(room)
 
@@ -269,9 +183,8 @@ function resolveAlignment(run: AlignmentRun, room: number): Array<number> {
 	for (;;) {
 		padding.fill(0)
 
-		// The stretches of lines still in the run that may line up with
-		// each other: all of them, or, where a line taken out parts the run,
-		// those on each side of it.
+		// The lines that may line up with each other. In a run that is
+		// `partedByBreaks`, a line taken out starts a new stretch.
 		let stretches: Array<Array<number>> = [[]]
 
 		for (let index = 0; index < items.length; index++) {
@@ -371,10 +284,8 @@ export function join(separator: Doc, parts: Array<Doc>): Doc {
 	return concat(result)
 }
 
-// Measured in code points rather than UTF-16 units so that the box
-// drawing and em dashes the corpus uses in divider Comments count as the one
-// column they occupy. Exported because the printer's alignment runs measure
-// their columns against the same ruler the renderer lays them out with.
+// One column per code point, and `TAB_WIDTH` per tab. Exported so that the
+// Printer measures alignment with the renderer's ruler.
 export function stringWidth(value: string): number {
 	let width = 0
 
@@ -385,10 +296,9 @@ export function stringWidth(value: string): number {
 	return width
 }
 
-// What a Doc reads as on one line, or null when it can never be on one —
-// it holds a hard break, or a group already resolved to break. Used to ask a
-// question the renderer answers too late: whether a `match` Handler is the kind
-// that stays on its own line, and so whether its brace joins an alignment run.
+// What a Doc reads as on one line, or null when it holds a hard break or a
+// group that must break. The Printer asks before rendering, such as whether a
+// `match` Handler stays on one line and so joins an alignment run.
 export function renderFlat(doc: Doc): string | null {
 	let out: Array<string> = []
 	let commands: Array<Doc> = [doc]
@@ -462,11 +372,8 @@ export function renderFlat(doc: Doc): string | null {
 				}
 				break
 
-			// Padding has no width until the column it is written at is
-			// known, and there is no column here. A Doc measured around one is
-			// a line whose run takes it out on its flat width, and that width
-			// is the line's own — the padding is exactly the part of it the
-			// run has yet to settle.
+			// No width without a column. A run judges a line by its flat width,
+			// which is the line's own without the padding.
 			case "align":
 				break
 		}
@@ -475,11 +382,9 @@ export function renderFlat(doc: Doc): string | null {
 	return out.join("")
 }
 
-// A hard line break inside a group means that group can never render
-// flat, and neither can any group around it — otherwise `fits` would measure a
-// candidate layout that the renderer would refuse to produce. Marking those
-// groups up front, once, is what lets the render loop treat `shouldBreak` as a
-// simple flag. Returns whether the subtree forces a break.
+// Marks every group that holds a hard break as broken, except through `ifBreak`
+// and `conditional`, and answers whether `doc` forces a break.
+// See "The document algebra" in DEVELOPMENT.md.
 function propagateBreaks(doc: Doc): boolean {
 	switch (doc.kind) {
 		case "text":
@@ -507,9 +412,8 @@ function propagateBreaks(doc: Doc): boolean {
 			return propagateBreaks(doc.contents)
 
 		case "ifBreak":
-			// Deliberately does not propagate. The broken branch exists
-			// only for the case where the enclosing group already broke, so
-			// letting a break inside it force that group would be circular.
+			// Does not propagate: the broken branch only exists once the group
+			// around it broke, so forcing that group from it would be circular.
 			propagateBreaks(doc.broken)
 			propagateBreaks(doc.flat)
 
@@ -523,10 +427,8 @@ function propagateBreaks(doc: Doc): boolean {
 			return doc.shouldBreak
 		}
 
-		// Deliberately does not propagate either. Each state is marked
-		// up inside, but a block inside one state is that state's own affair;
-		// the whole point of offering states is that the enclosing layout is
-		// decided by what fits, not by a hard break three levels down.
+		// Does not propagate either: what fits decides a `conditional`, not a
+		// hard break inside one of its states.
 		case "conditional":
 			for (let state of doc.states) {
 				propagateBreaks(state)
@@ -557,14 +459,9 @@ function propagateBreaks(doc: Doc): boolean {
 	}
 }
 
-// Whether `next` rendered flat fits in `remaining` columns. The commands
-// still queued matter as much as the candidate does — `(a, b)` fits only if the
-// `)` that follows it fits too — so the scan continues into `restCommands`
-// until it reaches a break, which is where the line would end anyway.
-//
-// `width` is the width of the page rather than what is left of the line: an
-// alignment run is resolved against the room its line was reached with, and
-// that is the page less the indentation, not the columns still free here.
+// Whether `next` fits flat in `remaining` columns, measured on into
+// `restCommands` until a break ends the line. The `width` is the page's, since
+// an alignment run is resolved against the page less its indentation.
 function fits(
 	next: Command,
 	restCommands: Array<Command>,
@@ -639,8 +536,7 @@ function fits(
 				}
 				break
 
-			// Zero width — the groups it forces to break were already
-			// marked by `propagateBreaks`, so here there is nothing to measure.
+			// Zero width, since `propagateBreaks` already broke its groups.
 			case "breakParent":
 				break
 
@@ -652,11 +548,9 @@ function fits(
 				])
 				break
 
-			// Measured as its first state when flat and its last when
-			// broken — the two the renderer would print in those modes. Only
-			// the conditional's own decision measures in `hug` mode; from
-			// here it is a plain flat measure, so a nested `expand` does not
-			// cut an outer group's measure short.
+			// Its first state when flat and its last when broken, as the
+			// renderer prints them. Measured plain flat, so a nested `expand`
+			// cannot cut an outer group's measure short.
 			case "conditional":
 				commands.push([
 					commandIndent,
@@ -681,9 +575,8 @@ function fits(
 				}
 				break
 
-			// Measured exactly as the renderer will write it: both ask
-			// the run for the same room, so a line the run keeps is one the
-			// renderer is bound to leave flat.
+			// Asks the run for the same room the renderer will, so a line the
+			// run keeps is one the renderer leaves flat.
 			case "align":
 				remaining -= alignmentPadding(
 					doc,
@@ -702,10 +595,8 @@ export function printDoc(doc: Doc, width: number): string {
 	let commands: Array<Command> = [[0, "break", doc]]
 	let out: Array<Segment> = []
 	let column = 0
-	// Trailing Comments waiting for the end of the line they were
-	// written on. Flushed before the next line break is written, so they land
-	// after everything else on the line — including a comma the layout put
-	// after the thing they trail.
+	// Trailing Comments, written before the next line break so that they
+	// follow everything else on their line.
 	let suffixes: Array<string> = []
 
 	let flushSuffixes = () => {
@@ -743,12 +634,8 @@ export function printDoc(doc: Doc, width: number): string {
 				commands.push([commandIndent + 1, mode, current.contents])
 				break
 
-			// Inside a group that fit flat, everything fits flat — the
-			// measure covered the whole of it — so a nested group is not asked
-			// again. Asking again is not just wasted: a `conditional`'s hugged
-			// state is printed flat past the point its own measure covered,
-			// and a group re-measured there against the rest of the line
-			// would break a Parameter list the hug had already placed.
+			// Inside a group that printed flat, a nested group is not measured
+			// again. See "The document algebra" in DEVELOPMENT.md.
 			case "group": {
 				let flat: Command = [commandIndent, "flat", current.contents]
 
@@ -861,10 +748,8 @@ export function printDoc(doc: Doc, width: number): string {
 				suffixes.push(current.value)
 				break
 
-			// Each separator is decided on its own: the item after it is
-			// measured flat, and the separator breaks only if that item would
-			// not fit on the line as it stands. Everything the renderer already
-			// knows how to do; only the decision is made pairwise.
+			// Each separator breaks only if the item after it would not fit on
+			// the line as it stands.
 			case "fill": {
 				let parts = current.parts
 
@@ -893,8 +778,7 @@ export function printDoc(doc: Doc, width: number): string {
 				let remaining: Command = [commandIndent, mode, fill(rest)]
 				let next = rest[0]
 
-				// Whether the separator breaks depends on whether the
-				// NEXT item, laid flat after a flat separator, would fit.
+				// Whether the next item fits flat after a flat separator.
 				let pairFits =
 					next !== undefined &&
 					fits(
@@ -939,12 +823,8 @@ export function printDoc(doc: Doc, width: number): string {
 
 	flushSuffixes()
 
-	// A break followed by another break lays down the first line's
-	// indentation with nothing after it. Trimming line ends here costs one pass
-	// and saves every caller from having to emit blank lines in a special way.
-	// Verbatim text is exempt: its trailing spaces are characters of the file,
-	// not layout, so the trim reaches back only as far as the last verbatim
-	// piece of each line.
+	// Trims line ends, so that a break after a break leaves an empty line. The
+	// trim stops at verbatim text, whose trailing spaces belong to the file.
 	let lines: Array<Array<Segment>> = [[]]
 
 	for (let segment of out) {

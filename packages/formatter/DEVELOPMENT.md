@@ -117,3 +117,86 @@ is handed back unformatted with the refusal.
 `literalOf` spells the value with `quotedText`, the runtime's own quoted printer, whose literal the Lexer reads back
 as the same value. `roundTrip.spec.ts` in the compiler holds it to that. It spells a newline as `\n`, so a recorded
 value stays on one line. A value long enough for that to read badly belongs in a stored snapshot.
+
+## The document algebra
+
+`src/doc.ts` is a Wadler-style document algebra. The Printer never decides where a line breaks. It describes the
+shape of the code as a `Doc`, and `printDoc` picks the layout that fits the width. So a printing rule says "these
+parts belong together, and break here if they do not fit" rather than testing columns itself.
+
+A `group` is printed flat when it fits and broken otherwise. `fits` measures the candidate flat, then goes on into the
+commands queued after it until it reaches a break. `(a, b)` fits only if the `)` after it fits too. A `text` Doc is
+measured as one line, even when it holds a line break, as a String written across lines does. Inside a group that was
+printed flat, a nested group is not measured again. The outer measure covered it, and measuring again could break a
+Parameter list that a hugged `conditional` state had already placed.
+
+A hard line break can never print flat, and neither can any group around it. `propagateBreaks` marks those groups
+once, before printing, so that `fits` never measures a layout the renderer would refuse. `breakParent` marks them the
+same way without a line break of its own. The Printer puts one after a trailing Comment, since nothing may follow a
+Comment on its line. Two nodes stop the marking:
+
+- `ifBreak`, whose broken branch only exists once its group has broken, so a break inside it forcing that group
+  would be circular.
+- `conditional`, whose point is that what fits decides the layout, not a hard break somewhere inside a state.
+
+### Hugging
+
+A `conditional` offers several layouts for one thing, such as a call whose last Argument is a Function literal. The
+renderer measures each state but the last in `hug` mode and prints the first that fits. The last state is the
+fallback and prints broken. A hard break inside a state leaves the groups around the `conditional` free to stay flat.
+So the call can stay on one line while the callback brings its own block.
+
+`hug` and `expand` are measuring modes only, never modes the renderer prints in. `hug` is flat, except that an
+`expand` inside it switches to `expand` mode. There, a group marked `expandable` counts as broken, so the measure ends
+at its first line, and every other group is measured whole and flat. So a hugged `xs::map((n) {` is measured to its
+`{` and no further, and what the body holds does not decide the call. Measured from outside, by a group asking
+whether the whole `conditional` fits, a state is plain flat and an `expand` is transparent. The renderer prints the
+contents of an `expand` in break mode, where each group inside still fits itself flat when it can.
+
+`breakIfTailFits` holds back a break that would not help. A group that does not fit flat still prints flat when its
+line already runs past the width. It also prints flat when the line its break would end on would not fit either.
+That line is the `breakIfTailFits` Doc at the group's indent, followed by everything after the group.
+
+### Line ends
+
+A `lineSuffix` is text at the end of the current line that is never measured, used for a trailing Comment. Its length
+is the author's business, so it must not break the code in front of it. Suffixes are written just before the next
+line break, so they follow everything else on the line, even a comma the layout added.
+
+A `fill` breaks its separators one at a time. Each separator breaks only if the item after it would not fit on the
+line, so as many items as fit share a line.
+
+After printing, `printDoc` trims every line end, so that a break followed by another break leaves an empty line
+rather than indentation. Text made by `verbatim`, such as a String Literal sliced from the source or a Comment, is
+exempt. Its trailing spaces belong to the file, so the trim stops at the last verbatim piece of each line.
+
+### Alignment runs
+
+Sibling lines can line up one column, such as the `=` of consecutive assignments or the `{` of `match` Handlers. An
+`alignmentSlot` is the padding one line carries. The Printer builds it before it knows whether the line joins a run,
+and `joinAlignment` puts it in one. A slot that joined no run is written as nothing.
+
+The renderer resolves a run only when it reaches it, since the padding depends on the column the run stands at.
+`resolveAlignment` answers for a given room, the width less the run's indentation, and remembers the answer per room.
+The renderer asks once to measure a line and again to write it, and both ask for the same room. So a line the run
+keeps is one the renderer is bound to leave flat.
+
+Each line is an `AlignmentItem`. `headWidth` is how wide it reads left of the column, and `fitWidth` how wide the
+whole line reads flat. A line whose padded `fitWidth` runs past the room would break, and a broken line need not keep
+the aligned thing on its first line. A `define` arm that breaks moves its `if` down, where no column reaches it. So
+such a line is taken out of the run, and the lines around it line up without it. `fitWidth` is null where breaking
+changes nothing about the column: an assignment's `=` follows its head wherever that ends, and only what follows it
+moves.
+
+In a run that is `partedByBreaks`, a line taken out also parts the run, and the lines before it and after it line
+up separately. A `match` Handler that breaks opens a block, and one column across two blocks would run through two
+tables. A `define` run is not parted, since a `define` arm that breaks opens nothing.
+
+The lines left in the run are split into blocks, each a maximal stretch of adjacent lines whose head widths differ by
+at most `maxSpan`. Each line in a block is padded to the block's widest head, and a block of one line is left
+unpadded. The span is measured from the narrowest to the widest head of the block rather than against the line
+before. Otherwise a slow ramp of widths would pad the first line far past the budget. Blocks are greedy from the first
+line rather than optimal, because a greedy split is stable under a second formatting. An optimal one need not be.
+
+Taking a line out can join the lines around it into one block and so widen it. The pass repeats until no line comes
+out, and it always ends, since a line is only ever taken out and never put back.
