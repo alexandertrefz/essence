@@ -28,6 +28,7 @@ export const RULES = [
 	"block-length",
 	"stacked",
 	"counts",
+	"citation",
 ] as const
 
 export type Rule = (typeof RULES)[number]
@@ -631,6 +632,77 @@ const countsPattern = new RegExp(
 	"gi",
 )
 
+// A pointer to a file of development notes names one of its headings. A bare
+// file name is the nearest one walking up from the comment's file. A path
+// starts at the repository root.
+const citationPattern = /\bSee "([^"]+)" in ((?:[\w.@-]+\/)*DEVELOPMENT\.md)\./g
+
+const mentionPattern = /DEVELOPMENT\.md/g
+
+export type Citation = {
+	file: string
+	line: number
+	heading: string
+	// The notes the citation names by path, or null for the nearest ones.
+	path: string | null
+}
+
+type Joined = {
+	text: string
+	lineAt: (offset: number) => number
+}
+
+// A block's lines joined by blanks, so that a quoted heading may wrap.
+function joinedOf(block: Block): Joined {
+	let text = ""
+	let starts: Array<{ offset: number; line: number }> = []
+
+	for (let line of block.lines) {
+		if (line.text === "") {
+			continue
+		}
+
+		text += text === "" ? "" : " "
+		starts.push({ offset: text.length, line: line.line })
+		text += line.text
+	}
+
+	return {
+		text,
+		lineAt: (offset) =>
+			starts.findLast((start) => start.offset <= offset)?.line ??
+			block.line,
+	}
+}
+
+function citationsOf(file: string, joined: Joined): Array<Citation> {
+	return [...joined.text.matchAll(citationPattern)].map((match) => ({
+		file,
+		line: joined.lineAt(match.index),
+		heading: match[1]!,
+		path: match[2] === "DEVELOPMENT.md" ? null : match[2]!,
+	}))
+}
+
+// The lines of a block that mention development notes outside a citation.
+function uncitedMentionsOf(joined: Joined): Array<number> {
+	let cited = [...joined.text.matchAll(citationPattern)].map((match) => ({
+		start: match.index,
+		end: match.index + match[0].length,
+	}))
+
+	return [...joined.text.matchAll(mentionPattern)]
+		.filter(
+			(mention) =>
+				!cited.some(
+					(range) =>
+						range.start <= mention.index &&
+						mention.index < range.end,
+				),
+		)
+		.map((mention) => joined.lineAt(mention.index))
+}
+
 type Context = {
 	file: string
 	names: Set<string>
@@ -777,6 +849,15 @@ export function findingsIn(source: Source): Array<Finding> {
 
 	for (let block of prose) {
 		checkBlock(context, block, block === header)
+
+		for (let line of uncitedMentionsOf(joinedOf(block))) {
+			context.findings.push({
+				file: source.file,
+				line,
+				rule: "citation",
+				detail: block.lines.find((part) => part.line === line)!.text,
+			})
+		}
 	}
 
 	for (let index = 1; index < blocks.length; index++) {
@@ -804,6 +885,12 @@ export function findingsIn(source: Source): Array<Finding> {
 
 export function sourceOf(file: string, text: string): Source {
 	return { file, text, scanned: scanScript(text) }
+}
+
+export function citationsIn(source: Source): Array<Citation> {
+	return blocksOf(source.text, source.scanned.comments).flatMap((block) =>
+		citationsOf(source.file, joinedOf(block)),
+	)
 }
 
 export async function repositoryFindings(): Promise<Array<Finding>> {

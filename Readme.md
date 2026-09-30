@@ -300,6 +300,9 @@ server's TypeScript directly, so there is no bundle to rebuild.
 - No two blocks with nothing but blank lines between them.
 - No count of other code, such as "the three callers".
 - No `NOTE:` prefix. `WARNING:` and `INVARIANT:` are the only markers, for the rare comment that is one.
+- No mention of a `DEVELOPMENT.md` but a citation, `See "<Heading>" in DEVELOPMENT.md.`, naming a heading of the
+  nearest one above the file; a path from the repository root may replace the bare name.
+  `scripts/tests/developmentCitations.spec.ts` checks that the heading is there.
 
 `scripts/tests/commentProse.baseline.json` records how often each file breaks each rule today, and a file can
 break a rule less often but never more. After fixing a comment, run `bun run comments:baseline` to lower the
