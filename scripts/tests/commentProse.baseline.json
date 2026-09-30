@@ -311,7 +311,6 @@
 	"packages/debug-adapter/src/variables.ts": {"sentence-length": 3, "em-dash": 4, "position": 1, "stacked": 1},
 	"packages/fixtures/src/index.ts": {"sentence-length": 2, "em-dash": 1},
 	"packages/fixtures/src/spawn.ts": {"sentence-length": 1},
-	"packages/formatter/src/tests/formatter.spec.ts": {"sentence-length": 97, "em-dash": 78, "all-caps": 13, "history": 4, "position": 3, "block-length": 4},
 	"packages/interfaces/src/common/index.ts": {"sentence-length": 130, "em-dash": 117, "all-caps": 78, "position": 2, "block-length": 28},
 	"packages/interfaces/src/common/typedNodes.ts": {"sentence-length": 96, "em-dash": 93, "all-caps": 51, "position": 6, "block-length": 24},
 	"packages/interfaces/src/common/typedSimpleNodes.ts": {"sentence-length": 162, "em-dash": 135, "all-caps": 102, "position": 5, "block-length": 35},

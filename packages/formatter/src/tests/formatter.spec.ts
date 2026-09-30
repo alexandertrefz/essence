@@ -12,13 +12,9 @@ import {
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"
 
-// Every `.es` source in the standard library, the fixtures, the
-// examples and the client's test Modules, which is what a formatter has to
-// survive before it is allowed anywhere near a source tree.
-//
-// The Diagnostic showcase files are included deliberately: all but the ones in
-// `REFUSED` carry no Parser error at all and only fail later, so a formatter
-// must handle them like any other file.
+// Every `.es` source in the standard library, the fixtures, the examples and
+// the client's test Modules. The Diagnostic showcase files are included, since
+// all but those in `REFUSED` parse cleanly and only fail later.
 function corpus(): Array<{ name: string; filePath: string; source: string }> {
 	let files = readStdlibFiles().map((file) => ({
 		name: "stdlib/" + path.basename(file.filePath),
@@ -26,10 +22,8 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		source: file.sourceText,
 	}))
 
-	// Every fixture directory, walked rather than listed: the Module
-	// fixtures live in subdirectories of their own — a Module Diagnostic takes
-	// more than one file to provoke — and a directory nobody thought to add
-	// here would be a corner of the repository the formatter is never held to.
+	// Walked rather than listed, since the Module fixtures live in
+	// subdirectories, and a directory missing from a list would go unchecked.
 	for (let filePath of essenceFilesUnder(fixturePath())) {
 		files.push({
 			name: path.relative(fixturePath(), filePath),
@@ -38,9 +32,8 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		})
 	}
 
-	// The showcase programs under `examples/` are Essence a reader is
-	// meant to copy from, so they are held to the same standard as the
-	// fixtures — walked the same way, for the same reason.
+	// The programs under `examples/` are held to the same standard, walked the
+	// same way.
 	for (let filePath of essenceFilesUnder(EXAMPLES_DIRECTORY)) {
 		files.push({
 			name: "examples/" + path.relative(EXAMPLES_DIRECTORY, filePath),
@@ -91,12 +84,8 @@ function essenceFilesUnder(directory: string): Array<string> {
 
 const CORPUS = corpus()
 
-// The showcase files the formatter must REFUSE — every one of them
-// carries an error the Parser itself reported, and formatting a file the Parser
-// could not read whole is exactly what the gate is there to prevent. Some of
-// them genuinely do not parse; the rest parse and are refused all the same,
-// because the Parser reports an error in each of them, and the formatter asks
-// only whether there were any.
+// The showcase files the formatter must refuse, since the Parser reports an
+// error in each, whether or not the file parses.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
@@ -112,9 +101,8 @@ const REFUSED = new Set([
 	"diagnostics/ForeignSyntax.es",
 ])
 
-// Showcase files the formatter reads but that stay as written, because
-// their layout is what the rendered report shows. `GenericChoice.es` splits the
-// `loop` call over two lines so the report keeps its `#Continue` callback.
+// Showcase files that stay as written, since the rendered report shows their
+// layout. `GenericChoice.es` splits a call over two lines for its report.
 const SHAPED = new Set(["diagnostics/GenericChoice.es"])
 
 describe("formatter", () => {
@@ -122,8 +110,7 @@ describe("formatter", () => {
 		expect(CORPUS.length).toBeGreaterThan(30)
 	})
 
-	// A tracked `.es` file the corpus does not read is one the formatter
-	// is never held to, so the corpus is checked against what git tracks.
+	// The corpus is checked against what git tracks, so no file escapes it.
 	it("holds every tracked Essence file", async () => {
 		let listed = await spawnAndWait(
 			["git", "ls-files", "-z", "--", "*.es"],
@@ -145,9 +132,8 @@ describe("formatter", () => {
 
 	describe("corpus", () => {
 		for (let file of CORPUS) {
-			// `format` runs the whole safety gate itself — the result
-			// parses, means the same thing, kept every Comment, and is stable
-			// under a second pass. A refusal here IS the failure.
+			// The safety gate runs inside `format`, so a refusal here is the
+			// failure.
 			it(`formats ${file.name} without refusing`, () => {
 				let result = format(file.source, {
 					documentPath: file.filePath,
@@ -174,11 +160,8 @@ describe("formatter", () => {
 		}
 	})
 
-	// This is the gate that replaces forcing a formatting pass on every
-	// successful compile. The corpus stays canonically formatted because it is
-	// checked here, not because the compiler writes to anybody's source tree.
-	//
-	// The showcase files in `REFUSED` and `SHAPED` are exempt.
+	// The corpus stays formatted because it is checked here, never because
+	// the compiler writes to a source tree. `REFUSED` and `SHAPED` are exempt.
 	describe("the repository is formatted", () => {
 		for (let file of CORPUS) {
 			if (REFUSED.has(file.name) || SHAPED.has(file.name)) {
@@ -196,11 +179,8 @@ describe("formatter", () => {
 		}
 	})
 
-	// A Case Matcher's payload binding is part of the Matcher, so it has
-	// to survive the round trip AND be measured as part of the Matcher's width
-	// by the case-brace alignment. The safety gate compares ASTs, so a dropped
-	// binding would be a refusal rather than silent data loss — but a refusal on
-	// ordinary source is itself the bug.
+	// A Case Matcher's payload binding is part of the Matcher, so it survives
+	// the round trip and counts toward the Matcher's width in the alignment.
 	describe("Case Matcher payload bindings", () => {
 		it("round-trips a binding and aligns the braces past it", () => {
 			let source = [
@@ -248,19 +228,14 @@ describe("formatter", () => {
 		})
 	})
 
-	// A Pattern takes a value apart, in five written positions. Every one
-	// of them is here because the printer reaches each by a different path — a
-	// Matcher, a Case payload, a Parameter, and the head of a Declaration —
-	// and because the safety gate compares Tokens: a spelling canonicalised
-	// anywhere along those paths is not a diff a reader would argue with, it is
-	// a refusal to format the file at all.
+	// A Pattern in each position that takes a value apart, since the Printer
+	// reaches each by its own path. See "Patterns" in DEVELOPMENT.md.
 	describe("Patterns", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
 
-		// One source per position, each already written the way the
-		// printer writes it, so that round-tripping it byte for byte is the
-		// whole assertion.
+		// One source per position, each written as the Printer writes it, so
+		// the round trip byte for byte is the whole assertion.
 		let positions: Array<[string, string]> = [
 			[
 				"a Matcher",
@@ -353,9 +328,8 @@ describe("formatter", () => {
 			})
 		}
 
-		// Declaration position has no alignment column at stake, so a
-		// Pattern there lays itself out like the Record Type it reads as — one
-		// member to a line, with the trailing comma every broken list gets.
+		// A Declaration has no alignment column at stake, so a Pattern there
+		// breaks like a Record Type, one member per line.
 		describe("in Declaration position", () => {
 			it("breaks a Pattern too wide for its line", () => {
 				let source = block(
@@ -400,10 +374,8 @@ describe("formatter", () => {
 				)
 			})
 
-			// A Pattern head reports no width, which ends its alignment
-			// run — two of a similar width padded to one column could each then
-			// break, leaving the padding they were given stranded after their
-			// closing braces.
+			// A Pattern head reports no width and ends its alignment run, or
+			// its padding could be stranded after its closing brace.
 			it("never pads a Pattern head out to a sibling's column", () => {
 				let source = block(
 					"\tconstant { alpha, beta } = first",
@@ -424,16 +396,11 @@ describe("formatter", () => {
 			})
 		})
 
-		// A Matcher's Pattern is never broken. `printMatch` measures a
-		// Matcher from its FLAT width and admits the Handler to a brace
-		// alignment run without asking whether the Matcher can break — so one
-		// that broke would drop the run's padding after its own closing brace,
-		// and every short sibling would be padded out to a column that no
-		// longer means anything.
+		// A Matcher's Pattern is never broken, since the alignment run measures
+		// it flat.
 		describe("in Matcher position", () => {
-			// The LAST brace of the line, unlike the `match` alignment's
-			// own helper above: a Pattern opens a brace of its own, and the
-			// column being measured is the one the Handler's body opens in.
+			// The last brace of each line, since a Pattern opens a brace of its
+			// own. The column is where the Handler's body opens.
 			let bracesOf = (source: string) =>
 				format(source)
 					.text.split("\n")
@@ -453,10 +420,8 @@ describe("formatter", () => {
 				).toEqual([34, 34])
 			})
 
-			// The width at which a breakable Pattern would give way. It
-			// stays on one line instead, which leaves the alignment column
-			// where the Matchers are — the arms give way in their bodies, the
-			// way every arm too wide for its line does.
+			// Wide enough that a breakable Pattern would break. It stays on one
+			// line, and the arms break in their bodies instead.
 			it("keeps a wide Pattern and its short sibling's on one line", () => {
 				let text = format(
 					block(
@@ -475,9 +440,7 @@ describe("formatter", () => {
 				expect(text).not.toContain("\t\tcase {\n")
 			})
 
-			// A Type inside a Matcher's Pattern is flattened with it. A
-			// Union is the one Type that would otherwise offer the group a
-			// break, and it would cost the same column.
+			// A Union inside a Matcher's Pattern is flattened with it.
 			it("keeps a Union written inside a Matcher's Pattern flat", () => {
 				let source = block(
 					"\tTerminal.print(match input -> String {",
@@ -509,11 +472,8 @@ describe("formatter", () => {
 			})
 		})
 
-		// `as` is an ordinary Identifier everywhere it is not a Keyword,
-		// so a member may be CALLED `as` — `{ as }` binds it, `{ as as as }`
-		// binds it under that name, and `{ as as { … } }` takes it apart. The
-		// printer writes the name it was given without ever asking what it
-		// spells.
+		// A member may be named `as`: `{ as }` binds it, `{ as as as }` binds it
+		// under that name, and `{ as as { … } }` takes it apart.
 		describe("a member named as", () => {
 			let source = block(
 				"\tconstant { as } = record",
@@ -536,10 +496,8 @@ describe("formatter", () => {
 			})
 		})
 
-		// Parameter position has no alignment column at stake either, so
-		// a Pattern there breaks like the one in a Declaration — and the
-		// Parameter list around it breaks first, since a Parameter that fits on
-		// a line of its own is the cheaper break.
+		// A Parameter's Pattern breaks like a Declaration's, after the
+		// Parameter list around it, which is the cheaper break.
 		describe("in Parameter position", () => {
 			let source = block(
 				"\tfunction area(of { horizontal, vertical, depth, timeIndex, weight }: Box) -> Integer {",
@@ -567,9 +525,8 @@ describe("formatter", () => {
 			})
 		})
 
-		// Every one of these is a spelling the printer could tidy away
-		// and a Token the safety gate would then miss — which costs the whole
-		// file its formatting, not one member's.
+		// Spellings the Printer must keep, since the gate would refuse the
+		// whole file over one changed Token.
 		describe("what must never be rewritten", () => {
 			let roundTrips = (source: string) => {
 				let result = format(source)
@@ -586,9 +543,8 @@ describe("formatter", () => {
 				roundTrips(block("\tconstant { x, y: Integer } = record"))
 			})
 
-			// A one-member Case payload has two readings, and the
-			// Pattern one is what was written — rewriting it as `#Done(value)`
-			// would bind the payload whole instead of taking it apart.
+			// Written as `#Done(value)`, the payload would be bound whole
+			// instead of taken apart.
 			it("keeps a one-member payload Pattern as a Pattern", () => {
 				roundTrips(
 					block(
@@ -600,9 +556,8 @@ describe("formatter", () => {
 				)
 			})
 
-			// `_ { … }` and a bare `{ … }` are ONE node — both are
-			// labelless — so which was written lives in the source and nowhere
-			// else, and the `_` is a Token like any other.
+			// `_ { … }` and `{ … }` are one node, so only the source says which
+			// was written.
 			it("keeps the underscore of a labelless Pattern Parameter", () => {
 				roundTrips(
 					block(
@@ -625,11 +580,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// The braces of a run of Handlers are written in one column, which is
-	// measured from each Matcher's flat rendering — and a Matcher holding a
-	// String written across several lines has no such width: the flat rendering
-	// hands the String back whole, newlines and all, and the column it reports
-	// is one no brace in the output reaches.
+	// A Matcher holding a String written across lines has no flat width, so it
+	// cannot join the Handlers' brace column.
 	describe("Match", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
@@ -655,9 +607,8 @@ describe("formatter", () => {
 			expect(twice.text).toBe(once.text)
 		})
 
-		// The same for a body holding such a String: the Handler spans
-		// two lines of the output whatever its brace does, and a table does
-		// not carry across a row that does.
+		// A body holding such a String spans two lines, and a table does not
+		// carry across such a row.
 		it("ends the run at a body written across lines", () => {
 			let source = block(
 				"\tconstant out = match value -> String {",
@@ -680,18 +631,14 @@ describe("formatter", () => {
 		})
 	})
 
-	// A `define` is a table of cases, so it is written one arm to a line
-	// whatever it would fit on — the shape a reader scans down — and the `if` of
-	// a run of adjacent arms is written in one column, `otherwise` among them.
+	// One arm per line, with the `if` of adjacent arms in one column.
+	// See "Define" in DEVELOPMENT.md.
 	describe("Define", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
 
-		// Every source here is written the way the printer writes it, so
-		// the source IS the expected output. Formatted twice on top of that,
-		// because a column that shifts on the second pass is caught by the
-		// gate as a refusal — which says that something moved, and nothing at
-		// all about which column it was.
+		// Each source is the expected output. It is formatted twice, so a
+		// column that shifts on the second pass fails with a diff.
 		let roundTrips = (source: string) => {
 			let once = format(source)
 
@@ -766,9 +713,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// `otherwise` is the last arm's case, so the arm is in the run
-		// and a `define` that has only that arm is a run of one — which
-		// a run leaves alone, the way it leaves a lone Declaration alone.
+		// A `define` with only its `otherwise` arm is a run of one, which
+		// stays unpadded.
 		it("leaves a define of one arm unpadded", () => {
 			roundTrips(
 				block(
@@ -779,10 +725,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The run's own blocking rule, through a `define`: a run whose
-		// answers span more than `MAX_ALIGNMENT_PADDING` is split into blocks
-		// that each line up on their own, rather than dragging the short ones
-		// across the line to meet the wide ones.
+		// Answers whose widths span more than `MAX_ALIGNMENT_PADDING` split
+		// the run into blocks that line up on their own.
 		it("splits a run whose answers are too far apart in width", () => {
 			roundTrips(
 				block(
@@ -810,10 +754,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// An arm wider than a line breaks in front of its `if` wherever
-		// it stands, so the column its head would hold open is one nothing
-		// occupies — it is out of the run, and the arms around it line up with
-		// one another.
+		// An arm wider than any line breaks before its `if`, so it leaves the
+		// run, and the arms around it line up with each other.
 		it("leaves an arm too wide for any line out of the run", () => {
 			roundTrips(
 				block(
@@ -828,20 +770,10 @@ describe("formatter", () => {
 			)
 		})
 
-		// Each of these arms FITS a line and none of them fits the line
-		// it starts three indents in, so each breaks in front of its `if` —
-		// and an arm that breaks writes its `if` below the column rather than
-		// in it. The run is resolved against the room it is reached with, so
-		// those two arms are out of it, and the `otherwise` that is left is a
-		// block of one and unpadded. Before the run knew its own column, they
-		// stayed in and held it open at their heads: the `otherwise` was
-		// padded out to a column that nothing in the whole `define` occupied.
-		//
-		// The padding of an arm that breaks anyway is written in front of the
-		// break, where it holds no column open and the line-end trimming takes
-		// it away. A stranded run of spaces at the end of a line would be
-		// invisible here and fatal to the second pass, which is what the
-		// explicit check is for.
+		// These arms fit a line but not one three indents in, so they break
+		// before their `if` and leave the run. The `otherwise` left is a block
+		// of one and unpadded. The explicit check catches stranded spaces at a
+		// line's end, which the trim should remove.
 		it("leaves the arms the column it stands at breaks out of the run", () => {
 			let source = block(
 				"\tconstant grade = (_ score: Integer) -> String {",
@@ -859,10 +791,8 @@ describe("formatter", () => {
 			expect(format(source).text).not.toMatch(/[ \t]\n/)
 		})
 
-		// The same thing four indents in, where the `define` is written,
-		// and with the wide arm in the middle of the table rather than above
-		// it: the arms either side of one that breaks are one table still, and
-		// they line up on the widest head that a column actually runs through.
+		// The same four indents in, with the wide arm in the middle. The arms
+		// around a broken one line up on the widest head the column runs through.
 		it("lines the arms either side of a broken one up without it", () => {
 			roundTrips(
 				[
@@ -883,13 +813,9 @@ describe("formatter", () => {
 			)
 		})
 
-		// An arm is taken out of the run for the padding it would carry
-		// as readily as for the column the run stands at — the two are one
-		// question. This one fits its line by two columns with no padding and
-		// runs six past it with the eight the widest head would give it, so
-		// keeping it in the run would be tearing a line in two to line up a
-		// word that the tear then moves. It keeps its line and its own column
-		// instead, and the two arms below it line up without it.
+		// An arm leaves the run when its padding would break it. This one fits
+		// by two columns unpadded and runs six past with the eight it would get.
+		// It keeps its line, and the arms after it line up without it.
 		it("leaves an arm out rather than let its padding break it", () => {
 			roundTrips(
 				block(
@@ -904,9 +830,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// An answer that lays itself out over several lines has no column
-		// to be measured against, so it ends the run — and keeps its own `if`
-		// against the brace it closes with, the way an `else` is written.
+		// An answer that opens a block ends the run, and keeps its `if` after
+		// the brace it closes with, as an `else` is written.
 		it("ends the run at an answer that opens a block", () => {
 			roundTrips(
 				block(
@@ -923,11 +848,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A CONDITION that lays itself out over several lines keeps its
-		// `if` on the answer's line for the same reason an ANSWER that does
-		// keeps its own: the brace opens right after the `if`, and nothing in
-		// front of that brace needs the room a break would buy. The arm stays
-		// in the run, its `if` written in the column like every other one.
+		// A condition that opens a block keeps its `if` on the answer's line,
+		// since the brace opens right after it. The arm stays in the run.
 		it("keeps the if on the line when the condition opens a block", () => {
 			roundTrips(
 				block(
@@ -956,8 +878,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A trailing callback in a Condition hugs the call it is written
-		// in, which it can only do with the `if` in front of it on the line.
+		// A trailing callback in a condition hugs its call, which needs the
+		// `if` on the answer's line.
 		it("lets a Condition's trailing callback hug", () => {
 			roundTrips(
 				block(
@@ -973,8 +895,7 @@ describe("formatter", () => {
 			)
 		})
 
-		// `otherwise` never breaks away from its answer: there is nothing
-		// after it for a break to buy room for, so the answer gives way inside
+		// `otherwise` never breaks from its answer, so the answer breaks inside
 		// itself instead.
 		it("keeps otherwise on the line its answer ends on", () => {
 			roundTrips(
@@ -1021,10 +942,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A blank line between two Declarations ends their alignment run,
-		// because it is how an author says that two groups of them are not one.
-		// Two arms are two rows of one table, and no amount of space between
-		// them makes the table two tables.
+		// A blank line ends a run of Declarations, but two arms are two rows of
+		// one table however far apart.
 		it("keeps a blank line from ending the run", () => {
 			roundTrips(
 				block(
@@ -1037,9 +956,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A trailing Comment is written as a line suffix and never
-		// measured, so how long the note at the end of an arm is must not be
-		// what decides the column in front of it.
+		// A trailing Comment is never measured, so its length cannot decide the
+		// column before it.
 		it("keeps a Comment at the end of an arm out of the column", () => {
 			roundTrips(
 				block(
@@ -1051,10 +969,9 @@ describe("formatter", () => {
 			)
 		})
 
-		// Every place a Comment can sit in a `define` — after the `{`,
-		// above an arm, at the end of an arm's line, and below the last arm.
-		// The safety gate compares each Comment's place among the Tokens around
-		// it, so a Comment claimed in the wrong order refuses the whole file.
+		// Every place a Comment can sit in a `define`: after the `{`, before an
+		// arm, at an arm's end, and after the last arm. One claimed out of order
+		// would make the gate refuse the file.
 		it("keeps the Comments written around its arms", () => {
 			roundTrips(
 				block(
@@ -1070,11 +987,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// `{ a }` and `{ a = a }` mean the same thing and are written
-	// differently, and `{ base with { a } }` and `{ base with a = a }` are not
-	// even the same parse. The Formatter keeps whichever was written, in both
-	// directions — the AST gate catches a dropped or invented `shorthand`
-	// already, and these pin the layout it comes out in.
+	// `{ a }` and `{ a = a }` mean the same, and `{ base with { a } }` and
+	// `{ base with a = a }` parse differently. Whichever was written is kept.
 	describe("Property shorthand", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
@@ -1108,10 +1022,9 @@ describe("formatter", () => {
 			)
 		})
 
-		// The braced right-hand side is the one shape
-		// `printCombination` decides by re-slicing the source, and it is
-		// exactly the shape the shorthand merge is written in — so it is
-		// pinned here rather than left to the AST gate, which does not see it.
+		// Only the Parser's `bare` mark tells this braced right side from a
+		// key list. The gate would refuse the other form, and this pins the
+		// layout.
 		it("keeps a Literal merged by an update braced", () => {
 			roundTrips(
 				block("\tconstant server = { base with { port, host } }"),
@@ -1148,11 +1061,8 @@ describe("formatter", () => {
 			expect(twice.text).toBe(once.text)
 		})
 	})
-	// A dotted key is printed step by step, as it was written. The
-	// Formatter never normalises between the spellings of a nested update —
-	// `a.b = 1, a.c = 2` is never gathered up and a gathering is never taken
-	// apart — because the two are different Programs to read even where they
-	// mean the same thing.
+	// A dotted key prints as written. `a.b = 1, a.c = 2` is never gathered up,
+	// and a gathering is never taken apart.
 	describe("Path keys", () => {
 		let block = (...lines: Array<string>) =>
 			["implementation {", ...lines, "}", ""].join("\n")
@@ -1208,9 +1118,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The one shape `printCombination` decides by re-slicing the
-		// source, which the AST gate does not see. A path key in the list must
-		// not make a bare key list look braced.
+		// A path key does not make a bare key list braced. The gate would
+		// refuse that, and this pins the layout.
 		it("keeps a key list with a path in it bare", () => {
 			let result = format(
 				block("\tconstant moved = { config with server.port = 1 }"),
@@ -1278,9 +1187,8 @@ describe("formatter", () => {
 			expect(twice.text).toBe(once.text)
 		})
 
-		// A path key is a KEY, printed by the same member list wherever
-		// one stands — so a Literal merged into a default prints one exactly as
-		// an update's key list does, with no arm of its own anywhere.
+		// A path key prints through the same member list wherever it stands,
+		// so a literal merged into a default prints one as an update does.
 		describe("in a Literal merged into a default", () => {
 			it("keeps a dotted key in an Argument dotted", () => {
 				roundTrips(
@@ -1357,8 +1265,8 @@ describe("formatter", () => {
 			roundTrips(block("\tconstant cities = people::map(.address.city)"))
 		})
 
-		// Never rewritten into a literal, and never the reverse — the
-		// spelling is the author's, and the two are not the same Node.
+		// A member path and a Function literal are different nodes, so neither
+		// is rewritten as the other.
 		it("keeps a Function literal a literal", () => {
 			roundTrips(
 				block(
@@ -1382,10 +1290,7 @@ describe("formatter", () => {
 		})
 	})
 
-	// A checked refinement's `where` clause has to come back on the Type's
-	// own line, because that is the only line the Parser reads it on — a clause
-	// broken onto the next one would be a Statement beginning with the name
-	// `where`, and the safety gate would catch it as a meaning that changed.
+	// A refinement's `where` stays on the Type's line while it fits.
 	describe("Predicate Type Aliases", () => {
 		it("round-trips a predicate", () => {
 			let source = [
@@ -1440,8 +1345,7 @@ describe("formatter", () => {
 			expect(twice.text).toBe(once.text)
 		})
 
-		// An unrefined Alias prints exactly as it always did — the clause
-		// is the only thing the printer learned, so nothing else may move.
+		// An Alias without a clause round-trips unchanged.
 		it("leaves an unrefined Alias alone", () => {
 			let source = [
 				"implementation {",
@@ -1457,11 +1361,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// A Protocol carries two things the printer had no shape for until
-	// provided Methods existed — an extension list, which is the very clause a
-	// Namespace conformance writes, and a Method body, which is the very
-	// Definition a Namespace Method writes. Both are printed by the code that
-	// already prints them, so what these hold is that the Protocol reaches it.
+	// A Protocol's extension list and provided Method bodies print through
+	// the code that prints a Namespace's conformance list and Methods.
 	describe("Protocols", () => {
 		it("round-trips a provided Method", () => {
 			let source = [
@@ -1551,9 +1452,7 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
-		// A Protocol of requirements alone prints exactly as it always
-		// did — the body and the extension list are the only things the printer
-		// learned, so nothing else may move.
+		// A Protocol of requirements alone round-trips unchanged.
 		it("leaves a Protocol of requirements alone", () => {
 			let source = [
 				"implementation {",
@@ -1571,12 +1470,9 @@ describe("formatter", () => {
 		})
 	})
 
-	// The `tests { … }` section is a block of Statements like any other,
-	// so what is worth holding it to is the two shapes only it has: the head of
-	// an item, which breaks its Modifiers onto their own lines and puts the `{`
-	// back in the item's column, and a file that wrote no implementation block
-	// at all — where a printer that reached for `program.position` would write
-	// one that was never there.
+	// The `tests { … }` section is a block of Statements. These hold the shapes
+	// only it has: an item head whose Modifiers break one per line, and a file
+	// with no implementation block.
 	describe("the tests section", () => {
 		it("writes a table test's rows and its row Parameter", () => {
 			let source = [
@@ -1704,10 +1600,9 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
-		// Every Matcher a `require` may take a value apart with, each one
-		// standing where a Declaration's name stands. A round trip is the whole
-		// of what is asked: the safety gate compares Tokens, so a spelling this
-		// wrote out or dropped would refuse the file rather than reformat it.
+		// Every Matcher a `require` may take a value apart with, where a
+		// Declaration's name stands. The gate compares Tokens, so a round trip
+		// is the whole assertion.
 		it("writes a Matcher left of the '='", () => {
 			let source = [
 				"implementation {",
@@ -1906,9 +1801,8 @@ describe("formatter", () => {
 			expect(result.text).toBe(source)
 		})
 
-		// The shape the design asks for when the head stops fitting: one
-		// Modifier per line, indented under the name, and the `{` back in the
-		// item's own column.
+		// A head that stops fitting puts one Modifier per line under the name,
+		// and the `{` back in the item's column.
 		it("breaks a long head onto one Modifier per line", () => {
 			let source = [
 				"implementation {}",
@@ -2019,13 +1913,8 @@ describe("formatter", () => {
 	})
 
 	describe("Comments above the Program", () => {
-		// The blank line that separates a file's header from its
-		// `implementation {` used to be found under EVERY line of that header,
-		// because each Comment was measured against the keyword rather than
-		// against the Comment below it — so a four-line header came back
-		// double-spaced, and running the formatter again spaced it again. Every
-		// deliberately-broken file under `fixtures/files/diagnostics/` opens
-		// with one of these headers.
+		// Each heading Comment is measured against the next one rather than
+		// the keyword, so a header is not written double-spaced.
 		it("keeps a run of heading Comments together", () => {
 			let source = [
 				"§ A header above the Program.",
@@ -2078,9 +1967,8 @@ describe("formatter", () => {
 			expect(result.refusal?.diagnostics.length).toBeGreaterThan(0)
 		})
 
-		// `guarded` is the wrapper `format` runs inside; no reachable
-		// source crashes the printer today, so the catch path is exercised
-		// through the seam directly.
+		// No known source crashes the Printer, so the catch path is tested
+		// through `guarded`, which `format` runs inside.
 		it("turns an unexpected crash into a refusal with the original bytes", () => {
 			let source = "implementation {\n\tconstant a = 1\n}\n"
 			let result = guarded(source, () => {
@@ -2094,10 +1982,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// A String's own text is written back from the source byte for byte —
-	// its escapes are decoded in the AST, so only the source still holds it as
-	// it was written — while what is inside a hole is code, and is printed like
-	// any other Expression.
+	// A String's text comes back from the source byte for byte, since the tree
+	// holds its escapes decoded. A hole holds code, printed like any other.
 	describe("string interpolation", () => {
 		let roundTrips = (line: string) => {
 			let source = `implementation {\n\t${line}\n}\n`
@@ -2119,8 +2005,7 @@ describe("formatter", () => {
 			roundTrips('Terminal.inspect("outer {"inner {name}"}")')
 		})
 
-		// A hole holds an Expression, not text, so it is formatted like
-		// one — the String's own text around it is what stays as written.
+		// A hole holds an Expression, so it is formatted like one.
 		it("formats the code inside a hole", () => {
 			expect(
 				format(
@@ -2129,9 +2014,8 @@ describe("formatter", () => {
 			).toContain('"sum {1::add(2)}"')
 		})
 
-		// The padding between a brace and what it holds is inside the
-		// hole, which makes it layout rather than a character of the String, so
-		// a hole has one spelling however it was typed.
+		// The padding between a brace and what it holds is layout, so a hole
+		// has one spelling however it was typed.
 		it("closes the braces up against what the hole holds", () => {
 			expect(
 				format(
@@ -2140,9 +2024,8 @@ describe("formatter", () => {
 			).toContain('"a {name} b {name}c"')
 		})
 
-		// An escaped brace is a character of the String, not a hole, so
-		// the text around it is left exactly as written — only the padding of a
-		// real hole is closed up.
+		// An escaped brace is a character of the String, not a hole, so the
+		// text around it stays as written.
 		it("leaves an escaped brace and the text around it alone", () => {
 			expect(
 				format(
@@ -2151,9 +2034,7 @@ describe("formatter", () => {
 			).toContain('"pre \\{ lit \\} post {name} tail"')
 		})
 
-		// The reason this was worth doing. A `match` written into a hole
-		// used to keep whatever shape it was first typed with, Handler alignment
-		// and all, because the whole String was reprinted verbatim.
+		// A `match` in a hole is laid out and aligned like any other.
 		it("lays out and aligns a match written into a hole", () => {
 			let result = format(
 				"implementation {\n" +
@@ -2172,10 +2053,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The `=` never breaks away from what it assigns. A String starts
-		// on the line its name is written on however long it is, and gives way
-		// at a hole further along — the beginning of a value stays where the
-		// name that introduced it is.
+		// The `=` never breaks from its value. A String starts on its name's
+		// line however long it is, and breaks at a hole further along.
 		it("keeps a long String on the line its name is on", () => {
 			let source =
 				'implementation {\n\tconstant alpha = 1\n\tconstant sentence = "the quick brown fox {alpha} jumped over the lazy dog now"\n}\n'
@@ -2188,9 +2067,8 @@ describe("formatter", () => {
 			expect(result.text).not.toContain("constant sentence =\n")
 		})
 
-		// A value that can give way inside itself does that, for the same
-		// reason — an Argument list breaks at its commas rather than moving off
-		// the line its name is on.
+		// A value that can break inside itself does, as an Argument list breaks
+		// at its commas.
 		it("leaves a value that can break to break inside itself", () => {
 			let result = format(
 				"implementation {\n\tconstant result = someCall(alpha 1, beta 2, gamma 3, delta 4, epsilon 5, zeta 6)\n}\n",
@@ -2199,9 +2077,8 @@ describe("formatter", () => {
 			expect(result.text).toContain("constant result = someCall(\n")
 		})
 
-		// A String with no hole has nothing to give — its text can not
-		// carry a break — so it is left over the line rather than moved down to
-		// buy one indent's worth of room.
+		// A String with no hole cannot break, so it runs past the line rather
+		// than moving down for one indent of room.
 		it("leaves a long String with no hole where it is", () => {
 			let result = format(
 				'implementation {\n\tconstant sentence = "the quick brown fox jumped over the very lazy dog and away"\n}\n',
@@ -2213,10 +2090,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A hole is the only break a String has to offer — the padding
-		// inside its braces is layout, while a newline in the text either side
-		// would be a character. This is the shape a String too long for its line
-		// gives way in, and the text on either side stays whole.
+		// A hole is the only place a String breaks, since a newline in its text
+		// would be a character. The text on either side stays whole.
 		it("breaks a String too long for its line at one of its holes", () => {
 			let result = format(
 				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha::toString()} jumped over the lazy dog {beta::toString()} and away"\n\t}\n}\n',
@@ -2230,9 +2105,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A hole holding nothing but a name is never the one to give:
-		// three lines around one word buy no room worth the tear. The String
-		// runs long instead.
+		// A hole holding only a name never breaks, since three lines around one
+		// word buy no room. The String runs long instead.
 		it("never breaks a hole that holds only a name", () => {
 			let source =
 				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta.value} and away"\n\t}\n}\n'
@@ -2240,8 +2114,8 @@ describe("formatter", () => {
 			expect(format(source).text).toBe(source)
 		})
 
-		// Only as far as it has to — the holes that still fit are left
-		// closed up, so a String gives way at one place rather than every place.
+		// Only the holes it must, so a String breaks at one place rather than
+		// at every hole.
 		it("breaks only the holes it has to", () => {
 			let result = format(
 				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha::toString()} jumped over the lazy dog {beta::toString()} and away"\n\t}\n}\n',
@@ -2250,9 +2124,8 @@ describe("formatter", () => {
 			expect(result.text).toContain("{alpha::toString()}")
 		})
 
-		// The hole that gives is the one the line runs out at, so the text
-		// before it — the part a reader starts on — keeps as much of the line as
-		// it can.
+		// The hole that breaks is the one the line runs out at. So the text a
+		// reader starts on keeps as much of the line as it can.
 		it("leaves a hole closed when breaking it would not help", () => {
 			let source =
 				'implementation {\n\tconstant name = "x"\n\tconstant long = "hello {name} this is a very long string that goes on and on and on and on and on and on past eighty {name} and then it keeps going and going and going for a while longer"\n}\n'
@@ -2378,11 +2251,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The `if` rule — a `{` on a line of its own when the head's
-		// chain breaks — reaches every head whose clauses are indented to the
-		// body's own column: a Handler's Guard, a `match`'s return Type, a
-		// Namespace's or Protocol's `for` and `is` clauses, and a Parameter
-		// list with nothing in it to break before its `->`.
+		// A broken head puts its `{` on a line of its own.
+		// See "Broken heads" in DEVELOPMENT.md.
 		describe("a broken head puts its brace on a line of its own", () => {
 			it("moves a Guard down whole and breaks the body under the brace", () => {
 				expect(
@@ -2465,9 +2335,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A chain of one link used never to break: the link's Argument
-		// list was the only thing on the line that could give way, and
-		// `expect shipping(…)::is(0)` put its `0` on a line of its own.
+		// A chain of one link moves its link down rather than breaking its
+		// Arguments. See "Method chains" in DEVELOPMENT.md.
 		describe("a chain of one link", () => {
 			it("breaks before the link when the head fits its line", () => {
 				expect(
@@ -2489,9 +2358,8 @@ describe("formatter", () => {
 				)
 			})
 
-			// A name dangling above its one link buys nothing — the
-			// link's Arguments still have to break under it — and
-			// `placed::append({` hugging its Record reads better than either.
+			// A name above its one link buys nothing, since the link's
+			// Arguments still break under it.
 			it("keeps a head that is a name fused to its link", () => {
 				expect(
 					formatted(
@@ -2513,9 +2381,7 @@ describe("formatter", () => {
 			})
 		})
 
-		// The corpus writes a blank line after every bodied member by
-		// hand — 1,152 block ends, one exception — so the rule changes nothing
-		// there and guarantees the gap in files the formatter meets cold.
+		// A blank line always follows a member that ends with a block.
 		describe("a blank line after a block", () => {
 			it("writes one after a bodied member, before the next sibling", () => {
 				expect(
@@ -2545,10 +2411,8 @@ describe("formatter", () => {
 			})
 		})
 
-		// An `if` body always opens a block, however short it is. The
-		// corpus writes nine inline ones against a hundred inline `case`
-		// bodies, and a half-flat `else if` chain — one arm on the `if`'s line,
-		// the next opening a block — reads worse than either shape alone.
+		// An `if` body always opens a block, since a half-flat `else if` chain
+		// reads worse than either shape alone.
 		it("always breaks an if body, however short", () => {
 			expect(
 				formatted(
@@ -2559,9 +2423,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The opposite rule for `case`, which is how the corpus writes a
-		// `match` throughout — a hundred of them — and expanding each to three
-		// lines would triple the size of every one.
+		// A short `case` body stays on one line, or every `match` would triple
+		// in size.
 		it("keeps a short case body on one line", () => {
 			let source =
 				'implementation {\n\tconstant a: Integer | Nothing = 1\n\n\tconstant b = match a -> String {\n\t\tcase Nothing { <- "none" }\n\t\tcase Integer { <- @::toString() }\n\t}\n}\n'
@@ -2578,9 +2441,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The corpus was written this way by hand in seven places and had
-		// drifted in the rest — `Protocols.es` aligned the first two Cases of
-		// four and gave up. Deriving it makes the whole `match` line up.
+		// The `{` of adjacent Handlers stands in one column.
+		// See "Match" in DEVELOPMENT.md.
 		describe("case body alignment", () => {
 			let bracesOf = (source: string) =>
 				formatted(source)
@@ -2604,9 +2466,8 @@ describe("formatter", () => {
 				).toEqual([16, 16])
 			})
 
-			// A `where` clause is an arbitrary Expression, and usually the
-			// longest thing in the `match` — padding every sibling out to it
-			// would push the braces right rather than line them up.
+			// A `where` clause is usually the widest thing in the `match`, and
+			// padding siblings out to it would push the braces right.
 			it("leaves a guarded case out of the run", () => {
 				let braces = bracesOf(
 					match(
@@ -2632,10 +2493,8 @@ describe("formatter", () => {
 				).toContain("case Integer { ")
 			})
 
-			// A Handler that breaks opens a block, and the column stops
-			// at it: the Handlers above it and the Handlers below it each line
-			// up among themselves. Carried across the block, the column would
-			// line the block's `{` up with bodies it does not read as one of.
+			// A Handler that breaks opens a block and parts the run, so the
+			// Handlers on each side line up among themselves.
 			it("parts the run at a case that breaks", () => {
 				expect(
 					bracesOf(
@@ -2660,10 +2519,8 @@ describe("formatter", () => {
 				).toEqual([15, 15, 15, 16, 16])
 			})
 
-			// The shape that asked for this: a wide Handler that breaks
-			// and one short one under it. Padded out to the wide Matcher, the
-			// short Handler's answer stood ten columns from the case it
-			// answers, with nothing in between but the broken block's brace.
+			// A short Handler after a wide broken one is not padded out to the
+			// wide Matcher.
 			it("leaves a short case under a broken one unpadded", () => {
 				expect(
 					formatted(
@@ -2675,9 +2532,8 @@ describe("formatter", () => {
 				).toContain("\t\tcase _ { <- 1/2 }\n")
 			})
 
-			// A Handler padded out to a wide sibling can be pushed past
-			// the width by the padding alone. Taken out of the run, it is
-			// written unpadded — and flat, since that is what fits.
+			// A Handler that only its padding would push past the width leaves
+			// the run, and is written unpadded and flat.
 			it("writes a case flat that only its padding would break", () => {
 				let wide =
 					'case #Played({ home, away, homeGoals, awayGoals }) { <- "played" }'
@@ -2700,9 +2556,8 @@ describe("formatter", () => {
 			})
 		})
 
-		// The same alignment the corpus was given for `match` Handlers,
-		// carried to the `=` of a run of adjacent Declarations — the one place a
-		// column lines something up outside a `match`.
+		// The `=` of adjacent Declarations stands in one column.
+		// See "Aligned columns" in DEVELOPMENT.md.
 		describe("assignment alignment", () => {
 			let equalsOf = (source: string) =>
 				formatted(source)
@@ -2731,9 +2586,7 @@ describe("formatter", () => {
 				)
 			})
 
-			// A decimal is one Literal and is measured as one — the
-			// point inside it is not a `=` and not a break, so a run of
-			// Declarations holding decimals lines up like any other.
+			// A decimal is one Literal and is measured as one.
 			it("lines up a run of decimal values", () => {
 				expect(
 					equalsOf(
@@ -2752,8 +2605,7 @@ describe("formatter", () => {
 				).toContain("constant a = 1")
 			})
 
-			// A blank line is how the author says two groups of Declarations
-			// are not one, so the column stops at it.
+			// A blank line ends the column.
 			it("starts a new column after a blank line", () => {
 				expect(
 					equalsOf(
@@ -2768,9 +2620,8 @@ describe("formatter", () => {
 				).toEqual([15, 15, 13, 13])
 			})
 
-			// A value that lays itself out over several lines is left out of
-			// the run, the same as a guarded `case` — it would drag the column
-			// past everything around it.
+			// A value over several lines stays in the run, since its `=` is on
+			// its head's line.
 			it("leaves a multi-line value out of the run", () => {
 				let equals = equalsOf(
 					block(
@@ -2784,8 +2635,8 @@ describe("formatter", () => {
 				expect(equals[1]).toBe(15)
 			})
 
-			// A reassignment writes no keyword, so padding it out to a
-			// Declaration would leave a keyword's worth of empty column mid-run.
+			// A reassignment writes no keyword, so padding it to a Declaration
+			// would leave a keyword's worth of empty column.
 			it("keeps a declaration and a bare reassignment in separate runs", () => {
 				expect(
 					equalsOf(
@@ -2794,11 +2645,8 @@ describe("formatter", () => {
 				).toEqual([17, 8, 8])
 			})
 
-			// A run whose heads span more than the padding budget is split
-			// into blocks that each line up on their own `=`, rather than forced
-			// to one column that a single long typed Declaration would drag right.
-			// Here a group of short Declarations, a pair of medium ones and a pair
-			// of wide ones each line up among themselves.
+			// Heads spanning more than the padding budget split the run into
+			// blocks. Short, medium and wide Declarations each line up apart.
 			it("splits a run into blocks that each line up", () => {
 				expect(
 					equalsOf(
@@ -2816,10 +2664,8 @@ describe("formatter", () => {
 				).toEqual([23, 23, 23, 23, 38, 38, 51, 51])
 			})
 
-			// A head far wider than its neighbours starts its own block, so
-			// it lines up with nothing and drags no sibling's `=` out to meet it. A
-			// short Declaration on either side of it lands in a block of its own
-			// too, and a block of one is left unpadded.
+			// A head far wider than its neighbours starts its own block, and so
+			// do the short ones around it. A block of one is left unpadded.
 			it("gives a wide declaration between short ones its own block", () => {
 				expect(
 					equalsOf(
@@ -2832,8 +2678,7 @@ describe("formatter", () => {
 				).toEqual([12, 50, 13])
 			})
 
-			// Heads of a similar width belong to one block — a run of
-			// uniformly long Declarations lines up like any other.
+			// Heads of a similar width belong to one block, however long.
 			it("aligns a run of uniformly long heads", () => {
 				expect(
 					equalsOf(
@@ -2868,9 +2713,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// Only the outermost list that has to break does. Once `Terminal.inspect(`
-		// is broken its Argument starts a level in, where it fits on one line —
-		// breaking the inner call as well would be gratuitous.
+		// Only the outermost list that has to break does. Once
+		// `Terminal.inspect(` breaks, its Argument fits on one line a level in.
 		it("breaks the outermost argument list that does not fit, and no more", () => {
 			let source =
 				'implementation {\n\tTerminal.inspect("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"::append("bbbbbbbbbbbbbbbbbbbbbbbbbb"))\n}\n'
@@ -2880,8 +2724,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A bare `@` is too small to hold a line of its own, so the first
-		// link of a broken chain stays fused to it.
+		// A bare `@` is too small for a line of its own, so the first link of a
+		// broken chain stays on its line.
 		it("keeps the first link of a broken chain on a bare @'s line", () => {
 			let source =
 				"implementation {\n\tconstant a: Integer | Nothing = 1\n\n\tconstant b = match a -> Boolean {\n\t\tcase Nothing { <- false }\n\t\tcase Integer {\n\t\t\t<- @\n\t\t\t\t::isGreaterThanOrEqualTo(100)\n\t\t\t\t::and(@::isLessThanOrEqualTo(100000))\n\t\t}\n\t}\n}\n"
@@ -2891,10 +2735,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The return clause is measured with the Parameter list as one
-		// header, so a header that does not fit breaks its Parameters — the
-		// return Type follows the `)` whole instead of splitting at a `|` that
-		// lands flush with the body.
+		// The return clause is measured with the Parameter list as one header,
+		// so the Parameters break and the return Type follows the `)` whole.
 		it("breaks the parameter list before ever splitting the return type", () => {
 			let source =
 				"implementation {\n\tconstant minimum = (_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {\n\t\tif firstNumber::isLessThanOrEqualTo(secondNumber) {\n\t\t\t<- firstNumber\n\t\t} else {\n\t\t\t<- secondNumber\n\t\t}\n\t}\n}\n"
@@ -2988,8 +2830,8 @@ describe("formatter", () => {
 			expect(result.text).toContain(fragment)
 		}
 
-		// The AST normalises `1_000` to `1000`, so a printer that reads
-		// the node rather than the source silently deletes the grouping.
+		// The tree holds `1_000` as `1000`, so only the source keeps the
+		// grouping.
 		it("keeps a grouped Number's underscores", () => {
 			roundTrips(
 				"implementation {\n\tconstant a = 1_000_000\n}\n",
@@ -2997,19 +2839,13 @@ describe("formatter", () => {
 			)
 		})
 
-		// A Rational's three Tokens are one literal only while they are
-		// written flush — `1 / 2` is not `1/2`.
+		// A Rational's three Tokens are one literal only while written flush.
 		it("keeps a Rational's parts flush", () => {
 			roundTrips("implementation {\n\tconstant a = 1/2\n}\n", "1/2")
 		})
 
-		// The decimal spelling of a Rational is the author's, and the
-		// node keeps none of it — `0.75` and `3/4` build the same numerator and
-		// denominator, and `1.50` builds one no digit of which is written the
-		// way it was. The printer slices the SOURCE for a Number Literal, which
-		// is what carries the spelling through; this holds it to that. The
-		// underscores and the sign come along for the same ride, and the point
-		// has to stay flush against both digit runs or the Literal is not one.
+		// The node keeps nothing of a decimal's spelling, since `0.75` and
+		// `3/4` build the same Rational. The Printer slices the source for it.
 		it("keeps a decimal exactly as it was written", () => {
 			let source = [
 				"implementation {",
@@ -3024,9 +2860,8 @@ describe("formatter", () => {
 			].join("\n")
 			let result = format(source)
 
-			// A parse error would leave the source untouched too, so the
-			// refusal is asked about first — otherwise this passes on a file
-			// the formatter never read.
+			// A parse error would also leave the source untouched, so the
+			// refusal is checked first.
 			expect(result.refusal).toBeNull()
 			expect(result.changed).toBe(false)
 			expect(result.text).toBe(source)
@@ -3042,10 +2877,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The Type Arguments applied at a construction sit between the
-		// Choice's name and its `#`, and every piece of that has to stay flush —
-		// a `<` on its own line reads as a new declaration, and a `#` off the `>`
-		// is not a construction at all.
+		// The Type Arguments of a construction stand between the Choice's name
+		// and its `#`, and all of it stays flush.
 		it("keeps an applied Case flush through its Type Arguments", () => {
 			roundTrips(
 				"implementation {\n\tchoice C<T> {\n\t\tA { value: T },\n\t}\n\n\tconstant a = C<Integer>#A(1)\n}\n",
@@ -3053,8 +2886,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// FunctionTypeParameter records only the external name, so an
-		// internal one exists in the source and nowhere else.
+		// The node records only the external name, so the internal one comes
+		// from the source.
 		it("keeps the internal name of a Function Type's parameter", () => {
 			roundTrips(
 				"implementation {\n\tfunction run(_ body: (_ value: Integer) -> Nothing) -> Nothing {\n\t\t<- nothing\n\t}\n}\n",
@@ -3062,10 +2895,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// `Type ~> { a = b }` is one typed Record value; dropping the `~>`
-		// still parses, as a constant bound to the Identifier `Type` followed by
-		// a bare untyped Record, so only the safety gate noticed — and a gate
-		// that refuses is a Format Document that silently does nothing.
+		// Without its `~>`, `Type ~> { a = b }` still parses, as a name and an
+		// untyped Record.
 		it("keeps the ~> of a typed record literal", () => {
 			roundTrips(
 				"implementation {\n\tconstant made = Type ~> { member = value }\n}\n",
@@ -3080,8 +2911,7 @@ describe("formatter", () => {
 			)
 		})
 
-		// The empty Record took an early return that answered `{}` before
-		// the Type prefix was ever built, which lost the Type outright.
+		// An empty typed Record keeps its Type.
 		it("keeps the type of an empty typed record literal", () => {
 			roundTrips(
 				"implementation {\n\tconstant made = Type ~> {}\n}\n",
@@ -3089,9 +2919,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The right side of a `with` is unwrapped to bare members only
-		// when the source never braced it — a typed Record always braces
-		// itself, so unwrapping it dropped the `Type ~>` outright.
+		// A typed Record after a `with` always has braces, so it is never
+		// unwrapped to bare members.
 		it("keeps the ~> of a typed record on the right of a with", () => {
 			roundTrips(
 				"implementation {\n\tconstant moved = { point with Point ~> { x = 3, y = 4 } }\n}\n",
@@ -3108,9 +2937,8 @@ describe("formatter", () => {
 			expect(format(once.text).text).toBe(once.text)
 		})
 
-		// The spaces before a line break inside a multi-line String are
-		// characters of the value, so the line-end trimming has to leave them
-		// alone — trimmed, the file means something else and is refused.
+		// The spaces before a line break inside a multi-line String belong to
+		// the value, so the line-end trim leaves them.
 		it("keeps trailing spaces inside a multi-line string", () => {
 			let source =
 				'implementation {\n\tconstant s = "hello   \nworld"\n}\n'
@@ -3138,10 +2966,8 @@ describe("formatter", () => {
 			expect(result.text).toContain(divider)
 		})
 
-		// Documentation attaches to a Declaration by line adjacency, so a
-		// blank line inserted here is valid code that silently loses the docs.
-		// `format`'s own gate compares the parsed Documentation, which is what
-		// makes this checkable at all.
+		// Documentation attaches by line adjacency, so a blank line here would
+		// detach it. The safety gate compares the parsed Documentation.
 		it("never separates a documentation block from what it documents", () => {
 			let source =
 				"implementation {\n\t§§ Doc.\n\tfunction f() -> Nothing {\n\t\t<- nothing\n\t}\n}\n"
@@ -3172,9 +2998,8 @@ describe("formatter", () => {
 			expect(format(source).text).toBe(source)
 		})
 
-		// The true body's brace is not the end of the `if … else` node,
-		// so bounding it by the false body's first Statement swept the `else`
-		// block's leading Comments up into the `if`.
+		// The true body ends at its own `}`, found in the source, so the
+		// Comments at the top of the `else` stay there.
 		it("does not pull an else block's comments into the if", () => {
 			let source =
 				"implementation {\n\tfunction f(_ a: Boolean) -> Integer {\n\t\tif a {\n\t\t\t<- 1\n\t\t} else {\n\t\t\t§ about the else\n\t\t\t<- 2\n\t\t}\n\t}\n}\n"
@@ -3184,9 +3009,8 @@ describe("formatter", () => {
 			expect(result.text).toContain("} else {\n\t\t\t§ about the else")
 		})
 
-		// The inner `<- box` ends on the same line as the whole
-		// Statement, so whichever asked first won — and the printer descends
-		// before it asks.
+		// The inner `<- box` ends on the same line as the Statement, and the
+		// outermost node claims the trailing Comment first.
 		it("gives a trailing comment to the outermost node on its line", () => {
 			let source =
 				"implementation {\n\tconstant list = [1]\n\n\tTerminal.inspect(list::map((box) { <- box }))  § note\n}\n"
@@ -3196,10 +3020,8 @@ describe("formatter", () => {
 			expect(result.text).toContain("})) § note")
 		})
 
-		// A Comment after a `{` belongs to no Statement on either side of
-		// the brace, so nothing claimed it — and `takeBefore` stops at a
-		// Comment that does not start its line, which stalled every Comment
-		// written below it.
+		// A Comment after a `{` belongs to no Statement, so the block claims
+		// it. Unclaimed, it would stall `takeBefore` for every later Comment.
 		it("keeps a comment that trails an opening brace", () => {
 			let source =
 				"implementation {\n\tconstant list = [1]\n\n\tTerminal.inspect(list::map((n) { § why\n\t\t<- n\n\t}))\n\n\t§ still here\n\tconstant after = 2\n}\n"
@@ -3226,10 +3048,8 @@ describe("formatter", () => {
 			expect(format(source).text).toBe(source)
 		})
 
-		// A Handler carries no Position for its own `}`, and its last
-		// Statement's line is only the brace's when the Handler was written
-		// flat — so a Comment trailing a broken Handler's brace was claimed by
-		// nobody and swept to the end of the block.
+		// A Handler has no Position for its own `}`, so the line is found in
+		// the source. The Comment trailing it stays with the Handler.
 		it("keeps a comment that trails a broken handler's closing brace", () => {
 			let source =
 				"implementation {\n\tconstant x = match 1 -> Integer {\n\t\tcase Integer {\n\t\t\t<- 1\n\t\t} § one\n\t\tcase _ { <- 2 }\n\t}\n}\n"
@@ -3240,9 +3060,8 @@ describe("formatter", () => {
 			expect(format(once.text).text).toBe(once.text)
 		})
 
-		// The Handler used to claim this Comment as its own and write it
-		// after the brace — across which the anchor comparison rightly refused
-		// to let it move. It belongs to the Statement, and holds the body open.
+		// This Comment belongs to the Statement, not to the Handler's brace,
+		// and holds the body open.
 		it("keeps a comment that trails the last statement of a handler", () => {
 			let source =
 				"implementation {\n\tconstant x = match 1 -> Integer {\n\t\tcase Integer {\n\t\t\tconstant y = 3\n\t\t\t<- y § note\n\t\t}\n\t\tcase _ { <- 2 }\n\t}\n}\n"
@@ -3253,10 +3072,8 @@ describe("formatter", () => {
 			expect(format(once.text).text).toBe(once.text)
 		})
 
-		// A Comment runs to the end of its line, so a body holding one on
-		// its last Statement can never collapse onto one line — flattened, the
-		// closing brace lands inside the Comment and the output no longer
-		// parses.
+		// A Comment runs to the end of its line, so a body holding one never
+		// collapses onto one line.
 		it("holds a body open around a trailing comment", () => {
 			let source =
 				"implementation {\n\tconstant doubled = [1, 2]::map((n) {\n\t\t<- n::multiplyWith(2) § note\n\t})\n}\n"
@@ -3278,10 +3095,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// `= { … }` at the end of a Case's payload shape — the second place a
-	// default is written, and the same gate protects it: the AST comparison
-	// carries `defaultValue`, so a printer that dropped one would refuse rather
-	// than quietly shorten the declaration.
+	// `= { … }` after a Case's payload shape. The tree comparison carries the
+	// default, so dropping one would be refused.
 	describe("Case payload defaults", () => {
 		function roundTrip(source: string): string {
 			let result = format(source)
@@ -3319,9 +3134,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// `= expression` at the end of a Parameter. Every case round-trips
-	// through `format`, which runs the AST-equality gate itself — a dropped
-	// default is a refusal here, not a silently shortened signature.
+	// `= expression` after a Parameter. The safety gate runs inside `format`,
+	// so a dropped default is a refusal here.
 	describe("Default Parameter Values", () => {
 		function roundTrip(source: string): string {
 			let result = format(source)
@@ -3393,9 +3207,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A trailing block-like default lays itself out over lines of its
-		// own. The header must not break around it — the Parameters before it
-		// stay on the line they were written on.
+		// A trailing default that opens a block leaves the Parameters before
+		// it on their line. See "Parameter lists" in DEVELOPMENT.md.
 		it("does not shatter the header for a trailing block-like default", () => {
 			let formatted = roundTrip(
 				"implementation {\n\tfunction f(_ a: Integer, _ pick: (_ n: Integer) -> Integer = (_ n: Integer) -> Integer {\n\t\t<- n\n\t}) -> Integer {\n\t\t<- a\n\t}\n}\n",
@@ -3406,11 +3219,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The rule above is about a default that HOLDS hard breaks, not
-		// about its kind. `= []` is a List literal that renders flat, so a
-		// header that no longer fits because of it breaks one Parameter per
-		// line, exactly as the same header without the default would — and
-		// exactly as it does with `= [1, 2, 3]`.
+		// `= []` prints flat, so a header it overflows breaks one Parameter per
+		// line, as it would without the default.
 		it("breaks a header around a trailing flat literal default", () => {
 			let source =
 				"implementation {\n\ttype Shape = { width: Integer }\n\n\ttype StatusPair = { index: Integer, status: String }\n\n\tfunction aggregated(at index: Integer, in shape: Shape, given leafStatuses: List<String>, into pairs: List<StatusPair> = []) -> Integer {\n\t\t<- index\n\t}\n}\n"
@@ -3429,8 +3239,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// The other side of the same rule — a `match` default lays
-		// itself out over lines whatever the width, so it still hugs.
+		// A `match` default spans several lines whatever the width, so it
+		// still hugs.
 		it("still hugs a trailing default that holds hard breaks", () => {
 			let formatted = roundTrip(
 				"implementation {\n\tfunction f(_ aVeryLongFirstParameterName: Integer, _ pick: Integer = match 1 -> Integer {\n\t\tcase 1 { <- 1 }\n\t\tcase Integer { <- 2 }\n\t}) -> Integer {\n\t\t<- pick\n\t}\n}\n",
@@ -3441,9 +3251,8 @@ describe("formatter", () => {
 			)
 		})
 
-		// A List literal keeps the Comments written among its items,
-		// so a default holding one is laid out like any other List — broken,
-		// with the Comment above the item it was written above.
+		// A default holding a Comment is laid out like any List, broken, with
+		// the Comment before its item.
 		it("keeps a Comment written inside a default", () => {
 			let source =
 				"implementation {\n\tfunction f(_ items: List<Integer> = [\n\t\t§ the first one\n\t\t1,\n\t\t2,\n\t]) -> List<Integer> {\n\t\t<- items\n\t}\n}\n"
@@ -3454,10 +3263,8 @@ describe("formatter", () => {
 		})
 	})
 
-	// A block's `{` is not on the line its owner starts on once a header
-	// breaks, and every one of these used to ask about the wrong line — an
-	// opening Comment left unclaimed and flushed out of the block, or a
-	// Namespace looking for its brace on the first member's `}`.
+	// Once a header breaks, a block's `{` is not on its owner's first line.
+	// The opening Comment is claimed on the line the `{` is found on.
 	describe("the line a block opens on", () => {
 		it("keeps a comment trailing the brace of a broken header", () => {
 			let source =
@@ -3691,10 +3498,9 @@ describe("formatter", () => {
 		})
 	})
 
-	// What the anchor comparison in `format` exists for. Every bug it
-	// caught was one the AST comparison and a plain comment-text comparison
-	// both passed: each Comment present, in order, and the code meaning the
-	// same thing — only the Comments had moved.
+	// Moves the comment anchors catch, which pass the tree comparison and a
+	// plain comparison of Comment texts. See "Comment anchors" in
+	// DEVELOPMENT.md.
 	describe("the safety gate", () => {
 		it("holds every comment in place among the tokens around it", () => {
 			let source =
