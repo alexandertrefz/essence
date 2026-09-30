@@ -163,8 +163,6 @@
 	"packages/compiler/src/parser/descent/parse.ts": {"sentence-length": 426, "em-dash": 342, "all-caps": 198, "history": 10, "position": 29, "block-length": 97, "counts": 4},
 	"packages/compiler/src/parser/descent/tokenStream.ts": {"sentence-length": 34, "em-dash": 27, "all-caps": 21, "history": 2, "position": 1, "block-length": 8},
 	"packages/compiler/src/parser/documentation.ts": {"sentence-length": 15, "em-dash": 12, "all-caps": 4, "position": 1},
-	"packages/compiler/src/parser/index.ts": {"em-dash": 1},
-	"packages/compiler/src/parser/nodeGenerators.ts": {"sentence-length": 3, "em-dash": 7},
 	"packages/compiler/src/printType.ts": {"sentence-length": 19, "em-dash": 20, "all-caps": 10, "position": 2, "block-length": 4},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
