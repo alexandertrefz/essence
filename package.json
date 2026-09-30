@@ -12,6 +12,7 @@
 		"check": "oxlint --fix && oxfmt",
 		"lint": "oxlint --deny-warnings",
 		"format:check": "oxfmt --check",
+		"comments:baseline": "bun scripts/updateCommentBaseline.ts",
 		"generate:natives": "bun run --cwd packages/compiler generate:natives",
 		"generate:schema": "bun scripts/generateProjectSchema.ts",
 		"generate:snippets": "bun scripts/generateSnippets.ts",

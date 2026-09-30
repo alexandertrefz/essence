@@ -16,6 +16,7 @@
 	"ignorePatterns": [
 		"coverage/**/*",
 		"packages/runtime/src/natives.generated.ts",
+		"scripts/tests/commentProse.baseline.json",
 		"packages/vscode-extension/schemas/essence.schema.json",
 		"packages/website/public/schemas/essence.schema.json",
 		"packages/escodegen/**",
