@@ -169,3 +169,44 @@ Every Program carries `type.ts`. It walks a List's runs and a Dictionary's live 
 run, with both counts fixed first. A Dictionary's live view is its `store.slots` in insertion order, each at the
 newest version the box's generation can see. A removal's tombstone is a symbol, and every Essence value is an
 object or a Function, so `everyLiveEntry` recognises a tombstone by `typeof`.
+
+## Transcendental numbers
+
+A `Transcendental` is a value in the linear span of a registry of named constants: `rationalPart + Σ coefficient·base`
+with at least one term. The rational part and every coefficient are reduced bigint rationals. `createTranscendental`
+is the gateway. It merges terms by base, drops zero coefficients and orders the terms by the registry. It answers a
+`Rational` when no term is left. So two values are equal exactly when their parts are, and `is` compares them field by
+field.
+
+The registry in `Transcendental.ts` maps each base's symbol to its place in the order and to an enclosure routine.
+Adding a constant is a registry entry and an enclosure, not a change to the arithmetic. Every base has to be a
+provably transcendental constant, since the sign decisions rely on it. The order is written into each entry rather
+than derived by a second top-level Map. A bundler can not prove such a call pure, so it would keep the module in
+every Program.
+
+### Deciding a Transcendental's sign
+
+Comparisons, `absolute` and `isPositive` all come down to the sign of a form `A + Σ B·base`.
+
+A form over one base is never zero, since that would make the base rational. `signOfSingleBaseForm` compares the base
+against the rational `−A/B`, refining the base's enclosure until the two separate. That always ends.
+
+Whether a form over several bases, such as `π − e`, can ever be zero is an open problem. It is conjectured not to be,
+by Schanuel's conjecture. `signOfMixedForm` doubles the precision until the enclosure clears zero, and throws at
+`precisionCutoffDigits` rather than loop forever. Against an `Algebraic`, `signRelativeTo` refines both enclosures
+the same way, and a single-base value always separates from an algebraic one.
+
+A Transcendental is never zero for the same reasons, and one with no terms is a Rational already. So `absolute` is
+the value or its negation, whichever is greater, and `isNegative` is `isPositive` negated.
+
+`compare(to:withPrecision:)` does not refine. It encloses the difference once, with enough guard digits that the
+enclosure is narrower than one unit of the last place asked for. An enclosure clear of zero is the sign, and one that
+straddles zero answers empty. So two values a unit of that place or more apart are always told apart, and the cutoff
+is never reached.
+
+### Reading a Transcendental's digits
+
+`round`, `approximate` and `decimalExponent` refine the value's enclosure until the question at the asked width is
+decided, through the grid readers in `Algebraic.ts`. A single-base value is irrational, so it never sits on a
+rounding step or a power of ten, and the refinement ends. A several-base value sitting on one would make a form such
+as `b·π + c·e` rational, so those readings stop at the same cutoff and throw.

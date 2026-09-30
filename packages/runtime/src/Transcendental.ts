@@ -28,27 +28,15 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// The linear span of the transcendentals over a registry of named
-// constant bases: every value is `rationalPart + Σ coefficient·base` with at
-// least one term, held as reduced bigint rationals over canonically-ordered,
-// zero-free terms. The basis is DATA — adding a constant is a registry entry
-// and an enclosure routine, not a change to the arithmetic. Within this
-// grammar equality is canonical-form equality. A value with a SINGLE term can
-// never equal an Integer, Rational or Algebraic — each registered base is
-// provably transcendental — which keeps those comparisons total. A value
-// carrying SEVERAL bases is different: whether such a combination can ever be
-// algebraic is an open problem (already for π + e), so the comparisons that
-// meet one run an interval refinement that terminates unless the two values
-// are equal — conjecturally never (Schanuel) — and give up at a deep,
-// documented precision cutoff instead of looping forever.
+// A Transcendental is `rationalPart + Σ coefficient·base` over a registry of
+// named constants. See "Transcendental numbers" in DEVELOPMENT.md.
 
 // #region Basis registry
 
 type ScaledEnclosure = (digits: bigint) => { low: bigint; high: bigint }
 
-// floor(π·10^digits) and its successor via Machin's formula,
-// π = 16·arctan(1/5) − 4·arctan(1/239), on scaled bigints. A few guard
-// digits absorb the truncation of the two series.
+// An enclosure of π·10^digits, three units wide, from Machin's formula
+// π = 16·arctan(1/5) − 4·arctan(1/239). Guard digits absorb the truncation.
 function scaledPi(digits: bigint): { low: bigint; high: bigint } {
 	const guardDigits = 8n
 	const scale = 10n ** (digits + guardDigits)
@@ -79,10 +67,8 @@ function scaledPi(digits: bigint): { low: bigint; high: bigint } {
 	}
 }
 
-// floor(e·10^digits) and its successor via the factorial series,
-// e = Σ 1/k!, on scaled bigints — each term is the previous one divided by
-// the next k, so the series needs no factorials of its own. The same guard
-// digits absorb the truncation.
+// An enclosure of e·10^digits, three units wide, from the series e = Σ 1/k!.
+// Each term is the previous one divided by the next k.
 function scaledE(digits: bigint): { low: bigint; high: bigint } {
 	const guardDigits = 8n
 	const scale = 10n ** (digits + guardDigits)
@@ -105,20 +91,9 @@ function scaledE(digits: bigint): { low: bigint; high: bigint } {
 	}
 }
 
-// Everything the rest of this module knows about a base: the symbol a
-// term prints under — also its identity in the representation — the place it
-// takes in canonical term order, which is what keeps structural equality a
-// plain walk, and a certified enclosure of its value. Every entry must be a
-// PROVABLY transcendental constant: single-term totality rests on it, and
-// `createTranscendental` is gated on membership here.
-//
-// The order rides in the registry so that a third base can not be
-// registered without one — a second Map deriving it, `new Map([...bases.keys()]
-// .map(…))`, is a top-level call no bundler can prove pure, and it pinned this
-// module and the two series behind it into every Program: 1,190 bytes of a
-// HelloWorld that names no constant at all. Deriving the order lazily inside
-// `orderOf` shakes the same way and costs 83 bytes more wherever the tower is
-// genuinely used.
+// A base's place in the canonical term order and its enclosure. Every entry
+// must be a provably transcendental constant. The order lives in each entry,
+// since a Map derived at the top level would keep this module in every bundle.
 type Base = { order: number; enclosure: ScaledEnclosure }
 
 const bases = new Map<string, Base>([
@@ -156,17 +131,15 @@ export type TranscendentalType = {
 	[typeKeySymbol]: "Transcendental"
 	rationalPartNumerator: bigint
 	rationalPartDenominator: bigint
-	// Canonically ordered by base registration, free of zero
-	// coefficients, at most one term per base, never empty — `createTranscendental`
-	// enforces all four, and everything below relies on them.
+	// INVARIANT: ordered by the registry, one term per base, no zero
+	// coefficient, never empty. `createTranscendental` enforces it.
 	terms: Array<TranscendentalTerm>
 }
 
 // #region Construction
 
-// The canonical term list of a coefficient map: reduced, zero-free,
-// in registration order. Shared by the gateway and by the difference forms
-// the comparisons build.
+// The canonical terms of a coefficient list: merged by base, reduced,
+// zero-free and in registry order. An unregistered base throws.
 function canonicalTerms(
 	coefficients: ReadonlyArray<{ base: string; coefficient: BigRational }>,
 ): Array<TranscendentalTerm> {
@@ -264,11 +237,8 @@ function scaledCoefficients(
 
 // #region Sign decisions
 
-// The refinement depth at which the conjecturally-total comparisons stop.
-// Only a comparison whose difference carries SEVERAL bases can reach it —
-// deciding such a tie would settle an open problem (is `b·π + c·e` ever
-// algebraic?), so past this depth the runtime reports the impasse instead of
-// looping forever.
+// The depth at which a sign decision over several bases gives up. Deciding
+// such a tie would settle an open problem.
 const precisionCutoffDigits = 32768n
 
 function throwPrecisionCutoff(): never {
@@ -281,11 +251,8 @@ function throwPrecisionCutoff(): never {
 	)
 }
 
-// The same cutoff met by a reader of digits rather than by a comparison.
-// Nothing on those paths has two numbers in hand, and the enclosure the reading
-// needs may never have been taken at all — a grid at or past the cutoff is
-// refused before the first one — so the caller passes what it was reading and
-// the message claims no depth that two values agreed to.
+// The cutoff met while reading digits. Two values never agreed to a depth
+// here, so the message names the reading instead.
 function throwPrecisionCutoffForReading(reading: string): never {
 	throw new Error(
 		`${reading} exceeded the precision cutoff of ` +
@@ -296,8 +263,8 @@ function throwPrecisionCutoffForReading(reading: string): never {
 	)
 }
 
-// A certified enclosure of `rationalPart + Σ coefficient·base`, scaled
-// by 10^digits. Each base's enclosure is computed only when a term carries it.
+// A certified enclosure of `rationalPart + Σ coefficient·base`, scaled by
+// 10^digits. A base's enclosure is computed only when a term carries it.
 function scaledFormInterval(
 	rationalPart: BigRational,
 	terms: ReadonlyArray<TranscendentalTerm>,
@@ -340,9 +307,8 @@ export function scaledTranscendentalInterval(
 	)
 }
 
-// The sign of `base − rational` for a provably irrational base. The loop
-// terminates *because* the base can never equal the rational, so the
-// enclosures must eventually separate.
+// The sign of `base − rational`. The loop ends because an irrational base
+// never equals the rational, so the enclosures separate.
 function signOfBaseMinusRational(
 	base: ScaledEnclosure,
 	rational: BigRational,
@@ -363,9 +329,8 @@ function signOfBaseMinusRational(
 	}
 }
 
-// The sign of `A + B·base` with B ≠ 0 — such a value being zero would
-// make the base rational, so the sign is decided by comparing the base against
-// the rational threshold −A/B. Total, no cutoff needed.
+// The sign of `A + B·base` with B ≠ 0, from comparing the base against −A/B.
+// Total. See "Deciding a Transcendental's sign" in DEVELOPMENT.md.
 function signOfSingleBaseForm(
 	base: ScaledEnclosure,
 	rationalPart: BigRational,
@@ -385,9 +350,7 @@ function signOfSingleBaseForm(
 		: (-baseSideSign as -1n | 1n)
 }
 
-// The sign of a form carrying several bases. Zero here would settle an
-// open problem — conjecturally impossible (Schanuel), never witnessed — so
-// the refinement runs to the documented cutoff.
+// The sign of a form over several bases, refined up to the cutoff.
 function signOfMixedForm(
 	rationalPart: BigRational,
 	terms: ReadonlyArray<TranscendentalTerm>,
@@ -409,9 +372,6 @@ function signOfMixedForm(
 	}
 }
 
-// The sign of a non-zero `A + Σ B·base` with at least one term — the
-// single-base case is exact and total, only a several-base form runs the
-// cutoff refinement.
 function signOfForm(
 	rationalPart: BigRational,
 	terms: ReadonlyArray<TranscendentalTerm>,
@@ -429,12 +389,8 @@ function signOfForm(
 	return signOfMixedForm(rationalPart, terms)
 }
 
-// The sign of `transcendental − other` for any non-transcendental
-// operand. Against an Integer or Rational the difference is again a form this
-// module can sign directly. Against an Algebraic the loop refines both
-// enclosures; it terminates whenever the transcendental carries a single base
-// — equality across those kinds is provably impossible — and runs to the
-// documented cutoff when it carries several.
+// The sign of `transcendental − other`. Against an Algebraic both enclosures
+// are refined, and only a value over several bases can reach the cutoff.
 export function signRelativeTo(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType | AlgebraicType,
@@ -473,12 +429,8 @@ export function signRelativeTo(
 
 // #region Methods
 
-// Canonical-form equality, decided structurally: `createTranscendental`
-// reduces, orders and de-zeroes every component, so two values are the same
-// number exactly when their rational parts and term lists agree. Native
-// because this Namespace has no ordering to write equality on — the Essence
-// body it replaces asked the covering `Number`, which put the whole numeric
-// tower behind an equality check.
+// Canonical forms are unique, so equality compares the fields. Native because
+// this Namespace has no ordering to write equality on.
 export function is(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -502,15 +454,8 @@ export function is(
 	)
 }
 
-// A Transcendental is never zero — a single-term `a + b·B = 0` with
-// b ≠ 0 would make that base rational, a several-base zero would settle an
-// open problem, and a value with no terms is a Rational at construction — so
-// it is below its own negation exactly when it is negative, and the comparison
-// below decides that with no zero value to build. Native because the sign
-// reaches no primitive this Namespace declares: Transcendental deliberately
-// does not conform to Comparable, and the Essence body this replaces borrowed
-// the covering `Number`'s ordering, dragging the whole numeric tower behind an
-// absolute value.
+// A Transcendental is never zero, so it is below its negation exactly when it
+// is negative. Native because the Namespace is not `Comparable`.
 export function absolute(
 	transcendental: TranscendentalType,
 ): TranscendentalType {
@@ -522,10 +467,7 @@ export function absolute(
 		: transcendental
 }
 
-// `transcendental − other`, which is again a form in the span: the
-// rational parts' difference and the canonical terms of the coefficients'
-// differences, with the terms that cancelled gone. Both comparisons below are
-// read off it.
+// `transcendental − other`, again a form in the span, with cancelled terms gone.
 function differenceForm(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -550,9 +492,6 @@ function orderingOfRational(rational: BigRational): OrderingType {
 	return rational.numerator < 0n ? less : greater
 }
 
-// The sign of the difference form is decided by `signOfForm` — exactly
-// for single-base differences, through the cutoff refinement for several-base
-// ones.
 export function compareTranscendentals(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -566,10 +505,8 @@ export function compareTranscendentals(
 	return signOfForm(rationalPart, terms) < 0n ? less : greater
 }
 
-// How wide `scaledFormInterval` is, in units of its own scale: the
-// rational part contributes 4, and each term 4 plus three times its
-// coefficient, since a base's enclosure is three units wide and the
-// coefficient scales it. Read by the bounded comparison to pick guard digits.
+// The width of `scaledFormInterval` in units of its scale: 4 for the rational
+// part, and for each term 4 plus three times its coefficient's ceiling.
 function scaledFormWidth(terms: ReadonlyArray<TranscendentalTerm>): bigint {
 	let width = 4n
 
@@ -588,20 +525,9 @@ function scaledFormWidth(terms: ReadonlyArray<TranscendentalTerm>): bigint {
 	return width
 }
 
-// The bounded form of the comparison above, and the one Method of the
-// Namespace named `compare`. The difference form is enclosed once and the
-// answer is read off that enclosure: an interval clear of zero is a sign, an
-// interval straddling zero is empty. A difference whose terms all cancelled is
-// a Rational and is signed exactly whatever the width.
-//
-// The enclosure is computed with enough guard digits that it is UNDER one unit
-// of the caller's last decimal place wide — `scaledFormWidth` units at the
-// guarded scale, which the guard's power of ten exceeds. That is what makes the
-// promise in the §§ block true in both directions: two values a unit of the
-// last place or more apart can not share an interval that narrow with zero, so
-// they are always told apart, and empty is answered only for two closer than
-// that. Nothing here refines, so nothing reaches the precision cutoff — that is
-// what a caller buys by naming a width, and why the answer is an Optional.
+// The bounded comparison: the difference is enclosed once, with guard digits
+// that make the enclosure narrower than one unit of the last place. It never
+// refines. See "Deciding a Transcendental's sign" in DEVELOPMENT.md.
 export function compare(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -676,10 +602,7 @@ export function divide(
 	)
 }
 
-// `divide` under the proof its refined entries carry. The divisor is a
-// `NonZeroInteger` or a `NonZeroRational` in the source, so the zero test above
-// it can not fire and the Optional always holds a value. A read of that value
-// rather than a second division: the arithmetic stays in one place.
+// `divide` for a divisor proven not zero, which always holds a value.
 export function divideByNonZero(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType,
@@ -697,11 +620,8 @@ export function addTranscendental(
 	)
 }
 
-// A quotient of two values in the span is representable exactly when
-// they are proportional — π/π = 1, Tau/Pi = 2, (1 + π)/(2 + 2·π) = 1/2 — and
-// proportionality is componentwise: the term lists must carry the same bases,
-// every part must scale by the same ratio, read off the divisor's first term.
-// Anything else — π/e most famously — leaves the grammar and comes back empty.
+// A quotient is a Rational exactly when the two values are proportional: same
+// bases, and every part scaled by one ratio. Anything else, like π/e, is empty.
 export function divideByTranscendental(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
@@ -745,9 +665,7 @@ export function divideByTranscendental(
 	return createValue(createRational(ratio.numerator, ratio.denominator))
 }
 
-// Negation flips the rational part and every term, and cannot create a
-// zero coefficient or disturb the canonical order, so the result stays a
-// Transcendental without consulting the `createTranscendental` gateway.
+// Negation keeps the terms canonical, so it skips `createTranscendental`.
 export function negate(transcendental: TranscendentalType): TranscendentalType {
 	return {
 		[typeKeySymbol]: "Transcendental",
@@ -761,27 +679,17 @@ export function negate(transcendental: TranscendentalType): TranscendentalType {
 	}
 }
 
-// The sign of the value, which `signOfForm` decides — exactly for a value
-// over one base, and through the cutoff refinement for one over several. Native
-// for the reason `absolute` above is: this Namespace declares no ordering to
-// write a sign on, and reading the covering `Number`'s puts the whole numeric
-// tower behind a sign test. `isNegative` is not here — a Transcendental is
-// never zero, so it is this question negated, and it is written in Essence.
+// Native because the Namespace declares no ordering. `isNegative` is this
+// negated, in Essence, since a Transcendental is never zero.
 export function isPositive(transcendental: TranscendentalType): BooleanType {
 	return createBoolean(
 		signOfForm(rationalPartOf(transcendental), transcendental.terms) > 0n,
 	)
 }
 
-// The three Methods that hand a Transcendental to a reader as digits, and
-// the seam the linear span pays its one conjectural price at. The enclosure of
-// the value is refined until the question at the width asked for is decided. A
-// value over a SINGLE base is irrational outright, so it never sits on the
-// point a rounding rule steps at, is never a power of ten, and the refinement
-// always ends. A value over several bases sitting on either point would make
-// `b·π + c·e` rational, which is an open problem, so that one refines to the
-// same cutoff every other several-base decision runs to and reports the impasse
-// there.
+// Refines the enclosure until the rounding at `places` is decided. Only a
+// value over several bases can reach the cutoff. See "Reading a
+// Transcendental's digits" in DEVELOPMENT.md.
 function roundedTranscendental(
 	transcendental: TranscendentalType,
 	places: bigint,
@@ -886,20 +794,15 @@ export function toString(transcendental: TranscendentalType): StringType {
 
 // #region Overload wrappers
 
-// The Rewriter addresses Overloads by index — these bind the generic
-// implementations to the Namespace's declared Overload order.
+// The Rewriter addresses Overloads by index, so these bind each entry in the
+// Namespace's declared order.
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addTranscendental
 export const multiply__overload$1 = multiply
 export const multiply__overload$2 = multiply
-// The refined entries take the same Integer the plain ones do — a
-// refinement erases before anything runs — and answer the narrower Type the
-// proof affords: a non-zero factor scales the rational part and every base
-// coefficient without taking one to zero, so at least one term survives and the
-// value can not collapse to a Rational. The product is the very implementation
-// above under a narrower signature, which is what keeps a proven call and an
-// unproven one the same arithmetic.
+// A non-zero factor takes no coefficient to zero, so the proven entries answer
+// a Transcendental. The arithmetic is the same.
 export const multiply__overload$3 = multiply as (
 	transcendental: TranscendentalType,
 	other: IntegerType,
@@ -920,9 +823,7 @@ export const divide__overload$8 = divideByNonZero as (
 	other: RationalType,
 ) => TranscendentalType
 
-// `round` answers an Integer as the first entry of its Overload; the
-// second is written in Essence on `approximate`. `toString` is the first entry
-// of its own, and the two `as:` entries beside it are Essence.
+// The other entries of `round` and `toString` are written in Essence.
 export const round__overload$1 = round
 export const toString__overload$1 = toString
 
