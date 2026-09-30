@@ -53,3 +53,9 @@ whole pipeline behind `essence build`,
 `embed` to load an Essence Module from JavaScript, and
 [`@essence-lang/language-server`](https://www.npmjs.com/package/@essence-lang/language-server)
 runs the analysis half of it over an editor's documents.
+
+## Development
+
+Working on the compiler itself, from the stages and the three ASTs to what
+adding a node kind takes, is covered in
+[DEVELOPMENT.md](https://github.com/alexandertrefz/essence/blob/master/packages/compiler/DEVELOPMENT.md).
