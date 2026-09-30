@@ -88,7 +88,6 @@
 	"packages/client/src/vite-plugin.ts": {"sentence-length": 18, "em-dash": 14, "all-caps": 8, "block-length": 3},
 	"packages/client/src/watch.ts": {"sentence-length": 17, "em-dash": 14, "all-caps": 10, "position": 1, "block-length": 1},
 	"packages/compiler/src/analysis.ts": {"sentence-length": 11, "em-dash": 9, "all-caps": 7, "block-length": 2, "counts": 1},
-	"packages/compiler/src/bundler/index.ts": {"sentence-length": 15, "em-dash": 11, "all-caps": 1, "position": 1, "block-length": 4},
 	"packages/compiler/src/cache/index.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 12, "position": 3, "block-length": 5, "counts": 1},
 	"packages/compiler/src/cache/snapshot.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 4, "history": 1, "position": 2, "block-length": 1},
 	"packages/compiler/src/compileMode.ts": {"sentence-length": 11, "em-dash": 5, "all-caps": 8, "position": 1, "block-length": 1},
