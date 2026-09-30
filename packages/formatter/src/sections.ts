@@ -2,13 +2,8 @@ import type { parser } from "@essence-lang/interfaces"
 
 import type { SectionSpan } from "./trivia"
 
-// The canonical order of a Module section is more than a Formatter's
-// preference: dispatch over imported Namespaces is defined to follow this same
-// order — sorted, never written — so re-sorting a block can never change which
-// Namespace a Method call resolves to.
-//
-// Compared by code unit rather than by locale, because every machine that
-// formats or compiles the file has to agree on the result.
+// By code unit rather than by locale, so that every machine agrees.
+// See "Module sections" in DEVELOPMENT.md.
 function compareStrings(left: string, right: string): number {
 	if (left === right) {
 		return 0
@@ -32,16 +27,14 @@ function compareKeys(left: Array<string>, right: Array<string>): number {
 	return 0
 }
 
-// The local name an entry binds under, which is what tells two entries
-// naming the same thing from the same file apart. Only `as` can produce that
-// pair, and it is a Diagnostic — but the Formatter still has to write it the
-// same way every time.
+// Tells apart two entries that name one thing from one file, which only `as`
+// can write. They still have to come out in the same order every time.
 function localName(entry: parser.ImportNode | parser.ExportNode): string {
 	return entry.alias === null ? "" : entry.alias.content
 }
 
-// The order of the names inside one group, and of the bare names of an
-// export block: by the exported name, then by the local one.
+// The order of the names in a group, and of the bare names of an export
+// block.
 export function compareEntries(
 	left: parser.ImportNode | parser.ExportNode,
 	right: parser.ImportNode | parser.ExportNode,
@@ -52,21 +45,14 @@ export function compareEntries(
 	)
 }
 
-// What a group is ordered by: its specifier, and the names inside it —
-// the shape of a group node, and of what the printer holds while it lays one
-// out.
+// A group node, or what the Printer holds while it lays one out.
 type GroupHead = {
 	source: parser.ModuleSpecifierNode
 	entries: Array<{ name: parser.IdentifierNode }>
 }
 
-// Groups are ordered by specifier. Two groups written for one file are
-// left as two — merging them would have to decide which of them keeps its
-// Comments — and stand next to each other, ordered by the first name in each,
-// which is where a reader finds them to fold together.
-//
-// Asked of groups whose entries are already in order, since that first name
-// is what they are compared on.
+// Two groups for one file stay two, ordered by their first names, so their
+// entries have to be sorted first.
 export function compareGroups(left: GroupHead, right: GroupHead): number {
 	return compareKeys(
 		[left.source.path, left.entries[0]?.name.content ?? ""],
@@ -74,8 +60,6 @@ export function compareGroups(left: GroupHead, right: GroupHead): number {
 	)
 }
 
-// Every group with its names in order, and the groups in order among
-// themselves.
 export function sortedGroups<
 	Group extends parser.ImportGroupNode | parser.ExportGroupNode,
 >(groups: Array<Group>): Array<Group> {
@@ -89,17 +73,8 @@ export function sortedGroups<
 		.sort(compareGroups)
 }
 
-// The same Program with both Module sections in canonical order. Sorting
-// a block is the one thing the Formatter is allowed to reorder, and the gate
-// that compares the AST before and after formatting reads the entry lists in
-// order — so both sides are brought into canonical order before they are
-// compared, rather than the reordering being waved through wholesale.
-//
-// `entries` is rebuilt from the sorted groups, because it is the flat list in
-// written order and the written order is what the sort changes. What a Module
-// declares itself comes first in an export block, then what it forwards — a
-// re-export names another file rather than anything in this one, so the two
-// read as separate lists even though they share a block.
+// Rebuilds the flat `entries` list too, which is in written order. An export
+// block lists what the Module declares before what it forwards.
 export function canonicalSections(program: parser.Program): parser.Program {
 	let imports = program.imports
 	let exports = program.exports
@@ -130,13 +105,9 @@ export function canonicalSections(program: parser.Program): parser.Program {
 	return { ...program, imports, exports }
 }
 
-// Read off the Program as it was written, never off a canonicalised copy:
-// the anchor comparison groups each entry with the Comments around it by the
-// same written order the trivia cursor walks.
-//
-// An entry is keyed by the specifier of its group, and a bare export entry by
-// nothing, so that a Comment moving from the `Optional` of one group to the
-// `Optional` of another is still a Comment that moved.
+// Read off the Program as written, never off a sorted copy. The key tells an
+// entry from its namesake in another group. See "Comment anchors" in
+// DEVELOPMENT.md.
 export function sectionSpans(program: parser.Program): Array<SectionSpan> {
 	let spans: Array<SectionSpan> = []
 

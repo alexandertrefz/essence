@@ -4,24 +4,18 @@ import { type common, lexer } from "@essence-lang/interfaces"
 const TokenType = lexer.TokenType
 
 export type Comment = {
-	// Verbatim, sigil included and line break excluded, exactly as the
-	// Lexer read it — bar the whitespace at its end, which is trailing
-	// whitespace like any other. Comments are never reflowed — the corpus
-	// contains divider rules and hand-wrapped prose that re-wrapping would
-	// destroy — so the text is only ever moved, never rewritten.
+	// As the Lexer read it, sigil included, trailing whitespace trimmed. It is
+	// moved but never rewritten. See "Placing comments" in DEVELOPMENT.md.
 	text: string
 	startLine: number
 	endLine: number
-	// A Comment with nothing but whitespace before it on its line belongs
-	// to whatever comes below it; one that follows code belongs to the line it
-	// is on.
+	// Whether only whitespace stands before it on its line. Then it belongs to
+	// what follows it rather than to its line.
 	ownLine: boolean
 }
 
-// The parser's TokenStream drops Comments and Linebreaks before the
-// parser ever sees them, and diverts Documentation into a line-keyed map. A
-// Lexer constructed here without any `ignore` call keeps all of it, which is
-// why the formatter needs no change to the parser at all.
+// A Lexer with no `ignore` call keeps the Comments and line breaks that the
+// parser's token stream drops.
 export function collectComments(source: string): Array<Comment> {
 	let sourceLexer = new Lexer()
 	sourceLexer.reset(source)
@@ -50,31 +44,23 @@ export function collectComments(source: string): Array<Comment> {
 			token = sourceLexer.next()
 		}
 	} catch {
-		// The Lexer's one fatal case is an unterminated String. `format`
-		// refuses any source that produced parse Diagnostics before it ever
-		// gets here, so reaching this means the Comments gathered so far are
-		// all there were to gather.
+		// The Lexer throws only on an unterminated String, and `format` refuses
+		// a source that does not parse before it gets here.
 	}
 
 	return comments
 }
 
-// Where one Module section stands, where each of its groups was written,
-// and where each of its entries was — in written order, which is the order the
-// Comments around them were claimed in. An entry's `key` is the specifier of
-// the group it is written in, or nothing for a bare export entry.
+// A Module section's groups and entries in written order. An entry's `key` is
+// its group's specifier, or empty for a bare export entry.
 export type SectionSpan = {
 	position: common.Position
 	groups: Array<common.Position>
 	entries: Array<{ position: common.Position; key: string }>
 }
 
-// One entry's share of a Module section, and one group's: its own Tokens
-// together with the Comments that ride with it. A group's share is its `from`,
-// its specifier and its braces — the Tokens inside it that are no entry's —
-// with the Comments written against those. The chunks of a section are
-// compared as a set, which is what lets the block be sorted while still
-// catching a Comment that changed which entry or group it belongs to.
+// A section's anchors, one chunk per entry and per group. A group's chunk holds
+// its `from`, its specifier, its braces and their Comments.
 type SectionChunks = {
 	span: SectionSpan
 	groups: Array<Array<string>>
@@ -88,24 +74,9 @@ function compareCursors(left: common.Cursor, right: common.Cursor): number {
 		: left.line - right.line
 }
 
-// Where each Comment sits among the code around it, as one flat
-// sequence: every Token in order, with Comments in their places.
-//
-// Comparing the sequence before and after formatting is what catches a Comment
-// that was MOVED rather than lost. Comparing the Comments alone cannot: a block
-// written inside an `else` that gets split across the `} else {` above it keeps
-// every Comment, in order, and reads as untouched.
-//
-// Commas are dropped because formatting legitimately adds one when it breaks a
-// list, and that is the only Token it ever adds — everything else about the
-// code is already held identical by the AST comparison.
-//
-// `sections` names the Module sections, the one place where the sequence is
-// deliberately allowed to change: those blocks are written in canonical order,
-// so their entries come out sorted rather than as they were read. Each entry is
-// compared as one chunk carrying the Comments written around it, and the chunks
-// as a set — a Comment that moved to another entry, or off the entry it was
-// written against, still fails.
+// Every Token but the commas in order, with each Comment in its place. A
+// Module section adds its chunks sorted. See "Comment anchors" in
+// DEVELOPMENT.md.
 export function commentAnchors(
 	source: string,
 	sections: Array<SectionSpan> = [],
@@ -121,9 +92,8 @@ export function commentAnchors(
 	let anchors: Array<string> = []
 	let lastCodeLine = 0
 
-	// Sorted, so that the block having been reordered does not show up as a
-	// difference, and joined per chunk, so that a Comment moving from one entry to
-	// another does.
+	// Sorted, so a reordered section compares equal. Joined per chunk, so a
+	// Comment that moved to another entry does not.
 	let closeSection = (section: SectionChunks) => {
 		let written = [
 			...section.groups,
@@ -175,8 +145,7 @@ export function commentAnchors(
 			let isComment =
 				token.type === TokenType.Comment ||
 				token.type === TokenType.DocComment
-			// A Comment's trailing whitespace is trimmed on the way out,
-			// so it is compared without it here too.
+			// Without trailing whitespace, which the Printer trims.
 			let anchor = isComment
 				? "§" + token.value.trimEnd()
 				: token.type + " " + token.value
@@ -199,7 +168,7 @@ export function commentAnchors(
 			token = sourceLexer.next()
 		}
 	} catch {
-		// See `collectComments` — unreachable for a source that parsed.
+		// Unreachable for a source that parsed, as in `collectComments`.
 	}
 
 	if (open !== null) {
@@ -209,18 +178,9 @@ export function commentAnchors(
 	return anchors
 }
 
-// Which entry or group a Token inside a Module section rides with, or
-// null for one that keeps its place in the sequence — the `import` Keyword, the
-// section's braces, and a Comment trailing the section's `{` itself, none of
-// which the sort can move.
-//
-// The rule is the printer's own. Code belongs to the entry it is written in,
-// else to the group. A Comment that follows code belongs to the entry ending
-// on its line, else to the group opening or closing on it — so the note after
-// a group written flat, `from "./A.es" { Amount } § note`, is the entry's. One
-// that starts its line belongs to the entry below it inside the same group,
-// else to the group it is written in, else to the entry or group below it,
-// else to no one.
+// The chunk a Token in a Module section rides with, or null for a Token the
+// sort cannot move. The rule is the Printer's own. See "Comment anchors" in
+// DEVELOPMENT.md.
 function chunkFor(
 	section: SectionChunks,
 	token: lexer.Token,
@@ -328,20 +288,16 @@ function chunkFor(
 		return below.chunk
 	}
 
-	// A Comment written below the last entry belongs to no entry at all —
-	// the printer flushes it before the closing brace, and it is still held to
-	// being present.
+	// A Comment after the last entry, which the Printer writes before the
+	// closing brace.
 	let loose: Array<string> = []
 	section.loose.push(loose)
 
 	return loose
 }
 
-// A cursor over the Comments in written order. The printer walks the AST
-// in source order, so it can simply ask, at each Statement or member boundary,
-// for everything written above that point — no per-node attachment table, and
-// nothing can be silently skipped, because whatever is never claimed is
-// flushed at the end of its block.
+// The Comments in written order, handed out as the Printer walks the tree in
+// source order. See "Placing comments" in DEVELOPMENT.md.
 export class TriviaCursor {
 	private comments: Array<Comment>
 	private index: number
@@ -351,7 +307,8 @@ export class TriviaCursor {
 		this.index = 0
 	}
 
-	// Every own-line Comment written strictly above `line`, consumed.
+	// The own-line Comments at the front of the sequence that start before
+	// `line`, consumed.
 	takeBefore(line: number): Array<Comment> {
 		let taken: Array<Comment> = []
 
@@ -369,18 +326,9 @@ export class TriviaCursor {
 		return taken
 	}
 
-	// The trailing Comment sitting on `line`, taken out of the sequence
-	// wherever it is rather than only from the front. Only one can exist per
-	// line — a Comment runs to its line break.
-	//
-	// Claimed by the OUTERMOST node ending on that line, before its children
-	// are printed. `Terminal.inspect(list::map((box) { <- box.value })) § note` ends the
-	// inner `<- box.value` on the same line as the whole Statement, and
-	// whichever asks first wins — so the outer one asks first, and the note
-	// stays at the end of the line instead of moving inside the braces.
-	//
-	// Searching forward rather than reading the front is what keeps that safe
-	// when a Comment written INSIDE the node comes before it in the source.
+	// The Comment trailing `line`, taken wherever it stands in the sequence.
+	// The outermost node ending on the line asks first. See "Placing comments"
+	// in DEVELOPMENT.md.
 	claimTrailingOn(line: number): Comment | null {
 		for (let at = this.index; at < this.comments.length; at++) {
 			let comment = this.comments[at] as Comment
@@ -399,8 +347,7 @@ export class TriviaCursor {
 		return null
 	}
 
-	// Everything left over, for the end of a block or of the file. A
-	// Comment that claimed no owner still has to be written.
+	// Everything left over. A Comment that no node claimed is still written.
 	takeRemaining(): Array<Comment> {
 		let taken = this.comments.slice(this.index)
 		this.index = this.comments.length

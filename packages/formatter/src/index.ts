@@ -10,19 +10,15 @@ import { collectComments, commentAnchors, TriviaCursor } from "./trivia"
 export { WIDTH }
 
 export type Refusal = {
-	// `syntax` means the source never parsed; `unsafe` means it did, was
-	// formatted, and the result failed one of the checks below — a formatter
-	// bug, not the author's problem. They are kept apart because only the first
-	// is worth showing as the file's own fault.
+	// `syntax`: the source does not parse, which is the file's own fault.
+	// `unsafe`: the result failed a check or the Printer threw, a formatter bug.
 	kind: "syntax" | "unsafe"
 	message: string
 	diagnostics: Array<common.Diagnostic>
 }
 
 export type FormatResult = {
-	// The formatted source, or — whenever anything at all went wrong —
-	// the original, byte for byte. `esfmt` can only ever improve a file or
-	// leave it exactly as it found it.
+	// The formatted source, or the original byte for byte after a refusal.
 	text: string
 	changed: boolean
 	refusal: Refusal | null
@@ -38,10 +34,8 @@ function formatOnce(source: string, documentPath?: string): string | null {
 	return printProgram(program, source)
 }
 
-// The Printer over a tree rather than over one parsed from the text, and
-// deliberately not exported: nothing outside this file holds a Program the
-// Printer has not just parsed, and a caller that did would be printing a tree
-// the safety gate has never compared against anything.
+// Not exported, so the safety gate only vouches for a Program that `format`
+// has just parsed.
 function printProgram(program: parser.Program, source: string): string {
 	let printer = new Printer(
 		new SourceText(source),
@@ -51,12 +45,9 @@ function printProgram(program: parser.Program, source: string): string {
 	return printDoc(printer.printProgram(program), WIDTH)
 }
 
-// Strips every Position so that two ASTs can be compared for the only
-// thing formatting is allowed to change: nothing. `documentation` is compared
-// rather than stripped, because Documentation attaches to a Declaration by
-// line adjacency — a blank line wrongly inserted between a `§§` block and what
-// it documents is valid code that silently loses the docs, and this is what
-// catches it.
+// Strips every Position, the one thing formatting may change. `documentation`
+// stays, since a blank line printed after a `§§` block detaches it.
+// See "The safety gate" in DEVELOPMENT.md.
 function stripPositions(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value.map((item) => stripPositions(item))
@@ -97,8 +88,8 @@ function parsed(source: string, documentPath?: string): parser.Program | null {
 	return program
 }
 
-// Both Module sections are brought into canonical order first, because
-// sorting a block is the one reordering the Formatter is allowed to make.
+// Sorting the Module sections is the one reordering formatting may make, so
+// both trees are sorted before they are compared.
 function astOf(program: parser.Program): unknown {
 	return stripPositions(canonicalSections(program))
 }
@@ -111,11 +102,8 @@ function unsafe(source: string, message: string): FormatResult {
 	}
 }
 
-// The last line of the safety story. Every check below catches a
-// mistake the formatter is known to be able to make; this catches the ones it
-// is not — a printer thrown off by an AST shape it has never seen must still
-// hand the original bytes back, not take the process down. Exported so the
-// catch path can be tested without engineering a real crash.
+// Hands the original back when formatting throws. Exported so that a spec can
+// reach the catch path without a real crash.
 export function guarded(
 	source: string,
 	work: () => FormatResult,
@@ -142,17 +130,13 @@ function formatUnguarded(
 ): FormatResult {
 	let { documentPath, verify = true } = options
 
-	// Line endings are normalised to `\n` before anything else looks at
-	// the source — the Lexer reads a `\r` as part of whatever Token it lands
-	// in, so a CRLF file otherwise parses as one syntax error after another
-	// and is refused. Formatting writes `\n`, and only that.
+	// The result has `\n` line endings whatever the source had.
 	let source = original.replace(/\r\n?/g, "\n")
 
 	let { diagnostics } = parseDocument(source, documentPath)
 
-	// Formatting a file that does not parse would delete code — the
-	// parser's recovery drops a broken Statement entirely rather than keeping
-	// text it could not read.
+	// The parser's recovery drops a broken Statement, so formatting a file that
+	// does not parse would delete code.
 	if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
 		return {
 			text: original,
@@ -186,11 +170,9 @@ function formatUnguarded(
 			)
 		}
 
-		// Compares each Comment's place among the Tokens around it, not
-		// just the Comments themselves — a Comment that moved across a brace is
-		// still present and still in order, and only its anchor gives it away.
-		// Inside a Module section the comparison is per entry rather than per
-		// Token, since the block comes out sorted.
+		// A Comment moved across a brace keeps its order among the Comments, so
+		// its place among the Tokens is compared. See "Comment anchors" in
+		// DEVELOPMENT.md.
 		if (
 			commentAnchors(source, sectionSpans(before)).join("\n") !==
 			commentAnchors(formatted, sectionSpans(after)).join("\n")
