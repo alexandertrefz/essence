@@ -740,6 +740,27 @@ function checkSentence(context: Context, sentence: Sentence) {
 	}
 }
 
+// The lines of a block that count toward its length: prose and blank lines.
+// An indented or fenced code example is left out.
+function proseLinesOf(block: Block): Array<CommentLine> {
+	let counted: Array<CommentLine> = []
+	let fenced = false
+
+	for (let line of block.lines) {
+		if (fencePattern.test(line.text)) {
+			fenced = !fenced
+
+			continue
+		}
+
+		if (!fenced && !line.code && (line.text === "" || isProse(line))) {
+			counted.push(line)
+		}
+	}
+
+	return counted
+}
+
 function checkBlock(context: Context, block: Block, header: boolean) {
 	let prose = block.lines.filter(isProse)
 	let first = prose[0]
@@ -755,9 +776,7 @@ function checkBlock(context: Context, block: Block, header: boolean) {
 		}
 	}
 
-	let counted = block.lines.filter(
-		(line) => line.text === "" || isProse(line),
-	)
+	let counted = proseLinesOf(block)
 
 	// The delimiters of a `/* */` block hold no text of their own.
 	while (counted[0]?.text === "") {

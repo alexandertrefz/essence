@@ -175,6 +175,30 @@ describe("Comment Prose", () => {
 			expect(rulesIn(`let a = 1\n${block(6)}\nlet b = 2\n`)).toEqual([])
 		})
 
+		it("should count only the prose of a block toward its length", () => {
+			let indented = [
+				"// One.",
+				"//",
+				"//     let first = 1",
+				"//     let second = 2",
+				"//     let third = 3",
+				"//",
+				"// Two.",
+			].join("\n")
+			let fenced = [
+				"// One.",
+				"// ```",
+				"// let first = 1",
+				"// let second = 2",
+				"// let third = 3",
+				"// ```",
+				"// Two.",
+			].join("\n")
+
+			expect(rulesIn(`let a = 1\n${indented}\nlet b = 2\n`)).toEqual([])
+			expect(rulesIn(`let a = 1\n${fenced}\nlet b = 2\n`)).toEqual([])
+		})
+
 		it("should find two blocks with nothing but blank lines between", () => {
 			expect(
 				rulesIn("let a = 1\n// One.\n\n// Two.\nlet b = 2\n"),
