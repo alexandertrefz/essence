@@ -1,19 +1,11 @@
-// The builtin Namespaces that have a runtime module in
-// `@essence-lang/runtime`, in the order their imports are emitted. Every one is
-// imported unconditionally by a lone Program, under its own name, and a
-// Namespace no Program references costs nothing — esbuild shakes an unused
-// `import * as <Name>` away entirely. A Method the standard library implements
-// in Essence is NOT a member of one of these; it is its own
-// `$es_<Namespace>_<member>` const, emitted alongside. The tests cross-check
-// this list against the other registration sites — a Namespace here but missing
-// a runtime module, or declared in `packages/standard-library/sources` but missing here,
-// emits a call to `undefined`.
+// The builtin Namespaces that have a runtime module in `@essence-lang/runtime`,
+// in the order their imports are emitted. A Method the standard library writes
+// in Essence is its own `$es_<Namespace>_<member>` const instead.
+// `builtins.spec.ts` holds this list to the declared Namespaces, since a
+// missing entry emits a call to `undefined`.
 //
-// A file of its own, rather than a const in the Rewriter that owns it,
-// because the Optimiser asks the same question and asking it through
-// `rewriter/rewrite` would close a cycle: the Rewriter reads the standard library
-// prelude, the prelude is optimised, and the Optimiser would read the Rewriter.
-// Nothing is imported here, so nothing can.
+// A file of its own because the Optimiser reads it too, and reading it
+// through `rewrite.ts` would close an import cycle through the prelude.
 export const runtimeNamespaceNames = [
 	"Terminal",
 	"String",
