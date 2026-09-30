@@ -2622,7 +2622,7 @@ describe("formatter", () => {
 
 			// A value over several lines stays in the run, since its `=` is on
 			// its head's line.
-			it("leaves a multi-line value out of the run", () => {
+			it("keeps a multi-line value in the run", () => {
 				let equals = equalsOf(
 					block(
 						"constant a = 1",
@@ -2631,8 +2631,7 @@ describe("formatter", () => {
 					),
 				)
 
-				expect(equals[0]).toBe(15)
-				expect(equals[1]).toBe(15)
+				expect(equals).toEqual([15, 15, 15])
 			})
 
 			// A reassignment writes no keyword, so padding it to a Declaration
