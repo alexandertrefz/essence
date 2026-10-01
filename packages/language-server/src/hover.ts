@@ -30,15 +30,8 @@ import {
 	typedProgramSections,
 } from "./sections"
 
-// Hovers are resolved on the enriched AST — every Expression carries
-// its inferred Type there. The smallest typed node containing the cursor
-// wins, so hovering an Identifier inside a larger Expression describes the
-// Identifier, not the Expression around it.
-//
-// Anything callable is rendered the way it is declared — `greet(subject:
-// String) -> String` rather than `greet: (subject: String) -> String` — and an
-// Overload set that has not been narrowed to one candidate spells out every
-// Overload on its own line instead of combining them into a single Type.
+// Hovers over the enriched Program: the smallest typed node containing the
+// cursor wins. See "Hover" in DEVELOPMENT.md.
 
 type HoverInfo = {
 	position: common.Position
@@ -49,14 +42,13 @@ type HoverInfo = {
 type State = {
 	cursor: common.Cursor
 	best: HoverInfo | null
-	// Every Protocol in scope, so a conformance clause can read back as
-	// the Protocol it names. Built once per request rather than per clause.
+	// Every Protocol in Scope, built once per request, so a conformance clause
+	// reads back as the Protocol it names.
 	protocols: Record<string, common.ProtocolType>
 }
 
-// The Protocols this document declares, over the ones it inherits — a
-// standard library source declares the very Protocols the builtin tables
-// already hold, and the document's own is the one whose Positions belong to it.
+// The document's own Protocols over inherited ones: a standard library source
+// redeclares Protocols the builtin tables hold, with its own Positions.
 function protocolsOf(
 	program: common.typed.Program,
 ): Record<string, common.ProtocolType> {
@@ -73,33 +65,16 @@ function protocolsOf(
 	return protocols
 }
 
-// `parserProgram` is what the passes below pair the typed tree against,
-// for the declarations whose parts the typed tree does not carry Positions for
-// at all:
-//
-//   • a body-less native Method signature has NO typed Node. The Enricher drops
-//     one deliberately — there is no body to emit, and putting one in the typed
-//     tree would make the Simplifier emit a definition under a runtime export's
-//     name. So the Method Types are all there (on the typed Namespace's `type`)
-//     while every Position that could locate the cursor inside a signature is
-//     only in the parsed source. Without `visitNativeSignatures` every Hover
-//     inside `packages/standard-library/sources/*.es` answered with the enclosing Namespace, whatever
-//     it was aimed at — and String, Integer and Rational are hundreds of these
-//     signatures each.
-//   • a Protocol's requirements and a Choice's payload members survive
-//     enrichment as plain Type Records, with no Position in them anywhere.
-//
-// Passing it is therefore worth it for EVERY document, not only a standard
-// library one: a native signature can not occur outside a declarations file, so
-// that pass simply finds nothing in an ordinary Program.
+// The parsed Program, paired with the typed tree where the typed tree has no
+// Positions. See "What the typed tree lacks" in DEVELOPMENT.md.
 export function findHover(
 	program: common.typed.Program,
 	cursor: common.Cursor,
 	parserProgram: parser.Program | null = null,
 	annotations: Array<common.TypeAnnotation> = [],
 	text: string | null = null,
-	// The Protocols the document's import block bound, which is how a
-	// Protocol imported under an alias is spelled the way the document does.
+	// The Protocols the import block bound, so an aliased Protocol is spelled as
+	// the document spells it.
 	imported: Record<string, common.ProtocolType> = {},
 ): HoverInfo | null {
 	return withProtocolSpellings(protocolSpellings(program, imported), () =>
@@ -124,15 +99,12 @@ function hoverAt(
 		protocols: protocolsOf(program),
 	}
 
-	// Every body the Program holds — see `sections.ts`. Without this a
-	// Hover inside a test body answered with nothing at all, while every Type in
-	// it was sitting in the typed tree.
+	// Every body the Program holds, test bodies included.
 	for (let section of typedProgramSections(program)) {
 		visitBody([...section.head, ...section.nodes], state)
 
-		// `for any (a: Integer)` names a value no Statement declares, so
-		// the Parameter answers for its own span here — the Type is the whole of
-		// what says what the runner generates.
+		// `for any (a: Integer)` names a value no Statement declares, so the
+		// Parameter answers for its own span.
 		for (let property of section.properties) {
 			consider(state, property.position, property.type, property.name)
 		}
@@ -150,12 +122,9 @@ function hoverAt(
 	return state.best
 }
 
-// A line's margins have no hover — its indentation, the blank after its
-// last character, the whole of a blank line. The smallest node containing the
-// cursor is otherwise whatever spans the gap, and a reader pointing past the
-// end of a line or into the indentation of a body is asking about nothing. A
-// space BETWEEN two tokens on a line is another matter: it is part of what
-// spans them — `a + b`, a Record Literal, a String — and answers as that.
+// A line's margins answer nothing: indentation, the space after the last
+// character, a blank line. A space between two tokens belongs to what spans
+// them.
 function isInMargin(text: string, cursor: common.Cursor): boolean {
 	let line = text.split("\n")[cursor.line - 1] ?? ""
 	let index = cursor.column - 1
@@ -170,25 +139,9 @@ function isInMargin(text: string, cursor: common.Cursor): boolean {
 	)
 }
 
-// Every Type annotation the Enricher resolved, paired with what it
-// resolved TO. The typed AST erases annotations — a resolved Type carries no
-// Position — so without this there is no candidate at an annotation's Position
-// at all, and the enclosing declaration, which spans its whole body, answers
-// for the cursor instead.
-//
-// A FLAT list, and no walker: an annotation's Position already says where it
-// sits, and `wins` picks the smallest candidate containing the cursor. Nesting
-// takes care of itself, because no annotation ever spans exactly what the
-// annotation containing it spans — every compound form needs a bracket or an
-// operator. Offered LAST so that an exact-span tie resolves to the annotation,
-// which is the most specific thing that can be said about its own span.
-//
-// An annotation NAMING a Record Alias answers with its members, the way
-// the Alias's own Declaration does. The cursor is on the word: answering
-// `Rectangle` over a `Rectangle` the reader is already looking at tells them
-// nothing, and what an annotation is asked is what the name stands for. A value
-// OF one still answers with the name, which is the split — the name where the
-// shape would drown the line, the shape where the name is already on it.
+// Every resolved annotation with what it resolved to, offered last so a tie
+// goes to the annotation. An annotation naming a Record Alias answers with its
+// members. See "What the typed tree lacks" in DEVELOPMENT.md.
 function visitAnnotations(
 	annotations: Array<common.TypeAnnotation>,
 	state: State,
@@ -209,10 +162,8 @@ function consider(
 	type: common.Type,
 	label: string | null,
 	declared: common.Documentation | null = null,
-	// One more sentence under whatever documents this. The `§§` says what
-	// a thing DOES; this says what a call may leave out of it, which is a fact
-	// about the Declaration rather than about the Type — the signature line
-	// itself is unchanged, because `?` there means the whole Argument may go.
+	// A sentence on what a call may leave out, under the documentation. The
+	// signature's `?` still means only that the whole Argument may go.
 	note: string | null = null,
 ) {
 	if (!wins(state, position)) {
@@ -264,9 +215,7 @@ function considerSignatures(
 	signatures: Array<common.BaseFunction>,
 	label: string,
 	fallback: common.Documentation | null,
-	// The Protocol that PROVIDED this Method, when one did — appended
-	// under whatever documents it, because the two answer different questions:
-	// the `§§` says what the Method does, this says whose Method it is.
+	// The Protocol that provided this Method, under its documentation.
 	providedBy: string | null = null,
 ) {
 	if (!wins(state, position)) {
@@ -293,9 +242,8 @@ function considerSignatures(
 	}
 }
 
-// Once the Arguments have narrowed an Overload set to one signature its
-// own text is what applies, falling back to whatever documents the set as a
-// whole. With the set still open only the shared text can be meant.
+// A narrowed Overload's own text applies, else the set's. An open set shows
+// only the shared text.
 function documentationFor(
 	signatures: Array<common.BaseFunction>,
 	fallback: common.Documentation | null,
@@ -307,12 +255,9 @@ function documentationFor(
 	return signatures[0].documentation ?? fallback
 }
 
-// The entries of the two Module sections. The typed entry carries what it
-// bound but flattens its names to plain text, and the parser entry still holds
-// the Identifiers with their Positions — so the pair is matched by the entry's
-// own span, and the Identifier under the cursor answers with the bound Type.
-// An entry the linking refused (or a re-export, whose declaration lives in the
-// dependency) carries no Type and stays silent; its Diagnostic is already on it.
+// The Module sections' entries: a typed entry holds the bound Type, its parsed
+// entry the Identifiers, matched by span. A refused entry or a re-export stays
+// silent.
 function visitModuleSections(
 	parserProgram: parser.Program,
 	program: common.typed.Program,
@@ -348,9 +293,8 @@ function visitModuleSections(
 				continue
 			}
 
-			// A Namespace prints as its bare name, which hovering that
-			// very name says nothing with — so it reads back as its
-			// declaration head instead, the way the declaring file spells it.
+			// A Namespace reads back as its declaration head, since its bare name would
+			// repeat the word under the cursor.
 			if (type.type === "Namespace") {
 				if (wins(state, identifier.position)) {
 					state.best = {
@@ -367,9 +311,7 @@ function visitModuleSections(
 				continue
 			}
 
-			// And a Record Alias for the same reason one Type over — an
-			// entry binding `Rectangle` under a cursor on the word `Rectangle`
-			// reads back as the members it stands for.
+			// And a Record Alias as its members, for the same reason.
 			consider(
 				state,
 				identifier.position,
@@ -388,9 +330,9 @@ function visitModuleSections(
 	}
 }
 
-// Ties go to the newer candidate — children are visited after their
-// parents, so the deeper node wins. Every node in the Program is offered, so
-// the Type is only printed once a candidate has actually won.
+// Ties go to the later candidate, and children follow their parents, so the
+// deeper node wins. A Type is printed only for a candidate that wins its turn,
+// not for every node.
 function wins(state: State, position: common.Position): boolean {
 	if (!contains(position, state.cursor)) {
 		return false
@@ -425,21 +367,15 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// The Constant a Pattern holds its value in is named by the
-			// Compiler, so hovering it would answer with a name no source
-			// wrote. Its value is still visited: the Expression under the
-			// cursor is the author's either way.
+			// The Constant a Pattern stores its value in has a made-up name, so only its
+			// value is visited.
 			if (node.synthesized === "base" || node.synthesized === "subject") {
 				visitNode(node.value, state)
 				return
 			}
 
-			// The NAME's Type, for the keyword as well as for the name —
-			// one declaration says one thing. The Statement's own Type is the
-			// shape a Record Alias stands for, and the binding's is the Alias:
-			// a reader hovering `constant` was told `t: { name: String, code:
-			// String }` and, one character to the right, `t: Team`. The name's
-			// is the one the rest of the file reads the Constant at.
+			// The name's Type, for the keyword too, since one declaration says one thing.
+			// The Statement's own Type would be the shape behind a Record Alias.
 			consider(
 				state,
 				node.headPosition,
@@ -454,8 +390,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitIdentifier(node.name, state)
 			visitNode(node.value, state)
 			return
-		// Declarations that carry a keyword in the source repeat it, so
-		// the Hover reads back as the declaration itself.
+		// A declaration reads back with its keyword, as written.
 		case "FunctionStatement":
 			consider(
 				state,
@@ -467,11 +402,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitFunctionDefinition(node.value, state)
 			return
 		case "NamespaceDefinitionStatement":
-			// A Namespace that declares conformance reads back as its
-			// whole declaration head — `namespace List<infer Item> for
-			// List<Item>, is Equatable, is Comparable where Item is Comparable`
-			// — spelled by hand like a Protocol or Choice so the clauses show.
-			// One without clauses keeps the plain name-and-Type Hover.
+			// A Namespace with conformance clauses reads back as its whole
+			// declaration head, spelled by hand like a Protocol or Choice. One
+			// without keeps the plain Hover.
 			if (node.conformsTo.length > 0) {
 				let generics =
 					node.type.generics.length === 0
@@ -511,16 +444,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				visitIdentifier(node.name, state, undefined, node.documentation)
 			}
 
-			// A Method sees the Namespace's Generics injected into its
-			// own list, so this is what a Namespace with no Methods would
-			// otherwise lose.
+			// A Method's Generics include the Namespace's, so only a Namespace without
+			// Methods needs these.
 			visitGenericDeclarations(node.generics, state)
 
-			// `is Comparable` names a Protocol, so it reads back as that
-			// Protocol — the same Hover its declaration gives. Its Position is
-			// the Protocol Identifier's alone, not the whole clause. A `where`
-			// condition names one of each: the Generic it bounds and the
-			// Protocol it bounds it by.
+			// `is Comparable` reads back as that Protocol, on the Protocol Identifier's
+			// span. A `where` condition names a Generic and a Protocol.
 			for (let clause of node.conformsTo) {
 				visitProtocolReference(clause.name, clause.position, state)
 
@@ -571,9 +500,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 				let label = isStatic ? `static ${name}` : name
 
-				// The name is typed as the Method itself, so hovering it
-				// describes the whole Method — every Overload at once, since
-				// the name is what they share.
+				// The name is typed as the Method itself, so it describes every Overload.
 				visitIdentifier(member.name, state, label)
 
 				for (let method of methods) {
@@ -587,11 +514,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
-			// A native Method has no typed body, so its Parameters are
-			// only ever reached through the frame the Compiler synthesizes for
-			// its defaults — which is the only part of a native signature that
-			// IS Essence, and the only part a hover has anything to say about
-			// beyond what `visitNativeSignatures` reads off the parsed source.
+			// A native Method's Parameters are reached only through the frame the
+			// Compiler synthesizes for its defaults.
 			for (let shim of node.nativeShims) {
 				for (let defaultValue of parameterDefaults(shim.parameters)) {
 					visitNode(defaultValue, state)
@@ -600,21 +524,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "TypeAliasStatement": {
-			// A checked refinement reads back as what it REFINES on its
-			// own Declaration, because its name would say nothing there:
-			// `NonZeroInteger: NonZeroInteger` is what naming it would answer,
-			// and the predicate is on the very line the cursor is on. Everywhere
-			// a VALUE of one is hovered the name is exactly right, which is what
-			// `printType` answers — the substitution is for this Declaration and
-			// for nowhere else.
-			//
-			// A GENERIC refined Alias is a Generic Alias wrapping the
-			// refinement, so its base is one level further in — `NonEmptyList<Item>`
-			// reads back as `List<Item>`, which is exactly as much as the
-			// non-generic one says.
-			//
-			// And a RECORD Alias reads back as its members, on the same
-			// rule and for the same reason — see `aliasedRecordShape`.
+			// A refinement reads back as what it refines on its own declaration, and a
+			// Record Alias as its members (`aliasedRecordShape`). See "How a declaration
+			// reads back" in DEVELOPMENT.md.
 			let declaredType =
 				refinedAliasBase(node.type) ??
 				aliasedRecordShape(node.type) ??
@@ -650,9 +562,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
-			// A provided Method's name and signature head are answered off
-			// the parsed source by `visitProtocolBodies`; its Parameters and body
-			// are typed here.
+			// `visitProtocolBodies` answers a provided Method's name and head; its
+			// Parameters and body are typed here.
 			for (let member of Object.values(node.methods)) {
 				let methods =
 					member.nodeType === "OverloadedMethod" ||
@@ -676,19 +587,14 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitBody(node.trueBody, state)
 			visitBody(node.falseBody, state)
 			return
-		// The `<-` says what the Statement returns. `IfStatement` and
-		// `IfElseStatement` stay candidate-less on purpose — there is nothing
-		// useful to say about the keyword, and offering the condition's Boolean
-		// under it would be worse than saying nothing.
+		// The `<-` says what the Statement returns. An `if` offers no candidate:
+		// nothing useful can be said about the keyword.
 		case "ReturnStatement":
 			consider(state, node.position, node.expression.type, null)
 			visitNode(node.expression, state)
 			return
-		// What the Matcher of a `require MATCHER = EXPR` proved, spelled
-		// out the way a Match Handler's is — the Case with its payload, at the
-		// span the Matcher was written. The asserted value is the Constant
-		// holding it there, whose synthesized name answers for nothing; what the
-		// Matcher BOUND is a Constant of its own, standing in the body below.
+		// What a `require` Matcher proved, as a Match Handler's Matcher reads, at the
+		// Matcher's span. Its bindings are Constants of the body.
 		case "ExpectStatement":
 		case "RequireStatement":
 			if (
@@ -706,12 +612,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.value, state)
 			return
 		case "Identifier":
-			// A Pattern's bindings read off a Constant the Compiler
-			// named, and that Identifier stands at the Pattern's own span — so
-			// hovering anywhere in `{ width, height }` answered with
-			// `$pattern_2_11`, a name no source wrote and no reader has seen.
-			// The binders themselves are Constants of their own and answer for
-			// their own spans, which is what a hover there should say.
+			// A Pattern's bindings read off a Constant with a made-up name at the
+			// Pattern's span, so it is skipped. Each binder answers for its own.
 			if (isSynthesizedName(node.content)) {
 				return
 			}
@@ -722,8 +624,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			consider(state, node.position, node.type, null)
 			visitNode(node.base, state)
 
-			// The Method name resolves through the Namespace — with an
-			// overload the invoked signature is picked out for the Hover.
+			// The Method name resolves through the Namespace; with Overloads, the invoked
+			// signature is picked out.
 			let signatures = invokedSignatures(node)
 
 			if (signatures !== null) {
@@ -735,12 +637,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					documentationOf(
 						node.namespace.type.methods[node.member.name],
 					),
-					// A Method nobody wrote on the receiver's Namespace
-					// still has to say where it came from — a reader looking one
-					// up needs the Protocol's name to find its declaration. On a
-					// bounded receiver the Namespace is the witness, whose
-					// members are provided and required alike, so the answer is
-					// per member there.
+					// A Method from a Protocol names that Protocol, so the reader can find its
+					// declaration. A bounded receiver's witness answers per member.
 					node.namespace.type.providedBy ??
 						node.namespace.type.providedMembers?.[
 							node.member.name
@@ -761,9 +659,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			consider(state, node.position, node.type, null)
 			visitNode(node.base, state)
 
-			// As in the MethodInvocation — a Method nobody wrote on the
-			// Namespace it is read off still has to say where it came from, so
-			// `Integer.isNot` names `Equatable` the way `5::isNot(3)` does.
+			// As for a MethodInvocation, so `Integer.isNot` names `Equatable` as
+			// `5::isNot(3)` does.
 			let signatures =
 				node.providedBy === undefined
 					? null
@@ -789,18 +686,14 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.lhs, state)
 			visitNode(node.rhs, state)
 			return
-		// What the Keyword ANSWERS with, the way a `<-` says what the
-		// Statement it opens returns — `complete` reads back as the Value waited
-		// for and `start` as the `Started` it put in flight. The operand is the
-		// smaller span and keeps its own Hover, so the Future and the Value it
-		// answers with are one cursor apart.
+		// What the Keyword answers with: `complete` reads back as the Value awaited,
+		// `start` as the `Started` it put in flight. The operand keeps its own Hover.
 		case "Start":
 		case "Complete":
 			consider(state, node.position, node.type, null)
 			visitNode(node.expression, state)
 			return
-		// The refused value itself is an `Error` and says nothing; what
-		// was written in front of the brackets still answers.
+		// The refused value is an `Error`; what precedes the brackets still answers.
 		case "RefusedValue":
 			visitNode(node.base, state)
 			return
@@ -809,10 +702,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.value, state)
 
 			for (let handler of node.handlers) {
-				// A Case Matcher's payload shape is spelled out the way a
-				// constructed Case value is — for an applied generic Choice its
-				// members are the instantiated ones (`state: Integer`), which the
-				// scrutinee's Type pins down.
+				// A Case Matcher's payload reads as a constructed Case does,
+				// instantiated for an applied generic Choice by the scrutinee.
 				if (
 					handler.matcher.type === "Case" &&
 					wins(state, handler.matcherPosition)
@@ -832,10 +723,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
-		// The whole `define` answers with one Type — what the arrow
-		// declared, or the Union of what its arms answer with — so a Hover on
-		// the Keyword says what the Expression produces, exactly as one on a
-		// `match` does. An arm carries no Type of its own beyond its value's.
+		// The `define` keyword answers with the whole Expression's Type, as a
+		// `match` does.
 		case "Define":
 			consider(state, node.position, node.type, null)
 
@@ -860,9 +749,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
-		// The literal answers with its own Type, exactly as a written List
-		// does — `Dictionary<String, Integer>` over the brackets, and whatever
-		// each key and value is over itself.
+		// The literal answers with its own Type, as a written List does.
 		case "DictionaryValue":
 			consider(state, node.position, node.type, null)
 
@@ -883,12 +770,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "FunctionValue":
-			// A member path is a Function literal the Compiler wrote, and
-			// its Parameter is not a thing the author can point at: it stands
-			// at the first step, where the member the step reads is the answer.
-			// So the path answers as a whole with the signature it stands for,
-			// each step answers with the member it reads, and the name the body
-			// reads the Parameter under — `_0` — is never offered at all.
+			// A member path is a Function literal the Compiler wrote. The path answers
+			// with its signature and each step with the member it reads; its `_0`
+			// Parameter is never offered.
 			if (node.synthesized === "path") {
 				consider(state, node.position, node.type, null)
 				visitMemberPathSteps(node, state)
@@ -905,8 +789,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "CaseValue":
 			consider(state, node.position, node.type, null)
 
-			// The Choice's half names the Union, the Case's half the
-			// constructed Case — both are hoverable on their own.
+			// The Choice's half names the Union, the Case's half the constructed Case.
 			if (node.choice !== null) {
 				visitIdentifier(node.choice, state)
 			}
@@ -929,9 +812,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "ChoiceDeclarationStatement": {
-			// Like a Protocol, a Choice's declaration Hover is spelled
-			// by hand — the keyword, the name, and each Case with its payload
-			// shape.
+			// Spelled by hand like a Protocol's: the keyword, the name, and each Case
+			// with its payload.
 			let caseLine = (caseType: common.CaseType): string => {
 				let members = Object.entries(caseType.members).map(
 					([memberName, memberType]) =>
@@ -943,12 +825,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					: `#${caseType.name} { ${members.join(", ")} }`
 			}
 
-			// A generic Choice reads back with its Type Parameters —
-			// `choice Step<State, Answer>` — the same way a Namespace's
-			// declaration head spells its own. Its Cases then show their payloads
-			// in terms of those Parameters (`state: State`), the abstract shape a
-			// use site instantiates. A non-generic Choice's Union carries no
-			// Parameters, so the head stays bare.
+			// A generic Choice reads back with its Type Parameters, `choice Step<State,
+			// Answer>`, and its payloads in terms of them.
 			let generics =
 				node.type.type === "GenericAlias" &&
 				node.type.generics.length > 0
@@ -984,9 +862,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
-			// A payload's `= { … }` holds Expressions of its own, and the
-			// cursor in one wants what it would get anywhere else — the Type of
-			// the value under it, not the Choice it is written inside.
+			// A payload default's Expressions answer with their own Types.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				visitNode(defaultValue, state)
 			}
@@ -1002,9 +878,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 	}
 }
 
-// What a refined Type Alias refines, or null when the Alias declares no
-// refinement at all. A generic one is a Generic Alias wrapping the refinement, so
-// the base sits one level further in than it does for `NonZeroInteger`.
+// What a refined Type Alias refines, or null. A generic one wraps the
+// refinement, one level further in.
 function refinedAliasBase(type: common.Type): common.Type | null {
 	if (type.type === "Refinement") {
 		return type.base
@@ -1020,22 +895,10 @@ function refinedAliasBase(type: common.Type): common.Type | null {
 	return null
 }
 
-// A Record Alias's shape, for the Alias's OWN Declaration — the rule
-// `refinedAliasBase` follows one Type over, and for the same reason:
-// `Standing: Standing` is what naming it would answer on the line that declares
-// it, and the members are what a reader came to this line to see. Everywhere a
-// VALUE of one is hovered, the name is exactly right and `printType` gives it.
-//
-// The OUTERMOST spelling alone is dropped. A member that is an Alias of its own
-// stays named — `team: Team` is what `Standing` declares, and expanding `Team`
-// here would answer a Declaration the cursor is not on.
-//
-// Null for every other Type, and for a Record nobody named: `printType` already
-// spells that one's members out, so there is nothing to put in its place.
-//
-// A GENERIC Alias is answered whatever its body says about itself — the body of
-// one is held unapplied and is never stamped, so there is no name on it to ask
-// about, and `Pair: Pair` is the answer without this.
+// A Record Alias's members, for its declaration and for a name of it, keeping
+// any member that is an Alias named. Null for any other Type and for an
+// unnamed Record. A generic Alias's body is unstamped, so any Record body
+// answers.
 function aliasedRecordShape(type: common.Type): common.Type | null {
 	if (type.type === "GenericAlias") {
 		return type.aliasedType.type === "Record" ? type.aliasedType : null
@@ -1047,9 +910,8 @@ function aliasedRecordShape(type: common.Type): common.Type | null {
 		: null
 }
 
-// A Type Parameter, rendered as declared: `infer Item`, or `Item is
-// Comparable` where it carries a bound. Used for the Hovers of declarations;
-// call sites render Generics through `printType`.
+// A Type Parameter as declared, `infer Item` or `Item is Comparable`, for
+// declarations. Call sites print Generics through `printType`.
 function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	let inferKeyword = generic.infer ? "infer " : ""
 	let constraint =
@@ -1060,9 +922,8 @@ function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	return `${inferKeyword}${generic.name}${constraint}`
 }
 
-// The typed Node spells the field `inferred` where the resolved Type
-// spells it `infer`. One adapter rather than a cast, so the day the two are
-// reconciled this stops compiling instead of quietly reading `undefined`.
+// The typed node spells the field `inferred`, the resolved Type `infer`. An
+// adapter rather than a cast, so reconciling the two breaks the build here.
 function printTypedGenericDeclaration(
 	generic: common.typed.GenericDeclarationNode,
 ): string {
@@ -1074,10 +935,8 @@ function printTypedGenericDeclaration(
 	})
 }
 
-// A Protocol is not a Type, so its Hover is spelled by hand — the
-// declaration keyword, the name, and each required signature. Shared with the
-// conformance clauses that NAME a Protocol (`is Comparable`), which should read
-// back as the Protocol they point at rather than as the Namespace around them.
+// A Protocol's Hover, spelled by hand: the keyword, the name, each required
+// signature. A conformance clause naming the Protocol shares it.
 function describeProtocol(
 	name: string,
 	protocolType: common.ProtocolType,
@@ -1103,10 +962,8 @@ function describeProtocol(
 		: `protocol ${name}\n${requirements}`
 }
 
-// A Type Parameter reads back as it was declared — `infer Item is
-// Comparable`. Only ever the declaration as a WHOLE: the typed Node keeps its
-// name and its bound as plain strings, so `Item` and `Comparable` within it can
-// not be told apart, and the whole clause already answers the question.
+// A Type Parameter as declared, as a whole. The typed node keeps its name and
+// bound as plain strings without Positions.
 function visitGenericDeclarations(
 	generics: Array<common.typed.GenericDeclarationNode>,
 	state: State,
@@ -1132,9 +989,8 @@ function visitIdentifier(
 	consider(state, node.position, node.type, label, declared, note)
 }
 
-// A place that NAMES a Protocol rather than declaring one. An unknown
-// name offers nothing, so a clause naming a Protocol that does not resolve
-// keeps whatever the declaration around it was already saying.
+// A place naming a Protocol. An unknown name offers nothing, so the
+// surrounding declaration answers.
 function visitProtocolReference(
 	name: string,
 	position: common.Position,
@@ -1162,10 +1018,8 @@ function visitArguments(
 	}
 }
 
-// Outwards in, so each step is offered before the steps it is read off —
-// they nest, and the innermost one containing the cursor is the narrowest span
-// there is. The Lookups are the only Nodes of this literal a cursor may land
-// on; its Parameter and its body's root Identifier are the Compiler's own.
+// Outwards in, so the innermost step containing the cursor wins. Only the
+// Lookups are the author's; the Parameter and root Identifier are not.
 function visitMemberPathSteps(
 	node: common.typed.FunctionValueNode,
 	state: State,
@@ -1193,16 +1047,11 @@ function visitFunctionDefinition(
 	visitGenericDeclarations(definition.generics, state)
 
 	for (let parameter of definition.parameters) {
-		// The Parameter as written, so that the cursor on a bare `_` — or
-		// on the `:` between a name and its annotation — is answered by the
-		// Parameter rather than by the signature around it. Offered BEFORE the
-		// names it contains, which are narrower and win on their own spans.
+		// The Parameter as written, so a bare `_` or the `:` answers with the
+		// Parameter. Offered before the narrower names it contains.
 		let declaredType =
 			parameter.internalName?.type ?? parameter.externalName?.type ?? null
-		// On every offer this Parameter makes — the span as written, its
-		// label and the name its body reads it under — because a reader hovers
-		// whichever of the three is under the cursor, and each of them wins on
-		// its own span.
+		// On each span the Parameter offers: as written, its label, and its name.
 		let note = omittableMembersNote(parameter)
 
 		if (declaredType !== null) {
@@ -1222,11 +1071,8 @@ function visitFunctionDefinition(
 			)
 		}
 
-		// A Parameter taken apart by a Pattern has a Compiler-made
-		// internal name standing over the Pattern's own span, so offering it
-		// would answer a hover anywhere in the Pattern with a name no source
-		// wrote. The names the Pattern BINDS are Constants at the head of the
-		// body and are visited with it.
+		// A Pattern Parameter's internal name is made up, so it is not offered. The
+		// names the Pattern binds are Constants of the body.
 		if (
 			parameter.internalName !== null &&
 			!isSynthesizedName(parameter.internalName.content)
@@ -1240,10 +1086,7 @@ function visitFunctionDefinition(
 			)
 		}
 
-		// A default is an Expression written where it stands, so a hover
-		// inside `= @::length()` answers about THAT call rather than about the
-		// Parameter the call sits on. Visited after the Parameter itself, which
-		// is offered over the wider span and loses to anything narrower.
+		// A default's Expressions answer for themselves, as in `= @::length()`.
 		if (parameter.defaultValue !== null) {
 			visitNode(parameter.defaultValue, state)
 		}
@@ -1252,14 +1095,9 @@ function visitFunctionDefinition(
 	visitBody(definition.body, state)
 }
 
-// The members a Record Parameter's default fills in, said in one sentence
-// — the only place a reader is told, since the signature line marks a Parameter
-// `?` only where the WHOLE Argument may be left out and a partial default grants
-// nothing of the sort.
-//
-// Read through the Compiler's own `recordDefaultMembers`, which is the one
-// answer the Parameter's Type carries and the callee's prologue fills in. A
-// second reading here would be a second answer.
+// The members a Record Parameter's default fills in, as one sentence: the
+// signature's `?` covers only a whole Argument. Read through the Compiler's
+// `recordDefaultMembers`, so there is one answer.
 function omittableMembersNote(
 	parameter: common.typed.ParameterNode,
 ): string | null {
@@ -1270,9 +1108,7 @@ function omittableMembersNote(
 	}
 
 	let sentence = `A call may leave ${members.map((name) => `\`${name}\``).join(", ")} out of this Record.`
-	// And which of them a path key may reach INTO — the other half of the
-	// same fact, through the same helper, so a Type, an emission and a sentence
-	// can not disagree about what the merge reaches.
+	// And which of them a path key may reach into, through the same helper.
 	let reaching = Object.keys(
 		recordDefaultNesting(parameter.type, parameter.defaultValue) ?? {},
 	)
@@ -1297,8 +1133,7 @@ function invokedSignatures(
 		return null
 	}
 
-	// With a resolved Overload only the invoked signature is shown —
-	// the others are noise once the Arguments have picked one.
+	// With a resolved Overload, only the invoked signature.
 	if (node.overloadedMethodIndex !== null) {
 		let invoked = signatures[node.overloadedMethodIndex]
 
@@ -1314,19 +1149,9 @@ function invokedSignatures(
 /* Body-less native declarations  */
 /**********************************/
 
-// What the pass below answers for, so the division of labour is written
-// down rather than discovered:
-//
-//   • the Method NAME — the full signature and its `§§` text. The whole point.
-//   • the signature itself, for the cursor anywhere along it.
-//   • a Parameter's EXTERNAL and INTERNAL names (`other` in `_ other: Boolean`)
-//     — read back off the resolved Parameter, so each says what the annotation
-//     resolved TO, not what was typed.
-//   • a native static PROPERTY's name.
-//
-// The annotations either side of those names are NOT its business: the
-// annotation index records every one of them, nested ones included, so
-// `visitAnnotations` answers for them in every document rather than only here.
+// Answers for a native Method's name, its signature, its Parameters' names as
+// resolved, and a native static property's name. The annotations are
+// `visitAnnotations`'s. See "What the typed tree lacks" in DEVELOPMENT.md.
 
 function namespaceTypesOf(
 	program: common.typed.Program,
@@ -1342,9 +1167,8 @@ function namespaceTypesOf(
 	return types
 }
 
-// The signature entries of one parser Method Node, paired index by index
-// with the resolved Overloads. A bodied entry is skipped — it has a typed Node
-// of its own, and the pass above already answered for it.
+// The signature entries of one parsed Method node, paired by index with the
+// resolved Overloads. A bodied entry has a typed node and is skipped.
 function nativeSignatureEntries(
 	member: parser.NamespaceMethods[string],
 	methodType: common.MethodType,
@@ -1410,8 +1234,7 @@ function visitNativeSignatures(
 		}
 
 		for (let [name, property] of Object.entries(node.properties)) {
-			// Only the VALUE-less ones — a Property with a value has a
-			// typed Node already.
+			// Only those without a value, which have no typed node.
 			if (property.value !== null) {
 				continue
 			}
@@ -1445,8 +1268,7 @@ function visitNativeSignatures(
 				methodType.type === "OverloadedStaticMethod"
 			let label = isStatic ? `static ${name}` : name
 
-			// The name is typed as the Method itself — every Overload at
-			// once, since the name is what they share.
+			// The name is typed as the Method itself, so it describes every Overload.
 			consider(state, member.name.position, methodType, label)
 
 			for (let { signature, resolved } of entries) {
@@ -1458,9 +1280,8 @@ function visitNativeSignatures(
 					signature.documentation,
 				)
 
-				// The receiver Parameter is injected ahead of the
-				// written ones on a non-static signature, so the resolved list
-				// is one longer than the parsed one.
+				// A non-static signature has the receiver injected first, so the resolved
+				// list is one longer.
 				let offset = isStatic ? 0 : 1
 
 				signature.parameters.forEach((parameter, index) => {
@@ -1493,17 +1314,9 @@ function visitNativeSignatures(
 /* Declarations whose parts the typed tree drops */
 /*************************************************/
 
-// A Protocol's requirements and a Choice's payload members exist in the
-// typed tree only as Types — `protocolType.methods` and `caseType.members` are
-// plain Records, with no Position anywhere in them. Every name inside either
-// declaration therefore had NO candidate at all, and the declaration around it
-// answered: hovering `size`, `resize`, `to` or `Self` inside a Protocol gave
-// back the whole Protocol, every time.
-//
-// Both are paired BY NAME with the parsed declaration, the same way
-// `visitNativeSignatures` pairs a native Method with its resolved Overloads.
-// The annotations either side of these names are not handled here — the
-// annotation index already records every one of them.
+// A Protocol's requirements and a Choice's payload members are typed as plain
+// Records without Positions, so they are paired by name with the parsed
+// declaration. See "What the typed tree lacks" in DEVELOPMENT.md.
 
 function protocolSignatureEntries(
 	member: parser.ProtocolMethods[string],
@@ -1576,8 +1389,7 @@ function visitProtocolBodies(
 				methodType.type === "OverloadedStaticMethod"
 			let label = isStatic ? `static ${name}` : name
 
-			// The name is the requirement itself — every Overload at
-			// once, since the name is what they share.
+			// The name is the requirement itself, so it describes every Overload.
 			consider(state, member.name.position, methodType, label)
 
 			for (let { signature, resolved } of protocolSignatureEntries(
@@ -1592,9 +1404,8 @@ function visitProtocolBodies(
 					signature.documentation,
 				)
 
-				// The receiver is injected ahead of the written
-				// Parameters on a non-static requirement, exactly as it is on a
-				// native Method signature.
+				// A non-static requirement has the receiver injected first, as a
+				// native signature does.
 				let offset = isStatic ? 0 : 1
 
 				signature.parameters.forEach((parameter, index) => {

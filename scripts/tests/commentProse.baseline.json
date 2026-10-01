@@ -366,7 +366,6 @@
 	"packages/language-server/src/fileRename.ts": {"sentence-length": 7, "em-dash": 6, "all-caps": 4, "history": 1, "position": 1, "block-length": 1},
 	"packages/language-server/src/foldingRanges.ts": {"sentence-length": 9, "em-dash": 13, "all-caps": 2},
 	"packages/language-server/src/formatting.ts": {"sentence-length": 6, "em-dash": 4},
-	"packages/language-server/src/hover.ts": {"sentence-length": 53, "em-dash": 57, "all-caps": 30, "position": 2, "block-length": 7},
 	"packages/language-server/src/importCompletion.ts": {"sentence-length": 10, "em-dash": 6, "all-caps": 1},
 	"packages/language-server/src/inlayHints.ts": {"sentence-length": 17, "em-dash": 15, "all-caps": 8, "block-length": 4},
 	"packages/language-server/src/matchHandlerChildren.ts": {"sentence-length": 5, "em-dash": 3, "all-caps": 1},

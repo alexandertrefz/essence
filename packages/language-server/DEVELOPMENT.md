@@ -389,3 +389,51 @@ cursor's own Scope comes first, then Record members and labels, the document, th
 Tiers are single digits, since `sortText` compares as text. A snippet ranks after the Keyword that shares its label,
 because a reader typing `test` usually means the word. An offer from another Module ranks last, because accepting it
 edits the import block too.
+
+## Hover
+
+`findHover` in `src/hover.ts` offers every typed node of the enriched Program as a candidate. The smallest candidate
+containing the cursor wins, and a tie goes to the later one. Children are offered after their parents, so hovering an
+Identifier inside a larger Expression describes the Identifier. A Type is printed only for a candidate that wins its
+turn, not for every node.
+
+A line's margins answer nothing: its indentation, the space after its last character, and a blank line. A space
+between two tokens belongs to whatever spans them, such as `a + b`, and answers as that.
+
+### What the typed tree lacks
+
+Some parts of a declaration have no typed node with a Position, so the passes pair the typed tree with the parsed one:
+
+- A native Method signature has no typed node at all: the Enricher drops it, since there is no body to emit. Its
+  Types are on the typed Namespace, and its Positions only in the parsed source. `visitNativeSignatures` pairs each
+  parsed signature with its resolved Overload, index by index. It answers for the Method name, the signature, the
+  Parameter names and a native static property. It finds nothing in an ordinary Program, since native signatures
+  occur only in a declarations file.
+- A Protocol's requirements and a Choice's payload members survive enrichment only as plain Records of Types.
+  `visitProtocolBodies` and `visitChoicePayloads` pair them with the parsed declaration by name.
+- The typed tree erases annotations. `visitAnnotations` offers the Enricher's resolved annotations as a flat list,
+  each paired with what it resolved to. No annotation spans exactly what its parent annotation spans, so the smallest
+  candidate rule handles nesting. They are offered last, so an exact tie goes to the annotation.
+- An import or export entry pairs its typed entry, which holds the bound Type, with the parsed entry by the entry's
+  span. An entry the linking refused stays silent; its Diagnostic is already on it.
+
+Names the Compiler made up answer nothing. That covers the Constant a Pattern stores its value in, a Pattern
+Parameter's internal name, and a member path's `_0` Parameter. The Pattern's own bindings answer for their spans.
+
+### How a declaration reads back
+
+A callable reads as declared, `greet(subject: String) -> String`, not as a Function Type. An Overload set not yet
+narrowed to one candidate lists each Overload on its own line.
+
+A declaration whose name would only repeat itself answers with what the name stands for:
+
+- A Protocol, a Choice and a Namespace with conformance clauses read back as their declaration head, with Type
+  Parameters, conformance clauses and each Case's payload. A Namespace without clauses answers `Name: Name`. An import
+  or export entry naming a Namespace reads back as `namespace Name for Target`.
+- A Record Alias reads back as its members, on its own declaration and on an annotation or entry naming it. A value of
+  one answers with the name, since the shape would drown the line. Only the outermost Alias is expanded: a member that
+  is an Alias stays named.
+- A checked refinement reads back as the Type it refines, on its own declaration. A generic one wraps the refinement
+  in a Generic Alias, so its base is one level further in.
+
+Everywhere else a value answers with its Type's name, as `printType` prints it.
