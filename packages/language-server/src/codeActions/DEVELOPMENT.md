@@ -223,6 +223,13 @@ one, the destination gets a second entry, unless the name binds a Namespace, a P
 destination away, since two entries for one Namespace make its calls ambiguous. A destination the name is imported
 from needs no import, as long as it declares the name under the one the Statement writes.
 
+A Namespace the move brings may answer a Method for a receiver that a Namespace the destination already reaches
+answers too. A call of that Method, in the Statement or in the destination's own code, would then answer differently or
+become ambiguous. So `namespacesCollide` turns such a destination away, and one reaching a Namespace that answers a
+Method the Statement calls through a builtin Namespace for that receiver. A receiver is a builtin Type, a Choice, or any
+Record, since Records are structural, and a refinement counts as its base. A Namespace already in reach brings nothing
+new. A target that can not be resolved, such as a Type Parameter, meets every receiver.
+
 The move may leave this file and the destination importing each other. A cycle breaks more than its Constants, which
 do not hoist: a static Property read across one may not be declared yet either. So `importsEachOther` turns such a
 destination away. It looks at the two Modules only, not at a longer cycle through others.

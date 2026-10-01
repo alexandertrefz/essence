@@ -5316,6 +5316,114 @@ describe("Workspace", () => {
 				).toEqual(["Move 'run' to a new Module"])
 			})
 
+			// `B.es` and `E.es` reach `OtherExtras`, whose `doubled` would answer
+			// the moved call or make it, and `B.es`'s own, ambiguous.
+			it("should not offer a Module whose Namespaces declare a Method the Declaration calls", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./E.es" { OtherExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = 1::doubled()",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": extras,
+					"E.es": [
+						"implementation {",
+						"\tnamespace OtherExtras for Integer {",
+						"\t\tdoubled() -> Integer {",
+						"\t\t\t<- @::multiply(with 3)",
+						"\t\t}",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tOtherExtras",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 6, "run").map(
+						(action) => action.title,
+					),
+				).toEqual([
+					"Move 'run' to ./C.es",
+					"Move 'run' to a new Module",
+				])
+			})
+
+			// `Money`'s `add` answers for `Money` values only, so it can not
+			// answer the `Integer` the Statement adds to.
+			it("should offer a Module whose Namespace declares the Method for another receiver", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction bump(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(1)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tbump",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"implementation {",
+						"\ttype Money = { cents: Integer }",
+						"",
+						"\tnamespace Money for Money {",
+						"\t\tadd(_ other: Money) -> Money {",
+						"\t\t\t<- { cents = @.cents::add(other.cents) }",
+						"\t\t}",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tMoney",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"bump",
+					"Move 'bump' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
 			// A Function bound twice is no ambiguity, so the name the
 			// Statement writes joins the one already there.
 			it("should write a second entry for a Function the Module it lands in imports under another name", () => {

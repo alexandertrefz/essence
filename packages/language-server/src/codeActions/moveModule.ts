@@ -124,7 +124,25 @@ type Move = {
 	unpublish: CodeActionEdit | null
 	usedHere: boolean
 	namings: Array<Naming>
+	// The Namespaces the move brings into the destination, and the calls the
+	// Statement makes through a Namespace no entry brings, such as a builtin
+	// one.
+	brings: Array<NamespaceShape>
+	unbroughtCalls: Array<{ member: string; receiver: Receiver }>
 }
+
+// What a Namespace answers for: its Methods, and the receivers it is written
+// for. See `Receiver`.
+type NamespaceShape = {
+	identity: string
+	methods: Set<string>
+	receiver: Receiver
+}
+
+// What a Namespace answers for, as far as two can be told apart. That is a
+// builtin Type such as `builtin:Integer`, a Choice by identity, or any Record,
+// since Records are structural. `unknown` may be anything.
+type Receiver = string
 
 const implementationKeyword = "implementation"
 
@@ -245,6 +263,14 @@ function movableAt(
 				exportEntry,
 			}),
 			namings: namingsOf(context, name),
+			...namespacesBrought(
+				context,
+				statement,
+				enrichedProgram,
+				span,
+				reads.needed,
+				imports,
+			),
 		}
 	}
 
@@ -402,6 +428,389 @@ function readsMovableNames(
 		})),
 		imports: [...imports],
 	}
+}
+
+// See `Move.brings`. A Namespace this file declares travels as an import of
+// it, or as the Statement itself.
+function namespacesBrought(
+	context: ImportContext,
+	statement: parser.ImplementationNode,
+	enrichedProgram: common.typed.Program,
+	span: common.Position,
+	needed: Array<{ name: string; local: string }>,
+	imports: Array<ReadImport>,
+): Pick<Move, "brings" | "unbroughtCalls"> {
+	let workspace = context.workspace
+	let brings = [
+		...needed.flatMap(({ name }) =>
+			namespacesBehind(workspace, context.filePath, name),
+		),
+		...imports.flatMap(({ entry, filePath }) =>
+			namespacesBehind(workspace, filePath, entry.name.content),
+		),
+	]
+
+	if (statement.nodeType === "NamespaceDefinitionStatement") {
+		brings.push(
+			namespaceShape(
+				workspace,
+				context.filePath,
+				context.program,
+				statement,
+			),
+		)
+	}
+
+	let bound = new Set([
+		...(context.program.imports?.entries ?? []).map(
+			(entry) => (entry.alias ?? entry.name).content,
+		),
+		...context.program.implementation.nodes.flatMap((node) =>
+			node.nodeType === "NamespaceDefinitionStatement"
+				? [node.name.content]
+				: [],
+		),
+		...derivedNamespaces,
+	])
+
+	return {
+		brings,
+		unbroughtCalls: callsIn(enrichedProgram, span).filter(
+			(call) => !bound.has(call.namespace),
+		),
+	}
+}
+
+// The Methods a Namespace declares for its values, rather than as statics.
+function instanceMethods(
+	node: parser.NamespaceDefinitionStatementNode,
+): Array<string> {
+	return Object.entries(node.methods).flatMap(([name, method]) =>
+		method.nodeType.includes("Static") ? [] : [name],
+	)
+}
+
+// The Namespaces a Module publishes under a name, wherever each is declared.
+function namespacesBehind(
+	workspace: ImportContext["workspace"],
+	filePath: string,
+	name: string,
+): Array<NamespaceShape> {
+	return workspace.exportsOf(filePath).flatMap((exported) => {
+		let text = workspace.sourceOf(exported.declaredIn)
+		let program = workspace.programOf(exported.declaredIn)
+
+		if (exported.name !== name || text === null || program === null) {
+			return []
+		}
+
+		let declared = sliceOf(text.split("\n"), exported.position)
+
+		return program.implementation.nodes.flatMap((node) =>
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			node.name.content === declared
+				? [
+						namespaceShape(
+							workspace,
+							exported.declaredIn,
+							program,
+							node,
+						),
+					]
+				: [],
+		)
+	})
+}
+
+function namespaceShape(
+	workspace: ImportContext["workspace"],
+	filePath: string,
+	program: parser.Program,
+	node: parser.NamespaceDefinitionStatementNode,
+): NamespaceShape {
+	let generics = new Set(node.generics.map((generic) => generic.name.content))
+
+	return {
+		identity: `${filePath}#${node.name.content}`,
+		methods: new Set(instanceMethods(node)),
+		receiver:
+			node.targetType === null
+				? "unknown"
+				: writtenReceiver(
+						workspace,
+						filePath,
+						program,
+						node.targetType,
+						generics,
+						0,
+					),
+	}
+}
+
+const builtinReceivers = new Set([
+	"Algebraic",
+	"Boolean",
+	"Dictionary",
+	"Integer",
+	"List",
+	"Rational",
+	"String",
+	"Transcendental",
+])
+
+// The receiver a written Type names, followed through Aliases and imports. A
+// refinement answers for its base's receiver. See `Receiver`.
+function writtenReceiver(
+	workspace: ImportContext["workspace"],
+	filePath: string,
+	program: parser.Program,
+	type: parser.TypeDeclarationNode,
+	generics: Set<string>,
+	depth: number,
+): Receiver {
+	if (type.nodeType === "GenericTypeDeclaration") {
+		return writtenReceiver(
+			workspace,
+			filePath,
+			program,
+			type.baseType,
+			generics,
+			depth,
+		)
+	}
+
+	if (type.nodeType === "RecordTypeDeclaration") {
+		return "record"
+	}
+
+	if (type.nodeType !== "IdentifierTypeDeclaration" || depth > 4) {
+		return "unknown"
+	}
+
+	let name = type.type.content
+
+	if (generics.has(name)) {
+		return "unknown"
+	}
+
+	for (let node of program.implementation.nodes) {
+		if (
+			node.nodeType === "ChoiceDeclarationStatement" &&
+			node.name.content === name
+		) {
+			return `choice:${filePath}#${name}`
+		}
+
+		if (
+			node.nodeType === "TypeAliasStatement" &&
+			node.name.content === name
+		) {
+			return writtenReceiver(
+				workspace,
+				filePath,
+				program,
+				node.type,
+				new Set(node.generics.map((generic) => generic.name.content)),
+				depth + 1,
+			)
+		}
+	}
+
+	let entry = program.imports?.entries.find(
+		(candidate) => (candidate.alias ?? candidate.name).content === name,
+	)
+
+	if (entry === undefined) {
+		return builtinReceivers.has(name) ? `builtin:${name}` : "unknown"
+	}
+
+	let dependency = workspace.dependenciesOf(filePath).get(entry.source.path)
+	let exported = workspace
+		.exportsOf(dependency ?? "")
+		.find((candidate) => candidate.name === entry.name.content)
+	let text =
+		exported === undefined ? null : workspace.sourceOf(exported.declaredIn)
+	let declaring =
+		exported === undefined ? null : workspace.programOf(exported.declaredIn)
+
+	if (exported === undefined || text === null || declaring === null) {
+		return "unknown"
+	}
+
+	return writtenReceiver(
+		workspace,
+		exported.declaredIn,
+		declaring,
+		{
+			nodeType: "IdentifierTypeDeclaration",
+			type: {
+				nodeType: "Identifier",
+				content: sliceOf(text.split("\n"), exported.position),
+				position: exported.position,
+			},
+			position: exported.position,
+		},
+		new Set(),
+		depth + 1,
+	)
+}
+
+// The receiver a typed receiver's Type is. See `Receiver`.
+function typedReceiver(type: common.Type | undefined): Receiver {
+	if (type === undefined) {
+		return "unknown"
+	}
+
+	if (builtinReceivers.has(type.type)) {
+		return `builtin:${type.type}`
+	}
+
+	switch (type.type) {
+		case "Refinement":
+			return typedReceiver(type.base)
+		case "Case":
+			return `choice:${type.choice}`
+		case "Record":
+			return "record"
+		case "UnionType": {
+			let members = new Set(
+				type.types.map((member) =>
+					"type" in member ? typedReceiver(member) : "unknown",
+				),
+			)
+
+			return members.size === 1 ? [...members][0]! : "unknown"
+		}
+		default:
+			return "unknown"
+	}
+}
+
+// Whether one value could reach both receivers.
+function receiversMeet(left: Receiver, right: Receiver): boolean {
+	return left === "unknown" || right === "unknown" || left === right
+}
+
+// The Method calls the typed tree records inside the span, each with the
+// Namespace that answers it and its receiver.
+function callsIn(
+	program: common.typed.Program,
+	span: common.Position,
+): Array<{ member: string; namespace: string; receiver: Receiver }> {
+	let calls: Array<{
+		member: string
+		namespace: string
+		receiver: Receiver
+	}> = []
+
+	let visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			node.forEach(visit)
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (typeof record["type"] === "string" && !("nodeType" in record)) {
+			return
+		}
+
+		if (
+			record["nodeType"] === "MethodInvocation" &&
+			isPosition(record["position"]) &&
+			containsRange(span, record["position"])
+		) {
+			let invocation =
+				record as unknown as common.typed.MethodInvocationNode
+			let member = invocation.member.name
+
+			calls.push({
+				member,
+				namespace: invocation.namespace.name,
+				receiver: typedReceiver(invocation.base.type),
+			})
+
+			for (let branch of invocation.dispatch ?? []) {
+				calls.push({
+					member,
+					namespace: branch.namespaceName,
+					receiver: typedReceiver(branch.memberType),
+				})
+			}
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(program)
+
+	return calls
+}
+
+// Whether a Namespace the move brings and one the destination reaches answer
+// a Method of one name for one receiver. A call the Statement makes through a
+// builtin Namespace counts too. Such a call would answer differently or become
+// ambiguous. See "Moving a Declaration" in DEVELOPMENT.md.
+function namespacesCollide(
+	move: Move,
+	target: Target,
+	landingNamings: Array<Naming>,
+): boolean {
+	let workspace = move.context.workspace
+	let program = target.program
+
+	if (program === null) {
+		return false
+	}
+
+	let unbound = new Set<unknown>(
+		landingNamings.flatMap((naming) =>
+			naming.entries.map((named) => named.entry),
+		),
+	)
+	let resolutions = workspace.dependenciesOf(target.filePath)
+	let present = [
+		...program.implementation.nodes.flatMap((node) =>
+			node.nodeType === "NamespaceDefinitionStatement"
+				? [namespaceShape(workspace, target.filePath, program, node)]
+				: [],
+		),
+		...(program.imports?.entries ?? []).flatMap((entry) => {
+			let filePath = resolutions.get(entry.source.path)
+
+			return unbound.has(entry) || filePath === undefined
+				? []
+				: namespacesBehind(workspace, filePath, entry.name.content)
+		}),
+	]
+
+	// A Namespace the destination already reaches brings nothing new.
+	let brought = move.brings.filter(
+		(shape) => !present.some((there) => there.identity === shape.identity),
+	)
+
+	return present.some(
+		(there) =>
+			move.unbroughtCalls.some(
+				(call) =>
+					there.methods.has(call.member) &&
+					receiversMeet(call.receiver, there.receiver),
+			) ||
+			brought.some(
+				(shape) =>
+					receiversMeet(shape.receiver, there.receiver) &&
+					[...shape.methods].some((method) =>
+						there.methods.has(method),
+					),
+			),
+	)
 }
 
 // The file and name an identity is made of, or null for one the standard
@@ -1083,7 +1492,8 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 
 	if (
 		imports === null ||
-		importsEachOther(move, target, imports, landingNamings)
+		importsEachOther(move, target, imports, landingNamings) ||
+		namespacesCollide(move, target, landingNamings)
 	) {
 		return null
 	}
