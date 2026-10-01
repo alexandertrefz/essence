@@ -77,7 +77,6 @@
 	"packages/runtime/src/tests/groupedList.spec.ts": {"sentence-length": 29, "em-dash": 20, "all-caps": 28, "block-length": 2},
 	"packages/runtime/src/tests/keyEncoding.spec.ts": {"sentence-length": 31, "em-dash": 17, "all-caps": 46, "position": 5, "block-length": 3},
 	"packages/runtime/src/tests/positionalWrites.spec.ts": {"sentence-length": 45, "em-dash": 25, "all-caps": 94, "position": 5, "block-length": 9},
-	"packages/runtime/src/tests/rendering.spec.ts": {"sentence-length": 19, "em-dash": 12, "all-caps": 16, "position": 3, "block-length": 1},
 	"packages/runtime/src/tests/sharing.spec.ts": {"sentence-length": 33, "em-dash": 26, "all-caps": 23, "history": 1, "position": 2, "block-length": 1},
 	"packages/runtime/src/tests/stringWindows.spec.ts": {"sentence-length": 47, "em-dash": 27, "all-caps": 57, "history": 2, "position": 3, "block-length": 7},
 	"packages/runtime/src/tests/testing.spec.ts": {"sentence-length": 39, "em-dash": 35, "all-caps": 19, "position": 2, "block-length": 1, "counts": 1},
