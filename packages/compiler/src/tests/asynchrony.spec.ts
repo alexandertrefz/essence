@@ -361,6 +361,11 @@ describe("Asynchrony", () => {
 		as complete.x otherwise
 	}
 
+	constant corner = define {
+		as { x = 0, y = 0 } if flag
+		as complete otherwise
+	}
+
 	constant moved = { complete with x = 3 }
 
 	constant named = match complete.y -> String {
@@ -372,8 +377,20 @@ describe("Asynchrony", () => {
 		}
 	}
 
-	Terminal.print(chosen::add(moved.x)::toString())
+	function label(_ start: Integer) -> String {
+		<- match start -> String {
+			case 2 {
+				<- "two"
+			}
+			case _ {
+				<- "other"
+			}
+		}
+	}
+
+	Terminal.print(chosen::add(moved.x)::add(corner.y)::toString())
 	Terminal.print(named)
+	Terminal.print(label(2))
 }`),
 			).toEqual([])
 		})
