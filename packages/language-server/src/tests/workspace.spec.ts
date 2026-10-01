@@ -4446,6 +4446,64 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
+			// The Module it lands in drops its entry for the Declaration and
+			// gains one for `STEP` in the same group. The one replaces the other.
+			it("should import what the Declaration reads in place of the entry that named it", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant STEP = 2",
+						"",
+						"\tfunction double(_ n: Integer) -> Integer {",
+						"\t\t<- n::multiply(with STEP)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tSTEP",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": dependent,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"double",
+					"Move 'double' to ./Main.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./A.es" { STEP }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(2)::toString())",
+						"",
+						"\tfunction double(_ n: Integer) -> Integer {",
+						"\t\t<- n::multiply(with STEP)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("Main.es"))).toEqual(
+					[],
+				)
+			})
+
 			// A Type is one of those names too, and a Module the file
 			// writes from scratch takes the block with the rest of the Program.
 			it("should import a Type into the Module it writes", () => {

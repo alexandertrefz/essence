@@ -3,11 +3,14 @@ import * as path from "node:path"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
+	type ImportEdit,
+	type ImportEntry,
+	importBlock,
 	insertExportEdit,
 	insertImportEdit,
-	insertImportsEdit,
+	insertImportsEdits,
 	relativeSpecifier,
-	spellNames,
+	spellName,
 } from "../autoImport"
 import { isSamePosition } from "../positions"
 import {
@@ -22,6 +25,7 @@ import {
 	insertBeforeClosingBrace,
 	lineAt,
 	overlaps,
+	removeLinesEdit,
 	removeMemberEdit,
 	sliceOf,
 } from "./geometry"
@@ -431,33 +435,66 @@ function removeSectionEdit(
 	return { range: lineRange(lines, first, last), newText: "" }
 }
 
-// Removes the destination's imports of the name, which it now declares, with
-// any group or block left empty. A forwarding Module is never a destination.
-function unbindEdits(naming: Naming): Array<CodeActionEdit> {
-	let lines = naming.sourceText.split("\n")
-	let section = naming.program.imports
+// Takes entries out of a Module's import block and writes others into it, as
+// edits that never overlap. See "Moving a Declaration" in DEVELOPMENT.md.
+function rewriteImports(
+	sourceText: string,
+	program: parser.Program,
+	removed: Array<parser.ImportNode>,
+	added: Array<ImportEntry>,
+): Array<ImportEdit> {
+	let lines = sourceText.split("\n")
+	let section = program.imports
 
-	if (section === null) {
-		return []
+	if (section === null || removed.length === 0) {
+		return insertImportsEdits(sourceText, program, added)
 	}
 
-	return naming.entries.flatMap((named) =>
-		named.section !== "imports"
-			? []
-			: [
-					{
-						...(section.entries.length === 1
-							? removeSectionEdit(lines, section.position)
-							: named.group.entries.length === 1
-								? removeMemberEdit(lines, named.group.position)
-								: removeMemberEdit(
-										lines,
-										named.entry.position,
-									)),
-						filePath: naming.filePath,
-					},
-				],
-	)
+	if (
+		added.length === 0 &&
+		section.entries.every((entry) => removed.includes(entry))
+	) {
+		return [removeSectionEdit(lines, section.position)]
+	}
+
+	let edits: Array<ImportEdit> = []
+	let left = added
+
+	for (let group of section.groups) {
+		let gone = group.entries.filter((entry) => removed.includes(entry))
+
+		if (gone.length === 0) {
+			continue
+		}
+
+		// `insertImportsEdits` writes into the first group of a Module.
+		let receives =
+			section.groups.find(
+				(candidate) => candidate.source.path === group.source.path,
+			) === group
+		let incoming = receives
+			? left.filter((entry) => entry.specifier === group.source.path)
+			: []
+
+		if (incoming.length > 0) {
+			left = left.filter((entry) => !incoming.includes(entry))
+			edits.push({
+				range: (gone[0] as parser.ImportNode).position,
+				newText: incoming.map(spellName).join(" "),
+			})
+			gone = gone.slice(1)
+		} else if (gone.length === group.entries.length) {
+			edits.push(removeLinesEdit(lines, group.position))
+
+			continue
+		}
+
+		for (let entry of gone) {
+			edits.push(removeLinesEdit(lines, entry.position))
+		}
+	}
+
+	return [...edits, ...insertImportsEdits(sourceText, program, left)]
 }
 
 // Whole lines with the last one's line break, or, at the end of the file, the
@@ -553,17 +590,13 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	// Module, this file's body, or this file's export block.
 	let publish =
 		move.unpublish !== null || otherNamings.length > 0 || move.usedHere
-	let landing = landingEdits(move, target, publish)
+	let landing = landingEdits(move, target, publish, landingNamings)
 
 	if (landing === null) {
 		return null
 	}
 
 	let edits = [move.removal, ...landing]
-
-	for (let naming of landingNamings) {
-		edits.push(...unbindEdits(naming))
-	}
 
 	if (move.unpublish !== null) {
 		edits.push(move.unpublish)
@@ -598,28 +631,23 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	}
 }
 
-// What lands in the destination: the Statement, and its export entry where
-// needed.
+// What lands in the destination: the Statement, its export entry where
+// needed, and the names it reads from this Module. The destination's own
+// imports of the name go, since it now declares it.
 function landingEdits(
 	move: Move,
 	target: Target,
 	publish: boolean,
+	landingNamings: Array<Naming>,
 ): Array<CodeActionEdit> | null {
 	let sourceText = target.sourceText
 	let program = target.program
-
-	// The names the Statement reads from this Module, imported back from it,
-	// which still publishes them.
-	let broughtAlong =
-		move.needed.length === 0
-			? null
-			: {
-					names: move.needed,
-					specifier: relativeSpecifier(
-						target.filePath,
-						move.context.filePath,
-					),
-				}
+	// Imported back from this Module, which still publishes them.
+	let imports = move.needed.map((name) => ({
+		name,
+		alias: null,
+		specifier: relativeSpecifier(target.filePath, move.context.filePath),
+	}))
 
 	// A new or blank file gets a whole Program.
 	if (sourceText === null || program === null || sourceText.trim() === "") {
@@ -638,7 +666,7 @@ function landingEdits(
 									column: (lines.at(-1) ?? "").length + 1,
 								},
 				},
-				newText: moduleText(move, publish, broughtAlong),
+				newText: moduleText(move, publish, imports),
 				filePath: target.filePath,
 				...(sourceText === null ? { createFile: true } : {}),
 			},
@@ -690,12 +718,14 @@ function landingEdits(
 		}
 	}
 
-	if (broughtAlong !== null) {
-		let edit = insertImportsEdit(sourceText, program, broughtAlong)
+	let unbound = landingNamings.flatMap((naming) =>
+		naming.entries.flatMap((named) =>
+			named.section === "imports" ? [named.entry] : [],
+		),
+	)
 
-		if (edit !== null) {
-			edits.push({ ...edit, filePath: target.filePath })
-		}
+	for (let edit of rewriteImports(sourceText, program, unbound, imports)) {
+		edits.push({ ...edit, filePath: target.filePath })
 	}
 
 	return edits
@@ -704,16 +734,10 @@ function landingEdits(
 function moduleText(
 	move: Move,
 	publish: boolean,
-	broughtAlong: { names: Array<string>; specifier: string } | null,
+	imports: Array<ImportEntry>,
 ): string {
 	let exported = publish ? `\nexport {\n\t${move.name}\n}\n` : ""
-	let imported =
-		broughtAlong === null
-			? ""
-			: `import {\n\t${spellNames(
-					broughtAlong.names,
-					broughtAlong.specifier,
-				)}\n}\n\n`
+	let imported = imports.length === 0 ? "" : `${importBlock(imports, "")}\n`
 
 	return `${imported}implementation {\n${move.text}\n}\n${exported}`
 }

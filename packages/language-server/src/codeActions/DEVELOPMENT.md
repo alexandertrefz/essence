@@ -215,6 +215,10 @@ The edits follow from who still names the Declaration:
 Removing the Statement also removes the one blank line that no longer separates anything. No doubled blank line,
 and no blank line against a brace, is left behind.
 
+The landing Module may lose import entries and gain others in one move. `rewriteImports` computes both as one set of
+edits, because an editor refuses edits that overlap. A group that loses an entry and gains others has that entry
+rewritten as the new ones, rather than being deleted and written into at once.
+
 ## Binders to @
 
 `binderToScrutineeAction` applies the Help for a redundant whole-value binder: the `as name` goes, and every read

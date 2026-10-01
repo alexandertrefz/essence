@@ -13,7 +13,7 @@ export type ImportEdit = {
 	newText: string
 }
 
-type ImportEntry = {
+export type ImportEntry = {
 	// The name the other Module publishes, never the local one.
 	name: string
 	alias: string | null
@@ -59,7 +59,7 @@ function compareNames(left: ImportEntry, right: ImportEntry): number {
 	)
 }
 
-function spellName(entry: ImportEntry): string {
+export function spellName(entry: ImportEntry): string {
 	return entry.alias === null ? entry.name : `${entry.name} as ${entry.alias}`
 }
 
@@ -189,92 +189,121 @@ export function insertImportEdit(
 	)
 }
 
-// Several names from one Module, in one edit, as when a moved Declaration
-// takes along the names it reads. Separate edits would each be computed against
-// text the others had not landed in. Names imported already are left out.
-export function insertImportsEdit(
+// Several entries, from one Module or several, as when a moved Declaration
+// takes along the names it reads. Separate calls would each be computed
+// against text the others had not landed in. Entries imported already are left
+// out, and the edits are listed in the order their text should appear.
+export function insertImportsEdits(
 	sourceText: string,
 	program: parser.Program,
-	request: { names: Array<string>; specifier: string },
-): ImportEdit | null {
+	entries: Array<ImportEntry>,
+): Array<ImportEdit> {
 	let lines = sourceText.split("\n")
 	let section = program.imports
-	let wanted = [...new Set(request.names)].sort(compareStrings)
+	let fresh = entries.filter(
+		(entry) =>
+			section === null ||
+			!section.entries.some(
+				(candidate) =>
+					candidate.source.path === entry.specifier &&
+					candidate.name.content === entry.name &&
+					(candidate.alias?.content ?? null) === entry.alias,
+			),
+	)
 
-	if (wanted.length === 0) {
-		return null
+	if (fresh.length === 0) {
+		return []
 	}
 
 	if (section === null) {
 		let line = program.implementation.position.start.line
-		let indentation = indentationOf(lines, line)
 
-		return insertionAt(
-			line,
-			`${indentation}import {\n${indentation}\t${spellNames(
-				wanted,
-				request.specifier,
-			)}\n${indentation}}\n\n`,
-		)
-	}
-
-	let missing = wanted.filter(
-		(name) =>
-			!section.entries.some(
-				(candidate) =>
-					candidate.source.path === request.specifier &&
-					candidate.name.content === name,
+		return [
+			insertionAt(
+				line,
+				`${importBlock(fresh, indentationOf(lines, line))}\n`,
 			),
-	)
-
-	if (missing.length === 0) {
-		return null
+		]
 	}
 
-	let group = section.groups.find(
-		(candidate) => candidate.source.path === request.specifier,
-	)
-
-	if (group !== undefined) {
-		return insertIntoGroup(
-			lines,
-			group,
-			{
-				name: missing[0] as string,
-				alias: null,
-				specifier: request.specifier,
-			},
-			missing.join(" "),
+	return groupsOf(fresh).map((group) => {
+		let spelling = group.map(spellName).join(" ")
+		let first = group[0] as ImportEntry
+		let written = section.groups.find(
+			(candidate) => candidate.source.path === first.specifier,
 		)
-	}
 
-	let spelling = spellNames(missing, request.specifier)
+		if (written !== undefined) {
+			return insertIntoGroup(lines, written, first, spelling)
+		}
 
-	if (section.groups.length === 0) {
-		return insertIntoEmptyBlock(lines, section, spelling)
-	}
+		let opened = `from "${first.specifier}" { ${spelling} }`
 
-	let successor = section.groups.find(
-		(candidate) =>
-			compareStrings(request.specifier, candidate.source.path) < 0,
-	)
-	let last = section.groups[
-		section.groups.length - 1
-	] as parser.ImportGroupNode
+		if (section.groups.length === 0) {
+			return insertIntoEmptyBlock(lines, section, opened)
+		}
 
-	return insertAmong(
-		lines,
-		spelling,
-		successor?.position ?? null,
-		last.position,
-		section.position.end.line,
-	)
+		let successor = section.groups.find(
+			(candidate) =>
+				compareStrings(first.specifier, candidate.source.path) < 0,
+		)
+		let last = section.groups[
+			section.groups.length - 1
+		] as parser.ImportGroupNode
+
+		return insertAmong(
+			lines,
+			opened,
+			successor?.position ?? null,
+			last.position,
+			section.position.end.line,
+		)
+	})
 }
 
-// A run of names written as a group on one line; the Formatter rewrites a
-// group of several.
-export function spellNames(names: Array<string>, specifier: string): string {
-	return `from "${specifier}" { ${names.join(" ")} }`
+// A whole import block, each Module's names written as one group on one line.
+// The Formatter rewrites a group of several.
+export function importBlock(
+	entries: Array<ImportEntry>,
+	indentation: string,
+): string {
+	let written = groupsOf(entries).map(
+		(group) =>
+			`${indentation}\tfrom "${(group[0] as ImportEntry).specifier}" { ${group
+				.map(spellName)
+				.join(" ")} }`,
+	)
+
+	return `${indentation}import {\n${written.join("\n")}\n${indentation}}\n`
+}
+
+// The entries by Module, each group sorted by name and the groups by
+// specifier, as the Formatter orders them.
+function groupsOf(entries: Array<ImportEntry>): Array<Array<ImportEntry>> {
+	let bySpecifier = new Map<string, Array<ImportEntry>>()
+
+	for (let entry of entries) {
+		let group = bySpecifier.get(entry.specifier) ?? []
+
+		if (
+			!group.some(
+				(other) =>
+					other.name === entry.name && other.alias === entry.alias,
+			)
+		) {
+			group.push(entry)
+		}
+
+		bySpecifier.set(entry.specifier, group)
+	}
+
+	return [...bySpecifier.keys()]
+		.sort(compareStrings)
+		.map((specifier) =>
+			(bySpecifier.get(specifier) as Array<ImportEntry>).sort(
+				compareNames,
+			),
+		)
 }
 
 // The export block's side of the builder, null when the name is published
