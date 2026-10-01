@@ -1,34 +1,9 @@
-// Every snippet the language ships, held once. Two things read this
-// table: Completion offers them as snippet-format entries scoped to the block
-// the cursor stands in, and `bun run generate:snippets` writes the VS Code
-// `.code-snippets` file out of it for the readers who switch the Server off.
-// The file is GENERATED rather than maintained beside this, because two hand
-// written copies of one table are two copies that drift — a spec regenerates
-// in memory and fails when the checked in file is stale.
-//
-// A body is written in LSP snippet syntax, which VS Code and the Server share:
-// `${1:default}` is a tab stop with text already selected, `$0` is where the
-// cursor is left, a tab stop number written twice is one stop edited in two
-// places, and `$`, `}` and `\` are escaped with a backslash where they are
-// meant literally. Indentation is a tab: an Editor re-indents every line of an
-// inserted snippet to the line the cursor stands on, so a body says how deep
-// its own lines are relative to each other and nothing about the file.
+// Every snippet the language ships, held once for Completion and for the
+// generated VS Code file. See "Snippets" in DEVELOPMENT.md.
 
-// The block a body parses in, which is what says whether it is offered.
-// Some of these carry no body of their own and still earn their place by what
-// they refuse: a cursor inside a `match` is offered the handlers that belong
-// there rather than the `function` and `namespace` a statement position would
-// offer, neither of which parses inside an Expression. `define`, `choice`,
-// `overload` and `parameters` are refusals and nothing else: an arm list, a
-// Case list, a list of signatures and a Parameter list each take one shape of
-// writing that no snippet here is.
-//
-// `top` is beside the sections rather than inside one — above the imports,
-// between the implementation and the tests, below the exports — which is where
-// a whole section is written. `implementation` and `declarations` are the two
-// spellings of a Program's body, and a Method's or a Function's body reports
-// the section it is written in rather than a block of its own: a Statement is a
-// Statement wherever it stands.
+// The block a body parses in, which decides where it is offered. `define`,
+// `choice`, `overload` and `parameters` only refuse. `top` is between the
+// sections, and a body reports the section it is written in.
 export type SnippetContext =
 	| "top"
 	| "implementation"
@@ -47,46 +22,30 @@ export type SnippetContext =
 	| "overload"
 	| "parameters"
 
-// A context that is a NARROWER reading of another: everything the wider
-// one offers is offered here too, and a snippet that needs the narrower one
-// says so and is offered nowhere else. `method` is a value position inside a
-// Namespace Method or a provided Protocol Method, which is the one place `{ @
-// with … }` means anything — everywhere else it raises `at-outside-method`.
+// A narrower reading of another context, offering everything the wider one
+// does. `method` is a value position in an instance Method's body.
 const widerContext: Partial<Record<SnippetContext, SnippetContext>> = {
 	method: "expression",
 }
 
-// The Module sections a file is made of. `implementation` stands for the
-// BODY section under either of its two spellings — a file that opened one has
-// no room for a `declarations { … }` beside it, and none for a second
-// `implementation { … }` either.
+// The Module sections a file is made of. `implementation` stands for either
+// spelling of the body section.
 export type ModuleSection = "implementation" | "tests" | "import" | "export"
 
 export type Snippet = {
-	// What is typed to reach it, and the name it is written under in the
-	// generated file — one word, so the two can not disagree.
+	// What is typed to reach it, and its name in the generated file.
 	prefix: string
 	description: string
 	body: Array<string>
 	contexts: Array<SnippetContext>
-	// The sections the body OPENS, for the six that open one. A second
-	// `tests { … }` is a Diagnostic and so is a second implementation section,
-	// so a file that already writes one is not offered the snippet that writes
-	// it again — `tests-file` is the one body that writes two.
+	// The sections the body opens. A file writing one already is not offered it
+	// again; `tests-file` is the one body that writes two.
 	writes?: Array<ModuleSection>
 }
 
-// What a body reads as before anything is typed: every tab stop's
-// default text in its place, and a bare stop — `$0`, which carries none —
-// replaced by whatever the caller stands in for it. Completion shows the first
-// line of this beside the prefix, and the spec compiles the whole of it to
-// prove the table parses.
-//
-// The walk is a scanner rather than one regular expression because a default
-// may hold a tab stop of its own — `${2:: ${3:Type}}` is the annotation of the
-// `constant` snippet — and nesting is the one thing a regular expression can
-// not count. An unescaped `}` inside a placeholder is therefore always the one
-// closing it, which is exactly the rule the escape exists for.
+// A body as it reads before anything is typed: defaults in place, and a bare
+// stop replaced by the caller's stand-in. A scanner, not a regular expression,
+// since a default may nest a tab stop, as in `${2:: ${3:Type}}`.
 export function renderPlaceholders(text: string, tabstop = ""): string {
 	let rendered = ""
 	let open = 0
@@ -141,9 +100,7 @@ export function snippetsFor(context: SnippetContext): Array<Snippet> {
 	)
 }
 
-// Ordered by what each one writes rather than alphabetically — a reader
-// adding one belongs beside the forms it is a variant of, and the Completion
-// list is sorted by the Editor anyway.
+// Ordered by what each writes, so a variant sits beside its form.
 export const snippets: Array<Snippet> = [
 	/* The sections a file is made of */
 
@@ -692,11 +649,8 @@ export const snippets: Array<Snippet> = [
 		prefix: "narrow",
 		description:
 			"A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it.",
-		// The doorway HOLDS its answer rather than returning it. This is
-		// offered wherever a Statement may stand, and the top of a section is
-		// one of those places — a `<-` written there is a `top-level-return`,
-		// which makes this a scaffold that writes a Diagnostic into the
-		// reader's file.
+		// The body holds its answer rather than returning it: a `<-` at the top of a
+		// section is a `top-level-return`.
 		body: [
 			"if ${1:value}::${2:isNot}(${3:0}) {",
 			"\tconstant ${4:answer} = ${0:proven}(${1:value})",

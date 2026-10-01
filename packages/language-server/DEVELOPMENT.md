@@ -553,3 +553,29 @@ has just closed it, so the call around it is the answer.
   can take it wins, preferring one whose required Parameters reach that far.
 
 Each label carries the callee's name, so it shows the whole call, `append(_ String) -> String`.
+
+## Snippets
+
+`src/snippets.ts` holds every snippet once. Completion offers them in the blocks they parse in. The
+`generate:snippets` script writes the VS Code `.code-snippets` file from the same table, for readers who switch the
+server off. A spec in the extension re-renders the file and fails when the checked-in copy is stale. The server's own
+spec parses every body in each context it is offered in.
+
+A body uses LSP snippet syntax, which VS Code shares. An Editor re-indents every inserted line to the cursor's line,
+so a body's tabs only say how deep its lines sit relative to each other.
+
+### Where a snippet is offered
+
+`snippetContextAt` in `src/snippetContext.ts` reads which block the cursor stands in off the parsed Program. Keywords
+are offered from the text alone, but a snippet is lines of scaffold, so being wrong costs more. The Program is parsed
+for Completion already, so the reading is a walk, not a compile.
+
+- A block is a span, and the innermost span containing the cursor wins. So a Method body inside a Namespace reads as
+  a Statement body, while the member list around it reads as the Namespace.
+- Some contexts exist only to refuse. A `define` arm list, a Choice's Cases, an `overload` group and a Parameter list
+  each take a shape no snippet writes. A Parameter default is a smaller span inside the list and reads as a value.
+- `method` is the value position inside an instance Method's body, where `{ @ with … }` means something. It is read
+  from every containing block, so a Function literal inside a Method keeps it.
+- Whether the cursor starts a Statement comes from the text, since the text being typed does not parse yet.
+- A section snippet is offered only where its section is missing. A section the file does not write still has an empty
+  Position after recovery, so only a span with something written in it counts.

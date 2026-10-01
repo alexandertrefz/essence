@@ -366,8 +366,6 @@
 	"packages/language-server/src/sections.ts": {"sentence-length": 12, "em-dash": 12, "all-caps": 8, "position": 1},
 	"packages/language-server/src/selectionRanges.ts": {"sentence-length": 12, "em-dash": 7, "all-caps": 3, "position": 1},
 	"packages/language-server/src/semanticTokens.ts": {"sentence-length": 12, "em-dash": 14, "all-caps": 2, "position": 1, "block-length": 1},
-	"packages/language-server/src/snippetContext.ts": {"sentence-length": 23, "em-dash": 17, "all-caps": 13, "history": 1, "position": 3, "block-length": 3},
-	"packages/language-server/src/snippets.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 5, "block-length": 2},
 	"packages/language-server/src/spellableTypes.ts": {"sentence-length": 24, "em-dash": 12, "all-caps": 9, "block-length": 6},
 	"packages/language-server/src/tests/affected.spec.ts": {"sentence-length": 5, "em-dash": 6, "all-caps": 3},
 	"packages/language-server/src/tests/analysisCache.spec.ts": {"sentence-length": 111, "em-dash": 71, "all-caps": 48, "history": 7, "position": 1, "block-length": 11, "counts": 1},
