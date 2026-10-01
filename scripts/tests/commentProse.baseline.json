@@ -75,8 +75,6 @@
 	"packages/runtime/src/tests/edits.spec.ts": {"sentence-length": 40, "em-dash": 26, "all-caps": 40, "history": 2, "position": 7, "block-length": 4},
 	"packages/runtime/src/tests/generators.spec.ts": {"sentence-length": 30, "em-dash": 17, "all-caps": 26, "position": 5, "block-length": 1},
 	"packages/runtime/src/tests/groupedList.spec.ts": {"sentence-length": 29, "em-dash": 20, "all-caps": 28, "block-length": 2},
-	"packages/runtime/src/tests/hybridIntegers.spec.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 9, "position": 3, "block-length": 1},
-	"packages/runtime/src/tests/importGraph.spec.ts": {"sentence-length": 11, "em-dash": 5, "all-caps": 8, "position": 3, "block-length": 1},
 	"packages/runtime/src/tests/keyEncoding.spec.ts": {"sentence-length": 31, "em-dash": 17, "all-caps": 46, "position": 5, "block-length": 3},
 	"packages/runtime/src/tests/positionalWrites.spec.ts": {"sentence-length": 45, "em-dash": 25, "all-caps": 94, "position": 5, "block-length": 9},
 	"packages/runtime/src/tests/randomness.spec.ts": {"sentence-length": 11, "em-dash": 4, "all-caps": 7, "position": 3, "block-length": 2},
