@@ -8,12 +8,17 @@ import * as path from "node:path"
 
 const sourceDirectory = path.join(import.meta.dir, "..")
 
+// Every source file under `src`, named by its path from there, the specs left
+// out.
 function productionSources(): Array<{ name: string; text: string }> {
-	return readdirSync(sourceDirectory, { withFileTypes: true })
-		.filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
-		.map((entry) => ({
-			name: entry.name,
-			text: readFileSync(path.join(sourceDirectory, entry.name), "utf-8"),
+	return readdirSync(sourceDirectory, { recursive: true, encoding: "utf-8" })
+		.filter(
+			(name) =>
+				name.endsWith(".ts") && name.split(path.sep)[0] !== "tests",
+		)
+		.map((name) => ({
+			name,
+			text: readFileSync(path.join(sourceDirectory, name), "utf-8"),
 		}))
 }
 
@@ -22,12 +27,17 @@ describe("the compilation seam", () => {
 	// every cost spec asserts those counters. An import around them makes the
 	// counts quietly low.
 	it("should be the only place the counted Compiler entry points are imported", () => {
+		// What `compilation.ts` wraps, as in `parseDocument as
+		// parseDocumentUncounted`, so a new counter joins the list on its own.
 		let counted = [
-			"parseDocument",
-			"enrichDocument",
-			"loadModuleGraph",
-			"linkModuleGraph",
-		]
+			...readFileSync(
+				path.join(sourceDirectory, "compilation.ts"),
+				"utf-8",
+			).matchAll(/\b(\w+) as \1Uncounted\b/g),
+		].map(([, name]) => name as string)
+
+		expect(counted).toContain("linkModuleAgainst")
+
 		let offenders = productionSources().flatMap((source) => {
 			if (source.name === "compilation.ts") {
 				return []
@@ -40,9 +50,7 @@ describe("the compilation seam", () => {
 			]
 				.filter(
 					([, names, specifier]) =>
-						/@essence-lang\/compiler\/(documents|modules)/.test(
-							specifier!,
-						) &&
+						/^@essence-lang\/compiler(\/|$)/.test(specifier!) &&
 						counted.some((name) =>
 							new RegExp(`\\b${name}\\b`).test(names!),
 						),
