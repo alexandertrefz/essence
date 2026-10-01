@@ -7344,9 +7344,8 @@ class DescentParser {
 		})
 	}
 
-	// Function Type parameters mirror the parameter grammar — the
-	// internal name only documents the parameter and may be omitted entirely
-	// (`_: String`), while the external name is part of the call syntax.
+	// A Function Type's Parameter mirrors a Parameter. Its internal name only
+	// documents it and may be left out, as in `_: String`.
 	protected parseFunctionTypeParameter(): parser.FunctionTypeParameterNode {
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
@@ -7449,9 +7448,8 @@ class DescentParser {
 		return this.parseType()
 	}
 
-	// A contextually typed Function literal may go straight from its
-	// Parameter list to its block, leaving the return Type to the expected
-	// signature — or, where that leaves it Generic, to its own body.
+	// A contextually typed Function literal may leave its return Type to the
+	// expected signature or, where that leaves it Generic, to its body.
 	protected parseOptionalReturnType(
 		allowsInferredTypes: boolean,
 	): parser.TypeDeclarationNode | null {
@@ -7472,20 +7470,14 @@ class DescentParser {
 	protected parseBlock(): BlockResult {
 		this.enterNesting()
 
-		// A block is a position of its own — what a Statement inside one
-		// is written into says nothing about the Argument list the block itself
-		// may stand in.
+		// A Statement in a block does not stand in the Argument list around it.
 		let outerInsideArgumentList = this.insideArgumentList
 
 		this.insideArgumentList = false
 
 		try {
-			// `(n: Integer) => n` — the one habit that is written where a
-			// BLOCK belongs, which is why it is answered here rather than beside
-			// the operators: the Parameter list read cleanly and what follows it
-			// is an arrow no construction of this language has. Every block goes
-			// through here, so the `=>` of a Function literal, of an `if` and of a
-			// `match` arm are all answered in the same words.
+			// `(n: Integer) => n`: an arrow written where a block belongs. Every
+			// block is read here, so each `=>` is answered in the same words.
 			let arrow = this.foreignLexeme()
 			let refusal =
 				arrow?.text === "=>"
@@ -7516,13 +7508,9 @@ class DescentParser {
 		}
 	}
 
-	// Called on the way into every parsing method that recurs once per
-	// written nesting level — `parseExpression`, `parseType` and `parseBlock`
-	// reach each other through everything between them, and a key list's braced
-	// descend is the one nesting that reaches none of the three. Counting the
-	// four bounds the whole descent. The caller decrements in a `finally`: a throw
-	// unwinds any number of levels at once, and the count has to unwind with
-	// them.
+	// Called on entry to every reader that recurs once per written level. The
+	// caller decrements `nestingDepth` in a `finally`, since a throw unwinds
+	// many levels at once.
 	protected enterNesting(): void {
 		if (this.nestingDepth >= maximumNestingDepth) {
 			let position =
@@ -7547,18 +7535,9 @@ class DescentParser {
 		this.nestingDepth++
 	}
 
-	// Whether the `(` the reader is standing on opens a parameter list
-	// rather than a call: it does exactly when the `)` that closes it is
-	// followed by the `{` of a block, or by the `for` of a `for any (…)`.
-	// Parentheses are the only thing counted — they nest inside every other
-	// bracket and every other bracket nests inside them, so a `)` at depth zero
-	// is the one that closes this `(` whatever stands in between.
-	//
-	// The `for` is what lets a test writing BOTH `across` and `for any`
-	// parse at all. It can not mean anything — a body runs written rows or
-	// generated values, never both — and the Enricher says exactly that. Reading
-	// it as a call instead would report a syntax error about a colon, which
-	// tells a reader nothing about what they wrote.
+	// Whether the `(` at the cursor opens a Parameter list rather than a call:
+	// its `)` is followed by a block's `{` or a `for any`. The `for` lets the
+	// enricher refuse a test that writes both `across` and `for any`.
 	protected stopsBeforeParameterList(): boolean {
 		let depth = 0
 
@@ -7594,17 +7573,9 @@ class DescentParser {
 		}
 	}
 
-	// How many `complete`s have been read inside the body being parsed and
-	// not claimed by a body nested in it — which is all a Function needs to know
-	// to say whether it is a COMPLETING body. Every body parse resets the count
-	// and restores the enclosing one behind it, so a `complete` written in a
-	// Function literal is counted by that literal and by nothing around it,
-	// which is exactly where the language draws the line.
-	//
-	// A counter rather than a stack of frames, because the only question
-	// asked of it is "was there one?" of the body being closed, and because a
-	// single number is what `speculate` can save and restore — a reading that is
-	// thrown away must leave no mark on the body it was attempted inside.
+	// The `complete`s read in the body being parsed and not in a body nested
+	// in it, which says whether the body is completing. A number, so `speculate`
+	// can save and restore it.
 	private completesSeen = 0
 
 	protected completingBody<T>(parse: () => T): {
@@ -7623,10 +7594,7 @@ class DescentParser {
 		}
 	}
 
-	// Reads a Function's body, which is never part of the test whose
-	// body it was written in — every Function block goes through here so that
-	// the one rule is stated in one place rather than at each of the four
-	// spellings a Function has.
+	// Reads a Function's body, which is never part of the test it is written in.
 	protected outsideTestBody<T>(parse: () => T): T {
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = false
@@ -7668,31 +7636,17 @@ class DescentParser {
 		return token
 	}
 
-	// The foreign lexeme standing at the cursor, joined back out of the
-	// Tokens it was split into — `=` and `=` written flush are the `==` a reader
-	// wrote, and `!` and `=` are their `!=`. Only ADJACENT Tokens are joined, and
-	// only behind one whose whole value was taken: `+2` contributes its `+` and
-	// stops there, so what is underlined is the operator and never the operand.
-	//
-	// Null where nothing at the cursor is made of these characters, which is the
-	// answer for every Program that is not written in another language.
-	//
-	// `from` is how far ahead of the cursor to read, and everything but
-	// `argumentIsLabelled` reads at the cursor itself. That one has to ask about
-	// the Token BEHIND the one it is deciding, because what it decides is
-	// whether the name in front of an operator is a label.
+	// The foreign lexeme `from` Tokens ahead of the cursor, joined from flush
+	// Tokens: `=` and `=` make `==`. Joining stops after a Token like `+2` that
+	// gives only part of itself, so the operand is never underlined.
 	protected foreignLexeme(from = 0): {
 		text: string
 		position: common.Position
-		// Whether the first Token gave the whole of itself to the lexeme.
-		// `+` did and `+2` did not, which is the difference between an operator
-		// standing between two values and one written flush against its
-		// operand — and the second is answered by the Enricher, which has the
-		// operand in hand and can name it.
+		// Whether the first Token gave all of itself: `+` did, `+2` did not.
+		// The enricher answers an operator flush against its operand.
 		whole: boolean
-		// How many Tokens the lexeme was glued out of, so that a caller
-		// can read what stands BEHIND it — the right operand of a compound
-		// assignment, which `+=` hides two Tokens deep.
+		// How many Tokens the lexeme spans, so a caller can read the right
+		// operand of a compound assignment such as `+=`.
 		tokens: number
 	} | null {
 		let first = this.tokens.peek(from)
@@ -7747,17 +7701,9 @@ class DescentParser {
 		}
 	}
 
-	// The verdict on the lexeme at the cursor: a habit with its own shape,
-	// an operator this language deliberately has none of, or nothing at all.
-	// Essence's own lexemes are answered `null` here rather than excluded Token by
-	// Token, which is what keeps `match x -> T` and `<- value` whole while leaving
-	// `a - b` and `a < b` refused.
-	//
-	// `left` is the Expression the operator was written BEHIND, where the
-	// caller has read one. It is what a compound assignment's Help is spelled
-	// out of — `tally += 5` is short for `tally = tally::add(5)`, and a Help
-	// that names neither `tally` nor `5` sends a reader to two undeclared names
-	// and an amount they never wrote.
+	// The verdict on the lexeme at the cursor: a habit, an operator Essence
+	// lacks, or null. `left` is the Expression before it, which a compound
+	// assignment's Help spells out, as in `tally = tally::add(5)`.
 	protected foreignTextAhead(
 		left?: parser.ExpressionNode,
 	): ForeignRefusal | null {
@@ -7767,9 +7713,7 @@ class DescentParser {
 			return null
 		}
 
-		// `["kim" => 7]` — the one `=>` that is not a Function literal's
-		// arrow. Answered before the table, which would hand a reader writing a
-		// Dictionary a Function literal to write instead.
+		// `["kim" => 7]`: an `=>` after a written key is a Dictionary entry.
 		if (
 			lexeme.text === "=>" &&
 			left !== undefined &&
@@ -7807,24 +7751,12 @@ class DescentParser {
 		}
 	}
 
-	// The verdict on the Token standing BEHIND the cursor — the same
-	// question as `foreignTextAhead`, asked one Token early. Its two callers are
-	// about to read the Token at the cursor as a NAME, and a name is never what
-	// stands in front of one of these: `Terminal.print(total + tax)` read
-	// `total` as an Argument's label, and `constant x = (a + b) * c` read `a` as
-	// a Parameter's.
-	//
-	// The operator has to be the whole of the Token it opens. `+` between two
-	// values is one, and the `+` of `+tax` is not: that one arrives glued to its
-	// operand, and the Enricher answers it with the operand in hand and names
-	// it.
+	// `foreignTextAhead` asked of the Token after the cursor, by callers about
+	// to read the cursor's Token as a label or Parameter name. Only a whole
+	// operator Token counts, not the `+` of `+tax`.
 	protected foreignTextFollowing(): ForeignRefusal | null {
-		// Only an Identifier, and that is the whole of the narrowing. The
-		// Symbols an operator is made of — `=`, `<`, `>`, `/`, `|` — begin no
-		// Expression, so neither caller ever reached this question for one. A
-		// `-` DOES begin one, and is left alone on purpose: `compute(offset -1)`
-		// is a labelled Argument carrying a negative Number, and there is no
-		// telling that from a subtraction without reading what follows the sign.
+		// Only an Identifier: a Symbol operator begins no Expression, and a `-`
+		// may sign a Number, as in `compute(offset -1)`.
 		if (this.tokens.peek(1)?.type !== TokenType.Identifier) {
 			return null
 		}
