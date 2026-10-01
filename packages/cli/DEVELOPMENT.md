@@ -148,3 +148,17 @@ a cached build loses in workers. A watch rebuild needs no rule of its own: it ne
 `MAX_WORKERS` is small and does not follow the core count, because esbuild runs threads of its own in every worker.
 Workers share nothing, so `groupEntries` groups the entries whose graphs overlap, judged one import deep, and each
 group goes to one worker.
+
+## Watching files
+
+`src/watcher.ts` is the file watching that `esc watch` and `essence test --watch` share. They differ in what they do
+with a change, not in how they notice one. The rules match `watchModule` in the client package:
+
+- One watcher per directory rather than per file. Many editors write a temporary file and rename it over the original,
+  which ends a watch on the file itself. A directory watch survives that, and also sees a file deleted and recreated.
+- A directory event only says that something happened there. On macOS a rename is reported under the temporary file's
+  name, so the event's file name is never trusted. The event is a prompt to reread the signatures.
+- A signature is `mtimeMs:size`, captured only for a file not seen before. A save can land while a rebuild runs, and
+  adopting it as the baseline would wait for a change that already happened.
+- A directory watcher is not armed when `fs.watch` returns, and a busy machine can lose an event outright. So the
+  signatures are also read on a timer, every `DEFAULT_POLL` milliseconds, and the events stay because they are faster.

@@ -40,7 +40,6 @@
 	"packages/cli/src/tests/twoMistakes.spec.ts": {"sentence-length": 17, "em-dash": 13, "all-caps": 13, "position": 5},
 	"packages/cli/src/theme.ts": {"sentence-length": 4, "em-dash": 5},
 	"packages/cli/src/watch.ts": {"sentence-length": 1, "em-dash": 1, "all-caps": 1, "position": 1},
-	"packages/cli/src/watcher.ts": {"sentence-length": 16, "em-dash": 7, "all-caps": 6, "block-length": 1},
 	"packages/cli/src/worker.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 1},
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
 	"packages/compiler/src/tests/asynchrony.spec.ts": {"sentence-length": 25, "em-dash": 20, "all-caps": 13, "block-length": 1, "counts": 1},
