@@ -27,10 +27,9 @@ import {
 	writeCorpus,
 } from "../testing/corpus"
 
-// The companion a property test's failing values live in — what it looks
-// like on disk, what a run's changes do to it, and what a file nobody should
-// have edited is read as. Nothing here runs a test: what a run REPORTS is the
-// runtime's spec, and what is done with the report is here.
+// The companion file a property test's failing values live in: its format,
+// what a run's changes do to it, and how a hand-edited file reads. What a run
+// reports is the runtime's spec. What is done with the report is tested here.
 
 const whole = (digits: string): EncodedValue => ({
 	kind: "integer",
@@ -41,9 +40,8 @@ function values(digits: string): Array<StoredValue> {
 	return [{ name: "n", data: whole(digits) }]
 }
 
-// The body is AWAITED before the directory goes. Everything the store
-// does is a file, and a `finally` that ran while the write was still in flight
-// would take the file away underneath it.
+// The body is awaited before the directory goes, or the `finally` would
+// remove it under a write still in flight.
 async function withDirectory<Value>(
 	body: (directory: string) => Promise<Value>,
 ): Promise<Value> {
@@ -99,8 +97,7 @@ describe("The counterexample companion file", () => {
 		expect(parseCorpusFile(printCorpusFile(entries))).toEqual(entries)
 	})
 
-	// Byte-stable, so that recording the same thing twice writes the same
-	// file and a diff shows what CHANGED rather than what moved.
+	// Byte-stable, so a diff shows what changed rather than what moved.
 	it("writes the same bytes for the same entries in any order", () => {
 		let first = printCorpusFile({
 			b: [{ values: values("1") }],
@@ -116,19 +113,17 @@ describe("The counterexample companion file", () => {
 		expect(first).toContain('\n\t"entries": {')
 	})
 
-	// Null rather than an empty store, and the two must never be
-	// confused: an empty store is a file the next write may lay a value over,
-	// and a mangled one — a merge conflict, a stray edit — is a file the next
-	// write must LEAVE, or everything its bytes still hold is gone.
+	// Null rather than an empty store. The next write may lay a value over an
+	// empty store, but must leave a mangled file alone, or what it holds is
+	// lost.
 	it("refuses a file it can not parse", () => {
 		expect(parseCorpusFile("not json at all")).toBeNull()
 		expect(parseCorpusFile("[]")).toBeNull()
 		expect(parseCorpusFile("")).toBeNull()
 	})
 
-	// A corpus is an optimisation over a search that works without it, so
-	// the worst a version nobody here understands can cost is the values it
-	// held — but they are held, not overwritten.
+	// A file of a schema this reader does not know is left as it is, not
+	// overwritten.
 	it("refuses a file of another schema", () => {
 		expect(
 			parseCorpusFile(
@@ -167,10 +162,8 @@ describe("Reading a run's stored counterexamples", () => {
 		})
 	})
 
-	// THE reason unreadable is its own answer. The run before this fix
-	// read a mangled file as empty, replayed nothing — correct — and then the
-	// next failing write rewrote the file whole from that emptiness, silently
-	// discarding every counterexample the bytes still held.
+	// A mangled file reads as unreadable rather than empty, so a failing
+	// write never replaces the counterexamples it still holds.
 	it("says a mangled companion out loud, and never writes over it", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -259,9 +252,8 @@ describe("Writing what a run said about its corpus", () => {
 		})
 	})
 
-	// By the DATA rather than by the printed value. A property that fails
-	// on the same value on ten runs would otherwise fill its own corpus with one
-	// value and push every other one out.
+	// Compared by the data rather than the printed value. Otherwise a value
+	// that fails on every run would fill the corpus and push the rest out.
 	it("does not store one counterexample twice", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -304,8 +296,8 @@ describe("Writing what a run said about its corpus", () => {
 		})
 	})
 
-	// Every index is into the list as it was READ, so they are taken from
-	// the back — dropping one from the front would move every index after it.
+	// Every index is into the list as it was read, so they are dropped from
+	// the back. Dropping one from the front would move every index after it.
 	it("drops exactly the entries a run could not read back", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -356,17 +348,16 @@ describe("Writing what a run said about its corpus", () => {
 			})
 
 			expect(existsSync(fileOf(directory))).toBe(false)
-			// The FILE goes; the directory may hold another Module's
-			// companion, and an empty one is not litter anybody sees.
+			// Only the file goes, since the directory may hold another
+			// Module's companion.
 			expect(
 				existsSync(path.join(directory, "__counterexamples__")),
 			).toBe(true)
 		})
 	})
 
-	// The snapshot rule, for the same reason: a run narrowed by a filter
-	// or a tag has not visited every test, and deleting what it did not visit
-	// would lose a regression for the price of a `-f`.
+	// A run narrowed by a filter or a tag has not visited every test. As with
+	// snapshots, what it did not visit stays.
 	it("keeps a key no test of this run claimed", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -438,9 +429,8 @@ describe("What a run's events say about its corpus", () => {
 		})
 	})
 
-	// A run driven by a spec rather than by the command line may have no
-	// path for a Module at all, and a counterexample with nowhere to live is a
-	// counterexample nobody can store.
+	// A run driven by a spec may have no path for a Module, and then a
+	// counterexample has nowhere to live.
 	it("says nothing about a Module with no path", () => {
 		expect(
 			collectCorpusChanges([
@@ -454,10 +444,9 @@ describe("What a run's events say about its corpus", () => {
 	})
 })
 
-// The key a stored counterexample lives under, spelled by the Compiler
-// here and by the runtime in `Testing.ts` — the runtime can not import this,
-// because it is inlined into a user's bundle. The two are pinned to each other
-// by this string and its twin in `testing.spec.ts`.
+// The key a stored counterexample lives under. The runtime's `Testing.ts`
+// spells it too, since a bundle can not import the Compiler. This string and
+// its twin in the runtime's `testing.spec.ts` pin the two together.
 describe("The key a counterexample is stored under", () => {
 	const identity = {
 		modulePath: "/Season.es",
