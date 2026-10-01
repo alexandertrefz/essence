@@ -113,3 +113,26 @@ Parameter that carries its value. Inventing that name would hand the reader a na
 Methods are turned away too, since only a Function Statement's body is offered. A Method extracted beside a Method
 must decide whether `@` becomes a Parameter or a Method call on the receiver. That decision changes what the code
 means, so it would be a refactoring of its own.
+
+## Inlining a Constant
+
+`inlineConstantActions` copies a Constant's value, as written, into every read and removes the declaration. It is
+offered only where each copy means what the name did.
+
+An Expression is a primary followed by suffixes, and most compound forms have brackets of their own, such as
+`match … { … }`. `start` and `complete` do not: they take the whole operand after them, so `complete work` pasted
+before `::add(1)` becomes `complete work::add(1)`.
+
+There is no hoisting hazard. A Constant is visible only after its declaration, so every read follows it. Every name
+the value reads is then in scope at each read, unless shadowed, which `readsAgree` checks.
+
+`isInlinable` admits only values that mean the same thing wherever and however often they are written:
+
+- A Function literal, a bare `#Case`, a member path, and an empty List or Dictionary take their Type from where
+  they stand. `@` means whatever the Method or Match Handler around it is about. None of these is inlined.
+- A value that calls anything is not inlined. It runs once where the Constant stood but once per read after
+  inlining, so `constant printed = Terminal.print("once")` read twice would print twice. Nothing here can tell a
+  call that only answers a value from one that does something.
+
+A read inside a Function literal is refused for the same reason, since it runs once per call of the literal. An
+exported Constant, one with a `§§` block, and one written over several lines are left alone too.

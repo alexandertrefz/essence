@@ -22,20 +22,9 @@ import {
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import { findConstantDeclaration, walk, walkNode } from "./lookups"
 
-// A Constant read back where it was written, and its declaration taken
-// away. The edit itself is a copy of the value's own bytes into every read —
-// what everything below is about is the reasons that copy would say something
-// else than the name did.
-//
-// Two of them turn out not to exist in this grammar, which is worth writing
-// down because they are the first two anybody looks for. There is no
-// PRECEDENCE hazard: an Essence Expression is a primary followed by suffixes,
-// and every compound form is delimited by brackets of its own — `{ base with
-// port = 1 }`, `match … { … }`, `define { … }` — so a value pasted in front of
-// a `::` reads as itself. And there is no HOISTING hazard: a Constant is
-// visible only after the Statement that declares it, so every read is below
-// the declaration and every name the value reads is in scope at every one of
-// them, shadowing aside — which is what `readsAgree` checks.
+// Copies a Constant's value into every read and removes its declaration. It
+// is offered only where each copy means what the name did. See "Inlining a
+// Constant" in DEVELOPMENT.md.
 
 export function inlineConstantActions(
 	program: parser.Program,
@@ -43,10 +32,8 @@ export function inlineConstantActions(
 	range: common.Position,
 	indexOf: () => ProgramIndex,
 ): Array<CodeActionEntry> {
-	// Asked of the Parser AST before the index is built. This is offered
-	// on a bare cursor, so it is consulted on every cursor move in the file, and
-	// indexing a Program to learn that the cursor is resting on a brace is the
-	// kind of work that shows up as a slow Editor.
+	// Checked before the index is built, since this runs on every cursor
+	// move.
 	if (!touchesAName(program, range)) {
 		return []
 	}
@@ -64,16 +51,13 @@ export function inlineConstantActions(
 		return []
 	}
 
-	// A `§§` block says something about the NAME, and the name is what
-	// this takes away. Left behind it would read as documentation of whatever
-	// Statement follows.
+	// A `§§` block documents the name, and would be left documenting the next
+	// Statement.
 	if (statement.documentation !== null) {
 		return []
 	}
 
-	// One line, because the value is copied into the middle of whatever
-	// line each read stands on. A Match laid out over six lines written into
-	// three reads is not an inline anybody asked for, whatever it parses as.
+	// One line, since the value is pasted into the middle of each read's line.
 	if (
 		!isInlinable(statement.value) ||
 		statement.value.position.start.line !==
@@ -100,25 +84,19 @@ export function inlineConstantActions(
 		return []
 	}
 
-	// A hole in an interpolated String is inside a String Literal, and the
-	// Lexer ends that Literal at the next `"` whatever is nesting around it.
-	// Every other value pastes into a hole intact — braces included, since the
-	// Lexer counts those.
+	// A value holding a `"` is kept out of an interpolation hole. The Lexer
+	// reads a String there, so this is only caution.
 	if (value.includes('"') && reads.some(isInterpolated(program))) {
 		return []
 	}
 
-	// And a read inside a Function literal is evaluated once per call of
-	// that literal rather than once where the Constant stood.
+	// A read inside a Function literal runs once per call of the literal.
 	if (reads.some(isInsideLiteral(program))) {
 		return []
 	}
 
-	// The Statement is deleted with the line break in front of it, which
-	// is what keeps the blank line it stood on from staying behind. Both ends of
-	// its line have to be its own for that: a Constant sharing a line with the
-	// Statement before it, or trailed by a Comment, would take the neighbour
-	// with it.
+	// The Statement's lines are deleted whole, so it must own both ends of
+	// its line.
 	if (
 		!opensItsLine(lines, statement.position.start) ||
 		!closesItsLine(lines, statement.position.end)
@@ -139,21 +117,15 @@ export function inlineConstantActions(
 			kind: "refactor.inline",
 			diagnosticCode: null,
 			diagnosticPosition: null,
-			// Never preferred, and the reason is not only that nothing was
-			// wrong: a value that CALLS something is called once where the
-			// Constant stood and once per read afterwards, so inlining one is a
-			// decision about the Program rather than about how it is spelled.
+			// Nothing was wrong with the Constant.
 			isPreferred: false,
 			edits,
 		},
 	]
 }
 
-// The Statement's own lines, and the blank line under it where there is
-// one. A Constant is written with a blank line below it as often as not, and a
-// deletion that takes the line alone leaves that blank standing where the
-// Statement was — which, for the first Statement of a body, is directly under
-// the brace the body opened on.
+// The Statement's own lines and the blank line after it, if any, so no blank
+// line is left where it stood.
 function removalOf(
 	lines: Array<string>,
 	position: common.Position,
@@ -171,9 +143,8 @@ function removalOf(
 	})
 }
 
-// Whether the range rests on a name at all — an Identifier anywhere in an
-// Expression, or the name a Declaration was given, which no walk of the
-// Expressions reaches.
+// Whether the range rests on a name: an Identifier in an Expression, or a
+// Declaration's name, which the walk does not reach as an Expression.
 function touchesAName(
 	program: parser.Program,
 	range: common.Position,
@@ -197,9 +168,8 @@ function touchesAName(
 	return found
 }
 
-// The one local Constant the range rests on. More than one is an
-// ambiguity nothing here can settle — a cursor between two names touches both —
-// so it is answered with nothing rather than with a guess.
+// The one local Constant the range rests on. A cursor between two names
+// touches both, and then nothing is answered.
 function constantAt(
 	index: RenameIndex,
 	range: common.Position,
@@ -225,18 +195,8 @@ function constantAt(
 	return found
 }
 
-// The values that mean the same thing wherever they are written, AS OFTEN
-// as they were written. The four Types turned away first do not mean the same
-// thing: a Function literal and a bare `#Case` take their Type from the position
-// they stand in, an empty List or Dictionary takes its item Type from there too,
-// and `@` means whatever the Method or the Match Handler around it is about.
-//
-// And a value that CALLS something is not written the same number of times: it
-// runs once where the Constant stood and once per read afterwards, so inlining
-// `constant printed = Terminal.print("once")` read twice prints twice. Nothing
-// here can tell a call that answers a value from one that does something, so
-// every call is turned away — including one written inside a Literal, which is
-// the same hazard one bracket in.
+// The values that mean the same wherever and however often they are written.
+// See "Inlining a Constant" in DEVELOPMENT.md.
 function isInlinable(value: parser.ExpressionNode): boolean {
 	if (value.nodeType === "FunctionValue" || value.nodeType === "MemberPath") {
 		return false
@@ -295,12 +255,8 @@ function calls(value: parser.ExpressionNode): boolean {
 	return found
 }
 
-// The Function literals of the file, walked once — the same reading
-// `isInterpolated` takes, and for the same reason. A read inside one is
-// evaluated once per CALL of that literal rather than once where it stands, so
-// a value written into it is a value run a number of times nothing in the
-// source says. One read is no protection either: `[1, 2, 3]::map((item) { <-
-// printed })` runs its body three times.
+// The file's Function literals, walked once. A read inside one runs once per
+// call, as often as `[1, 2, 3]::map(…)` calls it.
 function isInsideLiteral(
 	program: parser.Program,
 ): (occurrence: Occurrence) => boolean {
@@ -316,20 +272,15 @@ function isInsideLiteral(
 		bodies.some((body) => containsRange(body, occurrence.position))
 }
 
-// An exported name is read by Modules this file can not see, and the
-// declaration is what they read. A re-export names somebody else's declaration
-// and binds nothing here, so it is not one of these.
+// An exported name is read by other Modules. A re-export binds nothing here.
 function isExported(program: parser.Program, name: string): boolean {
 	return (program.exports?.entries ?? []).some(
 		(entry) => entry.source === null && entry.name.content === name,
 	)
 }
 
-// Every occurrence of the name that is not the declaration itself, or
-// null where one of them is something an inline can not write over: a second
-// WRITE is a reassignment the Compiler already refuses, and an occurrence
-// carrying `edits` is a Record Literal shorthand — `{ price }` means the member
-// AND the name, and a value written over it would mean neither.
+// Every read of the name. Null where one is a write, which the compiler
+// refuses, or a Record shorthand `{ price }`, which also names the member.
 function readsOf(
 	index: RenameIndex,
 	declaration: Declaration,
@@ -356,14 +307,9 @@ function readsOf(
 	return reads
 }
 
-// Whether every name the value reads means the same thing at every read.
-// The value moves DOWN into Scopes the declaration was above, and a name
-// declared in one of those shadows the one the value was written against — the
-// only way a copy of an Expression can quietly say something else.
-//
-// Names the value declares itself are left out: they travel with it. So are the
-// occurrences that name no binding — a Record member, a Method — since those
-// resolve against a Type rather than against a Scope.
+// Whether every name the value reads resolves the same at every read, since
+// an inner Scope may shadow it. Names the value declares, and members and
+// Methods, are skipped.
 function readsAgree(
 	index: RenameIndex,
 	scopes: ProgramIndex["scopes"],
@@ -378,11 +324,7 @@ function readsAgree(
 			continue
 		}
 
-		// A builtin Type is in no Scope — `String`, `Integer`, a Choice
-		// the standard library declares — so `resolve` answers null for it and
-		// the check below would refuse every value that NAMES one. Skipped for
-		// the reason `extractConstant` skips them: a name nothing declares here
-		// means the same thing wherever it is read.
+		// A builtin is in no Scope, and means the same wherever it is read.
 		if (occurrence.declaration.builtin) {
 			continue
 		}
@@ -437,9 +379,7 @@ function resolve(scope: Scope, name: string): Declaration | null {
 	return null
 }
 
-// The interpolated Strings of the file, walked once — a read is inside
-// one or it is not, and asking that per read would be a walk of the Program per
-// name.
+// The file's interpolated Strings, walked once rather than per read.
 function isInterpolated(
 	program: parser.Program,
 ): (occurrence: Occurrence) => boolean {
