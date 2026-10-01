@@ -26,18 +26,10 @@ import {
 } from "../workspace"
 import { makeSessionWorkspace, startSession } from "./lspSession"
 
-// What the cache and the request loop around it guarantee. Half of these
-// are cost invariants, and they are written as tests because they are invisible
-// everywhere else: every request in this package answers correctly whether it
-// compiled the document once or five times, so nothing but a counter tells the
-// difference — and the difference is the whole feature. The other half are the
-// things a cache can get WRONG that no per-request test can see, because they
-// are properties of what happens between two requests: what an edit invalidates,
-// what a document that is not being typed in is owed, and what goes on the wire.
-//
-// `compilationCounts` counts the Compiler entry points the Server ran. `links`
-// is the expensive one: one link enriches and Type-checks every Module of a
-// component.
+// What the cache and the request loop guarantee: costs only a counter can see,
+// and what happens between two requests. `compilationCounts` counts the
+// Compiler entry points the Server ran, and a link type-checks every Module of
+// a graph.
 
 let directories: Array<string> = []
 
@@ -90,10 +82,8 @@ afterEach(() => {
 	directories = []
 })
 
-// A three file chain — Top imports Middle imports Base — because that is
-// the shape every invariant here turns on: editing the middle of it has to
-// invalidate what depends on it and nothing else, and analysing any of them has
-// to fill the cache for all of them.
+// Top imports Middle, which imports Base. Editing the middle invalidates what
+// depends on it, and analysing any file fills the cache for all three.
 const baseSource = `implementation {
 	type Amount = { cents: Integer }
 
@@ -155,15 +145,13 @@ const chain = {
 	"Top.es": topSource,
 }
 
-// A Module nothing imports and that imports nothing — a second root of
-// whatever workspace it is put in, and therefore a second link.
+// A Module that imports nothing and that nothing imports: a second root, and
+// so a second link.
 const soloSource = `implementation {\n\tconstant solo = 1\n}\n\nexport {\n\tsolo\n}\n`
 
-// Two Modules importing each other, which nothing else imports: the one
-// shape a dependency graph can hold that has no root at all, since neither
-// member is a file with no in-edge. `Loop.es` is the broken one deliberately —
-// it is the member that is NOT chosen as the entry, so its Diagnostics only
-// reach the Editor because the other member's graph reached it.
+// Two Modules importing each other, which nothing else imports, so neither is
+// a root. `Loop.es` is broken and not chosen as the entry, so its Diagnostics
+// arrive through the other member's graph.
 const circleSource = `import {
 	from "./Loop.es" { flagged }
 }
@@ -207,24 +195,11 @@ const cycle = {
 	"Loop.es": loopSource,
 }
 
-// The shape a project of tests has: N files importing one library, none
-// of them importing another, which is N roots and therefore N links — that count
-// is inherent, one graph per file nothing imports, and it is not what the sweep's
-// chunking is about. What it is about is the order: analysing all of them inside
-// one callback is a Server that answers nothing until the last of them is done.
-//
-// Each root carries a few hundred declarations of its OWN, so that linking one
-// is work a clock can see. What rides on that is the pair of tests that type
-// mid-sweep: they read what the loop did once the keystroke has been answered, a
-// debounce window later, and a queue that had drained inside those 200 ms would
-// make the reading say nothing. Cheaper roots do not make those tests faster —
-// they make them need more of them. Nothing they ASSERT is a fact about the
-// clock, so a machine fast enough to drain the queue leaves them saying nothing
-// rather than saying something false.
-//
-// Every test built on this declares its own timeout. A fixture sized to outlast
-// a debounce window here is several seconds of work on a slower machine, and the
-// runner's default is five.
+// Many roots importing one library, each linked on its own. Each root carries
+// many declarations of its own, so the sweep is meant to outlast a debounce
+// window and a keystroke to land mid-sweep. On a machine that drains the queue
+// first, the mid-sweep specs pass without testing anything; they never fail
+// falsely. Every spec built on this sets its own timeout.
 function heavyFanOut(
 	roots: Array<number>,
 	declarations = 400,
@@ -234,9 +209,8 @@ function heavyFanOut(
 	}
 
 	for (let index of roots) {
-		// Two digits, so that the order a name sorts in is the order the
-		// number counts in — the Server analyses the roots in path order, and a
-		// test that waits for the last of them has to be able to name it.
+		// Two digits, so names sort in counting order. The Server analyses the
+		// roots in path order, and a spec names the last of them.
 		let name = String(index).padStart(2, "0")
 		let filler = Array.from(
 			{ length: declarations },
@@ -251,14 +225,10 @@ function heavyFanOut(
 	return files
 }
 
-// The same shape with one more Module in it. `Library.es` is BROKEN, and
-// the two files importing it are the FIRST root and the LAST — a dependency
-// shared by two roots standing at either end of the queue, which is the case a
-// batch firing mid-sweep can get wrong. Every other root imports an `Other.es`
-// of the same size instead, so that every root reaches three files and the queue
-// keeps path order: were the Library the only second Module, the two roots
-// holding it would reach further than the rest, sort to the front, and the sweep
-// would be done with both of them before anything could be typed.
+// The same shape with a broken `Library.es`, imported by the first and the
+// last root. A dependency shared by both ends of the queue is what a mid-sweep
+// batch can get wrong. Every other root imports an `Other.es` of the same size,
+// so the queue keeps path order.
 function heavyFanOutOverALibrary(
 	roots: Array<number>,
 	declarations = 400,
@@ -290,11 +260,9 @@ function heavyFanOutOverALibrary(
 	return files
 }
 
-// Nested String interpolation, which the Lexer reads by recursing once per
-// level — deep enough and it runs out of call stack, which is a Compiler throw
-// reachable from a text an Editor can hold. Deliberately far past where it starts
-// failing: how much stack is left depends on how deep the caller already is, and a
-// test that sits near the edge would pass or fail by where it is run from.
+// Nested String interpolation deep enough to exhaust the Lexer's call stack,
+// a Compiler throw an Editor's text can reach. It is far past the edge, since
+// the stack left depends on the caller's depth.
 const unparseableSource = `implementation {\n\tconstant a = ${'"{'.repeat(100000)}1${'}"'.repeat(100000)}\n}\n`
 
 describe("the analysis cache", () => {
@@ -316,10 +284,8 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(after)
 	})
 
-	// The invariant the write-through rides on. If a Module analysed
-	// inside a bigger graph could differ from the same Module analysed on its
-	// own, filling the cache for a whole component would be filling it with
-	// answers that belong to whoever happened to ask first.
+	// The cache fills a whole component from one analysis, which is sound only
+	// if a Module's Diagnostics do not depend on where the graph started.
 	it("should give a Module the same Diagnostics whichever Module the graph was loaded from", () => {
 		let { workspace, pathOf } = workspaceOf(chain)
 		let viaTop = workspace.analysisOf(pathOf("Top.es"))
@@ -337,10 +303,8 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// What a Module reaches, not what the graph the analysis started from
-	// reaches. The Server publishes these under the other files' own URIs and
-	// owns them afterwards — a file this Module never names would be a squiggle
-	// it can not clear.
+	// What a Module reaches, not what the graph reaches. The Server publishes
+	// these under the other files' URIs and owns them afterwards.
 	it("should report a Module's own dependencies rather than the whole graph's", () => {
 		let { workspace, pathOf } = workspaceOf(chain)
 
@@ -368,9 +332,9 @@ describe("the analysis cache", () => {
 		expect(workspace.documentOf(pathOf("Middle.es"))!.enrichedProgram).toBe(
 			first!,
 		)
-		// Collecting the annotations runs a SECOND link, because the
-		// collector only opens for one Module at a time — and it must not swap
-		// the typed Program the index was built against out from under it.
+		// Collecting the annotations runs a second link, since the collector
+		// opens for one Module at a time. It must keep the typed Program the
+		// index was built against.
 		workspace.annotationsOf(pathOf("Middle.es"))
 
 		expect(workspace.enrichedOf(pathOf("Middle.es"))).toBe(first!)
@@ -428,15 +392,14 @@ describe("the analysis cache", () => {
 
 		expect(workspace.enrichedOf(pathOf("Top.es"))).not.toBe(top!)
 		expect(compilationCounts.links).toBe(relinks + 1)
-		// The same link filled Base again, so reading it costs nothing —
-		// the component is what an edit invalidates and what one link restores.
+		// The same link filled Base again. An edit invalidates the component,
+		// and one link restores it.
 		expect(workspace.enrichedOf(pathOf("Base.es"))).not.toBe(base!)
 		expect(compilationCounts.links).toBe(relinks + 1)
 	})
 
-	// The reason the edges are kept rather than rebuilt. This used to read
-	// the entries of every known file on every keystroke, which meant a parse
-	// and a `realpath` per specifier per file.
+	// The edges are kept rather than rebuilt, so an edit invalidates a
+	// component without parsing the workspace.
 	it("should not parse the workspace to invalidate a component", () => {
 		let { workspace, pathOf, open } = workspaceOf(chain)
 
@@ -513,10 +476,8 @@ describe("the analysis cache", () => {
 		expect(workspace.enrichedOf(pathOf("Top.es"))).not.toBeNull()
 	})
 
-	// A file that writes neither section is a Program of its own
-	// everywhere in this Server, even where a graph reaches it as a dependency —
-	// two enrichments of one file with different Choice identities is the bug
-	// this prevents.
+	// A file that writes neither section is a Program of its own everywhere,
+	// even as a dependency, so it has one enrichment and one Choice identity.
 	it("should keep a section-less dependency's own enrichment", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Plain.es": `implementation {\n\tchoice Colour {\n\t\tRed\n\t\tBlue\n\t}\n}\n`,
@@ -531,13 +492,9 @@ describe("the analysis cache", () => {
 		expect(plain.enrichedProgram).not.toBeNull()
 	})
 
-	// And what is held for one survives a keystroke next door. A file
-	// writing neither section can not name anything another file declares, so
-	// nothing an importer does can move what it means — and an importer is what
-	// it has while its own `export` block is still being written, which is the
-	// state this is about. Dropping it with the component is an enrichment per
-	// keystroke in the importer for as long as the file is unfinished, and the
-	// graph that reaches it will never fill it back in.
+	// It survives an edit in the importer, since a section-less file names
+	// nothing another file declares. The graph reaching it would never fill it
+	// back in.
 	it("should keep a section-less dependency's enrichment through an edit in the importer", () => {
 		let plainSource = `implementation {\n\tchoice Colour {\n\t\tRed\n\t\tBlue\n\t}\n}\n`
 		let importerSource = `import {\n\tfrom "./Plain.es" { Colour }\n}\n\nimplementation {\n\tconstant chosen: Colour = #Red\n}\n`
@@ -568,13 +525,9 @@ describe("the analysis cache", () => {
 		expect(workspace.isAnalysed(pathOf("Plain.es"))).toBe(false)
 	})
 
-	// The asymmetry the edge index used to have. A graph only holds an edge
-	// it could READ, so a specifier naming a file that is not there yet recorded
-	// nothing — and the importer then kept answering `Error` for that name for as
-	// long as the session lasted, however many times the file was created.
-	//
-	// Writing an import before the file it names is the ordinary order to work in,
-	// which is what makes this the worst edge to be missing.
+	// A graph records the edge of a specifier naming a missing file too, so
+	// the file appearing invalidates its importer. See "Dependency edges" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should invalidate an importer once the file its specifier names appears", () => {
 		let { workspace, root, pathOf } = workspaceOf({
 			"Importer.es": `import {\n\tfrom "./Base.es" { thing }\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`,
@@ -597,10 +550,9 @@ describe("the analysis cache", () => {
 		).toEqual([])
 	})
 
-	// The set an edit obliges the Server to publish again, which is the
-	// dependents and not the component. A sibling importing the same Module
-	// imports nothing from this one, so nothing it means can have moved — and it
-	// is its own graph root, so including it costs a whole link.
+	// An edit obliges the Server to republish the dependents, not the
+	// component. A sibling importing the same Module imports nothing from this
+	// one.
 	it("should reach a file's dependents without reaching its siblings", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Shared.es": `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`,
@@ -614,16 +566,16 @@ describe("the analysis cache", () => {
 		expect(workspace.dependentsOf(pathOf("Left.es"))).toEqual([
 			pathOf("Left.es"),
 		])
-		// The undirected walk still answers with all three, because a
-		// rename through the shared name has to reach every file writing it.
+		// The undirected walk answers with all three, since a rename through the
+		// shared name reaches every file writing it.
 		expect(workspace.componentOf(pathOf("Left.es")).sort()).toEqual(
 			[pathOf("Shared.es"), pathOf("Left.es"), pathOf("Right.es")].sort(),
 		)
 	})
 
-	// The unit of analysis. A root is a file no other file imports, which
-	// is where a dependency graph starts — the roots between them reach every
-	// file of the workspace, so analysing those analyses all of it.
+	// A root is a file no other file imports. The roots between them reach
+	// every file of the workspace. See "Roots" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should answer with the files nothing imports as the roots of the workspace", () => {
 		let { workspace, pathOf } = workspaceOf({
 			...chain,
@@ -635,10 +587,8 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// "Closest to root", which is what a cycle nobody imports needs: no
-	// member of it has the empty in-edge set a root has, so the first half of
-	// the rule covers none of it. The member reaching the most others is taken
-	// instead, and its graph covers the rest.
+	// No member of a cycle nobody imports is a root, so the member reaching
+	// the most others is taken, and its graph covers the rest.
 	it("should take the closest to a root of a cycle nobody imports", () => {
 		let { workspace, pathOf } = workspaceOf({ ...chain, ...cycle })
 
@@ -647,11 +597,8 @@ describe("the analysis cache", () => {
 		)
 	})
 
-	// What an edit obliges the Server to run, which is never every root. A
-	// root that does not reach the edited file was judged against text that did
-	// not move, so re-linking it would find exactly what it found before — the
-	// invariant that keeps a keystroke in a Module thirty roots share from
-	// costing thirty links for the roots that merely share a dependency with it.
+	// An edit runs the roots reaching the edited file, not every root. A root
+	// that does not reach it was judged against text that did not move.
 	it("should answer with the roots reaching a file rather than every root", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Shared.es": `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`,
@@ -671,11 +618,8 @@ describe("the analysis cache", () => {
 		])
 	})
 
-	// How the Server finds what a batch of roots was supposed to judge and
-	// did not — a root that threw, a graph that could not read one of its
-	// Modules. It answers about the text the file holds NOW, and it answers
-	// without producing anything: a coverage check that analysed to answer would
-	// be the analysis it exists to decide against.
+	// How the Server finds what a batch was to judge and did not. It answers
+	// about the file's current text without analysing anything.
 	it("should say whether a file is analysed without analysing it", () => {
 		let { workspace, pathOf, open } = workspaceOf(chain)
 
@@ -718,12 +662,9 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(linked + 1)
 	})
 
-	// The Lexer recurs once per nesting level of an interpolated String and
-	// runs out of call stack before the Parser's own depth guard can refuse it, so
-	// this text is a Compiler throw that a buffer can actually hold. It has to come
-	// back as a Diagnostic: `fileOf` is called from request handlers, from the edge
-	// walk and from the debounced analysis' timer callback, and a throw out of a
-	// timer callback is the process.
+	// This text makes the Lexer run out of call stack. `fileOf` is called from
+	// the debounced analysis' timer callback, where a throw ends the process, so
+	// it answers with a Diagnostic.
 	it("should answer with a Diagnostic rather than throwing when a file can not be parsed", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Deep.es": unparseableSource,
@@ -740,11 +681,9 @@ describe("the analysis cache", () => {
 		])
 	})
 
-	// The graph parses its Modules through the Compiler's own path, so a
-	// dependency the Parser can not read throws out of the link rather than out of
-	// `fileOf` — into `analysisOf`'s catch, whose whole point is that the answer is
-	// KEPT. It was not, for the one field a Hover reads: the guard re-enters
-	// whenever the annotations are still null, so every Hover re-threw.
+	// A dependency the Parser cannot read throws out of the link, into
+	// `analysisOf`'s catch. The answer is kept, annotations included, so a Hover
+	// does not throw again.
 	it("should cache the answer for a document whose analysis threw", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Deep.es": `${unparseableSource}\nexport {\n\ta\n}\n`,
@@ -771,11 +710,9 @@ describe("the analysis cache", () => {
 })
 
 describe("the Server's request loop", () => {
-	// The contract every other test in this block stands on. `settle` is
-	// the `essence/idle` request, and what it promises is that the answer comes
-	// BEHIND whatever the loop published on its way to having nothing left —
-	// so a test that has the answer has the Diagnostics — and that a Server
-	// with nothing to do answers without doing anything.
+	// The contract the other specs here stand on. The `essence/idle` answer
+	// comes behind every publish, and a Server with nothing to do answers at
+	// once.
 	it("should answer essence/idle behind the publish it waited for, and at once with nothing pending", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n`
 		let files = makeSessionWorkspace({ "Broken.es": broken })
@@ -839,8 +776,8 @@ describe("the Server's request loop", () => {
 
 			await session.settle()
 
-			// One link for the component, whichever of the two open
-			// documents' timers happened to fire first — the other reads it.
+			// One link for the component, whichever open document's timer fired
+			// first.
 			expect(session.tallySince(window).links).toBe(1)
 		} finally {
 			await session.dispose()
@@ -848,13 +785,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A request that arrives inside the window pays for the graph the
-	// window was going to link anyway — the ROOT above this document, not the
-	// document's own smaller graph. Both would otherwise be linked, since the
-	// Editor asks for Semantic Tokens and a Hover in the same 200 ms in which
-	// the analysis is due, and the root's graph already holds the document. Whoever
-	// asks first pays, once, and that is still true now that what gets analysed
-	// is a whole project rather than a tab.
+	// A request inside the window pays for the graph the window would link
+	// anyway, the root's, not the document's own. Whoever asks first pays, once.
 	it("should answer a request that arrives before the analysis, and analyse only once", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -868,8 +800,8 @@ describe("the Server's request loop", () => {
 				middleSource.replace("by 2", "by 4"),
 			)
 
-			// Inside the debounce window on purpose: the Hover computes
-			// the analysis itself, and the debounced one that follows finds it.
+			// Inside the debounce window on purpose. The Hover computes the
+			// analysis, and the debounced one finds it.
 			let hover = await session.request<Hover | null>(HoverRequest.type, {
 				textDocument: { uri: uriFor(files.pathOf("Middle.es")) },
 				position: positionOf(middleSource, "averaged(_ amount", 2),
@@ -886,8 +818,8 @@ describe("the Server's request loop", () => {
 			expect(session.diagnosticsFor(files.pathOf("Middle.es"))).toEqual(
 				[],
 			)
-			// The root nobody has open was published all the same, out of
-			// the graph the Hover paid for.
+			// The root nobody has open was published from the graph the Hover
+			// paid for.
 			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
 		} finally {
 			await session.dispose()
@@ -895,12 +827,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The same window, measured from the request an Editor actually sends
-	// first. Semantic Tokens, Document Symbols and Code Actions all arrive
-	// inside the 200 ms after a keystroke, so this is the ordinary shape of
-	// typing rather than a race — and a file that is not itself a root would
-	// otherwise pay for its own graph and then for the root's, every window,
-	// for as long as the reader keeps typing.
+	// The same window, from the request an Editor sends first. Semantic Tokens
+	// arrive inside the window after a keystroke, so this is ordinary typing.
 	it("should link once for a keystroke a Semantic Tokens request beat", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -971,11 +899,9 @@ describe("the Server's request loop", () => {
 				),
 			).toEqual([0, 0, 0, 0])
 
-			// Rename is the one request that reads the WORKSPACE rather
-			// than the document: it walks the component to join the symbol
-			// across Modules, which parses the files nobody has open. It
-			// enriches nothing, and the walk is kept, so asking twice costs
-			// nothing at all.
+			// Rename walks the component to join the symbol across Modules,
+			// parsing files nobody has open. It enriches nothing, and the walk is
+			// kept.
 			await session.request(PrepareRenameRequest.type, {
 				textDocument: { uri },
 				position: positionOf(middleSource, "averaged(_ amount", 2),
@@ -1013,8 +939,8 @@ describe("the Server's request loop", () => {
 
 			source.cancel()
 
-			// `RequestCancelled` — the protocol's own answer for a request
-			// nobody is waiting for any more.
+			// `RequestCancelled`, the protocol's answer for a request nobody is
+			// waiting for.
 			await expect(pending).rejects.toMatchObject({ code: -32800 })
 		} finally {
 			await session.dispose()
@@ -1022,13 +948,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A request is answered on the version it named or not at all. Its
-	// Positions belong to that version, and an answer measured against a later
-	// one points at whatever moved into their place.
-	//
-	// `ContentModified` rather than `RequestCancelled`, because the Editor never
-	// asked for this to stop: vscode-languageclient answers a `ContentModified`
-	// with the request's default value and THROWS a CancellationError for a
+	// A request is answered on the version it named or not at all.
+	// `ContentModified`, since vscode-languageclient throws for a
 	// `RequestCancelled` whose own token is not cancelled.
 	it("should abandon a request the document moved on from", async () => {
 		let files = makeSessionWorkspace(chain)
@@ -1055,10 +976,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A watched file changing schedules the roots reaching it, and a file
-	// that did not exist a moment ago is reached through the edge its importer's
-	// specifier records whether or not it was there. However many files that
-	// comes to, one window and one link is what it must cost.
+	// A watched file changing schedules the roots reaching it, a new file
+	// included. It costs one window and one link.
 	it("should coalesce a watched file change into one window", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -1084,10 +1003,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The Completion list used to enrich the document WITHOUT its graph to
-	// find the Namespaces it declares, so every signature naming an imported Type
-	// printed `Error`. Reading the cache fixed it, which is why this is pinned
-	// here rather than left as a happy accident.
+	// Completion reads the document's Namespaces off the cached analysis, so a
+	// signature naming an imported Type prints it.
 	it("should print imported Types in the Method listing of a Module", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -1181,12 +1098,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// Writing the import first and creating the file second is the ordinary
-	// order to work in, and it is the case an edge index built from what a graph
-	// could READ can not see — the edge to a file that is not there is the one
-	// nothing records. Both halves are checked, because a stale publish and a
-	// stale ANSWER are different failures: the Hover said `Error` about a name
-	// that resolves.
+	// Writing the import before creating the file is the ordinary order. Both
+	// the publish and the Hover's answer must follow the new file.
 	it("should re-answer an importer once the Module it names is created", async () => {
 		let importerSource = `import {\n\tfrom "./Base.es" { thing }\n}\n\nimplementation {\n\tTerminal.print(thing::toString())\n}\n`
 		let files = makeSessionWorkspace({ "Importer.es": importerSource })
@@ -1225,13 +1138,10 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// One timer restarted by every keystroke is a document that is never
-	// analysed while another one is being typed in. Nothing here is stale-wrong —
-	// it is simply never published, for as long as the typing goes on.
-	//
-	// The burst is twelve keystrokes 60 ms apart, so three quarters of a
-	// second is spent waiting by design. The written budget is the one
-	// `scripts/testBudget.ts` gives every spec.
+	// Each file has its own deadline, so a document is analysed while another
+	// is typed in. The burst waits by design, so the spec writes out the budget
+	// `scripts/testBudget.ts` gives every spec. See "The debounce window" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should analyse a document nobody is typing in during a burst elsewhere", async () => {
 		let apart = {
 			"Alone.es": `implementation {\n\tconstant alone = 1\n}\n`,
@@ -1251,12 +1161,8 @@ describe("the Server's request loop", () => {
 				`implementation {\n\tconstant apart: Integer = "two"\n}\n`,
 			)
 
-			// A clock, deliberately, and the one place in this file that
-			// keeps one: a burst is keystrokes arriving FASTER than the window
-			// closes, and the fact under test is that the other document's own
-			// deadline is honoured while the window is re-armed under it. Waiting
-			// for the Server to settle between two of them would let the window
-			// fire, which is exactly what a burst does not do.
+			// A clock, deliberately: a burst is keystrokes arriving faster than
+			// the window closes. Settling between them would let the window fire.
 			for (let index = 0; index < 12; index++) {
 				await session.change(
 					files.pathOf("Alone.es"),
@@ -1267,8 +1173,7 @@ describe("the Server's request loop", () => {
 				})
 			}
 
-			// Read before the burst is given any time to drain, which is
-			// what makes this about the schedule rather than about the analysis.
+			// Read before the burst can drain, so this is about the schedule.
 			expect(session.codesFor(files.pathOf("Apart.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
@@ -1278,9 +1183,8 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// The version the list was computed against, which is what lets a client
-	// throw away a publish that raced a keystroke — the exact window a debounce
-	// widens. Free to send, since the analysis is always of the current buffer.
+	// The version the list was computed against lets a client drop a publish
+	// that raced a keystroke.
 	it("should name the buffer version every publish was computed against", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -1292,8 +1196,8 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// An edit that changes the Diagnostics, since one that does not
-			// is deliberately never sent.
+			// An edit that changes the Diagnostics, since an unchanged list is
+			// never sent.
 			await session.change(
 				files.pathOf("Middle.es"),
 				middleSource.replace(
@@ -1317,10 +1221,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// Refreshing a file whose meaning moved is why the root above it runs
-	// at all; sending one the list it already has is a wire message and a
-	// client-side rebuild for a file the reader is not even in — and a
-	// workspace-wide analysis has one of those per file it holds.
+	// A list is sent only when it differs from the last one sent to that
+	// URI.
 	it("should send a dependent nothing when its Diagnostics did not change", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -1338,8 +1240,7 @@ describe("the Server's request loop", () => {
 			await session.change(files.pathOf("Base.es"), `${baseSource}\n`)
 			await session.settle()
 
-			// The analysis really ran — this is the send being skipped, not
-			// the work.
+			// The analysis ran, and only the send was skipped.
 			expect(session.tallySince(counts).links).toBeGreaterThan(0)
 			expect(session.publishesSince(mark)).toEqual([])
 
@@ -1359,12 +1260,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A fan-in — one Module several files import — is the ordinary shape of
-	// a workspace, and it is the one the undirected component gets wrong: no
-	// sibling's graph contains another's, so every sibling would pay for its own
-	// link on every keystroke in any of them. With all of them open, which is
-	// where that cost was first paid; the test below it is the same invariant
-	// with none of them open, which is where the roots could have lost it.
+	// One Module several files import. No sibling's graph contains another's,
+	// so a keystroke in one must not link them all. Here all of them are open.
 	it("should link once for a keystroke however many siblings share the dependency", async () => {
 		let roots = [0, 1, 2, 3, 4, 5]
 		let fanIn: Record<string, string> = {
@@ -1402,9 +1299,8 @@ describe("the Server's request loop", () => {
 
 			expect(session.tallySince(counts).links).toBe(1)
 
-			// The other direction still fans out, which is what the roots
-			// reaching a change are FOR: editing what they all import DOES
-			// change what every one of them means.
+			// Editing what they all import does change what each means, so that
+			// edit fans out.
 			await session.change(
 				files.pathOf("Shared.es"),
 				`implementation {\n\tconstant shared: Integer = "one"\n}\n\nexport {\n\tshared\n}\n`,
@@ -1422,10 +1318,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The same invariant with none of the siblings open, which is where
-	// analysing a whole workspace could have lost it: every one of those files
-	// is a root now, and scheduling all the roots rather than the ones REACHING
-	// the keystroke would be a link apiece on every keystroke in any of them.
+	// The same with none of the siblings open, when every sibling is a root.
+	// Only the roots reaching the keystroke run.
 	it("should link once for a keystroke in a leaf root nothing else is open beside", async () => {
 		let siblings = [0, 1, 2, 3, 4, 5]
 		let fanIn: Record<string, string> = {
@@ -1460,15 +1354,9 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A file writing NEITHER Module section has TWO answers about it — its
-	// own, and the one the graph reaching it made and threw away — and only one
-	// of them may be published, or the Problems panel changes twice per keystroke
-	// in the importer. Its own is the one that is kept: it is what every request
-	// over that file reads, and it is what the reader sees when they open it.
-	//
-	// The state is an ordinary one. A file is section-less while its `export`
-	// block is still being written, and the importer that is waiting for it is
-	// already naming it.
+	// A file writing neither Module section has its own answer and the graph's.
+	// Its own is published, since every request over the file reads it. See
+	// "The analysis loop" in packages/language-server/DEVELOPMENT.md.
 	it("should publish a section-less dependency's own answer rather than the graph's", async () => {
 		let plain = `implementation {\n\tconstant amount: Integer = "two"\n\tconstant broken = (\n}\n`
 		let importer = `import {\n\tfrom "./Plain.es" { amount }\n}\n\nimplementation {\n\tconstant here = 1\n}\n`
@@ -1483,9 +1371,8 @@ describe("the Server's request loop", () => {
 			await session.open(files.pathOf("Importer.es"), importer)
 			await session.settle()
 
-			// The graph's answer holds the syntax error and not the
-			// mismatch, so a list holding both is the file's own. In file
-			// order, which puts the mismatch above the Statement that broke.
+			// The graph's answer holds the syntax error and not the mismatch, so
+			// a list holding both, in file order, is the file's own.
 			expect(session.codesFor(files.pathOf("Plain.es"))).toEqual([
 				"assignment-type-mismatch",
 				"syntax-error",
@@ -1517,10 +1404,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And answering for itself must not mean being re-analysed for ever. A
-	// section-less file is one the graph deliberately holds nothing for, so it
-	// reads as uncovered after every window — while nothing an importer does can
-	// change what it means, since it can not name anything the importer declares.
+	// A section-less file reads as uncovered after every window, but nothing an
+	// importer does can change it, so it is not enriched again.
 	it("should not re-enrich the dependencies that write neither section", async () => {
 		let plain = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 		let unfinished: Record<string, string> = {}
@@ -1566,11 +1451,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// Closing a file hands it back to disk, and the roots reaching it have
-	// to RUN for what the FILE says to reach the Editor — no keystroke is going
-	// to land in a document the reader just closed, so nothing else would ask
-	// them to. Nothing is cleared by a close any more; the test below this one
-	// is the half of that which nothing imports.
+	// Closing a file hands it back to disk, and the roots reaching it run
+	// again so the file's text reaches the Editor. A close clears nothing.
 	it("should keep a closed Module's Diagnostics through the documents importing it", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let importer = `import {\n\tfrom "./Broken.es" { amount }\n}\n\nimplementation {\n\tTerminal.print(amount::toString())\n}\n`
@@ -1603,8 +1485,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The entry reaches the broken file only through a facade that
-	// re-exports from it, and its own Problems still say which import to follow.
+	// The entry reaches the broken file only through a re-exporting facade,
+	// and its own Problems say which import to follow.
 	it("should report on the entry a broken Module it reaches through a re-export", async () => {
 		let measure = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let facade = `implementation {}\n\nexport {\n\tfrom "./Measure.es" { amount }\n}\n`
@@ -1639,9 +1521,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The debounced analysis is a timer callback, and a throw out of one is
-	// the process — no request left to answer, no Diagnostic, nothing in the log.
-	// The Parser reaching that state is not hypothetical: see `unparseableSource`.
+	// The debounced analysis is a timer callback, and a throw out of one ends
+	// the process. `unparseableSource` reaches that state.
 	it("should keep answering after opening a document the Parser can not read", async () => {
 		let files = makeSessionWorkspace({
 			...chain,
@@ -1672,12 +1553,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The window goes with the client. A closing Editor hands every buffer
-	// back to disk, and each of those schedules an analysis — one firing after
-	// the connection has gone publishes into nothing, and a throw out of a timer
-	// callback is the process rather than a failed request. Nothing else in this
-	// file would notice: every publish is wrapped, so the analysis simply runs
-	// for an Editor that is not there.
+	// The window goes with the client. A closing Editor's buffers each schedule
+	// an analysis, which must not fire after the connection has gone.
 	it("should stop a pending analysis when the client shuts down", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n`
 		let files = makeSessionWorkspace({ "Broken.es": broken })
@@ -1690,11 +1567,8 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// An edit that moves the list, sent inside the window and
-			// followed by the shutdown request — an analysis that did fire would
-			// publish, and there would be a message here to see. The settle is
-			// what makes the absence a finding rather than a race: a window the
-			// shutdown failed to clear is a window the settle waits out.
+			// An edit that moves the list, then the shutdown request. A window
+			// the shutdown failed to clear would publish before the settle answers.
 			await session.change(
 				files.pathOf("Broken.es"),
 				`implementation {\n\tconstant amount = 2\n}\n`,
@@ -1709,10 +1583,7 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The whole feature, in one assertion: a file nobody opened, that
-	// nothing open imports, is reported on. What the Problems panel used to hold
-	// was the open documents and their dependencies, so a mistake anywhere else
-	// in the project was invisible until somebody happened to open the file.
+	// A file nobody opened, that nothing open imports, is reported on.
 	it("should report on a file nobody opened and nothing open imports", async () => {
 		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
 		let files = makeSessionWorkspace({ ...chain, "Lonely.es": lonely })
@@ -1725,9 +1596,8 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("Lonely.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
-			// A file with nothing wrong with it is published as an
-			// explicitly empty list rather than left unmentioned, which is what
-			// tells the Problems panel it has been looked at.
+			// A file with nothing wrong is published as an empty list, which
+			// tells the Problems panel it was looked at.
 			expect(session.diagnosticsFor(files.pathOf("Base.es"))).toEqual([])
 			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
 		} finally {
@@ -1736,12 +1606,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The other half of reporting on a whole project: a project holds
-	// `.es` files that are not its sources — a corpus kept deliberately broken
-	// is the one this repository holds — and a panel that lists those is a panel
-	// nobody reads. `exclude` in the nearest `essence.json` is how a project
-	// says which directories those are, and it is the same list the test walk
-	// reads.
+	// A project may hold `.es` files that are not its sources. `exclude` in the
+	// nearest `essence.json` names their directories, as the test walk reads it.
 	const excludingCorpus = JSON.stringify({ exclude: ["corpus"] })
 	const lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
 
