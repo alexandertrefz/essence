@@ -143,8 +143,9 @@ means, so it would be a refactoring of its own.
 offered only where each copy means what the name did.
 
 An Expression is a primary followed by suffixes, and most compound forms have brackets of their own, such as
-`match … { … }`. `start` and `complete` do not: they take the whole operand after them, so `complete work` pasted
-before `::add(1)` becomes `complete work::add(1)`.
+`match … { … }`. So a copy reads as itself in front of a `::` or a `.`. `start` and `complete` do not: they take the
+whole operand after them, so `complete work` pasted before `::add(1)` would read as `complete work::add(1)`. No
+brackets group an Expression, so the copy cannot be guarded, and neither is inlined.
 
 There is no hoisting hazard. A Constant is visible only after its declaration, so every read follows it. Every name
 the value reads is then in scope at each read, unless shadowed, which `readsAgree` checks.
@@ -153,9 +154,10 @@ the value reads is then in scope at each read, unless shadowed, which `readsAgre
 
 - A Function literal, a bare `#Case`, a member path, and an empty List or Dictionary take their Type from where
   they stand. `@` means whatever the Method or Match Handler around it is about. None of these is inlined.
-- A value that calls anything is not inlined. It runs once where the Constant stood but once per read after
-  inlining, so `constant printed = Terminal.print("once")` read twice would print twice. Nothing here can tell a
-  call that only answers a value from one that does something.
+- A value that calls, starts or completes anything is not inlined. It runs once where the Constant stood but once
+  per read after inlining, so `constant printed = Terminal.print("once")` read twice would print twice. A copy of
+  `start work` would also start the work later. Nothing here can tell a call that only answers a value from one that
+  does something.
 
 A read inside a Function literal is refused for the same reason, since it runs once per call of the literal. An
 exported Constant, one with a `§§` block, and one written over several lines are left alone too.

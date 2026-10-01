@@ -202,7 +202,7 @@ function isInlinable(value: parser.ExpressionNode): boolean {
 		return false
 	}
 
-	if (calls(value)) {
+	if (acts(value)) {
 		return false
 	}
 
@@ -236,13 +236,17 @@ function readsSelf(value: parser.ExpressionNode): boolean {
 	return found
 }
 
-function calls(value: parser.ExpressionNode): boolean {
+// Whether evaluating the value calls, starts or completes anything, which
+// each copy would do again where it is read.
+function acts(value: parser.ExpressionNode): boolean {
 	let found = false
 
 	walkNode(value, (node) => {
 		if (
 			node.nodeType === "MethodInvocation" ||
-			node.nodeType === "FunctionInvocation"
+			node.nodeType === "FunctionInvocation" ||
+			node.nodeType === "Start" ||
+			node.nodeType === "Complete"
 		) {
 			found = true
 

@@ -7875,6 +7875,37 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "printed ="))).toEqual([])
 	})
 
+	// Each copy would start or wait for the work again, where it is read. A
+	// copy before `::add(1)` would also wait for `work::add(1)`.
+	it("offers nothing for a value that starts or completes anything", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction waited(_ work: Future<Integer>) -> Future<Integer> {",
+			"\t\tconstant answer = complete work",
+			"",
+			"\t\t<- answer::add(1)",
+			"\t}",
+			"",
+			"\tfunction launched(_ work: Future<Integer>) -> Future<Integer> {",
+			"\t\tconstant running = start work",
+			"",
+			"\t\t<- complete running",
+			"\t}",
+			"",
+			"\tfunction held(_ work: Future<Integer>) -> Future<Integer> {",
+			"\t\tconstant box = { answer = complete work }",
+			"",
+			"\t\t<- box.answer",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "answer ="))).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "running ="))).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "box ="))).toEqual([])
+	})
+
 	// A read inside a Function literal runs once per call of that literal.
 	it("offers nothing for a read inside a Function literal", () => {
 		let lines = [
