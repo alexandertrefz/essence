@@ -229,14 +229,7 @@ function collectCasesFromNode(
 			collectCasesFromNode(node.value, tokens)
 
 			for (let handler of node.handlers) {
-				if (handler.matcher.nodeType === "CaseMatcher") {
-					pushToken(
-						tokens,
-						handler.matcher.caseName.position,
-						"enumMember",
-						[],
-					)
-				}
+				collectCaseOfMatcher(handler.matcher, tokens)
 
 				if (handler.guard !== null) {
 					collectCasesFromNode(handler.guard, tokens)
@@ -316,6 +309,8 @@ function collectCasesFromNode(
 			return
 		case "ExpectStatement":
 		case "RequireStatement":
+			collectCaseOfMatcher(node.matcher, tokens)
+
 			for (let expression of assertionExpressions(node)) {
 				collectCasesFromNode(expression, tokens)
 			}
@@ -389,6 +384,16 @@ function collectCasesFromNode(
 		case "RationalValue":
 		case "BooleanValue":
 			return
+	}
+}
+
+// A Case Matcher names its Case, in a Match Handler and in a `require` alike.
+function collectCaseOfMatcher(
+	matcher: parser.MatcherNode | null,
+	tokens: Array<SemanticToken>,
+) {
+	if (matcher?.nodeType === "CaseMatcher") {
+		pushToken(tokens, matcher.caseName.position, "enumMember", [])
 	}
 }
 

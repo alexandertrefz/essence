@@ -343,6 +343,41 @@ describe("Semantic Tokens for Cases", () => {
 	})
 })
 
+describe("Semantic Tokens of a Case written in a require Matcher", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Holder {",
+		"\t\tFull { amount: Integer },",
+		"\t\tEmpty,",
+		"\t}",
+		"}",
+		"tests {",
+		'\ttest "reads the holder" {',
+		"\t\tconstant holder: Holder = #Full({ amount = 3 })",
+		"\t\trequire #Full(content) = holder",
+		"\t\texpect content.amount::is(3)",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should colour the Case as an enum member", () => {
+		expect(tokenAt(source, 10, 12)).toEqual({
+			line: 10,
+			column: 12,
+			length: 4,
+			type: "enumMember",
+			modifiers: [],
+		})
+	})
+
+	it("should colour the binding as a readonly variable declaration", () => {
+		expect(tokenAt(source, 10, 17)?.modifiers).toEqual([
+			"declaration",
+			"readonly",
+		])
+	})
+})
+
 describe("Semantic Tokens for the standard library", () => {
 	it("should mark builtin Types and Namespaces as defaultLibrary", () => {
 		let source = [
