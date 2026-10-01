@@ -390,3 +390,31 @@ because its admission outweighs the call. `BENCH.md` has the measurement.
 A hole in an Array is read as the `undefined` it holds, and admitted only where the item's shape admits absence.
 `[1, , 3]` is refused where the items are Integers. It crosses with `#Empty` in the middle where they are
 `Optional<Integer>`.
+
+### Reading a Union
+
+A Union reads a JavaScript value by trying its arms in declaration order, and the first arm that admits the value
+takes it. Overlapping arms are therefore decided rather than ambiguous. `Optional<String> | Integer` reads `"7"` as a
+String, because its `Optional<String>` arm comes first.
+
+Two shapes are refused before any arm is compiled, since an arm that took the value would already have decided. An
+`Optional` inside an `Optional` would spell `#Value(#Empty)` and `#Empty` both as `undefined`. Inside a Union, a later
+arm could take the `undefined` an earlier one refused. A Union whose arms collide as bare Cases has nothing to decide
+with, as "Bare Cases" describes.
+
+Three shortcuts change no answer. `familiesOf` lists the JavaScript kinds each arm could take, and an arm that rules
+out the value's kind is skipped. An arm refuses by throwing, and a thrown Error captures a stack, so failing arms would
+otherwise dominate a large call. A skipped arm never recognised the value, so it could neither have taken it nor given
+the refusal worth reporting. A Union of bare Cases alone reads a string from a table built when the reader is compiled,
+under both spellings of each Case. An object whose `$case` names an arm goes to that arm alone, whose refusal is the one
+the search would report. A miss in either table falls through to the arms.
+
+When every arm refuses, the refusal reported is the one from the arm that got inside the value, if exactly one did.
+`reachedInside` says so when the failure's path is deeper than the value's, or when the failure is marked `inside`. A
+Case whose `$case` matched but whose payload is wrong refuses at the value itself, and marks itself. So a misspelled
+payload member is named, as a Record's would be, rather than reported as the whole Choice. Otherwise the Union's own
+refusal names the whole Type.
+
+An `Optional` is that Union with its arms run through. Absence, `undefined` or `null`, is `#Empty`, and anything else
+is `#Value`. `null` is admitted because JSON has only that one, and `undefined` is what comes back out. `#Empty` never
+reaches inside a value, so a refusal from inside the `#Value` arm is the one reported.

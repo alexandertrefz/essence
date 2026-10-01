@@ -701,15 +701,9 @@ export function createInterpreter(
 						)
 					}
 
-					// Closed, unlike the Matcher a `case` narrows with. A
-					// key the Type does not name is a mistake in the making — a
-					// misspelled member, or a value from somewhere else entirely
-					// — and taking it silently drops it, which is how a `widht`
-					// gets as far as production.
-					//
-					// Looked for AFTER the members are read, so that a
-					// value which is wrong in both ways is named by the member
-					// that is wrong rather than by the one that is extra.
+					// Closed, unlike the Matcher a `case` narrows with, so a
+					// misspelled member is refused rather than dropped. Asked after
+					// the members, so a wrong member is named before an extra one.
 					let undeclared = undeclaredOf(given, declared, false)
 
 					if (undeclared !== null) {
@@ -720,11 +714,8 @@ export function createInterpreter(
 				}
 			}
 			case "optional": {
-				// The refusal `toJS` makes for the same pair, made here
-				// too: `#Value(#Empty)` and `#Empty` would both be `undefined`,
-				// and Essence is explicit that they are two values. It is a fact
-				// about the SHAPE rather than about any value of it, so a shape
-				// that has it compiles to the refusal itself.
+				// `#Value(#Empty)` and `#Empty` would both be `undefined`, so
+				// the shape compiles to a refusal, as in `toJS`.
 				if (admitsAbsence(expected.of)) {
 					return (_value, at, step) => {
 						throw nestedOptional(at, step)
@@ -733,16 +724,8 @@ export function createInterpreter(
 
 				let item = compileIn(expected.of)
 
-				// `Optional` is spelled by its ABSENCE on this side — `T |
-				// undefined` — so it reads the value itself rather than a `$case`
-				// on it. `null` is admitted beside `undefined` because JSON has
-				// only the one of them; `undefined` is what comes back.
-				//
-				// This is the Union of `#Value` and `#Empty` with its two
-				// arms run through: absence is the `#Empty` arm, anything else is
-				// the `#Value` arm, and a refusal that got INSIDE the value is the
-				// one the Union would have kept — `#Empty` never reaches inside
-				// anything, so it can never be that one.
+				// Spelled by absence, `undefined` or `null`. See "Reading a
+				// Union" in DEVELOPMENT.md.
 				return (value, at, step) => {
 					if (value === undefined || value === null) {
 						return makeCase(OPTIONAL_EMPTY)
@@ -768,12 +751,8 @@ export function createInterpreter(
 			case "case":
 				return buildCaseIn(expected)
 			case "union": {
-				// Before any arm is tried, because a nested Optional is
-				// refused rather than answered and an arm's refusal is something
-				// the next arm gets to overrule. A Union that offers an `Optional`
-				// among its arms would otherwise let a later arm take the
-				// `undefined` an earlier one had just refused — turning a shape
-				// with no JavaScript spelling into a confident wrong answer.
+				// Two shapes are refused before any arm is compiled. See
+				// "Reading a Union" in DEVELOPMENT.md.
 				let item = optionalItemOf(expected)
 
 				if (item !== null && admitsAbsence(item)) {
@@ -782,20 +761,6 @@ export function createInterpreter(
 					}
 				}
 
-				// And the second shape a Union can be in that no
-				// JavaScript value could be read into: a unit Choice's Case
-				// crosses as its bare name, so `"Up"` standing beside a String
-				// — or beside another Choice's `#Up` — is one string two arms
-				// would both take. Asked BEFORE the arms are compiled, for the
-				// reason the nested `Optional` above is: an arm that took the
-				// value would be an arm that had already decided, and what is
-				// wrong here is that there is nothing to decide it WITH.
-				//
-				// Refused rather than decided, which is the one place the
-				// "first arm wins" stance the arms below are compiled under
-				// does not reach. Deciding would hand a String `"Up"` back out
-				// as a `Direction#Up`, and losing the value it was given is the
-				// single thing this boundary may not do.
 				let collision = bareCaseCollision(expected)
 
 				if (collision !== null) {
@@ -806,40 +771,15 @@ export function createInterpreter(
 
 				let arms = expected.arms.map((arm) => compileIn(arm))
 				let count = arms.length
-				// Which JavaScript families each arm could take at all,
-				// so that an arm is only TRIED where it could succeed. An arm
-				// says no by throwing, and a thrown Error captures a stack —
-				// which is nothing against a value that fits the first arm and
-				// everything against a tree of ten thousand values whose fit is
-				// the third: two refusals built and discarded per value, and
-				// most of a call spent inside the Error constructor. Skipping
-				// an arm the family already rules out changes no answer: such
-				// an arm never recognised the value, so it could neither have
-				// taken it nor have been the one refusal worth reporting.
+				// The kinds each arm could take, a table for bare Cases and a
+				// table for `$case` tags. None of them changes an answer. See
+				// "Reading a Union" in DEVELOPMENT.md.
 				let families = expected.arms.map((arm) => familiesOf(arm))
-
-				// A Union of bare Cases and nothing else — a unit Choice
-				// as a value of it is declared, which is the shape a status or
-				// a kind is — is a lookup and no search: every string it can
-				// take is known when the reader is compiled, under both of its
-				// spellings, and answers the one shared instance. What is not
-				// in the table falls through to the arms, so a miss is refused
-				// in exactly the words it always was.
 				let named = bareCaseTable(expected)
-
-				// And the same for the Cases that cross as objects: which
-				// arm a `$case` names is known when the reader is compiled, so
-				// an object that names one is handed to that arm and no other.
-				// The arm's own refusal — a payload member wrong under a
-				// recognised tag — is then the ONE refusal, which is what the
-				// search below would have concluded after trying the rest.
 				let tagged = caseArmTable(expected)
 
-				// In declaration order, and the first arm that admits the
-				// value is the one it becomes. Overlapping arms are therefore
-				// DECIDED rather than ambiguous: `Optional<String> | Integer`
-				// makes a String out of `"7"` because `Optional<String>` is
-				// written first, not because anything weighed the two.
+				// The first arm in declaration order that admits the value
+				// takes it.
 				return (value, at, step) => {
 					let family = typeof value
 
@@ -867,9 +807,8 @@ export function createInterpreter(
 						}
 					}
 
-					// Built on the first refusal rather than before the
-					// first arm — an arm that takes the value is the whole of
-					// what usually happens, and it should leave nothing behind.
+					// Built on the first refusal, so the usual success allocates
+					// nothing.
 					let refused: Array<EssenceMarshalError> | null = null
 
 					for (let position = 0; position < count; position++) {
@@ -909,20 +848,15 @@ export function createInterpreter(
 			}
 			case "function":
 				return buildCallbackIn(expected)
-			// Work can not be BUILT from a JavaScript value. A Future is a
-			// description of Essence work and a Started is one run of it, and
-			// what a host holds instead is a `Promise` — an answer that has not
-			// arrived, which describes nothing and can not be run again. The one
-			// place a host says "work" is a callback the Module calls: the
-			// callback is the description, and `buildCallbackIn` is where that
-			// is read.
+			// Work can not be built from a JavaScript value, since a `Promise`
+			// describes no work and can not run again. A host hands work over as a
+			// callback, which `buildCallbackIn` reads.
 			case "future":
 			case "started":
 				return (_value, at, step) => {
 					throw asynchronyFromHost(shown, at, step)
 				}
-			// Everything the boundary has no mapping for, refused in the
-			// words the Compiler wrote when it still had the Type to name.
+			// What has no mapping, refused in the compiler's words.
 			case "refused": {
 				let why = expected.why
 
@@ -939,11 +873,8 @@ export function createInterpreter(
 		let shown = expected.shown
 		let tag = expected.tag
 
-		// One of `Optional`'s own Cases, met without the other — which is
-		// what `constant thing = Optional<Integer>#Value(3)` infers, a Case
-		// rather than the Union an annotation would have named. The pair is
-		// collapsed into an `optional` before it ever reaches here, so this is
-		// the lone arm, read by the rule the pair is read by.
+		// A lone Case of `Optional`, as an unannotated constant infers it, read
+		// by the rule the pair is read by.
 		if (expected.optional) {
 			if (expected.name === "Empty") {
 				return (value, at, step) => {
@@ -957,9 +888,8 @@ export function createInterpreter(
 
 			let item = expected.payload.item
 
-			// A `#Value` carrying nothing, and a `#Value` carrying another
-			// absence — neither is a shape any value has, so both are the whole
-			// of what this Case compiles to.
+			// A `#Value` carrying nothing, or another absence, is a shape no
+			// value has.
 			if (item === undefined) {
 				return (value, at, step) => {
 					throw mismatch(value, shown, at, step)
