@@ -11,31 +11,17 @@ import {
 	type ModuleBindings,
 } from "./marshal-runtime"
 
-// A Module that was compiled ALREADY — a bundle on disk and the Descriptor
-// written beside it — loaded without a Compiler anywhere in reach. `esc build
-// --embed` writes the pair; everything below reads it.
-//
-// Which is the whole point of a Descriptor being JSON. `loadModule`
-// compiles, describes and binds in one call, and pays for a Compiler to do it;
-// here the describing was over at build time and what is left is a `readFile`
-// and an `import`. A shipped application does not need a toolchain to talk to
-// the Essence inside it, and a container does not need one installed.
-//
-// Nothing in this file may reach the Compiler, and `prebuilt.spec.ts`
-// reads it back to say so under "The prebuilt door" — the one import that names
-// it above is a type import, which is erased before anything runs.
+// Loads a Module compiled already, a bundle and the Descriptor beside it, with
+// no compiler in reach. `esc build --embed` writes the pair. Nothing here may
+// import the compiler at run time, and `prebuilt.spec.ts` checks that.
 
-// What a Descriptor is written under beside its bundle: `app.js` and
-// `app.descriptor.json`. `esc build --embed` spells the same rule from the other
-// side, and the two are pinned together by a test that builds a pair and loads
-// it — a rule stated twice is one that can only be kept by being checked.
+// The Descriptor beside `app.js` is `app.descriptor.json`. The CLI's
+// `descriptorFileName` states the same rule, and a test loads a pair it built.
 const DESCRIPTOR_EXTENSION = ".descriptor.json"
 
 export function descriptorPath(bundlePath: string): string {
-	// The extension of the FILE NAME — `extname` reads the base name
-	// alone, so a dot in a directory above it is not one, and a name that is
-	// nothing but an extension has none to replace. `esc`'s own
-	// `descriptorFileName` is spelled out of the same call.
+	// `extname` reads the base name alone, so a dot in a directory name is not
+	// an extension.
 	let extension = path.extname(bundlePath)
 
 	return `${bundlePath.slice(
@@ -45,22 +31,19 @@ export function descriptorPath(bundlePath: string): string {
 }
 
 export type PrebuiltModule = ModuleBindings & {
-	// This bundle's own Type key and value constructors, read off its
-	// default export. Every Essence value carries its Type on a Symbol minted
-	// when the bundle was evaluated, so the only values this Module's Functions
-	// accept are the ones built here.
+	// This bundle's Type key and value constructors. The Type key is a Symbol
+	// minted when the bundle is evaluated, so its Functions accept only values
+	// built through this bridge.
 	bridge: RuntimeBridge
-	// The boundary itself, bound to that bridge — what `exports` was built
-	// through, for a host that wants to marshal something of its own across.
+	// The interpreter bound to that bridge, for a host that marshals values of
+	// its own.
 	interpreter: Interpreter
-	// What was read off disk, as it was read. A host that generates
-	// declarations or inspects the boundary has the same object the binding used.
+	// The Descriptor as read from disk.
 	descriptor: ModuleDescriptor
 }
 
-// What a prebuilt load can be told that its two files do not say — today
-// the one thing, and the same thing `LoadOptions` carries: the host's own stop,
-// which becomes the root of every run this binding starts.
+// `signal` is the host's stop, as on `LoadOptions`. It becomes the root of
+// every run this binding starts.
 export type PrebuiltOptions = {
 	signal?: AbortSignal
 }
@@ -71,9 +54,8 @@ export async function loadPrebuilt(
 	options: PrebuiltOptions = {},
 ): Promise<PrebuiltModule> {
 	let descriptor = await readDescriptor(sidecarPath)
-	// A URL rather than a path, because `import()` reads a specifier and a
-	// Windows path is not one. The host's own Module cache keys off it, so two
-	// loads of one bundle evaluate the Program inside it once.
+	// A URL, because a Windows path is not a specifier. The host's Module cache
+	// keys off it, so two loads of one bundle evaluate its Program once.
 	let namespace = (await import(pathToFileURL(bundlePath).href)) as Record<
 		string,
 		unknown
@@ -90,11 +72,8 @@ export async function loadPrebuilt(
 	}
 }
 
-// Checked for the one thing that tells a Descriptor from any other JSON,
-// and named by the file it was read from. What follows walks this object without
-// looking again, so a sidecar that is not one has to be caught where the file
-// name is still known — the alternative is "cannot read properties of undefined"
-// from somewhere inside the binding.
+// The binding walks the Descriptor without checking it, so a file that is not
+// one is refused here, where its name is still known.
 async function readDescriptor(sidecarPath: string): Promise<ModuleDescriptor> {
 	let read = JSON.parse(
 		await readFile(sidecarPath, "utf8"),

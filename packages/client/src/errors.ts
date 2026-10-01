@@ -1,38 +1,16 @@
-// The four ways reaching an Essence Module can go wrong, told apart by
-// WHOSE mistake they are: a JavaScript value does not fit the Essence Type it
-// was handed to, a Function was called in a way its signature does not allow,
-// the build itself was set up in a way that can not work, or the Essence source
-// did not compile. A host catching one of these knows which of its own sides to
-// look at, which a bare `Error` never says.
-//
-// Three of the four are here and the fourth is in `compile-error.ts`,
-// because this file is imported by `marshal-runtime.ts` — the half of the
-// boundary that ships to a browser with no Compiler anywhere near it. Nothing
-// here may import one. An `EssenceCompileError` renders Diagnostics through the
-// Compiler's own renderer, which is exactly what that rule excludes, and it is
-// also the one failure that can not happen at run time: by then the sources
-// have long since compiled.
+// The failures of reaching an Essence Module, told apart by whose mistake each
+// is. `EssenceCompileError` is in `compile-error.ts`, since this file is imported
+// by `marshal-runtime.ts`, which runs where no compiler exists.
 
-// A value that does not fit the Type on the other side of the boundary,
-// in either direction.
-//
-// `path` says WHERE, as the message already does — `argument 2 →
-// .items[0].width`. It is carried apart from the prose so that a host can group,
-// match or point an editor at the failure without reading the sentence back
-// again, which is the one thing a caught Error's message is bad at.
+// A value that does not fit the Type on the other side of the boundary, in
+// either direction. `path` says where, as in `argument 2 → .items[0].width`, so
+// a host need not parse the message.
 export class EssenceMarshalError extends Error {
 	readonly path: string
-	// Whether the value was RECOGNISED before it was refused — a Case
-	// whose `$case` named this arm and whose payload then did not fit, rather
-	// than an arm that never took the value at all. A Union tries its arms in
-	// order and answers with one refusal, and this is how it tells "you meant
-	// this one and got a member wrong" from "this is not any of them".
-	//
-	// And set by a refusal of the SHAPE rather than of the value — a
-	// position with no JavaScript spelling at all, which no value handed to it
-	// could have got right. Kept for the same reason the recognised ones are:
-	// what this flag is asked is "is this the refusal worth reporting", and a
-	// shape's own is always the answer.
+	// Set when the value was recognised before it was refused, as a Case whose
+	// `$case` matched and whose payload did not fit. A refused shape with no
+	// JavaScript spelling sets it too. A Union reports such a refusal rather than
+	// its own.
 	readonly inside: boolean
 
 	constructor(message: string, path = "", inside = false) {
@@ -44,9 +22,8 @@ export class EssenceMarshalError extends Error {
 	}
 }
 
-// A call the Function's signature does not admit — the wrong number of
-// Arguments, labels that are not its Parameters', an overloaded export with no
-// single answer.
+// A call the Function's signature does not admit: the wrong number of
+// Arguments, labels it does not declare, or no single Overload that fits.
 export class EssenceCallError extends Error {
 	constructor(message: string) {
 		super(message)
@@ -55,11 +32,9 @@ export class EssenceCallError extends Error {
 	}
 }
 
-// An invariant of the plugins broken while serving — a file that compiled
-// without emitting a Module of its own, the standard library's prelude asked for
-// before anything was compiled. Not a compile failure: every source involved
-// compiled, and what is wrong is a bug in the plugin rather than anything in a
-// file, so there is no excerpt to show and nothing to underline.
+// A plugin invariant broken while serving, such as the standard library's
+// prelude asked for before anything compiled. Every source compiled, so the bug
+// is the plugin's and there is no excerpt to show.
 export class EssenceBuildError extends Error {
 	constructor(message: string) {
 		super(message)
