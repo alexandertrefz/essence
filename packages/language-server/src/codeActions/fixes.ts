@@ -1122,11 +1122,8 @@ function brokenMembers(
 		.join(`\n${indentation}`)}`
 }
 
-// Members written beside what the Literal already holds, padded as a
-// one-line Literal is padded — a space after the opening brace and one before
-// the closing one. The space in FRONT is written unless a comma already ends the
-// line; the one behind only where the closing brace stands right there, which is
-// the empty `{}` and nothing else.
+// Members written on the Literal's one line, padded as a one-line Literal is.
+// A space follows them only where the brace stands right there, as in `{}`.
 function oneLineMembers(
 	lines: Array<string>,
 	names: Array<string>,
@@ -1140,29 +1137,9 @@ function oneLineMembers(
 	return `${separator} ${written}${padded}`
 }
 
-// A static Method reached the way an instance Method is, rewritten into
-// the call it was meant to be — `value::make(1)` as `Boxes.make(value, 1)` or as
-// `Boxes.make(1)`. TWO actions, because a static takes no receiver and so the
-// value the call was written on either belongs among the Arguments or does not
-// belong at all: `a::distance(to b)` was reaching a `distance(_ a: Point, to b:
-// Point)` and wants it kept, `p::origin()` was reaching an `origin()` and wants
-// it gone. Nothing in the Diagnostic says which, which is why its own Help
-// hedges — "passing the value as an Argument if it needs one" — and why neither
-// action is preferred: an Editor applies a preferred fix without asking, and one
-// of these two leaves a call with the wrong number of Arguments.
-//
-// The one that KEEPS the value is two edits around the receiver, so that
-// everything the receiver is written as — a call of its own, a Literal spanning
-// lines — is carried across untouched. What the second replaces is the `::name(`
-// between the receiver and the Arguments, with the comma that now separates it
-// from the first of them, or with nothing where the call passes none: the
-// closing bracket is already written and stays where it is. The one that DROPS
-// it is a single edit over both, since the receiver is what it removes.
-//
-// The span between the receiver and the bracket is read back off the buffer
-// first. A Namespace specifier is admitted there and goes with the rest — a
-// specifier picks between Namespaces that declare an INSTANCE Method, and the
-// call this writes names its Namespace outright.
+// Rewrites `value::make(1)` as a static call, `Boxes.make(value, 1)` or
+// `Boxes.make(1)`, as the signature accepts. Keeping the value edits around the
+// receiver, so it is not retyped.
 export function staticCallActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1207,18 +1184,12 @@ export function staticCallActions(
 		kind: "quickfix" as const,
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// Preferred where the signature leaves only one of the two
-		// standing — there is then nothing left for the reader to choose
-		// between, and the edit is simply right.
+		// Preferred when the signature accepts only one shape.
 		isPreferred: acceptsValue !== acceptsWithoutValue,
 		edits,
 	})
 
-	// Only the shapes the signature accepts, which the Compiler worked out
-	// from its arity — see `staticCallArities`. Both used to be offered whatever
-	// the arity, so a zero-Argument static answered "passing the value" with
-	// `argument-count-mismatch` and a one-Argument static answered the other one
-	// the same way: whichever the reader picked, one of the two was a refusal.
+	// Only the shapes the signature accepts, as `staticCallArities` finds.
 	return [
 		...(acceptsValue
 			? [
@@ -1257,17 +1228,9 @@ export function staticCallActions(
 	]
 }
 
-// A Type Parameter bound to a Protocol it never declared one for, bounded
-// where it was DECLARED — which is nowhere near the call the Diagnostic is
-// reported at. `is P` goes right after the name, ahead of any `= Default`,
-// because that is the order `<infer Item is Comparable = Integer>` is parsed in.
-//
-// Offered only where this file declares the Parameter: an edit into another
-// Module's head is not something a Diagnostic about a call can ask for, and a
-// bound in a Module this one only imports is that Module's decision. Offered
-// only where the Parameter carries NO bound already, too — `<infer T is A is P>`
-// is not a spelling, and which of the two bounds a reader meant to keep is the
-// question this can not answer.
+// Writes the bound a call needs onto the Type Parameter's declaration in this
+// file: `is P` after the name, before any `= Default`. Not offered where the
+// Parameter has a bound already.
 export function boundParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1296,12 +1259,8 @@ export function boundParameterAction(
 		return null
 	}
 
-	// The declaration as it will READ once the bound is written, which is
-	// not always what the Help shows: the Help spells `infer` because that is the
-	// form nearly every Parameter is declared in, and a Function may still write
-	// `<Value>`. Whether a Parameter is inferred or applied is a second question
-	// and one no Diagnostic about a bound asked, so the fix leaves that half of
-	// the declaration exactly as it stands and the title says so.
+	// The title spells the declaration as it will read. The Help always
+	// spells `infer`, but the fix keeps the declaration's own form.
 	let written = declared.inferred ? `infer ${parameter}` : parameter
 
 	return {
@@ -1323,9 +1282,8 @@ export function boundParameterAction(
 	}
 }
 
-// The import entry a bound's fix writes beside its own edit, where the
-// file binds no name for the Protocol. Null where that entry can not be
-// written, and then there is no fix: the bound alone would name nothing.
+// The import a bound's fix needs for its Protocol, if any. Null where it
+// cannot be written, and then there is no fix.
 function protocolImportEdit(
 	wanted: common.ProtocolImport | undefined,
 	imports: ImportContext | null,
@@ -1353,15 +1311,9 @@ function protocolImportEdit(
 			}
 }
 
-// A bound on one of the NAMESPACE's Type Parameters, written onto the
-// Method the call stands in — the counterpart of `boundParameterAction`, whose
-// edit goes on a declaration. Into the Method's existing `<…>` where it has one,
-// after the last entry, and as a whole `<…>` right before the Parameter list
-// where it has none.
-//
-// Offered only where the Method does not already bound that Parameter:
-// `<Item is A is P>` is not a spelling, and which of the two a reader meant to
-// keep is not a question a Diagnostic about a call can answer.
+// A bound on a Namespace Type Parameter, written onto the Method the call is
+// in: after its last `<…>` entry, or as a new `<…>`. Not offered where the
+// Method already bounds that Parameter.
 export function methodBoundAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1412,12 +1364,8 @@ export function methodBoundAction(
 	}
 }
 
-// A Method's `<…>` entry that re-declares one of its Namespace's Type
-// Parameters. The two shapes get the two edits their Diagnostics name: the
-// unbounded one is REMOVED, entry and separator together, and the one that
-// restates `infer` keeps the entry and loses the word.
-//
-// The whole `<…>` goes with the last entry — an empty `<>` is not a spelling.
+// A Method's `<…>` entry re-declaring a Namespace Type Parameter. An unbounded
+// one is removed with its separator; one restating `infer` loses the word.
 export function reDeclaredParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1464,14 +1412,8 @@ export function reDeclaredParameterAction(
 	let previous = generics[index - 1]
 	let next = generics[index + 1]
 
-	// A lone entry takes the angle brackets with it — an empty `<>` is not
-	// a spelling — so the span removed is the LIST's own, which the Parser hands
-	// over whole. Worked out from the entry it would be wrong the moment the
-	// list is broken across lines: the `<` is then on the line above, and an
-	// edit starting one column before the entry eats the indentation and leaves
-	// the `<` standing. A list with several entries is cut between entries
-	// instead, where the Parser's Positions are all that is needed at any
-	// layout.
+	// A lone entry takes the whole `<…>`, whose span the Parser records, since
+	// `<>` is no spelling. Otherwise the cut runs between entries.
 	let range =
 		generics.length === 1
 			? found.genericListPosition
@@ -1482,11 +1424,7 @@ export function reDeclaredParameterAction(
 						end: entry.position.end,
 					}
 
-	// A Comment inside the `<…>` is the reader's own text, and every span
-	// above is a span this edit DELETES — so where one sits in it, nothing is
-	// offered. The Diagnostic's Help says the same edit in words, and a reader
-	// doing it by hand keeps what they wrote; a Quick Fix that silently drops a
-	// sentence is worse than no Quick Fix.
+	// Nothing is offered where the deletion would take a Comment.
 	if (range === null || sliceOf(lines, range).includes("§")) {
 		return null
 	}
@@ -1501,13 +1439,9 @@ export function reDeclaredParameterAction(
 	}
 }
 
-// The conformance a Namespace writes a requirement of and never declared,
-// written onto its head. After the last clause where there is one, `, is P` — a
-// conformance list is comma separated — and after the target Type where there is
-// none, which is where the first `is` of a head stands.
-//
-// The Diagnostic is reported against the METHOD that gave the Namespace away, so
-// the head is found by walking out to the Namespace the range sits in.
+// Declares a conformance the Namespace's Methods imply: `, is P` after its
+// last clause, or ` is P` after the target Type. The Diagnostic spans the
+// Method, so the Namespace is found around it.
 export function declareConformanceAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1548,16 +1482,8 @@ export function declareConformanceAction(
 	}
 }
 
-// The Type Parameter a `where` condition binds and the Namespace never
-// declared, written into the Generic list — `<infer T>` after the Namespace's
-// name where there is no list, `, infer T` after the last Parameter where there
-// is. `infer` either way: a Namespace's Type Parameters are all inferred, which
-// `uninferred-namespace-parameter` says in its own words, so the applied form is
-// not a spelling a fix could choose here.
-//
-// The condition is written on the Namespace's HEAD, which is what the walk out
-// to the enclosing Namespace finds — a `where` clause is part of a conformance
-// and a conformance is part of the head.
+// Declares the Type Parameter a `where` condition names on the enclosing
+// Namespace, as `infer`, since a Namespace's Type Parameters are all inferred.
 export function declareParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1592,32 +1518,15 @@ export function declareParameterAction(
 	}
 }
 
-// A Pattern's whole-value binder, replaced by the `@` that already names
-// the same value — the Help applied. Every read of the name inside the arm is
-// rewritten and the `as name` goes, which is the whole of what the reader would
-// have done by hand.
-//
-// The reads are found by NAME rather than through the rename index, because the
-// Parser reports this binder and then DROPS it: there is no Declaration for the
-// index to bind them to, and a read of the name is an `unknown-name` of its own
-// until this fix lands. What the index would have given for free has to be
-// checked here instead, which is what the two refusals below are.
-//
-// REFUSED WHOLE, rather than applied to the reads it is sure of. A read standing
-// where `@` means something else — inside a nested Match's arm, inside a
-// Function written in the body — would be rewritten into a different value
-// silently, and a fix that rewrote the rest and left that one would leave an arm
-// half in one spelling and half in the other. So a single read anywhere `@` is
-// not the scrutinee, or a Declaration in the body spelling the same name, turns
-// the whole action away.
+// Replaces a Pattern's whole-value binder with `@`: the `as name` goes and
+// every read of the name becomes `@`. The Parser drops the binder, so reads
+// are found by name. See "Binders to @" in DEVELOPMENT.md.
 export function binderToScrutineeAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// The name comes off the BUFFER, since the binder the Parser dropped
-	// is nowhere in the AST and the Help that names it is prose this Compiler
-	// reserves the right to reword.
+	// The name comes off the buffer, since no Node holds the binder.
 	let written = /^as[ \t]+(\S+)$/.exec(sliceOf(lines, diagnostic.position))
 	let handler = findHandlerBefore(program, diagnostic.position.start)
 
@@ -1641,9 +1550,8 @@ export function binderToScrutineeAction(
 		return null
 	}
 
-	// The space in front of the `as` goes with it. A binder written on a
-	// line of its OWN takes the line break and the indentation instead, or what
-	// is left behind is a line of trailing whitespace.
+	// The space before `as` goes too, or the line break and indentation for a
+	// binder on its own line.
 	let before = lineAt(lines, diagnostic.position.start.line)
 		.slice(0, diagnostic.position.start.column - 1)
 		.replace(/[ \t]+$/, "")
@@ -1676,10 +1584,8 @@ export function binderToScrutineeAction(
 	}
 }
 
-// Where the binder's name is read inside its arm, or null where one of
-// those reads can not be rewritten — a Declaration in the body spelling the same
-// name, or a read standing somewhere `@` names something else. The two are one
-// answer because the fix is one edit or none.
+// Where the binder's name is read inside its arm, or null where the body
+// declares the name or a read stands where `@` means something else.
 function binderReads(
 	handler: Handler,
 	name: string,
@@ -1713,9 +1619,7 @@ function binderReads(
 		: reads
 }
 
-// Whether a Statement binds that name — a Declaration written plainly, or
-// one that takes its value apart and binds the name as a member. Either way the
-// name means the Declaration from there on, and `@` is not what it means.
+// Whether a Statement declares that name, directly or through a Pattern.
 function declaresName(node: parser.ImplementationNode, name: string): boolean {
 	if (
 		node.nodeType !== "ConstantDeclarationStatement" &&
@@ -1731,12 +1635,9 @@ function declaresName(node: parser.ImplementationNode, name: string): boolean {
 		: node.name.content === name
 }
 
-// The spans inside one Node where `@` does NOT mean what it means around
-// it. A nested Match rebinds it per arm — from the Matcher's end, so that the
-// guard is covered and the scrutinee the Match is written ON is not: `match name
-// -> …` still reads the outer `@`. A Function written in the body takes its
-// whole span, Parameter defaults included, since none of it is the arm's value
-// any more.
+// The spans inside one Node where `@` means something else: a nested Match's
+// arms from each Matcher's end, so its scrutinee still reads the outer `@`, or
+// a Function's whole span.
 function reboundRegionsOf(
 	node: parser.ImplementationNode,
 ): Array<common.Position> {
@@ -1755,15 +1656,12 @@ function reboundRegionsOf(
 	}
 }
 
-// A `§§` block read as LINES rather than as the Documentation the Parser
-// made of it. What the fixes below have to find is where a tag's text ends, and
-// a tag carries the span of its own name alone — the lines under it that
-// continue its description belong to no Node at all.
+// A `§§` block read as lines, since a tag's continuation lines belong to no
+// Node.
 const documentationPrefix = "§§"
 
-// What a `§§` line says, or null where the line is not one. The one space
-// after the sigil is the separator rather than content, exactly as the grammar
-// reads it.
+// What a `§§` line says, or null. The one space after the sigil is not
+// content.
 function documentationBody(line: string): string | null {
 	let text = line.trimStart()
 
@@ -1776,9 +1674,8 @@ function documentationBody(line: string): string | null {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// The three tags the grammar knows. An `@` line naming anything else is
-// prose the description keeps — writing about an `@address` costs nothing —
-// so it continues the tag above it rather than opening one.
+// The tags the grammar knows. Any other `@` line, such as `@address`, is
+// prose continuing the tag before it.
 const documentationTagPattern = /^@(param|returns|example)\b/
 
 const parameterTagPattern = /^@param\b/
@@ -1802,16 +1699,9 @@ function documentationSectionEnd(
 	}
 }
 
-// The line the block never wrote, put under the last `@param` it did —
-// and under the lines continuing that one, since a description may run over as
-// many as it needs. The Warning underlines the PARAMETER, which is nowhere near
-// the block, so where the line goes is what the Diagnostic carries.
-//
-// The description is left empty: what the Compiler knows is the name the line
-// has to write, and what the Parameter is for is the reader's to say. That is
-// also why it is not preferred — the Warning stands until the description is
-// written, which is a hole in plain sight rather than a line claiming to
-// document something.
+// Adds the missing `@param` line after the section of the `@param` the
+// Diagnostic's `data` names. The description is left empty for the reader, so
+// the fix is not preferred.
 export function documentationLineAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -1821,9 +1711,7 @@ export function documentationLineAction(
 	}
 
 	let anchor = diagnostic.data.after.start
-	// Read back off the buffer, as every edit here is: a Position from a
-	// stale analysis pointing at a line that no longer opens a `@param` would
-	// write the new one into the middle of somebody's prose.
+	// The anchor line must still open a `@param`.
 	let body = documentationBody(lineAt(lines, anchor.line))
 
 	if (body === null || !parameterTagPattern.test(body)) {
@@ -1849,9 +1737,7 @@ export function documentationLineAction(
 	}
 }
 
-// The whole `@param` line and the lines that continue it. Deleting the
-// name alone would leave `§§ @param` describing nothing, and deleting the line
-// alone would strand its description in the prose of whatever stands above it.
+// Removes a `@param` line with its continuation lines.
 export function removeDocumentationTagAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -1868,11 +1754,8 @@ export function removeDocumentationTagAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// Preferred only where there is nothing else to do with the line.
-		// A near miss on the name is the likelier reading wherever the Compiler
-		// found one — the description was written about something, and a rename
-		// is what left the tag behind — so the fix that keeps the text stands
-		// above the one that drops it.
+		// Not preferred where a near miss exists, since renaming keeps
+		// the description.
 		isPreferred: diagnostic.data?.kind !== "suggestion",
 		edits: [
 			{
@@ -1887,15 +1770,8 @@ export function removeDocumentationTagAction(
 	}
 }
 
-// A `§§` written EMPTY is the blank line of a Documentation block — it
-// separates the prose above it from the tags below. Taking the last tag out
-// strands it: the block ends on a separator with nothing behind it, which is
-// how `§§ A price in whole cents. / §§ / type Cents = Integer` was left. So the
-// removal starts one line higher where the line above is a bare separator and
-// the run being removed reaches the end of the block.
-//
-// The separator is kept wherever a tag still stands below the removal, which is
-// the block that still has two halves to keep apart.
+// An empty `§§` line separates a block's prose from its tags. Removing the
+// last tag also removes that separator, so the block does not end on one.
 function strandedSeparatorAbove(lines: Array<string>, tagLine: number): number {
 	let above = documentationBody(lineAt(lines, tagLine - 1))
 	let below = documentationBody(

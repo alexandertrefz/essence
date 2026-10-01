@@ -207,3 +207,15 @@ The edits follow from who still names the Declaration:
 
 Removing the Statement also removes the one blank line that no longer separates anything. No doubled blank line,
 and no blank line against a brace, is left behind.
+
+## Binders to @
+
+`binderToScrutineeAction` applies the Help for a redundant whole-value binder: the `as name` goes, and every read
+of the name inside the arm becomes `@`. The Parser reports the binder and then drops it, so no Declaration exists
+for the rename index to bind the reads to. The reads are found by name instead, and the fix checks what the index
+would have checked.
+
+It is refused whole rather than applied to the reads it is sure of. A read where `@` means something else, inside
+a nested Match's arm or a Function in the body, would silently become a different value. Rewriting the other reads
+and not that one would leave the arm in two spellings. So a single such read, or a Declaration in the body of the
+same name, turns the whole action away.
