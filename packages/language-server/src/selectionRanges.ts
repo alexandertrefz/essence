@@ -8,6 +8,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { assertionExpressions } from "./assertionChildren"
 import { defineArmExpressions } from "./defineArmChildren"
 import { matcherValueExpressions } from "./matchHandlerChildren"
+import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains } from "./positions"
 import { type ParserSection, programSections } from "./sections"
 
@@ -152,47 +153,10 @@ function collectFromNode(
 				}
 			}
 
+			// A native signature has no block, but its defaults are spans.
 			for (let member of Object.values(node.methods)) {
-				// Only bodied Methods have a block; native signatures are skipped.
-				let methods: Array<parser.FunctionValueNode> = []
-
-				if (
-					member.nodeType === "SimpleMethod" ||
-					member.nodeType === "StaticMethod"
-				) {
-					methods = [member.method]
-				} else if (
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-				) {
-					methods = member.methods
-				} else if (
-					member.nodeType === "OverloadedMethodSignatures" ||
-					member.nodeType === "OverloadedStaticMethodSignatures"
-				) {
-					methods = member.methods.filter(
-						(entry): entry is parser.FunctionValueNode =>
-							entry.nodeType === "FunctionValue",
-					)
-				}
-
-				for (let method of methods) {
-					if (contains(method.position, cursor)) {
-						chain.push(method.position)
-
-						if (
-							!collectFromDefaults(
-								method.value.parameters,
-								cursor,
-								chain,
-							)
-						) {
-							collectFromBody(method.value.body, cursor, chain)
-						}
-
-						return
-					}
-				}
+				collectFromOverloads(methodsOf(member), cursor, chain)
+				collectFromOverloads(nativeSignaturesOf(member), cursor, chain)
 			}
 
 			return
@@ -382,6 +346,7 @@ function collectFromNode(
 
 // An `overload` block, which only the standard library writes, may mix bodied
 // Functions with native signatures, whose defaults are spans inside no body.
+// A Namespace's Methods are read the same way.
 function collectFromOverloads(
 	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
 	cursor: common.Cursor,

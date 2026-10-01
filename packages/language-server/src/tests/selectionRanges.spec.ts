@@ -391,3 +391,25 @@ describe("Selection Ranges inside an overload function block", () => {
 		])
 	})
 })
+
+describe("Selection Ranges inside a native Method's default", () => {
+	it("should widen from a name in the default out through the default", () => {
+		let source = [
+			"declarations {",
+			"\tnamespace Text for String {",
+			"\t\tslice(to end: Integer = @::length()) -> String",
+			"\t}",
+			"}",
+		].join("\n")
+		let { program } = parseWithDiagnostics(source, {
+			allowDeclarationsHeader: true,
+		})
+
+		expect(findSelectionRanges(program, { line: 3, column: 27 })).toEqual([
+			{ start: { line: 3, column: 27 }, end: { line: 3, column: 28 } },
+			{ start: { line: 3, column: 27 }, end: { line: 3, column: 38 } },
+			{ start: { line: 2, column: 2 }, end: { line: 4, column: 3 } },
+			{ start: { line: 1, column: 1 }, end: { line: 5, column: 2 } },
+		])
+	})
+})
