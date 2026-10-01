@@ -1,0 +1,35 @@
+# Developing the command line
+
+`essence` parses its arguments, loads the project file, and runs one command. [README.md](README.md) covers using
+it. This file explains how its parts fit together.
+
+## What the result cache remembers
+
+`essence test` can answer an entry from a record of an earlier run instead of running it. A replayed record claims
+that its tests passed, were skipped or were deselected. Each rule here keeps that claim true.
+
+`remembersResults` decides whether a run reads or writes the cache at all. It refuses a run made for the file it
+leaves behind (`--update`, `--coverage`) and one that measures the machine (`--bench`). It refuses a run that chooses
+which values property tests draw: `--seed`, or a `--cases` that differs from the project's setting. It also refuses
+`--mutate`: a mutant is compiled from changed sources, and a record keyed by the real bundle would claim the real
+code passed. `--json` is allowed, since a replay writes the same events. The filters are part of the key, so a
+narrowed run is an answer of its own. A watch session and the Language Server never use the cache: they rerun only
+what a change reached, from bundles they already hold.
+
+`isRemembered` decides whether one entry's events may be recorded:
+
+- A failure always reruns. Its reader wants this run's output, and the failing entry is the one being edited.
+- A `not-focused` deselection is never recorded. What a focus silences is decided across a whole run.
+- A property test is never recorded. Fresh values on every run are the point of the search. The values it failed on
+  before live in the corpus, which is part of the key.
+- A snapshot or baseline that was written changed a file the key reads. The entry is recorded on the next run, once
+  it matches what it wrote.
+- Deselections by tag, filter or `bench`, and skips, follow from the manifest and the filters in the key, so they are
+  recorded like a pass.
+
+`runTest` adds the rules that need the loaded bundle. A focused run records nothing, because every entry of it
+reports what the focus decided. An entry is not recorded when a Module's own statements read host input or any code
+drew entropy, since the key holds neither. An entry whose bundle links the effectful runtime is not recorded either.
+That check runs before writing, so a warm run never reads the bundles it replays.
+
+Records are written after the snapshot, baseline and corpus stores, so every key reads a settled disk.

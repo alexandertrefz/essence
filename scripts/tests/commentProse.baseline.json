@@ -38,7 +38,6 @@
 	"packages/cli/src/session.ts": {"sentence-length": 20, "em-dash": 11, "all-caps": 4},
 	"packages/cli/src/spinner.ts": {"sentence-length": 2, "em-dash": 2},
 	"packages/cli/src/terminal.ts": {"sentence-length": 2, "em-dash": 5},
-	"packages/cli/src/test.ts": {"sentence-length": 84, "em-dash": 57, "all-caps": 47, "position": 5, "block-length": 13},
 	"packages/cli/src/testReport.ts": {"sentence-length": 38, "em-dash": 20, "all-caps": 13, "position": 2, "block-length": 6},
 	"packages/cli/src/testWatch.ts": {"sentence-length": 23, "em-dash": 14, "all-caps": 10, "position": 3},
 	"packages/cli/src/tests/cli.spec.ts": {"sentence-length": 66, "em-dash": 35, "all-caps": 15, "history": 1, "position": 5, "block-length": 7, "counts": 1},

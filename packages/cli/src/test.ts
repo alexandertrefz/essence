@@ -74,26 +74,20 @@ import {
 	toLcov,
 } from "./testReport"
 
-// `essence test` compiles every file it was pointed at with the tests
-// enriched, loads the bundles it emitted, and drives each one's own runner. The
-// run happens IN THIS PROCESS: a bundle inlines a runtime of its own, and every
-// value a test builds carries a hidden Type key that is a Symbol of that
-// instance — so everything that touches a value has to run inside the bundle,
-// and what crosses back out is events, which are plain data and already
-// rendered. `$tests` is the one name this file looks up, and `registryOf` the
-// one runtime function it calls, because indexing a manifest reads no value.
+// `essence test` compiles every file it is pointed at with the tests enriched,
+// loads the bundles and drives each one's own runner in this process. A bundle
+// inlines its own runtime, and each value's hidden Type key is a Symbol of that
+// instance. So values stay inside the bundle, and only events cross back out.
 
-// What a bundle publishes on its entry Module when any Module of its
-// graph wrote a `tests { … }` block. A bundle built from sources with no tests
-// in them publishes nothing, which is not an error — it is the answer.
+// What a bundle publishes on its entry Module when its graph has a `tests`
+// block. A bundle without tests publishes nothing, which is not an error.
 type TestEntryPoints = typeof entryPoints
 
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
-// One compiled entry and everything its bundle registered. The tests it
-// RUNS are a subset — two entries that reach one Module both carry that
-// Module's tests, and running them twice would report every one of them twice —
-// which is what `claimRegistries` works out across the whole run.
+// One compiled entry and everything its bundle registered. Two entries that
+// reach one Module both carry its tests, so `claimRegistries` picks which
+// entry runs them.
 export type LoadedBundle = {
 	inputFileName: string
 	tests: TestEntryPoints
@@ -103,71 +97,49 @@ export type LoadedBundle = {
 // A bundle and the tests it is the one to run.
 export type LoadedSuite = LoadedBundle & { registry: Registry }
 
-// One entry whose whole answer a run already held, ready to be written
-// back into the stream in place of running it. `tests` is what that entry
-// PLANNED, which the run's `run-start` has to count as its own.
+// One entry whose answer a result cache held, written into the stream in
+// place of running it. `tests` is how many it planned, which `run-start` counts.
 type CachedEntry = {
 	inputFileName: string
 	tests: number
 	events: Array<TestEvent>
 }
 
-// What a run is REPLAYING rather than running, and where each of those
-// entries stands among the ones it is running. The order matters: a replayed
-// entry is written into the stream exactly where it would have run, so that a
-// warm run and a cold one are the same report in the same order and the same
-// stream line for line. That is the whole claim a replay makes, and a reader
-// comparing two runs is the one it is made to.
+// The entries a run replays from the result cache. A replayed entry is written
+// where it would have run, so a warm run reports exactly what a cold one does.
 type ReplayOptions = {
 	entries?: Array<CachedEntry>
-	// Every entry of the run by name, replayed and live alike. Empty for a
-	// caller that replays nothing, which then runs what it was handed in the
-	// order it was handed it — the loop this has always been.
+	// Every entry of the run by name, replayed and live alike. Without it, the
+	// replays go first and the suites follow in the order given.
 	order?: Array<string>
 }
 
-// What one running suite selected, per entry — how many tests it planned
-// and how many its `--filter` matched. Both are facts about the selection rather
-// than about the run, and both are what a result cache writes down so that a
-// replay can answer them without a bundle.
+// How many tests one entry planned and how many its filters matched. A result
+// cache records both so a replay can answer them without a bundle.
 type EntrySelection = {
 	inputFileName: string
 	planned: number
 	matched: number
 }
 
-// What a run tells every property test of it. The first two are the
-// command line's — `--seed` and `--cases` — and the third is what every one of
-// them has failed on before, read off the `__counterexamples__` companions
-// beside the sources. It travels with the seed rather than beside it because
-// what it decides is the same thing: which values a property test is asked
-// about.
+// What a run tells every property test: `--seed`, `--cases`, and the values
+// each one failed on before, read from the `__counterexamples__` companions.
 type PropertyOptions = {
 	seed?: string
 	cases?: number | null
 	counterexamples?: Record<string, CorpusStore>
 }
 
-// What a run knows about snapshots before it starts: the stored entries
-// of every Module in it, and whether one that differs is to be recorded.
+// The stored snapshots of every Module in a run, and whether one that differs
+// is recorded.
 type SnapshotOptions = {
 	stored?: Record<string, SnapshotStore>
 	update?: boolean
 }
 
-// What a run wants out of the coverage counters. The table itself is what
-// `--coverage` reports, and a bundle compiled without the instrumentation has
-// none — so asking costs nothing and answers with nothing, which is why it is
-// passed through rather than guessed at from the events.
-//
-// `byTest` is the second reading of the same counters, and only
-// `essence test --mutate` asks for it — see `RunOptions.coverageByTest`. It is
-// what turns "this line ran" into "these tests reach this line", which is how a
-// mutant is judged by the tests that could possibly notice it. It costs the
-// points each test actually touched, and nobody pays who did not ask. It lives
-// beside the table rather than as a parameter of its own because it is a fact
-// about the SAME counters, and a caller that wanted it and not them would be
-// asking for the impossible.
+// What a run reads from the coverage counters. A bundle compiled without them
+// answers with nothing. `byTest` also records which points each test reached,
+// which `--mutate` uses to run a mutant against only the tests that reach it.
 type CoverageOptions = {
 	byTest?: boolean
 }
@@ -176,21 +148,13 @@ export type TestFilters = {
 	filter: string | null
 	tags: Array<string>
 	skipTags: Array<string>
-	// Whether the benchmarks of the run are measured. It is a FILTER
-	// rather than a mode: a benchmark nobody asked to measure is deselected
-	// through the same selection everything else goes through, so the report
-	// says why it did not run in the place it would have run.
+	// Whether benchmarks are measured. An unmeasured benchmark is deselected like
+	// any filtered test, so the report says why it did not run.
 	bench: boolean
 }
 
-// A Module's tests all arrive together, so what is claimed is the Module
-// — by its path, or by the id of its first test where a compile had no path to
-// give (which the CLI never does, and a spec driving one program might).
-//
-// Named apart so that a result cache can write down which Modules an
-// entry claimed and read them back without the bundle. What a claim is keyed by
-// has to be one spelling, or a record written under one would be checked against
-// the other.
+// The key a Module is claimed by: its path, or its first test's id when the
+// compile had no path. A result cache records claims under the same key.
 function moduleKeyOf(module: TestModule): string {
 	return module.module ?? module.tests[0]?.id ?? ""
 }
@@ -219,16 +183,9 @@ function claimModules(
 	return kept
 }
 
-// Which bundle runs which Module, decided across the whole run rather
-// than as the bundles arrive — so that a session re-loading ONE entry does not
-// silently take a shared Module away from the entry that has been running it.
-// The order is the order the entries were compiled in, which is the order they
-// were named in, so the answer is the same every time it is asked.
-//
-// `claimed` is what the run has already given away to entries that are
-// NOT among these bundles — which is only ever an entry a result cache answered
-// for, whose bundle nobody loaded. Empty for every other caller, which is the
-// same walk this has always done.
+// Which bundle runs which Module. It is decided across the whole run in the
+// order the entries were named, so reloading one entry never moves a Module.
+// `claimed` holds Modules already given to entries a result cache answered.
 export function claimRegistries(
 	bundles: Array<LoadedBundle>,
 	claimed: Set<string> = new Set(),
@@ -239,13 +196,9 @@ export function claimRegistries(
 	}))
 }
 
-// Every test the run was narrowed to, so that the refusal at the end can
-// point at each of them. A skipped test's `focused` narrows nothing — it does
-// not run either way — and is not what has to go.
-//
-// Exported for `--mutate`, which refuses a focused baseline outright and
-// names the same tests in the same words — a reader meets one refusal spelled
-// once, whichever of the two runs they asked for.
+// Every focused test, for the refusal that names them. A skipped test's
+// `focused` narrows nothing. `--mutate` refuses a focused baseline with the same
+// list.
 export function focusedTests(suites: Array<LoadedSuite>): Array<FocusedTest> {
 	return suites.flatMap((suite) =>
 		suite.registry.tests
@@ -272,16 +225,10 @@ export async function createStagingDirectory(prefix: string): Promise<string> {
 	return staging
 }
 
-// Bun's module resolver remembers what a directory held the first time it
-// resolved anything out of it, so a file that appears there afterwards is
-// invisible to `import()` — "Cannot find module", about a file plainly on disk.
-// Nothing else in the CLI meets it: `esc run` SPAWNS the bundle it built, and a
-// fresh process has nothing remembered. A run that loads its bundles in this
-// process meets it the moment it loads a second one, and a watch session would
-// meet it on every save. So every bundle a run loads is staged in a directory
-// of its own, which no resolver has ever read: a hard link where the filesystem
-// allows one — a bundle is content-addressed, and nobody writes to it — and a
-// copy where it does not.
+// Each bundle is imported from a fresh directory of its own. Bun's resolver
+// remembers a directory's files once it resolves from it, so a file written
+// there later is "Cannot find module". `import()` also caches by URL. Cache
+// entries are never written to, so a hard link is safe.
 async function stageBundle(
 	staging: string,
 	bundle: string,
@@ -293,12 +240,9 @@ async function stageBundle(
 
 	let staged = path.join(directory, "tests.mjs")
 
-	// The name is taken first, and this is not tidiness. A staged bundle
-	// is a HARD LINK to the cache entry, so a `copyFile` onto a staged name that
-	// already exists writes THROUGH the link and overwrites the cache entry
-	// itself — a content-addressed name would then answer with somebody else's
-	// bundle, in this session and in every later one. Unlinking first means a
-	// copy makes a file of its own whatever was there.
+	// WARNING: an existing staged name may be a hard link to a cache entry, and
+	// `copyFile` onto it would overwrite that entry. Removing it first keeps the
+	// cache intact.
 	await rm(staged, { force: true })
 
 	try {
@@ -343,10 +287,8 @@ export async function loadBundles(
 	return bundles
 }
 
-// Whether any bundle of a run holds a focused test. One bundle at a time,
-// because a selection renders each interpolating Module's names and a setup that
-// completes something is waited for — which is also why this is a walk rather
-// than the `some` it reads as.
+// Whether any bundle of a run holds a focused test. Selecting can wait on a
+// setup that completes something, so the bundles are asked one at a time.
 export async function holdsFocus(
 	suites: Array<LoadedSuite>,
 	bench: boolean | undefined,
@@ -360,66 +302,40 @@ export async function holdsFocus(
 	return false
 }
 
-// One run over several bundles. `all` is every bundle the run knows
-// about and `running` the ones to drive — the two differ only for a watch
-// session, which re-runs what a change reached and leaves the rest as they
-// were, but has to decide FOCUS across every test it holds all the same.
-//
-// Whether the run holds a focus is each bundle's own answer, asked of the
-// bundle — the rule for what counts as focused lives in the runtime and is not
-// worth a second spelling here. Once one bundle says yes, every bundle is told
-// so, and the ones holding no focused test of their own deselect everything
-// through the same selection that runs the rest.
+// One run over several bundles. `all` is every bundle the run knows and
+// `running` the ones to drive; a watch session drives fewer but decides focus
+// across all. Once one bundle holds a focused test, every other runs nothing.
 export async function runSuites(
 	all: Array<LoadedSuite>,
 	running: Array<LoadedSuite>,
 	filters: TestFilters,
-	// The suite an event came out of, so a session holding one stream per
-	// entry can replace the right one. Null for the run's own bookend, which
-	// belongs to no bundle.
+	// The suite an event came from, so a session holding one stream per entry
+	// replaces the right one. Null for the run's own bookends.
 	emit: (event: TestEvent, suite: LoadedSuite | null) => void,
-	// What the run wants OUT of the counters — see `CoverageOptions`. A
-	// plain `true` is the whole table and nothing per test, which is what
-	// `--coverage` and a watching session ask for.
+	// `true` reads the whole table and nothing per test.
 	coverage: boolean | CoverageOptions = false,
-	// What every `matches snapshot from "name"` of the run compares
-	// against, keyed by Module — read off disk here because a bundle reads
-	// nothing — and whether a difference is RECORDED rather than reported.
+	// Bundles read no files, so the stored snapshots are read here.
 	snapshots: SnapshotOptions = {},
-	// What every property test of the run draws from, and how many values
-	// each of them runs for. The SEED is made here rather than in the runtime,
-	// because one run over several bundles is one run and every bundle has to
-	// draw from the same one — which is what makes the replay a report prints
-	// reproduce a whole run and not just one file of it.
+	// The caller makes the seed, so every bundle of a run draws from one seed
+	// and a printed replay reproduces the whole run.
 	properties: PropertyOptions = {},
-	// The baselines every benchmark of the run is held to, keyed by
-	// Module — read off disk here, like the snapshots above, because a bundle
-	// reads nothing. Whether a measurement outside its band is RECORDED rather
-	// than failed is `snapshots.update`: it is one flag, and a run that accepts
-	// what it produced accepts all of it.
+	// The stored baselines, by Module. `snapshots.update` also records a
+	// measurement outside its band instead of failing it.
 	benchmarks: Record<string, BenchmarkStore> = {},
-	// The entries this run is REPLAYING rather than running — read off a
-	// result cache by whoever started the run, because a bundle reads nothing —
-	// and where each of them stands among the ones it is running. They are
-	// counted into the plan and written into the stream in their own place, so a
-	// warm run is the cold one's report and the cold one's stream.
+	// Counted into the plan and written into the stream in their own place.
 	replay: ReplayOptions = {},
 ): Promise<{
 	planned: number
 	focused: boolean
 	matched: number
-	// What each RUNNING suite selected. A caller keeping one record per
-	// entry needs both numbers per entry, and asking the registry a second time
-	// would evaluate every interpolating Module's setup again to render names
-	// this selection has already rendered.
+	// Per running suite, so a caller keeping one record per entry need not
+	// select again, which would rerun every interpolating Module's setup.
 	entries: Array<EntrySelection>
 }> {
 	let counters = coverage === true || coverage !== false
 	let byTest = coverage !== true && coverage !== false && coverage.byTest
-	// One bundle at a time. A selection EVALUATES each interpolating
-	// Module's setup to render its names, and a setup that completes something
-	// is waited for — so this is the first place a run of several bundles has to
-	// ask them in order rather than map over them.
+	// One bundle at a time: selecting runs each interpolating Module's setup to
+	// render names, and a setup that completes something is waited for.
 	let selected: Array<Awaited<ReturnType<LoadedSuite["tests"]["select"]>>> =
 		[]
 
@@ -430,10 +346,8 @@ export async function runSuites(
 	let runFilters: TestFilters & { focusedElsewhere?: boolean } = focused
 		? { ...filters, focusedElsewhere: true }
 		: filters
-	// A bundle that holds a focused test already selected correctly
-	// above; one that holds none runs nothing at all once another bundle does.
-	// So the count is read off the selection that was already made, rather than
-	// made a second time under the wider filters.
+	// Counted from the first selection: a bundle with a focused test selected
+	// correctly, and one without runs nothing once another holds one.
 	let entries = all.flatMap((suite, index): Array<EntrySelection> => {
 		if (!running.includes(suite)) {
 			return []
@@ -463,12 +377,7 @@ export async function runSuites(
 
 	let replays = new Map(replayed.map((entry) => [entry.inputFileName, entry]))
 	let live = new Map(running.map((suite) => [suite.inputFileName, suite]))
-	// The run's own order where a caller gave one, so a replayed entry is
-	// written into the stream exactly where it would have run. Where none was
-	// given every replay still goes out, ahead of the suites — nothing handed
-	// over may be lost for want of a place to put it — and a caller that replays
-	// nothing runs what it was handed in the order it was handed it, which is
-	// the loop this has always been.
+	// Without an order, every replay still goes out, ahead of the suites.
 	let sequence = replay.order ?? [
 		...replays.keys(),
 		...running.map((suite) => suite.inputFileName),
@@ -478,14 +387,8 @@ export async function runSuites(
 		let entry = replays.get(inputFileName)
 
 		if (entry !== undefined) {
-			// Attributed to no suite. A record is written out of a stream a
-			// bundle produced, and one replayed out of a record is never written
-			// again.
-			//
-			// A replayed entry can not hold a focused test — nothing is
-			// ever remembered out of a focused run, and a caller discards every
-			// one of these the moment a live bundle turns out to hold one — so
-			// nothing written here is silencing what runs around it.
+			// Attributed to no suite, so a replayed record is never written back.
+			// A focused run is never recorded, so a replay never holds focus.
 			emit(
 				{
 					schema: 1,
@@ -505,17 +408,14 @@ export async function runSuites(
 
 		let suite = live.get(inputFileName)
 
-		// A name the caller holds that is neither replayed nor running is
-		// an entry whose bundle published no tests at all, which is an answer
-		// rather than an omission.
+		// An entry neither replayed nor running published no tests.
 		if (suite === undefined) {
 			continue
 		}
 
 		await suite.tests.run(suite.registry, {
-			// One run over several bundles is still one run, so each
-			// bundle's own bookends are dropped and the pair around the whole
-			// of it is written by the caller.
+			// Each bundle's own bookends are dropped. This function writes the
+			// run's `run-start` and the caller its `run-end`.
 			sink: (event) => {
 				if (event.kind === "run-start" || event.kind === "run-end") {
 					return
@@ -538,9 +438,7 @@ export async function runSuites(
 	return {
 		planned,
 		focused,
-		// Across every bundle, because a filter names a test and the run
-		// is what holds the tests — a name that matches nothing in this file
-		// and something in the next one matched the run.
+		// Across every bundle: a filter that matches in any file matched the run.
 		matched: selected.reduce(
 			(total, selection) => total + selection.matched,
 			0,
@@ -549,11 +447,8 @@ export async function runSuites(
 	}
 }
 
-// `--skip-tag` wins over `--tag`, and a project's configured default is a
-// `--skip-tag` the command line did not have to write — except for a tag the
-// command line ASKED for, which is the whole point of configuring one. A
-// project that skips `slow` by default is a project where `essence test --tag
-// slow` is how the nightly job runs them.
+// A project's configured skip tags join `--skip-tag`, except a tag the command
+// line names with `--tag`. So `--tag slow` runs what a project skips by default.
 export function resolveFilters(
 	options: {
 		filter: string | undefined
@@ -579,12 +474,9 @@ export function resolveFilters(
 	}
 }
 
-// `--contracts` unions with the setting — the flag asks for the goals of
-// a project that never said it wanted them, and the setting asks for them every
-// run — and `--no-contracts` beats both: a project that configured goals still
-// needs a plain run on demand, while a broken declaration is repaired or when
-// only the written tests are the question. Both flags at once is a
-// contradiction the caller refuses before anything runs.
+// `--contracts` or the setting turns the generated goals on, and
+// `--no-contracts` turns them off whatever the setting says. Callers refuse
+// both flags at once.
 export function resolveContracts(
 	options: { contracts: boolean; noContracts: boolean },
 	configured: boolean,
@@ -592,23 +484,9 @@ export function resolveContracts(
 	return options.noContracts ? false : options.contracts || configured
 }
 
-// Whether a run may be answered out of the result cache AT ALL, in either
-// direction. `--update` and `--coverage` are runs whose whole point is the file
-// they leave behind; `--bench` measures a machine rather than asking a question
-// about the code; `--seed` and `--cases` say which values a property test
-// draws, and a property test is never remembered anyway. `--mutate` is here for
-// a reason of its own: what it runs is a MUTANT, an entry compiled from a lie
-// about the sources, and a record keyed by the bundle hash of the real ones
-// would claim those tests passed against the code as written.
-//
-// What is NOT here is `--json` — a replay is the same events on the same lines
-// — and the filters, which go into the key instead so that a narrowed run is an
-// answer of its own rather than one that can never be kept.
-//
-// `--watch` and the Language Server's session do not come through here
-// and use none of this. A watching run already re-runs only what a save
-// reached, out of bundles it is holding, and answering out of a file would be
-// slower than the loop it replaced.
+// Whether a run may read or write the result cache at all. `--json` is
+// allowed and the filters are part of the key. See "What the result cache
+// remembers" in DEVELOPMENT.md.
 export function remembersResults(
 	options: {
 		update: boolean
@@ -618,11 +496,8 @@ export function remembersResults(
 		seed: string | undefined
 		cases: number | null
 	},
-	// How many cases the PROJECT draws, where it said so. A run whose
-	// count is the project's own is that project's ordinary run and is
-	// remembered like one — it is `--cases` on the command line that says "this
-	// run is a one-off", and a standing setting that turned the store off for
-	// ever would be a project paying for every run of it twice.
+	// The project's configured case count. A run at that count is an ordinary
+	// run and is remembered like one.
 	configuredCases: number | null = null,
 ): boolean {
 	return (
@@ -635,30 +510,9 @@ export function remembersResults(
 	)
 }
 
-// Whether an entry's own stream may be REMEMBERED, so that the next run
-// over the same code, the same stores and the same filters can replay it
-// instead of running it. The replay claims that these tests passed, were skipped
-// or were deselected; each refusal below is a case where that claim would be
-// made about a run that has to happen again.
-//
-// A FAILURE always re-runs: a reader working through one wants this run's
-// output and this run's spans, and an entry that failed is the entry they are
-// editing. A `not-focused` deselection is a run somebody NARROWED by hand, and
-// what a focus silences is decided across a whole run rather than per entry — so
-// nothing out of it may be replayed into a run that focuses somewhere else. A
-// PROPERTY test is the one thing here that is meant to answer differently every
-// time: fresh entropy is what the search is for, and freezing a hundred cases
-// under a name would end it. The values it has already failed on are the
-// corpus's business, and the corpus is in the key.
-//
-// A snapshot or a baseline WRITTEN is a run that changed the very file the key
-// reads, so the record would be keyed against a disk that no longer exists.
-// Recording it one run later — when the entry has compared itself against what
-// it wrote and matched — is both correct and one run away.
-//
-// A deselection by tag, by filter or by `bench`, and a skip, are all
-// deterministic functions of the manifest and of the filters in the key, so
-// they are remembered like a pass.
+// Whether an entry's stream may be recorded for a later run to replay. Failures,
+// property tests, focus deselections and written snapshots or baselines are
+// not. See "What the result cache remembers" in DEVELOPMENT.md.
 function isRemembered(events: Array<TestEvent>): boolean {
 	return events.every((event) => {
 		switch (event.kind) {
@@ -676,13 +530,9 @@ function isRemembered(events: Array<TestEvent>): boolean {
 	})
 }
 
-// Which Modules of an entry the run would hand it, worked out WITHOUT the
-// bundles a result cache answered for. `claimRegistries` decides this across the
-// whole run in the order the entries were named, so a replayed entry has to be
-// handed exactly the Modules it was handed when it was recorded — otherwise a
-// Module whose owner moved would be reported twice or by nobody. A hit knows
-// its own Modules because the record wrote them down and the bundle hash that
-// names the record pins them; a miss has been loaded and can be asked.
+// Which Modules each entry would claim, the walk `claimRegistries` makes but
+// over Module keys, so entries a result cache answered need no bundle. A
+// replay is valid only while its entry claims what it claimed when recorded.
 function planClaims(
 	entries: Array<{ inputFileName: string; modules: Array<string> }>,
 ): Map<string, Array<string>> {
@@ -714,9 +564,8 @@ function sameClaim(left: Array<string>, right: Array<string>): boolean {
 	)
 }
 
-// A run nobody narrowed — no filter, no tags — is what CI runs, and it is
-// the run a leftover `focused` may not survive. Under any filter, focusing is
-// ordinary working practice and says nothing about the branch.
+// A run with no filter and no tags, as CI runs it. Only such a run fails on a
+// leftover focused test.
 function isPlainRun(filters: TestFilters, explicitSkipTags: number): boolean {
 	return (
 		filters.filter === null &&
@@ -729,10 +578,8 @@ function reportUnknownTags(
 	context: CLIContext,
 	suites: Array<LoadedSuite>,
 	named: Array<string>,
-	// The tags of every entry the run REPLAYED, which carry no registry to
-	// be asked. A record writes them down for exactly this: a tag that only the
-	// cached half of a project uses is a tag the run knows, and saying otherwise
-	// would make the warning fire because the cache was warm.
+	// The tags of every replayed entry, which a result record keeps so a warm
+	// cache never makes a known tag look unknown.
 	alsoKnown: Array<string> = [],
 ): void {
 	if (named.length === 0) {
@@ -759,10 +606,8 @@ function reportUnknownTags(
 	}
 }
 
-// A filter that named nothing. `--tag` says so already, and a `--filter`
-// that quietly reports "0 passed" is the worse half of the pair: a run that
-// selected nothing looks exactly like a run where everything held — and the
-// replay a failing property test prints is spelled with a `-f`.
+// Warns about a `--filter` that matched nothing, since a run that selected
+// nothing otherwise looks like one where everything passed.
 export function reportUnmatchedFilter(
 	context: CLIContext,
 	filter: string | null,
@@ -779,11 +624,9 @@ export function reportUnmatchedFilter(
 	)
 }
 
-// The one way a filter can match something and still run nothing: it
-// named benchmarks, and the run is not measuring. `matched` deliberately
-// counts what the FILTER matched — see `selectTests` — so the warning above
-// stays quiet, and the plain tree does not list a deselection; without this
-// sentence the run ends green with the reader's target never run.
+// Warns about a filter that matched only benchmarks in a run that does not
+// measure them. `reportUnmatchedFilter` stays quiet there, since `selectTests`
+// counts what the filter matched.
 function reportBenchOnlyFilter(
 	context: CLIContext,
 	run: TestRun,
@@ -820,18 +663,11 @@ export function printReport(
 	sources: Map<string, string>,
 	coverage: CoverageSummary = emptyCoverage,
 	snapshots: SnapshotWrites = noWrites,
-	// Whether the compile this run stands on emitted nothing, every entry
-	// of it having been in the bundle cache already. It is the note at the end
-	// of the summary, and it is the difference between a fast run and a fast
-	// run that also compiled the project.
+	// Whether every entry came from the bundle cache, noted in the summary.
 	cacheWarm = false,
-	// What the run recorded as baselines, which is what a snapshot count
-	// is beside it: a measurement written for the first time is a pass that
-	// left something on disk, and a reader has to be told without going to look.
 	baselines: BenchmarkWrites = noBenchmarkWrites,
-	// How many compiled entries the run held, which is what the count of
-	// replayed ones in the fold is a share of. Zero for a session that never asks
-	// the result cache — a watching one — which is what leaves the note off.
+	// How many entries the run compiled, the total the replayed count is shown
+	// against. Zero leaves that note off, as a watch session does.
 	entries = 0,
 ): void {
 	let { failures, summary, tree } = renderTestReport(
@@ -854,9 +690,7 @@ export function printReport(
 		context.terminal.err(failures)
 	}
 
-	// Between the failures and the summary line — a reader who has just
-	// been told what broke reads what was reached next, and the counts stay
-	// where they have always been, at the bottom.
+	// The coverage table goes between the failures and the summary line.
 	let table = context.options.quiet
 		? []
 		: renderCoverage(coverage, context.report)
@@ -876,11 +710,8 @@ export function printReport(
 	}
 }
 
-// The written half of a coverage run. Nothing is written unless a format
-// was named: a table is what `--coverage` promises, and a file left in a
-// project nobody asked for is litter. The directory is made on the way, and a
-// failure to write is a WARNING rather than a failure of the run — the tests
-// have already answered, and a full disk is not a broken test.
+// Writes the coverage file when a format was named. A failure to write is a
+// warning, not a failed run.
 export async function writeCoverageReport(
 	context: CLIContext,
 	coverage: CoverageSummary,
@@ -894,9 +725,8 @@ export async function writeCoverageReport(
 	let written =
 		format === "lcov" ? toLcov(coverage) : toCoverageJson(coverage)
 
-	// Nothing counted is nothing to write. An empty tracefile is not an
-	// empty report — a viewer reads it as a valid claim about zero files — and
-	// a directory made for it is litter.
+	// A viewer reads an empty tracefile as a claim about zero files, so nothing
+	// counted writes nothing.
 	if (!hasCoverage(coverage)) {
 		return
 	}
@@ -933,9 +763,6 @@ export async function runTest(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	// Refused before anything runs — the two flags contradict, and a run
-	// that guessed which one was meant would prove either more or less than the
-	// reader asked for.
 	if (context.options.contracts && context.options.noContracts) {
 		context.terminal.err(
 			"--contracts and --no-contracts contradict each other — say one.",
@@ -952,11 +779,8 @@ export async function runTest(
 	)
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let events: Array<TestEvent> = []
-	// The same stream a second time, bucketed by the entry that produced
-	// it — which is what a record is written out of. The flat one is what the
-	// report and `--json` read, in the order everything happened; a record needs
-	// one entry's events alone, and the emit is the one place that knows which
-	// entry an event came from.
+	// The same events by entry, which result records are written from. `events`
+	// keeps the run's order for the report and `--json`.
 	let byEntry = new Map<string, Array<TestEvent>>()
 	let emit = (event: TestEvent, suite: LoadedSuite | null = null): void => {
 		events.push(event)
@@ -1026,24 +850,16 @@ export async function runTest(
 		await plan.dispatcher.dispose()
 	}
 
-	// Compile Diagnostics go to stderr whatever was asked for, including
-	// under --json: they are not events, and a run that could not be compiled
-	// has to say why somewhere.
+	// Compile Diagnostics go to stderr even under `--json`, since they are not
+	// events.
 	printDiagnostics(context, compilation)
 
-	// An entry that would not compile is LEFT OUT rather than taken as
-	// the end of the run. A project where one file is half-typed is exactly the
-	// project whose other twenty files are worth hearing about, and a stream
-	// that stopped before its `run-start` tells a consumer nothing at all — not
-	// that the run failed, not that it is over. So the broken entries are named
-	// on stderr, the rest run, and the run ends non-zero because something in it
-	// could not be compiled. `--watch` has always worked this way.
+	// An entry that would not compile is named on stderr and left out, the rest
+	// run, and the run ends non-zero. A stream always gets its `run-start`.
 	let broken = compilation.outcomes.filter(
 		(outcome) => !outcome.ok || outcome.outputFileName === null,
 	)
-	// Warm when the emitter ran for nothing at all. A run where one entry
-	// had to be compiled is not a warm one, and saying so of it would make the
-	// note say nothing.
+	// Warm only when no entry had to be compiled.
 	let cacheWarm =
 		compilation.outcomes.length > 0 &&
 		compilation.outcomes.every((outcome) => outcome.cached)
@@ -1066,24 +882,16 @@ export async function runTest(
 		}
 	}
 
-	// Read before the run and handed over whole: a stored snapshot is a
-	// file, and the runtime is a bundle that reads none.
+	// The stores are read here because a bundle reads no files. Baselines are
+	// read only when measuring.
 	let stored = await readSnapshots(sources.keys())
-	// The same, and only where the run is measuring — a run with no
-	// benchmark in it would otherwise stat a `__benchmarks__` directory per
-	// Module to be told what it already knows.
 	let baselines = context.options.bench
 		? await readBenchmarks(sources.keys())
 		: {}
-	// And the values every property test of the run has failed on before,
-	// for the very same reason. They are read whether or not the run holds a
-	// property test at all — a Module with no companion answers with nothing,
-	// which costs one stat per file and saves asking twice.
 	let corpus = await readCorpus(sources.keys())
 
-	// A companion that exists but could not be read is said OUT LOUD on
-	// every run: the run replays nothing from it, the writer refuses to touch
-	// it, and a warning nobody prints is a corpus that quietly stopped working.
+	// An unreadable companion is neither replayed nor rewritten, so every run
+	// warns about it.
 	for (let entry of corpus.unreadable) {
 		context.terminal.err(
 			`  ${context.palette.warning(
@@ -1091,9 +899,8 @@ export async function runTest(
 			)} ${context.palette.muted(entry.problem)}`,
 		)
 	}
-	// One seed for the whole run, made HERE where there is one run: every
-	// bundle draws from it, and every property test folds its own identity in.
-	// So the replay a failure prints reproduces the run rather than the file.
+	// One seed for the whole run, which every property test folds its own
+	// identity into.
 	let seed = context.options.seed ?? randomSeed()
 
 	let resultStore = remembersResults(
@@ -1102,8 +909,7 @@ export async function runTest(
 	)
 		? resultCacheDirectory()
 		: null
-	// The entries a result cache could answer for at all — one that would
-	// not compile has no answer to remember and no bundle to name one with.
+	// The entries that have a bundle.
 	let loadable = compilation.outcomes.flatMap((outcome) =>
 		outcome.outputFileName === null
 			? []
@@ -1124,9 +930,8 @@ export async function runTest(
 		let host = hostKey()
 
 		for (let outcome of loadable) {
-			// An entry that did not compile is left out of the store in
-			// both directions. Its bundle may be an older run's, and what the
-			// report says about it is that its tests did not run.
+			// An entry that did not compile neither reads nor writes the store:
+			// its bundle may be an older run's.
 			if (!outcome.ok) {
 				continue
 			}
@@ -1158,10 +963,9 @@ export async function runTest(
 	let selections: Array<EntrySelection> = []
 
 	try {
-		// Each call stages into a directory of this run's own. Staging is
-		// numbered WITHIN a call, so two calls into one directory would both
-		// write `0/tests.mjs` — and `import()` caches by URL, so the second
-		// bundle would answer with the first one's registry.
+		// Each call stages into a directory of its own. Staging is numbered
+		// within a call, and `import()` caches by URL, so two calls into one
+		// directory would load the first bundle twice.
 		let staged = 0
 		let live = new Map<string, LoadedBundle>()
 		let load = async (names: Array<string>): Promise<void> => {
@@ -1188,10 +992,8 @@ export async function runTest(
 
 				return bundle === undefined ? [] : [bundle]
 			})
-		// What the run would give each entry if every bundle were here.
-		// A hit reads its Modules off its record — the bundle hash that names
-		// the record pins them, so what it says is what the bundle would say —
-		// and a miss has just been loaded.
+		// What the run would give each entry if every bundle were loaded. A hit
+		// reads its Modules from its record, which its bundle hash pins.
 		let plan = planClaims(
 			ordered.map((name) => ({
 				inputFileName: name,
@@ -1200,12 +1002,8 @@ export async function runTest(
 					(live.get(name)?.modules ?? []).map(moduleKeyOf),
 			})),
 		)
-		// A hit whose claim has MOVED is demoted and run live. It happens
-		// when an entry before it in the run changed and now reaches — or no
-		// longer reaches — a Module they share: the record answers for Modules
-		// this run would give somebody else, or is missing ones nobody else will
-		// run. Every other hit's claim is untouched by the demotion, because its
-		// Modules are the same either way.
+		// A hit whose claim moved, because an earlier entry now reaches a shared
+		// Module or no longer does, runs live. Demoting it moves no other claim.
 		let moved = ordered.filter((name) => {
 			let held = hits.get(name)
 
@@ -1223,23 +1021,16 @@ export async function runTest(
 			await load(moved)
 		}
 
-		// Seeded with what the surviving hits hold, so that a live entry
-		// sharing a Module with a replayed one does not take it over and report
-		// the tests the replay has already reported.
+		// The Modules the surviving hits hold, so a live entry never reports
+		// tests a replay reports.
 		let claimHits = (): Set<string> =>
 			new Set([...hits.keys()].flatMap((name) => plan.get(name) ?? []))
 
 		suites = claimRegistries(claimBundles(), claimHits())
 
-		// A focus silences every other test of the run, and a replayed
-		// stream would claim runs that must not happen — so one focused live
-		// bundle discards every hit and everything runs. Nothing cached can be
-		// focused itself: a focused run is never remembered.
-		//
-		// Focus is a fact about the MANIFEST rather than about the
-		// filters, so the probe hands the runtime only the one filter it depends
-		// on. Asking with the run's own `--filter` would render every
-		// interpolated name a second time to be told the same thing.
+		// A focused live bundle silences every other test, so it discards every
+		// hit and everything runs live. Of the filters, focus depends only on
+		// `bench`, so the probe passes no other.
 		if (hits.size > 0 && (await holdsFocus(suites, filters.bench))) {
 			let demoted = [...hits.keys()]
 
@@ -1280,16 +1071,12 @@ export async function runTest(
 			baselines,
 			{ entries: cached, order: ordered },
 		)
-		// The stream is folded up ONCE, here, and the `run-end` this
-		// writes carries the counts it found. Re-reading the stream afterwards
-		// would walk every `expect` of every test a second time to be told what
-		// it already knows; the only thing `run-end` adds to the fold is the
-		// duration measured around the loop, which is put back below.
+		// `run-end` carries the counts of the one fold of the events, and the
+		// duration measured around the run.
 		let duration = performance.now() - started
 
-		// Across the live entries AND the replayed ones, because a filter
-		// names a test and the run is what holds the tests — a name that matched
-		// nothing live and something in a cached entry matched the run.
+		// Across live and replayed entries: a filter that matched in either
+		// matched the run.
 		matchedNames =
 			matched +
 			[...hits.values()].reduce((total, held) => total + held.matched, 0)
@@ -1308,9 +1095,8 @@ export async function runTest(
 		})
 	} finally {
 		restore()
-		// The staged links go once the bundles have been read. A Module
-		// that is already loaded does not need its file any more, and the
-		// bundle they were made from is the cache's and stays where it is.
+		// A loaded Module no longer needs its staged file. The cache entry it
+		// links to stays.
 		await rm(staging, { recursive: true, force: true })
 	}
 
@@ -1326,31 +1112,26 @@ export async function runTest(
 	let coverage = context.options.coverage
 		? collectCoverage(events)
 		: emptyCoverage
-	// Written before the report, so that what the report says was
-	// recorded is what is on disk by the time a reader looks.
+	// The stores are written before the report, so what it says was recorded
+	// is on disk.
 	let written = await writeSnapshots({
 		snapshots: collectSnapshots(events),
 		sources,
 		stored,
-		// Reached through a dynamic import, like every other delegate the
-		// command line has: `essence build` must not pay for the Formatter,
-		// and a run with no inline snapshot in it does not either — which is
-		// why what is handed over is the LOADER rather than what it loads.
+		// A loader, so only a run that writes an inline snapshot loads the
+		// Formatter.
 		inline: async () =>
 			(await import("@essence-lang/formatter/snapshots"))
 				.writeInlineSnapshots,
 	})
 
-	// Beside the snapshots, and before the report for the same reason —
-	// what the summary says was recorded is on disk by the time a reader looks.
-	// A run that measured nothing has nothing to write, so a run without
-	// `--bench` never touches a baseline however it was asked to update.
+	// Without `--bench` nothing was measured, so `--update` writes no baseline.
 	let recorded = await writeBenchmarks({
 		benchmarks: collectBenchmarks(events),
 		stored: baselines,
 	})
 
-	// And the corpus, so the next run replays the value this one printed.
+	// So the next run replays the values this one failed on.
 	let kept = await writeCorpus({
 		corpus,
 		...collectCorpusChanges(events),
@@ -1368,14 +1149,9 @@ export async function runTest(
 		)
 	}
 
-	// After the stores have been written, so that a record is only ever
-	// keyed against a disk that has already settled — and refused for this run
-	// where a snapshot or a baseline was recorded, which is what changed it.
-	//
-	// Nothing at all is remembered out of a FOCUSED run. Every entry of it
-	// reports what a narrowing decided rather than what the code says, including
-	// the one holding the focus, whose own stream carries no sign of it where
-	// every test it holds is focused.
+	// Records are written after the stores, so their keys read a settled disk.
+	// A focused run records nothing. See "What the result cache remembers" in
+	// DEVELOPMENT.md.
 	if (resultStore !== null && !run.focused) {
 		for (let suite of suites) {
 			let key = keys.get(suite.inputFileName)
@@ -1392,22 +1168,19 @@ export async function runTest(
 				continue
 			}
 
-			// A test reads an empty input, but a Module's own statements
-			// read the run's as the bundle loads, and the key holds none of it.
+			// The key holds no host input, which a Module's own statements read
+			// as the bundle loads.
 			if (suite.tests.hasReadHostInput()) {
 				continue
 			}
 
-			// The key holds nothing the machine's entropy answered,
-			// whether a test drew it or a Module's own statements did.
+			// The key holds nothing drawn from the machine's entropy either.
 			if (suite.tests.hasDrawnEntropy()) {
 				continue
 			}
 
-			// Asked on the way IN rather than on the way out. An entry
-			// whose bundle reaches the world is never written here, so there is
-			// nothing for a later run to find — which is what keeps the warm
-			// path from having to read every bundle it is about to NOT load.
+			// An entry whose bundle links the effectful runtime is never recorded,
+			// so a warm run need not read the bundles it replays.
 			if (
 				await linksEffectfulRuntime(bundleOf.get(suite.inputFileName)!)
 			) {
