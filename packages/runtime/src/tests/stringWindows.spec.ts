@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { insensitive, sensitive } from "../CaseSensitivity"
 import { createInteger, type IntegerType } from "../Integer"
+import { stringEquals } from "../internalHelpers"
 import { encodeKey } from "../keyEncoding"
 import { firstCharacter, lastCharacter } from "../NonEmptyString"
 import type { OptionalType } from "../Optional"
@@ -747,19 +748,26 @@ describe("what a drain costs", () => {
 	})
 })
 
-// `compare` decides `is` over the NFC form, so a window equals a String written
-// with the same characters.
+// `compare` and `is` both read the NFC form, so a window equals a String
+// written with the same characters.
 describe("a window is the String it spells", () => {
 	test("a cut equals the text written down", () => {
-		let text = createString("café au lait")
+		// Written decomposed, so its clusters partition its NFC form rather than
+		// its own text.
+		let text = createString("cafe\u0301 au")
 		let window = slice(text, createInteger(0), createInteger(4))
 
+		// Four of seven characters is at least half, so the cut shares.
+		expect(viewOf(window).clusters).toBe(viewOf(text).clusters)
 		expect(compare(window, createString("café"))[typeKeySymbol]).toBe(
 			"Ordering#Equal",
 		)
-		expect(compare(window, createString("café"))[typeKeySymbol]).toBe(
+		expect(stringEquals(window, createString("café"))).toBeTrue()
+		// Spelled apart in code units, so only the NFC forms agree.
+		expect(compare(window, createString("cafe\u0301"))[typeKeySymbol]).toBe(
 			"Ordering#Equal",
 		)
+		expect(stringEquals(window, createString("cafe\u0301"))).toBeTrue()
 		expect(window.value).toBe("café".normalize("NFC"))
 	})
 })
