@@ -130,3 +130,69 @@ stands in a JavaScript `if`, where an Essence Boolean object would always be tru
 In a test compile, the tests section is walked by the same passes as the implementation, since
 `eliminate-dead-code` has to see what a test reads. Its entries are not walked through `walkBody`, so no hook can
 drop a test, or part a row's bindings from the row. Each test's own body is.
+
+## Purity
+
+`isPureExpression` in `purity.ts` answers whether an Expression can be left unevaluated without the Program noticing.
+A lowering asks it before it moves an Expression out of the order Essence evaluates it in. `a::and(b)` evaluates `b`
+before the call, and JavaScript's `&&` does not. A wrong answer is silent, since an effect that stops happening leaves
+no Diagnostic and no crash. So the answer is conservative: `true` means the compiler can name every reason the
+Expression could matter and none applies. A missing rule costs an optimisation, and a wrong one costs a
+`Terminal.print`.
+
+An Expression matters when it does any of these:
+
+- It prints or starts work. `Terminal` reads and writes the host's streams, and started work, such as an
+  `Http.send`, reaches the host too.
+- It assigns or draws. An assignment is an Expression as well as a Statement, and a draw advances the
+  `Randomness` it reads.
+- It diverges or throws. A call may do either, and recursion may never come back.
+
+So a call is impure unless it has one of the shapes the enumeration names. A literal, a name, a member read, a
+Function literal and a value built from pure parts reach nothing. A Match, a loop and a dispatch run bodies or Methods
+this function does not read, and are refused whole. A `define` holds only Expressions, so it is as pure as its parts,
+including the Conditions that never run. A Condition that would have printed is a reason not to skip the whole. A
+trace, a coverage counter, a `start` and a `complete` are never pure, since recording, counting, starting and waiting
+are what they are for.
+
+### The enumeration
+
+`pureMethods` is an allowlist: a Namespace with no entry has every Method refused. A Method call is pure only when its
+Namespace and Method are listed. Every Argument, the receiver included, must also be pure and of that Namespace's own
+Type. Requiring the Types closes the list over the bodies it was read against. `add` on `Integer` also has Overloads
+taking a Rational or a Transcendental, which are other Methods on the covering `Number` Namespace.
+
+Every entry earns its place on three counts. It prints and assigns nothing, it answers every value of its Parameter
+Types without throwing, and it finishes in bounded steps.
+
+- `Integer`'s entries are exact integer arithmetic and the comparisons written on it.
+- `Boolean`'s are logic over its two interned values.
+- `String`'s are the comparisons and `toString`. `compare` walks the NFC forms of both sides, bounded by their
+  lengths. Allocating is not an effect, since nobody can tell a discarded String was built.
+- `toString` is listed for every Namespace in the table that has one, since an interpolated String's hole calls
+  exactly that Method. `Rational` has only `toString`, because its arithmetic reduces through a gcd on every
+  operation.
+- The refinements of `Integer` list the sums and products a written operand reaches. A refined target wins over the
+  base target for a Method both declare. Each is `Integer`'s own operation. A refinement erases before the first pass,
+  so `pureNamespaceTypes` names the Type their Arguments actually carry.
+
+Some absences are deliberate, so that adding one is a decision. `Number`'s comparison reaches the interval arithmetic
+of irrational constants, which is not obviously bounded. `Integer.raise` is bounded only by memory.
+`NonZeroInteger::divide` answers an exact Rational, and `squareRoot` costs as much as the receiver is large. `List`
+and `Optional` run the Functions they are handed. The asynchronous Namespaces, `Async`, `Http`, `Future` and
+`Started`, are left out whole. Some of their Methods only build a description, but others run Functions, stop losers
+or reach the network. Most of all `Terminal` is left out, `describe` included, so that nobody reads the table as
+holding it.
+
+### Holes and shadowed names
+
+A hole of an interpolated String is a call the tree names. `printingNamespaceOf` reads the Namespace whose
+`toString` the hole's witness names, from a `direct-method` that `devirtualise-witnesses` left or from an
+unconditional `ConformanceValue`. A conditional conformance names a curried Function nobody declared, and is
+refused. The hole is then weighed as `a::toString()` written out would be. Purity only lets an Expression be
+skipped, never evaluated twice or out of order, and every caller is about to skip one.
+
+The enumeration reads a Namespace by name, but a Program may declare a nested Namespace named after a builtin,
+whose Methods can do anything. So `isPureExpression` takes `shadowed`, the Program's `nested` Namespaces, as a
+required Argument, and refuses a call on any of those names anywhere in the Program. A caller for whom the
+answer does not matter still passes the Program's set rather than an empty one.
