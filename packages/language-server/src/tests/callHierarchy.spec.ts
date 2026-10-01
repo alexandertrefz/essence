@@ -1,8 +1,11 @@
 import { describe, expect, it } from "bun:test"
+import * as path from "node:path"
 
+import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import { enrich } from "@essence-lang/compiler/enricher"
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 import type { common } from "@essence-lang/interfaces"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import {
 	type CallHierarchyCalls,
@@ -578,6 +581,68 @@ describe("Call Hierarchy inside a refused value", () => {
 				container: null,
 				calls: 1,
 			},
+		])
+	})
+})
+
+// Only the standard library declares natives, so the document is analysed as
+// one of its files.
+describe("Call Hierarchy of a native Method's default", () => {
+	let source = [
+		"declarations {",
+		"\tnamespace Sizes for Integer {",
+		"\t\tsize() -> Integer",
+		"",
+		"\t\tmeasured(to end: Integer = @::size()) -> Integer",
+		"",
+		"\t\tdoubled() -> Integer {",
+		"\t\t\t<- @::add(@)",
+		"\t\t}",
+		"",
+		"\t\ttripled() -> Integer {",
+		"\t\t\t<- @::add(@)::add(@)",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	function analyseLibrary() {
+		let documentPath = path.join(STDLIB_DIRECTORY, "Sizes.es")
+		let { program } = parseDocument(source, documentPath)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
+
+		return { program, enrichedProgram }
+	}
+
+	it("should credit the call to the Method whose default makes it", () => {
+		let { program, enrichedProgram } = analyseLibrary()
+
+		expect(
+			summarise(
+				findIncomingCalls(
+					program,
+					{ line: 3, column: 3 },
+					enrichedProgram,
+				),
+			),
+		).toEqual([
+			{ name: "measured", kind: "method", container: "Sizes", calls: 1 },
+		])
+	})
+
+	it("should list the call among that Method's outgoing calls", () => {
+		let { program, enrichedProgram } = analyseLibrary()
+
+		expect(
+			summarise(
+				findOutgoingCalls(
+					program,
+					{ line: 5, column: 3 },
+					enrichedProgram,
+				),
+			),
+		).toEqual([
+			{ name: "size", kind: "method", container: "Sizes", calls: 1 },
 		])
 	})
 })

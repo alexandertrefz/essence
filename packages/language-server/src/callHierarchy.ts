@@ -639,6 +639,39 @@ function callerFor(
 	return context.items.get(positionKey(position)) ?? fallback
 }
 
+// A native Method's calls live in the frame the Compiler synthesizes for its
+// defaults: `to end: Integer = @::length()` calls `length`.
+function visitNativeShims(
+	node: common.typed.NamespaceDefinitionStatementNode,
+	caller: CallHierarchyItem,
+	context: Context,
+	sites: Array<CallSite>,
+) {
+	for (let shim of node.nativeShims) {
+		visitDefaults(
+			shim.parameters,
+			memberItem(node.name.content, shim.memberName, context) ?? caller,
+			context,
+			sites,
+		)
+	}
+}
+
+// A shim keeps no Position, so its native Method's Item is found by name.
+function memberItem(
+	container: string,
+	name: string,
+	context: Context,
+): CallHierarchyItem | null {
+	for (let item of context.items.values()) {
+		if (item.container === container && item.name === name) {
+			return item
+		}
+	}
+
+	return null
+}
+
 // `position` is where the callee's name is written. A name the index does not
 // bind is one this document does not declare.
 function recordCall(
@@ -732,18 +765,9 @@ function visitNode(
 					)
 					visitBody(method.value.body, methodCaller, context, sites)
 				}
-
-				// A native Method's calls live in the frame the Compiler synthesizes for its
-				// defaults: `to end: Integer = @::length()` calls `length`.
-				for (let shim of node.nativeShims) {
-					visitDefaults(
-						shim.parameters,
-						callerFor(member.name.position, caller, context),
-						context,
-						sites,
-					)
-				}
 			}
+
+			visitNativeShims(node, caller, context, sites)
 
 			return
 		case "ProtocolDeclarationStatement":
