@@ -16,13 +16,11 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The numeric tower beyond its arithmetic — the number theory on
-// `Integer`, the radix pair, the division modes, the kind conversions, the
-// sign refinements on `Rational` and the statistics a List of Numbers answers.
-// Each is exercised through a compiled Program, because what is being checked
-// is what a call RESOLVES to as much as what it computes: several of these
-// entries stand beside one another and are told apart by a proof the receiver
-// carries.
+// The numeric tower beyond arithmetic. That is number theory on `Integer`,
+// radix parsing and printing, division modes, kind conversions, the sign
+// refinements on `Rational`, and List statistics. Programs are compiled
+// because what a call resolves to matters as much as what it computes. Several
+// entries stand side by side and are told apart by a proof the receiver carries.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -61,23 +59,20 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// A Program that prints one line per expression, so a case reads as the
-// list of answers it expects.
+// One printed line per expression, so a spec reads as its list of answers.
 function program(...lines: Array<string>): string {
 	return `implementation {\n\t${lines.join("\n\t")}\n}`
 }
 
-// `Terminal.inspect` rather than `Terminal.print`, because `print`
-// writes to the Program's own stream and only `inspect` goes through the
-// `console.log` this file captures. It renders a value through `Printable`,
-// so an Optional reads as `Value(…)` and `Empty`.
+// `Terminal.print` writes to the process's stream, while `Terminal.inspect`
+// goes through the `console.log` this file captures. `inspect` renders an
+// Optional as `Value(…)` and `Empty`.
 function show(expression: string): string {
 	return `Terminal.inspect(${expression})`
 }
 
-// A deterministic pseudo-random sequence, as `irrationals.spec.ts` uses,
-// so a property test draws the same cases on every run and a failure names a
-// case that can be re-run.
+// A deterministic sequence, so a property spec draws the same cases on every
+// run and a failure can be re-run.
 function* deterministicNumbers(seed: number): Generator<number> {
 	let state = seed
 
@@ -124,9 +119,9 @@ describe("Number theory on Integer", () => {
 		).toEqual(["12", "12", "42", "0", "0", "0"])
 	})
 
-	// The two laws the §§ blocks promise, over a spread of pairs each
-	// representation covers: the divisor divides both, and the product of the
-	// two answers is the product of the two Integers without its sign.
+	// The laws the §§ blocks promise, over pairs in both representations. The
+	// divisor divides both, and the product of the two answers is the product
+	// of the two Integers without its sign.
 	it("keeps both laws of the divisor and the multiple, for any pair", () => {
 		let numbers = deterministicNumbers(20260909)
 
@@ -181,8 +176,8 @@ describe("Number theory on Integer", () => {
 		])
 	})
 
-	// A written receiver proves its own sign, so it reaches the entry
-	// `NonNegativeInteger` declares and the answer is bare.
+	// A written receiver proves its sign, so it reaches the `NonNegativeInteger`
+	// entry and the answer is bare.
 	it("answers the factorial itself for a receiver proven not to be negative", async () => {
 		expect(
 			await run(
@@ -226,9 +221,8 @@ describe("Number theory on Integer", () => {
 		])
 	})
 
-	// The witnesses are what the §§ block promises exactness below its
-	// bound on, so the test is against a sieve rather than against a table of
-	// answers this file wrote down.
+	// The §§ block promises exactness below the witnesses' bound, so the spec
+	// checks against a sieve rather than a written table.
 	it("agrees with a sieve below a hundred thousand", () => {
 		let limit = 100000
 		let sieve = new Uint8Array(limit + 1).fill(1)
@@ -257,8 +251,8 @@ describe("Number theory on Integer", () => {
 		}
 	})
 
-	// Past 2⁵³ − 1 an Integer is a bigint, and the modular exponentiation
-	// the test rests on is the arm that is only reached there.
+	// Past 2⁵³ − 1 an Integer is a bigint, which is the only way to reach the
+	// bigint arm of the modular exponentiation.
 	it("decides a prime past the safe range", () => {
 		expect(
 			integer.isPrime(integer.createInteger(2n ** 61n - 1n)).value,
@@ -310,9 +304,8 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
-	// The base-less entry reads a leading sign and an underscore between
-	// two digits, and this is the same shape at every base — an Overload whose
-	// two entries read one text two ways is the trap these lines close.
+	// The entry with a base reads the sign and the underscore separators the
+	// base-less entry reads, so the Overload never reads one text two ways.
 	it("reads the sign and the separators the base-less entry reads", async () => {
 		expect(
 			await run(
@@ -345,8 +338,8 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
-	// The clamp both entries read a base through, which is what keeps
-	// them a round trip at a base no positional notation has.
+	// Both entries clamp the base the same way, which keeps them a round trip
+	// at a base no positional notation has.
 	it("reads a base outside two through thirty-six as the nearest of the two", async () => {
 		expect(
 			await run(
@@ -415,8 +408,8 @@ describe("Division modes", () => {
 		).toEqual(["4", "3", "3", "-3", "-3", "-4", "4", "3"])
 	})
 
-	// The one place the direction and the Euclidean pairing part
-	// company, which the §§ block of the entry names.
+	// A negative divisor is where the direction and the Euclidean pairing
+	// differ, as the entry's §§ block says.
 	it("answers the Euclidean quotient for a positive divisor alone", async () => {
 		expect(
 			await run(
@@ -448,9 +441,9 @@ describe("Division modes", () => {
 		).toEqual(["2", "-1", "1", "-1", "1", "0", "0"])
 	})
 
-	// The two laws the §§ blocks promise. The Euclidean remainder is
-	// never negative and always below the divisor's magnitude; the truncating
-	// one takes the dividend's sign; and either pairing rebuilds the dividend.
+	// The laws the §§ blocks promise. The Euclidean remainder is never negative
+	// and is below the divisor's magnitude. The truncating one takes the
+	// dividend's sign, and either pairing rebuilds the dividend.
 	it("keeps the laws of both pairings, for any pair", () => {
 		let numbers = deterministicNumbers(20260911)
 
@@ -526,8 +519,8 @@ describe("Crossing between the two exact kinds", () => {
 		).toEqual(["5/1", "-5/1", "0/1", "3/4", "3/2"])
 	})
 
-	// The Integer form is tried first, which is the whole of what this
-	// static adds over the two parsers it is written on.
+	// The static tries the Integer form first, which is all it adds over the
+	// parsers it is written on.
 	it("reads a whole number as an Integer and everything else as a Rational", async () => {
 		expect(
 			await run(
@@ -560,10 +553,9 @@ describe("Crossing between the two exact kinds", () => {
 })
 
 describe("The sign refinements on Rational", () => {
-	// A written Rational proves its own sign, so each of these reaches
-	// the narrowest Namespace that declares the name. The answers are the
-	// same arithmetic either way; what the proof buys is the ANSWER's Type,
-	// which the compiled cases below read back through a declaration.
+	// A written Rational proves its sign, so each call reaches the narrowest
+	// Namespace declaring the name. The proof changes the answer's Type, not
+	// its value.
 	it("answers the root itself for a receiver proven not to be negative", async () => {
 		expect(
 			await run(
@@ -597,8 +589,8 @@ describe("The sign refinements on Rational", () => {
 		).toEqual(["5/4", "0/1", "0/1", "1/3", "5/4", "3/8"])
 	})
 
-	// The Types the proofs answer, read back off a declaration — an
-	// answer too wide would be a `constant-type-mismatch` here.
+	// Each answer is read back through a declaration, so an answer too wide
+	// would be a `constant-type-mismatch`.
 	it("answers the proven Types the declarations promise", () => {
 		expect(() =>
 			generate(
@@ -617,9 +609,7 @@ describe("The sign refinements on Rational", () => {
 		).not.toThrow()
 	})
 
-	// A value above zero is a NonZeroRational and a NonNegativeRational
-	// at once, so both of those Namespaces are in reach — and `multiply` on
-	// the narrowest target is what keeps the call from being ambiguous.
+	// A PositiveRational is both a NonZeroRational and a NonNegativeRational.
 	it("passes a positive Rational wherever either weaker proof is wanted", () => {
 		expect(() =>
 			generate(
@@ -635,9 +625,8 @@ describe("The sign refinements on Rational", () => {
 })
 
 describe("The statistics a List of Numbers answers", () => {
-	// The three general Namespaces and the three proven ones are told
-	// apart here by whether the receiver is annotated `NonEmptyList`, which is
-	// what decides between the Optional answer and the bare one.
+	// Whether the receiver is annotated `NonEmptyList` decides between the
+	// general Namespaces' Optional answer and the proven ones' bare answer.
 	it("answers the median of an odd and an even count", async () => {
 		expect(
 			await run(
@@ -686,9 +675,8 @@ describe("The statistics a List of Numbers answers", () => {
 		])
 	})
 
-	// A List with an item in it answers each of these bare, so a `match`
-	// over the answer would be `no-matching-case` — which is the point of the
-	// proven Namespaces, and what these lines read back.
+	// A List with an item answers each of these bare, so a `match` over the
+	// answer would be `no-matching-case`.
 	it("answers the whole family bare for a List with an item in it", async () => {
 		expect(
 			await run(
@@ -735,10 +723,9 @@ describe("The statistics a List of Numbers answers", () => {
 		).toEqual(["7", "5", "1/4"])
 	})
 
-	// Two spellings of one value are one item to count. The walk counts
-	// by the canonical key encoding — the same rule a Dictionary finds a slot
-	// by — so `2/4` counts with `1/2` and a whole Rational counts with the
-	// Integer it equals, and the item answered is the first of them to stand.
+	// The walk counts by the canonical key encoding, as a Dictionary finds a
+	// slot. So `2/4` counts with `1/2`, a whole Rational counts with its equal
+	// Integer, and the answer is the first spelling written.
 	it("counts two spellings of one value as one item", async () => {
 		expect(
 			await run(
