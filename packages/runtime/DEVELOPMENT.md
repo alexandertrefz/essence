@@ -886,7 +886,71 @@ flag. A second value arriving after the choice must not stop the other runs, whi
 
 ### Timers
 
-`setTimeout` keeps its delay in a signed 32-bit integer, and a host fires an overflowed delay after one millisecond. An Essence
-Integer is unbounded. So `waitFor` arms the timer in chunks of at most `LONGEST_DELAY` and re-arms until the time is
-spent. A delay past what a number holds is `Infinity`, which never spends, and a negative one is no time at all. A
-`::within` deadline is called off when its own context stops, so no timer holds the host open for nobody.
+`setTimeout` keeps its delay in a signed 32-bit integer, and a host fires an overflowed delay after one millisecond.
+An Essence Integer is unbounded. So `waitFor` arms the timer in chunks of at most `LONGEST_DELAY` and re-arms until
+the time is spent. A delay past what a number holds is `Infinity`, which never spends, and a negative one is no time
+at all. A `::within` deadline is called off when its own context stops, so no timer holds the host open for nobody.
+
+## Randomness
+
+A `Randomness` is the one Essence value that changes: every draw advances it. A body that asks for a name and then a
+score must not get the same number twice. It is a bare tag rather than a Choice. A Case would carry a payload a
+Program could read, and the state is the runner's business. The Optimiser's purity table lists the Namespaces whose
+calls it may pool, hoist or drop, and `Randomness` has no entry.
+
+One tag covers two kinds. A seeded source holds four 32-bit words, so one seed answers one sequence, which is what
+`--seed` replays. An entropy source holds nothing and reads the machine at every draw. `entropy` answers one shared
+value, since two entropy sources could not be told apart. Every draw is written once, over `nextWord`, which serves
+both kinds.
+
+### Seeding a source
+
+The generator is sfc32: four words of state and a few shifts and adds per draw. A 64-bit generator would allocate a
+bigint per draw, and a property run draws hundreds of thousands of times. It is not a source of secrets.
+
+A seed is the hexadecimal String `essence test` prints on a failure and `--seed` reads back. A reader can type any
+text there, so `seedOf` folds every character into a 32-bit FNV-1a hash. `createRandomness` scrambles that word into
+four with splitmix32 and discards twelve draws. Seeding sfc32 with one word four times over gives early draws with
+visible structure.
+
+The entropy words come from `globalThis.crypto`, which every host a bundle runs on has. Importing `node:crypto` would
+break a bundle for the browser. They are read 256 at a time, since a `getRandomValues` call costs its crossing into
+the host rather than its bytes. `hasDrawnEntropy` tells a runner that remembers results that a run read the machine,
+since what the machine answered is in no key.
+
+### Drawing uniformly
+
+`below` draws a whole number under a bound from one word. It rejects a word in the remainder past the last whole
+multiple of the bound. Folding that remainder in would make the low values likelier. `bigBetween` applies the same
+rule over as many words as the span needs. `below` hands a bound wider than a word to it, since no whole multiple of
+such a bound fits in one word.
+
+A chance is drawn over its own denominator, so a chance of `1/3` holds a third of the time exactly. A chance outside
+`[0, 1]` is clamped, and two bounds name the same range in either order, as `Orderable::clamp` reads a pair. Every
+entry answers, since no signature here has an Optional to answer with. A proof such as a positive bound erases
+before anything runs, so the entries guard the edge it rules out.
+
+A Rational is drawn as a denominator and then a numerator, so the answer is exact and reads as `3/4`. The bounds are
+scaled to the denominator and rounded inwards, so every answer lies in the range written. A range too narrow to hold
+a multiple of the denominator answers its lower bound.
+
+A String is drawn from ASCII and four characters that break assumptions. `é` is one precomposed code point, and `ß`
+changes length with its case. `👋` is a surrogate pair, and `🇩🇪` is one character of two code points. `character`
+draws one of them for a property test's generator, which builds a String character by character to honour a minimum
+length.
+
+### Picking from a List
+
+`pick(_:from:)` draws without replacement, as a partial shuffle: each swap moves one drawn item to the front.
+Redrawing on a repeat would run for an unbounded time as the count nears the length. The one shuffle has two
+spellings. Both make the same draws in the same order, so a seed answers the same items either way. A few
+items out of many are drawn through a Map of displaced positions, which costs the count rather than the length. A
+larger share is drawn through a copy, since the Map is the slower Array once the swaps are dense. `SPARSE_DRAW_SHARE`
+sets the line between them.
+
+A weighted pick is exact. Every weight is scaled to the least common multiple of the denominators. The draw is then one
+whole number under the total, and the walk compares whole numbers. A weight of zero or less counts as zero. When every
+weight is zero, the pick is even.
+
+`shuffle` is Fisher and Yates, walked from the back, so every order is equally likely. It reorders an Array of its
+own and leaves the receiver as it was.

@@ -11,25 +11,9 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// A source of random values, and the one Essence value that CHANGES. Every
-// other value in this runtime is immutable; a source answers a different value
-// every time it is read. That is what `Generatable::generate` needs — a body
-// asking for a name and then for a score must not be handed the same number
-// twice — and it is why `Randomness` is a bare tag rather than a Choice: a Case
-// would carry a payload a Program could read, and the state is the runner's
-// business.
-//
-// One tag, two kinds. A SEEDED source holds four 32 bit words that every
-// answer advances, so one seed answers one sequence — what `--seed` replays. An
-// ENTROPY source holds nothing and reads the machine instead; what cannot be
-// told apart cannot be replayed, so a property run draws from the first kind,
-// and the second is for what must NOT repeat, beginning with the run's own
-// made-up seed.
-//
-// The mutation is invisible to everything that reasons about Essence
-// values. The Optimiser's purity table is an ALLOWLIST keyed by Namespace name
-// (`packages/compiler/src/optimiser/purity.ts`), and `Randomness` has no entry,
-// so no pass pools, hoists or drops a call on one.
+// A source of random values, the one Essence value that changes. A seeded
+// source replays, and an entropy source reads the machine. See "Randomness" in
+// DEVELOPMENT.md.
 export type RandomnessType = SeededRandomnessType | EntropyRandomnessType
 
 type SeededRandomnessType = {
@@ -46,13 +30,8 @@ type EntropyRandomnessType = {
 	seeded: false
 }
 
-// sfc32 — four words of state, a few shifts and adds per answer. It is
-// chosen over a 64 bit generator because a bigint per draw costs a heap
-// allocation, and a property run draws hundreds of thousands of times. It
-// passes PractRand at the sizes a test run reaches, which is the whole of what
-// is asked of it: nothing here is a source of secrets, and the Documentation
-// says so. An entropy source has no words of its own and is handed the
-// machine's instead, so every draw below serves both kinds unchanged.
+// sfc32 for a seeded source, the machine's words for an entropy one. See
+// "Seeding a source" in DEVELOPMENT.md.
 export function nextWord(source: RandomnessType): number {
 	if (!source.seeded) {
 		return entropyWord()
@@ -70,11 +49,7 @@ export function nextWord(source: RandomnessType): number {
 	return t >>> 0
 }
 
-// splitmix32, which is what turns a seed of a few characters into four
-// words that are not obviously related. Seeding sfc32 with the same word four
-// times over gives a first few thousand draws with visible structure in them;
-// this is the standard answer to that, and the twelve discarded draws below are
-// the other half of it.
+// splitmix32, which spreads one seed word into four unrelated ones.
 function scramble(state: number): { state: number; word: number } {
 	let next = (state + 0x9e3779b9) | 0
 	let word = next
@@ -85,11 +60,7 @@ function scramble(state: number): { state: number; word: number } {
 	return { state: next, word: (word ^ (word >>> 15)) >>> 0 }
 }
 
-// A seed is a hexadecimal String — what `essence test` prints on a failure
-// and what `--seed` reads back — so the mapping from text to state has to be
-// exact and has to accept any text at all, since a reader can type one. Every
-// character is folded into a 32 bit FNV-1a hash, so two seeds that differ
-// anywhere almost certainly give two different sources.
+// Any seed text as one word, through a 32-bit FNV-1a hash.
 export function seedOf(text: string): number {
 	let hash = 0x811c9dc5
 
@@ -101,9 +72,7 @@ export function seedOf(text: string): number {
 	return hash >>> 0
 }
 
-// The door every SEEDED source is built through: `seeded` below, which a
-// Program calls, and the test runtime, which builds a property run's source
-// from the seed it prints.
+// Every seeded source is built here, by `seeded` and by the test runtime.
 export function createRandomness(seed: number): RandomnessType {
 	let state = seed | 0
 	let first = scramble(state)
@@ -127,18 +96,12 @@ export function createRandomness(seed: number): RandomnessType {
 	return source
 }
 
-// The machine's words, read through `globalThis.crypto` — the one door
-// every host a bundle runs on owns: Bun, Node, Deno and the browsers the client
-// package reaches, where importing `node:crypto` would sink the bundle. They
-// are read 256 at a time into one buffer, because what a `getRandomValues` call
-// costs is the crossing into the host rather than the bytes; the buffer stays
-// far under the 65536 byte ceiling the host puts on one call.
+// The machine's words, read from `globalThis.crypto` a buffer at a time.
 const ENTROPY_WORDS = new Uint32Array(256)
 
 let entropyCursor = ENTROPY_WORDS.length
 
-// Whether a draw has read the machine. A runner that remembers results
-// asks it after a run, since what the machine answered is in no key.
+// Whether a draw has read the machine, which a result cache must know.
 let entropyDrawn = false
 
 export function hasDrawnEntropy(): boolean {
@@ -160,29 +123,20 @@ function entropyWord(): number {
 	return word
 }
 
-// The machine's own randomness, as ONE value. Two entropy sources could
-// not be told apart — the machine is one, and the words above are drawn from it
-// rather than held — so `entropy` below answers this from every call, and only
-// the seeded kind is worth building twice.
+// The one entropy source, since two could not be told apart.
 const ENTROPY: EntropyRandomnessType = {
 	[typeKeySymbol]: "Randomness",
 	seeded: false,
 }
 
-// A whole number in `[0, bound)`, taken from the low bits with the
-// rejection loop that keeps the answer uniform. `2 ** 32 % bound` is how much of
-// the word's range is left over after the last whole multiple of `bound`; a draw
-// that lands in it is thrown away rather than folded, which would make the low
-// values likelier.
+// A whole number in `[0, bound)`. A word past the last whole multiple of the
+// bound is rejected, so the answer stays uniform.
 export function below(source: RandomnessType, bound: number): number {
 	if (bound <= 1) {
 		return 0
 	}
 
-	// A bound WIDER than a word has no whole multiple inside one, so the
-	// rejection below would reject every draw and loop for ever. `bigBetween`
-	// is the same rule over as many words as the span needs, and it is reached
-	// from `drawString(upTo:)`, whose bound is whatever a caller wrote.
+	// A bound wider than a word has no whole multiple inside one.
 	if (bound > 4294967296) {
 		return Number(bigBetween(source, 0n, BigInt(bound) - 1n))
 	}
@@ -198,10 +152,8 @@ export function below(source: RandomnessType, bound: number): number {
 	}
 }
 
-// A whole number in `[low, high]`, over bigints so a range wider than a
-// word is drawn as exactly as a narrow one. The word loop below builds the
-// answer 32 bits at a time and rejects a draw past the span, which is the same
-// rule `below` follows one word at a time.
+// A whole number in `[low, high]`, built 32 bits at a time under the rule
+// `below` follows.
 export function bigBetween(
 	source: RandomnessType,
 	low: bigint,
@@ -240,20 +192,14 @@ export function bigBetween(
 	}
 }
 
-// A fraction in `[0, 1)` with 32 bits of resolution, for the weighted
-// coin the property runner tosses between a fresh case and a neighbour of one
-// it kept.
+// A fraction in `[0, 1)` with 32 bits of resolution.
 export function fraction(source: RandomnessType): number {
 	return nextWord(source) / 4294967296
 }
 
 // #region Natives
 
-// The two doors a Program builds a source through, and they are the two
-// kinds under the one tag. `entropy` hands over the singleton above, so a
-// Program that holds the answer in a Constant still reads the machine at every
-// draw and nothing it does is replayable. `seeded` folds the text into a word
-// and scrambles four out of it, which is the source `--seed` replays.
+// A Program holding this in a Constant still reads the machine at every draw.
 export function entropy(): RandomnessType {
 	return ENTROPY
 }
@@ -262,18 +208,14 @@ export function seeded(seed: StringType): RandomnessType {
 	return createRandomness(seedOf(seed.value))
 }
 
-// `true` or `false`, each half the time. It reads the top bit rather than
-// the bottom one, which is the better bit of an sfc32 word.
+// Reads the top bit, the better bit of an sfc32 word.
 export function drawBoolean__overload$1(source: RandomnessType): BooleanType {
 	return createBoolean(nextWord(source) >= 2147483648)
 }
 
-// `true` exactly as often as the chance says, which is why the draw is
-// over the chance's OWN denominator rather than over `fraction`: a chance of
-// `1/3` is a third of the time and not a third of 2^32 rounded to a word. The
-// parts are read unreduced, since `n/d` and `2n/2d` name one point either way.
-// A chance outside `[0, 1]` is clamped rather than refused — every entry here
-// answers, and there is no Optional in the signature to answer with.
+// Drawn over the chance's own denominator, so the chance holds exactly. A
+// chance outside `[0, 1]` is clamped. See "Drawing uniformly" in
+// DEVELOPMENT.md.
 export function drawBoolean__overload$2(
 	source: RandomnessType,
 	chance: RationalType,
@@ -291,10 +233,7 @@ export function drawBoolean__overload$2(
 	)
 }
 
-// Both bounds included, and the two naming the same range in either
-// order — the reading `Orderable::clamp` and `Orderable::isBetween` both give a
-// pair, so a draw between them reads it the same way. The bounds are exchanged
-// rather than the lower one answered, which is what made this the odd one out.
+// Both bounds included, naming one range in either order.
 export function drawInteger__overload$1(
 	source: RandomnessType,
 	low: IntegerType,
@@ -308,11 +247,8 @@ export function drawInteger__overload$1(
 	return createInteger(bigBetween(source, lowest, highest))
 }
 
-// The half open form an index draw wants, where the entry above is the
-// closed one a range wants. The bound is proven above zero and the answer is
-// proven not to be negative, so neither end needs an Optional; the proof erases
-// before anything runs, which is why a bound of one or less is guarded here and
-// answers zero.
+// Half-open, as an index wants. The bound's proof erases, so a bound of one or
+// less answers zero.
 export function drawInteger__overload$2(
 	source: RandomnessType,
 	bound: IntegerType,
@@ -326,15 +262,10 @@ export function drawInteger__overload$2(
 	return createInteger(bigBetween(source, 0n, limit - 1n))
 }
 
-// A Rational is drawn as a denominator and then a numerator, rather than
-// as a scaled double, so that what comes out is exact and has a denominator a
-// reader recognises. The denominators are the small ones a test wants to meet —
-// halves, thirds, and the powers of ten a decimal is written with.
+// The denominators a drawn Rational takes, ones a reader recognises.
 const DENOMINATORS = [1n, 2n, 3n, 4n, 5n, 6n, 8n, 10n, 12n, 16n, 100n, 1000n]
 
-// The two bounds name the same range in either order, exactly as they do
-// for the Integer above. A denominator is positive after `createRational`, so
-// the cross-multiplication below orders the pair.
+// The bounds name one range in either order.
 export function drawRational__overload$1(
 	source: RandomnessType,
 	low: RationalType,
@@ -348,11 +279,8 @@ export function drawRational__overload$1(
 	)
 }
 
-// The same draw with the lattice named rather than drawn. It is the entry
-// for everything the twelve denominators above are wrong for: a draw off a
-// hundredth is a draw off a hundredth however often it is asked for. The
-// denominator is proven above zero, and the proof erases, so a denominator of
-// zero or less is guarded into one whole.
+// The same draw over a named denominator. Its proof erases, so a denominator of
+// zero or less counts as one.
 export function drawRational__overload$2(
 	source: RandomnessType,
 	low: RationalType,
@@ -374,10 +302,8 @@ function overDenominator(
 		low.numerator * high.denominator > high.numerator * low.denominator
 	let lowerBound = exchanged ? high : low
 	let upperBound = exchanged ? low : high
-	// The bounds scaled to that denominator, rounded INWARDS on both
-	// sides, so every answer is inside the range the caller wrote. A range too
-	// narrow to hold one multiple of the denominator answers the lower bound,
-	// which is inside it.
+	// Rounded inwards, so every answer lies in the range. A range holding no
+	// multiple of the denominator answers its lower bound.
 	let lowest = ceilingOf(
 		lowerBound.numerator * denominator,
 		lowerBound.denominator,
@@ -394,11 +320,8 @@ function overDenominator(
 	return createRational(bigBetween(source, lowest, highest), denominator)
 }
 
-// The alphabet a String is drawn from: ASCII plus four characters that
-// are not, because the assumptions a String Method breaks are not about
-// letters. `é` is one precomposed code point, `ß` changes length when its
-// case changes, `👋` is a surrogate pair and `🇩🇪` is one character of two
-// code points.
+// ASCII and four characters that break String assumptions. See "Drawing
+// uniformly" in DEVELOPMENT.md.
 const CHARACTERS = [
 	..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ",
 	"é",
@@ -407,16 +330,13 @@ const CHARACTERS = [
 	"🇩🇪",
 ]
 
-// One character of that alphabet. It is what the structural generator a
-// property test derives builds a String out of, character by character, since
-// the one below answers a whole String and can not be told a MINIMUM length.
+// One character, for a generator that builds a String to a minimum length.
 export function character(source: RandomnessType): string {
 	return CHARACTERS[below(source, CHARACTERS.length)] ?? "a"
 }
 
-// A String of at most `upTo` characters, and possibly of none. A negative
-// bound answers the empty String, which is the only String shorter than nothing
-// asked for.
+// At most `upTo` characters. A bound below one, or past what a number holds,
+// answers the empty String.
 export function drawString(
 	source: RandomnessType,
 	upTo: IntegerType,
@@ -437,10 +357,7 @@ export function drawString(
 	return createString(characters.join(""))
 }
 
-// One item of the List, each equally likely. The List is a
-// `NonEmptyList`, so the refinement is what promises there is one to answer
-// with; it erases before anything runs, so nothing here checks for an empty
-// List.
+// One item, each equally likely. The List is proven to hold one.
 export function pick__overload$1<ItemType extends AnyType>(
 	source: RandomnessType,
 	items: ListType<ItemType>,
@@ -455,27 +372,9 @@ export function pick__overload$1<ItemType extends AnyType>(
 	return view.back[index - view.frontCount] as ItemType
 }
 
-// Without replacement, as a PARTIAL shuffle: `count` swaps put the drawn
-// items at the front of the receiver, each drawn from what is left. Drawing
-// again whenever the draw meets an item it already has is the other way to
-// spell it, and how long that runs is unbounded as `count` approaches the
-// length.
-//
-// A count above the length is the whole List reordered, because there is
-// no item left to draw a further one from. It is clamped rather than refused
-// for the reason the chance above is: the signature has no Optional in it.
-//
-// Two spellings of that one shuffle, told apart by how much of the
-// receiver is drawn. Both issue exactly the same `below(source, total - index)`
-// draws in the same order, so a seeded source answers the same items either
-// way. A FEW items out of many are drawn through a Map of the positions the
-// swaps displaced, which costs the count rather than the length: ten out of a
-// million measured 4.9 ms as a whole copy against 3.1 µs this way, and ten out
-// of a hundred thousand 540 µs against 1.3 µs. MOST of them are drawn through
-// the copy, because the Map is the slower Array once the swaps are dense —
-// every item of a million measured 8.8 ms copied against 117 ms mapped. The
-// crossover is near a twenty-fifth of the length at every size measured, where
-// the two are within a fifth of each other, so that is the line.
+// Above one in this many items drawn, the partial shuffle copies the List
+// rather than mapping displaced positions. See "Picking from a List" in
+// DEVELOPMENT.md.
 const SPARSE_DRAW_SHARE = 25
 
 export function pick__overload$2<ItemType extends AnyType>(
@@ -483,9 +382,7 @@ export function pick__overload$2<ItemType extends AnyType>(
 	count: IntegerType,
 	items: ListType<ItemType>,
 ): ListType<ItemType> {
-	// Read through `runsOf` rather than `viewOf`, because the receiver
-	// is read once here and `viewOf` writes its trimmed runs back. The front run
-	// is stored reversed, which is what the indexing below undoes.
+	// `runsOf`, since the receiver is read once and needs no trimming.
 	let view = runsOf(items)
 	let total = view.total
 	let wanted = Number(count.value)
@@ -511,10 +408,8 @@ export function pick__overload$2<ItemType extends AnyType>(
 		return createList(drawn)
 	}
 
-	// The swap the copy would perform, recorded instead of carried out:
-	// a position the Map does not name still holds its own item. Only the
-	// position drawn FROM is written back, since `choice` is never below
-	// `index` and no position below `index` is read again.
+	// The swaps the copy would make, recorded: a position the Map does not
+	// name holds its own item. No position before `index` is read again.
 	let displaced = new Map<number, number>()
 	let picked: Array<ItemType> = []
 
@@ -533,21 +428,8 @@ export function pick__overload$2<ItemType extends AnyType>(
 	return createList(picked)
 }
 
-// The weights are Rationals and the draw is exact, so the arithmetic is
-// over one common denominator rather than over a sum of doubles. It is the
-// least common multiple of the reduced denominators, built with `reduced` — the
-// gcd of the pair is what it divides out — and every weight scaled to it is a
-// whole number. So the draw is one Integer in `[0, total)`, and the walk that
-// spends it compares whole numbers. Adding the weights up as they come and
-// drawing over the sum's own denominator is the cheaper arithmetic and the
-// WRONG one: weights of a half, a half and a third answer 1/2, 1/4 and 1/4
-// that way rather than 3/8, 3/8 and 1/4. One pick over a thousand items whose
-// denominators run to eight measures 0.20 ms, nearly all of it this scaling.
-//
-// A weight of zero or less is drawn as zero: a negative likelihood is not
-// a likelihood, and refusing here would need an Optional the signature has no
-// room for. Weights that are all zero leave nothing to weigh the items by, so
-// the draw falls back to the even one the entry above makes.
+// The weight of an item weighted zero or less. See "Picking from a List" in
+// DEVELOPMENT.md.
 const NO_WEIGHT: BigRational = { numerator: 0n, denominator: 1n }
 
 export function pick__overload$3<ItemType extends AnyType>(
@@ -599,10 +481,8 @@ export function pick__overload$3<ItemType extends AnyType>(
 	return chosen[chosen.length - 1] as ItemType
 }
 
-// Fisher and Yates, walked from the back so that each turn draws from the
-// items it has not placed yet — which is what makes every one of the `n!`
-// orders equally likely. It reorders an Array of its own rather than the
-// receiver's, so the List it was handed is left as it was.
+// Fisher and Yates from the back, so every order is equally likely, over an
+// Array of its own.
 export function shuffle__overload$1<ItemType extends AnyType>(
 	source: RandomnessType,
 	items: ListType<ItemType>,
@@ -620,9 +500,7 @@ export function shuffle__overload$1<ItemType extends AnyType>(
 	return createList(drawn)
 }
 
-// The same Function under the proof, for the reason `String.split`'s
-// second entry is one: a refinement erases before anything runs, and a
-// reordering of a List with something in it has something in it.
+// The same Function under the proof, since a reordering keeps every item.
 export const shuffle__overload$2 = shuffle__overload$1
 
 // #endregion
