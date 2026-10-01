@@ -17,10 +17,8 @@ import { type ModuleInput, rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The Module fixtures, through the stages the CLI runs after linking —
-// the same graph `modules.spec.ts` pins as Diagnostic-clean — with each
-// Module's source text riding along, which is what a map embeds as
-// `sourcesContent`.
+// The `modules` fixtures through the stages the CLI runs after linking, with
+// each Module's source text, which a map embeds as `sourcesContent`.
 function moduleInputs(): {
 	inputs: Array<ModuleInput>
 	entryPath: string
@@ -51,10 +49,9 @@ function moduleInputs(): {
 	return { inputs, entryPath: linked.entryPath, texts }
 }
 
-// One source, compiled the way `essence dap` compiles a debug session —
-// every pass off, so what is stepped through is the Program as it was written.
-// A Module of its own rather than a line added to the `modules` fixtures, whose
-// text every expectation above is read out of.
+// Compiles one source the way `essence dap` compiles a debug session, with
+// every pass off. It is a Module of its own, so the `modules` fixtures that
+// other specs read stay unchanged.
 function unoptimisedModule(
 	filePath: string,
 	source: string,
@@ -87,12 +84,9 @@ function unoptimisedModule(
 	return { text, map: decodeInlineMap(text) }
 }
 
-// And the same Module with the Optimiser ON, for the one claim that can
-// not be made with it off: `loop-self-tail-calls` only rewrites an optimised
-// Program, and what it emits has to keep pointing at the lines that were
-// written. A debug session compiles with every pass off and never sees a loop —
-// but `essence build --sourcemap` does, and a stack trace out of a shipped
-// bundle is read through the map it carries.
+// The same with the Optimiser on, since `loop-self-tail-calls` only rewrites
+// an optimised Program. A debug session never sees the loop, but a stack trace
+// from a bundle built with `--sourcemap` is read through its map.
 function optimisedModule(
 	filePath: string,
 	source: string,
@@ -149,10 +143,8 @@ describe("Source Maps", () => {
 		expect(map.sources).toEqual([geometryPath])
 		expect(map.sourcesContent).toEqual([geometryText])
 
-		// The round trip, pinned on a Function the fixture declares: the
-		// emitted `function centimetres` maps back to the line the source
-		// declares it on — found in the text rather than hardcoded, so an
-		// edited fixture moves the expectation along with itself.
+		// Lines are found in the text rather than hardcoded, so an edited
+		// fixture moves the expectation with it.
 		let generatedLines = moduleText.split("\n")
 		let generatedLine =
 			generatedLines.findIndex((line) =>
@@ -176,11 +168,9 @@ describe("Source Maps", () => {
 		expect(original.line).toBe(sourceLine)
 	})
 
-	// The gate the whole feature stands behind — asked for no map, the
-	// emitted JavaScript is byte for byte what it was before source maps
-	// existed, and asked for one, only the trailing comment is new. escodegen
-	// renders through `SourceNode`s in map mode, which is equivalent but not
-	// provably identical, so it is pinned here rather than assumed.
+	// Asking for a map adds only the trailing comment. In map mode escodegen
+	// renders through `SourceNode`s, which should be equivalent, and this spec
+	// pins it.
 	it("changes nothing about the emitted JavaScript itself", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let plain = rewriteModules(inputs, entryPath)
@@ -202,12 +192,9 @@ describe("Source Maps", () => {
 		}
 	})
 
-	// A turn of a looped Function still points at the line the recursion
-	// was written on. What a reader steps through is a `continue`, but where the
-	// debugger says it IS is the `<- total(…)` they wrote — and the statements
-	// the turn is made of, the Arguments it holds and the Parameters it assigns,
-	// all carry that one position, because all of them stand for that one
-	// Return.
+	// A turn of a looped Function maps to the `<- total(…)` that was written.
+	// The `continue` and every Statement of the turn stand for that one Return,
+	// so all of them carry its position.
 	it("maps a looped tail call back onto the call that was written", () => {
 		let filePath = join(tmpdir(), "essence-sourcemaps", "Walk.es")
 		let source = `implementation {
@@ -241,12 +228,8 @@ describe("Source Maps", () => {
 		expect(original.source).toBe(filePath)
 		expect(original.line).toBe(writtenLine)
 
-		// And the Statements the turn is made of, which is what a reader
-		// stepping it stops on before the `continue`. Read as every mapping on
-		// those lines rather than as one column, for the reason the `define`
-		// case above gives: which token boundary a debugger's query lands on is
-		// its own business, and what has to hold is that none of them names
-		// another line.
+		// Every mapping on the turn's lines is read, not one column, since a
+		// debugger may query any token boundary. None may name another line.
 		let turnLines = new Set(
 			lines.flatMap((line, index) =>
 				/^\s*(?:const \$tail_\d+_t\d+ = |sum = |rest = )/.test(line)
@@ -271,9 +254,9 @@ describe("Source Maps", () => {
 		expect([...named]).toEqual([writtenLine])
 	})
 
-	// An empty map would not help — esbuild ignores one and self-maps the
-	// module anyway — so the prelude simply carries none, and the Bundler's
-	// final pass is what strips its lines from the bundle's map.
+	// esbuild ignores an empty map and maps the module onto itself, so the
+	// prelude carries none. See "Source maps" in
+	// packages/compiler/src/bundler/DEVELOPMENT.md.
 	it("gives the prelude no map of its own", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let { sources } = rewriteModules(inputs, entryPath, { sourcemap: true })
@@ -283,12 +266,9 @@ describe("Source Maps", () => {
 		).toBe(false)
 	})
 
-	// The band of pooled constants is emitted by the Compiler's own
-	// reckoning — the same `1` written on four lines is one const there — so the
-	// value in it belongs to no one site and maps to none. Without this it
-	// carried the Position of whichever site was rewritten first, and stepping
-	// the band in a debugger jumped into a line that merely happened to write
-	// that constant.
+	// A pooled constant stands for every site that writes the value, so it
+	// maps to none of them. A debugger stepping the pool would otherwise jump
+	// to an unrelated line.
 	it("gives the pooled constants no mapping", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let { sources } = rewriteModules(inputs, entryPath, { sourcemap: true })
@@ -317,12 +297,9 @@ describe("Source Maps", () => {
 		expect(mappedBandLines).toEqual([])
 	})
 
-	// A `define` is emitted as a chain of JavaScript conditionals on ONE
-	// line, so every arm of it maps back through a COLUMN rather than through a
-	// line of its own — which is the whole of what makes stepping through one in
-	// a debugger land where the arm was written rather than at the top of the
-	// ladder. Read with every pass off, because that is what `essence dap`
-	// compiles a session with.
+	// A `define` is emitted as a chain of conditionals on one line, so each arm
+	// maps back through a column. Stepping then lands on the arm, not on the
+	// top of the chain.
 	it("maps each arm of a define back to the arm it was written as", () => {
 		let filePath = join(tmpdir(), "essence-sourcemaps", "Grade.es")
 		let source = `implementation {
@@ -343,11 +320,9 @@ describe("Source Maps", () => {
 
 		expect(chainLine).toBeGreaterThan(0)
 
-		// Where each arm's ANSWER stands in the emitted chain, read as a
-		// span rather than as one column: escodegen writes a mapping at the
-		// token boundaries of the Node it was given, and which of them a
-		// debugger's own query lands on is its business. What has to hold is
-		// that every mapping over an arm's answer names THAT arm and no other.
+		// escodegen maps every token boundary of a Node, and a debugger may
+		// query any of them. So every mapping over an arm's answer must name
+		// that arm.
 		let answers = ["A", "B", "F"]
 		let spans = new Map(
 			answers.map((answer) => {
@@ -393,11 +368,9 @@ describe("Source Maps", () => {
 		)
 	})
 
-	// A Module whose top level WAITS, which is two claims in one. The
-	// emitted Module is ESM and may `await` at its top level, so a `complete`
-	// written there needs no Function around it; and the `await` it becomes has
-	// to map back to the Keyword rather than to the Statement holding it, which
-	// is what a debugger stepping onto a wait lands on.
+	// An ESM Module may `await` at its top level, so a top-level `complete`
+	// needs no Function around it. The `await` maps back to the Keyword, where
+	// a debugger stepping onto the wait lands.
 	it("maps a top-level wait back onto the Keyword that wrote it", () => {
 		let filePath = join(tmpdir(), "essence-sourcemaps", "Waiting.es")
 		let source = `implementation {
@@ -419,8 +392,7 @@ describe("Source Maps", () => {
 
 		expect(waitLine).toBeGreaterThan(0)
 		expect(lines[waitLine - 1]).toContain("await $future.complete(")
-		// The top level's own context, made fresh at the site rather than
-		// taken from a body — there is no body here to take one from.
+		// With no body to take a context from, the top level makes its own.
 		expect(lines[waitLine - 1]).toContain("$future.root()")
 
 		let awaitColumn = lines[waitLine - 1]!.indexOf("await ")
@@ -464,12 +436,9 @@ describe("Source Maps", () => {
 		}
 	})
 
-	// The composition seam, pinned end to end: esbuild reads each
-	// Module's inline map off the plugin-served contents and folds it into the
-	// bundle's own, so the FINAL map — the one a debugger loads — names the
-	// on-disk `.es` files, carries their text, and lands a known Function on
-	// its declaring line. Nothing touches disk; `write: false` keeps the
-	// outputs in memory.
+	// esbuild folds each Module's inline map into the bundle's. The final map
+	// names the `.es` files on disk, carries their text, and lands a known
+	// Function on its declaring line.
 	it("composes through esbuild into the bundle's final map", async () => {
 		let { inputs, entryPath, texts } = moduleInputs()
 		let generated = rewriteModules(inputs, entryPath, { sourcemap: true })
@@ -498,11 +467,9 @@ describe("Source Maps", () => {
 		let mainPath = fixturePath("modules", "Main.es")
 		let geometryPath = fixturePath("modules", "Geometry.es")
 
-		// The absolute `.es` paths must survive esbuild verbatim — they
-		// are what a debugger binds breakpoints against, wherever the bundle
-		// itself ended up. And they must be ALONE in there: the prelude's and
-		// the inlined runtime's pseudo-sources are stripped by the Bundler, so
-		// everything that is not Essence reads as unmapped code to step over.
+		// A debugger binds breakpoints against the absolute `.es` paths, so they
+		// survive verbatim. They are the only sources, so the prelude and the
+		// inlined runtime read as unmapped code to step over.
 		expect(map.sources).toContain(mainPath)
 		expect(map.sources).toContain(geometryPath)
 		expect(map.sources.filter((source) => !source.endsWith(".es"))).toEqual(
@@ -516,10 +483,7 @@ describe("Source Maps", () => {
 		let bundleLines = bundleText.split("\n")
 		let consumer = new SourceMapConsumer(map)
 
-		// A top-level Function of the entry — `describe` survives
-		// tree-shaking because the entry calls it — lands on its declaring
-		// line, found in the text rather than hardcoded, so an edited fixture
-		// moves the expectation along with itself.
+		// The entry calls `describe`, so it survives tree-shaking.
 		let describeLine =
 			bundleLines.findIndex((line) =>
 				line.includes("function describe("),
@@ -540,10 +504,8 @@ describe("Source Maps", () => {
 		expect(describeOriginal.source).toBe(mainPath)
 		expect(describeOriginal.line).toBe(describeSourceLine)
 
-		// A Method's body reaches back into the Module that declared the
-		// Namespace — the first statement inside `area` is Geometry's, not the
-		// entry's. The Method HEAD stays unmapped (nothing rewrites it as an
-		// Expression), so the assertion reads the line after it.
+		// A Method's body maps into the Module that declared its Namespace. The
+		// Method head stays unmapped, so the spec reads the line after it.
 		let areaBodyLine =
 			bundleLines.findIndex((line) => line.includes("static area(")) + 2
 		let areaSourceLine =
@@ -562,9 +524,8 @@ describe("Source Maps", () => {
 		expect(areaOriginal.source).toBe(geometryPath)
 		expect(areaOriginal.line).toBe(areaSourceLine)
 
-		// The prelude's consts must stay unmapped — that is what its
-		// empty map is FOR — so no `.es` source may claim a `$es_` const's
-		// declaring line.
+		// The prelude carries no map, so no `.es` source may claim a `$es_`
+		// declaration's line.
 		let preludeLine =
 			bundleLines.findIndex((line) => line.includes("var $es_")) + 1
 
