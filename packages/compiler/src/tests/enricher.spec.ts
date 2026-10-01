@@ -8666,11 +8666,8 @@ describe("Enricher", () => {
 				).toBe("Above")
 			})
 
-			// And a body of the CONFORMER's own that names a provided
-			// Method reaches the requirement through two readings, neither of
-			// which the other could see: the provided body names `Self::isAbove`
-			// and this one names the provided body. Both are recorded by the
-			// time the leaf is read, so the leaf is followed the whole way.
+			// The conformer's body names the provided body, which names
+			// `Self::isAbove`. Both readings are recorded before the leaf is read.
 			it("should follow a conformer's body through a provided one", () => {
 				expect(
 					narrowedTypeOf(
@@ -8706,13 +8703,9 @@ describe("Enricher", () => {
 				).toBe("Above")
 			})
 
-			// A leaf naming an OVERLOADED Method stops there. Which
-			// entry of an Overload a leaf means is the Arguments' business,
-			// and a leaf carries scalars rather than the typed, labelled
-			// Arguments an Overload is chosen by. So the requirement is as far
-			// as the leaf goes: the comparison the conformer wrote is out of
-			// reach, while a refinement written on the provided Method itself
-			// is not.
+			// A leaf carries scalars, not the typed Arguments that choose an
+			// Overload, so it stops at an overloaded requirement. A refinement on
+			// the provided Method is still reached.
 			it("should stop at an Overload the witness answers with", () => {
 				const RANKED = `protocol Ranked {
 						isAbove(_ n: Integer) -> Boolean
@@ -8760,10 +8753,9 @@ describe("Enricher", () => {
 				expect(narrowedThrough("@::isAtMost(3)", true)).toBe("Above")
 			})
 
-			// And `Comparable`'s own provided bodies reach a witness the
-			// same way. A String writes none of the four itself, so every one
-			// of them is the Protocol's body over `String::compare` — and
-			// `isLessThanOrEqualTo` is `isGreaterThan` negated through it.
+			// A String's comparisons are `Comparable`'s bodies over
+			// `String::compare`, and `isLessThanOrEqualTo` is `isGreaterThan`
+			// negated.
 			it("should narrow through a provided body the standard library writes", () => {
 				expect(
 					narrowedTypeOf(
@@ -8784,18 +8776,11 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The ordering's law is the BASE's promise, so it is read off the
-		// base's own Namespace and off the covering `Number`, and off nothing
-		// else. A Program may spell `is`, `isLessThan` or `isNot` in a Namespace
-		// of its own and mean whatever its body means by them — reading below,
-		// above and equal off those words would rule out comparisons nobody made.
+		// The ordering law is read only off the base's Namespace and `Number`.
+		// A Program's own `is` or `isLessThan` means what its body says.
 		describe("a foreign Namespace spelling the comparisons", () => {
-			// `Tag::is` and `Tag::isLessThan` each read a CHAIN, so each
-			// is a question of its own about the LENGTH, and neither excludes
-			// the other: a three-letter word answers both. Read as the
-			// trichotomy, the true branch would have proven the contrary of
-			// `Tag::isLessThan(3)` and walked into 'NotLess', whose own
-			// predicate the value answers 'false'.
+			// `Tag::is` and `Tag::isLessThan` ask about the length, and a
+			// three-letter word answers both, so neither excludes the other.
 			it("should not exclude a sibling comparison it never contradicts", () => {
 				expect(
 					narrowedTypeOf(
@@ -8827,11 +8812,9 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// And `isNot` is not turned into `is` negated here either. The
-			// BODY decides, and both of these bodies say "above the bound" — so
-			// each is `Integer::isGreaterThan(other)` and neither is the other's
-			// contrary. The `else` below has proven the value is NOT above zero,
-			// which no refinement in scope is declared by.
+			// Here `isNot` is not `is` negated: both bodies ask "above the
+			// bound". The `else` proves "not above zero", which no refinement
+			// declares.
 			it("should read a foreign contrary as the question its body asks", () => {
 				expect(
 					narrowedTypeOf(
@@ -8861,11 +8844,8 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// Which is the same rule the other way round. `Weird::isNot`
-			// asks whether the value is above the bound, so a refinement written
-			// on it is the one written on that comparison — `PositiveInteger`,
-			// which the standard library declares. Two refinements proving one
-			// leaf are one Type, and a value proven either way reaches both.
+			// `Weird::isNot` asks "above the bound", so a refinement on it is one
+			// Type with `PositiveInteger`, reached by a value proven either way.
 			it("should make a foreign alias one Type with the leaf it asks", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -8899,9 +8879,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The shadow lives in a WRAPPER Scope of its own, so a body that
-		// re-declares the very name the condition narrowed is told nothing — the
-		// declaration it would collide with is one nobody wrote.
+		// The narrowing lives in a wrapper Scope, so the body may re-declare the
+		// narrowed name.
 		it("should leave a body free to re-declare the narrowed name", () => {
 			let source = `implementation {
 				constant d = 3
@@ -8937,8 +8916,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// And evidence a Type already carries counts towards what the branch
-		// proves, which is what lets a condition ADD to it.
+		// A Type's own evidence counts towards what the branch proves, so a
+		// condition adds to it.
 		it("should add the condition's evidence to what the Type carries", () => {
 			let source = `implementation {
 				type SmallNonZero = Integer where @::isNot(0)::and(@::isLessThan(10))
@@ -8955,10 +8934,9 @@ describe("Enricher", () => {
 			expect(readTypesOf(source, "n").slice(-1)).toEqual(["SmallNonZero"])
 		})
 
-		// A Guard proves things about `@` exactly as a condition proves them
-		// about a Constant, and it runs before any Statement of the Handler — the
-		// Matcher's own check is ANDed in front of it — so what it proves holds
-		// throughout the body.
+		// A Guard narrows `@` as a condition narrows a Constant, and it runs
+		// before the Handler's body. See "Match Handlers and Guards" in
+		// packages/compiler/src/enricher/DEVELOPMENT.md.
 		it("should narrow '@' by a Match Handler's Guard", () => {
 			let value = lastConstantValue(`implementation {
 				constant value: Integer | String = 3
@@ -8978,9 +8956,7 @@ describe("Enricher", () => {
 				throw new Error("Last Constant is not a Match.")
 			}
 
-			// Navigated rather than searched, because a Handler holds TWO
-			// `@`s — its Guard's and its body's — and only the body's is the one
-			// the Guard narrowed.
+			// Navigated, since only the body's `@`, not the Guard's, is narrowed.
 			let returned = value.handlers[0].body[0]
 
 			if (returned.nodeType !== "ReturnStatement") {
@@ -9021,18 +8997,13 @@ describe("Enricher", () => {
 			expect(printType(returned.expression.type)).toBe("Integer")
 		})
 
-		// A Guard proves things about the value a Handler NAMED exactly as it
-		// proves them about `@` — `case #Value(item) where item::hasCharacters()` is
-		// one question about one value, and which of the two ways to spell that value
-		// it was asked of is no part of what it proved.
+		// A Guard narrows a payload binding as it narrows `@`, since
+		// `case #Value(item) where item::hasCharacters()` asks about one value.
 		describe("a Match Handler's payload binding", () => {
 			const SHOUT = "type Shout = String where @::hasCharacters()"
 
-			// What the Handler's body reads under a name — navigated rather than
-			// searched, because a Handler holds the name three times over: the Guard's
-			// reading of it, the Constant the binding desugars to, and the body's own
-			// use, which is the only one a Guard narrowed. The body's LAST Statement
-			// is the use every source below is about.
+			// The Type the body's last Statement reads a name at. Navigated, since
+			// the Guard, the desugared Constant and the body each hold the name.
 			function bodyReadingOf(source: string): string {
 				let value = lastConstantValue(source)
 
@@ -9050,13 +9021,9 @@ describe("Enricher", () => {
 				return printType(returned.expression.type)
 			}
 
-			// The standard library's own `NonEmptyString` proves the very
-			// thing `Shout` does, and it is reached first, being declared first
-			// in the one top-level table — so it is the Type the Guard
-			// establishes. `Shout` is what the sources below ask nothing of:
-			// each is about a name or a binding form the evidence does not
-			// reach, and a Program-declared candidate beside the builtin is
-			// what keeps them about that rather than about which Alias won.
+			// The builtin `NonEmptyString` proves what `Shout` does and is
+			// declared first, so the Guard establishes it. `Shout` keeps the other
+			// sources about reach rather than about which Alias won.
 			it("should narrow the binding its Guard proved the predicate of", () => {
 				expect(
 					bodyReadingOf(`implementation {
@@ -9121,9 +9088,8 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// And a Variable is no narrowing receiver under a Guard either — it
-			// can be written to inside the very body the evidence would hold over,
-			// which is the rule a condition narrows Constants alone by.
+			// A Variable can be written in the body, so a Guard does not narrow
+			// it either.
 			it("should not narrow a Variable a Guard proved the predicate of", () => {
 				expect(
 					bodyReadingOf(`implementation {
@@ -9145,10 +9111,8 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 
-			// The Constant the binding desugars to is a Statement of the body,
-			// so a body declaring that name AGAIN declares it twice — which the
-			// narrowing must not quietly turn into a legal shadow, or the emitted
-			// Program would hold two Constants of one name in one block.
+			// The binding's desugared Constant is in the body, so declaring the
+			// name again is still a duplicate, not a shadow.
 			it("should still refuse a body that re-declares the narrowed binding", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -9172,9 +9136,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// An Error matches everything in both directions, so a poisoned
-		// binding would qualify for whichever refinement is declared first and walk
-		// out of the branch better typed than it went in.
+		// An Error matches every refinement, so a poisoned binding is not
+		// narrowed.
 		it("should not narrow a binding whose Type is poisoned", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				type NonEmptyStrings = List<String> where @::hasItems()
@@ -9210,13 +9173,9 @@ describe("Enricher", () => {
 			)
 		})
 
-		// A refinement over a base the binding is not of establishes nothing,
-		// however the predicate is spelled. Asked of an Integer receiver rather
-		// than of a List or a String one, because the standard library's own
-		// `NonEmptyList` and `NonEmptyString` are refinements over every List and
-		// every String and would be established here on their own account — which
-		// is the doorway working, not this rule failing. `isEven` is a predicate
-		// no refinement in scope asks, so nothing but the base can answer.
+		// A refinement over another base establishes nothing. An Integer
+		// receiver keeps the builtin List and String refinements out, and no
+		// refinement in scope asks `isEven`.
 		it("should not narrow across bases", () => {
 			expect(
 				narrowedTypeOf(
@@ -9234,21 +9193,13 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// A GENERIC refined Alias stands for nothing until something decides
-		// its Type Arguments, and a branch has exactly one thing to decide them
-		// FROM: the receiver the question was asked of. So the candidate is worked
-		// out per binding — the declared base unified against the receiver's Type —
-		// and everything below it is the rule every other refinement is established
-		// by, asked of the refinement that unification built.
+		// A generic refined Alias's Type Arguments are decided per binding, by
+		// unifying its base with the receiver's Type. The result is then
+		// established like any refinement.
 		describe("a generic refinement", () => {
-			// The standard library's own `NonEmptyList` is the generic refinement
-			// every `hasItems` branch establishes now, so these ask nothing of a
-			// Program-declared Alias — a second one proving the same thing is a
-			// candidate beside it, and the builtin is reached first, being declared
-			// first in the one top-level table. A Program's OWN generic refined
-			// Alias is what `Filled` below is for: the value a branch establishes
-			// flows into a Parameter written with it, because two refinements are
-			// one Type when they prove the same thing of the same base.
+			// Every `hasItems` branch establishes the builtin `NonEmptyList`,
+			// declared first. `Filled` proves the same of the same base, so the
+			// established value flows into a `Filled` Parameter.
 			const FILLED = "type Filled<Item> = List<Item> where @::hasItems()"
 
 			it("should narrow a List to the Alias applied to its items", () => {
@@ -9266,9 +9217,7 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList<String>")
 			})
 
-			// The Arguments are worked out from the receiver whatever they are
-			// — a List of Lists decides `ItemType` as the inner List, and the
-			// spelling says so.
+			// A List of Lists decides `ItemType` as the inner List.
 			it("should narrow a List of Lists to the Alias applied to them", () => {
 				expect(
 					narrowedTypeOf(
@@ -9284,11 +9233,8 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList<List<String>>")
 			})
 
-			// The narrowing is worth what it lets a Program write, and what it
-			// lets a Program write is a call nothing spelled the Type of: the
-			// Parameter says `Filled<String>` and the branch worked that out from
-			// a `List<String>`. Asserted end to end in `codeGeneration.spec.ts`,
-			// where the Validator that refuses it outside the branch runs.
+			// The branch works out `Filled<String>` from a `List<String>`.
+			// `codeGeneration.spec.ts` asserts it end to end.
 			it("should let a narrowed List reach a refined Parameter", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -9307,10 +9253,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// `hasItems` IS `isEmpty` negated — the standard library writes
-			// it that way and the body is read — so the `else` of an `isEmpty`
-			// establishes the instantiated refinement for the same reason the
-			// true branch of a `hasItems` does. One shared helper asks both.
+			// `hasItems` is written as `isEmpty` negated, so the `else` of
+			// `isEmpty` establishes what the true branch of `hasItems` does.
 			it("should narrow the else branch of isEmpty", () => {
 				expect(
 					narrowedTypeOf(
@@ -9362,10 +9306,8 @@ describe("Enricher", () => {
 				)
 			})
 
-			// And the value a Handler NAMED, which is what the narrowing is
-			// worth having for: `firstItem` on the binding answers the item itself
-			// rather than an Optional, so the Guard reached the total Method through a
-			// Type nobody in the Program wrote.
+			// `firstItem` on the narrowed binding answers the item bare, through
+			// a Type the Program never wrote.
 			it("should narrow a payload binding by a Match Handler's Guard", () => {
 				let value = lastConstantValue(`implementation {
 					constant value: Optional<List<String>> = #Value(["a"])
@@ -9416,12 +9358,8 @@ describe("Enricher", () => {
 				).toBe("List<String>")
 			})
 
-			// A unification that leaves a Parameter undecided is no candidate:
-			// `B` appears nowhere in the base, so no receiver could ever decide it,
-			// and a refinement whose base nobody decided would put a Type nobody
-			// wrote into the branch. The predicate is `isEmpty` so that the ONLY
-			// candidate in the branch is the one under test — the builtin `NonEmptyList`
-			// asks the opposite question and establishes nothing here.
+			// `B` appears nowhere in the base, so no receiver decides it and the
+			// Alias is no candidate. `isEmpty` keeps the builtin `NonEmptyList` out.
 			it("should not narrow where the receiver decides only some Parameters", () => {
 				expect(
 					narrowedTypeOf(
@@ -9439,11 +9377,8 @@ describe("Enricher", () => {
 				).toBe("List<String>")
 			})
 
-			// A receiver whose items are the enclosing Function's own Type
-			// Parameter decides `Item` as that Parameter, which is a decision like
-			// any other — the branch inside a generic Function narrows exactly as one
-			// outside it does. It reads terse because every Argument is a Parameter,
-			// the way an unapplied Case header does.
+			// Items of the enclosing Function's Type Parameter decide `Item` as
+			// that Parameter. It prints terse, as every Argument is a Parameter.
 			it("should narrow a List whose items are a Type Parameter", () => {
 				expect(
 					narrowedTypeOf(
