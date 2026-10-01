@@ -8,59 +8,28 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
 import { spellTypeAt } from "./spellableTypes"
 
-// Inlay Hints annotate whatever carries no Type annotation with the Type
-// it was inferred as — Constant and Variable declarations, and the Parameters
-// and return Type of a contextually typed Function literal, which take their
-// Types from the signature they are passed to and so show them nowhere in the
-// source.
-//
-// Parameter *name* hints — the other common use of Inlay Hints — would be dead
-// weight in Essence: a Parameter either declares a label, which the call site
-// is then required to write out, or it is declared label-less with `_` and has
-// no name to show. Either way the call site already reads correctly.
+// Inlay Hints show the inferred Type where the source wrote none: Constants,
+// Variables, and a contextually typed Function literal's Parameters and return
+// Type. Parameter name hints add nothing, since labels are written at calls.
 
 export type InlayHint = {
 	position: common.Cursor
 	label: string
-	// `type` is the annotation the source left out; `value` is what a
-	// test RECORDED at that place — the answer of an `expect` that did not
-	// hold, the value of a Constant a test body wrote, the value of a line
-	// ending in `§?`. A value Hint carries no edit: there is nothing to accept,
-	// because a value is a fact about one run rather than something the source
-	// could have said.
+	// `type` is the annotation the source left out; `value` is what a test
+	// recorded there, which has no edit.
 	kind: "type" | "value"
 	textEdit: InlayHintEdit | null
 }
 
-// An insertion, so a Cursor rather than a Position — the annotation goes
-// where the Hint is shown and replaces nothing.
+// An insertion, so a Cursor: the annotation replaces nothing.
 type InlayHintEdit = {
 	position: common.Cursor
 	newText: string
 }
 
-// Every Hint's label is the annotation the source left out, spelled
-// exactly as it would have been written, and every Hint sits exactly where
-// that annotation belongs — so accepting a Hint is inserting its own label at
-// its own position, and building the two together is what keeps them from
-// drifting apart.
-//
-// A Type that can not be WRITTEN is shown and not offered. `printType` prints
-// every Type there is, including the ones no Declaration accepts — a blank as
-// `Unknown`, a poisoned slot as `Error`, a Type Parameter under a name that
-// means nothing outside the Declaration that introduced it — and the refactor
-// that applies a hint wrote those into the buffer, which added `unknown-type`
-// on top of whatever was already wrong and, for a Function Type, stopped the
-// file parsing. The hint still SHOWS what was inferred, which is information;
-// it simply carries no edit, exactly as a recorded value does.
-//
-// The label and the edit are built from the same Type and are not always
-// the same TEXT, which is the one place the two part company: a label names an
-// Alias wherever the reader is standing, and an edit may only write a name the
-// position can resolve. `: Point` over a file that imports no `Point` is shown
-// as it stands and applied as `: { x: Integer, y: Integer }` — the same Type,
-// spelled the way this file can read it — and where not even the shape can be
-// written, the hint carries no edit at all. `spellTypeAt` is what decides.
+// Each Hint's label is the omitted annotation, placed where it belongs, so
+// accepting it inserts it. A Type that cannot be written gets no edit, and the
+// edit spells only what the position resolves, via `spellTypeAt`.
 function typeHint(
 	position: common.Cursor,
 	prefix: string,
@@ -101,9 +70,8 @@ export function findInlayHints(
 	)
 }
 
-// The list being filled and the Program it is read off, carried together
-// through the walk — what a Hint's edit may WRITE is a question about the
-// Scopes standing where the Hint sits, and the Program is where those are read.
+// The Hints being collected, and the Program whose Scopes say what an edit may
+// write.
 type Hints = {
 	list: Array<InlayHint>
 	program: common.typed.Program
@@ -122,15 +90,10 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// `declaredType` is set exactly when the source spelled the
-			// Type out — annotating an annotated declaration would be noise.
-			// A failed inference is left alone rather than shown as `Error`.
-			//
-			// A SYNTHESIZED Declaration is skipped outright. It stands for a
-			// binder the author wrote somewhere no annotation may follow — a
-			// Matcher's `case #Value(item)`, a Pattern's `{ width }` — so a
-			// hint there proposes an edit that does not parse, and the Quick
-			// Fix offering to apply it would break the file.
+			// `declaredType` is set when the source spelled the Type out, and
+			// then no Hint is needed. A failed inference shows nothing. A
+			// synthesized Declaration, such as a Pattern's `{ width }` binder,
+			// takes no annotation and is skipped.
 			if (node.synthesized !== undefined) {
 				visitNode(node.value, hints)
 				return
@@ -244,10 +207,8 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 			}
 
 			return
-		// An arm declares nothing to annotate, but a Function literal
-		// written as one of its values takes its Types from the position it
-		// fills and shows them nowhere in the source — exactly the case a hint
-		// answers.
+		// An arm declares nothing, but a Function literal among its values takes its
+		// Types from the position, so it gets Hints.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
 				visitNode(expression, hints)
@@ -291,9 +252,8 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 
 			return
 		case "ChoiceDeclarationStatement":
-			// A Function literal written inside a Case payload's default
-			// takes its Types from the member it fills in, so it shows them
-			// nowhere in the source — exactly the case a hint answers.
+			// A Function literal in a Case payload's default takes its Types from the
+			// member it fills, so it gets Hints.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				visitNode(defaultValue, hints)
 			}
@@ -310,11 +270,8 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 	}
 }
 
-// A Function literal that annotates itself in full already shows its
-// whole Type at the declaration — repeating that Type beside the name says
-// nothing the line does not already say, and says it at the width of a
-// signature. A literal that left an annotation out is the opposite case: the
-// hint beside the name is then the only place the Type appears, so it stays.
+// A fully annotated Function literal already shows its Type, so the name gets
+// no Hint. One that omitted an annotation does.
 function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 	if (value.nodeType !== "FunctionValue") {
 		return false
@@ -328,26 +285,17 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 	)
 }
 
-// `inferredType` and `inferredReturnType` are set exactly when the
-// source left the annotation out, mirroring `declaredType` on a Constant.
-// A failed inference is left alone rather than shown as `Error`.
-//
-// The Parameter hint sits at the end of the Parameter, which for an
-// unannotated one is the end of its name; the return hint sits at the end of
-// the Parameter list, where the `-> Type` would have been written.
+// `inferredType` and `inferredReturnType` are set when the source omitted
+// them; a failed inference shows nothing. The Hints sit at the end of the
+// Parameter's name and at the end of the Parameter list.
 function visitFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	hints: Hints,
 ) {
 	for (let parameter of definition.parameters) {
-		// `parameter.position` stops at the Type and does NOT cover a
-		// default — deliberately, and this is the reason it does not: the hint
-		// sits at that end, and `codeActions` offers the same span as an
-		// APPLIED edit, so a widened Position would write `: Integer` after
-		// `= 1` and produce source that does not parse. An unannotated
-		// Parameter is a Function literal's, which can not carry a default
-		// anyway, so the two never actually meet — the invariant is kept
-		// because the day they do is not the day to find out.
+		// INVARIANT: `parameter.position` stops at the Type, before any default. The
+		// applied edit writes at that end, so a wider span would put `: Integer` after
+		// `= 1`.
 		if (
 			parameter.inferredType !== null &&
 			parameter.inferredType.type !== "Error"

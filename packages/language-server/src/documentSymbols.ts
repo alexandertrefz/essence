@@ -18,22 +18,9 @@ import { isAtOrBefore } from "./positions"
 import { protocolSpellings } from "./protocolSpellings"
 import { typedProgramBodies } from "./sections"
 
-// The outline is built from the Parser AST alone — it must work while
-// the Program has Type errors. Top level Statements become symbols;
-// Namespaces contribute their Properties and Methods as children, Record
-// Type Aliases their members.
-//
-// A named construct owns the bodies it carries, so a Function declared inside
-// a Function is a child of it. An unnamed block — an `if` or `else` body, a
-// Match arm, a Function literal passed as an Argument — is transparent
-// instead: there is no name to hang an entry on, so what it declares joins the
-// enclosing entry rather than nesting a level per block, which is what keeps a
-// Match of a dozen arms from burying the outline it sits in.
-//
-// `detail` is the one thing the Parser cannot answer. An enriched Program may
-// be handed in to fill it, matched to the Parser's entries by the Position of
-// their names. Without one every detail stays null and the outline is exactly
-// what it is without Types — which is the whole point of the Parser-only rule.
+// The outline, built from the Parser AST so it works despite Type errors. A
+// named construct owns the bodies it carries; an unnamed block is transparent.
+// An enriched Program, matched by name Position, fills in `detail`.
 
 type DocumentSymbolKind =
 	| "constant"
@@ -55,11 +42,10 @@ type DocumentSymbolKind =
 export type DocumentSymbolEntry = {
 	name: string
 	kind: DocumentSymbolKind
-	// The text shown beside the name — a printed Type, a signature, or a
-	// Case with its payload. Null whenever no enriched Program was given.
+	// The text beside the name: a printed Type, a signature, or a Case with its
+	// payload. Null without an enriched Program.
 	detail: string | null
-	// `range` spans the whole construct, `selectionRange` just the
-	// name — mirroring the LSP's DocumentSymbol.
+	// `range` spans the whole construct, `selectionRange` the name.
 	range: common.Position
 	selectionRange: common.Position
 	children: Array<DocumentSymbolEntry>
@@ -68,8 +54,8 @@ export type DocumentSymbolEntry = {
 export function findDocumentSymbols(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null = null,
-	// The Protocols the document's import block bound, so that a detail
-	// spells a bound the way the document does.
+	// The Protocols the import block bound, so a detail spells a bound as the
+	// document does.
 	imported: Record<string, common.ProtocolType> = {},
 ): Array<DocumentSymbolEntry> {
 	let symbols = symbolsOfBody(program.implementation.nodes)
@@ -84,27 +70,19 @@ export function findDocumentSymbols(
 		)
 	}
 
-	// What the file PROVES, below what it does — read off the Parser like
-	// everything else here, so the outline holds up in a file that does not
-	// compile and in one a build would strip the block from. A test and a suite
-	// are named by a String rather than by an Identifier, so their names are
-	// shown as written, interpolations and all.
+	// The tests, read off the Parser too. A test or suite is named by a String,
+	// shown as written.
 	symbols = [...symbols, ...testsSymbols(program)]
 
-	// What this Module publishes, last and under one entry — an outline is
-	// read for the declarations, and the export block is the summary of them
-	// rather than one more of them. The `import { … }` block is deliberately
-	// absent: it names what OTHER Modules declare, and none of it is in this
-	// file to navigate to.
+	// What this Module publishes, last and under one entry. The import block is
+	// absent: nothing it names is in this file.
 	let exportSection = exportSymbols(program)
 
 	return exportSection === null ? symbols : [...symbols, exportSection]
 }
 
-// No enriched Program is consulted for a detail here. An entry with a
-// `from` clause names something no Type in this file describes, and the two
-// facts worth showing — where a re-export forwards from, and what an aliased
-// entry publishes locally — are both written in the entry itself.
+// No enriched Program is read for these: an entry's re-export source and its
+// alias are written in the entry itself.
 function exportSymbols(program: parser.Program): DocumentSymbolEntry | null {
 	let section = program.exports
 
@@ -176,9 +154,8 @@ function testsNodeSymbols(
 	})
 }
 
-// The name as it stands in the source. An interpolation keeps its braces
-// — the outline is read beside the file, so what is shown should be what is
-// written there rather than a rendering of a row nothing has run yet.
+// The name as written, braces and all, rather than a rendering nothing has
+// run.
 function writtenName(
 	node: parser.StringValueNode | parser.InterpolatedStringValueNode,
 ): string {
@@ -197,8 +174,8 @@ function writtenName(
 		.join("")
 }
 
-// The Modifiers, spelled the way they were written, as the detail beside
-// the name — which is what tells a skipped test from a focused one at a glance.
+// The Modifiers as written, as the detail, which tells a skipped test from a
+// focused one.
 function modifierDetail(
 	modifiers: Array<parser.TestModifierNode>,
 ): string | null {
@@ -248,9 +225,8 @@ function symbolsOfNode(
 					...symbolsOfBody(handler.body),
 				]),
 			]
-		// An arm declares nothing itself — that is the whole point of a
-		// `define` — but a Function literal written as one of its values
-		// outlines like any other.
+		// An arm declares nothing, but a Function literal among its values outlines
+		// as any other.
 		case "Define":
 			return defineExpressions(node).flatMap(symbolsOfNode)
 		case "FunctionValue":
@@ -304,10 +280,8 @@ function symbolsOfArguments(
 	return nodeArguments.flatMap((argument) => symbolsOfNode(argument.value))
 }
 
-// A Declaration whose name is a Pattern is ONE Statement binding several
-// names, and the outline says both: the entry stands for the Statement and is
-// titled by what the Pattern binds, with a child per name so that a reader
-// looking for `matching` finds it where the outline is searched.
+// A Declaration whose name is a Pattern is one entry, titled by what it binds,
+// with a child per bound name.
 function patternSymbols(
 	node:
 		| parser.ConstantDeclarationStatementNode
@@ -342,9 +316,7 @@ function symbolForStatement(
 ): DocumentSymbolEntry | null {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
-			// A Pattern names no one thing, so the outline lists what it
-			// BINDS — one entry per name, which is what a reader is looking for
-			// when they open the outline to find where `matching` comes from.
+			// A Pattern names no one thing, so each bound name gets an entry.
 			if (node.name.nodeType === "Pattern") {
 				return patternSymbols(node, node.name, "constant")
 			}
@@ -386,8 +358,7 @@ function symbolForStatement(
 				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				// A body-less native signature declares nothing to
-				// outline — only the bodied entries do.
+				// A native signature declares nothing to outline.
 				children: node.methods.flatMap((method) =>
 					method.nodeType === "FunctionValue"
 						? symbolsOfBody(method.value.body)
@@ -474,9 +445,7 @@ function protocolMembers(
 		let children: Array<DocumentSymbolEntry> = []
 
 		for (let signature of signatures) {
-			// A PROVIDED Method's symbol spans its block as well — the
-			// body is part of what was written, and an outline that stopped at
-			// the return Type would not select it.
+			// A provided Method's symbol spans its block too, so the outline selects it.
 			range = unionOfPositions(
 				range,
 				signature.body?.position ?? signature.position,
@@ -531,8 +500,7 @@ function namespaceMembers(
 			detail: null,
 			range: unionOfPositions(
 				property.name.position,
-				// A native static Property has no value to span to — its
-				// range is then just its name.
+				// A native static Property has no value, so its range is its name.
 				property.value?.position ?? property.name.position,
 			),
 			selectionRange: property.name.position,
@@ -559,15 +527,14 @@ function namespaceMembers(
 			member.nodeType === "StaticMethodSignature" ||
 			member.nodeType === "OverloadedStaticMethodSignatures"
 
-		// The Method wrappers carry no Position of their own — the
-		// range is the span from the name to the end of the last overload.
+		// The range runs from the name to the end of the last Overload.
 		let range = member.name.position
 		let children: Array<DocumentSymbolEntry> = []
 
 		for (let method of methods) {
 			range = unionOfPositions(range, method.position)
 
-			// A body-less native signature declares nothing to outline.
+			// A native signature declares nothing to outline.
 			if (method.nodeType === "FunctionValue") {
 				children.push(...symbolsOfBody(method.value.body))
 			}
@@ -600,10 +567,8 @@ function unionOfPositions(
 /* Details */
 /***********/
 
-// Keyed by the start of the name, which is the one Position the Parser
-// and the Enricher are guaranteed to agree on for every entry the outline
-// shows — a Namespace Method's wrapper has no Position at all, and a Case's
-// span depends on whether it declared a payload.
+// Keyed by the start of the name, the one Position the Parser and the Enricher
+// agree on for every entry.
 type Details = Map<string, string>
 
 function withDetails(
@@ -624,9 +589,7 @@ function cursorKey(cursor: common.Cursor): string {
 function detailsOf(program: common.typed.Program): Details {
 	let details: Details = new Map()
 
-	// The tests section's bodies too — the outline already shows what
-	// stands in a test, and a Constant declared there deserves the same Type
-	// beside it that one above it gets.
+	// The tests section's bodies too, so their Constants show Types.
 	for (let body of typedProgramBodies(program)) {
 		collectDetails(body, details)
 	}
@@ -744,10 +707,7 @@ function collectDetail(
 			collectDetail(node.value, details)
 
 			for (let handler of node.handlers) {
-				// The Parser walk above outlines whatever a Guard or a
-				// Matcher literal declares, so this one has to reach the same
-				// Nodes — otherwise those entries are the only ones in the
-				// outline with no Type beside them.
+				// Reaches what a Guard or Matcher literal declares, as the Parser walk does.
 				for (let expression of typedHandlerExpressions(handler)) {
 					collectDetail(expression, details)
 				}
@@ -756,9 +716,7 @@ function collectDetail(
 			}
 
 			return
-		// The Parser walk above outlines whatever an arm's value
-		// declares, so this one has to reach the same Nodes — otherwise those
-		// entries are the only ones in the outline with no Type beside them.
+		// Reaches what an arm's value declares, as the Parser walk does.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
 				collectDetail(expression, details)
@@ -847,15 +805,13 @@ function record(
 	}
 }
 
-// A Type that failed to infer is left without a detail rather than
-// labelled `Error` — the Diagnostic already says so, in the place that can
-// explain it.
+// A Type that failed to infer gets no detail; its Diagnostic explains it.
 function typeDetail(type: common.Type): string | null {
 	return type.type === "Error" ? null : printType(type)
 }
 
-// Nameless, since the name is right beside it in the outline. Overloads
-// past the first are counted rather than spelled out — a detail is one line.
+// Without the name, which stands beside it. Overloads past the first are
+// counted, since a detail is one line.
 function signatureDetail(type: common.Type): string | null {
 	let signatures = signaturesOf(type)
 
