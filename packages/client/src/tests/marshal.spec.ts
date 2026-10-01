@@ -46,9 +46,7 @@ afterAll(() => {
 	rmSync(cacheDirectory, { recursive: true, force: true })
 })
 
-// The Types every test below builds against are the Module's OWN, read
-// off the Export Surface — an `Optional<Integer>` here is the one the Compiler
-// wrote down for `maybe`, not one this file spelled to suit itself.
+// The Module's own Types, read off its Export Surface.
 function parameterType(name: string): common.Type {
 	let signature = module.surface.values[name] as common.FunctionType
 
@@ -65,10 +63,7 @@ function constantType(name: string): common.Type {
 	return module.surface.values[name] as common.Type
 }
 
-// The whole boundary in one call — a JavaScript value in, through the
-// Module's own identity Function, and back out. What comes back is what a host
-// would have got, having gone the whole way rather than having been checked
-// halfway.
+// A JavaScript value in through the Module's identity Function, and back out.
 function through(name: string, value: unknown): unknown {
 	let callee = module.raw[name] as (
 		...args: Array<EssenceValue>
@@ -80,21 +75,15 @@ function through(name: string, value: unknown): unknown {
 	)
 }
 
-// The same round trip made the way a HOST makes one — through the door
-// `exports` binds, where the way out is compiled against the return the Module
-// DECLARED rather than left to the walk the value directs. The two answer alike
-// for every row of the table, `through` included; this exists because a unit
-// Choice is the shape where they answer alike for DIFFERENT reasons — the
-// declared door reads the Case off the position, the walk reads it off the
-// Module — and both are worth calling.
+// The same round trip through `exports`, compiled against the declared return.
+// For a unit Choice the two agree for different reasons, so both are called.
 function called(name: string, ...args: Array<unknown>): unknown {
 	return (module.exports[name] as (...args: Array<unknown>) => unknown)(
 		...args,
 	)
 }
 
-// A project on disk in a directory of its own, removed again — for the
-// one test that needs a Module GRAPH rather than a single file.
+// A temporary project, for a test that needs a Module graph.
 async function withProject<Result>(
 	files: Record<string, string>,
 	work: (directory: string) => Promise<Result>,
@@ -115,17 +104,14 @@ async function withProject<Result>(
 	}
 }
 
-// A wait of the TEST's own, which is what makes a stopped run something
-// to assert rather than a race: a timer set after the Module's expires after
-// it, so a wait of this one that fires while the Module's has not is a wait the
-// Module's will never finish.
+// The test's own wait. Set after the Module's timer, it expires after it, so
+// a stopped run has visibly not finished.
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-// Whether a promise has SETTLED — the whole of what a stopped run looks
-// like from this side. Nothing is ever rejected: a Future can not fail, so work
-// that was stopped answers nothing at all.
+// Whether a promise has settled. Stopped work never does, since a Future can
+// not fail.
 function settlingOf(promise: Promise<unknown>): () => boolean {
 	let settled = false
 
@@ -158,8 +144,7 @@ function marshalError(work: () => unknown): EssenceMarshalError {
 describe("Round trips", () => {
 	it("carries an Integer as a bigint", () => {
 		expect(through("integer", 42n)).toBe(42n)
-		// A number is admitted where it is exactly an integer, and comes
-		// back as the bigint the Type says it is.
+		// A safe integer number comes back as a bigint.
 		expect(through("integer", 42)).toBe(42n)
 		expect(through("integer", -9007199254740991n)).toBe(-9007199254740991n)
 	})
@@ -170,8 +155,7 @@ describe("Round trips", () => {
 		expect(third).toBeInstanceOf(EssenceRational)
 		expect((third as EssenceRational).toString()).toBe("1/3")
 
-		// Reduced and sign-canonicalised on the way in, which is what the
-		// runtime does with the pair as well.
+		// Reduced, with the sign on the numerator, as the runtime does.
 		expect(
 			(
 				through(
@@ -206,12 +190,8 @@ describe("Round trips", () => {
 		})
 	})
 
-	// An absent key IS `undefined`, which is how `Optional<String>` is
-	// spelled on this side — so leaving it off is the same statement as writing
-	// it. Refusing absence reported "expected Optional<String>, got nothing" for
-	// the one Type that accepts exactly nothing, and made a Record that had been
-	// through `JSON.stringify` — which drops an `undefined`-valued key —
-	// impossible to hand back.
+	// An absent key reads as `undefined`, so an `Optional` member may be left
+	// off, as `JSON.stringify` leaves it.
 	it("takes a Record with an Optional member left off", () => {
 		expect(through("card", { title: "a", note: "b" })).toEqual({
 			title: "a",
@@ -233,7 +213,7 @@ describe("Round trips", () => {
 		).toEqual({ title: "a", note: undefined })
 	})
 
-	// The same rule, and the same sentence, where the sentence is true.
+	// A member that is not Optional may not.
 	it("still refuses a Record with a member that is not Optional left off", () => {
 		expect(marshalError(() => through("box", { width: 3n })).message).toBe(
 			"argument 1 → .height: expected Integer, got nothing.",
@@ -243,8 +223,7 @@ describe("Round trips", () => {
 	it("carries an Optional as the value or nothing", () => {
 		expect(through("maybe", 7n)).toBe(7n)
 		expect(through("maybe", undefined)).toBeUndefined()
-		// `null` is admitted beside `undefined` — JSON has only the one —
-		// and `undefined` is what comes back either way.
+		// `null` is admitted, since JSON has no `undefined`.
 		expect(through("maybe", null)).toBeUndefined()
 	})
 
@@ -266,12 +245,8 @@ describe("Round trips", () => {
 		})
 	})
 
-	// The `Result` row of the table. It is an ordinary generic Choice on
-	// this side — a `$case` and its payload, both ways round — and not the
-	// `undefined` its sibling `Optional` is spelled by: `undefined` says "no
-	// value" and has no room for a reason. So a `Result#Value` is a `$case`
-	// where an `Optional#Value` is the item itself, which is the one thing the
-	// two carriers do not share across the boundary.
+	// A `Result` is an ordinary Choice with a `$case`, since `undefined` has no
+	// room for a reason.
 	it("carries a Result as an ordinary Choice, not as absence", () => {
 		expect(through("result", { $case: "Result#Value", item: 3n })).toEqual({
 			$case: "Result#Value",
@@ -282,8 +257,7 @@ describe("Round trips", () => {
 		).toEqual({ $case: "Result#Failure", reason: "gone" })
 	})
 
-	// What the Essence source itself writes — `#Circle` needs no Choice in
-	// front of it there, so neither does a host.
+	// As the Essence source writes it.
 	it("takes a Case by its bare name", () => {
 		expect(through("shape", { $case: "Circle", radius: 2n })).toEqual({
 			$case: "Shape#Circle",
@@ -296,10 +270,7 @@ describe("Round trips", () => {
 		expect(through("labelled", 12n)).toBe(12n)
 	})
 
-	// `toString` lives on `Object.prototype`, so reading an absent key
-	// through the prototype chain finds JavaScript's own function where the
-	// absent-key rule promises `undefined` — a plain literal and a JSON-parsed
-	// object both inherit it.
+	// An absent `toString` must not be found on `Object.prototype`.
 	it("reads a member through its own keys, never the prototype's", () => {
 		expect(through("config", JSON.parse("{}"))).toEqual({
 			toString: undefined,
@@ -333,13 +304,8 @@ describe("Round trips", () => {
 		])
 	})
 
-	// A List is stored as two runs and a VIEW into each — the authority is
-	// `packages/runtime/src/List.ts` — because the Arrays under one are SHARED
-	// with every List built from it. So a value added to at both ends keeps its
-	// first items in a different Array from its last, and a value another List
-	// was built from is stored in an Array holding more items than it has. What
-	// crosses the boundary has to be the items the value holds, and these are
-	// the two shapes a List built here and handed straight back can never be in.
+	// A List added to at both ends, and one another List grew from. See "List
+	// boxes" in DEVELOPMENT.md.
 	it("carries a List that was added to at both ends", () => {
 		expect(through("grown", ["b", "c"])).toEqual([
 			"first",
@@ -359,9 +325,7 @@ describe("Round trips", () => {
 		expect(through("branched", [])).toEqual([["z"], ["a"], []])
 	})
 
-	// The Module does something with the value rather than handing it
-	// back, so this is what says the value it was given was a real one — a Case
-	// the Match did not recognise would have thrown inside the bundle.
+	// The Module matches on the value, so it must be a real one.
 	it("hands the Module values its own Methods accept", () => {
 		let areaOf = module.raw.areaOf as (value: EssenceValue) => EssenceValue
 		let shapeType = parameterType("shape")
@@ -384,13 +348,7 @@ describe("Round trips", () => {
 	})
 })
 
-// A Dictionary crosses as a JavaScript `Map` at every key Type, which is
-// the one shape that holds an entry per key of any kind and holds them in the
-// order they were put in. The alternative was a plain object, and only for a
-// `Dictionary<String, V>`: one Essence shape would then have had two JavaScript
-// spellings depending on a Type Argument, an integer-looking key would have come
-// back first however it was written down, and every other key Type would have
-// had nowhere to go.
+// A Dictionary crosses as a `Map` at every key Type, keeping its order.
 describe("A Dictionary", () => {
 	it("carries its entries as a Map, in the order it holds them", () => {
 		let ages = through(
@@ -411,9 +369,7 @@ describe("A Dictionary", () => {
 		]).toEqual([])
 	})
 
-	// Each key kind spelled as its own Type is spelled everywhere else —
-	// an Integer is a bigint out and either kind in, a Rational is an
-	// `EssenceRational`, and a unit Choice's Case is its bare name.
+	// Each key is spelled as its Type is everywhere else.
 	it("carries a key of every kind the boundary spells", () => {
 		expect([
 			...(through(
@@ -452,11 +408,8 @@ describe("A Dictionary", () => {
 		expect(shares[0]![1]).toBe("third")
 	})
 
-	// A `Map` tells its keys apart by `===`, so a key that crosses as an
-	// object is a key to ITERATE rather than one to look up: the Record that
-	// comes back is a fresh object, and `get` on an equal one finds nothing. The
-	// entries are all there and in order, which is what such a Dictionary is
-	// handed over for.
+	// An object key comes back as a fresh object, so it is iterated rather than
+	// looked up.
 	it("carries an object key for iterating rather than for looking up", () => {
 		let plots = through("plots", new Map([[{ width: 1n, height: 2n }, 3n]]))
 
@@ -493,16 +446,9 @@ describe("A Dictionary", () => {
 		).toEqual(new Map([["a", new Map([["b", 1n]])]]))
 	})
 
-	// A Dictionary is a SHARED STORE with a generation stamp — the
-	// authority is `packages/runtime/src/Dictionary.ts` — so a written key is a
-	// version pushed onto a store other boxes still read, and a removed one
-	// leaves a tombstoned slot standing where it was. What crosses has to be
-	// what the BOX holds, which is the shape a Dictionary built here and handed
-	// straight back can never be in.
-	//
-	// It is also what says the value that went in was a real one: the
-	// Module writes to it, and a Dictionary built any other way would have
-	// failed inside the bundle rather than out here.
+	// A Dictionary shares a store with other boxes, as
+	// `packages/runtime/src/Dictionary.ts` lays it out. What crosses is what this
+	// box holds.
 	it("carries what the box holds, not what its store does", () => {
 		expect([
 			...(through(
@@ -518,11 +464,7 @@ describe("A Dictionary", () => {
 		])
 	})
 
-	// A refinement crosses unwrapped to its base and unproven — the rule
-	// the boundary keeps for every one of them, stated here because a
-	// `NonEmptyDictionary` is where a reader would expect the empty Map to be
-	// refused. It is not: the predicate belongs at the crossing and does not run
-	// there yet, exactly as a `NonEmptyList` Parameter takes an empty Array.
+	// A refinement crosses as its base, unproven, so an empty Map is taken.
 	it("takes a refined Dictionary unproven, as every refinement crosses", () => {
 		expect(through("filled", new Map())).toEqual(new Map())
 		expect(through("filled", new Map([["a", 1n]]))).toEqual(
@@ -530,21 +472,15 @@ describe("A Dictionary", () => {
 		)
 	})
 
-	// The other object JavaScript has, met where a host reached for the
-	// one every String key would have fitted. It is answered with the shape to
-	// write rather than with the Type it already named.
+	// A plain object is refused with the shape to write instead.
 	it("refuses a plain object and says what to write instead", () => {
 		expect(marshalError(() => through("ages", { alex: 39n })).message).toBe(
 			"argument 1: expected Dictionary<String, Integer>, which crosses as a Map rather than as a plain object — 'new Map(Object.entries(…))' builds one.",
 		)
 	})
 
-	// A Map tells its keys apart by `===` and a Dictionary by the key
-	// Type's own equality, so two entries of one Map can be one entry of the
-	// other — and taking the second would lose an entry a host wrote. Every
-	// pairing here is one the language calls equal: the two representations of
-	// an Integer, an Integer and the whole Rational it equals, and the two
-	// Unicode spellings of one accented String.
+	// Two Map keys the language calls equal are refused: an Integer's two
+	// forms, an Integer and its whole Rational, and a String's two spellings.
 	it("refuses two entries whose keys are one key", () => {
 		expect(
 			marshalError(() =>
@@ -594,17 +530,8 @@ describe("A Dictionary", () => {
 		)
 	})
 
-	// The one thing the way OUT can lose, and the one shape that can
-	// arrange it: a Namespace writing an `is` for the key Type. The boundary
-	// builds a Dictionary with the standard library's own equality — a
-	// Descriptor is JSON and a conformance is a value, so nothing crossing
-	// carries one — and this Module's own `is` calls no two keys equal at all,
-	// so it holds two entries whose keys are one JavaScript string. A Map of it
-	// would have one entry, and handing back a value with an entry missing is
-	// the single thing this boundary may not do.
-	//
-	// A project of its own, because `Marshal.es` is a table of the shapes
-	// that CROSS and this is here to be refused.
+	// A Namespace's own `is` that calls no keys equal lets a Dictionary hold
+	// two keys that are one string. A Map would drop one, so it is refused.
 	it("refuses a Dictionary whose keys are one JavaScript value", async () => {
 		await withProject(
 			{
@@ -646,9 +573,7 @@ export {
 		)
 	})
 
-	// The door a host reaches for when it has no Type to hand over — the
-	// walk the VALUE directs, with both slots read by what each entry says it
-	// is rather than by what a position declared.
+	// With no Type, each entry is read by what it says it is.
 	it("crosses with nothing declared at all", () => {
 		expect(marshaller.toJS(module.raw.sizes)).toEqual(
 			new Map([
@@ -659,12 +584,8 @@ export {
 	})
 })
 
-// The door question is asked of the WHOLE boundary — the exported values
-// AND the exported Types. A Module whose only Dictionary sits in a declared
-// Type exports no value that names one, so a walk over the values alone left it
-// doorless while the declaration file published `Map<string, bigint>` and the
-// Marshaller refused a host's Map with a sentence blaming a bundle from another
-// compile.
+// The door question covers exported Types, so a Dictionary named only in one
+// still gets its door.
 describe("A Dictionary the boundary names only in a Type", () => {
 	it("crosses against the declared Type it was published under", async () => {
 		await withProject(
@@ -709,11 +630,8 @@ export {
 	})
 })
 
-// The conditional door is decided from what the boundary DECLARES, and a
-// Record is structurally open — the outbound walk reads the value's members —
-// so a Dictionary can reach a position no Type names, where there is no door to
-// cross through. It is refused, and what the refusal says has to be the truth:
-// this pair came from one compile.
+// A Record member no Type names may hold a Dictionary with no door. The
+// refusal must not blame another compile.
 describe("A Dictionary at a position the boundary does not name", () => {
 	it("is refused with the reason the bundle has no door", async () => {
 		await withProject(
@@ -749,38 +667,25 @@ export {
 	})
 })
 
-// A Choice whose every Case is payload-less crosses as the bare NAME of
-// the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
-// is the one shape whose JavaScript spelling was chosen for the HOST rather
-// than derived from the Essence value, and the whole of why is in what a
-// declaration then reads: `turn(direction: "Up" | "Down")` is an enumeration a
-// TypeScript reader already knows, where the object form was this Module's
-// bookkeeping made a caller's problem.
+// A unit Choice's Case crosses as its bare name, `"Up"`, in both directions.
 describe("A unit Choice", () => {
 	it("carries each of its Cases as the bare name", () => {
 		expect(called("direction", "Up")).toBe("Up")
 		expect(called("direction", "Down")).toBe("Down")
 	})
 
-	// The same pair of spellings every other Case answers to — the bare
-	// name the Essence source itself writes, and the qualified one a `$case`
-	// carries. What comes back is the bare one either way, because there is one
-	// spelling OUT.
+	// The qualified name goes in too, and the bare one comes out.
 	it("takes a Case by its qualified name as well", () => {
 		expect(called("direction", "Direction#Up")).toBe("Up")
 	})
 
-	// And the standard library's own, which is the Choice the whole rule
-	// was wanted for: every `compare` in the language answers one, and a host
-	// reading the answer should be reading `"Less"`.
+	// The standard library's `Ordering`, which every `compare` answers.
 	it("carries the standard library's Ordering", () => {
 		expect(called("ordering", "Less")).toBe("Less")
 		expect(called("ordering", "Ordering#Greater")).toBe("Greater")
 	})
 
-	// Beside an `Optional`, which is spelled by absence — so the two do
-	// not collide and there is nothing to decide: a string is a Case and
-	// `undefined` is the absence.
+	// Inside an `Optional`, a string is a Case and `undefined` the absence.
 	it("carries one held by an Optional as the name or nothing", () => {
 		expect(called("maybeDirection", "Up")).toBe("Up")
 		expect(called("maybeDirection", undefined)).toBeUndefined()
@@ -798,9 +703,7 @@ describe("A unit Choice", () => {
 		})
 	})
 
-	// All-or-nothing per Choice. `Shape` has `#Blank` beside `#Circle`,
-	// so every one of its Cases keeps the object form — a Choice half of whose
-	// Cases were strings is one no host could write a single `switch` over.
+	// `Shape` has a payload, so even its `#Blank` is an object.
 	it("leaves a payload-less Case of a mixed Choice alone", () => {
 		expect(called("shape", { $case: "Shape#Blank" })).toEqual({
 			$case: "Shape#Blank",
@@ -810,12 +713,7 @@ describe("A unit Choice", () => {
 		)
 	})
 
-	// One spelling per shape, so the object form is not kept as a second
-	// one: a position that took both would be a position two different
-	// JavaScript values cross into, while the way out can hand only one of them
-	// back. It is worth its own sentence because it is the one wrong value that
-	// is RIGHT about which Case it means — "expected Direction, got an object
-	// with '$case'" would be true and would not say what to write instead.
+	// The object form is refused, with the string to write instead.
 	it("refuses the object form and says which string to write", () => {
 		expect(
 			marshalError(() => called("direction", { $case: "Direction#Up" }))
@@ -839,12 +737,8 @@ describe("A unit Choice", () => {
 		).toBe('argument 1 → [1]: expected Direction, got the string "Left".')
 	})
 
-	// And with NOTHING declared, which is the position the fact is hardest
-	// to answer from: a `Direction#Up` and a `Shape#Blank` are the same empty
-	// object under two tags, so the value itself can not say which of them
-	// crosses as a string. What answers is the Module — a door built from a
-	// Descriptor knows every Case that Descriptor names — and it has to, or
-	// `toJS` would hand a host a value `fromJS` then refuses.
+	// With nothing declared, the Module's table says which Cases are strings,
+	// so `toJS` agrees with `fromJS`.
 	it("crosses as the same string with nothing declared", () => {
 		let up = module.bridge.case("./Marshal.es#Direction#Up")
 
@@ -854,12 +748,8 @@ describe("A unit Choice", () => {
 	})
 })
 
-// Two shapes this boundary told apart by object-versus-string until a
-// unit Choice's Cases became strings, and now can not. Refused rather than
-// decided, which is the ONE place the Union rule "arms in declaration order,
-// first admitting arm wins" deliberately does not reach: deciding would hand a
-// String `"Up"` back out as a `Direction#Up`, and losing the value it was given
-// is the single thing this boundary may not do.
+// A Union whose bare Cases collide is refused. See "Bare Cases" in
+// DEVELOPMENT.md.
 describe("A position two spellings would collide in", () => {
 	// The way OUT of a refused position, which is the only way it can be
 	// reached at all — the way in refuses the value before any Function is
