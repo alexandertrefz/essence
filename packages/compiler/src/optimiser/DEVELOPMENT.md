@@ -593,3 +593,49 @@ Each point records its innermost enclosing Function or Method, found by Position
 `Standings::compute › case #Postponed`. On a tie the first collected, the nested one, wins. `essence test
 --mutate` joins its mutation sites onto these points by span, using this pass's own definitions of holding and
 overlapping.
+
+### inline-loops
+
+Essence has no loop Statement. A walk is a driver Function handed callbacks, such as `loop(startingWith 0, while (n) {
+… }, (n) { … })`, and the driver calls one closure per callback per turn. The control flow is a value, but it is also
+the most expensive shape a Program can take. Where every callback is written at the call, this pass writes the walk
+out as a JavaScript `while` or `for`. Each body stands where its call was:
+
+```
+let $loop_0_state = state;
+while (true) {
+  { const n = $loop_0_state; if (!(…)) break $loop_0; }
+  { const n = $loop_0_state; $loop_0_state = …; }
+}
+```
+
+A Function-valued name is a value the pass can not read, so such a call stays a call. The standard library's own
+walks, such as `firstItem(where:)` and `count(where:)`, are written on `reduce` and `everyItem` with literal
+callbacks. So their loops are written out once, in the prelude.
+
+The counted walks that run to the end become a `for` over the raw values the bounds hold. Those are numbers where both
+fit, and a bigint otherwise. In Essence they are written on the `while` driver, with a Record and an Integer per turn.
+The counted walks whose body answers a `Step` are written on the general driver, which is inlined inside their prelude
+bodies.
+
+A `Step` answer is read where it is built, so the Case is never built. `#Done(x)` stops the walk with `x`, and
+`#Continue(x)` carries `x` on. Where the construction is not visible, the tag is read as the driver would read it.
+That is so for a `Step` held under a name or answered by a nested walk.
+
+The pass recognises a free `loop` by its mangled name, and checks the labels each entry declares, in order. The
+mangled number only says which entry was resolved, and `Loop.es` decides the numbering. So a reordered file can only
+stop a call from being inlined. The `until` walk is the `while` walk with the answer read the other way. A Program can
+not shadow these names, since `overload` blocks are the standard library's and no name a Program writes holds a `_`.
+The List walks are found by Namespace name, so a nested `List` or `NonEmptyList` Namespace turns them off.
+`NonEmptyList` re-declares only `map`, which is `List`'s own, so that one is read under both names.
+
+Some calls are left alone:
+
+- A call that left an Argument out, since the callee's own defaults have no binding in the written-out body.
+- A callback that is not a Function literal of the shape the driver calls, or that binds one name twice.
+- A completing callback. Its body is emitted inside the async closure of a future, and inlined, its `await`s
+  would land in a Function that can not wait.
+
+Loop names are numbered across the Program, since a loop inlined into another loop's body shares its Scope. In
+the Statement positions `lower-matches-to-statements` lifts from, this pass lifts the loop itself, since that pass
+runs earlier and never sees it.

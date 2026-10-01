@@ -3,70 +3,15 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
-// Essence has no loop Statement. A walk is a driver Function handed
-// callbacks — `loop(startingWith 0, while (n) { … }, (n) { … })` — and the
-// driver calls them, one closure call per callback per turn, threading whatever
-// they answer with between them. That is the language's whole answer to
-// iteration, and it is a good one: the control flow is a value, so a Match can
-// read it and `<-` keeps its one meaning. It is also the most expensive shape a
-// Program can be written in, because the Compiler knows every part of it and
-// emitted none of it:
-//
-//   loop__overload$1(state, function (n) { … }, function (n) { … })
-//
-// Which driver it is, is the name. What the callbacks do, is their bodies. So
-// the walk is written out where the call stands — a real `while` or `for` — with
-// each body where the call to it was:
-//
-//   let $loop_0_state = state;
-//   while (true) {
-//     { const n = $loop_0_state; if (!(…)) break $loop_0; }
-//     { const n = $loop_0_state; $loop_0_state = …; }
-//   }
-//
-// The two counted entries whose body runs the walk to its end do not go
-// through their driver at all. `loop(from:through:startingWith:_)` and
-// `loop(from:downTo:startingWith:_)` are written in Essence on the `while`
-// driver and thread `{ index, carried }` — a Record built per turn, around an
-// Integer built per turn, checked by a closure and advanced by another. Inlined
-// each is a `for` over the bigint the Integers hold, and the only allocation
-// left is the Integer the body is handed. The three counted entries whose body
-// answers a `Step` are written on the general driver instead, so what is
-// inlined for them is that driver, once, inside their prelude bodies.
-//
-// A `Step` a callback answers with is read where it is BUILT. The general
-// loop and `reduce`'s early-stopping entry both decide by a tag the body has
-// just written — `#Done(x)` stops the walk with `x`, `#Continue(x)` carries `x`
-// on — so where the Compiler can see the construction at the answering position,
-// the Case is never built: the walk assigns and leaves. Where it can not see one
-// — a `Step` held under a name, or one a nested walk answers with — the tag is
-// read exactly as the driver read it, at that one site.
-//
-// What decides whether a call is inlined at all is whether every callback
-// is written AT the call. A Function-valued name is whatever was bound to it,
-// which is a value this pass can not read, so the call stays exactly what it
-// was. That is also why the standard library's own walks inline: `firstItem
-// (where:)`, `firstIndex(of:)`, `count(where:)` and the rest are written on
-// `reduce` and `everyItem` with literal callbacks, so the loop inside each of
-// THEM is written out, once, in the prelude — the Program's own call still calls
-// that Method, and what it calls no longer allocates a `Step` per item.
+// Writes a driver call whose callbacks are all literals out as a JavaScript
+// `while` or `for`, with each callback's body where its call was. A `Step` is
+// read where it is built. See "inline-loops" in DEVELOPMENT.md.
 
 export const inlineLoops: OptimiserPass = {
 	name: "inline-loops",
 	run: (program, namespaces) => {
-		// `List` is a name a Program may take for itself — nested, where
-		// it is not taken yet — and a `namespace List for List` writing its own
-		// `map` answers under exactly the name and shape this pass is written
-		// for. `NonEmptyList`, which the walk below reads for the same Method,
-		// is such a name too. The same set answers it for every other pass that
-		// reads a Namespace by name: a name a Program declares below its own top
-		// level is not the standard library's here.
-		//
-		// The free `loop` entries need no such guard. They are reached by
-		// their mangled `loop__overload$N` name, an `overload function` block is
-		// refused outside the standard library, and no name a Program can write
-		// holds a `_` — the Lexer reads it as a Symbol. There is no Program that
-		// can put a different Function behind those names.
+		// A nested `List` or `NonEmptyList` Namespace may declare its own walks. The
+		// free `loop` entries need no guard, since no name a Program writes holds a `_`.
 		let shadowed = namespaces.nested
 		let inlining = new Inlining(shadowed)
 
@@ -77,10 +22,8 @@ export const inlineLoops: OptimiserPass = {
 	},
 }
 
-// Unspellable in Essence, like every other name the Compiler binds for
-// itself, and numbered across the whole Program rather than per Function: a loop
-// inlined into another loop's body stands in the Scope that one threads its
-// State in, and two loops numbered from zero would declare one name twice.
+// Unspellable in Essence, and numbered across the Program, since an inner
+// loop shares the Scope of the loop it is inlined into.
 const loopPrefix = "$loop_"
 
 class Inlining {
@@ -107,11 +50,9 @@ class Inlining {
 		}
 	}
 
-	// A loop standing where a Statement may be written, which is where the
-	// arrow around it is not needed: the positions `lower-matches-to-statements`
-	// lifts a Match out of, a walk written for its effects among them. That pass
-	// runs BEFORE this one and can not see a loop this one has not made yet, so
-	// the lifting is done here rather than there.
+	// A loop in a Statement position needs no arrow around it.
+	// `lower-matches-to-statements` runs earlier and never sees it, so the lifting
+	// is done here.
 	statement(
 		node: common.typedSimple.ImplementationNode,
 	): common.typedSimple.ImplementationNode {
@@ -130,26 +71,20 @@ class Inlining {
 					{ kind: "assignment", name: node.name },
 					node,
 				)
-			// A declaration holds no Expression standing for its own
-			// answer, and a lowered Statement is one already lifted.
+			// Declarations, and Statements already lifted.
 			case "NamespaceDefinitionStatement":
 			case "ProtocolDeclarationStatement":
 			case "TypeAliasStatement":
 			case "FunctionStatement":
 			case "ConditionalStatement":
-			// An assertion holds an Expression that has to be tested
-			// where it stands — lifting it into a Statement above would put
-			// the recording somewhere the assertion is not.
+			// An assertion is tested where it stands.
 			case "TestAssertionStatement":
-			// And a turn of a looped Function holds the Arguments it
-			// evaluated and the Parameters it assigns, neither of which
-			// stands for the Statement's own answer — it has none.
+			// A loop turn has no answer of its own.
 			case "TailCallStatement":
 			case "IntrinsicStatement":
 				return node
 			default:
-				// An Expression written for its effects — what it answers
-				// goes nowhere, and the walk still runs.
+				// An Expression written for its effects, whose answer goes nowhere.
 				return this.lifted(node, { kind: "discard" }, node)
 		}
 	}
@@ -173,20 +108,12 @@ class Inlining {
 		}
 	}
 
-	// WHICH walk this call is, and null for every call that is not one of
-	// them or that was handed a callback this pass can not read.
+	// Which walk this call is, or null.
 	private driverOf(
 		node: common.typedSimple.ExpressionNode,
 	): common.typedSimple.InlineLoopDriver | null {
-		// A call that left an Argument out is left alone. This pass writes
-		// the CALLEE'S BODY out where the call stands, and the callee's own
-		// default parameters are what would have filled the Argument in — there
-		// is no binding here for them to fill, and the Argument list this pass
-		// reads is the one the call WROTE. None of the callees it inlines
-		// carries a default (`loop`'s entries and `reduce`'s are dispatched by
-		// their label sets, which is what an `overload` block is for), so this
-		// costs nothing; it is here so that a default written on one of them is
-		// a missed optimisation rather than a wrong Program.
+		// A call that left an Argument out stays, since the callee's defaults have no
+		// binding in the written-out body.
 		if (node.nodeType === "FunctionInvocation") {
 			return node.omitsArguments === true ? null : this.freeLoop(node)
 		}
@@ -205,19 +132,10 @@ class Inlining {
 			return null
 		}
 
-		// The mangled number is which ENTRY of the Overload was resolved,
-		// which is decided by the order they are written in `Loop.es` — so it is
-		// not on its own what says which walk this is. Each entry below also
-		// names the labels it expects, in the order the entry declares them, and
-		// a call whose labels do not match is left alone: a `Loop.es` written in
-		// a different order can not make one of these read as another, it can
-		// only stop them reading at all.
+		// The mangled number follows the order of `Loop.es`, so each entry also checks
+		// its labels, in order.
 		switch (node.name.name) {
-			// The `while` driver and its `until` sibling, which is the
-			// same call with the predicate read the other way round —
-			// `loop__overload$2` IS `loop__overload$1` with a negating closure
-			// around the condition, and inlining reads the answer the other way
-			// instead of building one.
+			// The `while` walk, and `until`, which reads the condition the other way.
 			case "loop__overload$1":
 				return this.conditionLoop(node, "while", false)
 			case "loop__overload$2":
@@ -226,10 +144,8 @@ class Inlining {
 				return this.countedLoop(node, "through", false)
 			case "loop__overload$4":
 				return this.generalLoop(node)
-			// The down-counting counted entry, whose body is positional
-			// like its up-counting neighbour's. The three counted entries whose
-			// body answers a `Step` are not here: each is written on the general
-			// loop, whose driver is inlined inside their prelude bodies.
+			// The down-counting entry. The `Step` counted entries are written on the
+			// general loop instead.
 			case "loop__overload$6":
 				return this.countedLoop(node, "downTo", true)
 			default:
@@ -277,10 +193,8 @@ class Inlining {
 
 		let [from, through, seed, advance] = args
 
-		// The bounds are Integers, always — the Overload takes no other
-		// Type — and the emission reads the bigint each of them holds. Asked
-		// anyway, because what an emission rests on is what the pass has to
-		// check.
+		// The emission reads the raw value each bound holds, so they are
+		// checked to be Integers.
 		if (from!.type.type !== "Integer" || through!.type.type !== "Integer") {
 			return null
 		}
@@ -327,26 +241,8 @@ class Inlining {
 			return null
 		}
 
-		// A refinement is erased at the head of the stage, before the
-		// first pass runs, so a List a Program has proven has something in it
-		// arrives here as the ordinary List it always was — the Type gate below
-		// asks that unchanged. What survives erasure is the Namespace the
-		// Simplifier NAMED, and `NonEmptyList` declares a `map` of its own so
-		// that it may promise the answer is not empty either. That promise is
-		// the whole of the difference: the runtime Method behind it is `List`'s
-		// own `map`, re-exported, so the walk written out here is the walk that
-		// would have run.
-		//
-		// Per Method rather than per Namespace, and `map` is the only one
-		// the two share. `everyItem` and both `reduce` entries are not declared
-		// on `NonEmptyList` at all — each can answer with fewer items than it
-		// was handed — so a proven receiver reaches `List`'s own entry by
-		// widening and is emitted under `List`'s own name, which is why they
-		// were never affected. Everything else that Namespace declares stays
-		// refused until somebody weighs it: `reverse`, `sort`, `pair`, `split`
-		// and `removeDuplicates` are re-exports this pass does not walk, and
-		// `prepend(contentsOf:)` and `replace` are not `List`'s Functions at
-		// all.
+		// `NonEmptyList` re-declares `map` as `List`'s own, so the same walk runs.
+		// No other walk is declared on both.
 		if (node.base.name === "NonEmptyList") {
 			return node.member.name === "map" ? this.mapWalk(node) : null
 		}
@@ -358,10 +254,8 @@ class Inlining {
 		switch (node.member.name) {
 			case "map":
 				return this.mapWalk(node)
-			// The filter is an Overload entry — `everyItem(alsoIn:)`
-			// stands beside it — so the name a call carries by this stage is
-			// the mangled one. The `alsoIn:` entry is a native over a Map and
-			// has no walk to write out.
+			// The filter is mangled, since `everyItem(alsoIn:)` stands beside it as a
+			// native with no walk to write out.
 			case "everyItem__overload$1":
 				return this.keepWalk(node)
 			case "reduce__overload$1":
@@ -435,12 +329,8 @@ class Inlining {
 	}
 }
 
-// The Arguments a call was given, in the order it evaluated them, and null
-// where the call is not the one this pass is looking for. The names are the
-// labels the entry declares and the ORDER is the one it declares them in:
-// Essence refuses a call that labels them any other way, so the order the
-// Arguments arrive in is the order they are evaluated in, and the emission
-// evaluates them in exactly that order.
+// The Arguments under the labels the entry declares, in that order, which is
+// the order they are evaluated in. Null for any other call.
 function argumentsNamed(
 	args: Array<common.typedSimple.ArgumentNode>,
 	names: Array<string | null>,
@@ -464,10 +354,8 @@ function argumentsNamed(
 	return values
 }
 
-// A Method's Arguments, which are the receiver and then the labelled ones.
-// The receiver has to BE a List: a Method Invocation carries the Namespace that
-// answers it, and a covering Namespace or a Type Parameter standing where a List
-// is expected is not the value these walks read `.value` off.
+// The receiver and the labelled Arguments. The receiver has to be exactly a
+// List, whose `.value` the walk reads.
 function listArguments(
 	node: common.typedSimple.MethodInvocationNode,
 	names: Array<string | null>,
@@ -481,12 +369,8 @@ function listArguments(
 	return args
 }
 
-// One callback, and null unless it is a Function LITERAL of exactly the
-// shape the driver calls it with. A name bound to a Function is a value this
-// pass can not read; a Parameter count that disagrees is a call shape it did not
-// expect; and two Parameters under one name — which the Enricher refuses, and
-// which is checked here because the emission binds each of them as a `const` —
-// would be a name declared twice.
+// A Function literal of the shape the driver calls, or null. Two Parameters
+// under one name would declare a `const` twice.
 function callbackOf(
 	value: common.typedSimple.ExpressionNode,
 	parameterCount: number,
@@ -495,22 +379,14 @@ function callbackOf(
 		return null
 	}
 
-	// A COMPLETING callback is left alone. This pass writes the callback's
-	// body out where the call stands, and a completing body is not emitted as
-	// its body at all — it is emitted as a Function that answers with a future,
-	// with everything written in it inside the async closure that future runs.
-	// Inlined, its `await`s would land in whatever Function the walk was written
-	// into, which is not one that can wait. The call stays a call, and the
-	// future it builds per turn is the price of a walk that suspends.
+	// A completing callback stays, since its `await`s would land in a Function
+	// that can not wait.
 	if (value.value.completing === true) {
 		return null
 	}
 
-	// A callback's Parameter can not carry a default — a Function literal
-	// is refused one at the Parser, since its arity is fixed by the Function
-	// Type it was written for — and this pass binds each Parameter as a `const`,
-	// which has nowhere to put one. Asked rather than assumed, because what
-	// makes it true is a rule somewhere else.
+	// The parser refuses a default on a Function literal's Parameter, and a
+	// `const` has nowhere to put one.
 	if (
 		value.value.parameters.some(
 			(parameter) => parameter.defaultValue !== null,
