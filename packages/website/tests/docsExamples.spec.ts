@@ -19,31 +19,20 @@ import { essenceSamples, type Sample } from "../src/lib/samples.ts"
 
 /*
  * Every Essence sample on the site, held to the toolchain the site documents.
+ * Each block is checked as `essence check` checks a file, tests included, and
+ * must be byte-identical to what `essence format` makes of it. A line printing
+ * with its output in a `§ …` comment is run and compared.
  *
- * A sample that does not compile teaches a reader that the page is wrong, and
- * from then on they trust the compiler over the page — so this is a completion
- * gate in the sense `diagnosticCodes.spec.ts` is one. Each block of every page
- * is checked the way `essence check` checks a file (the tests section
- * included), held byte-identical to what `essence format` makes of it, and,
- * where a line prints with its output written beside it in a `§ …` comment,
- * run and compared line by line with what it printed.
+ * Blocks are read through `src/lib/samples.ts`, as the site's Shiki
+ * transformer reads them. `§ fragment` is never compiled, and
+ * `§ file: Name.es` writes the block under that name for others to import.
  *
- * The blocks are read through `src/lib/samples.ts`, the module the site's own
- * Shiki transformer reads them through, so a marker the page hides is a marker
- * this honours: `§ fragment` is never compiled, and `§ file: Name.es` writes
- * the block under that name beside the page's other blocks, so a module the
- * next block imports is there to be imported.
- *
- * In process, through the command line's own compile — `compileFile` over
- * a `CompileSession` is what `essence check`, `build` and `run` hand a file to,
- * minus the report. Spawning `essence` per block is what the writers' checker
- * did; four hundred processes is minutes, and this has to sit in `bun test`.
+ * Compiles run in process through `compileFile` over a `CompileSession`, as
+ * the CLI's commands do, since a process per block would take minutes.
  */
 
-// A directory of this run's own for the bundle cache, set before the
-// first compile, because where the cache lives is read off the environment
-// every time it is asked for. A sample compiled here neither answers out of
-// the user's cache nor leaves a bundle in it.
+// A bundle cache of this run's own, set before the first compile, so samples
+// never touch the user's cache.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-docs-cache-"))
 
 process.env.ESSENCE_CLI_CACHE = bundleCache
@@ -57,10 +46,8 @@ afterAll(() => {
 	rmSync(bundleCache, { recursive: true, force: true })
 })
 
-// The globals `run` below hijacks to read what a Program wrote. A test
-// that times out mid-import leaves its `finally` unrun, and every later sample
-// would then print into a buffer nothing reads — so they are put back after
-// every test as well.
+// The globals `run` hijacks to read what a Program wrote. A test that times out
+// mid-import never reaches its `finally`, so `afterEach` restores them too.
 const originalLog = console.log
 const originalStandardOut = process.stdout.write
 const originalStandardError = process.stderr.write
@@ -87,9 +74,8 @@ function pagesUnder(directory: string): Array<string> {
 
 type WrittenSample = Sample & { fileName: string }
 
-// Every block of a page is written before any of them is compiled, into
-// one directory per page — a block that imports `./Money.es` finds the block
-// that is `Money.es` whichever of the two comes first on the page.
+// Every block of a page is written into one directory before any compiles. So
+// an import of `./Money.es` finds that block wherever it stands on the page.
 function writeSamples(
 	pageId: string,
 	samples: Array<Sample>,
@@ -110,11 +96,8 @@ function writeSamples(
 	})
 }
 
-// A directory of its own for every bundle, made just before the bundle is
-// written into it. Bun's resolver remembers what a directory held the first
-// time it resolved a module out of it, so a second bundle written beside one
-// already imported is "not found" for the rest of the process — every run
-// after a page's first would fail on a file that is plainly there.
+// A fresh directory for every bundle, as `stageBundle` gives test bundles, so
+// no import of an earlier bundle affects this one.
 function bundlePathFor(sample: WrittenSample): string {
 	let directory = mkdtempSync(path.join(scratch, "bundle-"))
 
@@ -137,12 +120,9 @@ function report(outcome: Awaited<ReturnType<typeof compileFile>>): string {
 		.join("\n")
 }
 
-// What a Program writes to standard output, the way `essence run` shows
-// it: `Terminal.print` and `Terminal.write` reach the stream, and
-// `Terminal.inspect` ends its line through `console.log`, which under Bun goes
-// to the file descriptor without passing `process.stdout.write`. Both are held.
-// Standard error is held too, and kept apart — the writers' checker read only
-// what came out between the run's banners, which is standard output alone.
+// What a Program writes to standard output, as `essence run` shows it.
+// `Terminal.inspect` writes through `console.log`, which under Bun bypasses
+// `process.stdout.write`, so both are held. Standard error is silenced.
 async function run(bundle: string): Promise<Array<string>> {
 	let written = ""
 
@@ -193,8 +173,8 @@ let pages = pagesUnder(DOCS_DIRECTORY)
 
 describe("the samples on the site", () => {
 	it("finds the site's samples", () => {
-		// A guard on the reading — a fence pattern that silently stopped
-		// matching would turn every test below into no test at all.
+		// A guard on the reading: a fence pattern that stopped matching would
+		// leave no tests at all.
 		expect(pages.length).toBeGreaterThan(30)
 		expect(pages.flatMap((page) => page.samples).length).toBeGreaterThan(
 			300,
@@ -205,11 +185,9 @@ describe("the samples on the site", () => {
 		describe(page.id, () => {
 			let samples = writeSamples(page.id, page.samples)
 
-			// One Session per page and per mode, which is how one
-			// `essence check` over a page's files would compile them: a module
-			// two blocks import is read and enriched once. A check links the
-			// tests section and a run does not, and a Session opened in one mode
-			// may not answer for the other.
+			// One Session per page and mode, as one `essence check` over the
+			// page's files would use. A check links the tests section and a run
+			// does not, and a Session serves only its own mode.
 			let checking = createCompileSession(
 				samples.map((sample) => sample.fileName),
 				{ tests: true },
