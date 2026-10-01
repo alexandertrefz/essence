@@ -249,7 +249,7 @@
 	"packages/language-server/src/tests/testsSection.spec.ts": {"sentence-length": 13, "em-dash": 15, "all-caps": 9, "history": 1},
 	"packages/language-server/src/tests/textEdits.ts": {"sentence-length": 1},
 	"packages/language-server/src/tests/workspace.spec.ts": {"sentence-length": 61, "em-dash": 48, "all-caps": 24, "history": 2, "position": 3, "block-length": 2},
-	"packages/runtime/src/Testing.ts": {"sentence-length": 91, "em-dash": 62, "all-caps": 56, "position": 2, "block-length": 14},
+	"packages/runtime/src/Testing.ts": {"sentence-length": 40, "em-dash": 26, "all-caps": 24, "position": 1, "block-length": 6},
 	"packages/runtime/src/tests/asciiFastPath.spec.ts": {"sentence-length": 29, "em-dash": 18, "all-caps": 30, "position": 4, "block-length": 3},
 	"packages/runtime/src/tests/asynchrony.spec.ts": {"sentence-length": 14, "em-dash": 9, "all-caps": 6, "position": 1, "block-length": 2},
 	"packages/runtime/src/tests/dictionaries.spec.ts": {"sentence-length": 85, "em-dash": 55, "all-caps": 64, "history": 2, "position": 5, "block-length": 6},

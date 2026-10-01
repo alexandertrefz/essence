@@ -1242,3 +1242,36 @@ recorded again rather than held to.
 A measurement within `REGRESSION_RATIO` and `IMPROVEMENT_RATIO` of its baseline matches. Past them it has regressed,
 which fails, or improved, which passes. An updating run writes either down instead. After the measurement the body
 runs once more, unguarded, and the report is built from that run.
+
+### The event stream
+
+A run reports as one stream of newline-delimited JSON, and every event carries `schema` and `kind`. A consumer
+ignores a kind it does not know, so adding a kind breaks no reader. `TestEvent` is the stream's schema, so it also
+lists the kinds only the command line writes. Those are `results-cached` for replayed results, and `mutant` and
+`mutation-end` for a mutation run.
+
+A `snapshot`, `property` or `benchmark` event is written whether its test held or not. A runner needs a new
+snapshot's text and span, and a new baseline's number, to write them down. A passing property's seed lets the run
+be repeated. These events carry `module` and `key` or `name`, which say which file's store an entry belongs to. The
+Compiler spells the key, so no consumer spells its escaping again. `coverage` and `test-coverage` events appear
+only where a run asked for them.
+
+A `mutant` event is one deliberate change to the code and what became of it. `killed` means a test failed, or the
+mutant would not load or threw, since a program that comes apart is noticed. `hung` is a run that never came back.
+`survived` is the finding, and `uncovered` is a site no test reaches. `invalid` means only that the mutant did not
+compile. `tests` counts the tests that reach the site, which tells a mutant no test covers from one many tests miss.
+`mutation-end` counts every site the walker found. Where `--mutation-limit` stopped the judging early, the statuses
+add up to less, and the rest is what the limit left unjudged.
+
+### Selecting tests
+
+`selectTests` decides what runs, what is skipped and what is deselected, once for every runner. A filter matches the
+suites and name joined by `/`, the name as written or as rendered, or the whole key. Rendering an interpolated name
+evaluates its Module's setup, which may have to wait, so selection is asynchronous. It renders only under a filter,
+and only once.
+
+Named ids select those tests alone. That is what an editor's "run this test" asks, and two tests may render one
+name. A benchmark is deselected as `bench` unless the run measures, and a measuring run still judges everything
+else. Focus is decided across the whole run, but a registry can not see the bundles beside it. So a runner tells
+each registry, with `focusedElsewhere`, when another holds a focused test, and the registry deselects its own tests
+as `not-focused`.

@@ -1061,11 +1061,7 @@ function median(values: Array<number>): number {
 	return sorted[(sorted.length - 1) >> 1] ?? 0
 }
 
-// THE trace mechanism — record a value at an instrumented point,
-// attributed to a source span, and answer with the very value so that wrapping
-// an Expression in one changes nothing about what it evaluates to. `expect` and
-// `require` are its first consumers; the `§?` value comment and coverage are
-// the next two, and they record at points of their own against the same table.
+// Records a value at an instrumented point and answers it unchanged.
 export function trace<Value extends AnyType>(
 	context: TestContext,
 	point: number,
@@ -1078,11 +1074,8 @@ export function trace<Value extends AnyType>(
 	return value
 }
 
-// The `§?` value comment — the same recording as a trace, into the buffer
-// no assertion drains, so what a line asked about survives to the end of the
-// test whatever was asserted after it. A line inside a loop records once per
-// turn and the last one is what is reported, for the same reason a traced
-// sub-expression is: what a reader is looking at is the turn they can see.
+// The `§?` value comment, recorded where no assertion takes it. In a loop the
+// last turn is reported.
 export function probe<Value extends AnyType>(
 	context: TestContext,
 	point: number,
@@ -1095,10 +1088,7 @@ export function probe<Value extends AnyType>(
 	return value
 }
 
-// `expect` — record and carry on, so one test can report several failures
-// at once. The traces the asserted Expression left are drained INTO the
-// expectation: they are what that assertion evaluated, and the next one starts
-// with an empty buffer.
+// `expect` records and carries on, taking the traces its Expression left.
 export function expected(
 	context: TestContext,
 	point: number,
@@ -1108,19 +1098,12 @@ export function expected(
 	record(context, "expect", point, passed, comparison)
 }
 
-// What a failed `require` unwinds with. It is thrown rather than
-// returned, because "ends the test" has to hold WHEREVER the assertion was
-// written: a `match` used as an Expression is emitted as a call to an arrow
-// Function, and an early `return` inside one of its Handlers would end that
-// arrow and leave the test running on with a value it never computed. A throw
-// leaves no shape of the lowering able to swallow it. It is a private object
-// rather than an Error so that `runOne` can tell "the test ended itself" from
-// "the test threw", and no stack is built for something nobody reads.
+// What a failed `require` throws. A `return` inside an emitted arrow Function
+// would not end the test. A private object, not an Error, so `runOne` can tell it
+// from a throw.
 const requirementFailed = { requirementFailed: true }
 
-// `require` — the same recording as an `expect`, and then a failure ends
-// the test where it stands. What ended it is already on the context, so the
-// unwinding carries nothing.
+// `require` records as `expect` does, and a failure ends the test.
 export function required(
 	context: TestContext,
 	point: number,
@@ -1134,16 +1117,9 @@ export function required(
 	}
 }
 
-// `matches snapshot`. What it is handed is the value already RENDERED —
-// `Printable::toString`, which the Compiler lowers as the interpolation an
-// author could have written — so the whole of the comparison here is two
-// strings, and a Type that says what it looks like is recorded in that form.
-//
-// A snapshot nothing has recorded PASSES and is written down: the first run of
-// a new snapshot is what records it, and a run that refused it would refuse
-// every new test. An updating run treats a difference the same way. Everything
-// recorded is handed back through the context, because writing a file is the
-// runner's business and not a bundle's.
+// `matches snapshot`, comparing the rendered text. A snapshot with nothing
+// recorded passes and is written down, and so is a difference in an updating
+// run.
 export function snapshotted(
 	context: TestContext,
 	point: number,
@@ -1186,10 +1162,7 @@ export function snapshotted(
 	}
 }
 
-// The entry a stored snapshot is kept under. A row of a table test gets
-// one per row, spelled with the row number, because the rows share a body and
-// would otherwise share the entry: the first run would store the last row's
-// value and every run after would report the others as differing, for ever.
+// A table test's row gets its own entry, since the rows share a body.
 function storedName(name: string | null, row: number | null): string | null {
 	if (name === null) {
 		return null
@@ -1230,9 +1203,7 @@ function record(
 	})
 }
 
-// The LAST value traced at a point, because a point inside a loop — which
-// a test body may hold — records once per turn, and what a failure is about is
-// the turn that failed.
+// The last value traced at a point, the turn a failure is about.
 function valueAt(traces: Array<Trace>, point: number): AnyType | undefined {
 	for (let index = traces.length - 1; index >= 0; index -= 1) {
 		if (traces[index]!.point === point) {
@@ -1247,17 +1218,12 @@ function valueAt(traces: Array<Trace>, point: number): AnyType | undefined {
 
 // #region The structural diff
 
-// One line of a rendered difference. `same` is context, `left` is what
-// the receiver held and `right` what it was compared against — the reporter
-// decides how to mark them, because a terminal, an editor hover and a JSON
-// consumer each want something different.
+// One line of a difference: `left` is the receiver's, `right` what it was
+// compared against. The reporter marks them.
 export type DiffLine = { kind: "same" | "left" | "right"; text: string }
 
-// What `Equatable::is` compared, written out as a difference rather than
-// as two dumps. A Record is walked member by member and a List index by index,
-// so what a reader sees is the ONE member that differs surrounded by the ones
-// that do not — which is the whole reason the lowering keeps both operands.
-// Anything else is answered as the pair it is.
+// What `Equatable::is` compared, as a difference. A Record is walked by member
+// and a List by index, so the member that differs stands among those that match.
 export function structuralDiff(
 	left: AnyType | undefined,
 	right: AnyType | undefined,
@@ -1274,10 +1240,8 @@ function diffValue(
 	right: AnyType,
 	indent: string,
 	label: string,
-	// What follows the value — the comma of the member it stands for, or
-	// nothing at the top. It is handed IN rather than appended afterwards
-	// because an unequal pair of values is TWO lines, both of which end a
-	// member, and appending to the last of them commas only one.
+	// The member's comma, handed in since an unequal pair is two lines that
+	// both need it.
 	suffix: string,
 ): Array<DiffLine> {
 	if (anyIs(left, right)) {
@@ -1307,13 +1271,8 @@ function diffValue(
 		)
 	}
 
-	// A kind neither arm above names may still have said how it is taken
-	// apart — the registry in `registry.ts` is where a container's own module
-	// leaves that, and probing it here rather than writing an arm is what keeps
-	// a container's difference in the container's module. A Dictionary is one
-	// such kind: it is walked BY ITS KEYS, which is what it is read by — so a
-	// difference shows the one entry that moved surrounded by the ones that did
-	// not, and an entry only one side holds arrives on a line of its own.
+	// A registered container says how it is taken apart, as a Dictionary does
+	// by its keys.
 	if (sameTag(left, right)) {
 		let kind = kindOf(String(left[typeKeySymbol]))
 
@@ -1329,11 +1288,8 @@ function diffValue(
 	}
 
 	if (isCase(left) && isCase(right) && sameTag(left, right)) {
-		// The rendered text rather than the tag — `Door#Open`, not the
-		// Module the tag also carries. A failure report is read by a person, and
-		// `caseText` in `registry.ts` says why a path is no part of what they
-		// need; the two sides are already known to carry the SAME tag here, so
-		// nothing is being told apart by what is cut off.
+		// The Case as a reader writes it, without the Module. Both sides carry
+		// one tag, so nothing is lost.
 		let tag = caseText(String(left[typeKeySymbol]))
 
 		return diffEntries(
@@ -1351,19 +1307,14 @@ function diffValue(
 	]
 }
 
-// Keys in the LEFT's order, then whatever only the right side has — so a
-// difference reads down the value the test computed, and a member that was
-// never there arrives at the end rather than in a place it never had.
+// Keys in the left side's order, then those only the right side has.
 function diffEntries(
 	left: Array<[string, AnyType]>,
 	right: Array<[string, AnyType]>,
 	indent: string,
 	open: string,
 	close: string,
-	// Whether an entry is written under its key. A Record's members are;
-	// a List's items are not — its keys are the indices this walk pairs the two
-	// sides up by, and printing them would show a List as something no source
-	// can write.
+	// A List's indices pair its items but are not printed.
 	keyed = true,
 ): Array<DiffLine> {
 	let inner = `${indent}    `
@@ -1411,12 +1362,8 @@ function diffEntries(
 	return lines
 }
 
-// What a snapshot's difference reads as: the lines the two texts share,
-// and the ones only one of them has. It is the plainest correct answer — a
-// common-prefix and common-suffix walk, with whatever is left in the middle
-// reported whole — because a snapshot is text a reader wrote or a Program
-// printed, and a minimal edit script over lines would only ever say the same
-// thing in a way that is harder to read.
+// A snapshot's difference: the common first and last lines, and the middle of
+// each side reported whole.
 export function lineDiff(left: string, right: string): Array<DiffLine> {
 	let leftLines = left.split("\n")
 	let rightLines = right.split("\n")
@@ -1487,9 +1434,7 @@ function recordEntries(value: AnyType): Array<[string, AnyType]> {
 	return Object.entries(value as object) as Array<[string, AnyType]>
 }
 
-// A List holds its items in two runs with a view into each, so what is
-// diffed is the LOGICAL items rather than whatever the backing Array holds —
-// the same reading `Terminal.inspect` does.
+// A List's logical items, as `Terminal.inspect` reads them.
 function listEntries(value: AnyType): Array<[string, AnyType]> {
 	return materialise(value as never).map(
 		(item, index) => [String(index), item] as [string, AnyType],
@@ -1500,9 +1445,8 @@ function listEntries(value: AnyType): Array<[string, AnyType]> {
 
 // #region Events
 
-// ONE stream, newline-delimited JSON, every event carrying `schema` and
-// `kind`. A consumer that meets a kind it does not know must ignore it, so that
-// a kind added to this list changes nothing that reads the stream.
+// One newline-delimited JSON stream. A consumer ignores a `kind` it does not
+// know, so a new kind breaks no reader.
 export type TestEvent =
 	| { schema: 1; kind: "run-start"; tests: number; focused: boolean }
 	| {
@@ -1512,10 +1456,8 @@ export type TestEvent =
 			name: string
 			suitePath: Array<string>
 			module: string | null
-			// Which row of a table test this is, counting from zero, and
-			// null for every test that is not one. The id ends in it already —
-			// this is the same fact where a reporter can read it without
-			// taking a name apart.
+			// The row of a table test from zero, so a reporter need not
+			// parse the id.
 			row: number | null
 	  }
 	| {
@@ -1534,9 +1476,8 @@ export type TestEvent =
 			duration: number
 			expectations: number
 			failures: Array<FailureEvent>
-			// A test body that threw, rendered. It is a Compiler or a
-			// runtime bug rather than a failed assertion, and it ends the test
-			// where it stands.
+			// A body that threw, which is a bug rather than a failed
+			// assertion.
 			error: string | null
 	  }
 	| {
@@ -1549,12 +1490,8 @@ export type TestEvent =
 			reason: string
 			row: number | null
 	  }
-	// `suitePath` and `module` on a test that never started, for the same
-	// reason `test-start` carries them: a report groups by where a test was
-	// written, and a skip is reported in its place in that tree rather than in a
-	// list of its own. Nothing can derive them from the id — the id escapes its
-	// steps, and a reader would be parsing an identity it is meant to treat as
-	// opaque.
+	// A test that never started still carries where it stands, since the id
+	// is opaque.
 	| {
 			schema: 1
 			kind: "test-deselected"
@@ -1575,15 +1512,10 @@ export type TestEvent =
 			values: Array<TracedValue>
 			comparison: ComparisonEvent | null
 	  }
-	// What a `§?` value comment recorded. It is not a failure and not an
-	// assertion — it is the answer to a question a reader wrote into the source,
-	// which an Editor draws beside the line and a `--json` consumer may ignore.
+	// What a `§?` value comment recorded, which is no assertion.
 	| ({ schema: 1; kind: "probe"; id: string } & ProbedValue)
-	// What one `matches snapshot` did. It is written whether the snapshot
-	// held or not, because a runner needs the text of a new one and the span to
-	// write it into as much as it needs to know a stored one still matches.
-	// `span` is where a recorded value stands or would stand, and `module` says
-	// which file's `__snapshots__` a named one belongs to.
+	// What one `matches snapshot` did, held or not. See "The event stream" in
+	// DEVELOPMENT.md.
 	| {
 			schema: 1
 			kind: "snapshot"
@@ -1595,15 +1527,7 @@ export type TestEvent =
 			text: string
 			recorded: string | null
 	  }
-	// What one property test's run of cases did. It is written whether the
-	// property held or not, because "a hundred cases held" is the answer a
-	// reader wants as much as the counterexample is — and the seed is on it
-	// either way, so a run that passed today can be run again tomorrow.
-	//
-	// `module` and `key` say where a counterexample belongs, exactly as a
-	// snapshot event's `module` and `name` do. The key is the test's identity
-	// without the Module step, worked out HERE so that no consumer has to spell
-	// the escaping a second time and risk spelling it differently.
+	// What one property test's cases did, held or not.
 	| {
 			schema: 1
 			kind: "property"
@@ -1621,10 +1545,7 @@ export type TestEvent =
 			fromCorpus: boolean
 			encoded: Array<StoredValue> | null
 	  }
-	// What one benchmark measured. It is written whether the measurement
-	// held to its baseline or not, because a runner needs the number of a new
-	// one to write down as much as it needs to know an old one still holds —
-	// and `module` says which file's `__benchmarks__` the entry belongs to.
+	// What one benchmark measured, held or not.
 	| {
 			schema: 1
 			kind: "benchmark"
@@ -1646,26 +1567,17 @@ export type TestEvent =
 			stream: OutputStream
 			text: string
 	  }
-	// What one Module's counters counted, written once per instrumented
-	// Module at the end of a run. Only a run that ASKED for coverage carries
-	// these; every other stream has none, which is what "a consumer ignores
-	// what it does not know" is for.
+	// One instrumented Module's counts, at the end of a run that asked.
 	| {
 			schema: 1
 			kind: "coverage"
 			module: string | null
 			points: Array<CoveredPoint>
 			choices: Array<CoverageChoice>
-			// The indices of points executed at LOAD, credited to no test
-			// — see `CoverageReport.loaded`. Optional so a stream written before
-			// it existed, or a report built by hand, still reads: absent means
-			// "not told", which a consumer treats as none.
+			// The points that ran at load. Absent reads as none.
 			loaded?: Array<number>
 	  }
-	// The points ONE test touched in one instrumented Module, by index
-	// into that Module's coverage table — written per test, and only where the
-	// run asked to attribute. The inverse of the affected-set map: a consumer
-	// folding these knows, for every point, which tests cover it.
+	// The points one test touched in one Module, where the run attributes.
 	| {
 			schema: 1
 			kind: "test-coverage"
@@ -1673,37 +1585,11 @@ export type TestEvent =
 			module: string | null
 			points: Array<number>
 	  }
-	// That the events which follow were REPLAYED rather than run — one
-	// compiled entry whose answer a runner already held, under a name that can
-	// only mean the code, the stores and the filters this run has. It carries the
-	// entry it stands for and how many tests that entry planned, so a reader is
-	// told what was skipped and a summary can count it.
-	//
-	// Written by the COMMAND LINE and never by the runtime. It lives in
-	// this union because this union IS the stream's schema, and a consumer that
-	// meets it has to read it the way it reads every other kind — which for this
-	// one, per the stream's own contract at the top of the union, is to ignore it.
+	// That the events which follow were replayed from a cached run. The
+	// command line writes it, never the runtime.
 	| { schema: 1; kind: "results-cached"; entry: string; tests: number }
-	// What ONE deliberate lie about the code did — the site it was told
-	// at, the sentence the Compiler's own walker spells for it, and whether any
-	// test noticed. `killedBy` is the id of the first test that failed, null for
-	// every other status; `tests` is how many tests reach the site at all, which
-	// is what makes a survivor readable: a mutant no test covers and a mutant
-	// twelve tests miss are different findings.
-	//
-	// The five statuses, and the line each of them draws. `killed` is a
-	// test that failed — and a mutant that CRASHED, whether it would not load or
-	// threw as it ran, because a program that comes apart is a program the world
-	// notices. `hung` is a mutant whose run never came back and was stopped,
-	// which is a failure a reader would see too. `survived` is the finding.
-	// `uncovered` is a site no test reaches. `invalid` means one thing only: the
-	// mutant DID NOT COMPILE, which is the walker's own shortfall rather than
-	// anything the tests did or did not do.
-	//
-	// Written by the COMMAND LINE and never by the runtime, exactly as
-	// `results-cached` is, and here for exactly the same reason — this union IS
-	// the stream's schema, and a consumer that meets one of these reads it the
-	// way it reads every other kind it does not know, which is to ignore it.
+	// One mutant and what became of it. The command line writes it. See "The
+	// event stream" in DEVELOPMENT.md.
 	| {
 			schema: 1
 			kind: "mutant"
@@ -1715,11 +1601,7 @@ export type TestEvent =
 			killedBy: string | null
 			tests: number
 	  }
-	// The tally of a mutation run, written once where a `run-end` would
-	// stand. `sites` counts every mutant the walker found, whatever became of
-	// it, so the five statuses below it add up to it — and where a
-	// `--mutation-limit` stopped the judging early, the remainder a consumer
-	// derives from them is what the limit left unjudged.
+	// A mutation run's tally, in place of `run-end`.
 	| {
 			schema: 1
 			kind: "mutation-end"
@@ -1741,23 +1623,17 @@ export type TestEvent =
 			focused: boolean
 	  }
 
-// `not-focused` and `tag` are the spec's two; `filter` is the third a
-// `--filter` needs, and `bench` the fourth — which together are why a consumer
-// is told to tolerate what it does not know rather than to switch exhaustively.
+// A consumer should tolerate a reason it does not know.
 export type DeselectionReason = "not-focused" | "tag" | "filter" | "bench"
 
 export type TracedValue = { point: number; span: Span | null; value: string }
 
-// What one `§?` line answered — the same three fields a traced value
-// carries, named apart because a consumer keeps them apart: a traced value
-// explains an assertion that failed, and a probed one answers a question that
-// was asked whether or not anything failed.
+// What one `§?` line answered. It has a traced value's fields, and a separate
+// name since a consumer keeps the two apart.
 export type ProbedValue = { point: number; span: Span | null; value: string }
 
 export type ComparisonEvent = {
-	// `snapshot` is the third: what an `is` compares are two values, and
-	// what a snapshot compares are two texts, which a reader wants shown as
-	// lines rather than as a structure.
+	// A snapshot compares two texts, shown as lines.
 	kind: "is" | "isNot" | "snapshot"
 	left: string | null
 	right: string | null
@@ -1778,30 +1654,17 @@ export type EventSink = (event: TestEvent) => void
 // #region Selection
 
 export type Filters = {
-	// A substring of the test's suites and name joined by `/`, the name as
-	// rendered and as written, or the whole `key` a stored baseline is headed
-	// with. Rendering an interpolated name evaluates its Module's setup, which
-	// `selectTests` does once, and only under a filter.
+	// Matched against the suites and name joined by `/`, the written or
+	// rendered name, or the whole key.
 	filter?: string | null
 	tags?: Array<string>
 	skipTags?: Array<string>
-	// Structural ids. Where any are named, ONLY those run — which is what
-	// an Editor's "run this test" asks for, and the one selection a name can not
-	// express: two tests may render the same name and never share an id.
+	// Where any ids are named, only those tests run.
 	ids?: Array<string>
-	// Whether the benchmarks of the run are to be MEASURED. Measuring a
-	// body takes hundreds of runs of it, which is not what somebody waiting on
-	// `essence test` asked for — so a benchmark is deselected as `bench` unless
-	// this says otherwise, and it ADDS to a run rather than replacing it: a run
-	// that measures still judges everything beside the measurements.
+	// Whether benchmarks run. It adds to a run rather than replacing it.
 	bench?: boolean
-	// Whether a registry BESIDE this one holds a focused test. Focus is
-	// decided across a whole run rather than per bundle — the design's
-	// "focusing one test in Standings.es also silences Season.tests.es" — and a
-	// registry can not see the bundles loaded next to it. Told so, one that
-	// holds no focused test of its own deselects everything as `not-focused`,
-	// through the same selection and the same rendered names as any other run,
-	// so a runner never has to write those events itself.
+	// Whether another registry of the run holds a focused test. See
+	// "Selecting tests" in DEVELOPMENT.md.
 	focusedElsewhere?: boolean
 }
 
@@ -1810,16 +1673,9 @@ export type Selection =
 	| { test: RegisteredTest; state: "skip"; reason: string }
 	| { test: RegisteredTest; state: "deselected"; reason: DeselectionReason }
 
-// What runs, what is reported skipped, and what was deselected and by
-// what — one answer, so that the command line, the Language Server's session
-// and any other runner all select the same way. `focused` says whether the
-// registry holds a focused test at all, which is what a plain run exits
-// non-zero about.
-// Asynchronous for one reason: a `--filter` matches what a READER sees,
-// which for an interpolated name means rendering it, which means evaluating the
-// Module's setup — and a setup that completes something can only be evaluated
-// by waiting for it. A caller that holds the rendered names already, or that
-// passes no filter, waits for nothing.
+// What runs, is skipped or is deselected, the same for every runner. `focused`
+// says whether the registry holds a focused test. Asynchronous, since rendering
+// a name for a filter may wait on a setup.
 export async function selectTests(
 	registry: Registry,
 	filters: Filters = {},
