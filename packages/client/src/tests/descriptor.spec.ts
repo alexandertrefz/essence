@@ -20,8 +20,7 @@ import {
 
 const FILES = path.join(import.meta.dirname, "files")
 
-// Every shape this package has a fixture for — the marshalling table, the
-// calls, the declarations, the names JavaScript can not spell and the refusals.
+// Every fixture of this package's shapes.
 const FIXTURES = [
 	"Marshal.es",
 	"Calls.es",
@@ -32,9 +31,7 @@ const FIXTURES = [
 	"Async.es",
 ]
 
-// Linked rather than compiled — describing reads an Export Surface, and
-// linking is where one comes from. Nothing here needs a bundle, which is the
-// point: the whole of what a Descriptor says is decided before a single byte is
+// Linked rather than compiled, since a Descriptor is decided before anything is
 // emitted.
 function moduleDescriptor(fileName: string): ModuleDescriptor {
 	let entry = canonicalPath(path.join(FILES, fileName))
@@ -42,19 +39,15 @@ function moduleDescriptor(fileName: string): ModuleDescriptor {
 	return describeModule(linkToMemory(entry).surface, entry)
 }
 
-// The Types the Module names beside the values it binds, which is the
-// other half of the boundary every door question is asked of.
+// The Types the Module names, which the door questions ask about too.
 function moduleTypes(fileName: string): Array<DeclaredType> {
 	let entry = canonicalPath(path.join(FILES, fileName))
 
 	return describeTypes(linkToMemory(entry).surface, entry)
 }
 
-// The fixtures, described. A snapshot is the right shape for this because
-// a Descriptor is what BOTH halves of the boundary agree on — a rule that
-// quietly stops baking a Case's tag, stops unwrapping an Alias or starts
-// spelling a refusal differently is a change to a contract, and a contract that
-// changes without anyone reading the diff is how the two halves come apart.
+// A Descriptor is the contract both halves of the boundary read, so a change
+// to one shows as a snapshot diff someone has to read.
 describe("A Module described", () => {
 	for (let fileName of FIXTURES) {
 		it(`describes ${fileName}`, () => {
@@ -71,9 +64,7 @@ describe("A Module described", () => {
 		expect(JSON.stringify(measure)).not.toContain(canonicalPath(FILES))
 	})
 
-	// A Case tag is entry-relative, and the Descriptor is where that
-	// spelling is decided once — every value the interpreter builds carries what
-	// is written here, so this is the one place the rule can be read.
+	// The Descriptor fixes the entry-relative tag every built value carries.
 	it("bakes a Case tag as the bundle spells it", () => {
 		expect(moduleDescriptor("Marshal.es").exports.circle).toMatchObject({
 			kind: "constant",
@@ -88,10 +79,8 @@ describe("A Module described", () => {
 		})
 	})
 
-	// One of `Optional`'s two Cases can reach a Surface WITHOUT the other
-	// — `constant thing = Optional<Integer>#Value(3)` is inferred as the Case
-	// alone — so the lone arm keeps a Case of its own, marked as the one Choice
-	// that is spelled by absence rather than by a `$case`.
+	// An unannotated `Optional<Integer>#Value(3)` infers the lone Case, which is
+	// marked as spelled by absence.
 	it("marks one of Optional's own Cases met without the other", () => {
 		expect(
 			describeType(
@@ -115,9 +104,8 @@ describe("A Module described", () => {
 		})
 	})
 
-	// And a Module's own `choice Optional` is a Choice like any other. The
-	// identity is compared whole rather than by the name it displays under,
-	// which is the only thing telling the two apart: both print `Optional`.
+	// A Module's own `choice Optional` is an ordinary Choice. The whole identity
+	// tells it apart, since both print `Optional`.
 	it("leaves a Module's own Choice of that name alone", () => {
 		expect(
 			describeType(
@@ -141,11 +129,8 @@ describe("A Module described", () => {
 		})
 	})
 
-	// The invariant the two halves of a payload default rest on: a Case
-	// payload member marked omittable carries the VALUE it is filled with, since
-	// nothing stands between a host's object and the Case for a callee to fill
-	// it in at. `optional` without a `fill` would be a declaration promising a
-	// call the marshaller then refuses.
+	// An omittable payload member carries its `fill`, since no callee fills it
+	// in. Without one the declaration would promise a call the marshaller refuses.
 	it("carries a fill beside every omittable payload member", () => {
 		let described = moduleDescriptor("Defaults.es")
 		let seen = 0
@@ -211,26 +196,17 @@ describe("A Module described", () => {
 			}
 		}
 
-		// Five members, at each of the three positions the Case is
-		// described from — the Choice's own entry, the Parameter that takes one
-		// and the return that hands one back. The mark is on the payload rather
-		// than on a direction; which direction prints a `?` is `dts.ts`'s.
-		//
-		// One of the five is filled from a Constant rather than from a written
-		// literal, and it carries a `fill` like any other: what the declaring
-		// Module baked into the Case Type is a value, so this side can not tell
-		// the two apart and has nothing to do differently.
+		// Five members at each of the Choice's entry, a Parameter and a return.
+		// One is filled from a Constant and carries a `fill` like the others.
 		expect(seen).toBe(15)
 	})
 
-	// `Optional<T>` is the one Union with a JavaScript spelling of its
-	// own, and the only one that collapses. A Union that merely CONTAINS an
-	// Optional still decides arm by arm.
+	// Only `Optional<T>` itself collapses. A Union containing one decides arm by
+	// arm.
 	it("collapses an Optional and leaves every other Union alone", () => {
 		let calls = moduleDescriptor("Calls.es")
 
-		// `measure(box: Optional<Box>)` and `boxed(box: Box | Integer)` —
-		// one Union that IS an Optional and one that is not.
+		// `measure(box: Optional<Box>)` and `boxed(box: Box | Integer)`.
 		expect(calls.exports.measure).toMatchObject({
 			of: { parameters: [{ of: { kind: "optional" } }] },
 		})
@@ -239,11 +215,8 @@ describe("A Module described", () => {
 		})
 	})
 
-	// Work is described WHEREVER it is met — a Type is described where it
-	// stands, and which positions may hold one is the marshaller's rule. So the
-	// Descriptor carries a `future` node at the answer that crosses and at the
-	// Record member that is refused alike, and the refusal is a sentence read
-	// off the shape rather than a node baked here.
+	// Work is described wherever it stands. Which positions may hold it is the
+	// marshaller's rule.
 	it("describes work as what it answers with, at every position", () => {
 		let described = moduleDescriptor("Async.es")
 
@@ -274,9 +247,7 @@ describe("A Module described", () => {
 		})
 	})
 
-	// The door question, which is what decides whether the bundle carries
-	// the three runtime Functions work crosses through. Asked of the whole
-	// boundary, so a Module that names no Future anywhere pays for none of it.
+	// Whether the bundle carries the Future door, asked of the whole boundary.
 	it("answers whether the boundary names work at all", () => {
 		expect(
 			carriesFuture(
@@ -292,10 +263,8 @@ describe("A Module described", () => {
 		).toBe(false)
 	})
 
-	// And the walk goes THROUGH work to what it answers with, which is a
-	// value that crosses like any other — a Module whose only Dictionary is the
-	// one a future answers with still needs the door a Dictionary crosses
-	// through. `counted` is that Module's whole reason for existing.
+	// The door question walks through work to what it answers, so `counted`
+	// still needs the Dictionary door.
 	it("finds a Dictionary a future answers with", () => {
 		expect(
 			carriesDictionary(
@@ -307,12 +276,8 @@ describe("A Module described", () => {
 })
 
 describe("A Descriptor", () => {
-	// The whole point of the split. A Descriptor is written on one machine
-	// and read on another — embedded in a generated Module, written beside a
-	// bundle, handed across a wire — so anything that does not survive
-	// `JSON.stringify` is not a Descriptor at all. A `Map`, a `Symbol`, a
-	// `bigint` or an `undefined` in one of these would pass every other test in
-	// this package and fail the day a plugin serves one.
+	// A Descriptor is written on one machine and read on another, so it must
+	// survive `JSON.stringify`.
 	for (let fileName of FIXTURES) {
 		it(`survives a round trip through JSON for ${fileName}`, () => {
 			let descriptor = moduleDescriptor(fileName)
@@ -324,12 +289,8 @@ describe("A Descriptor", () => {
 	}
 })
 
-// The rule the whole split exists for, checked as text because there is no
-// other way to check it: a `bun test` run has the Compiler on disk either way,
-// so an accidental import would work perfectly here and fail in the browser it
-// was split apart for. What is asserted is what a bundler would follow — a value
-// import — and every specifier is checked against the three that can not be
-// followed anywhere but a machine with a toolchain on it.
+// The interpreter must not reach a toolchain. A test run has the compiler on
+// disk, so this reads the imports as text, as a bundler would follow them.
 describe("The runtime half", () => {
 	const RUNTIME_SAFE = ["./bare-cases", "./errors", "./rational"]
 	const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
@@ -349,8 +310,8 @@ describe("The runtime half", () => {
 		)
 	}
 
-	// `[^"']*?` spans lines, which is what a formatted import list needs,
-	// and can not run past the specifier of the import it is reading.
+	// `[^"']*?` spans the lines of a formatted import list, and stops at its
+	// specifier.
 	function importsOf(
 		source: string,
 	): Array<{ specifier: string; typeOnly: boolean }> {
@@ -362,9 +323,8 @@ describe("The runtime half", () => {
 		}))
 	}
 
-	// Every file a bundler reaches from the marshaller, in this package or
-	// the runtime, found by following the imports Bun's transpiler keeps. It
-	// erases a type-only import, so that is not followed.
+	// Every file a bundler reaches from the interpreter, following the value
+	// imports Bun's transpiler keeps.
 	function bundledFrom(entry: string): Map<string, string> {
 		let transpiler = new Bun.Transpiler({ loader: "ts" })
 		let bundled = new Map<string, string>()
@@ -425,10 +385,8 @@ describe("The runtime half", () => {
 		expect(reached).toEqual([])
 	})
 
-	// A type import is erased before anything runs, so `./descriptor` and
-	// `./bridge` may be named — the Descriptor's own shape has to be spelled
-	// somewhere, and the file that describes is where it belongs. A VALUE import
-	// of either would pull the Compiler in behind it.
+	// `./descriptor` and `./bridge` may be imported for types, which are
+	// erased. A value import would pull the compiler in.
 	it("imports values from the runtime-safe files alone", () => {
 		expect(
 			importsOf(MARSHALLER)
@@ -438,17 +396,14 @@ describe("The runtime half", () => {
 		).toEqual(RUNTIME_SAFE)
 	})
 
-	// And the file it reaches for a rule in reaches for nothing at all —
-	// it names `./descriptor` to say what shape it reads and imports no value
-	// anywhere, which is what makes it safe to be imported for one.
+	// `bare-cases.ts` imports no value at all.
 	it("leaves the shared rule with no value imports of its own", () => {
 		expect(
 			importsOf(SHARED_RULE).filter((entry) => !entry.typeOnly),
 		).toEqual([])
 	})
 
-	// And nothing reaches around the import list. A dynamic import or a
-	// `require` may be handed a specifier no reader can follow.
+	// No dynamic import or `require` reaches around the import list.
 	it("reaches for nothing at run time either", () => {
 		for (let source of BUNDLED.values()) {
 			expect(source).not.toMatch(/\bimport\s*\(/)

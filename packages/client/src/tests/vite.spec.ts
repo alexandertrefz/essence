@@ -16,12 +16,8 @@ import { rawSpecifier } from "../plugin-core"
 import { essence } from "../vite-plugin"
 import { REPOSITORY } from "./typecheck"
 
-// The plugin under a REAL dev server, rather than its hooks called by
-// hand — `plugin.spec.ts` does the latter, and this file is the one place the
-// claims about hot reloading are checked against what Vite actually does with
-// them: which modules an edit invalidates, what is served again afterwards, and
-// what happens when the edit does not compile. No browser is attached; what a
-// browser would be sent is read off the module graph instead.
+// The plugin under a real dev server, checking hot reloading against what Vite
+// does. No browser is attached, so the module graph is read instead.
 
 const MATH_MODULE = (body: string) => `implementation {
 
@@ -62,10 +58,8 @@ afterAll(() => {
 	rmSync(workspace, { recursive: true, force: true })
 })
 
-// A project with this package installed in it — see `project` in
-// `plugin.spec.ts` for why: the wrapper imports the interpreter by name and the
-// served Modules import the runtime by name, and it is the host that resolves
-// both.
+// A project with this package installed, as `project` in `plugin.spec.ts`
+// makes one.
 function project(files: Record<string, string>): string {
 	let directory = realpathSync.native(
 		mkdtempSync(path.join(workspace, "project-")),
@@ -100,10 +94,8 @@ function squaringProject(extra: Record<string, string> = {}): string {
 	})
 }
 
-// In middleware mode with no watcher of its own — the tests say when a
-// file changed, so that nothing depends on the filesystem's timing — and no
-// client, since no browser is attached. Dependency optimisation is off: there
-// is nothing to pre-bundle, and the scan would go looking for an `index.html`.
+// Middleware mode with no watcher, since the tests report changes themselves,
+// and no client. Dependency optimisation would look for an `index.html`.
 async function serve(root: string): Promise<ViteDevServer> {
 	return await createServer({
 		root,
@@ -116,26 +108,11 @@ async function serve(root: string): Promise<ViteDevServer> {
 	})
 }
 
-// What Vite's own watcher does when a file changes, driven by hand: the
-// watcher is a no-op one under `watch: null`, but the handlers are attached to
-// it all the same, and emitting on it reaches them — `watchChange` for every
-// plugin, the module graph, and then the HMR propagation. The handler is fired
-// rather than awaited by the watcher, so what is waited for is the mark the
-// propagation leaves behind: it ends by invalidating every module the file
-// belongs to once more, as an HMR update, and that stamps each of them with
-// the update's own time. A stamp from after the emit is the whole chain done —
-// the plugin told, the graph invalidated, the update sent.
-//
-// Waited for rather than slept through. This used to be a sleep of a
-// hundred milliseconds, which was enough here and not on a loaded runner —
-// where a module still holding its old transform result was served as if
-// nothing had changed, and the test that expected the edit to break the build
-// found it still standing.
-//
-// The wait is over the modules the graph holds for the file BEFORE the
-// emit, which is what the propagation reaches — a file no served module was
-// compiled from is a change Vite has nothing to say about, and asking this to
-// wait for it would wait forever. That is refused rather than waited on.
+// Emits a change on Vite's no-op watcher, which runs `watchChange`, the graph
+// and the HMR propagation without awaiting them. The propagation ends by
+// stamping every module of the file with the update's time, so this waits for
+// stamps newer than the emit. A file no served module came from is never
+// stamped, so it is refused.
 async function changed(server: ViteDevServer, file: string): Promise<void> {
 	let modules = [
 		...(server.environments.client.moduleGraph.getModulesByFile(file) ??
@@ -146,20 +123,14 @@ async function changed(server: ViteDevServer, file: string): Promise<void> {
 		throw new Error(`No served module was compiled from ${file}.`)
 	}
 
-	// Newer than every stamp the modules already carry, and not merely
-	// the clock: Vite stamps from a monotonic clock that steps ahead of the
-	// wall clock whenever it is read twice in one millisecond, so the stamp of
-	// the change BEFORE this one can read as later than now — and a wait
-	// keyed on now alone would answer out of it. The new stamp is read after
-	// the emit, and the clock never hands out the same value twice.
+	// Newer than the stamps already there too, since Vite's monotonic clock can
+	// run ahead of `Date.now()`.
 	let before = Math.max(
 		Date.now(),
 		...modules.map((module) => module.lastHMRTimestamp + 1),
 	)
-	// Under the per-test budget `scripts/testBudget.ts` sets, for the
-	// reason `client.spec.ts` gives: a wait that gives up after the test already
-	// has throws where nobody is listening, and bun reports that as a second
-	// failure between tests, attributed to nothing.
+	// Inside the per-test budget `scripts/testBudget.ts` sets, so the wait never
+	// throws after its test has ended.
 	let deadline = Date.now() + 4_000
 	let stamped = () =>
 		modules.every((module) => module.lastHMRTimestamp >= before)
@@ -190,10 +161,8 @@ async function transformed(
 	return result!.code
 }
 
-// Vite stamps the import of a module it just updated with `&t=<now>`,
-// so that a browser fetches it afresh rather than out of its cache. That is
-// the one way the text of an unchanged importer moves, and it is not a change
-// to it.
+// Vite stamps the import of an updated module with `&t=<now>`, the one way an
+// unchanged importer's text moves.
 function withoutTimestamps(code: string): string {
 	return code.replace(/&t=\d+/g, "")
 }
@@ -206,9 +175,8 @@ function transformResult(server: ViteDevServer, id: string): unknown {
 	return node!.transformResult
 }
 
-// What `transformRequest` is handed for a module no filesystem holds. A
-// browser asks for `/@id/__x00__essence-raw:…`, and Vite's transform middleware
-// unwraps that to the id itself before it transforms — this is that id.
+// The id `transformRequest` gets for a module no filesystem holds, which Vite
+// unwraps from a browser's `/@id/__x00__essence-raw:…`.
 function rawUrl(file: string): string {
 	return `\0${rawSpecifier(file)}`
 }
@@ -230,9 +198,8 @@ describe("Under a Vite dev server", () => {
 				...graph.getModuleById(main)!.importedModules,
 			].map((node) => node.id)
 
-			// What the wrapper really imports — its Module behind the
-			// raw door, and the interpreter, resolved by the host out of
-			// `node_modules`.
+			// The wrapper imports its Module and the interpreter, which the
+			// host resolves from `node_modules`.
 			expect(importedIds).toContain(`\0${rawSpecifier(main)}`)
 			expect(
 				importedIds.some((id) => id?.endsWith("/marshal-runtime.ts")),
@@ -240,9 +207,7 @@ describe("Under a Vite dev server", () => {
 
 			let rawMain = await transformed(server, rawUrl(main))
 
-			// The runtime, resolved by the host: what the Rewriter wrote
-			// as `@essence-lang/runtime/Integer` is served as the file the
-			// project's `node_modules` resolves it to.
+			// The host resolves `@essence-lang/runtime/Integer` to a file.
 			expect(rawMain).toContain("/@fs/")
 			expect(rawMain).toContain("/runtime/src/Integer.ts")
 
@@ -251,13 +216,9 @@ describe("Under a Vite dev server", () => {
 					.importedModules,
 			].map((node) => node.id)
 
-			// One served Module imports another by the id the plugin
-			// resolves the Rewriter's specifier to — the same id `?raw` on
-			// the sibling would reach.
+			// A served Module imports another by the id `?raw` would reach.
 			expect(rawImports).toContain(`\0${rawSpecifier(math)}`)
-			// And every source it was compiled from is an edge of the
-			// graph as well — that is what Vite makes of a watch file — which
-			// is what carries an edit to a sibling up to the entry.
+			// Every source is an edge of the graph, which carries an edit up.
 			expect(rawImports).toContain(math)
 			expect(rawImports).toContain(main)
 		} finally {
@@ -265,12 +226,8 @@ describe("Under a Vite dev server", () => {
 		}
 	})
 
-	// THE hot-reload claim. An edit to a file the entry imports
-	// invalidates the served Module of that file and everything that imports
-	// it — the entry's Module, the wrapper — and what is served again holds
-	// the edit. The wrapper's own text is what it was: the boundary did not
-	// change, so what a browser re-evaluates is a wrapper reading new Functions
-	// through the same Descriptor.
+	// An edit invalidates the edited Module and everything importing it, and
+	// the edit is served. The wrapper's text is unchanged, since its boundary is.
 	it("invalidates along the import graph, and serves the edit", async () => {
 		let root = squaringProject()
 		let server = await serve(root)
@@ -291,9 +248,7 @@ describe("Under a Vite dev server", () => {
 			)
 			await changed(server, math)
 
-			// Invalidated — the transform result is gone from every node
-			// on the path from the edited file to the entry, and NOT from the
-			// prelude, which no edit to a source can change.
+			// Invalidated along the path to the entry, but not the prelude.
 			expect(transformResult(server, `\0${rawSpecifier(math)}`)).toBe(
 				null,
 			)
@@ -308,10 +263,7 @@ describe("Under a Vite dev server", () => {
 			let wrapperAfter = await transformed(server, "/src/Main.es")
 
 			expect(rawMathAfter).toContain("Integer.sum")
-			// The entry's own Module did not change — it imports
-			// `square` and calls it, and both are what they were. Served again
-			// because it has to be re-evaluated against the new sibling,
-			// byte-identical because nothing in it moved.
+			// The entry's Module is served again, byte for byte the same.
 			expect(withoutTimestamps(rawMainAfter)).toBe(rawMainBefore)
 			expect(withoutTimestamps(wrapperAfter)).toBe(wrapperBefore)
 			expect(await transformed(server, PRELUDE_URL)).toBe(preludeBefore)
@@ -320,11 +272,8 @@ describe("Under a Vite dev server", () => {
 		}
 	})
 
-	// An edit that does not compile. The next request for anything the
-	// edit reaches fails with the Compiler's own report — which Vite hands to
-	// the browser as an error overlay, leaving the modules it already
-	// evaluated running — and the edit that fixes it serves again as if
-	// nothing had happened.
+	// A request the broken edit reaches fails with the compiler's report, and
+	// the fix serves again.
 	it("fails the request an edit broke, and recovers with the fix", async () => {
 		let root = squaringProject()
 		let server = await serve(root)
@@ -361,17 +310,9 @@ describe("Under a Vite dev server", () => {
 		}
 	})
 
-	// The raw door asked for FIRST, before anything that imports the
-	// Module has been analysed — which is when the node the served Module
-	// hangs off does not exist until its load has returned, and the files the
-	// load named would be dropped with it (see `served` in the plugin). An
-	// edit has to reach a Module however it was first reached; the order the
-	// requests arrive in is a fact about the browser, or the machine.
-	//
-	// This is the one the runner found. The wrapper's analysis warms
-	// the raw Module up in the background, and on a machine fast enough that
-	// warmup creates the node before a test asks for the Module — so the edge
-	// was there by luck, and a loaded runner is where the luck ran out.
+	// The raw door asked for before any importer is analysed, when the
+	// Module's node does not exist yet. See "Watch files under Vite" in
+	// DEVELOPMENT.md.
 	it("reaches a Module served before its importer was analysed", async () => {
 		let root = squaringProject()
 		let server = await serve(root)
@@ -398,9 +339,7 @@ describe("Under a Vite dev server", () => {
 		}
 	})
 
-	// Two entries, one edit. Only the entry whose graph reaches the
-	// edited file is invalidated; the other keeps its transform result and is
-	// not compiled again.
+	// Only the entry whose graph reaches the edit is compiled again.
 	it("leaves an entry the edit does not reach alone", async () => {
 		let root = squaringProject({
 			"src/Other.es": `implementation {
