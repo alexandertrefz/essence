@@ -6,46 +6,21 @@ import { overloadIndexOf, resolveOverloadedMethodName } from "../helpers/types"
 import { withoutOverloadSuffix } from "../optimiser/purity"
 import { rewriteNodes } from "../optimiser/walk"
 
-// Coverage says a line RAN; mutation says a bug there would be CAUGHT. A
-// mutant is this Module's one deliberate lie about a Program — a comparison
-// rotated a step, a Case swapped for its sibling, a branch turned inside out —
-// and the question a run asks of it is whether any test notices.
-//
-// It works on a SIMPLIFIED Program, and on the implementation alone. The
-// tests section is not mutated, for the reason the coverage pass does not count
-// it: what is under test is the code, and a lie told inside a test is a lie
-// about the question rather than about the answer. Enumeration happens
-// post-simplify and PRE-optimise, so a site stands where the author wrote it
-// and no instrumentation the Optimiser added is ever mistaken for one.
-//
-// Every mutant this Module produces is TYPE-SHAPED by construction, and
-// that is the whole discipline: a mutated Program is never enriched again, so
-// nothing downstream would catch a lie that does not typecheck. A Case swap
-// demands the identical member-name shape, a literal nudge answers the same
-// Type, a branch swap moves Statements that were already there, a `define` arm
-// swap permutes the very values whose Union is the answer Type, and a member
-// swap is refused outright unless the Namespace it is aimed at declares the
-// name AT THE SAME ARITY, or the Protocol that answered the call wrote a body
-// for it — see `swappableMember`. Where a site can not be shown to be sound it
-// is silently not a site; the walker's reach improves later, and a mutant
-// nobody can trust is worse than a mutant nobody made.
+// A mutant is one deliberate lie about a simplified Program, and a run asks
+// whether any test notices it. Every mutant type-checks by construction, since
+// nothing enriches it again. See "Type-shaped mutants" in DEVELOPMENT.md.
 
 export type MutationSite = {
-	// The site's position in the walk, which is its NAME: `applyMutation`
-	// walks the same Program the same way and applies the rewrite the id lands
-	// on. Ids are assigned before the per-line cap below drops anything, so
-	// what a cap leaves out does not renumber what it keeps.
+	// The site's place in the walk, which names it. See "Sites" in
+	// DEVELOPMENT.md.
 	id: number
-	// Which file the site is in. A simplified Program does not know its
-	// own path — one Program is one Module's, and the caller is what pairs the
-	// two — so it is stamped here by whoever enumerates.
+	// The site's file, which the enumerating caller stamps, since a simplified
+	// Program does not know its path.
 	module: string | null
 	position: common.Position
 	operator: MutationOperator
-	// The finished sentence fragment a report reads out — "swap
-	// ::isGreaterThan for ::isGreaterThanOrEqualTo". It is spelled HERE, once,
-	// so the human report and the event stream can never disagree about what a
-	// mutant did.
+	// What a report reads out, such as "swap ::isGreaterThan for
+	// ::isGreaterThanOrEqualTo". Spelled once, so every report agrees.
 	description: string
 }
 
@@ -58,30 +33,13 @@ export type MutationOperator =
 	| "integer"
 	| "case"
 
-// At most this many sites on one line of source. A line dense enough to
-// carry more is a line where the fifth mutant tells a reader nothing the first
-// four did not, and the cost of a mutant is a whole compile and a run of every
-// test that reaches it. Dropped from the END of the line's own sites, which is
-// the walk's order, so the answer is the same every time it is asked.
+// At most this many sites on one line, since each mutant costs a compile and
+// a test run. The last in walk order are dropped.
 const SITES_PER_LINE = 4
 
-// The comparison rotations, each a SINGLE step: a bound moved by one, or
-// an order reversed. `isLessThan` against `isGreaterThanOrEqualTo` is two steps
-// and is left out — it is the negation, which a test that checks anything at
-// all already fails, so the mutant would be killed by everything and would
-// distinguish no suite from another.
-//
-// Both steps for EVERY member, which is the rule stated above and not a
-// rule with two members exempt from it. `isLessThanOrEqualTo` reversed is
-// `isGreaterThanOrEqualTo` — a bound written the wrong way round, which is the
-// commonest comparison bug there is — and leaving the two `…OrEqualTo` names
-// with only their bound-moving step made them the two names a suite could get
-// backwards without the score moving.
-//
-// Maps rather than object literals, all three of them, and that is not a
-// preference. A Method's name is user text — `toString`, `valueOf`,
-// `constructor` are all perfectly good members — and an object literal answers
-// every one of those out of `Object.prototype` rather than saying it has none.
+// Single steps only, a bound moved or an order reversed, for every member.
+// Maps, since an object would answer `toString` out of `Object.prototype`. See
+// "Operators" in DEVELOPMENT.md.
 const COMPARISON_SWAPS = new Map<string, Array<string>>([
 	["isLessThan", ["isLessThanOrEqualTo", "isGreaterThan"]],
 	["isLessThanOrEqualTo", ["isLessThan", "isGreaterThanOrEqualTo"]],
@@ -89,18 +47,14 @@ const COMPARISON_SWAPS = new Map<string, Array<string>>([
 	["isGreaterThanOrEqualTo", ["isGreaterThan", "isLessThanOrEqualTo"]],
 ])
 
-// `is` against `isNot` is the one equality rotation there is, and it is
-// the sharpest mutant in the set: a test that asserts a value rather than
-// merely exercising it kills it, and one that does not, does not.
+// A test that asserts a value, rather than only reaching it, kills this one.
 const EQUALITY_SWAPS = new Map<string, Array<string>>([
 	["is", ["isNot"]],
 	["isNot", ["is"]],
 ])
 
-// Addition against subtraction both ways, and multiplication toward
-// addition one way. The reverse — `add` toward `multiply` — is left out
-// because it agrees with the original wherever the operands are 2 and 2, and a
-// mutant that is sometimes not one is a mutant whose survival says nothing.
+// No `add` becomes `multiply`, which agrees with the original wherever both
+// operands are 2.
 const ARITHMETIC_SWAPS = new Map<string, Array<string>>([
 	["add", ["subtract"]],
 	["subtract", ["add"]],
@@ -109,9 +63,7 @@ const ARITHMETIC_SWAPS = new Map<string, Array<string>>([
 
 // #region Enumerating and applying
 
-// Every mutation this Program admits, in walk order. Deterministic
-// throughout: the walk is the Optimiser's own, which is a fixed reading of the
-// tree, and every table above is read in the order it was written.
+// Every mutation this Program admits, in walk order, the same on every call.
 export function enumerateMutations(
 	program: common.typedSimple.Program,
 	module: string | null = null,
@@ -127,15 +79,9 @@ export function enumerateMutations(
 	return withinLineCap(found)
 }
 
-// A fresh Program with exactly one site rewritten. The Program handed in
-// is untouched — the walk rebuilds only the spine above the Node it replaced,
-// exactly as an Optimiser pass does — so the Session's simplified Program stays
-// the unmutated one every other entry of the run is compiled from.
-//
-// It THROWS on an id it can not find. A stale site is a bug in whoever
-// held it — a walker that changed under a saved list, an id from another
-// Module — and compiling the unmutated Program instead would report every test
-// as failing to kill a mutant that was never there.
+// A fresh Program with one site rewritten, leaving the one handed in alone.
+// Throws on an unknown id, which would otherwise report a mutant that was never
+// there.
 export function applyMutation(
 	program: common.typedSimple.Program,
 	site: number,
@@ -158,9 +104,7 @@ export function applyMutation(
 	return mutated
 }
 
-// The cap, applied to the enumerated list rather than to the walk, which
-// is what keeps an id meaning the same site whether or not the line it is on
-// was crowded.
+// Applied after the walk, so the cap never renumbers a site.
 function withinLineCap(sites: Array<MutationSite>): Array<MutationSite> {
 	let perLine = new Map<number, number>()
 
@@ -178,9 +122,7 @@ function withinLineCap(sites: Array<MutationSite>): Array<MutationSite> {
 
 // #region The walk
 
-// What the walk offers, before it is known whether anybody wants it. The
-// id is the running count over the whole walk, so it is fixed by the shape of
-// the Program and by nothing else.
+// What the walk offers. The id is a running count over the whole walk.
 type Candidate = {
 	id: number
 	position: common.Position
@@ -188,31 +130,23 @@ type Candidate = {
 	description: string
 }
 
-// One lie about one Node, ready to be told: what family it belongs to,
-// the sentence a report reads out, and the replacement itself, built only if
-// anybody asks. Every producer below answers with these and `offer` consumes
-// them, so what a candidate IS is spelled once rather than restated at each end
-// of every hand-off.
+// One lie about one Node, whose replacement is built only when taken.
 export type MutationCandidate<Node> = {
 	operator: MutationOperator
 	description: string
 	rewrite: () => Node
 }
 
-// One walk, shared by enumeration and application, because two walks
-// would be two chances to disagree about which site an id names. `take`
-// answers whether THIS candidate is the one to apply; enumeration records and
-// always declines, application accepts exactly once.
+// The one walk enumeration and application share. `take` answers whether to
+// apply a candidate: enumeration always declines, application accepts once.
 function walkMutations(
 	program: common.typedSimple.Program,
 	take: (candidate: Candidate) => boolean,
 ): common.typedSimple.Program {
 	let context = contextOf(program)
 	let next = 0
-	// A Node's candidates are offered in order and at most one of them is
-	// taken, which is what makes three nudges of one literal three sites rather
-	// than one. The Node handed back is the last replacement anybody asked for,
-	// or the Node itself.
+	// Each candidate of a Node gets its own id, so three nudges of one literal
+	// are three sites.
 	let offer = <Node>(
 		node: Node,
 		position: common.Position,
@@ -240,8 +174,7 @@ function walkMutations(
 		return result
 	}
 
-	// The implementation ALONE — the tests section is walked past, so no
-	// id is ever spent on a Node inside it and nothing there can be mutated.
+	// The tests section is skipped, so no id is spent inside it.
 	let mutated = rewriteNodes(
 		{ ...program, tests: null },
 		{
@@ -261,8 +194,6 @@ type Offer = <Node>(
 	candidates: Array<MutationCandidate<Node>>,
 ) => Node
 
-// What every producer below answers with — a lie about one Expression,
-// which is every position this walker tells one in.
 type ExpressionCandidate = MutationCandidate<common.typedSimple.ExpressionNode>
 
 function mutateStatement(
@@ -276,26 +207,14 @@ function mutateStatement(
 
 	let position = node.position
 
-	// A Conditional the Compiler synthesized has no Position and is not a
-	// site — the same line `instrument-coverage` draws, and for the same
-	// reason: a report can not point at one.
+	// A synthesized Conditional has no Position, and a report could not point
+	// at it.
 	if (position === undefined) {
 		return node
 	}
 
-	// A NARROWING doorway is left alone. Swapping the bodies of `if
-	// value::is(#Value(x))` would run the body that was type-checked against
-	// the refinement in the branch where the refinement does not hold — the
-	// mutant is not type-shaped, it fails everything it touches, and a mutant
-	// killed by every test distinguishes no suite from another.
-	//
-	// Asked of the CONDITION rather than of `node.narrows`, because the
-	// same refusal has to reach the member swaps inside that condition and a
-	// swap is offered at a Node the walk has already passed by the time this
-	// runs. One set answers both — see `readContext`, which is also where the
-	// SECOND claim is asked: a condition narrows the branch it opens, the
-	// branch it declines, or both, and a body may be moved only where it
-	// narrows neither.
+	// A narrowing condition keeps its bodies, which were typed against what it
+	// proves. See "Type-shaped mutants" in DEVELOPMENT.md.
 	if (context.narrowed.has(node.condition)) {
 		return node
 	}
@@ -308,10 +227,8 @@ function mutateStatement(
 	return offer(node, position, [
 		{
 			operator: "branch",
-			// The condition is INVERTED by swapping the two bodies rather
-			// than by wrapping it in a negation. No Node is invented, nothing
-			// has to be proven about the Type of a synthesized call, and what a
-			// reader is told is what actually happened.
+			// Swapping the bodies inverts the condition without inventing a
+			// Node.
 			description: "swap the branches of this if",
 			rewrite: () => ({
 				...node,
@@ -329,10 +246,7 @@ function mutateExpression(
 ): common.typedSimple.ExpressionNode {
 	let position = node.position
 
-	// Only what the SOURCE wrote. The Simplifier builds literals,
-	// Optionals and witnesses nobody asked for, and those carry no Position —
-	// which is exactly the line between a mutant a reader can be shown and one
-	// they can not.
+	// Only what the source wrote. What the simplifier builds has no Position.
 	if (position === undefined) {
 		return node
 	}
@@ -359,52 +273,16 @@ function mutateExpression(
 	}
 }
 
-// A ladder's own lie: one arm answers where nothing matched, and the
-// fallback answers where that arm held. It is the `define` reading of
-// `mutateStatement`'s branch swap — an arm and the `otherwise` below it ARE an
-// `if` and its `else` — and it is the mutant a ladder needs, because the
-// question a ladder gets wrong is which arm answers rather than what any one of
-// them says.
-//
-// TYPE-SHAPED by construction, and it is worth writing down why, because
-// the arms of a `define` need not share a Type. Where an arrow or the position
-// around the `define` decided the answer Type, every arm was read against it and
-// any two of them may trade places. Where the ARMS decided it, the Type is the
-// Union of exactly these values — and a swap PERMUTES that list rather than
-// changing it, so the Union is the same Union and each value carries its own
-// Type along with it. Neither reading can be broken by moving an answer.
-//
-// What CAN break it is evidence. Every arm below the first is read in a
-// Scope holding the complements of the Conditions above it, and every arm's own
-// value is read behind whatever its Condition established — so an answer moved
-// out from under the Condition that typed it would run against a refinement
-// nobody proved. That is the same refusal `mutateStatement` makes of a narrowing
-// `if`, and it is made of BOTH claims here: an arm that narrows nothing itself
-// may still be the one whose complement the `otherwise` value was written
-// against.
-//
-// One candidate per ARM, so a ladder of four is four lies a reader can
-// tell apart rather than one — but all of them at the `define`'s OWN Position
-// rather than at the answer that moves, which is a decision about the per-line
-// cap. An arm's line carries its Condition too: `as "A" if score::isGreater\
-// ThanOrEqualTo(90)` already offers three literal nudges and two rotations
-// there, more than `SITES_PER_LINE` keeps, so an arm swap on that line would be
-// dropped. That is the cap working as written, and it would have meant this
-// operator never appearing on the commonest ladder there is. The line a
-// `define` opens with holds nothing else.
-//
-// Which arm moved is then the DESCRIPTION's to say, counted from one as a
-// reader counts them. The Position is the `define`, so a report points at the
-// ladder and the sentence points into it.
+// Swaps one arm's answer with the `otherwise` answer, which is the `define`
+// form of the branch swap. Each candidate stands at the `define`'s Position.
+// See "Operators" in DEVELOPMENT.md.
 function mutateDefine(
 	node: common.typedSimple.DefineNode,
 	offer: Offer,
 ): common.typedSimple.ExpressionNode {
 	let position = node.position
 
-	// A `define` the Simplifier built rather than one the source wrote —
-	// the same line every other site here draws, and a report can not point at
-	// one.
+	// A `define` the simplifier built has no Position.
 	if (position === undefined) {
 		return node
 	}
@@ -425,9 +303,7 @@ function mutateDefine(
 	)
 }
 
-// Built from the Node this walk was HANDED rather than from whatever the
-// loop above is holding, which is right because at most one candidate of the
-// whole walk is ever taken: a mutant is one lie about one Program.
+// Built from the Node as handed in, since a walk takes at most one candidate.
 function swappedAnswer(
 	node: common.typedSimple.DefineNode,
 	index: number,
@@ -441,11 +317,8 @@ function swappedAnswer(
 	}
 }
 
-// `+1`, `−1` and `→0`, in that order — the off-by-one either way and the
-// boundary. Repeats are dropped rather than counted: a literal `1` nudged down
-// and a literal `1` taken to zero are the SAME mutant, and a literal `0` taken
-// to zero is the Program itself, which nothing can kill and which would be
-// reported as a survivor for ever.
+// One up, one down, and zero, without repeats or the literal itself, which no
+// test could kill.
 function integerNudges(
 	node: common.typedSimple.IntegerValueNode,
 ): Array<ExpressionCandidate> {
@@ -454,9 +327,8 @@ function integerNudges(
 	try {
 		value = BigInt(node.value)
 	} catch {
-		// A literal the Lexer accepted is a literal `BigInt` reads, so
-		// this is unreachable — and it is here because the field is a String
-		// and a throw out of a walk would take a whole compile with it.
+		// Unreachable for a literal the lexer accepted, but a throw here would
+		// end the compile.
 		return []
 	}
 
@@ -474,10 +346,7 @@ function integerNudges(
 	}))
 }
 
-// A construction swapped for a SIBLING Case of the same Choice. It is the
-// operator an exhaustive language makes possible and a line-counting one can
-// not: the Cases are a closed set, so "no test notices this being a #Draw" is a
-// complete statement rather than a guess.
+// A construction swapped for a sibling Case of the same Choice.
 function caseSwaps(
 	node: common.typedSimple.CaseValueNode,
 	context: MutationContext,
@@ -505,15 +374,8 @@ function caseSwaps(
 	]
 }
 
-// The next Case of the Choice in DECLARATION order, wrapping around, with
-// the same member names. Payload-free swaps freely with payload-free; anything
-// else has to carry the very members the construction already built, because
-// the payload Expression is kept as it stands and a Case that wanted other
-// names would be handed a Record that has none of them.
-//
-// One sibling rather than all of them. A Choice of six Cases would
-// otherwise put five mutants on one construction, each of them a compile and a
-// run, to answer a question the first one answers.
+// The next Case in the context's order, wrapping around, with the same member
+// names, since the payload is kept. One sibling, not all of them.
 function nextSibling(
 	type: common.CaseType,
 	context: MutationContext,
@@ -543,8 +405,7 @@ function nextSibling(
 	return null
 }
 
-// The three families of Method-name swap, offered in one order so that a
-// call site's sites are the same sites every time they are counted.
+// The Method-name swaps, always in the same order.
 function memberSwaps(
 	node: common.typedSimple.MethodInvocationNode,
 	context: MutationContext,
@@ -557,14 +418,7 @@ function memberSwaps(
 	]
 	let swaps: Array<ExpressionCandidate> = []
 
-	// Nothing inside the condition of a NARROWING `if`, for the reason
-	// that already leaves the doorway itself alone: `if n::isNot(0)` is what
-	// typed the body it opens, and a mutant that asks a different question
-	// there runs a body against a refinement nobody proved — which fails
-	// everything it touches and distinguishes no suite from another. It is the
-	// same set the branch swap consults, asked of the condition and of every
-	// Node the condition is written out of, because a condition is read as a
-	// conjunction and the narrowing leaves of one are nested inside it.
+	// Nothing inside a narrowing condition, which typed the body it opens.
 	if (context.narrowed.has(node)) {
 		return []
 	}
@@ -591,27 +445,9 @@ function memberSwaps(
 	return swaps
 }
 
-// The mangled name to call INSTEAD, or null where this swap can not be
-// shown to be sound. It is the whole of what keeps a mutant honest: a mutated
-// Program is never enriched again, so a swap onto a member the Namespace does
-// not declare would emit a call to `undefined` and be counted as killed by
-// whichever test happened to reach it — a false kill, which is the one answer a
-// mutation score must never give.
-//
-// A Method a PROTOCOL provided is answered by the Protocol rather than by
-// the Namespace named on the call: `5::isNot(3)` is `Integer`'s conformance
-// reaching `Equatable`'s one body. So the swap is sound exactly when the SAME
-// Protocol wrote a body for the target — that body is the Function the emitted
-// call names, and a target the Protocol merely REQUIRES has no body anywhere to
-// name. `Equatable` requires `is` and provides `isNot`, so a provided `isNot`
-// has nowhere to rotate to; `Comparable` provides all four comparisons, so a
-// user Type that conforms to it offers the same rotations a builtin does.
-//
-// Asked of the standard library's Protocol table, which is the only one
-// in reach here — the walk runs on a SIMPLIFIED Program and the Enricher's
-// Scope, where a Module's own Protocols live, is long gone by then. A Method a
-// Module's own Protocol provided is refused rather than guessed at, and it
-// becomes swappable when the sites a Module offers do.
+// The mangled name to call instead, or null where the swap can not be shown
+// sound. A call to a missing member would count as a kill no test earned. See
+// "Type-shaped mutants" in DEVELOPMENT.md.
 function swappableMember(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -621,10 +457,8 @@ function swappableMember(
 	let overload = overloadIndexOf(node.member.name)
 
 	if (node.providedBy !== undefined) {
-		// And never where the call site was MANGLED. A provided Method is
-		// emitted under its plain name, so a mangled call is one whose Protocol
-		// declared Overloads and whose target's slot is not this one's to
-		// assume.
+		// A provided Method is emitted under its plain name, so a mangled call
+		// is refused.
 		return overload === null && provides(node.providedBy, target)
 			? target
 			: null
@@ -636,19 +470,8 @@ function swappableMember(
 		return null
 	}
 
-	// A Namespace the MODULE declares carries its Methods already
-	// mangled, so the name to call is the name to look for. A builtin carries a
-	// Method TYPE per member, and the index the call site was mangled with has
-	// to be a slot that Method actually has: two members of one Namespace need
-	// not have the same number of Overloads, and calling the fourth Overload of
-	// a Method that has two is calling nothing at all.
-	//
-	// Both of them check the ARITY, and for one reason: the Arguments the
-	// call site already wrote are handed on untouched. Two Methods that happen
-	// to share a slot need not take the same number of values, and a swap onto
-	// one that does not would crash wherever it ran — which this run would
-	// record as a KILL the tests never earned, the one answer this file's own
-	// header forbids.
+	// A Module's Namespace holds its Methods by mangled name. Both kinds check
+	// the arity, since the call's Arguments are handed on unchanged.
 	if (declared.kind === "module") {
 		let name =
 			overload === null
@@ -696,12 +519,8 @@ function swappableMember(
 		return null
 	}
 
-	// The two Overloads have to take the same number of values, because
-	// the Arguments the call site already wrote are handed on untouched. The
-	// LABELS need not agree — `multiply(with 2)` and `add(2)` are one emitted
-	// call each, positional by the time anything runs — and the Types are the
-	// same by the way these families are written: every member in them is
-	// declared over the same operand Types in the same order.
+	// Labels need not agree, since the emitted call is positional. Every member
+	// of a swap table takes the same operand Types.
 	let originalOverload = original.overloads[overload]
 
 	return originalOverload !== undefined &&
@@ -711,10 +530,7 @@ function swappableMember(
 		: null
 }
 
-// `hasOwn` and not a bare read, for the reason the tables above are Maps:
-// `methods["toString"]` answers out of `Object.prototype` for a Namespace that
-// declares no such Method, and the answer is a Function no call site could ever
-// reach.
+// A bare read of `methods["toString"]` would answer out of `Object.prototype`.
 function ownMethod<Method>(
 	methods: Record<string, Method>,
 	name: string,
@@ -722,10 +538,7 @@ function ownMethod<Method>(
 	return Object.hasOwn(methods, name) ? methods[name] : undefined
 }
 
-// Whether a Protocol wrote the BODY this swap would call. `providedMethods`
-// names the Protocol each provided Method belongs to, and it has to be this one:
-// a name an ancestor wrote is emitted under the ancestor's, so a swap onto it
-// from here would name a Function that is not there.
+// Whether this Protocol, not an ancestor, wrote the body the swap would call.
 function provides(protocolName: string, member: string): boolean {
 	return (
 		ownMethod(builtinProtocols(), protocolName)?.providedMethods?.[
@@ -738,44 +551,24 @@ function provides(protocolName: string, member: string): boolean {
 
 // #region What the walk has to know
 
-// A Namespace as this Module can see it: the one it DECLARES, whose
-// mangled member names are simply the keys it emitted, or a BUILTIN, whose
-// Method Types the standard library snapshot has already answered. A Namespace
-// imported from another Module of the graph is neither, and a swap aimed at one
-// is refused — the sites a Module offers improve when this does.
+// A Namespace the Module declares, keyed by mangled name, or a builtin one. An
+// imported Namespace is neither, so a swap onto it is refused.
 type KnownNamespace =
 	| { kind: "module"; methods: common.typedSimple.Methods }
 	| { kind: "builtin"; methods: Record<string, common.MethodType> }
 
 type MutationContext = {
 	namespaces: Map<string, KnownNamespace>
-	// Every Choice this Module can name a Case of, in DECLARATION order,
-	// with each Case's whole Type — which is what a swap needs and a tag alone
-	// can not give. Read out of the Module's own Type Aliases the way
-	// `instrument-coverage` reads them, and topped up from the constructions
-	// themselves so that a Choice declared in another Module is still swappable
-	// among the Cases this one builds.
+	// Each Choice's Cases with their whole Types, from the Module's own Type
+	// Aliases and from the constructions, in the order the walk meets them.
 	choices: Map<string, Array<common.CaseType>>
-	// Every Node the condition of a NARROWING `if` is written out of, the
-	// condition itself included — and every Node of a narrowing `define` arm's
-	// Condition beside them. Narrowing in EITHER direction, its own branch or
-	// the one below it, because a body may only be moved where nothing was
-	// proven for either. It is one set because it answers one question asked in
-	// two places — see `mutateStatement` and `memberSwaps` — and it is gathered
-	// here because the walk that offers sites reaches a condition's Nodes before
-	// it reaches the `if` or the arm they belong to.
+	// Every Node of a condition that narrows in either direction. It is
+	// gathered first, since the walk reaches a condition's Nodes before its `if`.
 	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
-// One context per Program, kept. A mutation run walks ONE simplified
-// Program once to enumerate its sites and once more per mutant it compiles out
-// of it — hundreds of times, on the same object, through a Session that holds
-// that object for the length of the run. What the context reads is a whole
-// second walk of the Module plus the standard library's Namespace table, and
-// none of it can have changed: the walk never mutates the Program it is handed.
-//
-// A WeakMap, so a Program a Session has finished with takes its context
-// with it rather than pinning it for the length of the process.
+// One context per Program, since a run walks one Program once per mutant and
+// never changes it. Weak, so a finished Program takes its context with it.
 const CONTEXTS = new WeakMap<common.typedSimple.Program, MutationContext>()
 
 function contextOf(program: common.typedSimple.Program): MutationContext {
@@ -820,10 +613,8 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 
 	let narrowed = new Set<common.typedSimple.ExpressionNode>()
 
-	// The declared Choices FIRST, so a Choice this Module declares is
-	// ordered the way it was written rather than the way it happens to be
-	// constructed — which is what makes "the next sibling" a reader's next
-	// sibling.
+	// One walk gathers the Namespaces, the Choices and the narrowing
+	// conditions.
 	rewriteNodes(
 		{ ...program, tests: null },
 		{
@@ -843,17 +634,8 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 					}
 				}
 
-				// `narrows` is spelled HERE and nowhere else. What the
-				// walk needs is not "is this `if` a doorway" but "may this Node
-				// be mutated", and the two are one question with one answer.
-				//
-				// BOTH claims, for the reason the arms below are asked
-				// both: a condition that establishes nothing where it holds may
-				// be the very one an `else` was typed against.
-				// `separator::isEmpty()` proves `NonEmptyString` where it
-				// FAILS, so swapping the bodies it stands over — or asking a
-				// different question there — moves the `else` out from under
-				// the only proof it had.
+				// Both claims, since `separator::isEmpty()` proves
+				// `NonEmptyString` for the `else`.
 				if (
 					node.nodeType === "ConditionalStatement" &&
 					(node.narrows || node.narrowsFalse)
@@ -871,11 +653,8 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 					remember(node.type)
 				}
 
-				// And an arm's Condition the same way, asked of BOTH
-				// claims. A swap inside `separator::isEmpty()` would leave the
-				// arm below it reading a `NonEmptyString` nobody proved, and
-				// that arm's Condition establishes nothing for its own answer —
-				// so the claim that refuses it is the one about the arms below.
+				// An arm's Condition likewise, for its own answer or the arms
+				// after it.
 				if (node.nodeType === "Define") {
 					for (let arm of node.arms) {
 						if (arm.narrows || arm.narrowsBelow) {
@@ -892,11 +671,8 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 	return { namespaces, choices, narrowed }
 }
 
-// Every Node of one condition, gathered by walking it as a Program of its
-// own — an Expression IS an `ImplementationNode`, so the walk that reads a whole
-// Module reads one Expression without a second walker being written for it. The
-// hook answers with the Node it was handed, so nothing is rebuilt and the
-// identities the mutation walk will meet are the identities gathered here.
+// Every Node of one condition, walked as a Program of its own. Nothing is
+// rebuilt, so the mutation walk meets the same identities.
 function collectCondition(
 	program: common.typedSimple.Program,
 	condition: common.typedSimple.ExpressionNode,
