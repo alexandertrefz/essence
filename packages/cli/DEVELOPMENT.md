@@ -33,3 +33,34 @@ drew entropy, since the key holds neither. An entry whose bundle links the effec
 That check runs before writing, so a warm run never reads the bundles it replays.
 
 Records are written after the snapshot, baseline and corpus stores, so every key reads a settled disk.
+
+## The bundle cache
+
+`src/cache.ts` keeps the bundles `esc` emitted, each named by `bundleKey`. The key hashes every source of the linked
+graph, the Optimiser options, the toolchain, the Compiler's own fingerprint and `emitterKey`. Simplifying, optimising,
+generating and bundling are a pure function of those, and they are most of what a build costs. Two compiles that agree
+on the key emit the same bytes.
+
+`emitterKey` names everything that changes the bytes without changing the graph. That is `EMITTER`, minifying, the
+emit target, the runtime bridge, the compile mode and the source map's shape. A linked map adds the output's base
+name, since the bundle's last line spells it. The same sources built into two directories share one entry. The Compiler's fingerprint
+is in the key because `esc` is what a Compiler developer runs, so an edited Rewriter must never reuse a bundle.
+`EMITTER` stands in for `esc`'s own code.
+
+`compileFile` takes the key from the linked graph and reads the cache before emitting. So the front half always runs:
+every Diagnostic about the source is reported, and `esc watch` still learns which files a build reads. A hit skips the
+emitter. Some compiles bypass the cache:
+
+- A mutated compile neither reads nor writes it. A mutant stored under the real sources' key would be served as the
+  Program, and reading would hand the mutant run the unmutated bundle.
+- A compile that enumerates mutation sites writes the cache but never reads it, because the sites are collected while
+  simplifying.
+- An emit that reported Diagnostics is not stored, since a hit would skip the stages that report them.
+
+The JavaScript client keeps a cache of its own in another area. `ESSENCE_CLI_CACHE=off` turns this one off, which is
+how two runs are compared, while the client has no off switch. A run that may not keep an entry spawns a scratch
+bundle, written under a name no entry has.
+
+A watch session writes an entry per save, so `prune` keeps the newest `KEPT_BUNDLES` by modification time. A
+content-addressed file is never rewritten, so its time is when it was emitted. Pruning runs only after a write, and a
+wrongly evicted entry costs one rebuild.

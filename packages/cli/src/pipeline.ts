@@ -42,16 +42,10 @@ import {
 } from "./cache"
 import { type CompileSession, createCompileSession } from "./session"
 
-// The Bundler and the emit seam are imported where they are used and
-// nowhere else. `esc check` must not pay for an emitter it never calls — a
-// static import at the top of this module would load the Rewriter, a hundred
-// and seventy kilobytes of it, before the first file is even read. A build that
-// finds its bundle in the cache does not load it either.
-
-// One description of the Compiler pipeline, used by both the in-process
-// path and the worker path. Everything the CLI reports — stage timings, output
-// sizes, which stage a compilation stopped at — is produced here, so the two
-// paths can never drift into reporting different things.
+// The Compiler pipeline for both the in-process and the worker path, so both
+// report the same timings, sizes and stopping stages. The Bundler and the
+// emitter are imported dynamically, so `esc check` and a cached build never
+// load them.
 
 const stageNames = [
 	"read",
@@ -84,78 +78,50 @@ type StageTiming = {
 	duration: number
 }
 
-// A request carries the compile MODE — see `CompileMode`. It changes what
-// is enriched out of the very same sources, so it joins `bundleKey`: a build's
-// bundle and a test's are two different files over one graph, and the cache must
-// never hand one for the other. The SESSION is what actually carries the mode
-// into the Enricher, because linking is where it is read, so a request that sets
-// it must be compiled through a Session that was opened with it.
+// The compile mode changes what is enriched from the same sources, so it joins
+// `bundleKey`. The Session carries it into the Enricher, so a request with a
+// mode is compiled through a Session opened with it.
 export type CompileRequest = CompileMode & {
 	inputFileName: string
-	// Where the bundle is written, or null for a compile that emits
-	// nothing at all — which is what `check` is. `esc run` without `--out` names
-	// neither: what it wants is a file it can spawn rather than an artifact, and
-	// it asks for `cacheOutput` instead.
+	// Null for a compile that emits nothing, as `check` does. `esc run` without
+	// `--out` asks for `cacheOutput` instead.
 	outputFileName: string | null
-	// The bundle goes into the bundle cache under the name that means
-	// these exact sources, and the outcome reports where it landed. A repeat run
-	// of unchanged sources then writes nothing whatsoever: the file is already
-	// there, and it is already what would have been written.
+	// Writes the bundle into the bundle cache under its sources' key, so a
+	// repeat run of unchanged sources writes nothing.
 	cacheOutput?: boolean
 	minify: boolean
 	sourcemap: boolean
-	// How the map reaches the output — `linked` beside it (the default),
-	// `inline` inside it, which is what `run`'s transient output needs. Read
-	// only when `sourcemap` is set.
+	// `linked` writes the map beside the output, `inline` inside it. Read only
+	// when `sourcemap` is set.
 	sourcemapMode?: "linked" | "inline"
-	// Which Optimiser passes to run. Absent means every one of them, which
-	// is what a caller that offers no say — the Debug Adapter, a spec — compiles
-	// with. It travels to a worker as part of the request, so a batch spread
-	// across threads compiles every file under the Options the command line
-	// asked for.
+	// Absent means every pass. It travels to a worker with the request.
 	optimisation?: OptimiserOptions
-	// Who the emitted Modules are for — see `EmitTarget`. Absent, and
-	// unspelled by any flag, means a bundle: `esc` writes a file to run, and
-	// every other target exists for a build that resolves Essence's Modules
-	// itself. It is here because it changes the emitted bytes without changing
-	// the sources, which is exactly what `bundleKey` has to name.
+	// Absent means a bundle. It changes the emitted bytes but not the sources,
+	// so `bundleKey` names it.
 	emit?: EmitTarget
-	// Whether the bundle is built for a JavaScript host to LOAD rather
-	// than for anything to run: the runtime bridge goes into it and a Descriptor
-	// is written beside it. It changes the bytes as well, so it joins the key
-	// too.
+	// A bundle for a JavaScript host to load: it carries the runtime bridge and
+	// a Descriptor is written beside it. It joins the key too.
 	embed?: boolean
-	// Whether every Module of this compile is asked what mutations it
-	// admits, which the outcome then carries — see `CompileOutcome.mutations`.
-	// Only `essence test --mutate`'s baseline asks, and it costs one walk of
-	// each simplified Program.
+	// Asks every Module which mutations it admits, for the baseline of
+	// `essence test --mutate`. See `CompileOutcome.mutations`.
 	enumerateMutations?: boolean
-	// The one deliberate lie this compile tells, by the Module it is told
-	// about and the site's id in that Module's walk — see `applyMutation`. The
-	// rewrite lands post-simplify and pre-optimise, which is where the sites
-	// were enumerated, so an id means the same Node in both directions.
-	//
-	// It does NOT join the bundle key, because a mutated compile has no
-	// business in the bundle cache at all — see `compileFile`, which bypasses
-	// the store in both directions the moment this is set.
+	// The one mutation this compile applies, by Module and site id. Sites are
+	// enumerated and applied after simplifying and before optimising, so an id
+	// names the same Node. A mutated compile bypasses the bundle cache.
 	mutation?: { module: string; site: number }
 }
 
-// One file of the compiled graph, with the text its Diagnostics are
-// rendered against. `Diagnostic` is deliberately not widened with a file of its
-// own: which file a Diagnostic belongs to is a property of the collection it
-// was gathered into, and every collection here is one Module's.
+// One file of the compiled graph, with the text its Diagnostics are rendered
+// against. A Diagnostic names no file: the collection it is in does.
 export type CompiledModule = {
 	fileName: string
 	sourceText: string
 	diagnostics: Array<common.Diagnostic>
 }
 
-// `diagnostics` is every Module's, in the order the Modules are listed,
-// and then whatever belongs to the compilation itself rather than to a source
-// file — an unreadable entry, a failed bundle, a Compiler that threw. The
-// layout is what `ownDiagnostics` reads the tail off, so a Module dropped from
-// a batch takes its own Diagnostics with it and leaves the rest standing.
+// INVARIANT: `diagnostics` holds every Module's, in Module order, then the
+// compilation's own, such as an unreadable entry or a Compiler that threw.
+// `ownDiagnostics` reads that tail.
 export type CompileOutcome = {
 	inputFileName: string
 	outputFileName: string | null
@@ -169,31 +135,19 @@ export type CompileOutcome = {
 	gzipBytes: number | null
 	failedStage: StageName | null
 	stack: string | null
-	// Whether the bundle came out of the bundle cache rather than the
-	// emitter. It is what a report means by a warm cache, and it is the answer
-	// for THIS entry: a run over twenty files is warm when every one of them
-	// was.
+	// Whether this entry's bundle came from the bundle cache.
 	cached: boolean
-	// What every Module this entry reaches could be lied about, for a
-	// compile that ASKED — absent otherwise, which is every compile but a
-	// mutation run's baseline. A Module two entries reach is enumerated under
-	// each of them, and the sites are identical: the walk is a function of the
-	// simplified Program, and one Program is one Module's. Whoever folds them
-	// keys by Module.
+	// The mutation sites of every Module the entry reaches, when asked. A
+	// shared Module yields the same sites under each entry, so callers key them
+	// by Module.
 	mutations?: Array<MutationSite>
 }
 
 type ProgressReporter = (stage: StageName) => void
 
-// What a Descriptor is written under beside its bundle: `app.js` and
-// `app.descriptor.json`. `@essence-lang/client`'s `loadPrebuilt` defaults to the
-// same rule from the other side — the two are pinned together by a test that
-// builds a pair here and loads it there, because a rule stated twice is one that
-// can only be kept by being checked.
+// The Descriptor beside a bundle: `app.js` gets `app.descriptor.json`.
+// `@essence-lang/client` spells the same rule, and a test holds the two together.
 export function descriptorFileName(outputFileName: string): string {
-	// The extension of the FILE NAME — `extname` reads the base name
-	// alone, so a dot in a directory above it is not one, and a name that is
-	// nothing but an extension has none to replace.
 	let extension = path.extname(outputFileName)
 
 	return `${outputFileName.slice(
@@ -202,14 +156,8 @@ export function descriptorFileName(outputFileName: string): string {
 	)}.descriptor.json`
 }
 
-// How big the bundle is over the wire, which is the number a build report
-// prints beside the size on disk — and null for a compile nobody is going to
-// ask, exactly as the failure path answers null.
-//
-// A MUTANT is nobody's build artifact. It is compiled, imported once by a
-// Worker and thrown away, and a mutation run compiles hundreds of them — so
-// compressing every one of them to produce a number no report reads is the
-// cheapest thing in the loop to stop doing.
+// The gzipped size a build report prints. A mutant is never reported, so it
+// is not compressed.
 function gzipBytesOf(
 	request: CompileRequest,
 	contents: Uint8Array,
@@ -217,21 +165,13 @@ function gzipBytesOf(
 	return request.mutation === undefined ? gzipSync(contents).byteLength : null
 }
 
-// The boundary between this Module and the JavaScript that will load it,
-// written beside the bundle — and written on the cached path as well as the
-// emitted one, because a build that found its bundle still has to leave the pair
-// behind wherever it was asked to put it.
-//
-// Indented rather than packed. It is a build artifact that a host reads
-// once and a person reads when the boundary surprises them, and the second of
-// those is the one that is hard.
+// Writes the Descriptor beside the bundle, on the cached path as well as the
+// emitting one. It is indented, since people read it too.
 async function writeDescriptor(
 	request: CompileRequest,
 	front: Front,
 ): Promise<void> {
-	// A standard library source is not a Module — it is one shared
-	// declaration space, and exports nothing — so there is no Surface, and
-	// nothing to write down.
+	// A standard library source exports nothing, so it has no Surface.
 	if (
 		request.embed !== true ||
 		request.outputFileName === null ||
@@ -240,10 +180,8 @@ async function writeDescriptor(
 		return
 	}
 
-	// The describing door rather than the whole of `embed`, which reaches
-	// the emitter and esbuild behind it. This runs beside an emit that has
-	// loaded both already, but naming the smaller door is what keeps it true
-	// that only the emitting path pays for them.
+	// The cached path runs this too, and `embed/describe` loads neither the
+	// emitter nor esbuild.
 	let { describeModule } =
 		await import("@essence-lang/compiler/embed/describe")
 	let { writeFile } = await import("node:fs/promises")
@@ -259,18 +197,10 @@ async function writeDescriptor(
 	)
 }
 
-// What makes an embedded bundle one — the runtime's own Type key and value
-// constructors, injected as a Module and handed over as the bundle's default
-// export — and which of the conditional doors it carries: the one a Dictionary
-// crosses through and the one asynchronous work does, each asked of the
-// Module's own Descriptor. `@essence-lang/client` asks the same questions of the
-// same Descriptor before it compiles, so one graph gets one bundle whichever
-// tool built it, and the key both of them cache under does not have to name the
-// answer.
-//
-// A standard library source has no Surface — it is one shared declaration
-// space rather than a Module — so there is no boundary to ask about and the
-// plain bridge is what goes in.
+// The runtime bridge an embedded bundle exports, with the Dictionary and Future
+// parts its Descriptor needs. `@essence-lang/client` asks the same questions,
+// so both tools build one bundle per graph. A standard library source gets the
+// plain bridge.
 async function runtimeBridgeFor(
 	front: Front,
 ): Promise<(sources: ModuleSources) => ModuleSources> {
@@ -283,8 +213,7 @@ async function runtimeBridgeFor(
 
 	let { carriesDictionary, carriesFuture, describeModule, describeTypes } =
 		await import("@essence-lang/compiler/embed/describe")
-	// Described ONCE for both questions — describing a Module is a walk
-	// of its whole Surface, and the two flags are read in the same breath.
+	// Described once for both questions.
 	let described = describeModule(front.surface, front.entryPath)
 	let declared = describeTypes(front.surface, front.entryPath)
 	let dictionary = carriesDictionary(described, declared)
@@ -293,11 +222,8 @@ async function runtimeBridgeFor(
 	return (sources) => withRuntimeBridge(sources, { dictionary, future })
 }
 
-// A remembered bundle as the outputs of the compile that would have
-// produced it — the same two files under the same two names, so a build that
-// found its answer writes exactly what a build that emitted one writes. The map
-// is `<output>.map` because that is what the Bundler names it, and the bundle's
-// last line already says so.
+// A cached bundle as the outputs the emitting compile writes. The map is
+// `<output>.map`, as the Bundler names it and the bundle's last line says.
 function bundleOutputs(
 	outputFileName: string,
 	cached: CachedBundle,
@@ -322,11 +248,9 @@ export function ownDiagnostics(
 	)
 }
 
-// Every file of a batch reported by exactly one outcome. A dependency
-// that is also an entry belongs to its own outcome; every other shared file
-// goes to the first outcome that reached it. Only the Diagnostics move — the
-// Module list stays whole, because `esc watch` reads it to learn which files a
-// rebuild depends on, and a file two entries share has to wake both of them.
+// Reports each file of a batch under exactly one outcome: its own if it is an
+// entry, else the first that reached it. Only Diagnostics move, since
+// `esc watch` reads each outcome's whole Module list.
 export function attributeDiagnostics(
 	outcomes: Array<CompileOutcome>,
 ): Array<CompileOutcome> {
@@ -337,10 +261,8 @@ export function attributeDiagnostics(
 	let owners = new Map<string, CompileOutcome>()
 
 	for (let outcome of outcomes) {
-		// The entry Module of an outcome is the last one — everything
-		// ahead of it is something it depends on. Read that way rather than by
-		// canonicalising the name the caller wrote, so both sides of the
-		// comparison are spellings the graph itself produced.
+		// The entry Module is the last one. Taking it from the graph compares
+		// spellings the graph produced, not the caller's.
 		let entry = outcome.modules.at(-1)
 
 		if (entry !== undefined && !owners.has(entry.fileName)) {
@@ -403,14 +325,9 @@ class Timeline {
 	}
 }
 
-// The near miss for a path that could not be read, spelled the way the
-// path was. Matched on the FILE NAME rather than on the whole path, because a
-// path shares its directories with every candidate — comparing
-// `/long/way/down/src/Xyz.es` against `/long/way/down/src/Main.es` is mostly
-// comparing the part the two agree on, and then everything reads as a near
-// miss. The directory is put back on the answer, so what the reader is offered
-// is a path they can pass straight back. An unreadable directory answers
-// nothing, which is the same as having no candidates at all.
+// The near miss for a path that could not be read, in the path's own spelling.
+// Only base names are compared, since the shared directories would make every
+// candidate look close.
 function nearestSource(fileName: string): string | null {
 	let directory = path.dirname(fileName)
 
@@ -430,10 +347,7 @@ function nearestSource(fileName: string): string | null {
 	}
 }
 
-// A Help on every branch, because the answer is in hand at each of them.
-// The advice goes in the Help, where every other Diagnostic here puts it,
-// rather than in the MESSAGE, which is the one line a report repeats
-// everywhere.
+// Every branch puts its advice in a Help, keeping the message to one line.
 function readError(error: unknown, fileName: string): common.Diagnostic {
 	let code = (error as NodeJS.ErrnoException | undefined)?.code
 
@@ -491,19 +405,15 @@ function readError(error: unknown, fileName: string): common.Diagnostic {
 	}
 }
 
-// What the front of the pipeline produced: the Modules to report about,
-// the typed Programs to emit from — one per Module, in the same order — and the
-// stage it stopped at, if it did. `programs` is null exactly when nothing may
-// be emitted, which is not the same as an empty graph.
+// What the front of the pipeline produced. `programs` has one typed Program per
+// Module, in Module order, and is null exactly when nothing may be emitted.
 type Front = {
 	entryPath: string
 	sourceText: string
 	modules: Array<CompiledModule>
 	programs: Array<common.typed.Program> | null
-	// What the ENTRY offers, for a compile that has to write the boundary
-	// down beside its bundle. Null where there is nothing to offer: a standard
-	// library source is one shared declaration space rather than a Module, and
-	// a compile that stopped never got as far as a Surface.
+	// The entry's exports. Null for a standard library source and for a compile
+	// that stopped before linking.
 	surface: ExportSurface | null
 	diagnostics: Array<common.Diagnostic>
 	failedStage: StageName | null
@@ -525,16 +435,9 @@ function unreadableFront(
 	}
 }
 
-// The graph the entry names, read, parsed, linked and judged. Every file
-// it reaches goes through the Session, so a batch loads each of them once
-// however many of its entries reach it.
-//
-// Every stage runs, whatever the one before it found. The Parser recovers
-// and hands on what it could read, the Linker types what is left, and the
-// Validator judges what those two established — which is what makes one run
-// report a syntax error, a Type error and a missing return together instead of
-// one of the three per run. `@essence-lang/compiler/analysis` is the one
-// description of that, and the Editor runs it over the same graph.
+// Reads, parses, links and validates the entry's graph through the Session, so
+// a batch loads each file once. Every stage runs whatever the one before found,
+// so one run reports every kind of error.
 async function linkGraph(
 	request: CompileRequest,
 	timeline: Timeline,
@@ -548,10 +451,8 @@ async function linkGraph(
 		return unreadableFront(request, read.filePath, read.error)
 	}
 
-	// Run for its own sake and for the timing. What it produces is held by
-	// the Session, and the link below reads it back — the Modules this reports
-	// about are the LINKED ones, whose Diagnostics carry the parse stage's with
-	// them.
+	// Timed on its own. The Session holds the parsed Modules for linking, and
+	// the linked Modules carry the parse Diagnostics.
 	await timeline.run("parse", () => session.modules(request.inputFileName))
 
 	let linked = await timeline.run("enrich", () =>
@@ -572,11 +473,8 @@ async function linkGraph(
 			],
 		})),
 		programs: linked.map((module) => module.program),
-		// The ENTRY's Surface, found by name rather than taken off the end
-		// of the list. The entry is last — everything ahead of it is something
-		// it depends on — but a Descriptor describing a dependency instead would
-		// be a Module a host binds nothing of, and reading the one thing that
-		// says which file this is costs nothing.
+		// Found by path rather than by position, so a Descriptor can never
+		// describe a dependency.
 		surface:
 			linked.find((module) => module.module.filePath === read.filePath)
 				?.surface ?? null,
@@ -585,15 +483,9 @@ async function linkGraph(
 	}
 }
 
-// A standard library source, which is not a Module: it is one shared
-// declaration space, its `declarations { … }` header is a permission no other
-// file has, and its own names are already builtins by the time it is read.
-// `enrichDocument` is what knows all three, and it takes one Program — so this
-// file is compiled the way it was before Modules, alone.
-//
-// The seam matters beyond the standard library itself: `esc check` on one of
-// its sources and the Editor's view of the same file have to agree, or a
-// Compiler developer can not check their own transcription.
+// A standard library source is not a Module: it is one shared declaration
+// space whose names are already builtins. `enrichDocument` compiles it alone,
+// as the Editor does.
 async function enrichDeclarations(
 	request: CompileRequest,
 	timeline: Timeline,
@@ -616,10 +508,7 @@ async function enrichDeclarations(
 			source: read.sourceText,
 		}),
 	)
-	// Every stage runs here too, for the reason `linkGraph` gives — and
-	// the seam matters most of all in this file, since `esc check` on a standard
-	// library source and the Editor's view of it are what a Compiler developer
-	// checks their own transcription against.
+	// Every stage runs here too, as in `linkGraph`.
 	let analysed = await timeline.run("validate", () =>
 		analyseEnriched(parsed.program, parsed.diagnostics, enriched),
 	)
@@ -694,50 +583,22 @@ export async function compileFile(
 
 		let programs = front.programs
 
-		// Every stage that has anything to say about the SOURCE has now
-		// run, so this is the whole of what is wrong with it — one report per
-		// mistake, whichever stage found it. What is left is the emitter, and an
-		// Error anywhere stops it: nothing is built out of a Program that does
-		// not compile.
-		//
-		// And `failedStage` is null, because no stage refused. The report
-		// says "stopped before building" where there was something to build; for
-		// a `check` there is nothing to add, since what the reader is holding is
-		// the complete answer.
+		// Every stage that reports on the source has run, and any error stops
+		// the emitter. `failedStage` stays null because no stage refused.
 		if (containsErrors(modules.flatMap((module) => module.diagnostics))) {
 			return finish(false, null)
 		}
 
-		// `check` stops here — everything past this point exists only to
-		// produce a file, and produces no further Diagnostics about the source.
+		// `check` stops here: the rest only produces a file.
 		if (request.outputFileName === null && request.cacheOutput !== true) {
 			return finish(true, null)
 		}
 
-		// The key BEFORE the emit, which is the whole point of naming a
-		// bundle after what it was compiled from: where the file that names is
-		// already on disk, nothing is simplified, optimised, generated or
-		// bundled, because the answer was computed by whoever asked first.
-		// Running the pipeline to the end and only then discovering the output
-		// was already there would leave the name saving one `writeFile`.
-		//
-		// Taken off the LINKED graph rather than the parsed one, so that
-		// everything a compile has to say about the source has already been said
-		// by the time a hit skips the rest. A hit is a shortcut through the
-		// emitter and never through the front half — which is also what keeps
-		// `esc watch` able to report the graph it is watching.
-		//
-		// A MUTATED compile has no store at all, in either direction. Its
-		// bundle is a lie told once and thrown away — remembering it would let
-		// a later run be handed a mutant under a name that promises the
-		// Program, and reading from the store would hand this compile the
-		// unmutated world's answer and report every test as failing to notice a
-		// mutant that was never emitted.
+		// The key is taken from the linked graph before emitting, and a mutated
+		// compile has no store. See "The bundle cache" in DEVELOPMENT.md.
 		let store =
 			request.mutation === undefined ? bundleCacheDirectory() : null
-		// And no name, where nothing is going to be looked up or written
-		// under one. The key is a hash of every source of the graph, which is
-		// not free, and a mutant run computes it hundreds of times for nothing.
+		// Hashing the graph is skipped where no name is needed.
 		let key =
 			store === null && request.outputFileName !== null
 				? ""
@@ -748,19 +609,13 @@ export async function compileFile(
 							modules.map((module) => [module.fileName, module]),
 						),
 					)
-		// Only a linked map is a second file. An inline one rides in the
-		// bundle, and there is nothing beside it to look for.
+		// Only a linked map is a second file.
 		let hasMapFile =
 			request.sourcemap &&
 			request.sourcemapMode !== "inline" &&
 			request.outputFileName !== null
-		// A compile that ENUMERATES may not be served out of the store
-		// either, though what it emits is byte for byte what a plain compile
-		// emits and is remembered as such. The sites are collected while the
-		// Modules are simplified, and a hit skips simplification along with
-		// everything else past it — so a warm cache would answer with the
-		// bundle and no sites at all, and the run would report a project with
-		// nothing in it worth mutating.
+		// An enumerating compile writes the store but never reads it: the sites
+		// are collected while simplifying, which a hit skips.
 		let cached =
 			store === null || request.enumerateMutations === true
 				? null
@@ -787,15 +642,10 @@ export async function compileFile(
 			})
 		}
 
-		// Everything past validation is the emitter's, which `esc`
-		// SHARES with the in-memory compile rather than owning: what the stages
-		// are, what order they run in and what each of them is handed is one
-		// description, and it lives in the Compiler. What stays here is what is
-		// the CLI's own — the Session's caches, and the timings this file
-		// reports.
+		// The Compiler's `emitBundle` owns the stages past validation. `esc`
+		// adds the Session's caches and the timings.
 		let { emitBundle } = await import("@essence-lang/compiler/embed")
-		// Reached the same way and for the same reason — a build must not
-		// pay for a walker only a mutation run calls.
+		// Loaded only for a mutation run.
 		let mutating =
 			request.mutation !== undefined ||
 			request.enumerateMutations === true
@@ -804,13 +654,10 @@ export async function compileFile(
 			: null
 		let embedding =
 			request.embed === true ? await runtimeBridgeFor(front) : undefined
-		// `run` without `--out` has no name to emit under, and needs none
-		// until the key is known: what it asked for is a file to spawn. The
-		// scratch name is only ever the one it keeps, because a clean emit is
-		// spawned out of the cache entry it becomes.
+		// `run` without `--out` emits under the scratch name, but a clean emit is
+		// spawned from the cache entry it becomes.
 		let emitFileName = request.outputFileName ?? scratchBundlePath(key)
-		// Which file each typed Program is, which the emitter does not
-		// carry — the two lists are parallel and this is where they still are.
+		// Each typed Program's file, which the emitter does not carry.
 		let names = new Map(
 			programs.map((program, index) => [
 				program,
@@ -818,16 +665,9 @@ export async function compileFile(
 			]),
 		)
 		let mutations: Array<MutationSite> = []
-		// The simplify seam is where the CLI already substitutes its own
-		// answer, and a mutant is the same substitution: what is handed on is
-		// the Program THIS compile is about. It is also exactly the moment the
-		// design asks for — after simplification, before the Optimiser — so a
-		// site stands where the author wrote it and no counter the
-		// instrumentation added can be mistaken for one.
-		//
-		// The Session's own cache is left holding the UNMUTATED Program,
-		// because `applyMutation` answers with a fresh one. Every other entry
-		// of the run compiled through this Session is untouched.
+		// Mutations are enumerated and applied after simplifying and before
+		// optimising, so a site is where the author wrote it. `applyMutation`
+		// returns a fresh Program, so the Session keeps the unmutated one.
 		let simplify: NonNullable<
 			Parameters<typeof emitBundle>[1]
 		>["simplify"] = (program, options) => {
@@ -862,19 +702,15 @@ export async function compileFile(
 				outputFileName: emitFileName,
 				minify: request.minify,
 				sourcemap: request.sourcemap,
-				// A bundle with no name of its own has nowhere beside it to
-				// put a map, so it rides inside — which is also what keeps the name
-				// out of the key and the key out of the name.
+				// A bundle with no name of its own carries its map inline.
 				sourcemapMode:
 					request.outputFileName === null
 						? "inline"
 						: request.sourcemapMode,
 				optimisation: request.optimisation ?? defaultOptimiserOptions,
 				emit: request.emit,
-				// What makes an embedded bundle one: the runtime's own
-				// Type key and value constructors go in beside the Module, as
-				// its default export. A host can not build a value this bundle
-				// accepts without them — see `withRuntimeBridge`.
+				// The runtime's Type key and value constructors, which a host needs
+				// to build values. See `withRuntimeBridge`.
 				transformSources: embedding,
 			},
 			{
@@ -908,10 +744,8 @@ export async function compileFile(
 				await writeDescriptor(request, front)
 			}
 
-			// Remembered only where the emit had nothing of its own to
-			// say. A hit skips the stages that produce those Diagnostics, so an
-			// entry standing for a bundle that warned would answer with the
-			// bundle and swallow the warning.
+			// Kept only when the emit reported nothing, since a hit would skip
+			// the stages that report.
 			if (store !== null && bundled.diagnostics.length === 0) {
 				let file = await writeBundle(store, key, emitted)
 
@@ -930,9 +764,8 @@ export async function compileFile(
 			...(request.enumerateMutations === true ? { mutations } : {}),
 		})
 	} catch (error) {
-		// A throw that reaches here is a Compiler bug rather than a
-		// problem with the source. It is reported as a Diagnostic so that a
-		// batch compile keeps going, and the stack is kept for --verbose.
+		// A throw here is a Compiler bug. As a Diagnostic it lets a batch go on,
+		// and the stack is kept for `--verbose`.
 		own.push(
 			placelessDiagnostic(
 				"error",
