@@ -766,7 +766,8 @@ continue $tail_0;
 ```
 
 Where any Argument must be held, all are, so the rebinding is simultaneous: the turn reads both names before
-writing either. Where no written Argument reads a Parameter the turn assigns in place, the pass holds none.
+writing either. The pass holds none where no written Argument reads a Parameter the turn assigns in place
+and no written Argument follows an omitted one.
 
 ## Type descriptors
 
