@@ -250,7 +250,6 @@
 	"packages/language-server/src/tests/textEdits.ts": {"sentence-length": 1},
 	"packages/language-server/src/tests/workspace.spec.ts": {"sentence-length": 61, "em-dash": 48, "all-caps": 24, "history": 2, "position": 3, "block-length": 2},
 	"packages/runtime/src/Future.ts": {"sentence-length": 38, "em-dash": 29, "all-caps": 30, "position": 2, "block-length": 10},
-	"packages/runtime/src/Http.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 19, "position": 2, "block-length": 3},
 	"packages/runtime/src/Integer.ts": {"sentence-length": 46, "em-dash": 31, "all-caps": 22, "position": 5, "block-length": 10},
 	"packages/runtime/src/Randomness.ts": {"sentence-length": 33, "em-dash": 12, "all-caps": 15, "position": 13, "block-length": 3},
 	"packages/runtime/src/Testing.ts": {"sentence-length": 190, "em-dash": 128, "all-caps": 119, "position": 5, "block-length": 21},

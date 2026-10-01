@@ -785,3 +785,41 @@ A seal closes the Array to every box that shares it, and lasts for good, as "The
 another copy the whole List every turn. `sealedRunsOf` seals without trimming, for walks that must leave the
 receiver's representation alone. `positionalWrites.spec.ts` holds each sealing walk against a callback that writes
 the List being walked.
+
+## HTTP requests
+
+`Http.ts` is the one runtime module that reaches another machine, and what comes back is not a function of the
+inputs. The test result cache refuses to store a run whose bundle links it. It finds the module by the label esbuild
+writes for the file, `// Http.ts`, which `EFFECTFUL_RUNTIME_LABELS` in `packages/cli/src/resultCache.ts` names. So
+the file keeps that name. The Optimiser leaves `Http` out of its purity table, as it does every asynchronous
+Namespace.
+
+A request is a description. `send` builds a Future and sends nothing. The `fetch` runs each time the Future is
+started, under the context that start made. So `::within(milliseconds:)` and `::attempt(times:)` apply to a request
+as they do to any Future.
+
+What the library can decide for itself, it decides before anything is sent, in a sentence of its own. An address
+that does not parse, or whose scheme is not `http:` or `https:`, is `#InvalidUrl`. A host without `fetch`, a body on
+a `GET` or a `HEAD`, and a header name that is not an HTTP token are `#Unreachable`. A host library would refuse the
+last two in words that name `fetch()`, which no Program can reach.
+
+`#Refuse` is sent as `"manual"`, and `send` refuses the answer when it is a redirect. Sent as `"error"`, `fetch` would
+reject with its own sentence, which can not be told apart from a refused connection. A redirect is a status of 301,
+302, 303, 307 or 308, or an `opaqueredirect`, which a browser answers under `"manual"` with no status. A 304 is an
+answer.
+
+A stopped run never answers: `send` hands back a promise that never settles. Throughout the runtime, cancelling
+signals the work and drops its answer. A `#Failure` would put a reason in front of the Program, and `::within` and
+`::race` promise that a stopped run is never seen.
+
+The request's headers go to `fetch` as pairs rather than as an object, so two spellings of one name stay two
+entries. The Dictionary decided what one key is, and `Headers` decides the rest. The answer's header names are
+lowercased into a Dictionary, since HTTP header names do not differ by case and a Dictionary's keys do.
+`Response::header(named:)` lowercases the name it is asked for.
+
+`Headers` joins a name sent twice into one entry with `", "`, apart from `set-cookie`, which it answers once per
+cookie. A Dictionary holds one value per key, so `answeredHeaders` joins those the same way and no cookie is lost. A
+joined `set-cookie` can not be split again, since a cookie's `Expires` holds a comma.
+
+`hostFetch` looks `fetch` up on every call, for the reason `Terminal.ts` looks up its streams, as "Writing to the
+host" describes.

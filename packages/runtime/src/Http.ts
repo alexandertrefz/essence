@@ -14,26 +14,10 @@ import { createFailure, createValue, type ResultType } from "./Result"
 import { createString, type StringType } from "./String"
 import { liveEntriesOf, typeKeySymbol } from "./type"
 
-// THE ONE RUNTIME MODULE THAT REACHES ANOTHER HOST. Everything else in
-// this runtime answers out of values the Program already holds or out of THIS
-// host's own streams, descriptors and entropy — `Terminal` and `Randomness` are
-// those — where a request goes to a machine of its own, and what comes back is
-// not a function of the inputs.
-// Two things rest on this module being exactly one file with exactly this name:
-// the Optimiser refuses `Http` a place in its purity table, and the test result
-// cache refuses to remember a run whose bundle links `Http.ts` — see
-// `EFFECTFUL_RUNTIME_LABELS` in `packages/cli/src/resultCache.ts`, which names
-// the label esbuild writes for this file.
+// The one runtime module that reaches another machine. The test result cache
+// finds it by its file name. See "HTTP requests" in DEVELOPMENT.md.
 //
-// A REQUEST IS A DESCRIPTION. `send` builds a Future and sends nothing:
-// the `fetch` below runs when the Future is started, once per start, under the
-// context that start made. That is what puts `::within(milliseconds:)` and
-// `::attempt(times:)` within reach without a line here — both are Methods of
-// `Future`, and a request is a Future like any other.
-
-// The Request the Compiler hands over, spelled the way the generated
-// native contract renders `Http.es`'s Record. The defaults are filled in before
-// this is reached, so every member is here.
+// The Request as the native contract renders it, with every default filled in.
 type RequestType = RecordType & {
 	url: StringType
 	method: HttpMethodType
@@ -48,26 +32,16 @@ type ResponseType = RecordType & {
 	body: StringType
 }
 
-// The witness the answer's header Dictionary is built with. Its keys are
-// Strings, and `stringEquals` is what `String::is` decides — the NFC forms
-// compared, which for a header name is its own text. It is branded `structural`
-// for that reason: the claim the brand makes is that the canonical key encoding
-// agrees with the standard library's own `is` for this kind, which for a String
-// is the claim `keyEncoding.ts` is written on.
+// The answer's header keys compare as `String::is` does, so the key encoding
+// agrees with them and the witness carries the `structural` brand.
 const headerKeys: EquatableWitness<StringType> = {
 	is: (first, second) => createBoolean(stringEquals(first, second)),
 	isNot: (first, second) => createBoolean(!stringEquals(first, second)),
 	structural: true,
 }
 
-// The verbs, keyed by the Case tag a `HttpMethod` carries. A table rather
-// than a chain of comparisons, and rather than slicing the tag apart and
-// uppercasing it: what goes on the wire is decided here, where a reader can see
-// all seven at once.
-//
-// Keyed by the TAG TYPE rather than by `string`, so a Case added to the
-// Choice and forgotten here is a `tsc` error rather than a request quietly sent
-// as a GET. The same rule keys the redirect modes below.
+// Keyed by the tag Type, so a Case added to the Choice and missed here is a
+// type error rather than a request sent wrongly.
 const METHOD_NAMES: Record<HttpMethodType[typeof typeKeySymbol], string> = {
 	"HttpMethod#Get": "GET",
 	"HttpMethod#Post": "POST",
@@ -78,14 +52,8 @@ const METHOD_NAMES: Record<HttpMethodType[typeof typeKeySymbol], string> = {
 	"HttpMethod#Options": "OPTIONS",
 }
 
-// And the three redirect modes, under the names `fetch` knows them by.
-// `#Refuse` is sent as `"manual"` and refused HERE rather than as `"error"`,
-// which would have `fetch` reject: the rejection carries the host library's own
-// sentence, naming `fetch()` and its options in a value an Essence Program
-// prints, and there is no way to tell it apart from a connection that was
-// refused. Sent manually, the redirect comes back as an answer this module can
-// recognise, and the reason a Program reads is this library's own. Nothing is
-// followed either way, which is the whole of what `#Refuse` promises.
+// `#Refuse` is sent as `"manual"` and refused by `send`, so the reason a
+// Program reads is this library's own.
 const REDIRECT_MODES: Record<
 	RedirectsType[typeof typeKeySymbol],
 	"follow" | "manual"
@@ -95,11 +63,8 @@ const REDIRECT_MODES: Record<
 	"Redirects#Refuse": "manual",
 }
 
-// The statuses that carry a `location` and mean "ask there instead". 304
-// is not among them: a 3xx that is not a redirect is an answer, and `#Refuse`
-// refuses redirects rather than a range of numbers. `opaqueredirect` is what a
-// browser answers under `"manual"` instead of the redirect itself — no status
-// and no headers — so the Type is read as well as the number.
+// A 304 is an answer, not a redirect. A browser answers an `opaqueredirect`
+// with no status, so the Type is read too.
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 function isRedirect(answered: Response): boolean {
@@ -109,36 +74,24 @@ function isRedirect(answered: Response): boolean {
 	)
 }
 
-// The methods that carry no body. A host library refuses one that does,
-// in its own words — "fetch() request with GET/HEAD method cannot have body." —
-// which names a Function no Essence Program can reach. Refused here instead, in
-// this library's words, before anything is sent.
+// The methods that carry no body. Refused here, before anything is sent.
 const BODILESS_METHODS = new Set(["GET", "HEAD"])
 
-// A header name is an HTTP token: these characters and no others. A host
-// library refuses anything else in its own words too, so the same reading
-// applies — what a Program gets back is a sentence about the header it wrote.
+// A header name is an HTTP token: these characters and no others.
 const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
-// The schemes this library sends. An address of any other scheme is
-// `#InvalidUrl` rather than a request that fails somewhere further down: `fetch`
-// on some hosts reads a `file:` URL, and a Program asking `Http.get` for one is
-// asking this library for something it does not do.
+// Any other scheme is `#InvalidUrl`, since `fetch` on some hosts reads a `file:`
+// URL.
 const SCHEMES = new Set(["http:", "https:"])
 
-// Probed PER CALL, for the reason `Terminal.ts` probes its streams per
-// write: a read at the top of this module is a side effect esbuild has to keep,
-// and a bundle would carry it whether or not the Program sends anything. And a
-// bare `fetch` on a host without one is a ReferenceError rather than
-// `undefined`, which is why the `typeof` comes first.
+// Looked up per call, and through `typeof`, since a bare `fetch` throws on a
+// host without one.
 function hostFetch(): typeof fetch | null {
 	return typeof fetch === "function" ? fetch : null
 }
 
-// What a thrown value says, as a reason a reader can act on. The `cause`
-// is read because that is where the host libraries put the sentence worth
-// having: a refused connection arrives as "fetch failed" with the refusal
-// underneath it.
+// A refused connection arrives as "fetch failed" with the refusal in its
+// `cause`, so the cause is read too.
 function reasonOf(thrown: unknown): string {
 	if (!(thrown instanceof Error)) {
 		return String(thrown)
@@ -151,18 +104,12 @@ function reasonOf(thrown: unknown): string {
 		: thrown.message
 }
 
-// A run that was stopped never answers. The timer `Async.sleep` clears is
-// this promise: what cancellation is throughout this runtime is that the work is
-// signalled and its answer is dropped, never observed. Answering a `#Failure`
-// here instead would put a reason in front of a Program that a `match` would
-// then read and print, which is a cancelled request being visible — and the one
-// thing `::within` and `::race` promise is that it is not.
+// What a stopped run answers, so that no Program sees it.
 function neverAnswers<Value>(): Promise<Value> {
 	return new Promise<Value>(() => {})
 }
 
-// `Http.send(_ request)` — the one native of the Namespace, and the door
-// every verb in `Http.es` is written on.
+// The one native of the Namespace. Every verb in `Http.es` is written on it.
 export function send(
 	request: RequestType,
 ): FutureType<ResultType<ResponseType, HttpFailureType>> {
@@ -192,10 +139,8 @@ export function send(
 			return createFailure(invalidUrl(address))
 		}
 
-		// What this library can decide for itself, decided before a socket
-		// exists. `#Unreachable` is the Case for all three — a host that was not
-		// reached covers one that was never asked — and the reason is this
-		// library's own sentence rather than the host library's.
+		// Decided before anything is sent, as `#Unreachable` with this
+		// library's own reason.
 		let method = METHOD_NAMES[request.method[typeKeySymbol]]
 		let written = headersOf(request.headers)
 
@@ -269,10 +214,7 @@ export function send(
 	})
 }
 
-// The request's headers as the host wants them, read off the Dictionary in
-// the order they were set. A pair Array rather than an object, so that a name a
-// Program wrote twice in two spellings is not silently one key here: the
-// Dictionary already decided what one key is, and `Headers` decides the rest.
+// Pairs in the order they were set, so two spellings of one name stay two.
 function headersOf(
 	headers: DictionaryType<StringType, StringType>,
 ): Array<[string, string]> {
@@ -282,25 +224,9 @@ function headersOf(
 	])
 }
 
-// The answer's headers, LOWERCASED into a Dictionary. HTTP header names
-// do not differ by case, and a Dictionary's keys do — so one spelling has to be
-// the spelling, and lowercase is the one every host already answers with.
-// `Response::header(named:)` lowercases what it is asked for and reads the key
-// back, which is what makes the lookup case-insensitive without a second
-// vocabulary.
-//
-// `Headers` folds a name sent twice into ONE entry, joined with ", " —
-// for every name but `set-cookie`, which the Fetch standard exempts, so an
-// answer carrying two cookies iterates as two `set-cookie` pairs. A Dictionary
-// has one value per key, so the second would overwrite the first and the first
-// would be gone with nothing said anywhere. Folded here the way the host folds
-// every other name instead: what a Program reads is what it would have read had
-// the host done the folding.
-//
-// A joined `set-cookie` is not splittable back — a cookie's `Expires`
-// holds a comma of its own — so what this keeps is the fact that a second
-// cookie was sent, not a way to read the two apart. A reader of its own over
-// `getSetCookie()` is what that would take, and it is not what this answers.
+// The answer's headers with lowercased names. A repeated `set-cookie` is joined
+// as `Headers` joins every other name. Only `getSetCookie()` could tell the
+// cookies apart again.
 function answeredHeaders(
 	answered: Response,
 ): DictionaryType<StringType, StringType> {
