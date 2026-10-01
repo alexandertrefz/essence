@@ -615,3 +615,22 @@ describe("Signature Help inside a Protocol-provided Method body", () => {
 		expect(help?.activeParameter).toBe(1)
 	})
 })
+
+// A refinement predicate is a Method call on `@`, written in a Type Alias
+// rather than in a body.
+describe("Signature Help inside a refinement predicate", () => {
+	it("should show the signature of the Method the predicate calls", () => {
+		let source = [
+			"implementation {",
+			"\ttype Small = Integer where @::isLessThan(",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 2, column: 43 })
+
+		expect(help?.signatures[0].label).toBe(
+			"isLessThan(_ Integer) -> Boolean",
+		)
+		expect(help?.activeParameter).toBe(0)
+	})
+})

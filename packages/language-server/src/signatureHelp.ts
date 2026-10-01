@@ -477,6 +477,12 @@ function findEnclosingInvocation(
 		}
 	}
 
+	function visitPresent(node: common.typed.ImplementationNode | null) {
+		if (node !== null) {
+			visitNode(node)
+		}
+	}
+
 	function visitNode(node: common.typed.ImplementationNode) {
 		consider(node)
 
@@ -638,7 +644,10 @@ function findEnclosingInvocation(
 				}
 
 				return
+			// A call in a refinement predicate gets help too.
 			case "TypeAliasStatement":
+				visitPresent(node.predicate)
+				return
 			case "Identifier":
 			case "Self":
 			case "StringValue":
