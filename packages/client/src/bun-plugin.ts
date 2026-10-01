@@ -17,58 +17,8 @@ import {
 	wrapperFor,
 } from "./plugin-core"
 
-// The same plugin, in the shape Bun asks for it. It serves two hosts at
-// once: `Bun.build`, where it is a bundler plugin like the esbuild one, and the
-// RUNTIME, where `Bun.plugin` registers it once for the process and every
-// `import "./Math.es"` after that — in a script, under `bun test`, under
-// `bun --hot` — is compiled where it is asked for. Registered from a `preload`
-// in `bunfig.toml`, it is there before the entry runs.
-//
-// The two hosts read a plugin differently, and this file is written to
-// be read both ways. The bundler is esbuild's shape: a resolver is offered the
-// specifier as written and the namespace of the module that wrote it. The
-// runtime is its own: a specifier spelled `scheme:rest` is offered to the
-// resolvers registered FOR THAT SCHEME as their namespace, with `rest` as its
-// path — the scheme already taken off — and a specifier with no `.` and no `:`
-// in it (a package, by name) is offered to no plugin at all. So every resolver
-// below is registered once with no namespace, for the bundler and for what a
-// FILE imports under the runtime, and once more under the scheme it answers
-// for, for what a served module imports under the runtime; and each reads its
-// specifier with the scheme on or off. The two packages every served module
-// imports by name — the runtime, and this package's interpreter — are not
-// resolved by a hook at all: they are resolved here, out of the root, and
-// written into the served text as the files they resolve to, so that neither
-// host is ever asked.
-//
-// One consequence worth stating: a served module has no `resolveDir`
-// under Bun, so had those imports stayed bare, the runtime would have resolved
-// them from the `.es` file's own directory — right for a source inside the
-// project, and wrong for one reached through `../`. Written as files, they
-// resolve from the root under both hosts, exactly as the esbuild plugin's
-// `resolveDir` makes them.
-//
-// And `bun --hot`, which is the reason this plugin exists at all rather
-// than `Bun.build` alone. Bun reloads a module when a file IT READ changes,
-// and it never read a `.es` file — this plugin did — so nothing served here
-// would ever reload on its own, and an edit to a source would sit unseen
-// until the process was restarted by hand. So every module served under the
-// runtime imports, beside what it really imports, the SOURCE of every file of
-// its graph — as text, under a query that keeps it clear of this plugin's own
-// hooks — and Bun, having read those itself, watches them: an edit to any one
-// re-loads every module of the graph that reaches it, the wrapper included,
-// and everything that imports the wrapper after that. One runtime for the
-// process, one Type key — a value from before the reload is a value after it.
-// `bun --watch` restarts the whole process on the same edits, for the same
-// reason. Neither import goes into a `Bun.build` bundle: a build is one pass,
-// and its output has no watcher to answer to.
-//
-// The compiler's memory is what the reload would otherwise be answered
-// out of. There is no `onStart` under the runtime and no hook that says a
-// file changed, so this plugin looks for itself: every source it has served
-// is remembered by size and time, and every load first asks the filesystem
-// which of them moved and tells the compiler about exactly those. A load
-// under `Bun.build` asks the same question and hears the same answer —
-// nothing moved — at the cost of a `stat` per source.
+// The bundler plugin in the shape Bun asks for, serving both `Bun.build` and
+// the runtime through `Bun.plugin`. See "Under Bun" in DEVELOPMENT.md.
 
 export type BunResolveArguments = {
 	path: string
@@ -91,8 +41,7 @@ export type BunLoadResult = {
 }
 
 export type BunBuild = {
-	// Present under `Bun.build`, absent under the runtime. Only `root` is
-	// read: the directory every Module of a build is spelled against.
+	// Present under `Bun.build`, absent under the runtime. Only `root` is read.
 	config?: { root?: string }
 	onResolve(
 		options: { filter: RegExp; namespace?: string },
@@ -112,45 +61,37 @@ export type BunPlugin = {
 }
 
 export type BunPluginOptions = PluginOptions & {
-	// The project root, which everything served is spelled against and
-	// the two packages are resolved from. `Bun.build` says; the runtime does
-	// not, and the working directory is what a script started from — right for
-	// `bun run` at the root of a project, and this is the override for anything
-	// else.
+	// The project root, which everything served is spelled against and the
+	// runtime packages resolve from. Without it the runtime uses the working
+	// directory.
 	root?: string
-	// How a package is turned into a file. `Bun.resolveSync` is the
-	// answer everywhere this plugin runs; the seam exists for a test.
+	// How a package is turned into a file: `Bun.resolveSync` unless a test
+	// passes another.
 	resolve?: (specifier: string, from: string) => string
 }
 
-// The namespaces the emitted Modules and the prelude are served in — the
-// same two the esbuild plugin spells. The first is ALSO the scheme the wrapper
-// imports its Module by, which under the runtime is what makes an import of it
-// land here: `essence-raw:/…/Math.es` is offered to the resolvers of namespace
-// `essence-raw`, and loaded from it.
+// The namespaces of the emitted Modules and the prelude, as in the esbuild
+// plugin. The runtime offers `essence-raw:/…/Math.es` to the resolvers of the
+// namespace `essence-raw`.
 const RAW_NAMESPACE = "essence-raw"
 const PRELUDE_NAMESPACE = "essence-prelude"
 
-// And the scheme one served module imports another by — `essence:` —
-// which is not a namespace anything is served IN, only the one the runtime
-// offers those imports UNDER.
+// The namespace the runtime offers `essence:` imports under. Nothing is served
+// in it.
 const SERVED_NAMESPACE = MODULE_SCHEME.slice(0, -1)
 
 const ANY = /.*/
 const RAW_IMPORT = /\.es\?raw$/
 
-// What a served module imports its sources under, so that Bun reads and
-// watches them — see the note on `bun --hot`. A query, so that the import is
-// not a `.es` path this plugin's own hook would claim and answer with a wrapper
-// instead of the text.
+// What a served module imports its sources under, so that Bun watches them.
+// The query keeps this plugin's `.es` hook from claiming the import.
 const SOURCE_QUERY = "?source"
 
 // What a served module and the wrapper import by name, and nothing else.
 const BY_NAME =
 	/(["'])(@essence-lang\/(?:runtime\/[^"']+|client\/marshal-runtime))\1/g
 
-// With the scheme, or without: the bundler offers the former and the
-// runtime the latter, and one reading serves both.
+// The bundler offers a specifier with its scheme and the runtime without.
 function withScheme(specifier: string, scheme: string): string {
 	return specifier.startsWith(scheme) ? specifier : `${scheme}${specifier}`
 }
@@ -168,11 +109,10 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				((specifier: string, from: string) =>
 					Bun.resolveSync(specifier, from))
 			let rawDoors = new Set<string>()
-			// `Bun.build` hands its configuration over; the runtime has
-			// none to hand.
+			// Only `Bun.build` hands over a configuration.
 			let runtime = build.config === undefined
-			// Every source served so far, by size and time — what a load
-			// checks against the filesystem before it answers.
+			// Every source served so far, by size and time, which each load
+			// checks against the filesystem first.
 			let signatures = new Map<string, string>()
 
 			function signature(file: string): string {
@@ -185,8 +125,7 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				}
 			}
 
-			// Which of the sources served so far moved since — each is
-			// told to the compiler, and remembered as it now is.
+			// Invalidates each served source that moved, and remembers it anew.
 			function noticeChanges(): void {
 				for (let [file, known] of signatures) {
 					let now = signature(file)
@@ -206,8 +145,8 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				}
 			}
 
-			// The sources of a served module, imported as text under the
-			// runtime so that Bun watches them — and nothing at all in a build.
+			// Under the runtime, imports of a served module's sources as text,
+			// so that Bun watches them. A build gets none.
 			function watching(files: Array<string>): string {
 				if (!runtime) {
 					return ""
@@ -223,9 +162,8 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 					.join("")
 			}
 
-			// The two packages, as files, out of the root. Resolved once
-			// each — the same two names in every served module — and spelled
-			// into the text as JSON, which is how a specifier is quoted.
+			// The runtime packages as files resolved from the root, each once,
+			// and quoted as JSON.
 			let resolved = new Map<string, string>()
 			let asFiles = (code: string): string =>
 				code.replace(BY_NAME, (_match, _quote, specifier: string) => {
@@ -240,27 +178,21 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 					return JSON.stringify(file)
 				})
 
-			// A served Module's path in its namespace is the SPECIFIER —
-			// `essence-raw:/…/Math.es` — rather than the `.es` file's path with
-			// the namespace telling the two apart, because `Bun.build` tells
-			// modules apart by path alone: a Module served under the file's own
-			// path would be taken for the wrapper already loaded under it, and
-			// the wrapper would import itself. The file is read back off the
-			// specifier where the Module is loaded.
+			// A served Module's path is its raw specifier, since `Bun.build`
+			// tells modules apart by path alone. See "Under Bun" in DEVELOPMENT.md.
 			let rawModule = (file: string): BunResolveResult => ({
 				path: rawSpecifier(file),
 				namespace: RAW_NAMESPACE,
 			})
 
-			// The wrapper's own import of the Module behind it, and the
-			// same door as a host writes it — see the esbuild plugin.
+			// The wrapper's import of its Module.
 			let toRaw = (args: BunResolveArguments): BunResolveResult =>
 				rawModule(
 					rawFile(withScheme(args.path, RAW_SCHEME)) ??
 						canonicalPath(args.path),
 				)
 
-			// What one served Module imports another by, and the prelude.
+			// A served Module importing another or the prelude.
 			let toServed = (args: BunResolveArguments): BunResolveResult => {
 				let specifier = withScheme(args.path, MODULE_SCHEME)
 
@@ -283,9 +215,8 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				toServed,
 			)
 
-			// `./Math.es?raw`, resolved against the file that wrote it.
-			// Only a file writes it — a served module imports its siblings by
-			// the scheme above — so one registration is enough for both hosts.
+			// `./Math.es?raw`, resolved against the importing file. Only a file
+			// writes it, so one registration serves both hosts.
 			build.onResolve({ filter: RAW_IMPORT }, (args) => {
 				let file = canonicalPath(
 					path.resolve(
@@ -332,11 +263,8 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				},
 			)
 
-			// For FILES, and said so: under `Bun.build` a load hook with
-			// no namespace answers for every namespace, and the Module behind
-			// the raw door sits under the same `.es` path in a namespace of its
-			// own — left unsaid, this hook would answer for that too, with a
-			// wrapper that imports itself.
+			// Files only: under `Bun.build` a load hook with no namespace answers
+			// for every namespace, the raw one included.
 			build.onLoad(
 				{ filter: ESSENCE_FILE, namespace: "file" },
 				async (args) => {

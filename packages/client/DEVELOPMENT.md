@@ -170,3 +170,38 @@ away, as a test or a second tab does, can lose them. An edit to its sources then
 is served again. Whether that happens depends on a race with the analysis of the importer that would have created the
 node. By `transform` the node exists, so the edge is drawn either way. The `load` call stays, because it is also what
 puts the file under the real watcher.
+
+### Under Bun
+
+`essenceBun` serves two hosts. Under `Bun.build` it is a bundler plugin like the esbuild one. Under the runtime,
+`Bun.plugin` registers it once for the process. Every later `.es` import is then compiled when it is asked for, in a
+script, under `bun test` and under `bun --hot`. A `preload` in `bunfig.toml` registers it before the entry runs.
+
+The two hosts offer specifiers differently. The bundler follows esbuild: a resolver sees the specifier as written and
+the namespace of the module that wrote it. The runtime offers a specifier spelled `scheme:rest` to the resolvers
+registered for that scheme as their namespace, with the scheme taken off. It offers a specifier with no `.` and no `:`,
+such as a package name, to no plugin at all. So each resolver is registered once with no namespace, for the bundler
+and for files under the runtime. It is registered once more under its scheme, for served modules under the runtime.
+`withScheme` reads a specifier with the scheme on or off.
+
+The packages every served module imports by name, the runtime and the interpreter, go through no hook. The plugin
+resolves them from the root and writes the resolved files into the served text. A served module has no `resolveDir`
+under Bun, so a bare import would resolve from the `.es` file's own directory. That fails for a source reached
+through `../`.
+
+A served Module's path is its raw specifier rather than the file's path in a namespace of its own. `Bun.build` tells
+modules apart by path alone. A Module served under the file's path would be taken for the wrapper already loaded
+there, and the wrapper would import itself. For the same reason the wrapper's load hook names the `file` namespace,
+since a `Bun.build` load hook without one answers for every namespace.
+
+`bun --hot` reloads a module when a file Bun read changes. Bun never reads a `.es` file, since the plugin does, so
+nothing served would reload. Under the runtime every served module therefore also imports the source of every file of
+its graph as text. The `?source` query keeps those imports away from the plugin's own hooks, and Bun watches the files
+it read. An edit to one reloads every module of the graph that reaches it, the wrapper included, and every importer of
+the wrapper. The process keeps one runtime and one Type key, so a value from before the reload is a value after it.
+`bun --watch` restarts the process on the same edits. A `Bun.build` bundle gets no such imports, since a build is one
+pass with no watcher.
+
+The runtime has no `onStart` and no hook that reports a changed file, so the plugin checks for itself. It remembers
+every source it served by size and time. Each load first asks the filesystem which of them moved, and invalidates
+those. Under `Bun.build` the same check finds nothing moved, at the cost of a `stat` per source.
