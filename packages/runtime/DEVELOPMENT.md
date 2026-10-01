@@ -1275,3 +1275,24 @@ name. A benchmark is deselected as `bench` unless the run measures, and a measur
 else. Focus is decided across the whole run, but a registry can not see the bundles beside it. So a runner tells
 each registry, with `focusedElsewhere`, when another holds a focused test, and the registry deselects its own tests
 as `not-focused`.
+
+### Reporting a test
+
+`runOne` writes a test's events in a fixed order. First come its output, the points it touched and its probes.
+Then come its `property`, `benchmark` and `snapshot` events, one `expect` event per assertion, and last its verdict. A
+property's assertions are about the one smallest failing case, so the reader learns that first. A snapshot event
+carries what a runner must write, pass or fail. Only a failed assertion has its values rendered, since rendering a
+Record walks all of it.
+
+A benchmark that regressed fails its test, as an assertion would. It failed no assertion and threw nothing, so
+`runOne` writes the reason as the failure's `error`. A consumer that ignores the `benchmark` kind still sees why.
+Every value is rendered inside the runtime, so a JSON consumer and a terminal reporter show the same text.
+
+### The boundary of a bundle
+
+A bundle publishes `entryPoints` under `$tests` on its entry Module, and a runner reaches the test runtime only
+through it. Each bundle inlines its own runtime, and every value carries a Type key that is a `Symbol` of that
+runtime. A runtime asked from outside would read `undefined` off every value. So everything that touches a value
+runs inside the bundle, and what crosses the boundary is events: plain data, already rendered. `registryOf` reads no
+value, so it is safe from either side, and the Language Server's Worker uses it. The entry points are one object, so
+the contract can grow without the Rewriter learning a new name.
