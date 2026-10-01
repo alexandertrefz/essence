@@ -7,27 +7,13 @@ import type { common } from "@essence-lang/interfaces"
 import { endOfLine, lineAt, sliceOf } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 
-// The Diagnostics about how a Token was WRITTEN — a String that was never
-// closed, an escape the Lexer does not know, a tag that ran into its own text.
-// Each of them is a handful of characters on one line, so each fix here reads
-// the span back off the buffer before it writes: what these answer is a mistake
-// in the very text the edit is about to land in, and a Position from an analysis
-// two keystrokes old points at something else entirely.
+// Fixes for how a Token was written: an unclosed String, an unknown escape, a
+// tag run into its text. Each reads its few characters back off the buffer
+// before writing.
 
-// The String's opening quote is the first Label standing on a `"`, which
-// is the one thing the two shapes of this Diagnostic share. The plain one stands
-// at the END OF THE INPUT — an unclosed String swallows every line below it, so
-// that is where the Lexer ran out — and carries the opening quote as its
-// secondary Label. The one that names a String for SWALLOWING the lines below it
-// stands on that String's opening quote itself, with the quote it closed on
-// beside it. Either way the fix writes the missing quote where the reader forgot
-// it: at the end of the line the String opened on, which is what gives the lines
-// below it back to the Program.
-//
-// A String may run over line breaks, so the LINE is a reading of what was meant
-// rather than the only place a quote could go. It is the reading every other one
-// costs a Program: closing the String at the end of the input keeps the rest of
-// the file inside it, which is the shape that was already refused.
+// Closes a String at the end of the line it opened on, which gives the
+// following lines back to the Program. Both shapes of this Diagnostic carry
+// the opening quote as a Label.
 export function closeStringAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -42,22 +28,14 @@ export function closeStringAction(
 
 	let end = endOfLine(lines, opening.start.line)
 
-	// A quote written behind an ODD run of backslashes is escaped by the
-	// last of them — `"hello\` closed this way reads `"hello\"`, which is a
-	// String still running — so the one edit this offers would leave the very
-	// Diagnostic it answers standing. What the trailing backslash was meant to
-	// be is not something the source says, so nothing is offered rather than
-	// something that does not hold. An EVEN run is `\\`, a written backslash,
-	// and closes as any other character does.
+	// After an odd run of backslashes the quote would be escaped, as in
+	// `"hello\"`, so nothing is offered. An even run is written backslashes.
 	if (trailingBackslashes(lineAt(lines, end.line), end.column) % 2 === 1) {
 		return null
 	}
 
-	// And a String whose `{` opened a hole is refused for the same reason
-	// and withheld for the same reason: `"{\"a\": 1}"` answered this fix with
-	// the very Diagnostic it was applied to, so the fix ran again and wrote a
-	// third quote, and a fourth. The report says what is actually missing there
-	// — the `\{` and the `\}` — and asked the same question of the same line.
+	// A hole holding an escape, as in `"{\"a\": 1}"`, would leave the String
+	// unclosed after this fix too. Its report asks for `\{` and `\}` instead.
 	if (
 		holeHoldsAnEscape(
 			lineAt(lines, opening.start.line).slice(opening.start.column - 1),
@@ -87,15 +65,11 @@ function trailingBackslashes(text: string, column: number): number {
 	return count
 }
 
-// The Diagnostic spans exactly the two characters `\c`, whatever `c` came
-// out as.
+// The Diagnostic spans exactly the two characters `\c`.
 const escapePattern = /^\\(.)$/
 
-// The two answers the Help gives, both offered and neither preferred: a
-// backslash that was meant to be one is written `\\`, and a backslash that was
-// never meant at all goes. Which of the two was meant is what the writer knows
-// and the Lexer does not — `"C:\temp"` wants the first and `"a\q"` almost
-// certainly wants the second — so an Editor must not pick one without asking.
+// Writes `\\` for a meant backslash, or drops it. Neither is preferred:
+// `"C:\temp"` wants the first and `"a\q"` likely the second.
 export function invalidEscapeActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -133,20 +107,9 @@ export function invalidEscapeActions(
 	]
 }
 
-// The rewrite a `\u{…}` Diagnostic already carries. The Lexer worked out
-// which digits the reader meant and spelled them back at them — four where
-// JavaScript would have read four, a surrogate pair's whole character, the
-// leading zeros off a seventh digit, the `U+` off a named code point — and
-// re-deriving any of that here would be that reading written a second time, in
-// a place with only a span to read it from. The shape of the Help is the
-// contract between the two, and it is written in exactly one place: the
-// Helps of `readUnicodeEscape`.
-//
-// The Help for a code point read as DECIMAL is deliberately NOT offered
-// as a fix. It offers its spelling on a condition the source can not settle —
-// whether those digits were meant as decimal at all — and a fix applied from a
-// menu settles every condition it is given, so following that one has to stay
-// the reader's own decision.
+// The `\u{…}` rewrite the Lexer's `readUnicodeEscape` spells in the Help. See
+// "Reading a Help" in DEVELOPMENT.md. The Help for digits read as decimal is
+// not offered, since only the reader knows whether they were meant so.
 const unicodeRewritePattern =
 	/^(?:Write it in braces|Write the character as one escape|Drop the leading zeros|Close it with a '\}'|Write the digits alone): '(\\u\{[0-9A-Fa-f]{1,6}\})'/
 
@@ -173,18 +136,12 @@ export function unicodeEscapeActions(
 	})
 }
 
-// The two halves of a decimal that was written with one side empty. A
-// digit run may be grouped with `_`, which is part of the spelling and stays in
-// whatever is written back.
+// A decimal with one side empty. A `_` grouping digits is kept.
 const leadingPointPattern = /^\.([0-9][0-9_]*)$/
 const trailingPointPattern = /^(-?[0-9][0-9_]*)\.$/
 
-// `.5` has ONE answer — a decimal missing its whole part is a decimal
-// whose whole part is zero, and no other reading of it exists. `1.` has two,
-// which the Diagnostic's own Helps give in order: the digits behind the point
-// were forgotten, or the point was. They differ in the Type the Literal ends up
-// with — `1.0` is a Rational and `1` is an Integer — so neither is preferred and
-// the reader picks.
+// `.5` becomes `0.5`, preferred. `1.` becomes `1.0` or `1`, a Rational or an
+// Integer, so neither of those is preferred.
 export function partialDecimalActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -215,8 +172,7 @@ export function partialDecimalActions(
 		return []
 	}
 
-	// The point is the last character of the span, and the Position runs
-	// one past it, as every Position does.
+	// The point is the span's last character; a Position ends one past it.
 	let point = {
 		line: diagnostic.position.end.line,
 		column: diagnostic.position.end.column - 1,
@@ -237,14 +193,8 @@ export function partialDecimalActions(
 	]
 }
 
-// The value the two spellings say between them, written back each way.
-// Both are offered and neither is preferred: `1.5/2` is `3/4` and `0.75` alike,
-// and which of them the file should read is a matter of what it is about — a
-// ratio is a fraction and a price is a decimal.
-//
-// The arithmetic is the Compiler's — see `mixedRationalSpellings` — because the
-// Help printed on this Diagnostic offers the same two spellings, and a Help and
-// a fix that disagree about a number are worse than either of them alone.
+// `1.5/2` written as `3/4` or `0.75`, neither preferred. The arithmetic is
+// `mixedRationalSpellings`, which the Help uses too, so the two agree.
 export function mixedRationalActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -258,11 +208,8 @@ export function mixedRationalActions(
 	)
 }
 
-// One shape for every Literal rewritten in place: the title names the
-// spelling the reader will be left with, which is the only thing that tells two
-// of them apart in a list. Preferred only where the offer stands alone — where
-// two spellings are offered, choosing between them is what a Diagnostic can not
-// do for anyone.
+// A Literal rewritten in place, titled with the spelling it leaves. Preferred
+// only when it is the sole offer.
 function literalAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	spelling: string,
@@ -281,33 +228,22 @@ function literalAction(
 
 const emDash = "—"
 
-// The Diagnostic underlines the TEXT rather than the tag it ran into —
-// the em-dash is missing exactly where the text begins — so the separator is
-// written in front of it and not one character of what was typed is retyped.
-//
-// The space after the dash is part of the separator: `@param subject —who` reads
-// as a dash against a word rather than as a tag and its description, and the
-// Formatter has no say over the inside of a Comment.
+// Writes the separator before the text the Diagnostic underlines, with a
+// space after it, since the formatter does not touch a Comment's inside.
 export function documentationSeparatorAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): CodeActionEntry | null {
 	let written = sliceOf(lines, diagnostic.position)
 
-	// The span opens on the first character of the text, so leading
-	// whitespace or a dash already standing there says the buffer has moved on
-	// since the Diagnostic was made.
+	// Leading whitespace or a separator means the buffer has moved on.
 	if (written === "" || /^\s/.test(written) || written.startsWith(emDash)) {
 		return null
 	}
 
 	let start = diagnostic.position.start
-	// JSDoc writes `@param name - text`, and the hyphen is ITS separator
-	// — so a fix that only inserts the em dash left `@param _ — - the number`,
-	// with both languages' punctuation standing in one line. The run is
-	// REPLACED where one was written: it is the same separator, spelled the way
-	// the reader's last language spells it. A hyphen inside the text is left
-	// alone; only a run at the head of it is one of these.
+	// A leading hyphen or en dash is JSDoc's separator, so it is replaced
+	// rather than kept beside the new one.
 	let separator = /^[-–]\s+/.exec(written)?.[0] ?? ""
 	let end = {
 		line: start.line,
@@ -324,16 +260,12 @@ export function documentationSeparatorAction(
 	}
 }
 
-// A value comment is `§?` written at the end of a Statement, and the
-// Diagnostic spans the whole Comment — the two characters and everything the
-// reader wrote behind them.
+// A value comment is `§?` at a Statement's end; the Diagnostic spans all of
+// it.
 const valueComment = "§?"
 
-// The two characters at the front, and nothing else: what a reader wrote
-// behind them is a Comment either way, and is left exactly as it was. Preferred,
-// because the other answer the Help gives — ask it of a Statement inside the
-// `tests { … }` block — is a move rather than an edit, and moving a Statement is
-// not something a span can say how to do.
+// Replaces only the `§?`. Preferred, since the Help's other answer, moving
+// the Statement into `tests { … }`, is no edit.
 export function ordinaryCommentAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
