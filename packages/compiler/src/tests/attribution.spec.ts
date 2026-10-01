@@ -4,11 +4,9 @@ import { attributionOf, coveringPoints } from "@essence-lang/compiler/testing"
 import type { common } from "@essence-lang/interfaces"
 import type { CoveredPoint, TestEvent } from "@essence-lang/runtime/Testing"
 
-// The coverage-attribution join, read the way both readers read it — the
-// `--mutate` driver and the Language Server's live session. `attributionOf`
-// folds an event stream into one table per Module; `coveringPoints` asks that
-// table which of its points stand over a site. Everything here builds events by
-// hand, because the join reads EVENTS and nothing else.
+// The coverage-attribution join that the `--mutate` driver and the Language
+// Server's live session both read. The join reads only events, so these specs
+// build them by hand.
 
 describe("The attribution table", () => {
 	let at = (
@@ -21,9 +19,8 @@ describe("The attribution table", () => {
 		end: { line: endLine, column: endColumn },
 	})
 
-	// A CoveredPoint whose only field the join reads is its position. The
-	// rest are filled with what the runtime would emit, so the fixture is a real
-	// event and not a shape the type happens to admit.
+	// The join reads only the position. The other fields hold what the runtime
+	// emits, so the fixture is a real event.
 	let point = (position: common.Position): CoveredPoint => ({
 		kind: "statement",
 		label: "",
@@ -88,9 +85,8 @@ describe("The attribution table", () => {
 		])
 	})
 
-	// A `test-coverage` naming a Module no `coverage` event described has
-	// nowhere to land — the table is keyed by the coverage events alone, and a
-	// test of an uninstrumented Module is dropped rather than inventing a row.
+	// The table is keyed by the `coverage` events alone, so no row is invented
+	// for an uninstrumented Module.
 	it("drops a test-coverage for a Module with no coverage event", () => {
 		let events = [
 			coverage("/A.es", [at(1, 1, 1, 5)]),
@@ -135,20 +131,17 @@ describe("The attribution join", () => {
 		expect(coveringPoints(points, at(3, 4, 3, 10))).toEqual([0, 1])
 	})
 
-	// The fallback, and the reason it is EVERY overlap: a site the
-	// Simplifier trimmed differently from the Node the counter stands in front
-	// of overlaps rather than nests, and answering with nothing would report a
-	// well-tested site as one no test reaches.
+	// A site the Simplifier trimmed differently from the counter's Node overlaps
+	// rather than nests. Answering with nothing would report a tested site as
+	// one no test reaches.
 	it("falls back to every overlapping span", () => {
 		let points = [at(1, 1, 4, 30), at(3, 1, 4, 8), at(9, 1, 9, 5)]
 
 		expect(coveringPoints(points, at(4, 6, 5, 2))).toEqual([0, 1])
 	})
 
-	// A site that STRADDLES two points is reached by whatever reached
-	// either of them: neither span holds it, and the tests of the narrower one
-	// alone are a covering set with a test missing — which is a survivor nobody
-	// can trust.
+	// A site that straddles two points is reached by whatever reached either.
+	// Taking one point alone would leave a covering test out.
 	it("takes both points a site straddles", () => {
 		let points = [at(3, 1, 3, 20), at(3, 25, 4, 4)]
 

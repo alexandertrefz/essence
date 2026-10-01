@@ -11,10 +11,9 @@ import {
 	snapshotFileOf,
 } from "../testing/snapshots"
 
-// The two places a recorded snapshot ends up: the `__snapshots__`
-// companion beside the source, and the source itself. Both are read back after
-// they are written, because what a snapshot is worth is exactly what survives
-// the round trip.
+// A recorded snapshot goes to the `__snapshots__` companion or into the source
+// itself. Each spec reads back what it wrote, since a snapshot is worth what
+// survives the round trip.
 
 describe("The snapshot companion file", () => {
 	it("names a file beside the source it belongs to", () => {
@@ -55,9 +54,8 @@ describe("The snapshot companion file", () => {
 		expect(parseSnapshotFile(printSnapshotFile(entries))).toEqual(entries)
 	})
 
-	// The format writes `\n` and only `\n`, so a `\r` in a file is either
-	// a value's own or a tool's rewriting of the line endings — and which of
-	// the two it is, is what the whole file says rather than one line.
+	// The format writes only `\n`. Whether a `\r` is a value's own or a tool's
+	// rewrite of the line endings is decided by the whole file, not one line.
 	it("keeps a carriage return a value put there", () => {
 		let entries = { odd: "before\rafter" }
 
@@ -123,9 +121,8 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).not.toContain('"old"')
 	})
 
-	// Essence has no multi-line String Literal, so a value that spans
-	// lines is spelled on one with the escapes the Lexer knows — and read back
-	// as the very text it was recorded from.
+	// Essence has no multi-line String Literal. The value is spelled on one line
+	// with the Lexer's escapes and reads back as the same text.
 	it("spells a value that spans lines on one line", () => {
 		let slots = slotsOf(source)
 		let text = 'two\nlines "quoted" {braced}\tand tabbed'
@@ -179,10 +176,8 @@ describe("Writing a recorded value into the source", () => {
 		expect(written.text).toBe(source)
 	})
 
-	// Recording a snapshot is a test run writing into a source, and a run
-	// that also reformatted the file would be a build formatting your code.
-	// Only the slot moves; the rest of the file is left exactly as it was
-	// written, however it was written.
+	// A test run that records a snapshot must not reformat the source. Only the
+	// slot changes.
 	it("leaves an unformatted file unformatted but for the slot", () => {
 		let messy = [
 			"implementation {",

@@ -1,15 +1,11 @@
 import type { common } from "@essence-lang/interfaces"
 
-// `common.Diagnostic` requires a code, a labelled span and explicit
-// notes and helps — deliberately, so that no Diagnostic in the Compiler can
-// skip them. Tests about *rendering* and *plumbing* care about one field at a
-// time, so they build theirs through this instead of restating the whole
-// shape. Nothing in `src` outside the tests may use it: the point of the
-// required fields is that a report site has to make each decision.
-// The parameter is spelled out rather than `Partial<common.Diagnostic>`
-// — `Partial` of a union distributes, and the distributed form rejects a
-// `Position | null` for `position`, which is exactly what a test that covers
-// both halves needs to pass.
+// Fills the required fields of a `common.Diagnostic` for specs that care about
+// one field at a time. Code outside the tests must not use it, so every report
+// site still decides each field.
+//
+// The parameter is not `Partial<common.Diagnostic>`: that distributes over the
+// union and rejects the `Position | null` a spec of both halves passes.
 export function testDiagnostic(partial: {
 	severity: common.DiagnosticSeverity
 	message: string
