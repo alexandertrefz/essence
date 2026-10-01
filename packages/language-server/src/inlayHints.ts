@@ -1,10 +1,10 @@
-import { caseDefaults } from "@essence-lang/compiler/helpers"
 import { printType } from "@essence-lang/compiler/printType"
+import {
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
 import { spellTypeAt } from "./spellableTypes"
 
@@ -56,8 +56,18 @@ export function findInlayHints(
 	let hints: Hints = { list: [], program }
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body, hints)
+		for (let node of body) {
+			visitNode(node, hints)
+		}
 	}
+
+	// A Function's own Hints are made before its Parameters' defaults are
+	// visited, so the list is put back in written order.
+	hints.list.sort(
+		(a, b) =>
+			a.position.line - b.position.line ||
+			a.position.column - b.position.column,
+	)
 
 	if (range === null) {
 		return hints.list
@@ -77,16 +87,7 @@ type Hints = {
 	program: common.typed.Program
 }
 
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	hints: Hints,
-) {
-	for (let node of nodes) {
-		visitNode(node, hints)
-	}
-}
-
-function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
+function visitNode(node: TypedNode, hints: Hints) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -94,12 +95,8 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 			// then no Hint is needed. A failed inference shows nothing. A
 			// synthesized Declaration, such as a Pattern's `{ width }` binder,
 			// takes no annotation and is skipped.
-			if (node.synthesized !== undefined) {
-				visitNode(node.value, hints)
-				return
-			}
-
 			if (
+				node.synthesized === undefined &&
 				node.declaredType === null &&
 				node.type.type !== "Error" &&
 				!writesItsOwnType(node.value)
@@ -114,160 +111,13 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 				)
 			}
 
-			visitNode(node.value, hints)
-			return
-		case "VariableAssignmentStatement":
-			visitNode(node.value, hints)
-			return
-		case "FunctionStatement":
-			visitFunctionDefinition(node.value, hints)
-			return
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				visitNode(property.value, hints)
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, hints)
-				}
-			}
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, hints)
-				}
-			}
-
-			return
-		case "IfStatement":
-			visitNode(node.condition, hints)
-			visitBody(node.body, hints)
-			return
-		case "IfElseStatement":
-			visitNode(node.condition, hints)
-			visitBody(node.trueBody, hints)
-			visitBody(node.falseBody, hints)
-			return
-		case "ReturnStatement":
-			visitNode(node.expression, hints)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, hints)
-			}
-
-			return
-		case "FunctionInvocation":
-			visitNode(node.name, hints)
-			visitArguments(node.arguments, hints)
-			return
-		case "MethodInvocation":
-			visitNode(node.base, hints)
-			visitArguments(node.arguments, hints)
-			return
-		case "Lookup":
-			visitNode(node.base, hints)
-			return
-		case "Start":
-		case "Complete":
-			visitNode(node.expression, hints)
-			return
-		case "RefusedValue":
-			visitNode(node.base, hints)
-			return
-		case "Combination":
-			visitNode(node.lhs, hints)
-			visitNode(node.rhs, hints)
-			return
-		case "Match":
-			visitNode(node.value, hints)
-
-			for (let handler of node.handlers) {
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, hints)
-				}
-
-				visitBody(handler.body, hints)
-			}
-
-			return
-		// An arm declares nothing, but a Function literal among its values takes its
-		// Types from the position, so it gets Hints.
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				visitNode(expression, hints)
-			}
-
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				visitNode(member, hints)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				visitNode(value, hints)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				visitNode(entry.key, hints)
-				visitNode(entry.value, hints)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, hints)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			visitFunctionDefinition(node.value, hints)
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				visitNode(node.value, hints)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			// A Function literal in a Case payload's default takes its Types from the
-			// member it fills, so it gets Hints.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				visitNode(defaultValue, hints)
-			}
-
-			return
-		case "TypeAliasStatement":
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
+			break
+		case "FunctionDefinition":
+			hintFunctionDefinition(node, hints)
+			break
 	}
+
+	forEachTypedChild(node, visitNode, hints)
 }
 
 // A fully annotated Function literal already shows its Type, so the name gets
@@ -288,7 +138,7 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 // `inferredType` and `inferredReturnType` are set when the source omitted
 // them; a failed inference shows nothing. The Hints sit at the end of the
 // Parameter's name and at the end of the Parameter list.
-function visitFunctionDefinition(
+function hintFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	hints: Hints,
 ) {
@@ -309,10 +159,6 @@ function visitFunctionDefinition(
 				),
 			)
 		}
-
-		if (parameter.defaultValue !== null) {
-			visitNode(parameter.defaultValue, hints)
-		}
 	}
 
 	if (
@@ -327,16 +173,5 @@ function visitFunctionDefinition(
 				hints.program,
 			),
 		)
-	}
-
-	visitBody(definition.body, hints)
-}
-
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	hints: Hints,
-) {
-	for (let argument of nodeArguments) {
-		visitNode(argument.value, hints)
 	}
 }

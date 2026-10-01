@@ -260,10 +260,11 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 9. Rewriter: `rewriter/rewrite.ts`.
 10. Formatter: `packages/formatter/src/printer.ts`.
 11. Language server, in `packages/language-server/src`: `argumentContext.ts`, `callHierarchy.ts`,
-    `completion.ts`, `documentSymbols.ts`, `foldingRanges.ts`, `hover.ts`, `inlayHints.ts`, `rename.ts`,
+    `completion.ts`, `documentSymbols.ts`, `foldingRanges.ts`, `hover.ts`, `rename.ts`,
     `selectionRanges.ts`, `semanticTokens.ts`, `signatureHelp.ts` and `snippetContext.ts`; in
     `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts`, `payloads.ts` and
-    `typedLookups.ts`.
+    `typedLookups.ts`. `inlayHints.ts` descends through the visitor, and needs an edit only where the
+    kind writes something a Hint should annotate.
 12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
 13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
