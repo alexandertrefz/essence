@@ -198,6 +198,5 @@
 	"packages/runtime/src/tests/testing.spec.ts": {"sentence-length": 39, "em-dash": 35, "all-caps": 19, "position": 2, "block-length": 1, "counts": 1},
 	"packages/runtime/src/tests/unicodeEdges.spec.ts": {"sentence-length": 17, "em-dash": 13, "all-caps": 18, "history": 1},
 	"packages/runtime/src/tests/writing.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 2},
-	"packages/vscode-extension/tests/grammar.spec.ts": {"sentence-length": 25, "em-dash": 17, "all-caps": 12, "position": 4, "block-length": 1},
-	"packages/vscode-extension/tests/testModel.spec.ts": {"sentence-length": 11, "em-dash": 8, "all-caps": 5, "position": 1}
+	"packages/vscode-extension/tests/grammar.spec.ts": {"sentence-length": 25, "em-dash": 17, "all-caps": 12, "position": 4, "block-length": 1}
 }

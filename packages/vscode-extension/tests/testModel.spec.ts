@@ -30,10 +30,8 @@ import {
 	treeOf,
 } from "../testModel.js"
 
-// Everything the Test Explorer decides, without an extension host. What
-// `testView.js` adds is VS Code objects — a TestItem, a TestRun, a decoration —
-// and nothing it adds decides anything, which is why this file can stand in for
-// a walkthrough nobody can automate.
+// Everything the Test Explorer decides, without an extension host.
+// `testView.js` only turns these answers into VS Code objects.
 
 const FILE = "/repo/Season.tests.es"
 
@@ -56,8 +54,8 @@ function site(overrides: Partial<TestSite> = {}): TestSite {
 	let file = overrides.file ?? FILE
 
 	return {
-		// Spelled exactly as the Compiler spells a structural id, because
-		// the whole point of a suite's id is that it is the prefix of these.
+		// Spelled as the compiler spells a structural id, so a suite's id is
+		// its prefix.
 		id: suiteKey(file, [...suitePath, name]),
 		name,
 		suitePath,
@@ -194,12 +192,10 @@ describe("folding an event batch", () => {
 		])
 	})
 
-	// The event stream is versioned separately from the payload, so a
-	// batch may carry a kind this extension has never heard of. Ignoring the
-	// event is the rule; ignoring the batch would lose everything beside it.
+	// Events are versioned apart from the payload, so a batch may carry an
+	// unknown kind. The event is ignored, not the batch.
 	it("ignores an event kind it does not know", () => {
-		// Carrying a field no version of this client has a name for,
-		// which is half of what tolerating an unknown kind means.
+		// With a field this client has no name for.
 		let coverage = { schema: 1, kind: "coverage", id: "a", lines: [1, 2] }
 		let records = foldEvents([
 			started("a", "adds up"),
@@ -280,9 +276,7 @@ describe("applying a batch", () => {
 		])
 	})
 
-	// The case a half-typed line produces, and the reason this rule
-	// exists at all: an Explorer that empties itself between keystrokes is an
-	// Explorer nobody can read.
+	// A half-typed line must not empty the Explorer between keystrokes.
 	it("keeps a file the batch found nothing for and could not compile", () => {
 		let state = createState()
 		let one = site()
@@ -316,9 +310,8 @@ describe("applying a batch", () => {
 		expect(treeOf(state, FILE)).toEqual([])
 	})
 
-	// A Run lens over one test reports a deselection for every other test
-	// of that file. Adopting those would turn "run this one" into "forget the
-	// rest".
+	// A Run lens over one test reports every other test of its file as
+	// deselected, which must not forget their results.
 	it("merges a batch that was narrowed to some of a file's tests", () => {
 		let state = createState()
 		let one = site({ name: "adds up" })
@@ -418,9 +411,8 @@ describe("the tree", () => {
 		])
 	})
 
-	// A suite has no identity of its own — the runner never selects one —
-	// so the client spells it the way the Compiler would have, which makes it
-	// the prefix every id under it starts with.
+	// A suite has no id of its own, so the client spells one as the compiler
+	// would: the prefix of every id under it.
 	it("gives a suite the id every test under it starts with", () => {
 		let state = createState()
 		let inner = site({ name: "waits", suitePath: ["slow"] })
@@ -438,8 +430,8 @@ describe("the tree", () => {
 		expect(suiteKey("/repo/A.es", ["a/b"])).toBe("\\/repo\\/A.es/a\\/b")
 	})
 
-	// An interpolated name is worked out where the test stands, so the
-	// only name a test that never ran has is its template.
+	// An interpolated name is rendered when the test runs, so a test that
+	// never ran shows its template.
 	it("shows the rendered name where a run reported one", () => {
 		let state = createState()
 		let one = site({ name: "row {index}" })
@@ -506,9 +498,8 @@ describe("what a failure says", () => {
 			error: null,
 		})
 
-		// A literal traced as an operand renders to its own source, and
-		// the assertion's own answer is what "this failed" already said. Both
-		// would be a line the reader has to look past.
+		// A literal renders to its own source, and the assertion's answer
+		// repeats "this failed", so neither is listed.
 		expect(message.text).toBe(
 			["expect total::is(5)", "  total = 4"].join("\n"),
 		)
@@ -538,13 +529,12 @@ describe("what a failure says", () => {
 		expect(message.expected).toBe("5")
 		expect(message.actual).toBe("4")
 		expect(message.text).toContain("`is` compared 4 with 5")
-		// A difference over two scalars is the two of them, which the
-		// line above has already said in full.
+		// A difference over two scalars repeats the comparison line.
 		expect(message.text).not.toContain("the difference")
 	})
 
-	// "Expected" is a claim `isNot` never makes, and VS Code draws those
-	// two fields as "expected this, got that".
+	// VS Code draws the fields as "expected this, got that", which `isNot`
+	// never claims.
 	it("does not claim an expectation for an isNot", () => {
 		let [message] = messagesOf({
 			property: null,
@@ -565,9 +555,8 @@ describe("what a failure says", () => {
 		expect(message.text).toContain("`isNot` compared 4 with 4")
 	})
 
-	// A snapshot is the one failure that IS a text difference, and the
-	// pair VS Code draws as a diff is what was recorded against what this run
-	// held. Saying `is` of them would claim the very thing that failed.
+	// A snapshot's diff is the recording against this run, not an `is`
+	// comparison.
 	it("explains a snapshot as a recording and a run", () => {
 		let [message] = messagesOf({
 			property: null,
@@ -623,8 +612,7 @@ describe("what a failure says", () => {
 		expect(message.text).toContain("+   width = 4")
 	})
 
-	// A test body that THREW is a Compiler or a runtime bug rather than a
-	// failed assertion, and it has no span of its own.
+	// A body that threw has no span of its own.
 	it("reports a thrown body against the test itself", () => {
 		let messages = messagesOf({
 			property: null,
@@ -648,9 +636,8 @@ describe("what a failure says", () => {
 	})
 })
 
-// A property test's values are made up by the runner, so nothing in the
-// source says what a failure failed FOR — which is why the batch carries them
-// and the message says them.
+// The runner makes up a property test's values, so the batch carries the ones
+// a failure failed for, and the message shows them.
 describe("what a property test says", () => {
 	function property(id: string, name: string): TestEvent {
 		return {
@@ -775,16 +762,14 @@ describe("what to draw in the gutter", () => {
 		expect(marks.failed).toEqual([{ start: 2, end: 6 }])
 		expect(marks.skipped).toEqual([{ start: 8, end: 9 }])
 		expect(marks.passed).toEqual([])
-		// The one line INSIDE the test that failed, which the test's own
-		// mark could not point at.
+		// The failed line inside the test.
 		expect(marks.expects).toHaveLength(1)
 		expect(marks.expects[0].range.start.line).toBe(4)
 		expect(marks.expects[0].text).toContain("expect total::is(5)")
 	})
 
-	// A test a tag or a filter left out did not fail and was not skipped
-	// by anything the source says. Colouring its lines would be colour that
-	// answers no question.
+	// A test a tag or filter left out neither failed nor was skipped by the
+	// source, so its lines are not coloured.
 	it("leaves a test nobody selected unmarked", () => {
 		let state = createState()
 		let one = site()
@@ -876,9 +861,8 @@ describe("what a Debug gesture launches", () => {
 		])
 	})
 
-	// One session compiles one file, so a selection reaching two of them
-	// is two of them — in the order the files were first named, each carrying
-	// its own tests.
+	// One session compiles one file, so each file gets a session, in the
+	// order the files were first named, carrying its own tests.
 	it("splits a selection by the file each test is written in", () => {
 		expect(
 			debugConfigurationsFor([
@@ -1023,10 +1007,8 @@ describe("coverage on a batch", () => {
 			total: 5,
 		})
 
-		// A cycle that counted a DIFFERENT file leaves this one standing
-		// — which is the whole of why the files are laid over rather than
-		// replaced: a cycle covers what a change reached and says nothing about
-		// the rest.
+		// A cycle that counted another file leaves this one standing, since
+		// a cycle covers only what a change reached.
 		applyBatch(
 			state,
 			batch({
@@ -1052,9 +1034,8 @@ describe("coverage on a batch", () => {
 			total: 5,
 		})
 		expect(coverageOf(state, "/repo/Other.es")).not.toBeNull()
-		// And the Choices ARE replaced, because the Server works out
-		// which Cases anything built across the whole run and a client that
-		// merged them would be working that answer out twice.
+		// The Choices are replaced, since the Server merges them across the
+		// whole session.
 		expect(state.coverage.choices).toEqual([])
 	})
 
@@ -1077,10 +1058,8 @@ describe("coverage on a batch", () => {
 		expect(state.coverage.choices).toEqual([])
 	})
 
-	// The Server runs everything when a setting changes and throws its
-	// own coverage away first, so what such a cycle carries is the whole
-	// answer — and a cycle carrying nothing is the news that the counting was
-	// turned off, which the marks have to hear.
+	// A `settings` cycle carries the whole answer, so one carrying nothing
+	// means coverage was turned off and every mark goes.
 	it("is replaced whole by a cycle that ran everything", () => {
 		let state = createState()
 
@@ -1171,18 +1150,15 @@ describe("what a coverage view draws", () => {
 		expect(coverageMarksOf(file).covered).toEqual([{ start: 3, end: 3 }])
 	})
 
-	// The `if` ran and the `else` never did, on one line — which is
-	// neither covered nor uncovered, and a mark that said either would be
-	// wrong.
+	// The `if` ran and the `else` on the same line never did.
 	it("marks a line that ran but not whole as partial", () => {
 		let file = coverage().files[0]!
 
 		expect(coverageMarksOf(file).partial).toEqual([{ start: 7, end: 7 }])
 	})
 
-	// A Case built at a line is an Expression, and the Statement it
-	// stands in is counted already — the same rule the ratios were counted
-	// under.
+	// A Case built on a line is an Expression; the Statement it stands in
+	// is counted already, as the ratios count it.
 	it("draws nothing for a line only a construction stands on", () => {
 		let marks = coverageMarksOf(coverage().files[0]!)
 		let lines = [...marks.covered, ...marks.uncovered, ...marks.partial]
