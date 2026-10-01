@@ -13,8 +13,8 @@ function contextAt(source: string, cursor: common.Cursor) {
 	return findArgumentContext(enrichedProgram, cursor, source.split("\n"))
 }
 
-// Completion reaches this walker through a probe, which cannot close an
-// open Handler yet — so a Guard is covered here, where the Program is whole.
+// These specs walk a whole enriched Program, so they hold the walker apart from
+// the probe Completion reaches it through.
 describe("Argument context inside a Match Guard", () => {
 	let source = [
 		"implementation {",
@@ -52,11 +52,9 @@ describe("Argument context inside a Match Guard", () => {
 	})
 })
 
-// An update's right-hand side is held to the LEFT side's Type — every
-// member it may name is one the left side already has — and an unannotated
-// `{ base with … }` has no other expected Type at all. Both spellings of the
-// right-hand side are covered here, because they are one Node with one shape
-// and only the braces tell them apart.
+// An update's right-hand side is held to the left side's Type, and an
+// unannotated `{ base with … }` has no other expected Type. Both spellings are
+// one Node, and only the braces tell them apart.
 describe("Argument context inside an update", () => {
 	let source = [
 		"implementation {",
@@ -98,8 +96,8 @@ describe("Argument context inside an update", () => {
 	})
 })
 
-// Every arm's value answers the whole `define`, so it is held to what the
-// position expects — which is what completes a member name inside one.
+// Every arm's value answers the whole `define`, so it is held to the Type the
+// position expects.
 describe("Argument context inside a define arm", () => {
 	let source = [
 		"implementation {",

@@ -36,9 +36,8 @@ function outgoing(source: string, cursor: common.Cursor) {
 	return findOutgoingCalls(program, cursor, enrichedProgram)
 }
 
-// Who calls whom, and how often — the grouping is what the expectations
-// below are about; the individual call Positions are asserted where they carry
-// the point of the test.
+// The expectations are about who calls whom and how often. Call Positions
+// are asserted only where they carry the point of a test.
 function summarise(calls: Array<CallHierarchyCalls>) {
 	return calls.map((entry) => ({
 		name: entry.item.name,
@@ -177,8 +176,8 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// `add` is a standard library Method — it has no Declaration in
-		// this document, so there is nothing to expand and it is left out.
+		// `add` is a standard library Method with no Declaration in this
+		// document, so it is left out.
 		expect(summarise(outgoing(source, { line: 12, column: 11 }))).toEqual([
 			{ name: "helper", kind: "function", container: null, calls: 1 },
 			{
@@ -236,8 +235,8 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// Both Overloads share one name and therefore one Declaration —
-		// one item, both calls, exactly as renaming treats them.
+		// Both Overloads share one name and so one Declaration, as renaming
+		// treats them: one item with both calls.
 		let calls = incoming(source, { line: 3, column: 12 })
 
 		expect(summarise(calls)).toEqual([
@@ -367,16 +366,14 @@ describe("Call Hierarchy", () => {
 			"}",
 		].join("\n")
 
-		// The dispatched call resolves per member Type, and its
-		// `namespace` is a placeholder — see the NOTE on the Method Invocation
-		// case in `callHierarchy.ts`.
+		// A call on a Union receiver dispatches per member Type, and its
+		// `namespace` is a placeholder, so `callHierarchy.ts` skips it.
 		expect(incoming(source, { line: 3, column: 3 })).toEqual([])
 	})
 })
 
-// `= @::length()` IS a call, made by the Declaration the default is
-// written on — so it is an outgoing call of that Method exactly as one written
-// in the body is.
+// `= @::length()` is a call made by the Declaration the default is written on,
+// so it is an outgoing call of that Method.
 describe("Call Hierarchy of a call written in a default", () => {
 	let source = [
 		"implementation {",
@@ -403,9 +400,8 @@ describe("Call Hierarchy of a call written in a default", () => {
 	})
 })
 
-// A `define` is Expressions and nothing else, so a Function called only
-// from an arm would be reported as called by nobody by a walk with no case for
-// one.
+// A walk with no case for a `define` would report a Function called only from
+// an arm as called by nobody.
 describe("Call Hierarchy inside a define", () => {
 	let source = [
 		"implementation {",
@@ -444,9 +440,8 @@ describe("Call Hierarchy inside a define", () => {
 	})
 })
 
-// Every call that answers work is written under one of the two Keywords,
-// so a walk with no case for them reports the Functions asynchrony is written
-// with as called by nobody.
+// A walk with no case for `start` and `complete` would report the Functions
+// called under them as called by nobody.
 describe("Call Hierarchy through start and complete", () => {
 	let source = [
 		"implementation {",

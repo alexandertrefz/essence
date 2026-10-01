@@ -10,11 +10,9 @@ import {
 	type EntryAttribution,
 } from "../affected"
 
-// The line-to-tests reasoning, pinned without an Editor: everything in
-// `affected.ts` is a function of its arguments, so a hand-built event stream and
-// a pair of buffers is the whole world it needs. The session in `testSession.ts`
-// is what feeds it the real ones; here the events and the text are built by hand
-// so the rules read straight off the assertions.
+// `affected.ts` is a function of its arguments, so hand-built events and buffers
+// are all these specs need. See "Narrowing a cycle" in
+// packages/language-server/DEVELOPMENT.md.
 
 describe("The attribution the session folds out of a run", () => {
 	let at = (
@@ -71,8 +69,7 @@ describe("The attribution the session folds out of a run", () => {
 		expect(ids(table, "/A.es")).toEqual([["t1"], [], ["t1"]])
 	})
 
-	// A `test-coverage` naming a Module no `coverage` event described has
-	// nowhere to land — the table is keyed by the coverage events alone.
+	// The table is keyed by the `coverage` events alone.
 	it("drops a test-coverage for a Module with no coverage event", () => {
 		let events = [
 			coverage("/A.es", [at(1, 1, 1, 5)]),
@@ -105,8 +102,8 @@ describe("The span a change touched", () => {
 		let oldText = ["alpha", "beta", "gamma"].join("\n")
 		let newText = ["alpha", "BETA", "gamma"].join("\n")
 
-		// 1-based and inclusive; the end column is one past the old line's
-		// last character.
+		// Lines count from 1 and the end line is included. The end column is one
+		// past the old line's last character.
 		expect(changedRange(oldText, newText)).toEqual({
 			start: { line: 2, column: 1 },
 			end: { line: 2, column: 5 },
@@ -119,8 +116,8 @@ describe("The span a change touched", () => {
 		expect(changedRange(text, text)).toBeNull()
 	})
 
-	// Refused on purpose — every point below the edit moved, so the stored
-	// table's coordinates no longer describe the file.
+	// An added line moves every later point, so the stored table no longer
+	// describes the file.
 	it("refuses an edit that adds a line", () => {
 		let oldText = ["alpha", "beta"].join("\n")
 		let newText = ["alpha", "beta", "gamma"].join("\n")
@@ -135,9 +132,8 @@ describe("The span a change touched", () => {
 		expect(changedRange(oldText, newText)).toBeNull()
 	})
 
-	// A scattered edit is over-stated into one bounding span rather than
-	// under-stated — a wider range reaches more tests, which is the safe way to be
-	// wrong. Line 3 here never changed and is inside the span anyway.
+	// A wider span reaches more tests, which is the safe way to be wrong. Line 3
+	// never changed and is inside the span.
 	it("bounds a scattered in-line edit into one span", () => {
 		let oldText = ["a", "b", "c", "d", "e"].join("\n")
 		let newText = ["a", "B", "c", "D", "e"].join("\n")
@@ -202,8 +198,7 @@ describe("The tests a change reached", () => {
 		"end",
 	].join("\n")
 
-	// Line 2 is reached by "a", line 4 by "b" — two tests of one Module,
-	// each over its own line.
+	// Test "a" reaches line 2 and test "b" reaches line 4, both in one Module.
 	let attr = entryFor("/E.es", [pt(2, 1), pt(4, 1)], [["a"], ["b"]], oldText)
 
 	it("returns just the test whose reached line changed", () => {
@@ -239,9 +234,9 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// A point reached at LOAD by no single test — a top-level Constant, a
-	// suite's setup — feeds tests whose spans never touched it, so an edit there
-	// can change a test the attribution cannot name. Run whole.
+	// A point reached at load, such as a top-level Constant, feeds tests whose
+	// spans never touched it. An edit there can change a test the attribution
+	// cannot name.
 	it("runs whole for an edit to a line reached only at load", () => {
 		let loaded = entryFor("/E.es", [pt(2, 3)], [[]], oldText)
 
@@ -255,11 +250,9 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// The trap the load flag exists for: a helper called BOTH from a
-	// top-level Constant (at load) AND directly by test "a". Its point carries
-	// "a" in its set and ran at load, so narrowing to "a" alone would leave
-	// every test that read the load-time result stale. The load flag makes it a
-	// whole run despite the attributed test.
+	// A helper called by a top-level Constant at load and by test "a" directly.
+	// Narrowing to "a" would leave every test that read the load-time result
+	// stale.
 	it("runs whole for a point reached at load even when a test also reached it", () => {
 		let shared = entryFor("/E.es", [pt(2, 4)], [["a"]], oldText, [0])
 
@@ -273,9 +266,8 @@ describe("The tests a change reached", () => {
 		).toBeNull()
 	})
 
-	// A dead point (`count === 0`, no tests) narrows to nothing, and an
-	// empty result is itself the whole-run fallback rather than "nothing was
-	// affected".
+	// A dead point narrows to nothing, and an empty result runs whole rather
+	// than running no test.
 	it("runs whole for an edit to a line nothing reached", () => {
 		let dead = entryFor("/E.es", [pt(2, 0)], [[]], oldText)
 
@@ -301,8 +293,8 @@ describe("The tests a change reached", () => {
 	})
 
 	it("ignores a changed file the entry does not reach", () => {
-		// `reaches` answers false, so the unreached file is not this entry's
-		// concern; with nothing else changed there is nothing to narrow to.
+		// `reaches` answers false, so the file is not this entry's concern and
+		// nothing is left to narrow to.
 		expect(
 			affectedTests(
 				[attr],
@@ -312,8 +304,8 @@ describe("The tests a change reached", () => {
 			),
 		).toBeNull()
 
-		// And an unreached change does not veto a narrowing a reached file
-		// did produce — the edit to /M.es still selects "a".
+		// An unreached change does not veto the narrowing the edit to /M.es
+		// produces.
 		expect(
 			affectedTests(
 				[attr],
