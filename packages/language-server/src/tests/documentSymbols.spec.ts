@@ -841,3 +841,27 @@ describe("Document Symbols inside a test's head", () => {
 		expect(test.children.map((child) => child.name)).toEqual(["doubled"])
 	})
 })
+
+// A Function literal in a predicate is refused, but the outline shows what is
+// written and the Type the enricher still gives it.
+describe("Document Symbols inside a refinement's predicate", () => {
+	let source = [
+		"implementation {",
+		"\ttype Small = List<Integer> where @::hasOnlyItems(where (item) {",
+		"\t\tconstant limit = 10",
+		"",
+		"\t\t<- item::isLessThan(limit)",
+		"\t})",
+		"}",
+	].join("\n")
+
+	it("should nest what the predicate declares under the Type Alias", () => {
+		let [alias] = symbolsOf(source)
+
+		expect(alias.children.map((child) => child.name)).toEqual(["limit"])
+	})
+
+	it("should put the inferred Type beside it", () => {
+		expect(detailOf(detailedSymbolsOf(source), "limit")).toBe("Integer")
+	})
+})

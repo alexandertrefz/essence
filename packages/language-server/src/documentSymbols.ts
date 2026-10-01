@@ -413,7 +413,12 @@ function symbolForStatement(
 				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				children: recordTypeMembers(node.type),
+				children: [
+					...recordTypeMembers(node.type),
+					...(node.predicate === null
+						? []
+						: symbolsOfNode(node.predicate)),
+				],
 			}
 		case "ChoiceDeclarationStatement":
 			return {
@@ -664,6 +669,43 @@ function collectFunctionDetails(
 	collectDetails(definition.body, details)
 }
 
+function collectNamespaceDetails(
+	node: common.typed.NamespaceDefinitionStatementNode,
+	details: Details,
+) {
+	for (let property of Object.values(node.properties)) {
+		record(details, property.name.position.start, typeDetail(property.type))
+		collectDetail(property.value, details)
+	}
+
+	for (let [name, member] of Object.entries(node.methods)) {
+		let methodType = node.type.methods[name]
+
+		if (methodType !== undefined) {
+			record(
+				details,
+				member.name.position.start,
+				signatureDetail(methodType),
+			)
+		}
+
+		let methods =
+			member.nodeType === "OverloadedMethod" ||
+			member.nodeType === "OverloadedStaticMethod"
+				? member.methods
+				: [member.method]
+
+		for (let method of methods) {
+			collectFunctionDetails(method.value, details)
+		}
+	}
+
+	// A native Method's defaults stand in the frame made for them.
+	for (let shim of node.nativeShims) {
+		collectDefaultDetails(shim.parameters, details)
+	}
+}
+
 function collectCaseDetails(
 	node: common.typed.ChoiceDeclarationStatementNode,
 	details: Details,
@@ -714,42 +756,7 @@ function collectDetail(
 			collectFunctionDetails(node.value, details)
 			return
 		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				record(
-					details,
-					property.name.position.start,
-					typeDetail(property.type),
-				)
-				collectDetail(property.value, details)
-			}
-
-			for (let [name, member] of Object.entries(node.methods)) {
-				let methodType = node.type.methods[name]
-
-				if (methodType !== undefined) {
-					record(
-						details,
-						member.name.position.start,
-						signatureDetail(methodType),
-					)
-				}
-
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					collectFunctionDetails(method.value, details)
-				}
-			}
-
-			// A native Method's defaults stand in the frame made for them.
-			for (let shim of node.nativeShims) {
-				collectDefaultDetails(shim.parameters, details)
-			}
-
+			collectNamespaceDetails(node, details)
 			return
 		case "ProtocolDeclarationStatement":
 			for (let member of Object.values(node.methods)) {
@@ -767,6 +774,12 @@ function collectDetail(
 			return
 		case "ChoiceDeclarationStatement":
 			collectCaseDetails(node, details)
+			return
+		case "TypeAliasStatement":
+			if (node.predicate !== null) {
+				collectDetail(node.predicate, details)
+			}
+
 			return
 		case "IfStatement":
 			collectDetail(node.condition, details)
