@@ -336,9 +336,7 @@ describe("The bridges from a List", () => {
 			).toEqual(["[=]", "true"])
 		})
 
-		// A key with no canonical encoding is found through its own `is`, on
-		// the scan path, which only a right answer shows from here.
-		it("groups under a key with no canonical encoding", async () => {
+		it("groups under a Record key", async () => {
 			expect(
 				await run(`implementation {
 					constant seats = [
@@ -354,6 +352,22 @@ describe("The bridges from a List", () => {
 					)
 				}`),
 			).toEqual(["[ { row = 1 } = 2, { row = 2 } = 1 ]"])
+		})
+
+		// An Algebraic has no canonical encoding, so each key is found through
+		// `Number`'s `is` on the scan path.
+		it("groups under a key with no canonical encoding", async () => {
+			expect(
+				await run(`implementation {
+					constant roots: List<Number> = [2::squareRoot(), 3::squareRoot(), 2::squareRoot()]
+
+					Terminal.inspect(
+						roots
+							::group(on (root) { <- root })
+							::map(({ key, value }) { <- value::length() }),
+					)
+				}`),
+			).toEqual(["[ √2 = 2, √3 = 1 ]"])
 		})
 
 		// A List of groups is one `entries()` away, and each group is a
