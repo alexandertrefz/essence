@@ -6,15 +6,10 @@ import {
 	firstAnalysed,
 } from "./followedHelps"
 
-// The Helps about a Match's Cases, each one followed LITERALLY. Every one
-// of them named a second spelling of the same mistake: reorder two Cases that
-// ask the same question and the report moves to the other one; move a Case that
-// names no value to the end of a Match that already ends in one and the Case at
-// the end reports instead; guard the Case the report is about and the Case that
-// decides first goes on deciding first.
+// The Helps about a Match's Cases, each followed literally, so that none leads
+// to a second spelling of the same mistake.
 //
-// The Validator reports all of these, so the whole pipeline runs — `firstOf`
-// over the Enricher alone would find nothing here.
+// The Validator reports all of these, so the whole pipeline runs.
 
 describe("A Case an earlier one answers for", () => {
 	let twice = `implementation {
@@ -34,10 +29,8 @@ describe("A Case an earlier one answers for", () => {
 		Terminal.print(name(Colour#Red))
 	}`
 
-	// Two Matchers that ask the same question swallow each other in
-	// whichever order they are written, so "write it above" moved the report to
-	// the other Case and left a reader circling between two spellings of one
-	// duplicate.
+	// Two Matchers asking the same question swallow each other in either
+	// order, so a reorder would only move the report.
 	it("should not offer a reorder for two Cases that ask one question", () => {
 		expect(firstAnalysed(twice, "unreachable-case").helps).toEqual([
 			"Remove this Case — the Case above answers for every value it would take, in whichever order the two are written.",
@@ -64,9 +57,8 @@ describe("A Case an earlier one answers for", () => {
 		).toBe(true)
 	})
 
-	// A Case the one above COVERS rather than repeats is a different
-	// mistake, and reordering really is one of its answers — the clause stays
-	// where it still leads somewhere.
+	// A Case covered by a wider one, rather than repeated, is fixed by
+	// reordering.
 	it("should keep the reorder where the covered Case is narrower", () => {
 		let source = `implementation {
 			function describe(_ value: Integer | String) -> String {
@@ -99,12 +91,9 @@ describe("A Case an earlier one answers for", () => {
 })
 
 describe("Two Cases a Signature can not tell apart", () => {
-	// The Guard clause is GONE, in both positions. On this Case a Guard
-	// changes nothing — the earlier one decides first and never reaches it. On
-	// the Case above it takes that Case's claim away and leaves no Case to make
-	// it, which is `missing-case`, whose own two answers are both covered by the
-	// Case that decides first and report this again. Two Matchers asking one
-	// erased question admit no exhaustive Match at all.
+	// No Guard is offered. On the later Case it changes nothing, and on the
+	// earlier one it leads to `missing-case`. Two Matchers asking one erased
+	// question admit no exhaustive Match at all.
 	let source = `implementation {
 		type Handler = { run: (_ value: Integer) -> Integer }
 		type Logger = { run: (_ value: String) -> String }
@@ -143,9 +132,8 @@ describe("Two Cases a Signature can not tell apart", () => {
 		).toBe(true)
 	})
 
-	// The Guard on the Case above was the clause a reader followed into
-	// `missing-case`, which sent them back here. Pinned so the round trip can
-	// not be reintroduced by wording.
+	// A Guard on the Case that decides first leads to `missing-case`, whose
+	// Helps lead back here.
 	it("should not survive a Guard on the Case that decides first", () => {
 		let guarded = `implementation {
 			type Handler = { run: (_ value: Integer) -> Integer }
@@ -168,10 +156,8 @@ describe("Two Cases a Signature can not tell apart", () => {
 		).toContain("missing-case")
 	})
 
-	// A dispatch branch is picked the same way a Case is, so a Match
-	// written over the same two member Types reports the very same conflict one
-	// line further down — the reader followed the Help and met it again wearing
-	// the Match's wording.
+	// A dispatch branch is picked the way a Case is, so a Match over the same
+	// member Types would report the same conflict.
 	it("should not send a dispatch conflict into a Match", () => {
 		let dispatched = `implementation {
 			type Handler = { run: (_ value: Integer) -> Integer }
@@ -205,11 +191,8 @@ describe("Two Cases a Signature can not tell apart", () => {
 })
 
 describe("Two Cases naming Type Parameters", () => {
-	// The closed loop this report had. Neither Case is narrower than the
-	// other — Types erase before a Match runs, so each accepts every value that
-	// reaches it — and the clause that said "write this Case above the other
-	// one" moved the report to the other Case, whose own Help moved it back. A
-	// reader could swap the arms forever.
+	// Types erase before a Match runs, so each Case accepts every value and
+	// neither is narrower. A reorder would only move the report.
 	let source = `implementation {
 		function describe<infer First is Printable, infer Second is Printable>(_ value: First | Second) -> String {
 			<- match value -> String {
@@ -225,12 +208,8 @@ describe("Two Cases naming Type Parameters", () => {
 		])
 	})
 
-	// The same sentence `undispatchable-method` says about the call this
-	// Match was written to replace, out of the same builder — the two reports
-	// are one mistake met at two stages, and one answer said two ways is how two
-	// answers start. A signature taking one Type Parameter has nothing left for
-	// a Match to ask about, which is the point: the Match was standing in for
-	// the narrowing the Union could never do.
+	// `undispatchable-method` says the same sentence, from the same builder.
+	// One Type Parameter leaves nothing for a Match to ask about.
 	it("should compile when the signature is written that way", () => {
 		expect(
 			compiles(`implementation {
@@ -241,9 +220,8 @@ describe("Two Cases naming Type Parameters", () => {
 		).toBe(true)
 	})
 
-	// And the reorder clause stands where it is TRUE: a Case naming a
-	// declared Type really is narrower than the Generic Case that swallowed it,
-	// and moving it up is an edit that ends.
+	// A Case naming a declared Type is narrower than a Generic Case, so here
+	// the reorder clause holds.
 	it("should keep the reorder clause where this Case is narrower", () => {
 		let narrower = `implementation {
 		function describe<infer Item is Printable>(_ value: Item | Integer) -> String {
@@ -271,10 +249,8 @@ describe("Two Cases naming Type Parameters", () => {
 })
 
 describe("A Case an empty container crosses into", () => {
-	// A Match narrows nothing here — its Cases are picked by the same
-	// erased question the dispatch branches were. What decides an empty
-	// container is a GUARD, so the Help spells the whole shape rather than the
-	// half that reads like an answer.
+	// A Match's Cases ask the same erased question as the dispatch branches,
+	// so only a Guard decides an empty container. The Help spells it whole.
 	let dispatched = `implementation {
 		namespace Strings for List<String> {
 			describe() -> String {
@@ -343,10 +319,8 @@ describe("A Case of a Match on values", () => {
 		Terminal.print(describe(1))
 	}`
 
-	// `'case 0'` was an example of a value and a dead end on a Match over
-	// Strings — a Case naming an Integer there is refused two clauses down. The
-	// example is gone rather than translated, because the value this Case is
-	// about is the reader's to know.
+	// An example value such as `'case 0'` would be refused in a Match over
+	// Strings, and the value meant is the reader's to know.
 	it("should name no literal of its own", () => {
 		let overStrings = `implementation {
 			function describe(_ word: String) -> String {
@@ -367,10 +341,8 @@ describe("A Case of a Match on values", () => {
 		}
 	})
 
-	// "Move it to the end" is only an edit where there is no end yet. A
-	// Match that already closes with `case _` has this Case moved BELOW it,
-	// which makes the `case _` the one that names no value — the report, one
-	// Case further down.
+	// Moving this Case after a closing `case _` would leave the `case _` naming
+	// no value. So only a Match with no end hears "move it to the end".
 	it("should ask for a removal where the Match already ends", () => {
 		expect(
 			firstAnalysed(alreadyEnded, "literal-match-shape").helps,
@@ -404,9 +376,8 @@ describe("A Case of a Match on values", () => {
 			Terminal.print(describe(1))
 		}`
 
-		// Two `literal-match-shape` reports stand here — this Case, and
-		// the Match that now has no last Case — so the one under test is picked
-		// by what it is about rather than by being first.
+		// The Match that now has no last Case reports `literal-match-shape`
+		// too, so this report is picked by its message.
 		expect(
 			analysedDiagnosticsFor(noEnd).find(
 				(diagnostic) =>
@@ -441,17 +412,15 @@ describe("A Pattern that names the whole value", () => {
 		})
 	}`
 
-	// Rewriting the body alone leaves the binder standing, and the binder
-	// is what is refused — the Quick Fix has always made both edits.
+	// The binder is what is refused, so rewriting the body alone is not
+	// enough. The Quick Fix makes both edits.
 	it("should name both halves of the edit", () => {
 		expect(firstAnalysed(source, "redundant-pattern-binder").helps).toEqual(
 			["Drop the 'as whole' and write '@' where 'whole' was meant."],
 		)
 	})
 
-	// One mistake, one report. The binder is DROPPED rather than bound, so
-	// every read of the name below reported as a name nobody declared — this
-	// mistake said again in words about a different one.
+	// One mistake, one report: reads of the dropped binder report nothing.
 	it("should report nothing about the name it dropped", () => {
 		expect(
 			analysedDiagnosticsFor(source).map((diagnostic) => diagnostic.code),

@@ -18,7 +18,6 @@
 	"packages/compiler/src/tests/helpers.spec.ts": {"sentence-length": 78, "em-dash": 64, "all-caps": 52, "history": 4, "position": 5, "block-length": 12},
 	"packages/compiler/src/tests/hybridIntegers.spec.ts": {"sentence-length": 35, "em-dash": 28, "all-caps": 24, "history": 2, "position": 3, "block-length": 7},
 	"packages/compiler/src/tests/lexer.spec.ts": {"sentence-length": 13, "em-dash": 13, "all-caps": 17, "history": 1, "block-length": 3},
-	"packages/compiler/src/tests/matchHelps.spec.ts": {"sentence-length": 13, "em-dash": 12, "all-caps": 7, "position": 4},
 	"packages/compiler/src/tests/matchLowering.spec.ts": {"sentence-length": 24, "em-dash": 19, "all-caps": 7, "history": 1, "position": 2, "block-length": 5},
 	"packages/compiler/src/tests/mutation.spec.ts": {"sentence-length": 21, "em-dash": 13, "all-caps": 15, "block-length": 2, "counts": 1},
 	"packages/compiler/src/tests/natives.spec.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 2},
