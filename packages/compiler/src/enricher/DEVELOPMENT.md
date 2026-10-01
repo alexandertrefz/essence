@@ -32,6 +32,30 @@ binds the Choice's own Type Parameters under fresh names, so a Record that fits 
 Record. A Case that defaults its payload also accepts a Record Literal that is a partial of its Record, as in
 `#Post({ url = "/x" })`.
 
+### Resolving a Case
+
+A Choice's Type Parameters are applied, never inferred. `resolveCaseValueType` resolves a construction in this
+order.
+
+A bare `#Case` first looks in the expected Type of its position, as a Matcher looks in its subject
+(`resolveCaseInExpectedType`). Two arms there declaring the name is `ambiguous-case`. Where the position decides
+nothing, the scan of every Case in scope decides (`resolveBareCaseReference`). Two Choices declaring the name are
+ambiguous again, unless the position was itself refused. A unit Case of a generic Choice has no payload to
+decide anything, so a bare `#Bare` that nothing decides reports `undecided-type-arguments`, as `Holder#Bare` does.
+
+A prefixed `Holder#Case` is decided by the Type Arguments it writes, then by its position
+(`resolvePrefixedCaseValueType`). Its payload only chooses among the instantiations the position offers, and the
+validator checks it. So `Holder#Full({ value = 1 })` where nothing expects a Holder is undecided too. A
+Choice without Type Parameters has nothing to decide.
+
+`reportUndecidedTypeArguments` is the one report for every undecided construction, spelled the way the source
+wrote it. Its notes name the Choice's own Type Parameters. Those names are not in scope at the construction, so the Helps
+spell an application instead. Each Argument the payload decided is written out, with `…` for the rest.
+
+A bare Case that fails to resolve as an Argument is probed once per candidate, and the probes keep nothing.
+`noteExpectedChoice` remembers every Type it was measured against, so `unknown-case` can name the Choices the
+position accepts and their Cases. Without a position the report names the Choices that declare the near miss.
+
 ### Instantiating a generic Case from its payload
 
 A bare or prefixed Case without Type Arguments resolves to the declared Case, whose members still mention the
@@ -589,3 +613,52 @@ only the pairs its algorithm reaches. `orderDispatchCasesBySpecificity` places e
 strictly more specific than it, walking in declaration order to keep the rest stable. A Type Parameter or Unknown
 member matches every value at runtime (`isRuntimeCatchAllType`), so it goes last, and two of them make the call
 `undispatchable-method`.
+
+### Two nesting levels
+
+An Overload may have an entry for a carrier and one for the value it holds. `Optional::is` takes an
+`Optional<ItemType>` beside an `ItemType`, so on an `Optional<Optional<Integer>>` a written `#Empty` fits both the
+receiver and the Optional it holds. The entry for the whole carrier is written first, so `nested::is(#Empty)` asks
+whether the receiver is empty. `reportAmbiguousNestingLevel` warns with `ambiguous-nesting-level`, offering the
+holding Case around the Argument or an annotated Constant.
+
+It recognises the shape, not the names. The selected entry takes the receiver's own Type, compared both ways.
+Another entry of the same Overload takes what one of that Type's Cases holds, and the value the call built reads
+at both levels. A refinement ladder also lets two entries accept one call, but both entries ask about the same
+value, so it is not this trap.
+
+The written Argument's Type is compared rather than whether an entry accepts the call. An Argument an entry can
+not read types as Error inside, and an Error matches anything. That comparison runs before any entry is probed,
+because each probe is a full match and solve, and most calls never warn. `nestingLevelProbes` counts the probes,
+so `tests/enricher.spec.ts` can hold the cost without a clock. The check relies on the order the standard
+library declares the entries in; see "Why bodies look the way they do" in
+`packages/standard-library/DEVELOPMENT.md`.
+
+## Dead fallbacks
+
+A `defaultingTo` Argument is worth writing only where the call could come back empty without it. A proof the
+caller holds can take that away: `nonEmpty::firstItem()` answers an Integer, so the fallback in
+`nonEmpty::firstItem(defaultingTo 0)` is never read. The library can not refuse that call itself, since a
+refinement adds Methods and hides none, so `fallback-never-used` is a Warning raised here. The label is
+`fallbackArgumentLabel`, matched by name alone, so a Program's own Namespace following the convention is read the
+same way.
+
+`bareAnswerWithoutFallback` asks the same resolver the call went through what the call answers with the Argument
+struck out. Whatever entry the bare call reaches is what the fallback is measured against, so no per-Method
+knowledge is needed. A probe that selects nothing, reports an error or answers an Error says nothing. Neither
+does one that still answers a Case of the builtin `Optional`, since the fallback then has an empty answer to stand
+in for.
+
+Two more checks keep the Warning true:
+
+- A probe that lands on the entry the written call selected says nothing. A `defaultingTo` Parameter with a
+  default value is filled in by the callee, so striking the Argument reaches the same entry. The written Argument
+  is then read at run time.
+- The question is asked a second time with the caller's proof erased (`erasingRefinementProof`). The receiver is
+  widened to its base, and no written value is admitted to a refinement. If the call answers bare even then, the
+  proof was not what made the fallback dead, and dropping it could change which entry runs. The Warning stays
+  silent.
+
+Both probes hold everything aside. Their Diagnostics are dropped and their recordings never committed, so an
+Argument stays typed by the resolution the Program committed to. `probingDeadFallback` keeps a probe from
+re-probing a nested call with its own `defaultingTo`, which would double the work per level and report nothing.

@@ -13457,16 +13457,12 @@ function resolveFunctionInvocation(
 	}
 }
 
-// The label the Standard Library gives the Argument that stands in for an
-// answer there is none — `firstItem(defaultingTo 0)`, `divide(by 2,
-// defaultingTo 0/1)`, `average(on .total, defaultingTo 0/1)`. Nothing below
-// knows a Method or a Namespace name, so a Program's own Namespace following the
-// same convention is read exactly the same way.
+// The label the standard library gives a fallback Argument, as in
+// `firstItem(defaultingTo 0)`. Matched by name alone, so a Program's own
+// Namespace following the convention counts too.
 const fallbackArgumentLabel = "defaultingTo"
 
-// The Argument a dead fallback would be reported on. A call that writes
-// none — which is nearly every call in every Program — costs one `find` over a
-// list that is usually empty and nothing else.
+// The Argument a dead fallback would be reported on.
 function writtenFallbackArgument(
 	args: Array<parser.ArgumentNode>,
 ): parser.ArgumentNode | undefined {
@@ -13475,11 +13471,8 @@ function writtenFallbackArgument(
 	)
 }
 
-// Whether the bare call could still come back empty. Any Case of the
-// builtin `Optional` among the answer's members is enough: the fallback is dead
-// only when there is no empty answer left for it to stand in for, so an answer
-// that still holds one keeps it. The identity is compared whole, so a Module
-// declaring a `choice Optional` of its own is a Choice like any other.
+// Whether the bare call could still come back empty: any Case of the builtin
+// `Optional` in the answer. A Module's own `choice Optional` is another Choice.
 function answersOptional(type: common.Type): boolean {
 	if (type.type === "Case") {
 		return type.choice === "Optional"
@@ -13494,20 +13487,15 @@ function answersOptional(type: common.Type): boolean {
 	return false
 }
 
-// A Type with the proof its refinement carries taken off. Only the
-// OUTERMOST one is taken: what a dead fallback is measured against is the
-// receiver's or the Argument's own proof, and a refinement nested inside one
-// promises something about the items rather than about the answer being there.
+// A Type without its outermost refinement. A nested one promises something
+// about the items, not that the answer is there.
 function withoutRefinement(type: common.Type): common.Type {
 	return type.type === "Refinement" ? type.base : type
 }
 
-// Which entry a resolution selected, written out as one line — the
-// Namespace it was found in and the position inside that Namespace's Overload. A
-// dispatched receiver selects one per Union member and is written out in branch
-// order, which the two probes share because they share the receiver. Compared
-// instead of the answers, since two entries of one Overload can answer the very
-// same Type and still be different code.
+// Which entry a resolution selected, as one line: Namespace and Overload
+// position, one per branch for a dispatched receiver. Two entries can answer
+// the same Type and still be different code.
 function selectedEntry(
 	entries: Array<{
 		namespaceName: string
@@ -13519,16 +13507,12 @@ function selectedEntry(
 		.join("|")
 }
 
-// A re-probe re-enriches the Arguments it keeps, and one of those may be
-// an Invocation writing a `defaultingTo` of its own. Re-probing THAT one from
-// inside here would double the work per nesting level and could report nothing
-// anyway — its Diagnostics are dropped with the rest of the probe's, and the
-// enrichment the Program actually commits reports on it for itself.
+// Set while a fallback is re-probed, so a nested call's `defaultingTo` is not
+// re-probed from inside; its own enrichment reports on it.
 let probingDeadFallback = false
 
-// Set while the SECOND re-probe runs — the one asking what the same call
-// would have answered had the caller held no proof at all. Read by the Argument
-// typer; the receiver is widened by the rail, which is the only place holding it.
+// Set during the second re-probe, which asks what the call answers with no
+// proof held. The Argument typer reads it.
 let erasingRefinementProof = false
 
 // What one re-probe answered, and which entry answered it.
@@ -13538,39 +13522,8 @@ type ProbedBareAnswer = {
 	entry: string
 }
 
-// What the same Invocation answers with the `defaultingTo` Argument struck
-// out, or null where that question has no answer worth reporting on.
-//
-// Resolved by the SAME resolver the call itself went through: whatever entry the
-// bare call reaches is what the fallback is measured against, so no per-Method
-// knowledge is needed and an Overload set the Library grows later is covered on
-// the day it is written. A probe that selects nothing, reports an Error, or
-// answers a Type carrying one says nothing at all — an ambiguous or failing
-// re-probe is not evidence about the call that was written.
-//
-// Two more things a bare answer alone does not say, and each of them would make
-// the Warning's own text false, so each is asked for on its own:
-//
-// The Parameter may have been DEFAULTED rather than dropped. A `defaultingTo`
-// Parameter carrying a default value is filled in by the callee where no Argument
-// is written, so striking the Argument reaches the very entry the call already
-// selected and answers its declared Type — while the Argument that WAS written is
-// read at run time and answers with. Nothing was proven there; it is one entry
-// asked twice. So a probe landing on the written call's own entry says nothing.
-//
-// And the proof may not be what made the difference. Striking an Argument can let
-// an entirely different entry win — an Overload whose other entry answers bare for
-// reasons of its own is reached by a caller holding no proof at all — and then the
-// fallback IS read and following the Help swaps which entry runs. So the question
-// is asked a second time with the caller's proof erased: the receiver widened to
-// the Type its refinement is refined from, and no written value admitted to one.
-// An answer that is never empty even then was never the proof's doing.
-//
-// Held aside on every rail. The Diagnostics are collected and dropped, since the
-// call that was written has already reported its own; the contextual recordings
-// are made under a recording nobody commits, so a Function literal or a member
-// path Argument is left typed by the resolution the Program committed to rather
-// than by this speculative one.
+// What the Invocation answers with the `defaultingTo` Argument struck out, or
+// null where that says nothing. See "Dead fallbacks" in DEVELOPMENT.md.
 function bareAnswerWithoutFallback(
 	writtenEntry: string,
 	probe: (erasingProof: boolean) => ProbedBareAnswer,
@@ -13621,20 +13574,13 @@ function bareAnswerWithoutFallback(
 	return bare.result.type
 }
 
-// A `defaultingTo` Argument is worth writing only where the call could
-// come back empty without it, and a proof the caller already holds can take that
-// possibility away: `nonEmpty::firstItem()` answers an Integer, so
-// `nonEmpty::firstItem(defaultingTo 0)` answers that same Integer and the
-// fallback is unreachable. The Library can not refuse the call for itself — a
-// refinement adds Methods and takes none away, so `namespace NonEmptyList`
-// answers `firstItem()` bare and can not hide `List::firstItem(defaultingTo:)`
-// — which is why this is a Diagnostic rather than a signature.
+// Warns about a `defaultingTo` Argument that can never be read. See "Dead
+// fallbacks" in DEVELOPMENT.md.
 function reportDeadFallback(
 	fallback: parser.ArgumentNode,
 	bareType: common.Type,
 ): void {
-	// The label is part of the span, because the label is part of what the
-	// Help asks the reader to drop.
+	// The label is part of the span, since the Help drops it too.
 	let position = {
 		start: (fallback.name ?? fallback.value).position.start,
 		end: fallback.value.position.end,
@@ -13658,11 +13604,8 @@ function reportDeadFallback(
 	)
 }
 
-// The two Invocation shapes hand the same question to the same helper: a
-// Method call through `::`, and a Function or static call written with its
-// Arguments in brackets. A dispatched Union receiver comes through the first,
-// since per-member dispatch answers from `resolveMethodInvocation` like any
-// other receiver does.
+// A `::` call, including a dispatched Union receiver, and a call with its
+// Arguments in parentheses ask the same helper.
 function reportDeadFallbackOnMethodInvocation(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -13686,18 +13629,15 @@ function reportDeadFallbackOnMethodInvocation(
 						(argument) => argument !== fallback,
 					),
 				},
-				// The receiver is the caller's other proof, so the probe
-				// that erases one erases this one too — a `NonEmptyList` asks as
-				// the List it is refined from, and reaches whatever a caller
-				// holding nothing would have reached.
+				// The receiver is the caller's other proof, so the erasing
+				// probe widens it to its base.
 				erasingProof ? withoutRefinement(baseType) : baseType,
 				scope,
 				typer,
 			)
 
 			// A Method Invocation that resolved to nothing answers an Error
-			// Type and says so that way — `resolveFailedMethodInvocation` is every
-			// one of its failure rails.
+			// Type.
 			return {
 				type: resolved.type,
 				selected: resolved.type.type !== "Error",
@@ -13711,9 +13651,8 @@ function reportDeadFallbackOnMethodInvocation(
 	}
 }
 
-// A dispatched Invocation keeps its targets in `dispatch` and resolves to
-// the placeholder Namespace, so the branches are what names it; every other one
-// is the single Namespace it was found in.
+// A dispatched Invocation is named by its branches, any other by its one
+// Namespace.
 function methodInvocationEntry(resolved: ResolvedMethodInvocation): string {
 	return selectedEntry(
 		resolved.dispatch ?? [
@@ -13738,11 +13677,9 @@ function reportDeadFallbackOnFunctionInvocation(
 ): void {
 	let fallback = writtenFallbackArgument(node.arguments)
 
-	// The call that was WRITTEN has to have resolved to something first —
-	// a lone signature the Arguments did not match still answers its declared
-	// return Type, and `twice(3, defaultingTo 0)` against a `twice(_ Integer)`
-	// would be told to drop an Argument the Validator is already reporting for
-	// passing.
+	// The written call must have selected something. A lone signature that did
+	// not match still answers its return Type, and the validator reports its
+	// Arguments.
 	if (
 		fallback === undefined ||
 		!resolved.selected ||
@@ -13751,9 +13688,8 @@ function reportDeadFallbackOnFunctionInvocation(
 		return
 	}
 
-	// One callee, so the Overload position alone names the entry. And
-	// nothing to widen either: the callee is a Function rather than a receiver,
-	// which leaves the Arguments as the only proof there is to erase.
+	// One callee, so the Overload position names the entry. The Arguments are
+	// the only proof to erase.
 	let bareType = bareAnswerWithoutFallback(
 		functionInvocationEntry(resolved.overloadedMethodIndex),
 		() => {
@@ -13786,34 +13722,9 @@ function functionInvocationEntry(overloadedMethodIndex: number | null): string {
 	return selectedEntry([{ namespaceName: "", overloadedMethodIndex }])
 }
 
-// A carrier and the value it holds are two levels, and an Overload with an
-// entry for each reads one written Argument at either of them. `Optional::is`
-// takes an `Optional<ItemType>` beside an `ItemType`, so on an
-// `Optional<Optional<Integer>>` receiver a written `#Empty` fits the whole
-// Optional and the Optional it holds both — two questions with two answers — and
-// the entry taking the whole one is reached first because it is written first.
-// `nested::is(#Empty)` therefore answers whether the RECEIVER is empty, and a
-// reader who meant "does it hold an empty Optional" is handed `false` with
-// nothing said. `Result` has the same shape one Case over: a written
-// `#Failure(reason)` fits a `Result<Result<Value, Failure>, Failure>` and the
-// `Result<Value, Failure>` it holds both.
-//
-// Nothing here names `is`, `Optional` or `Result`. What is recognised is the
-// SHAPE — the entry the call selected takes the receiver's own Type, another
-// entry of the same Overload takes what one of that Type's Cases holds, and the
-// value the call built reads at both — so a Namespace a Program declares over a
-// carrier of its own is read exactly the same way.
-//
-// Two entries accepting one call is not a trap on its own: a refinement ladder
-// is exactly that, and `overloadProbeOrder` exists to decide which of them wins.
-// What makes this one is that the two entries ask about different VALUES, one
-// about the receiver and one about the payload inside it, so which entry is
-// reached decides the ANSWER rather than only the evidence carried into it.
-//
-// Written about the order the Library declares — the whole-carrier entry first,
-// which DEVELOPMENT.md pins as load-bearing. An Overload declaring the payload
-// entry first selects that one instead; the mirror of this Warning is a
-// different sentence, and nothing in the Library has that shape to say it about.
+// Warns where one written Argument fits both the receiver and what it holds, as
+// `nested::is(#Empty)` does on an `Optional<Optional<Integer>>`. See "Two
+// nesting levels" in DEVELOPMENT.md.
 function reportAmbiguousNestingLevel(
 	node: parser.MethodInvocationNode,
 	receiverType: common.Type,
@@ -13826,9 +13737,8 @@ function reportAmbiguousNestingLevel(
 	let argument = node.arguments[0]
 	let selectedOverload = overloads[selected.index]
 
-	// One Argument, written without a label, against an Overload with
-	// something else to reach. Anything else is a signature the two-level
-	// reading is not about: the levels are two readings of ONE written value.
+	// One unlabelled Argument against an Overload with another entry: the two
+	// levels are two readings of one written value.
 	if (
 		overloads.length < 2 ||
 		node.arguments.length !== 1 ||
@@ -13845,20 +13755,15 @@ function reportAmbiguousNestingLevel(
 		return
 	}
 
-	// Asked before anything is probed, and the filter that keeps this off
-	// the numeric comparisons: `Integer::is` takes its receiver's own Type too,
-	// and an Integer holds nothing, so there is no second level for an Argument
-	// to be read at.
+	// Asked before any probe. It also keeps this off numeric comparisons, since
+	// an Integer holds nothing.
 	let held = payloadsByCase(wholeType)
 
 	if (held.length === 0) {
 		return
 	}
 
-	// The claim is about the RECEIVER, so the entry has to take the
-	// receiver's own Type rather than one of the same shape. Compared both ways
-	// round: a Parameter the receiver is merely assignable to is a wider
-	// question than the one the Warning describes.
+	// The entry must take the receiver's own Type, compared both ways.
 	if (
 		!matchesType(wholeType, receiverType) ||
 		!matchesType(receiverType, wholeType)
@@ -13866,28 +13771,9 @@ function reportAmbiguousNestingLevel(
 		return
 	}
 
-	// And the VALUE has to read at both levels, not merely the entry accept
-	// the call. An Argument an entry can not read types as Error somewhere inside
-	// itself, and `matchTypes` lets an Error match anything, so such an entry
-	// "accepts" a value it can make no sense of: `#Value(#Empty)` against an
-	// `Optional<Integer>` comes back as an `Optional<Integer>#Value` with the
-	// payload's failure buried in its member, and the entry says yes. What the
-	// Program actually built is compared instead — a written `#Empty` against an
-	// `Optional<Optional<Integer>>` Parameter is an
-	// `Optional<Optional<Integer>>#Empty` — which is the question this Warning
-	// asks out loud.
-	//
-	// Asked BEFORE the loop, because the loop is what costs: probing an
-	// Overload entry is a full match-and-solve, and running one per entry on
-	// every plain `maybe::is(#Empty)` — the call that never warns — was 2.8x the
-	// enrich cost of the whole Method Invocation, about 16 µs a call. This half
-	// of the question needs no probe: the written value must read as SOME Case's
-	// payload, or no entry taking one can be a second reading of it.
-	//
-	// It can only ever lose a Warning the loop would not have reported. The loop
-	// keeps a Case whose payload is mutually assignable with the probed entry's
-	// Parameter and then asks that Parameter to accept the written value, so
-	// every Warning it reports satisfies this too.
+	// The written value must read as some Case's payload. What the Program
+	// built is compared, since an Error inside an Argument matches anything.
+	// Asked before the loop, whose probes are the cost.
 	let writtenType = probedArgumentType(matchableArguments, wholeType)
 
 	if (
@@ -13915,16 +13801,9 @@ function reportAmbiguousNestingLevel(
 			continue
 		}
 
-		// The two entries have to stand at two LEVELS of one value, which
-		// is what the other entry taking a Case's payload says. Anything else is
-		// a pair of entries about the same value — a refinement ladder, a second
-		// numeric kind — and which of those wins changes what a call proves
-		// rather than what it asks.
-		//
-		// EVERY Case whose payload matches, not the first: a carrier may
-		// hold one Type in more than one Case, and each of them asks a different
-		// question. Naming one would present one of several readings as the fix,
-		// and the Rewrite would then commit the Program to it.
+		// The other entry must take a Case's payload, a second level of the
+		// value. Every matching Case is named, since each asks a different
+		// question.
 		let holding = held.filter(
 			([, payloadType]) =>
 				matchesType(payloadType, heldType) &&
@@ -13935,10 +13814,7 @@ function reportAmbiguousNestingLevel(
 			continue
 		}
 
-		// And THIS entry has to be the one that reads it — the half of the
-		// question above that needs the probe. The gate above says the written
-		// value is some Case's payload; this says the entry beside the selected
-		// one takes exactly that.
+		// And this entry must take exactly the written value.
 		if (!matchesType(heldType, writtenType)) {
 			continue
 		}
@@ -13986,10 +13862,8 @@ function reportAmbiguousNestingLevel(
 	}
 }
 
-// The Type of an entry's single non-receiver Parameter, as this call bound
-// it — and null for every other signature there is. A Type Parameter the call
-// left unsolved answers null too: what is compared below are Types, and a
-// Parameter standing for whatever some other caller might bind is not one.
+// The Type of an entry's single non-receiver Parameter, as this call bound it,
+// or null. An unsolved Type Parameter is no Type to compare.
 function soleArgumentType(
 	overload: common.BaseFunction,
 	inferred: InferredInvocation,
@@ -14007,10 +13881,8 @@ function soleArgumentType(
 	return applyGenericBindings(parameter.type, inferred.bindings)
 }
 
-// What each Case of a Choice holds, for the Cases holding exactly one
-// thing. A Case with no payload holds nothing an Argument could be read as, and
-// one carrying several members holds a Record written into a Case rather than a
-// level a single value can be read at.
+// What each single-member Case of a Choice holds. A payload-free Case holds
+// nothing, and a multi-member one holds a Record rather than a level.
 function payloadsByCase(type: common.Type): Array<[string, common.Type]> {
 	let members = type.type === "UnionType" ? flattenUnionMembers(type) : [type]
 
@@ -14028,28 +13900,13 @@ function payloadsByCase(type: common.Type): Array<[string, common.Type]> {
 	})
 }
 
-// How many times the two-level Warning has probed an Overload entry, and
-// the whole of what guards its cost. The check runs on EVERY call to an
-// Overload whose selected entry takes the receiver's own Type — which is every
-// `Optional::is` and `Optional::isNot` in the language — and the probe is a full
-// match-and-solve, so a probe per entry on the call that never warns cost 2.8x
-// the enrich time of the Invocation. What guards that has to be deterministic:
-// `stdlibLoader.spec.ts` states outright that a clock is no guard for enrich
-// cost, five idle runs of it spreading 66%, and a ceiling tight enough to see
-// 16 µs a call is the flake that rule refuses. So the count is the guard, and
-// this is the one thing outside this file that reads it.
+// How many Overload entries the two-level Warning has probed. A spec reads the
+// count to hold the check's cost without a clock.
 export const nestingLevelProbes = { count: 0 }
 
-// The Parameter Type another entry would read this call's Argument at,
-// where that entry accepts the call, and null everywhere else. Accepting is
-// asked the way `selectOverload` asks it — the Arguments matched, the bounds
-// solved, and neither of them reporting an Error — so an entry whose bounds the
-// receiver can not satisfy is no second reading at all.
-//
-// Held aside on every rail: the Diagnostics are collected and dropped, since an
-// entry that was not selected is not the one the Program runs, and the
-// contextual recordings are made under a recording nobody commits, so an
-// unannotated Function literal Argument stays typed by the entry that won.
+// The Parameter Type another entry would read this call's Argument at, where it
+// accepts the call as `selectOverload` would, or null. Probed silently, its
+// recordings never committed.
 function probeAcceptedOverload(
 	overload: common.BaseFunction,
 	matchableArguments: Array<MatchableArgument>,
@@ -14066,18 +13923,10 @@ function probeAcceptedOverload(
 	)
 	let probed = result.result
 
-	// None of the three rejections has a Program behind it today, and the
-	// reason is the shape rather than luck. Reaching them at all needs a written
-	// value that reads at two levels, which is a payload-free Case; a bound can
-	// only be attached to an entry's OWN Type Parameter, which then binds from
-	// that Argument — so the entry's Parameter Type is the Case's Type, and a
-	// Case's Type is never mutually assignable with a sibling Case's payload,
-	// which is what the caller asks for next. An entry taking the Namespace's
-	// Parameter carries no bound of its own to fail. So they are `selectOverload`'s
-	// contract restated at the rails it can arrive on rather than logic with its
-	// own reach — kept because an entry that "accepts" a call its bounds refuse
-	// is no second reading of it, and that has to stay true of whatever
-	// `probeOverload` grows into.
+	// None of these rejections can arise today: a payload-free Case's Type
+	// never matches a sibling Case's payload. They restate `selectOverload`'s
+	// contract, so an entry whose bounds refuse the call is never a second
+	// reading.
 	if (
 		probed === undefined ||
 		probed.sawErrorArgument ||
@@ -14091,10 +13940,8 @@ function probeAcceptedOverload(
 }
 
 // What the one written Argument comes to under the Parameter Type the call
-// settled on. Held aside like every other question asked twice here: the reading
-// is the one the Invocation commits for itself, and committing it a second time
-// from inside a Warning would leave a second recording behind and report
-// whatever it has to report all over again.
+// settled on. Held aside, so the Invocation's own recording and reports are not
+// repeated.
 function probedArgumentType(
 	matchableArguments: Array<MatchableArgument>,
 	expectedType: common.Type,
@@ -14110,9 +13957,8 @@ function probedArgumentType(
 	).result.result
 }
 
-// Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name
-// resolves through the ordinary Type scope, so a Type Alias of a Choice works
-// too (`type Op = CalculatorOperation` admits `Op#Add`).
+// Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name resolves
+// through the Type scope, so `type Op = CalculatorOperation` admits `Op#Add`.
 function resolveCaseReference(
 	choice: parser.IdentifierNode,
 	caseName: parser.IdentifierNode,
@@ -14121,13 +13967,8 @@ function resolveCaseReference(
 	let choiceType = findTypeInScope(choice.content, scope)
 
 	if (choiceType === null) {
-		// Silent for a Choice whose Declaration the Parser dropped, for
-		// the reason every other read of a dropped name is — see
-		// `declarationWasAbandoned`. This is the SECOND way a Choice's name is
-		// read; the bare `#Case` path had the question and this one did not, so
-		// a dropped `choice Signal { … }` answered `Signal#Red` with "Type
-		// 'Signal' is not declared" — the syntax error, said again about a Type
-		// the file declares.
+		// Silent for a Choice whose Declaration the Parser dropped; see
+		// `declarationWasAbandoned`.
 		if (declarationWasAbandoned(scope, choice.content, choice.position)) {
 			return { type: "Error" }
 		}
@@ -14152,9 +13993,8 @@ function resolveCaseReference(
 		return { type: "Error" }
 	}
 
-	// A generic Choice is a Generic Alias over the anonymous Union of its
-	// Cases — `Step#Done` resolves the DECLARED (still GenericUse-membered)
-	// Case out of that body Union, the way a use site would then instantiate it.
+	// A generic Choice is a Generic Alias over the Union of its Cases, and the
+	// declared Case comes from that Union.
 	let members =
 		choiceType.type === "UnionType"
 			? flattenUnionMembers(choiceType)
@@ -14183,24 +14023,10 @@ function resolveCaseReference(
 	return caseType
 }
 
-// Every Type a bare Case was measured against before it failed to resolve
-// — read by the report and by nothing else. A Case written as an Argument is
-// probed once per Overload candidate, and each probe throws its Diagnostics away
-// and leaves no recording behind where nothing resolved. So the position that
-// DECIDED the Case is in hand everywhere except the one place the refusal is
-// finally written, which is why `#Floor` was told that no Choice in scope
-// declares it while the Parameter it stood at took a Rounding and nothing else.
-//
-// Keyed on the NAME Node rather than the construction, because that is what both
-// rails have in hand and what the Diagnostic underlines. Written on the failure
-// path of a probe as well as on the direct positions, and read once.
-//
-// A Type is recorded ONCE. The Node is the parse tree's, which outlives
-// the enrichment that wrote here — the Language Server enriches one cached parse
-// tree on every keystroke — so an entry that merely appended would grow by one
-// Type per probe per pass for as long as the buffer is open. The report never
-// showed it, because reading groups by Choice and drops the repeats; what grew
-// was the memory behind a Diagnostic that says the same thing every time.
+// Every Type a bare Case was measured against before it failed to resolve, read
+// only by the report. Probes leave no recording on failure, so this keeps the
+// positions. Keyed on the name Node, and each Type is recorded once, since the
+// language server reuses one parse tree on every keystroke.
 const expectedChoicesForCase = new WeakMap<
 	parser.IdentifierNode,
 	Array<common.Type>
@@ -14223,12 +14049,8 @@ function noteExpectedChoice(
 	}
 }
 
-// The Choices a position accepts, each with the Cases it declares there —
-// grouped by Choice because an Overload's candidates may accept several, and a
-// reader picking between them has to see which Cases belong to which. The Cases
-// are the position's own rather than the Choice's whole declaration: a Parameter
-// typed `Optional<Integer>` accepts `#Value` and `#Empty` and that is the honest
-// list, even where the Choice has more.
+// The Choices a position accepts, grouped by Choice, each with the Cases the
+// position accepts rather than the Choice's whole declaration.
 function expectedChoicesOf(
 	caseName: parser.IdentifierNode,
 ): Map<string, Array<common.CaseType>> {
@@ -14256,14 +14078,9 @@ function expectedChoicesOf(
 	return choices
 }
 
-// A Case as a reader would have to WRITE it, payload and all — listing
-// `#Value` beside `#Empty` with nothing to tell them apart is a list nobody can
-// act on. This list stands where a value is CONSTRUCTED, which is what decides
-// how the payload is spelled: a Case carries one value, so a payload of several
-// members is carried as a Record, and `'#Rect(width, height)'` — the pattern
-// form, which is what this printed — is `case-payload-is-one-value` the moment
-// it is copied. `'#Rect({ width, height })'` is the same names in the Record
-// Literal's shorthand, and compiles wherever they are bound.
+// A Case as a reader would write it at a construction, payload included.
+// Several payload members are a Record, `'#Rect({ width, height })'`, since the
+// pattern form `'#Rect(width, height)'` is refused there.
 const CASE_LIST_CAP = 8
 
 function spelledCases(cases: Array<common.CaseType>): string {
@@ -14282,15 +14099,9 @@ function spelledCases(cases: Array<common.CaseType>): string {
 		: spelled.join(", ")
 }
 
-// A `match` written one level out — the subject holds the Choice rather
-// than being it, which is what a `match` on the Future that answers one is. The
-// Matcher then names a Case the subject really has not got, and the list of what
-// it does declare is empty, so the report said nothing at all.
-//
-// Asked of the same `heldValuesOf` a Method call asks, so the two reports agree
-// about what a value holds — and answered only where the held Type declares the
-// very Case that was written, which is what makes this an account of the mistake
-// rather than a guess at it.
+// A `match` written one level out, whose subject holds the Choice, as a Future
+// answering one does. Answered through `heldValuesOf`, as a Method call is, and
+// only where the held Type declares the written Case.
 function heldCaseSubject(
 	valueType: common.Type,
 	caseName: string,
@@ -14305,11 +14116,8 @@ function heldCaseSubject(
 			continue
 		}
 
-		// Waiting is not something every body may do, and the Help said
-		// otherwise: written in a body that answers anything but a Future, the
-		// `complete` it asks for is refused, so the edit takes TWO steps and the
-		// declaration is the first of them. The same "may this body wait?" rule
-		// every other report about a forgotten `complete` follows.
+		// Only a body that may wait can write the `complete` the Help asks for;
+		// otherwise the Help first declares a `Future` return Type.
 		let waits = held.kind !== "future" && held.kind !== "started"
 
 		return {
@@ -14333,10 +14141,8 @@ function heldCaseSubject(
 	return { notes: [], helps: [] }
 }
 
-// Whether the subject HOLDS a Union declaring this Case, which is the
-// question `heldCaseSubject` answers with a report — asked on its own by the
-// arms that stay silent, so that what one arm reports and the rest suppress is
-// decided by one rule rather than two.
+// Whether the subject holds a Union declaring this Case, the rule that decides
+// which arm reports and which stay silent.
 function holdsCaseNamed(valueType: common.Type, caseName: string): boolean {
 	return heldValuesOf(valueType).some((held) =>
 		unionArmsOf(held.type).some(
@@ -14348,10 +14154,8 @@ function holdsCaseNamed(valueType: common.Type, caseName: string): boolean {
 function resolveBareCaseReference(
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
-	// See `positionWasRefused`. Which of two Choices was meant is the
-	// position's answer to give, so a position that is itself an Error has no
-	// ambiguity to report — but a name NO Choice declares is still a name no
-	// Choice declares.
+	// See `positionWasRefused`. A refused position reports no ambiguity, but a
+	// name no Choice declares still reports.
 	refusedPosition: boolean = false,
 ): common.CaseType | common.ErrorType {
 	let casesInScope = findCaseTypesInScope(scope)
@@ -14363,9 +14167,8 @@ function resolveBareCaseReference(
 		return candidates[0]
 	}
 
-	// A Case the Parser dropped along with the `choice` block that
-	// declared it is a Case this Program has, so writing it is not a mistake the
-	// reader made — see `declarationWasAbandoned`.
+	// A Case dropped with its `choice` block is declared, so writing it is no
+	// mistake; see `declarationWasAbandoned`.
 	if (declarationWasAbandoned(scope, caseName.content, caseName.position)) {
 		return { type: "Error" }
 	}
@@ -14379,16 +14182,9 @@ function resolveBareCaseReference(
 	return { type: "Error" }
 }
 
-// Where the position says which Choice was meant, the report is about THAT
-// Choice — its name in the message, the Cases it declares as a note, and the near
-// miss drawn from them rather than from every Case in the language. Every flag in
-// the standard library is a bare Case passed at a Parameter, so this report is
-// how a reader discovers what `round(toward:)` or `trim(at:)` will take.
-//
-// Where the position says nothing, the report stays the one it always was, with
-// one sentence added: the Choices that declare the near miss, which is the half a
-// reader can not look up, and what to write so the Case has a Choice to resolve
-// against at all.
+// Where the position names the Choice, the report is about that Choice: its
+// Cases as a note, and the near miss among them. Otherwise it names the Choices
+// that declare the near miss.
 function reportUnknownBareCase(
 	caseName: parser.IdentifierNode,
 	casesInScope: Array<common.CaseType>,
@@ -14400,10 +14196,8 @@ function reportUnknownBareCase(
 		let accepted = [...expected.values()].flat()
 
 		reportError(
-			// One Choice is named outright. Several is an Overload whose
-			// candidates disagree, and which of them the reader meant is exactly
-			// what this can not decide — so the message stays about the Case and
-			// the notes name each Choice in turn.
+			// One Choice is named outright. Several come from Overload
+			// candidates that disagree, so each is a note.
 			choiceNames.length === 1
 				? `'${choiceNames[0]}' declares no Case '#${caseName.content}'`
 				: `No Choice this position accepts declares a Case '#${caseName.content}'`,
@@ -14429,10 +14223,8 @@ function reportUnknownBareCase(
 		caseName.content,
 		casesInScope.map((candidate) => candidate.name),
 	)
-	// WHICH Choices declare the near miss, which the scan already has in
-	// hand and the reader has nowhere to look up. The Cases themselves are still
-	// not listed: the scan reaches the whole prelude, and a Diagnostic that
-	// prints every Case in the language buries the one line worth reading.
+	// Which Choices declare the near miss. The Cases themselves are not listed,
+	// since the scan covers the whole prelude.
 	let declaring =
 		suggestion.data?.kind === "suggestion"
 			? [
@@ -14470,11 +14262,8 @@ function reportUnknownBareCase(
 	)
 }
 
-// Contextual resolution for the bare form — the expected Type of the
-// position (a Declaration's annotation, an Assignment's target, the declared
-// return Type at a `<-`) is consulted before the scope scan, exactly like a
-// Matcher consults the scrutinee. `null` means the context does not pin the
-// Case down, and the scan decides.
+// A bare Case resolved against the expected Type of its position, before the
+// scope scan. `null` where the position does not decide it.
 function resolveCaseInExpectedType(
 	caseName: parser.IdentifierNode,
 	expectedType: common.Type,
@@ -14502,13 +14291,8 @@ function resolveCaseInExpectedType(
 	return candidates[0]
 }
 
-// The payload's Type is asked for rather than handed over, because
-// resolving the Case is what decides the Type the payload should be READ under
-// — a question only the one position that offers several instantiations of the
-// same Case has to ask, and then once per candidate. Asked about the CASE rather
-// than about the Type its payload is expected to be, so that the answer can be
-// kept per candidate and the candidate that wins can be committed without
-// reading its payload a second time.
+// The payload's Type is asked per candidate Case rather than handed over. It is
+// kept per candidate, so the winner is committed without a second reading.
 type PayloadReader = (under: common.Type) => common.Type | null
 
 function resolveCaseValueType(
@@ -14530,25 +14314,17 @@ function resolveCaseValueType(
 				return contextual
 			}
 
-			// Kept for the refusal below, which is written where the
-			// position is no longer in hand — see `expectedChoicesForCase`.
+			// Kept for the refusal, written where the position is gone; see
+			// `expectedChoicesForCase`.
 			noteExpectedChoice(node.caseName, expectedType)
 		}
 
 		let bareCase = resolveBareCaseReference(node.caseName, scope, refused)
 
-		// A unit Case of a generic Choice carries no payload to read a Type
-		// Argument off, so a bare `#Bare` nothing around decides is exactly as
-		// undecided as the prefixed `Holder#Bare` is, and reports as one. It used
-		// to resolve to the DECLARED Case and stand: the Choice's own Type
-		// Parameters escaped into the Program as raw GenericUses and resurfaced far
-		// from here, as an `unsatisfied-bound` about a name nothing applied or as
-		// nothing at all.
-		//
-		// The payload-carrying bare form is untouched — it is the one form whose
-		// payload still decides, and the form a Function literal with no written
-		// return Type answers with, which is what the standard library's folds are
-		// written on (`<- #Done(item)`).
+		// A unit Case of a generic Choice has no payload to decide its Type
+		// Arguments, so an undecided bare `#Bare` reports as `Holder#Bare`
+		// does. A bare form with a payload still decides through it, as in `<-
+		// #Done(item)`.
 		if (
 			bareCase.type === "Case" &&
 			bareCase.choiceGenerics !== undefined &&
@@ -14580,26 +14356,8 @@ function resolveCaseValueType(
 	)
 }
 
-// A Choice's Type Parameters are APPLIED, never inferred. A prefixed
-// construction is therefore decided by exactly two things: the Arguments it
-// writes itself (`Holder<Integer>#Bare`) and, failing those, the position it
-// stands in — the same annotation, declared return Type or Parameter Type a
-// bare `#Bare` already resolves against. Neither is `undecided-type-arguments`.
-// The payload is CHECKED against whatever was decided (the Validator's
-// `payload-type-mismatch`), and where a position offers several instantiations
-// of the one Case it picks which of them is meant, but it never decides an
-// Argument of its own: `Holder#Full({ value = 1 })` written where nothing
-// expects a Holder is as undecided as `Holder#Bare` is, and used to quietly
-// become a `Holder<Integer>` because its payload happened to be one.
-//
-// The written Arguments win over the position, and the two disagreeing is the
-// ordinary mismatch of a value that does not fit where it is put — the
-// construction IS a `Holder<Integer>#Bare` and the annotation says otherwise, so
-// the assignment is what reports, exactly as for any other value.
-//
-// A Choice with no Type Parameters has nothing to decide and is never asked —
-// `Ordering#Equal` stands anywhere, as does every Case of every plain Choice.
-// Writing Arguments at one is still refused, by the application rail itself.
+// A prefixed construction is decided by its written Type Arguments, then by its
+// position. See "Resolving a Case" in DEVELOPMENT.md.
 function resolvePrefixedCaseValueType(
 	node: parser.CaseValueNode,
 	choice: parser.IdentifierNode,
@@ -14648,24 +14406,9 @@ function resolvePrefixedCaseValueType(
 	)
 }
 
-// The one Diagnostic all three undecided rails report — the prefixed
-// `Holder#Bare`, the bare `#Bare` of a unit Case and the bare `#Full(…)` whose
-// payload left a Parameter standing — spelled with the form the source wrote,
-// since the annotation that is one way out is written around that very spelling.
-// The Choice's name is handed in rather than read off the Case, so the prefixed
-// rail keeps naming the Alias the reader wrote where one stood in for the
-// Choice.
-//
-// The Choice's own Parameter names are what the NOTES name, and nothing
-// else: they are the declaration's names, they are not in scope at the
-// construction, and a reader who copied `Result<ValueType, FailureType>` out of a
-// Help met `unknown-type` twice for their trouble. So the Helps spell an
-// application instead — every Argument the payload already decided written out,
-// and an ellipsis where the reader has to choose — which is text that parses.
-//
-// `takesPayload` keeps the parentheses on where the Case carries members. The
-// prefixed rail used to drop them, so `Holder#Full` copied out of a Help was
-// `missing-payload` on the next run.
+// The one report for every undecided construction, spelled as the source wrote
+// it. See "Resolving a Case" in DEVELOPMENT.md. `takesPayload` keeps the
+// parentheses where the Case carries members.
 function reportUndecidedTypeArguments(
 	construction: string,
 	choiceName: string,
@@ -14673,11 +14416,9 @@ function reportUndecidedTypeArguments(
 	choiceGenerics: Array<common.GenericDeclaration>,
 	position: common.Position,
 	takesPayload: boolean,
-	// The payload rail's extra — what the payload bound each Type
-	// Parameter to, one entry per Parameter, so the Helps can spell the half the
-	// reader is not being asked about and the label can say which half is
-	// missing. Absent for the two rails that carry no payload to decide anything
-	// with, where every Argument is the reader's to write.
+	// What the payload bound each Type Parameter to, so the Helps spell the
+	// decided half and the label names the missing one. Absent without a
+	// payload.
 	payloadArguments?: Array<common.Type | undefined>,
 ): common.ErrorType {
 	let parameterNames = choiceGenerics.map((generic) => generic.name)
@@ -14726,12 +14467,8 @@ function reportUndecidedTypeArguments(
 	return { type: "Error" }
 }
 
-// What the primary label says under the construction. The two rails with
-// no payload say nothing decides them, which is the whole of it there. The
-// payload rail says which Parameters the payload DID decide beside the ones it
-// left, because a reader looking at `#Stopped({ value = "x" })` can see the
-// String going in and needs telling that the OTHER Parameter is the one nothing
-// answers for.
+// The primary label. With a payload it says which Type Parameters the payload
+// decided beside those it left open.
 function undecidedLabel(
 	parameterNames: Array<common.GenericName>,
 	undecided: Array<common.GenericName> | undefined,
@@ -14753,23 +14490,17 @@ function quotedNames(names: Array<common.GenericName>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
-// `Holder<Integer>#Full(…)` — the Type Arguments written at the value.
-// Applied through the rail an annotation's `Holder<Integer>` takes, so the arity
-// check, the bounds and the refusal of a Type that takes no Arguments are the
-// SAME ones, and then the Case is picked out of what came back. A Case the
-// applied Choice does not carry is impossible here — the declared Case was found
-// in that same Choice — so `null` from the lookup only ever means the application
-// itself failed and has already reported.
+// `Holder<Integer>#Full(…)`: Type Arguments written at the value, applied as an
+// annotation's are, then the Case picked out. `null` from the lookup means the
+// application failed and reported.
 function resolveAppliedCase(
 	typeArguments: Array<parser.TypeDeclarationNode>,
 	declaredCase: common.CaseType,
 	choice: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.CaseType | common.ErrorType {
-	// Looked up raw rather than resolved, so a Generic Alias does not apply
-	// its defaults before these Arguments get a chance to — the same reason
-	// `resolveGenericTypeDeclarationType` looks its own base Type up this way. The
-	// name is in scope: `resolveCaseReference` just found the Case in it.
+	// Looked up raw, so a Generic Alias does not apply its defaults before
+	// these Arguments, as in `resolveGenericTypeDeclarationType`.
 	let baseType = findTypeInScope(choice.content, scope) ?? {
 		type: "Error" as const,
 	}
@@ -14784,21 +14515,9 @@ function resolveAppliedCase(
 	return instantiatedCaseOf(declaredCase, applied) ?? { type: "Error" }
 }
 
-// The instantiation the surrounding position decides for a prefixed
-// construction — `constant left: Holder<String> = Holder#Bare` is the `Bare` of
-// `Holder<String>`, exactly what the bare `#Bare` resolves to there. `null` when
-// the position says nothing about this Choice at all, which is the undecided
-// state its caller reports.
-//
-// A Union can offer SEVERAL instantiations of the one Case (`Box<Integer> |
-// Box<String>` carries `Box#Full` twice), and then the payload picks which of
-// them is meant, the way any value picks the arm of a Union annotation it fits.
-// Each is asked what the payload comes out as under ITS members, so a payload
-// that is itself a construction is read against a decided Type rather than
-// against nothing at all. A payload that fits none leaves the first standing, so
-// the mismatch is reported against a concrete instantiation rather than
-// swallowed here; a unit Case fits every one of them and takes the first, which
-// is the same value under every arm.
+// The instantiation the position decides for a prefixed construction, or `null`
+// where it says nothing about this Choice. Several instantiations are chosen
+// between by the payload, and the first stands where none fits.
 function decideCaseFromExpectedType(
 	declaredCase: common.CaseType,
 	expectedType: common.Type,
@@ -14823,11 +14542,8 @@ function decideCaseFromExpectedType(
 				return true
 			}
 
-			// A payload that could not even be READ under a candidate has
-			// not fit it. An Error matches everything, which is what keeps one
-			// mistake from becoming several — but here it would make the first
-			// arm win every time a payload the next arm decides is undecided
-			// under this one, which is exactly the question being asked.
+			// A payload that could not be read under a candidate does not fit
+			// it, although an Error matches everything elsewhere.
 			return (
 				!typeContainsError(payloadType) &&
 				payloadFitsCase(candidate, payloadType)
@@ -14836,19 +14552,14 @@ function decideCaseFromExpectedType(
 	)
 }
 
-// Whether a payload can stand for an instantiated Case's Record — either
-// as written, or through the one-member shorthand `wrapSingleMemberShorthand`
-// applies afterwards, so that `Box#Full("hello")` picks `Box<String>` out of a
-// `Box<Integer> | Box<String>` rather than being read against Integer first.
+// Whether a payload stands for an instantiated Case's Record, as written or
+// through the one-member shorthand, so `Box#Full("hello")` picks `Box<String>`.
 function payloadFitsCase(
 	caseType: common.CaseType,
 	payloadType: common.Type,
-	// The payload as WRITTEN, where the caller has it — a Literal
-	// carrying path keys is measured by what the merge makes of it, and its own
-	// Type says nothing about that. Left out where only a Type is in hand: a
-	// Case that defaults its payload can not be generic, so the one caller that
-	// has no value to give is deciding among instantiations a defaulting Case
-	// never has.
+	// The payload as written, so path keys are measured by the merge. Absent
+	// only for the caller choosing among generic instantiations, and a
+	// defaulting Case is never generic.
 	payloadValue: common.typed.ExpressionNode | null = null,
 ): boolean {
 	let recordShape: common.RecordType = {
@@ -14866,12 +14577,9 @@ function payloadFitsCase(
 		return true
 	}
 
-	// A Case that DEFAULTS its payload is fitted as a partial — the
-	// members it leaves out are the ones the default writes, so a payload that
-	// says only things the Case declares is one this Case can stand for. Judged
-	// on the payload's TYPE rather than on how it was written, because this
-	// decides which Case a construction IS; whether the spelling was allowed to
-	// be partial is `casePayloadIsPartial`'s question, one stage later.
+	// A Case that defaults its payload is fitted as a partial, judged on the
+	// payload's Type. Whether the spelling may be partial is
+	// `casePayloadIsPartial`'s question.
 	if (
 		caseType.payloadDefault !== undefined &&
 		effectiveType.type === "Record" &&
@@ -14892,21 +14600,15 @@ function payloadFitsCase(
 	})
 }
 
-// What a Type offers as its arms, with a nested Union spelled out, so
-// `Walk<Integer> | String` offers Walk's Cases as readily as `Walk<Integer>`
-// does. A Type that is no Union is its own only arm — every caller here is
-// asking "what could a value of this be", and one shape is an answer to that.
+// What a Type offers as its arms, nested Unions spelled out. A Type that is no
+// Union is its own only arm.
 function unionArmsOf(type: common.Type): Array<common.Type> {
 	return type.type === "UnionType" ? flattenUnionMembers(type) : [type]
 }
 
-// The scrutinee's own member for a declared Case — the same Choice and
-// the same Case name, but with the Type Arguments the matched value applied
-// substituted into its payload. `null` when the matched value has no such
-// member at all, which its caller reports: the DECLARED Case can not stand in
-// for one, because its members are still the Choice's Type Parameters, bounds
-// and all, and a Handler reaching through one solves the bound against a hidden
-// conformance Parameter no call site in sight ever fills.
+// The subject's own member for a declared Case, with the applied Type Arguments
+// substituted, or `null`. The declared Case can not stand in, since its members
+// are still the Choice's bounded Type Parameters.
 function instantiatedCaseOf(
 	declaredCase: common.CaseType,
 	valueType: common.Type,
@@ -14921,18 +14623,9 @@ function instantiatedCaseOf(
 	)
 }
 
-// One Matcher for several instantiations of the same Case — a scrutinee
-// typed `Box<Integer> | Box<String>` carries `Box#Full` twice, and both are
-// this Handler's, because the emitted check starts at the tag both of them
-// share. So what the Handler may assume of the payload is what EVERY
-// instantiation carries: each member joined across them, which makes `@.value`
-// an `Integer | String` the Handler has to narrow further before using. Taking
-// the first instantiation instead typed the payload by whichever member the
-// Union happened to name first, and a `Box<String>`'s String arrived typed
-// Integer — `@.value::add(1)` compiled clean and answered "hello1".
-//
-// The joined Case carries no `typeArguments`: the instantiations disagree
-// about them, and they are display spelling — the members decide assignability.
+// One Matcher for several instantiations of the same Case: each member is
+// joined across them, so `@.value` in `Box<Integer> | Box<String>` is `Integer
+// | String`. The join keeps no `typeArguments`.
 function joinCaseInstantiations(
 	instantiations: Array<common.CaseType>,
 ): common.CaseType | null {
@@ -14961,34 +14654,23 @@ function joinCaseInstantiations(
 		choice: instantiations[0].choice,
 		name: instantiations[0].name,
 		members,
-		// Whether the Choice's Cases all have empty payloads is a fact
-		// about the DECLARATION, which every instantiation being joined here
-		// shares — so it survives the join that `typeArguments` does not.
+		// `unitChoice` is a fact about the declaration, so it survives the
+		// join.
 		...(instantiations[0].unitChoice === true
 			? { unitChoice: true as const }
 			: {}),
 	}
 }
 
-// The Type a value has for ONE member, asked silently. The Lookup
-// resolver reports `type-without-members` on a Union base, and a Union base is
-// exactly the shape asked here — a Pattern discriminating `Click | KeyPress`
-// names members only some arms carry, which is the whole reason to write one.
-// Arms without the member contribute nothing.
-//
-// No arm carrying it answers `Unknown`, which constrains nothing at runtime and
-// is the honest degradation for "binds, and says nothing about the Type". It is
-// deliberately NOT a Diagnostic here: a Matcher naming a member no arm carries
-// makes an arm that can never be taken, and `unreachable-case` is the Validator's
-// to report. Where the position can not decline anything — a Parameter, a
-// Declaration — the caller asks about the member itself and does report.
+// The Type a value has for one member, asked silently, since a Pattern on a
+// Union names members only some arms carry. No arm carrying it answers
+// `Unknown`; the validator reports the unreachable arm.
 function memberTypeOf(type: common.Type, name: string): common.Type {
 	let found: Array<common.Type> = []
 
 	for (let arm of unionArmsOf(type)) {
-		// `Object.hasOwn` before the read — a member named after one of
-		// `Object.prototype`'s would otherwise answer with a JavaScript function
-		// the arm does not carry.
+		// `Object.hasOwn`, so a member named like a prototype property is not
+		// read off the prototype.
 		let member =
 			(arm.type === "Record" || arm.type === "Case") &&
 			Object.hasOwn(arm.members, name)
