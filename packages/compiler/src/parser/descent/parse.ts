@@ -848,22 +848,16 @@ class DescentParser {
 	parseProgram(): parser.Program {
 		let above = this.parseModuleSections("above")
 
-		// A file that is nothing but tests — the `Season.tests.es`
-		// convention — writes its imports and a `tests { … }` block and no
-		// implementation block at all. It still carries an implementation
-		// section, empty and spanning the tests block, so that every stage
-		// reading a Program's Statements reads one shape.
+		// A file of nothing but tests, such as `Season.tests.es`, has no
+		// implementation block. It gets an empty implementation section spanning
+		// the tests block, so every Program has one shape.
 		if (this.startsTestsSection()) {
 			let keyword = this.peekOrFail()
 			let tests = this.parseTestsSection()
 
-			// An implementation block BELOW the tests section, which is a
-			// file written in the wrong order rather than a file that is
-			// nothing but tests. Both blocks are kept where they stand — the
-			// Program the author meant is the one they wrote — and the
-			// Diagnostic points at the block that moved rather than at the one
-			// that did not, which is what an "unexpected 'implementation'"
-			// would have done.
+			// An implementation block after the tests section is a file in the
+			// wrong order. Both blocks are kept, and the Diagnostic points at the
+			// tests block that moved.
 			if (this.startsProgramHeader()) {
 				this.reportTestsSectionAboveImplementation(keyword.position)
 
@@ -905,8 +899,7 @@ class DescentParser {
 		let header = this.parseProgramHeader()
 
 		if (header === null) {
-			// Without the `implementation {` header nothing can be
-			// parsed — an empty Program is returned alongside the Diagnostic.
+			// Without the `implementation {` header nothing can be parsed.
 			let position = {
 				start: { line: 1, column: 1 },
 				end: { line: 1, column: 1 },
@@ -938,13 +931,9 @@ class DescentParser {
 			end: closingPosition.end,
 		})
 
-		// The tests section is read where it belongs, last of all — and
-		// once more directly under the implementation block, so that a
-		// `tests { … }` written above `export { … }` is diagnosed as the block
-		// in the wrong place rather than as a Token where the Program was
-		// supposed to have ended. A Module with nothing to export has nothing
-		// for the block to stand after, so a section read there is where it
-		// belongs and no Diagnostic is owed.
+		// The tests section is also read directly after the implementation
+		// block, so a `tests { … }` before `export { … }` is reported as a block
+		// in the wrong place. Without an export block it is in place.
 		let testsAboveExports =
 			testsAbove === null && this.startsTestsSection()
 				? this.parseTestsSection()
@@ -981,10 +970,8 @@ class DescentParser {
 				: "the tests block ends here",
 		)
 
-		// A Program's Position stays the implementation block's own span,
-		// sections or none — the Formatter reads it as the block it writes
-		// `implementation {` and its closing brace for, and each section carries
-		// its own span for whoever needs the file's full extent.
+		// A Program's Position is the implementation block's span, which the
+		// formatter reads. Each section carries its own span.
 		return generators.program(
 			implementation,
 			implementation.position,
@@ -996,10 +983,8 @@ class DescentParser {
 		)
 	}
 
-	// Whatever is left once every section has been read. `endPosition` is
-	// where the Program was supposed to have ended — the last section's own
-	// span where there was one, and the block's closing brace where there was
-	// not.
+	// Reports whatever is left once every section has been read. `endPosition`
+	// is where the Program should have ended when no section follows the block.
 	protected reportTrailingTokens(
 		below: Array<ModuleSectionRead>,
 		endPosition: common.Position,
@@ -1029,11 +1014,8 @@ class DescentParser {
 				notes: [
 					"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.",
 				],
-				// The span the primary Label stands on is what there is
-				// to delete, so the edit is one the report already knows and
-				// said nothing about. The `essence-spelling` payload with an
-				// empty spelling is the same "remove this" a `;` carries, which
-				// is where the Quick Fix behind it comes from.
+				// An empty `essence-spelling` asks the Quick Fix to delete the
+				// primary span, as for a `;`.
 				helps: [`Remove the ${describeToken(token)}.`],
 				data: {
 					kind: "essence-spelling",
@@ -1044,16 +1026,9 @@ class DescentParser {
 		)
 	}
 
-	// Both blocks are read on BOTH sides of the implementation, in either
-	// order — a block written on the wrong side is parsed where it stands rather
-	// than left to cascade into "Expected 'implementation'" or "nothing may
-	// follow here", which say nothing about what the author got wrong. A second
-	// block of the same kind on one side is left to those two Diagnostics, which
-	// is where it belongs: it is not a section in the wrong place, it is a Token
-	// where the Program was supposed to have ended.
-	//
-	// The `{` is part of what is recognised, because all four Module Keywords are
-	// ordinary Identifiers everywhere else.
+	// Reads `import` and `export` blocks on either side of the implementation,
+	// so a block on the wrong side is reported as misplaced. A second block of
+	// one kind on one side is left to the trailing-Token report.
 	protected parseModuleSections(
 		side: ModuleSectionRead["side"],
 	): Array<ModuleSectionRead> {
@@ -1091,12 +1066,9 @@ class DescentParser {
 		}
 	}
 
-	// Which of the blocks read on either side the Program keeps, and which
-	// are refused. A refused block is dropped rather than carried along broken:
-	// every later stage may read the sections a Program has as the sections it
-	// meant. A `declarations { … }` Program carries them on the same terms as
-	// any other — the standard library's files are Modules too, each importing
-	// what it uses from its siblings.
+	// Which of the blocks read on either side the Program keeps. A block on the
+	// wrong side is reported and dropped. A `declarations { … }` Program keeps
+	// its sections like any other.
 	protected resolveModuleSections(
 		sections: Array<ModuleSectionRead>,
 		implementationPosition: common.Position,
@@ -1143,10 +1115,8 @@ class DescentParser {
 			section.keywordPosition,
 			{
 				code: "misplaced-module-section",
-				// The whole block's span, since the Diagnostic underlines
-				// the KEYWORD and the section is dropped rather than carried
-				// along — so a fix that moves the block has nothing else left
-				// to read where its text ends.
+				// The whole block's span for the Quick Fix that moves it, since
+				// the Diagnostic underlines the Keyword and the section is dropped.
 				data: {
 					kind: "section-order",
 					section: isImport ? "import" : "export",
@@ -1172,8 +1142,7 @@ class DescentParser {
 		)
 	}
 
-	// An import block holds nothing but groups — every name comes from
-	// somewhere, so every name is written under its `from`.
+	// An import block holds only groups, since every name comes from a `from`.
 	protected parseImportSection(): parser.ImportSectionNode {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
@@ -1196,9 +1165,8 @@ class DescentParser {
 	}
 
 	// An export block lists what the Module declares bare, and what it
-	// forwards in groups. `from` is an ordinary Identifier everywhere else —
-	// a Module may well export something called `from` — so what makes it a
-	// group here is the specifier after it: `from "./Module.es" {`.
+	// forwards in groups. A Module may export a name `from`, so a group needs
+	// the specifier after it: `from "./Module.es" {`.
 	protected parseExportSection(): parser.ExportSectionNode {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
@@ -1231,9 +1199,8 @@ class DescentParser {
 		})
 	}
 
-	// `from "./Module.es" { … }` — the shape both blocks share. The
-	// specifier is read once and handed to every entry inside, so an entry
-	// carries where it came from without the group having to be asked.
+	// `from "./Module.es" { … }`, the shape both blocks share. Every entry
+	// carries the specifier it came from.
 	protected parseModuleGroup<Entry>(
 		parseEntry: (source: parser.ModuleSpecifierNode) => Entry,
 	): {
@@ -1270,8 +1237,8 @@ class DescentParser {
 		})
 	}
 
-	// The group an entry is written in is what makes it a re-export; a
-	// bare entry, with no `source`, exports something this Program declares.
+	// An entry in a group is a re-export. A bare entry, with no `source`,
+	// exports something this Program declares.
 	protected parseExportEntry(
 		source: parser.ModuleSpecifierNode | null,
 	): parser.ExportNode {
@@ -1284,10 +1251,8 @@ class DescentParser {
 		})
 	}
 
-	// `as` binds the entry under a local name of the author's choosing. It
-	// is only a Keyword here — everywhere else it is an ordinary Identifier, an
-	// Argument label included — so an entry may itself be named `as`, and
-	// `as as as` renames the imported `as` to `as`.
+	// `as` binds the entry under a local name. It is a Keyword only here, so
+	// `as as as` renames an imported `as` to `as`.
 	protected parseOptionalAlias(): parser.IdentifierNode | null {
 		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
 			return null
@@ -1309,11 +1274,9 @@ class DescentParser {
 		leftBrace: Token
 		kind: parser.Program["kind"]
 	} | null {
-		// A bare Identifier can never begin a Program today, so
-		// `declarations {` is unambiguous — no Lexer keyword is needed. Only the
-		// standard library is allowed to open one; anywhere else it is a tailored
-		// Diagnostic, after which the block is parsed as an implementation
-		// section so its contents still produce Diagnostics.
+		// No Identifier begins a Program, so `declarations {` needs no Lexer
+		// keyword. Outside the standard library it is reported, and the block is
+		// read as an implementation section.
 		let token = this.tokens.peek()
 
 		if (
@@ -1366,9 +1329,8 @@ class DescentParser {
 
 	// #region Tests
 
-	// What opens an implementation block, asked without consuming
-	// anything — `declarations {` included, because a stdlib file written in
-	// the wrong order deserves the same answer.
+	// Whether an implementation block opens here, `declarations {` included,
+	// without consuming anything.
 	protected startsProgramHeader(): boolean {
 		let token = this.tokens.peek()
 
@@ -1390,9 +1352,8 @@ class DescentParser {
 		)
 	}
 
-	// `tests { … }`. Like the Module sections, the `{` is part of what is
-	// recognised, because `tests` is an ordinary Identifier everywhere else —
-	// `constant tests = […]` is still a Declaration of a name.
+	// `tests { … }`. The `{` is part of what is recognised, since `tests` is an
+	// ordinary Identifier elsewhere.
 	protected parseTestsSection(): parser.TestsSectionNode {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
@@ -1406,8 +1367,8 @@ class DescentParser {
 		})
 	}
 
-	// A tests section written ABOVE the implementation block, which reads
-	// as a tests-only file until the implementation block turns up behind it.
+	// A tests section before the implementation block, which reads as a
+	// tests-only file until the implementation block follows it.
 	protected reportTestsSectionAboveImplementation(
 		keywordPosition: common.Position,
 	): void {
@@ -1436,10 +1397,8 @@ class DescentParser {
 		)
 	}
 
-	// A tests section written ABOVE the `export { … }` block. It is read
-	// where it stands and kept — the Program it describes is the one the author
-	// meant, and dropping it would turn one Diagnostic about an order into a
-	// cascade of "unknown name" about everything inside it.
+	// A tests section before the `export { … }` block. It is kept, since
+	// dropping it would turn one Diagnostic about order into a cascade.
 	protected reportTestsSectionAboveExports(
 		sectionPosition: common.Position,
 		exportPosition: common.Position,
