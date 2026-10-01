@@ -259,3 +259,19 @@ opened yet.
 
 `recovery` answers `undefined` where nothing was abandoned. It sorts every list, so one source always parses to one
 Program and a snapshot of a broken file is stable.
+
+## Test Modifiers
+
+A test, suite or benchmark takes zero or more Modifiers between its name and its body, written the way trailing
+labelled Arguments follow a call. The grammar is a name and the arguments that follow it. What a name means is left
+to the enricher, so a new Modifier such as `within 2s` needs no parser work.
+
+A literal always belongs to the Modifier before it. A bare name is the one shape a Modifier and its argument
+share. `opensTestModifierArguments` reads it as an argument only where a comma or the start of the body follows it.
+That start is a `{`, or the `across` or `for` of a table or a property list.
+
+- `tagged slow { … }`: the body settles it, and `slow` is the argument of `tagged`.
+- `tagged slow, network`: the comma does, and both names are arguments.
+- `focused tagged slow { … }`: `tagged` has a name after it, so it is a Modifier, and `slow` is its argument.
+- `tagged slow focused { … }`: no lookahead settles it. `tagged` takes no argument, and `focused` becomes the
+  argument of a Modifier `slow`.

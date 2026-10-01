@@ -1427,9 +1427,8 @@ class DescentParser {
 		)
 	}
 
-	// What may stand in a tests section, and in a `suite`'s body: a test,
-	// a nested suite, or any Statement an implementation block takes — a
-	// `constant` written here is setup, a `function` is a helper.
+	// What may stand in a tests section or a `suite`'s body: a test, a nested
+	// suite, or any Statement an implementation block takes, as setup or helper.
 	protected parseTestsNode(): parser.TestsNode {
 		if (this.startsTestItem(this.peekOrFail())) {
 			return this.parseTestItem()
@@ -1438,9 +1437,8 @@ class DescentParser {
 		return this.parseImplementationNode()
 	}
 
-	// `test`, `suite` and `benchmark` are ordinary Identifiers as well, so
-	// what opens an item is the Keyword AND the name that must follow it —
-	// `test = 5` stays an assignment to a variable called `test`.
+	// `test`, `suite` and `benchmark` are also Identifiers, so an item opens
+	// only where a String name follows: `test = 5` is an assignment.
 	protected startsTestItem(token: Token): boolean {
 		if (
 			token.type !== TokenType.KeywordTest &&
@@ -1466,11 +1464,8 @@ class DescentParser {
 		return this.parseTest()
 	}
 
-	// One reading for both forms — a benchmark is a test whose body is
-	// timed rather than judged, and it takes the same head: a name, Modifiers,
-	// and the `across` rows that make it several. What a benchmark may NOT take
-	// (`for any`) is the Enricher's refusal, because the Parser failing over a
-	// form it can read would drop the body a reader is still editing.
+	// A test or a benchmark, which is a test whose body is timed. The enricher
+	// refuses `for any` on a benchmark, so the body stays parsed while edited.
 	protected parseTest(): parser.TestNode {
 		let keyword =
 			this.tokens.peek()?.type === TokenType.KeywordBenchmark
@@ -1508,10 +1503,7 @@ class DescentParser {
 		}
 	}
 
-	// `for any` is the one two-word opener in the grammar. `for` is a
-	// Keyword and `any` is an ordinary name, so the pair is read together: a
-	// `for` with anything else behind it opens nothing here, and `constant any =
-	// 1` is still a Declaration of a name.
+	// `for any` opens the form only as a pair, since `any` is an ordinary name.
 	protected startsTestProperties(): boolean {
 		if (this.tokens.peek()?.type !== TokenType.KeywordFor) {
 			return false
@@ -1524,10 +1516,8 @@ class DescentParser {
 		)
 	}
 
-	// `for any (a: Integer, b: NonEmptyList<String>)` — what the runner
-	// generates a value of, once per case. The Parameter list is a closure's, so
-	// the shape reads the way a reader already knows it; the Enricher is what
-	// asks every Parameter for the Type that says what to generate.
+	// `for any (a: Integer, b: NonEmptyList<String>)`: the values the runner
+	// generates once per case, written as a closure's Parameter list.
 	protected parseTestProperties(): parser.TestPropertiesNode {
 		let keyword = this.tokens.next()
 
@@ -1546,19 +1536,15 @@ class DescentParser {
 		)
 	}
 
-	// `across` is recognised by content, the way `matches` is in an
-	// assertion: it opens the one form that stands between a test's Modifiers
-	// and its body, and everywhere else it is an ordinary name.
+	// `across` is recognised by content, as `matches` is in an assertion.
 	protected startsTestTable(): boolean {
 		let token = this.tokens.peek()
 
 		return token?.type === TokenType.Identifier && token.value === ACROSS
 	}
 
-	// `across [ … ] ({ scored, conceded }: Scoreline)` — the rows a test
-	// runs for, and what one row is called inside the body. The parameter list
-	// is a closure's, so a row can be taken apart by a Pattern and annotated
-	// with the Type that lets a bare Case in a row resolve.
+	// `across [ … ] ({ scored, conceded }: Scoreline)`: the rows a test runs
+	// for, and a closure's Parameter list naming one row inside the body.
 	protected parseTestTable(): parser.TestTableNode {
 		let keyword = this.tokens.next()
 		let value = this.parseExpression(true)
@@ -1581,9 +1567,7 @@ class DescentParser {
 		let name = this.parseTestName("suite")
 		let modifiers = this.parseTestModifiers()
 
-		// A suite's own body is not a test body — the Statements directly
-		// in it are the setup its tests share, and an assertion written among
-		// them belongs to no test.
+		// A suite's own Statements are shared setup, not a test body.
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = false
 
@@ -1605,9 +1589,8 @@ class DescentParser {
 		}
 	}
 
-	// A name is a String Literal so that it can say what the test proves
-	// rather than name it like a Function — and an interpolated one, because a
-	// table test names each row out of the row's own values.
+	// A name is a String Literal that says what the test proves. A table test
+	// interpolates each row's values into it.
 	protected parseTestName(
 		item: "test" | "suite" | "benchmark" = "test",
 	): parser.TestNode["name"] {
@@ -1630,22 +1613,9 @@ class DescentParser {
 		return generators.stringValueNode(token.value, token.position)
 	}
 
-	// Zero or more Modifiers, written between the name and the body the
-	// way trailing labelled Arguments are written after a call's own. The
-	// grammar is a name and the arguments that follow it; what a name MEANS is
-	// left to the stage that knows the vocabulary, so `within 2s` or
-	// `retries 3` land later as vocabulary rather than as parser work.
-	//
-	// A literal always belongs to the Modifier in front of it — there is
-	// nothing else it could be. A bare name is the one shape a Modifier and its
-	// own argument share, and it is read as an argument only where a comma or
-	// the body follows it: in `tagged slow { … }` the body settles it, in
-	// `tagged slow, network` the comma does, and in `focused tagged slow` the
-	// name in the middle is left to be the Modifier it is. What no lookahead
-	// can settle — one bare argument with another Modifier behind it, as in
-	// `tagged slow focused` — reads as three Modifiers, which the stage that
-	// knows the vocabulary can say something useful about; a greedy reading
-	// would swallow `focused` instead and say nothing.
+	// Zero or more Modifiers between the name and the body, each a name with
+	// arguments. The enricher knows the vocabulary.
+	// See "Test Modifiers" in DEVELOPMENT.md.
 	protected parseTestModifiers(): Array<parser.TestModifierNode> {
 		let modifiers: Array<parser.TestModifierNode> = []
 
@@ -1695,10 +1665,8 @@ class DescentParser {
 
 		let following = this.tokens.peek(1)
 
-		// `tagged slow across [ … ]` and `tagged slow for any (…)` — both
-		// open where the body would, so a bare name in front of either is that
-		// Modifier's own argument for exactly the reason it is in front of a
-		// `{`.
+		// `across` and `for` open where the body would, so a bare name before
+		// either is an argument as before a `{`.
 		return (
 			following?.type === TokenType.SymbolComma ||
 			following?.type === TokenType.SymbolLeftBrace ||
@@ -1728,10 +1696,8 @@ class DescentParser {
 
 	// #endregion
 
-	// The list loop with nothing around it — no block, no braces, no
-	// Program. `parseStatementList` stops at a `}` or at the end of the input,
-	// and an example has neither, so what it reads is everything the text
-	// holds.
+	// The Statement loop with no block around it, which reads the whole text
+	// of an `@example`.
 	parseStatements(): Array<parser.ImplementationNode> {
 		return this.parseStatementList(() => this.parseImplementationNode())
 	}
@@ -1775,27 +1741,9 @@ class DescentParser {
 		})
 	}
 
-	// Which of two accounts of one broken Statement is reported — the
-	// failure of the reading that was KEPT, or the furthest failure among the
-	// readings that were thrown away on the way to it. See `furthestFailure`.
-	//
-	// Four things have to hold for the recorded one to win, and each of them is
-	// a way of asking whether it is still about text nobody has read since:
-	//
-	//   - The caught failure is a plain one. A coded refusal is a verdict about
-	//     written text, and it outranks a reading that merely got further —
-	//     `{ x = .5 }` is answered by the decimal, not by whatever the update
-	//     reading tripped over behind it.
-	//   - The record stands FURTHER into the input than the reading that was
-	//     kept managed to get. Where it does not, the kept reading's failure is
-	//     the furthest one and there is nothing to swap.
-	//   - The record belongs to this level of speculation or one inside it.
-	//     A failure recorded outside the speculation this Statement is being
-	//     read inside of is an alternative of a LARGER construction, still being
-	//     tried, and answering for this text with it would be the mistake this
-	//     whole mechanism exists to undo, turned around.
-	//   - It is consumed once. Two Statements can not both be answered by one
-	//     abandoned reading.
+	// Which failure of one broken Statement is reported: the kept reading's,
+	// or the furthest among the readings thrown away.
+	// See "The furthest failure" in DEVELOPMENT.md.
 	private furthestOf(caught: ParseError): ParseError {
 		let recorded = this.furthestFailure
 
@@ -1813,11 +1761,8 @@ class DescentParser {
 		return recorded
 	}
 
-	// Several parts of the AST hold their members in a name-keyed
-	// Record — a Namespace's Methods, a Record's members — where a repeated
-	// name can not be represented at all: building the Record drops the
-	// earlier definition, and with it whatever Expression it held. No later
-	// stage ever sees the first one, so the duplicate is reported here, where
+	// A name-keyed part of the AST, such as a Namespace's Methods, keeps only
+	// the last of a repeated name. So the duplicate is reported here, while
 	// both are still in hand.
 	protected reportDuplicateNames(
 		entries: Array<{ name: parser.IdentifierNode }>,
@@ -1852,11 +1797,8 @@ class DescentParser {
 						),
 						secondary(firstPosition, "first defined here"),
 					],
-					// The edit the two Labels already spell out between
-					// them, said rather than left to be worked out: the second
-					// writing is the one that goes, because the first is the one
-					// the value is read as having. Callers that have something
-					// sharper to say pass their own.
+					// The second writing is the one to remove. Callers with
+					// something sharper to say pass their own Helps.
 					helps:
 						helps.length === 0
 							? [
@@ -1868,11 +1810,9 @@ class DescentParser {
 		}
 	}
 
-	// Parses list elements until the closing `}` (or the end of the
-	// input), reporting a single Diagnostic per broken element and
-	// resynchronising afterwards. Broken elements are DROPPED from the AST —
-	// the Enricher already tolerates missing declarations through its
-	// ErrorType poison machinery, so no error nodes are invented.
+	// Parses list elements until the closing `}` or the end of the input. A
+	// broken element is reported once and dropped. See "Error recovery" in
+	// DEVELOPMENT.md.
 	protected parseStatementList<T>(parseElement: () => T): Array<T> {
 		let elements: Array<T> = []
 
@@ -1886,32 +1826,15 @@ class DescentParser {
 				break
 			}
 
-			// Asked here rather than by an element reader, because what it
-			// answers is a line that is NO element — swallowed, so the list
-			// carries on with the line behind it and nothing is dropped.
+			// Asked here, since a foreign Comment line is no element at all.
 			if (this.swallowForeignComment()) {
 				continue
 			}
 
 			let startState = this.tokens.save()
 
-			// Each element is read with no record of a reading thrown
-			// away for the element in front of it — `forgetFailuresFrom` is
-			// about a group of alternatives resolving, and a Statement that
-			// parsed is that too. An abandoned reading of the LARGER
-			// construction this loop is running inside of is left alone: it is
-			// still a live alternative, and the depth is what tells the two
-			// apart.
-			//
-			// Defensive, and deliberately so. A record only ever wins
-			// where it stands FURTHER into the input than the reading that was
-			// kept — see `furthestOf` — and every reading a Statement is given
-			// stops at or before the Statement's own end, so a record left by
-			// the Statement in front can not reach past the next one's failure.
-			// No written Program is known that needs this line. It costs one
-			// comparison per Statement, and what it is insurance against is a
-			// reading that one day reads ahead of the Statement it is a reading
-			// OF, which is exactly the shape nothing would notice.
+			// Defensive: forgets a reading thrown away for the previous element.
+			// See "The furthest failure" in DEVELOPMENT.md.
 			this.forgetFailuresFrom(this.speculationDepth)
 
 			try {
@@ -1924,18 +1847,9 @@ class DescentParser {
 		return elements
 	}
 
-	// `# count the items` — a Comment written the way Python and the
-	// shells write one. A `#` opens a CASE here, so the line read as a bare Case
-	// and then a Statement per word behind it, and every one of those words was
-	// answered as a name nothing declares: one habit, four Diagnostics.
-	//
-	// Narrow on purpose, because `#Red` and `# Red` are both Essence and a
-	// Program may write either. What makes this a Comment is the WORDS behind
-	// the Case: a Case carries its payload in brackets, and no Statement of this
-	// language stands behind another on one line. So the shape is the `#`, a
-	// name, at least one more name, and nothing on the line that is not one —
-	// which leaves a one-word Comment (`# todo`) to be read as the Case it is
-	// indistinguishable from.
+	// `# count the items`: a Comment in the shell's spelling, reported and
+	// skipped. It needs two or more names and nothing else on the line, since
+	// `# todo` is a valid bare Case.
 	protected swallowForeignComment(): boolean {
 		let hash = this.tokens.peek()
 
@@ -1995,9 +1909,8 @@ class DescentParser {
 		this.reportParseError(error)
 		this.resynchronise(startState.braceDepth)
 
-		// Guarantee progress — when the broken element consumed no
-		// Token and resynchronisation stopped immediately, the enclosing loop
-		// would otherwise retry the same Token forever.
+		// Guarantee progress where the broken element consumed no Token and
+		// resynchronisation stopped at once.
 		if (
 			this.tokens.save().index === startState.index &&
 			!this.tokens.isAtEnd()
@@ -2008,16 +1921,8 @@ class DescentParser {
 		this.recordAbandoned(startState.index)
 	}
 
-	// What the recovery just walked past, written down for the stages
-	// behind the Parser — see `parser.Recovery`. Read off the Tokens rather
-	// than off the Node that was never built, because the Node is exactly what
-	// a dropped Statement does not leave behind.
-	//
-	// A speculation that is thrown away must leave nothing behind, and
-	// this is reached only from the Statement loops, which run outside every
-	// speculation: a reading given back for another attempt has not abandoned
-	// anything, and recording it would make a name the Program declares read as
-	// one it does not.
+	// Records what the recovery just walked past, read off its Tokens.
+	// See "Abandoned Statements" in DEVELOPMENT.md.
 	protected recordAbandoned(fromIndex: number): void {
 		let abandoned = this.tokens.between(fromIndex, this.tokens.save().index)
 		let opensBody = abandonedRunOpensBody(abandoned)
@@ -2044,10 +1949,8 @@ class DescentParser {
 
 		let hoistable = hoistableKeywordTokenTypes.has(opening.type)
 
-		// Deduplicated, because one run declares a name once however many
-		// of its Tokens say so — a Choice's Case written with a payload names
-		// itself twice over, and two records for it would be two identical
-		// silences.
+		// A Case written with a payload names itself twice, as `#Case` and as
+		// `Case(`, so the names are deduplicated.
 		for (let declared of new Set(abandonedDeclarationNames(abandoned))) {
 			this.recordAbandonedDeclaration(
 				declared,
@@ -2057,9 +1960,7 @@ class DescentParser {
 		}
 	}
 
-	// One name, pending the block that will claim it. Every record is
-	// written down here so that there is one place the shape is built and one
-	// place the claim can be explained.
+	// One name, pending the block that will claim it.
 	protected recordAbandonedDeclaration(
 		name: string,
 		position: common.Position,
@@ -2074,18 +1975,9 @@ class DescentParser {
 		})
 	}
 
-	// A block has just closed, so every record still pending inside it
-	// stands in THIS block — the innermost one that encloses it, because a
-	// nested block closes before the block around it and the first claim wins.
-	// Claiming as blocks close is what makes the span exact without the Parser
-	// having to know where it is: the `{` it was opened at and the `}` it was
-	// closed at are both in hand right here.
-	//
-	// `section` says this block is an `implementation { … }`, `declarations
-	// { … }` or `tests { … }` — the only blocks whose own Statements are
-	// hoisted. It rides on the record rather than being worked out later,
-	// because a Statement's DEPTH is exactly what the stages behind the Parser
-	// can no longer see.
+	// A block has just closed, so it claims every pending record inside it.
+	// `section` marks a block whose own Statements hoist.
+	// See "Abandoned Statements" in DEVELOPMENT.md.
 	protected claimAbandonedDeclarations(
 		openingPosition: common.Position | null,
 		closingPosition: common.Position,
@@ -2101,10 +1993,8 @@ class DescentParser {
 		}
 
 		for (let record of this.abandonedDeclarations) {
-			// Pending AND inside this block. A block that closes is not
-			// necessarily a block the pending records stand in — a Statement
-			// dropped at the top level is still pending when the NEXT
-			// Function's body closes below it, and that body never held it.
+			// A pending record may stand outside this block, such as a
+			// Statement dropped before a later Function's body.
 			if (
 				record.enclosing === null &&
 				positionHolds(enclosing, record.position.start)
@@ -2115,16 +2005,10 @@ class DescentParser {
 		}
 	}
 
-	// The record handed to the Program — see `parser.Recovery`. Undefined
-	// where nothing was abandoned, which is what keeps a Program that parsed the
-	// shape it has always had. Sorted, so that one source parses to one Program
-	// however the recovery met it and a snapshot of a broken file is stable.
+	// The `parser.Recovery` handed to the Program, sorted so one source always
+	// parses to one Program. Undefined where nothing was abandoned.
 	protected recovery(): parser.Recovery | undefined {
-		// Either set, because a DROPPED BINDER abandons a name without
-		// abandoning any text — the Matcher around it parsed whole, and what
-		// was refused is the one clause inside it. Keyed off the lines alone,
-		// the name never reached the Enricher and the body's read of it
-		// reported a second time as a name nobody declared.
+		// A refused binder abandons a name without abandoning any text.
 		if (
 			this.abandonedLines.size === 0 &&
 			this.abandonedDeclarations.length === 0
@@ -2132,11 +2016,8 @@ class DescentParser {
 			return undefined
 		}
 
-		// A record no block ever claimed stood outside every block this
-		// Parser got to close — a file with no `implementation {` header at all,
-		// or one whose blocks were all torn open. There is nothing tighter to
-		// say than the file, so it is the file, and it counts as section level:
-		// that is the widest silence, and it is what a file this broken had.
+		// A record no block claimed stood outside every block that closed. It
+		// covers the whole file at section level.
 		let wholeFile = {
 			start: { line: 1, column: 1 },
 			end: this.tokens.endPosition().end,
@@ -2170,16 +2051,14 @@ class DescentParser {
 		}
 	}
 
-	// Skips ahead to the next Token that can begin a Statement (or to
-	// the closing `}`) at the brace depth the broken element started on —
-	// braces opened by the broken element itself are skipped over entirely.
+	// Skips to the next Statement start or `}` at the brace depth the broken
+	// element started on, skipping braces the element opened.
 	protected resynchronise(targetDepth: number): void {
 		while (true) {
 			let token = this.tokens.peek()
 
 			if (token === undefined) {
-				// Resynchronisation hit the end of the input — every
-				// further error would be a cascade of the one just reported.
+				// At the end of the input every further error is a cascade.
 				this.suppressDiagnostics = true
 
 				return
@@ -2210,16 +2089,9 @@ class DescentParser {
 		)
 	}
 
-	// `openingPosition` is where the `{` this closes was written. The
-	// end of the input is where a missing `}` is *noticed*; the `{` is where
-	// the mistake is, and pointing at both is the difference between "there
-	// is a brace missing somewhere" and "this block was never closed".
-	//
-	// `section` marks the three blocks whose own Statements are hoisted —
-	// `implementation`, `declarations` and `tests`. Every block close funnels
-	// through here, which is what makes this the one place an abandoned
-	// Declaration can be told which block it stood in; see
-	// `claimAbandonedDeclarations`.
+	// Reads a block's `}`, whose `{` stands at `openingPosition`. Every block
+	// closes here, so it claims abandoned Declarations. `section` marks a block
+	// whose own Statements hoist.
 	protected parseClosingBrace(
 		openingPosition: common.Position | null = null,
 		section: boolean = false,
@@ -2237,8 +2109,8 @@ class DescentParser {
 			return token.position
 		}
 
-		// Only the innermost torn-open block reports — a missing `}`
-		// necessarily tears open every enclosing block as well.
+		// Only the innermost torn-open block reports, since a missing `}`
+		// tears open every enclosing block too.
 		if (!this.suppressDiagnostics) {
 			this.reportUnclosedBlock(openingPosition)
 
@@ -2252,19 +2124,8 @@ class DescentParser {
 		return endPosition
 	}
 
-	// Where the brace is missing, which is not where its absence is
-	// noticed. The block that ran out of input is the OUTERMOST one — a missing
-	// `}` tears open every block around it, and the counting hands the braces
-	// below the mistake to the blocks above the ones they were written for. So
-	// `implementation {` was named for an `if` four lines down, and the Help,
-	// followed, wrote a `}` at the end of the file and made it compile with the
-	// wrong meaning: every Statement below the `if` inside it.
-	//
-	// `outdentedClose` asks what the counting can not: which `}` was written
-	// further out than the block it closed. Where it answers, the report is
-	// about THAT block, positioned on its `{` — which is what an Editor jumps to
-	// — and the `}` that took its brace is the second Label. Where it does not,
-	// the report is what it was: the end of the input, and the outermost block.
+	// Reports where the brace is missing, which is not where its absence is
+	// noticed. See "Unclosed blocks" in DEVELOPMENT.md.
 	protected reportUnclosedBlock(
 		openingPosition: common.Position | null,
 	): void {
