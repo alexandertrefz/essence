@@ -1,6 +1,6 @@
 import { type Color, Colors } from "./color"
 
-// The characters used to draw boxes, arrows & underlines, per character set.
+// The characters that draw boxes, arrows and underlines, per character set.
 export interface Characters {
 	hbar: string
 	vbar: string

@@ -1,8 +1,7 @@
-// Port of ariadne's snapshot test suite (`src/report/tests.rs`). The
-// expected outputs are taken verbatim from upstream, which is what makes the
-// renderer port verifiable, except in this port's own tests: a code on a line
-// of its own, a display line offset that moves the margin, a lone middle line
-// that is shown rather than elided, and the colour and ANSI-stripping tests.
+// Port of ariadne's snapshot test suite (`src/report/tests.rs`). Expected
+// outputs are upstream's verbatim, which verifies the port. The port's own
+// tests cover its differences, such as the code's own line, and colour and
+// ANSI stripping.
 
 import { describe, expect, test } from "bun:test"
 
@@ -146,9 +145,8 @@ describe("ariadne report rendering", () => {
 		)
 	})
 
-	// The header and the margin describe the same lines, so a display line
-	// offset moves both together — and widens the margin when the shifted
-	// numbers need more digits.
+	// A display line offset moves the header and the margin together, and
+	// widens the margin when the shifted numbers need more digits.
 	test("display line offset shifts the margin with the header", () => {
 		let source = Source.from("apple\n== orange;").withDisplayLineOffset(10)
 		let message = new Report({
@@ -660,8 +658,8 @@ describe("ariadne report rendering", () => {
 		)
 	})
 
-	// An ellipsis row takes as much room as the line it replaces, so a single
-	// hidden line is shown instead; two or more still collapse into one row.
+	// An ellipsis row takes as much room as one line, so a single hidden line
+	// is shown instead. Two or more still collapse into one row.
 	test("a multiline label shows a lone middle line rather than eliding it", () => {
 		let source = "apple\n==\norange\n!=\npear"
 		let message = new Report({

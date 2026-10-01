@@ -1,9 +1,9 @@
 import type { Color } from "./color"
 import type { Span } from "./span"
 
-// How many lines of a multi-line label should be shown: all of them, or at
-// most N (the start and end lines are always shown, so N should be >= 2).
-// A single middle line is never elided.
+// How many lines of a multi-line label to show: all, or at most N. The start
+// and end lines always show, so N should be at least 2. A single middle line
+// is never elided.
 export type LabelShowLines = "all" | number
 
 export interface LabelOptions {

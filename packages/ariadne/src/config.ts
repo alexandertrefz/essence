@@ -5,9 +5,9 @@ import { type Color, Colors } from "./color"
 // boxes and arrows.
 export type CharSet = "unicode" | "ascii"
 
-// How span offsets are interpreted: as Unicode code points ("char", the
-// equivalent of ariadne's char spans) or as UTF-16 code units ("utf16", the
-// JavaScript-native equivalent of ariadne's byte spans).
+// How span offsets count. "char" counts Unicode code points, like ariadne's
+// char spans. "utf16" counts UTF-16 code units, the JavaScript analogue of
+// ariadne's byte spans.
 export type IndexType = "char" | "utf16"
 
 // The attachment point of inline label arrows.

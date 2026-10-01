@@ -1,17 +1,12 @@
-// Port of ariadne's report renderer (`src/report/write.rs`).
-// https://codeberg.org/zesterer/ariadne — MIT licensed.
+// Port of ariadne's report renderer (`src/report/write.rs`), under the MIT
+// licence: https://codeberg.org/zesterer/ariadne
 //
-// The upstream file opens with a warning that applies equally here:
+// WARNING: upstream's own warning applies here too. The code is complex, has
+// many implicit invariants and some known bugs.
 //
-//   A WARNING, FOR ALL YE WHO VENTURE IN HERE
-//   - This code is complex and has a lot of implicit invariants
-//   - Yes, it has some bugs
-//   - Yes, it needs rewriting
-//   - No, you are not expected to understand it.
-//
-// This port follows the upstream logic statement by statement, except where
-// the README's "Differences from upstream" lists otherwise, so that its output
-// stays verifiable against the upstream snapshot test suite.
+// The port follows upstream statement by statement, except where the README's
+// "Differences from upstream" says otherwise, so the upstream snapshot tests
+// still verify it.
 
 import { type Color, paint, stripAnsi } from "./color"
 import type { Config } from "./config"
@@ -293,11 +288,9 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 
 	let kindColor = reportKindColor(report.kind, config)
 
-	// The code gets a line of its own above the header, in the same
-	// color as `Note` and `Help`, rather than sharing the kind's line and
-	// color as upstream does. It is a lookup key rather than part of the
-	// sentence, and on the header line it competes with the word that says
-	// whether this is an error at all.
+	// Unlike upstream, the code gets its own line above the header, coloured
+	// like `Note` and `Help`. It is a lookup key, and on the header line it
+	// would compete with the report's kind.
 	if (report.code !== null) {
 		w.writeLine(paint(`[${report.code}]`, config.noteColor()))
 	}
@@ -308,10 +301,8 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 
 	let groups = getSourceGroups(report, cache)
 
-	// Line number maximum width
-	// The margin prints its numbers with the source's display offset
-	// applied — the same offset the header location carries — so the width has
-	// to be measured on the offset numbers too.
+	// The margin's width, measured on line numbers with the source's display
+	// offset applied, as the margin prints them.
 	let lineNumberWidth = groups.reduce((maximum, group) => {
 		let fetched = fetchSource(cache, group.sourceId as Id)
 		let offset = fetched === null ? 0 : fetched[0].displayLineOffset
@@ -325,11 +316,8 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 	const marginCharacter = (character: string): string =>
 		paint(character, config.marginColor())
 
-	// `displayLineOffset` shifts the printed number exactly as it shifts
-	// the header location — one report never shows two accounts of the same
-	// line. Upstream applies the offset only to the header, which leaves the
-	// gutter contradicting it; that is a bug in the feature, not a behaviour
-	// to preserve.
+	// `displayLineOffset` shifts the margin's numbers as it shifts the header
+	// location. Upstream shifts only the header, so its margin contradicts it.
 	const writeMargin = (
 		index: number,
 		isSourceLine: boolean,
@@ -654,8 +642,8 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 			}
 		}
 
-		// Whether no label is drawn on a line and it lies outside the display
-		// area of every label, which is what lets a line be skipped.
+		// Whether a line has no label and lies outside every label's display
+		// area, so it may be skipped.
 		const isUnlabelledLine = (index: number): boolean => {
 			let line = source.line(index)
 			if (line === null) {
