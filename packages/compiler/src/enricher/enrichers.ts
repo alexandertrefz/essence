@@ -17,7 +17,9 @@ import {
 	asynchronyData,
 	asynchronyHelps,
 	booleanQuestionFor,
+	caseCandidatePrefixes,
 	asynchronyState,
+	ambiguousCaseWording,
 	barredCompletion,
 	choiceIdentity,
 	countOf,
@@ -14283,7 +14285,7 @@ function resolveCaseInExpectedType(
 	}
 
 	if (candidates.length > 1) {
-		reportAmbiguousCase(caseName, candidates, "in the expected Type")
+		reportAmbiguousCase(caseName, candidates, "in the expected Type", true)
 
 		return { type: "Error" }
 	}
@@ -17544,50 +17546,41 @@ export function settleConformanceClauses(
 	return true
 }
 
-// Shows the qualified spelling for each candidate. A generic Choice also needs
-// its Type Arguments, written as `<…>`, since its Type Parameter names are not
-// in scope at the call. Takes Cases, which know the Choice's display name and
-// whether it is generic.
+// Shows the qualified spelling for each candidate. A declared generic Choice
+// also needs its Type Arguments, written as `<…>`, since its Type Parameter
+// names are not in scope at the call. See `caseCandidatePrefixes`.
 function reportAmbiguousCase(
 	caseName: parser.IdentifierNode,
 	candidates: Array<common.CaseType>,
 	where: string,
+	applied: boolean = false,
 ): void {
-	let choiceNames = candidates.map((candidate) =>
-		displayChoiceName(candidate.choice),
+	let prefixes = caseCandidatePrefixes(candidates, applied)
+	let choiceNames = prefixes.map((prefix) => prefix.name)
+	let wording = ambiguousCaseWording(
+		caseName.content,
+		candidates,
+		where,
+		choiceNames.length,
 	)
 
-	reportError(
-		`Case '#${caseName.content}' is declared by more than one Choice`,
-		caseName.position,
-		{
-			code: "ambiguous-case",
-			labels: [
-				primary(
-					caseName.position,
-					`${countOf(choiceNames.length, "Choice")} ${where} declare${choiceNames.length === 1 ? "s" : ""} it`,
-				),
-			],
-			notes: choiceNames.map(
-				(choiceName) =>
-					`'${choiceName}' declares '#${caseName.content}'.`,
-			),
-			// One Help per candidate, since which Choice was meant is what this
-			// can not decide. The builtin `Optional`'s `#Empty` and `#Value`
-			// collide with names a Program likely declares.
-			helps: candidates.map((candidate) => {
-				let choiceName = displayChoiceName(candidate.choice)
-
-				return candidate.choiceGenerics === undefined
-					? `Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`
-					: `Write '${choiceName}<…>#${caseName.content}' with its Type Arguments to pick '${choiceName}'.`
-			}),
-			// The names alone, one action each in the same order. A fix writes
-			// the prefix, and `undecided-type-arguments` then asks for any Type
-			// Arguments.
-			data: { kind: "choice-candidates", names: choiceNames },
-		},
-	)
+	reportError(wording.message, caseName.position, {
+		code: "ambiguous-case",
+		labels: [primary(caseName.position, wording.label)],
+		notes: wording.notes,
+		// One Help per prefix, since which was meant is what this can not
+		// decide. The builtin `Optional`'s `#Empty` and `#Value` collide
+		// with names a Program likely declares.
+		helps: prefixes.map(({ name, generic }) =>
+			generic
+				? `Write '${name}<…>#${caseName.content}' with its Type Arguments to pick '${name}'.`
+				: `Write '${name}#${caseName.content}' to pick '${name}'.`,
+		),
+		// The names alone, one action each in the same order. A fix writes
+		// the prefix, and `undecided-type-arguments` then asks for the Type
+		// Arguments of a declared generic Choice.
+		data: { kind: "choice-candidates", names: choiceNames },
+	})
 }
 
 // The near miss for an unknown Case, computed once for every reporting site, so

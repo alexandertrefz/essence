@@ -3060,13 +3060,13 @@ Error: Case '#Red' is declared by more than one Choice
 
 </div>
 
-Prefix the case with its choice: `Colour#Red`.
+Prefix the case with its choice: `Colour#Red`. Where the expected type holds one generic choice applied twice, as `Box<Integer> | Box<String>`, one choice declares the case, so the report reads `Case '#Full' fits more than one application of 'Box'`, and each help names the type arguments as well: `Write 'Box<Integer>#Full' to pick 'Box<Integer>'.` A `match` case writes no type arguments, so its helps name each choice once.
 
 Quick Fix: **Prefix with 'Colour#'**, one for each choice that declares the case.
-Where the choice is generic the prefix alone leaves
-[`undecided-type-arguments`](#undecided-type-arguments) behind, by design: the
-prefix says *which* choice, and which type arguments it is applied with is a
-second question only the position can answer.
+Where a generic choice is named without its type arguments, the prefix says *which* choice and leaves its type
+arguments to the position. A position that decides them, such as a declared type, settles them: `Box#Full(1)`
+under `Box<Integer> | Crate` compiles. Where nothing decides them, the prefix leaves
+[`undecided-type-arguments`](#undecided-type-arguments) behind, by design.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 

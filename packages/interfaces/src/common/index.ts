@@ -123,7 +123,8 @@ export type DiagnosticData =
 	// a different fix.
 	| { kind: "holding-case"; caseNames: Array<string> }
 	// The display names of the Choices that declare a bare `#Case`, in the
-	// order the Helps name them, without Type Arguments.
+	// order the Helps name them. A name carries Type Arguments only where
+	// another candidate applies the same Choice, and never as `<…>`.
 	| { kind: "choice-candidates"; names: Array<string> }
 	// The `@param` line the first undocumented Parameter is missing, with the
 	// name it writes and the last `@param` line, which it goes after. Lines

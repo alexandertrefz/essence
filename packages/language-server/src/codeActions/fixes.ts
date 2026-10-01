@@ -968,8 +968,9 @@ export function namespaceSpecifierActions(
 }
 
 // One action per Choice declaring the Case, none preferred. The Choice's name
-// is inserted before the written `#`. A generic Choice's Type Arguments are
-// left for `undecided-type-arguments` to ask for.
+// is inserted before the written `#`, applied where two candidates apply one
+// Choice. A declared generic Choice's Type Arguments are left for
+// `undecided-type-arguments` to ask for.
 export function choicePrefixActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,

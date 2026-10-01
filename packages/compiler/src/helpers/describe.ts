@@ -258,6 +258,67 @@ export function describeCaseChoice(type: common.CaseType): string {
 		: `${choiceName}<${type.typeArguments.map(describeType).join(", ")}>`
 }
 
+// The prefixes that pick among the Cases a bare `#Case` could mean, and whether
+// each still needs Type Arguments written. Two applications of one Choice
+// differ only in their Type Arguments, so where `applied` holds they are named
+// with them, as a construction can write. A Case Matcher writes none and covers
+// every application, so otherwise each Choice is one prefix.
+export function caseCandidatePrefixes(
+	candidates: Array<common.CaseType>,
+	applied: boolean,
+): Array<{ name: string; generic: boolean }> {
+	return candidates.flatMap((candidate) => {
+		let sameChoice = candidates.filter(
+			(other) => other.choice === candidate.choice,
+		)
+
+		if (!applied && sameChoice[0] !== candidate) {
+			return []
+		}
+
+		return [
+			{
+				name:
+					applied && sameChoice.length > 1
+						? describeCaseChoice(candidate)
+						: displayChoiceName(candidate.choice),
+				generic: candidate.choiceGenerics !== undefined,
+			},
+		]
+	})
+}
+
+// What `ambiguous-case` says beside its Helps, given how many prefixes they
+// offer. Two applications of one Choice are one declaration, so there the
+// report counts applications rather than Choices.
+export function ambiguousCaseWording(
+	caseName: string,
+	candidates: Array<common.CaseType>,
+	where: string,
+	prefixes: number,
+): { message: string; label: string; notes: Array<string> } {
+	let declaring = [
+		...new Set(candidates.map((candidate) => candidate.choice)),
+	].map(displayChoiceName)
+	let notes = declaring.map(
+		(choiceName) => `'${choiceName}' declares '#${caseName}'.`,
+	)
+
+	if (declaring.length === 1) {
+		return {
+			message: `Case '#${caseName}' fits more than one application of '${declaring[0]}'`,
+			label: `${countOf(prefixes, "application")} of '${declaring[0]}' ${where} have it`,
+			notes,
+		}
+	}
+
+	return {
+		message: `Case '#${caseName}' is declared by more than one Choice`,
+		label: `${countOf(declaring.length, "Choice")} ${where} declare it`,
+		notes,
+	}
+}
+
 // A function Type as a Type Annotation spells it, `(_: Integer) -> Integer`,
 // with labels but no internal names. A Method named rather than called shows
 // its receiver as the first Parameter.

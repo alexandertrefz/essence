@@ -1202,6 +1202,33 @@ describe("Code Actions", () => {
 
 			expect(codesOf(result)).toEqual(["undecided-type-arguments"])
 		})
+
+		// Two applications of one Choice differ only in their Type Arguments, so
+		// each action writes its own.
+		it("should write the Type Arguments of an applied candidate", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Box<ItemType> { Full { item: ItemType }, Blank }",
+				"",
+				'\tconstant boxed: Box<Integer> | Box<String> = #Full("x")',
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Prefix with 'Box<Integer>#'",
+				"Prefix with 'Box<String>#'",
+			])
+
+			let result = applied(lines, fixes[1])
+
+			expect(result[3]).toBe(
+				'\tconstant boxed: Box<Integer> | Box<String> = Box<String>#Full("x")',
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
 	})
 
 	describe("ambiguous-namespace", () => {

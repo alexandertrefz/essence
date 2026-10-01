@@ -1624,6 +1624,96 @@ describe("Choices", () => {
 			).toContain("ambiguous-case")
 		})
 
+		// A Case Matcher covers every instantiation and takes no Type Arguments,
+		// so each Choice gets one Help, and is counted once.
+		it("offers a bare Matcher one Help per Choice", () => {
+			let source = `implementation { ${box}
+				choice Crate { Full { weight: Integer } }
+
+				constant thing: Box<Integer> | Box<String> | Crate = Crate#Full({ weight = 2 })
+
+				Terminal.inspect(match thing -> String {
+					case #Full { <- "full" }
+					case _ { <- "other" }
+				})
+			}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write 'Box#Full' to pick 'Box'.",
+				"Write 'Crate#Full' to pick 'Crate'.",
+			])
+			expect(labelsOf(source)).toEqual([
+				"2 Choices in the matched Union declare it",
+			])
+			expect(notesOf(source)).toEqual([
+				"'Box' declares '#Full'.",
+				"'Crate' declares '#Full'.",
+			])
+		})
+
+		// A construction can write the Type Arguments, and they are what tells
+		// the candidates apart.
+		it("names each instantiation a bare construction could mean", () => {
+			let source = `implementation { ${box}
+				constant boxed: Box<Integer> | Box<String> = #Full("hello")
+			}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write 'Box<Integer>#Full' to pick 'Box<Integer>'.",
+				"Write 'Box<String>#Full' to pick 'Box<String>'.",
+			])
+			expect(diagnosticsOf(source)[0]?.data).toEqual({
+				kind: "choice-candidates",
+				names: ["Box<Integer>", "Box<String>"],
+			})
+		})
+
+		// One Choice declares the Case once, however often the Type applies it.
+		it("speaks of applications where one Choice is applied twice", () => {
+			let source = `implementation { ${box}
+				constant boxed: Box<Integer> | Box<String> = #Full("hello")
+			}`
+
+			expect(messagesOf(source)).toEqual([
+				"Case '#Full' fits more than one application of 'Box'",
+			])
+			expect(labelsOf(source)).toEqual([
+				"2 applications of 'Box' in the expected Type have it",
+			])
+			expect(notesOf(source)).toEqual(["'Box' declares '#Full'."])
+		})
+
+		it("builds the construction the Help writes", async () => {
+			expect(
+				await run(`implementation { ${box}
+					constant boxed: Box<Integer> | Box<String> = Box<String>#Full("hello")
+
+					Terminal.inspect(boxed)
+				}`),
+			).toEqual(['Box#Full("hello")'])
+		})
+
+		// A Choice with one candidate is told apart by its name alone, and the
+		// position decides its Type Arguments.
+		it("spells Type Arguments only where they tell candidates apart", async () => {
+			expect(
+				helpsOf(`implementation { ${box}
+					constant thing: Box<Integer> | Box<String> | Optional<Integer> = #Empty
+				}`),
+			).toEqual([
+				"Write 'Box<Integer>#Empty' to pick 'Box<Integer>'.",
+				"Write 'Box<String>#Empty' to pick 'Box<String>'.",
+				"Write 'Optional#Empty' to pick 'Optional'.",
+			])
+			expect(
+				await run(`implementation { ${box}
+					constant thing: Box<Integer> | Box<String> | Optional<Integer> = Optional#Empty
+
+					Terminal.inspect(thing)
+				}`),
+			).toEqual(["Optional#Empty"])
+		})
+
 		it("picks each instantiation's own dispatch branch", async () => {
 			expect(
 				await run(`implementation {
