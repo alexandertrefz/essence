@@ -4,58 +4,38 @@ import type {
 } from "@essence-lang/compiler/testing"
 import type { Range, TestEvent } from "@essence-lang/runtime/Testing"
 
-// What the Language Server tells an Editor about a test run, and what it
-// tells the Worker that performs one. Both are written down here, apart from
-// the code that sends them, because they are a CONTRACT: an extension is built
-// against the notification and a bundled Worker is built against the messages,
-// and neither can be read out of the implementation once it ships.
+// What the Language Server tells an Editor about a test run, and what it tells
+// the Worker that performs one. Extensions and bundled Workers are built
+// against these shapes, so they are a contract.
 
 // #region Where a test stands
 
-// One test as the Compiler found it, independently of what running it
-// said. It is the half of a run an Editor needs to draw a TREE — a Test
-// Explorer lists what exists, including everything a filter left out, and puts
-// each item on the line it was written on.
-//
-// The events carry no Position at all, on purpose: an event is about what
-// happened, and a span belongs to the source. These come off the Module's own
-// manifest, which is what the Compiler emitted beside the tests, so the ranges
-// are the ranges the lenses and the Diagnostics use.
+// One test as the Compiler found it, whatever running it said, for a client
+// drawing a tree. Its ranges come from the Module's manifest, the same ranges
+// the lenses and Diagnostics use; events carry no Position.
 export type TestSite = {
 	// The structural id, exactly as every event spells it.
 	id: string
-	// The name TEMPLATE. What a run reports is the RENDERING, which only
-	// differs where the name interpolates — a client shows the rendering it has
-	// and falls back to this, which is the only name a test that never ran has.
+	// The name template. A run reports the rendering, which differs only where
+	// the name interpolates; a test that never ran has only this.
 	name: string
-	// Which row of a table test this is, and null for the ordinary test
-	// that runs once. `suitePath` already ends in the template the rows share,
-	// so a client that draws a tree needs nothing else; this is what it labels
-	// a row with before anything has run and worked out its name.
+	// Which row of a table test this is, or null for an ordinary test. A client
+	// labels a row with it before anything has run.
 	row: number | null
 	suitePath: Array<string>
-	// The file the test was WRITTEN in, as an absolute path.
+	// The file the test was written in, as an absolute path.
 	file: string
-	// The whole `test "…" { … }`, which is what a gutter marks, and the
-	// keyword alone, which is where a lens and an Explorer item sit.
+	// The whole `test "…" { … }`, which a gutter marks, and the keyword alone,
+	// where a lens and an Explorer item sit.
 	range: Range
 	keywordRange: Range
-	// The EFFECTIVE tags — the test's own and every enclosing suite's —
-	// so a client filtering by tag never has to walk a suite path.
+	// The effective tags, the test's own and every enclosing suite's.
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
-	// Whether the item was written as a `benchmark`. The session runs
-	// without `--bench`, so one is reported deselected for the reason `bench` —
-	// and this is what lets a client say so as a fact about the item rather than
-	// as an accident of the run, and offer to measure the one somebody points
-	// at. Running one BY ID measures it: the ids branch of the selection is
-	// ahead of the gate, which is exactly the "Run this one" door.
-	//
-	// Added without moving `TEST_RUN_VERSION`. A client built before this
-	// existed reads the sites it always read and never looks here — which is the
-	// same tolerance the events ask for, where a kind nobody knows is ignored
-	// rather than refused.
+	// Whether the item is a `benchmark`. The session runs without `--bench`, so
+	// one reports deselected for `bench`; running it by id measures it. A client
+	// that predates this field ignores it, as it ignores an unknown event.
 	benchmark: boolean
 }
 
@@ -63,52 +43,33 @@ export type TestSite = {
 
 // #region The custom notification
 
-// `essence/testRun`. Sent twice per cycle: once when a run begins, so the
-// Editor can mark what is about to run, and once when it ends, carrying the
-// whole event batch.
-//
-// VERSIONED, and separately from the events it carries. `version` is this
-// PAYLOAD's shape; every event inside carries `schema`, which is the event
-// stream's. The two move independently — a new event kind is not a new payload
-// — and a client that meets a `version` it does not know must ignore the
-// notification rather than guess at it. A client that meets an event KIND it
-// does not know must ignore that event and keep the rest.
+// `essence/testRun`, sent when a cycle starts and when it ends with the whole
+// batch. `version` is the payload's shape, `schema` each event's. A client
+// ignores a notification of an unknown version and an event of an unknown kind.
 export const TEST_RUN_NOTIFICATION = "essence/testRun"
 
-// The version this Server sends, so a client can name what it needs
-// rather than repeating the number in a condition.
+// The version this Server sends.
 export const TEST_RUN_VERSION = 3
 
 export type TestRunNotification = {
 	version: typeof TEST_RUN_VERSION
-	// Which cycle this is, counted from the session's start. The `end`
-	// carrying a run number answers the `start` that carried it, and a client
-	// that has already drawn a later run may drop an earlier one that arrives
-	// out of order.
+	// The cycle's number, counted from the session's start. The `end` answers the
+	// `start` with its number; a client may drop a run older than one it drew.
 	run: number
 	kind: "start" | "end"
-	// What asked for the run. `open` is the session starting or a folder
-	// arriving, `change` an edit, `settings` a setting that changes what runs,
-	// and `request` an `essence/runTests` from the Editor — which is what a Run
-	// lens sends.
+	// What asked for the run: `open` at session start or a new folder, `change`
+	// an edit, `settings` a setting, `request` an `essence/runTests`.
 	reason: "open" | "change" | "settings" | "request"
-	// The files this cycle covers, as absolute paths. On a `start` they
-	// are what is about to run; on an `end` they are what ran. Everything the
-	// session holds for a file in this list is REPLACED by this batch — unless
-	// the batch was NARROWED, see `ids`.
+	// The files this cycle covers, as absolute paths: about to run on a `start`,
+	// run on an `end`. The batch replaces a file's results unless narrowed.
 	files: Array<string>
-	// The tests this cycle was narrowed to, empty where it was not. What
-	// it decides is how much of a file the batch replaces: a run somebody asked
-	// for by id reports a deselection for every OTHER test of that file, and a
-	// client that adopted those would turn "run this one" into "forget the
-	// rest". The Server holds its own results the same way.
+	// The tests this cycle was narrowed to, or empty. A narrowed batch replaces
+	// only these tests; its deselections of the others are not adopted.
 	ids: Array<string>
 	// The whole batch, in the order it happened. Empty on a `start`.
 	events: Array<TestEvent>
-	// Every test of every file this cycle covers, whether it ran or not,
-	// in the order they were written. Empty on a `start`, and empty for a file
-	// that would not compile — which is what lets a client keep drawing the
-	// tree it last had rather than emptying it on a half-typed line.
+	// Every test of every covered file, in written order, run or not. Empty on a
+	// `start`, and for a file that would not compile, so a client keeps its tree.
 	sites: Array<TestSite>
 	counts: {
 		passed: number
@@ -117,29 +78,12 @@ export type TestRunNotification = {
 		deselected: number
 	}
 	duration: number
-	// False when a file this cycle covers could not be compiled. Its
-	// Diagnostics are published the ordinary way, under its own URI; what this
-	// says is that the results the client is holding for that file are the last
-	// ones that ran rather than the ones the buffer would produce.
+	// False when a covered file would not compile. The results a client holds for
+	// it are then the last ones that ran.
 	compiled: boolean
-	// What this CYCLE counted, and what the session knows about the
-	// Choices. The two halves are carried differently on purpose:
-	//
-	// `files` is only what this cycle recomputed, keyed by SOURCE file — which
-	// is not the same set as `files` above: a `Foo.tests.es` runs the tests,
-	// and what its counters counted is mostly `Foo.es`. A client showing the
-	// project lays each batch over what it had, keyed by `module`, and keeps
-	// the files this cycle says nothing about. Sending the whole project every
-	// time would put every point of every file on the wire at every keystroke.
-	//
-	// `choices` is the SESSION's answer, laid over cycle by cycle and sent
-	// whole, because which Cases were CONSTRUCTED is a question about the whole
-	// run — a Case built only by the file that was just re-run is still a Case
-	// somebody built — and it is small enough to say again. A client replaces
-	// it rather than merging, so nobody works that answer out twice.
-	//
-	// Both empty unless the session was asked for coverage, and empty on a
-	// `start`.
+	// `files` is what this cycle counted, keyed by source file, for a client to
+	// lay over what it has. `choices` is the session's whole answer about which
+	// Cases were constructed, which a client replaces. Empty unless asked for.
 	coverage: CoverageSummary
 }
 
@@ -147,27 +91,14 @@ export type TestRunNotification = {
 
 // #region What the Server reads out of the client's configuration
 
-// The `essence.tests` section, pulled with `workspace/configuration`
-// whenever the client says something under `essence` changed. It is part of
-// this contract rather than of the extension's manifest because any client may
-// answer it, and a client that answers nothing keeps the defaults — a session
-// that is on, counts nothing, and waits `450` milliseconds.
-//
-// Every one of these is a fact about the READER: whether they want their
-// project run as they type, whether they want it instrumented, and how long a
-// burst of keystrokes is allowed to be. What a project RUNS — the tags it
-// skips, whether its declarations are tested — is a fact about the project, and
-// lives in the `essence.json` the terminal reads too. `essence.tests.skipTags`
-// used to be spelled here as well, which left a project with two lists to keep
-// agreeing and an editor that ran something else than `essence test`.
+// The `essence.tests` settings, pulled through `workspace/configuration`.
+// Without an answer: on, no coverage, a `450` millisecond debounce. What a
+// project runs comes from its `essence.json`, as for `essence test`.
 export type TestSettings = {
 	enabled?: boolean
 	debounce?: number
-	// Whether a run counts what it reached. It is off by default and
-	// deliberately: instrumentation makes every compile of the session a
-	// different bundle from the one a build would produce, and it makes the
-	// Program do more work on every keystroke. A reader who wants the gutter
-	// asks for it.
+	// Whether a run counts coverage. Off by default: an instrumented bundle differs
+	// from the build's and does more work per keystroke.
 	coverage?: boolean
 }
 
@@ -175,46 +106,26 @@ export type TestSettings = {
 
 // #region The request an Editor sends
 
-// `essence/runTests`. What a Code Lens's command ends up sending, and
-// what a Test Explorer's "run" button sends. Answering it schedules a run and
-// answers with the number the notifications will carry.
+// `essence/runTests`, sent by a lens's command and a Test Explorer's run
+// button. It schedules a run and answers with the run number.
 export const RUN_TESTS_REQUEST = "essence/runTests"
 
 export type RunTestsParams = {
-	// Structural test ids — `<module>/<suite path>/<name>`, exactly as
-	// every event spells them. A suite is named by the ids of the tests under
-	// it rather than by a path of its own, because a suite is not a thing the
-	// runner selects.
+	// Structural test ids, `<module>/<suite path>/<name>`, as events spell them. A
+	// suite is named by the ids of its tests.
 	ids?: Array<string>
 	// Whole files, as absolute paths. Given both, the union runs.
 	files?: Array<string>
-	// Given NEITHER, every test file of the workspace runs. That is what
-	// a Test Explorer's Run and Refresh buttons mean, and a client that had to
-	// name the files instead could only name the ones it had already been told
-	// about — never the file whose first test was written a moment ago.
-	//
-	// `update` is what the "Accept snapshot" Code Lens sends: every
-	// snapshot this run produces is RECORDED, whether it differs from what was
-	// stored or was never stored at all. A `__snapshots__` companion is written
-	// where it stands; a source is answered as an edit, because the buffer the
-	// run compiled may never have been saved.
+	// Given neither, every test file of the workspace runs, including files the
+	// client has not heard of. `update` records every snapshot the run produces:
+	// a `__snapshots__` companion is written, a source answered as an edit.
 	update?: boolean
 }
 
 export type RunTestsResult = {
-	// The cycle the results will arrive under, or null where the session
-	// is off or nothing matched.
-	//
-	// It is THIS request's cycle, always — never the number of a run that
-	// happens to be in flight. A request landing mid-cycle is deferred rather
-	// than cancelling the compile in front of it, and what it is answered with
-	// is the number that deferred cycle will carry: a client ties the run it
-	// opened to this number, so naming the cycle already going would hand a
-	// reader who asked for one test the batch of a cycle nobody asked for. The
-	// number is therefore handed out before anything carries it — which is why
-	// a cycle asked for in between can start and end first, and why a promised
-	// cycle left with nothing to run still ends under its number rather than
-	// going quiet.
+	// The number of the cycle that will run this request, or null where the
+	// session is off or nothing matched. A request deferred behind a running cycle
+	// gets the deferred cycle's number, which may end after a cycle started later.
 	run: number | null
 }
 
@@ -222,43 +133,20 @@ export type RunTestsResult = {
 
 // #region What the Worker is told, and what it answers
 
-// The session compiles and runs in a Worker rather than in the Server.
-// Three reasons, in order of how badly each one bites:
-//
-// 1. A Program writes to `process.stdout`, and the Server's stdout IS the LSP
-//    protocol stream. One `Terminal.print` outside a test would corrupt the
-//    connection.
-// 2. Every Compiler stage collects Diagnostics into module-level state, which
-//    is safe exactly as long as no two collections interleave. A test compile
-//    suspends inside itself — the bundler is asynchronous — so running one
-//    beside the Server's own analysis is the one thing that discipline forbids.
-// 3. A test can loop forever. A Worker can be terminated; a Server cannot
-//    interrupt itself.
-
-// What one entry of a run is: the file, and what the project governing
-// THAT file says about running it. Per entry rather than per run because a
-// workspace is not one project — two folders are two of them, and a folder
-// holds a nested project as easily as none — and the Worker compiles and runs
-// the entries one at a time anyway, so carrying a list per run would only be a
-// way of getting the second project wrong.
+// One entry of a run: the file and its own project's settings, since a
+// workspace may hold several projects.
 export type TestEntry = {
-	// The file to compile and run. It runs the tests of its OWN Module
-	// and no others: a file two entries import runs its tests under its own
-	// name once.
+	// The file to compile and run. It runs its own Module's tests only.
 	filePath: string
-	// The tags this entry's project skips — `test.skipTags` of the
-	// `essence.json` governing it, which is the same list `essence test` obeys.
+	// The tags this entry's project skips, `test.skipTags` of its `essence.json`.
 	skipTags: Array<string>
-	// Whether this entry also tests what its own declarations promise, as
-	// `essence test --contracts` does for one run. It changes the emitted bytes
-	// — the goals are a suite synthesized into the section — so it is part of
-	// the compile rather than of the selection.
+	// Whether this entry also tests its declarations' goals, as
+	// `essence test --contracts` does. It changes the emitted bytes.
 	contracts: boolean
 }
 
-// What the Worker is started with. `staging` is the directory it writes
-// its bundles into: named by the session, created when the first bundle is
-// staged, and removed once the Worker closes or exits.
+// What the Worker is started with. `staging` is where it writes its bundles,
+// created on first use and removed when the Worker ends.
 export type TestWorkerData = {
 	staging: string
 }
@@ -267,34 +155,23 @@ export type TestWorkerRequest =
 	| {
 			kind: "run"
 			run: number
-			// The entries to compile and run, each with the settings of
-			// the project it belongs to — see `TestEntry`.
+			// The entries, each with its project's settings; see `TestEntry`.
 			entries: Array<TestEntry>
-			// The unsaved buffers, by absolute path. The Worker reads
-			// these before it reads disk, which is what makes the session
-			// answer for the file as it is being typed rather than as it was
-			// last saved.
+			// The unsaved buffers, by absolute path, read before disk.
 			overlays: Record<string, string>
-			// What every entry of this run is selected by. The tags one
-			// SKIPS is not among them: that is the project's answer rather than
-			// the run's, and it rides on the entry.
+			// What every entry is selected by. Skipped tags ride on each entry.
 			filters: {
 				filter?: string | null
 				tags?: Array<string>
 				focusedElsewhere?: boolean
 			}
-			// Run only these tests, by structural id. Empty runs whatever
-			// the filters select.
+			// Only these tests, by structural id. Empty runs what the filters select.
 			ids: Array<string>
-			// Whether every snapshot this run produces is RECORDED —
-			// what the Editor's "Accept snapshot" asks for. A source it would
-			// rewrite comes back as `rewrites`; the companion files are
-			// written where the Worker stands.
+			// Whether every snapshot is recorded. A source comes back as `rewrites`;
+			// companion files are written in place.
 			update: boolean
-			// Whether to compile with the instrumentation pass on and
-			// count what the run reaches. It changes the emitted bytes, so a
-			// session that turns it on compiles bundles of its own rather than
-			// re-using the ones it already staged.
+			// Whether to instrument and count coverage. It changes the emitted bytes, so
+			// the bundles are compiled anew.
 			coverage: boolean
 	  }
 	| { kind: "close" }
@@ -306,32 +183,25 @@ export type TestWorkerResponse =
 			run: number
 			entry: string
 			events: Array<TestEvent>
-			// Every test this entry holds, off the compiled Module's own
-			// manifest, whether it ran or not. Empty where the entry would not
-			// compile, for the same reason `events` is.
+			// Every test of the entry from its manifest, run or not. Empty where it would
+			// not compile.
 			sites: Array<TestSite>
-			// Whether this entry holds a focused test, so the session can
-			// tell every other entry so on the next cycle — focus is decided
-			// across a whole run and one Worker message knows one bundle.
+			// Whether the entry holds a focused test, which the session passes to the
+			// other entries next cycle.
 			focused: boolean
 			compiled: boolean
-			// What went wrong, rendered, where the entry could not be
-			// compiled or its bundle would not load. Diagnostics are not sent:
-			// the Server's own analysis publishes those, from the same buffers.
+			// Why the entry could not be compiled or loaded. Diagnostics are not sent;
+			// the analysis publishes them.
 			problem: string | null
-			// The sources an accepted snapshot would rewrite, and what
-			// each would become. Empty unless the run was asked to record —
-			// the Server turns each into a workspace edit, so that an unsaved
-			// buffer is edited rather than written round.
+			// The sources an accepted snapshot would rewrite, which the Server applies as
+			// edits.
 			rewrites: Array<SourceRewrite>
 	  }
 	| {
 			kind: "done"
 			run: number
-			// The Worker has loaded as many distinct bundles as it is
-			// willing to hold. Every bundle a session compiles is a Module that
-			// can never be unloaded, so a long editing session would grow
-			// without bound; the session starts a new Worker instead.
+			// The Worker holds as many bundles as it will, since none can be unloaded.
+			// The session starts a new Worker.
 			exhausted: boolean
 	  }
 

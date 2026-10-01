@@ -437,3 +437,73 @@ A declaration whose name would only repeat itself answers with what the name sta
   in a Generic Alias, so its base is one level further in.
 
 Everywhere else a value answers with its Type's name, as `printType` prints it.
+
+## The live test session
+
+`createTestSession` in `src/testSession.ts` runs the workspace's tests as they are typed. It watches the buffers an
+Editor changes and the files that change on disk, and re-runs the test files a change reached. A test file is one that
+writes a `tests` block, or under `test.contracts` one that declares a Namespace. A changed test file reaches itself;
+any other file reaches every test file that imports it, as `workspace.dependentsOf` answers.
+
+The session holds one event stream per test file, and a run replaces the streams of the files it ran. What a reader
+sees, the `test-failed` Diagnostics and the value hints, folds every stream. A file nobody touched keeps saying what
+it last said.
+
+### Why a Worker
+
+The session compiles and runs tests in a Worker rather than in the server, for three reasons:
+
+1. A Program writes to `process.stdout`, and the server's stdout carries the protocol. One `Terminal.print` would
+   corrupt the connection.
+2. The Compiler collects Diagnostics into module-level state, which is safe only while no two compilations interleave.
+   A test compile suspends inside itself, since bundling is asynchronous, so it cannot run beside the analysis.
+3. A test can loop for ever. A Worker can be terminated; the server cannot interrupt itself.
+
+Every bundle a Worker loads is a Module it can never unload. Once it holds as many as it will, it reports itself
+exhausted, and the session starts a new Worker.
+
+### Cycles
+
+A cycle compiles, loads and runs a set of test files in the Worker of `src/testWorker.ts`. It reads the open buffers
+as they are when it starts.
+
+- Changes wait out a debounce longer than the analysis's, since the squiggle matters first and a run is expensive.
+  Working out which test files a change reached waits for the window too, since it reads the workspace's parses.
+- One cycle runs at a time. A change or request arriving meanwhile is folded into `pending` and runs as the next
+  cycle. Terminating the Worker would discard a compile that is nearly always about to answer.
+- Each cycle carries a run number, which `essence/runTests` answers with. A request deferred behind a running cycle is
+  answered with the number of the cycle that will run it, and that cycle carries it. A promised cycle that ends up
+  with nothing to run still sends an end under its number, so no client waits for ever.
+- A cycle that does not finish within the deadline takes the Worker with it. Nothing else ends a test that loops for
+  ever, and every later run waits on the one in flight. What the cycle reported before it was stopped is kept.
+- A switched-off session runs nothing by itself, but still runs what an Editor asks for, such as a Run lens.
+- A cycle that recorded snapshots runs again, so the results compare against what was recorded and the lens goes.
+  The Server applies a rewritten source as an edit, since the buffer the run compiled may be unsaved.
+- A `focused` test anywhere in the workspace silences the others, as on the command line. A Worker knows one bundle,
+  so each cycle is told what the previous cycle found, which converges after one cycle.
+
+### Narrowing a cycle
+
+With coverage on, a cycle can run only the tests a change reached. `narrowingFor` answers which, or null to run the
+reached files whole. Running more is always the safe answer: a test whose reached lines did not change cannot change
+its verdict.
+
+- An entry's attribution records which of its tests reached which coverage points. Only a clean cycle that ran every
+  test of the entry builds it, together with the buffer text its Positions were measured in. A narrowed or failed
+  cycle drops the entry from `freshEntries` until a whole run settles it again. So does a cycle where a focus silenced
+  a test, since that test's lines would look unreached.
+- A cycle is narrowed only when it is exactly the reach of one window's changes. Anything deferred into it, such as
+  another request, runs whole.
+- `affectedTests` in `src/affected.ts` may refuse a change, and then the reached files run whole.
+- A property test draws fresh values every run, so its attribution is one sample. A narrowed cycle runs every property
+  test of the reached entries.
+
+A narrowed cycle replaces only the tests it ran and leaves the rest of each file's results as they were.
+
+### Coverage
+
+Coverage is off by default, because an instrumented bundle differs from the build's and does more work per run. Each
+whole cycle's counts are laid over what the session holds, since a cycle covers only what a change reached. A narrowed
+cycle counts only some tests, so its coverage is not adopted. The picture the last whole run left stays on the right
+lines, because only an edit within existing lines is narrowed. Switching coverage on or off discards what was counted
+and every attribution.
