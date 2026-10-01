@@ -3,15 +3,11 @@ import { execFileSync } from "node:child_process"
 import { PUBLISHED_PACKAGES, stageDirectory } from "./packages"
 import { stagePackages } from "./stage"
 
-// Publishing re-stages rather than trusting whatever a previous run
-// left behind — staging is seconds, and what goes to the registry should be
-// what the tree says right now. The smoke test is NOT run here, because it
-// wants the network and a couple of minutes; `bun run publish:smoke` is the
-// step before this one, and PUBLISHING.md is the checklist.
+// Stages afresh, then publishes. See "Publishing packages" in DEVELOPMENT.md.
 //
-// Each staged manifest carries `publishConfig.access: "public"`, so a plain
-// `npm publish` is enough — but it does need `npm login` to have happened,
-// and the @essence-lang organisation to exist on npm.
+// Staged manifests carry `publishConfig.access: "public"`, so a plain
+// `npm publish` works after `npm login`, once the @essence-lang organisation
+// exists on npm.
 
 let dryRun = process.argv.includes("--dry-run")
 

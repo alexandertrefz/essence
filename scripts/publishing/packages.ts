@@ -1,8 +1,7 @@
 import * as path from "node:path"
 
-// The one description of what gets published. Everything else in this
-// directory — staging, packing, smoke-testing, publishing — walks this list,
-// so a package joins or leaves the published set by editing exactly one place.
+// The one description of what gets published, which every other script in
+// this directory walks.
 
 export const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../..")
 export const BUILD_DIRECTORY = path.join(REPOSITORY_ROOT, "build", "publish")
@@ -12,10 +11,9 @@ export const TARBALL_DIRECTORY = path.join(BUILD_DIRECTORY, "tarballs")
 
 export type PublishedPackage = {
 	directory: string
-	// Directories shipped verbatim beside `dist/` — the standard
-	// library's `.es` sources, and the runtime's TypeScript, which the
-	// Bundler inlines from source so a published compiler emits the same
-	// bundle bytes a workspace checkout does.
+	// Directories shipped verbatim beside `dist/`, such as the standard
+	// library's sources. The runtime ships its TypeScript, which the Bundler
+	// inlines, so a published compiler emits a checkout's bytes.
 	data?: Array<string>
 	// A package that already is JavaScript. The listed files are the
 	// package; there is no compilation and no `dist/`.

@@ -23,12 +23,8 @@ import {
 	TARBALL_DIRECTORY,
 } from "./packages"
 
-// What staging is: the workspace never builds, so the publishable form
-// of each package — compiled JavaScript, declarations, a manifest whose
-// entries point at them — is assembled OUT of the tree, under
-// `build/publish/packages/`, and the repository's own manifests stay exactly
-// the source-first ones Bun develops against. `npm publish` then runs in the
-// staged directory, never in `packages/`.
+// Assembles each package's publishable form outside the tree, under
+// `build/publish/packages/`. See "Publishing packages" in DEVELOPMENT.md.
 
 function readManifest(filePath: string): Manifest {
 	return JSON.parse(readFileSync(filePath, "utf8")) as Manifest
@@ -58,14 +54,9 @@ export function compilePackages(): void {
 	)
 }
 
-// tsc emits the import specifiers exactly as written, and the sources
-// are written bundler-style — `./common/index`, no extension — which Node's
-// ESM loader refuses. Every relative specifier is resolved against the
-// compiled tree itself and given the extension it must carry: `.js` for a
-// file, `/index.js` for a directory. A specifier that resolves to neither is
-// an error, loudly, rather than a module a consumer discovers missing. The
-// same rewrite serves the declarations: TypeScript resolves a `.js` specifier
-// to the `.d.ts` beside it.
+// Relative specifiers without extensions, which tsc emits as written and Node's
+// ESM loader refuses. Each gets `.js` or `/index.js` from the compiled tree, and
+// one that resolves to neither is an error.
 const SPECIFIER_PATTERN =
 	/(\bfrom\s+|\bimport\s+|\bimport\()(["'])(\.{1,2}\/[^"']+)\2/g
 
@@ -125,9 +116,8 @@ export function fixRelativeSpecifiers(root: string): number {
 	return rewritten
 }
 
-// `./src/<x>.ts` becomes the pair of files the consumer actually
-// resolves — the declaration first, the JavaScript as the answer. An entry
-// into `tests/` is not published at all.
+// `./src/<x>.ts` becomes the declaration and the JavaScript a consumer
+// resolves. An entry into `tests/` is not published.
 function publishedTarget(
 	sourcePath: string,
 ): { types: string; default: string } | null {
@@ -197,10 +187,9 @@ function publishedManifest(
 	if (real.bin !== undefined) {
 		bin = {}
 
-		// Spelled without `./` — npm 11 rejects a dot-slashed bin path
-		// outright and publishes the package with no commands at all. The
-		// `--dry-run` in PUBLISHING.md's checklist is what catches this class
-		// of thing; the smoke test calls the bin files by path and cannot.
+		// Spelled without `./`, since npm 11 drops a dot-slashed bin path and
+		// publishes no commands. The smoke test calls bin files by path, so only
+		// the checklist's `--dry-run` would catch this.
 		for (let [name, filePath] of Object.entries(real.bin)) {
 			bin[name] = `${filePath}.js`
 		}

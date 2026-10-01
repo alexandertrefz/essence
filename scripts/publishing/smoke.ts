@@ -19,17 +19,12 @@ import {
 } from "./packages"
 import { stagePackages } from "./stage"
 
-// The lesson the monorepo split taught, applied before anything is
-// published: a green suite proves the SOURCES, and only running the artifact
-// proves the artifact. The staged packages are copied into a scratch npm
-// workspace in the system's tmpdir — outside the repository, so a missing
-// file cannot be papered over by Node walking up into the workspace's own
-// `node_modules` — installed with real npm, and driven with real Node:
-// every export imported, a program compiled, run, source-mapped, formatted.
+// Installs the staged packages in a scratch npm workspace outside the
+// repository and drives them with Node. See "Publishing packages" in
+// DEVELOPMENT.md.
 //
-// The tmpdir is realpath'd for the same reason `prepareBundle` realpaths in
-// the debug adapter: macOS answers `mkdtempSync` with a symlink, and paths
-// that are compared must all be spelled canonically.
+// The temporary directory is resolved through `realpath`, since macOS answers
+// `mkdtempSync` with a symlink and compared paths must be canonical.
 
 function run(
 	command: string,

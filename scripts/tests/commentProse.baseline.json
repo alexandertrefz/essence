@@ -244,10 +244,5 @@
 	"packages/vscode-extension/tests/vscodeStub.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 5, "citation": 1},
 	"scripts/generateProjectSchema.ts": {"sentence-length": 2},
 	"scripts/generateSnippets.ts": {"sentence-length": 4, "em-dash": 1},
-	"scripts/publishing/packages.ts": {"sentence-length": 2, "em-dash": 2},
-	"scripts/publishing/publish.ts": {"sentence-length": 3, "em-dash": 2, "all-caps": 1},
-	"scripts/publishing/smoke.ts": {"sentence-length": 2, "em-dash": 1, "all-caps": 1},
-	"scripts/publishing/stage.ts": {"sentence-length": 1, "em-dash": 4, "all-caps": 1, "block-length": 1},
-	"scripts/testBudget.ts": {"sentence-length": 4, "em-dash": 3, "all-caps": 2},
 	"scripts/tests/dependencies.spec.ts": {"sentence-length": 3}
 }
