@@ -1,5 +1,10 @@
 import type { common } from "@essence-lang/interfaces"
 
+import {
+	findSimpleChild,
+	forEachSimpleChild,
+	type SimpleNode,
+} from "../../visitor/typedSimple"
 import type { OptimiserPass } from "../index"
 import { rewriteExpressionsIn, rewriteNodes } from "../walk"
 
@@ -257,7 +262,7 @@ function planOf(
 			continue
 		}
 
-		for (let name of capturedNames(parameter.defaultValue)) {
+		for (let name of capturedNames([parameter.defaultValue])) {
 			if (rebound.has(name)) {
 				return null
 			}
@@ -876,97 +881,76 @@ function bindsAtTopLevel(
 
 // Whether any of the names occurs in the subtree. It may over-answer, at the
 // cost of a temporary, a slot or a declined Function. `renamed` may not.
-function mentionsAnyName(value: unknown, names: ReadonlySet<string>): boolean {
+function mentionsAnyName(
+	node: SimpleNode,
+	names: ReadonlySet<string>,
+): boolean {
 	if (names.size === 0) {
 		return false
 	}
 
-	if (Array.isArray(value)) {
-		return value.some((entry) => mentionsAnyName(entry, names))
+	if (node.nodeType === "Identifier") {
+		return names.has(node.name)
 	}
 
-	if (value === null || typeof value !== "object") {
-		return false
-	}
+	return findSimpleChild(node, nameInChild, names) ?? false
+}
 
-	let node = value as Record<string, unknown>
-
-	if (
-		node["nodeType"] === "Identifier" &&
-		typeof node["name"] === "string" &&
-		names.has(node["name"])
-	) {
-		return true
-	}
-
-	return Object.values(node).some((entry) => mentionsAnyName(entry, names))
+function nameInChild(
+	child: SimpleNode,
+	names: ReadonlySet<string>,
+): true | undefined {
+	return mentionsAnyName(child, names) || undefined
 }
 
 // Whether anything inside declares a name: a Match, a Function literal or a
 // lowered Statement.
-function bindsInside(value: unknown): boolean {
-	if (Array.isArray(value)) {
-		return value.some((entry) => bindsInside(entry))
-	}
-
-	if (value === null || typeof value !== "object") {
-		return false
-	}
-
-	let node = value as Record<string, unknown>
-	let kind = node["nodeType"]
-
+function bindsInside(node: SimpleNode): boolean {
 	if (
-		kind === "Match" ||
-		kind === "FunctionValue" ||
-		kind === "IntrinsicStatement"
+		node.nodeType === "Match" ||
+		node.nodeType === "FunctionValue" ||
+		node.nodeType === "IntrinsicStatement"
 	) {
 		return true
 	}
 
-	return Object.values(node).some((entry) => bindsInside(entry))
+	return findSimpleChild(node, bindsInChild) ?? false
+}
+
+function bindsInChild(child: SimpleNode): true | undefined {
+	return bindsInside(child) || undefined
 }
 
 // Every name a Function literal in the subtree mentions, which a closure could
 // capture. Missing one would let a closure read the next turn's value.
-function capturedNames(value: unknown): ReadonlySet<string> {
+function capturedNames(nodes: ReadonlyArray<SimpleNode>): ReadonlySet<string> {
 	let names = new Set<string>()
 
-	collectCaptured(value, names, false)
+	for (let node of nodes) {
+		collectCaptured(node, names)
+	}
 
 	return names
 }
 
-function collectCaptured(
-	value: unknown,
-	names: Set<string>,
-	inside: boolean,
-): void {
-	if (Array.isArray(value)) {
-		for (let entry of value) {
-			collectCaptured(entry, names, inside)
-		}
+// Outside every Function literal, where a name is no capture.
+function collectCaptured(node: SimpleNode, names: Set<string>): void {
+	forEachSimpleChild(
+		node,
+		node.nodeType === "FunctionValue" ||
+			node.nodeType === "FunctionStatement"
+			? collectInside
+			: collectCaptured,
+		names,
+	)
+}
 
-		return
+function collectInside(node: SimpleNode, names: Set<string>): void {
+	if (node.nodeType === "Identifier") {
+		names.add(node.name)
 	}
 
-	if (value === null || typeof value !== "object") {
-		return
-	}
-
-	let node = value as Record<string, unknown>
-	let kind = node["nodeType"]
-
-	if (inside && kind === "Identifier" && typeof node["name"] === "string") {
-		names.add(node["name"])
-	}
-
-	let nested =
-		inside || kind === "FunctionValue" || kind === "FunctionStatement"
-
-	for (let entry of Object.values(node)) {
-		collectCaptured(entry, names, nested)
-	}
+	forEachSimpleChild(node, collectInside, names)
 }
 
 // Renames slotted Parameters through the shared walk, which knows `opts.n` is a

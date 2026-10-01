@@ -813,9 +813,9 @@ a `const` of the turn. A closure built in one turn then keeps the value of that 
 shadowed where the tail call stands is slotted too, so the assignment can not land on the shadowing binding. Inside a
 Match Handler that is `_self`, which names the matched value there. Every other Parameter is assigned where it stands.
 
-`mentions` and `capturedNames` may over-answer, which costs only a temporary, a slot or a declined Function. A
-rename may not over-answer, since a rewritten name that meant something else names nothing. So `renamed` uses
-the shared walk, which knows that `opts.n` reads a member and not a Parameter called `n`.
+`mentionsAnyName` and `capturedNames` may over-answer, which costs only a temporary, a slot or a declined
+Function. A rename may not over-answer, since a rewritten name that meant something else names nothing. So
+`renamed` uses the shared walk, which knows that `opts.n` reads a member and not a Parameter called `n`.
 
 #### What declines
 

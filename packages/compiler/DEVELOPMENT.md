@@ -260,9 +260,12 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    an edit only for a kind that names an import outside a node, in a field it does not read yet.
 7. Validator: `validator/validate.ts`.
 8. Simplifier: `simplifier/simplify.ts`.
-9. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such
-   as `passes/instrumentCoverage.ts`, `passes/loopSelfTailCalls.ts` and `passes/unboxConditions.ts`, and so
-   does `mutation/index.ts`.
+9. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`, whose switch decides each kind and reads a
+   value's parts through the visitor. Some passes switch on kinds themselves, such as
+   `passes/instrumentCoverage.ts`, `passes/loopSelfTailCalls.ts` and `passes/unboxConditions.ts`, and so does
+   `mutation/index.ts`. `optimiser/namespaces.ts` and the name searches of `passes/eliminateDeadCode.ts`,
+   `passes/lowerMatchesToStatements.ts`, `passes/buildListsInPlace.ts` and `passes/loopSelfTailCalls.ts`
+   descend through the visitor.
 10. Rewriter: `rewriter/rewrite.ts`.
 11. Formatter: `packages/formatter/src/printer.ts`.
 12. Language server, in `packages/language-server/src`: `completion.ts`, `rename.ts` and `snippetContext.ts`;

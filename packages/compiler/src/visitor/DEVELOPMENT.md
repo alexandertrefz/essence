@@ -145,7 +145,8 @@ server feature enters through `typedProgramSections` and never meets them. A wal
 
 The tables serve walkers that read. The enricher, the simplifier and the rewriter build another tree, and keep their
 own switches, which the type checker holds exhaustive. So does the optimiser's `rewriteNodes`, which every pass
-rewrites through.
+rewrites through. The optimiser's readers, such as `declaredNamespaces` and the name searches of its passes,
+descend through the simplified table.
 
 ## Adding a node kind
 
