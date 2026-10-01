@@ -2006,10 +2006,8 @@ describe("Enricher", () => {
 			})
 
 			it("keeps the literal typed when resolution stays ambiguous", () => {
-				// No winner to read the literal's Types off, so the last
-				// probe's stand in — the Invocation fails either way, and a
-				// literal left with nothing recorded would report its
-				// Parameters as uninferable on top of the real Diagnostic.
+				// With no winner, the last probe's Types stand in, so the
+				// literal adds no uninferable report to the real Diagnostic.
 				expect(
 					diagnosticsFor(`implementation {
 						namespace FirstApplier for Integer {
@@ -2029,13 +2027,9 @@ describe("Enricher", () => {
 				).toEqual(["ambiguous-namespace"])
 			})
 
-			// A callee with no Type Parameters infers nothing, which is
-			// why its Arguments used to be handed straight back — and a literal
-			// that omitted its annotations was told it had nothing to infer
-			// from, in the very Argument position the Diagnostic's own Note
-			// names as the one place that works. The identical literal passed
-			// to a non-Generic METHOD always resolved, because Method
-			// resolution matches its Arguments on every path.
+			// A callee with no Type Parameters still matches its Arguments, so
+			// an unannotated literal reads its Parameter Types there, as with a
+			// Method.
 			it("takes its Parameter Type from a non-Generic free Function", () => {
 				expect(
 					typeOfFirstConstant(`implementation {
@@ -2078,9 +2072,7 @@ describe("Enricher", () => {
 			})
 
 			it("threads the expected Types past a labelled Parameter", () => {
-				// Two Parameters, the literal in front of the plain one —
-				// every Argument is asked for its Type against the Parameter it
-				// was written for, not just the first.
+				// Every Argument reads its own Parameter, not just the first.
 				expect(
 					typeOfFirstConstant(`implementation {
 						function combine(
@@ -2098,12 +2090,8 @@ describe("Enricher", () => {
 				).toEqual({ type: "String" })
 			})
 
-			// The same, past an Argument that does not fit: matching a
-			// GENERIC free Function stopped at the first mismatch, so the
-			// literal behind it was left with no context and reported as
-			// uninferable — burying the Argument mismatch the Validator was
-			// about to report under a Diagnostic about a literal that is
-			// written perfectly well.
+			// A literal after a mismatching Argument still gets its context, so
+			// only the mismatch is reported.
 			it("keeps its context behind a mismatching Argument", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -2120,15 +2108,9 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// A callback's return position is the call's to decide, and a
-			// call decides it AFTER it has matched: nothing but this literal's
-			// own body binds `Result`, so while the literal is being matched its
-			// position still reads `Progress<State, Result>` and the body is all
-			// there is to read a return Type off. A body decides only what its
-			// payloads happen to mention — `#Stopped("done")` names `Result` and
-			// leaves `State` standing as the Choice's own Parameter — so the
-			// position is read a second time once the call has committed and its
-			// bindings are final, and THAT is what the body is enriched against.
+			// Only the body binds `Result`, and `#Stopped("done")` leaves `State`
+			// open. So the position is read again once the call has committed,
+			// and the body is enriched against that.
 			it("decides a Case in the callback's return by the committed Overload", () => {
 				let stepped = collectCaseTypes(
 					lastConstantMethodInvocation(`implementation {
@@ -2162,10 +2144,8 @@ describe("Enricher", () => {
 					}`),
 				)
 
-				// `Integer` from the committed Overload's bindings and
-				// `String` from the payload — neither the `State` the match was
-				// still carrying, nor the `Progress<String, String>` the Overload
-				// that lost would have decided.
+				// `Integer` comes from the committed Overload's bindings and
+				// `String` from the payload.
 				expect(stepped).toEqual([
 					{
 						type: "Case",
@@ -2190,10 +2170,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// The same shape as the standard library spells it, which is
-			// where every Program meets it: `loop`'s general entry declares its
-			// `step` as `(_: State) -> Step<State, Result>`, and a `#Done` in
-			// that callback is the construction the whole rail is about.
+			// `loop`'s general entry declares `step` as
+			// `(_: State) -> Step<State, Result>`, the shape Programs meet.
 			it("decides a Case in a stdlib callback the same way", () => {
 				expect(
 					collectCaseTypes(
@@ -2213,10 +2191,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// A callback inside a callback is decided by ITS own call —
-			// `<-` returns from the literal it is written in, never from the walk
-			// around it, so the inner `loop`'s `#Done` carries the inner Result
-			// and the outer one's carries the outer's.
+			// `<-` returns from its own literal, so each `#Done` carries its own
+			// `loop`'s Result.
 			it("decides a nested callback by its own call", () => {
 				expect(
 					collectCaseTypes(
@@ -2244,21 +2220,10 @@ describe("Enricher", () => {
 				])
 			})
 
-			// The Type Parameter of the Namespace a callback is written
-			// INSIDE is a decision — a generic one — and the position it makes
-			// is a real one. This is `List.firstItem(where:)` spelled out: the
-			// fold's `Result` is bound by the annotated seed, so `reduce` hands
-			// the callback a `Step<Optional<Item>, Optional<Item>>`, and the
-			// `#Done(…)` in it is decided by that rather than by the one
-			// Parameter its own payload happens to mention.
-			//
-			// The `#Value(item)` inside that `#Done` is the same question
-			// one level down, and it is there because `Optional` is a Choice: a
-			// Method answering an `Optional<Item>` hands back a Case it built,
-			// never a bare `item` that widened into a Union. Both it and the
-			// `#Empty` seed print terse — `Optional#Value` — because their one
-			// Type Argument is still the unbound `Item`, which is exactly what
-			// `caseHeader` leaves out.
+			// `List.firstItem(where:)` spelled out. The annotated seed binds the
+			// fold's `Result`, so the `#Done(…)` and the `#Value(item)` in it are
+			// decided by `Step<Optional<Item>, Optional<Item>>`. They print terse,
+			// as `caseHeader` leaves out the unbound `Item`.
 			it("decides a Case in a callback by the enclosing Namespace's Type Parameter", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					namespace Finder<infer Item> for List<Item> {
@@ -2285,11 +2250,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// What a Diagnostic from inside a callback body names is the
-			// committed Overload's reading of it. The Overload that lost takes a
-			// `Boolean` there and would have reported that Booleans have no
-			// `add` at all; the one that won hands the call the Integer
-			// signatures `add` actually offers.
+			// A Diagnostic inside a callback body uses the committed Overload's
+			// Types, not a losing Overload's `Boolean`.
 			it("reports from inside a callback in the committed Overload's Types", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					namespace Runner for Integer {
@@ -2350,22 +2312,12 @@ describe("Enricher", () => {
 			).toContain("Type Parameter 'T' could not be inferred")
 		})
 
-		// An Error Type matches everything — that is what keeps a
-		// reported mistake from being reported again at every Type it flows
-		// through — but matching a Type Parameter binds nothing, so the
-		// Invocation would go on to announce that it could not infer it. The
-		// Diagnostic points at the enclosing call rather than at the Argument
-		// that actually failed, which is the cascade poison Types exist to
-		// prevent.
+		// An Error Type matches everything but binds no Type Parameter, so the
+		// call must not then report the Type Parameter as uninferable.
 		it("should not report uninferable Type Parameters for an Error Argument", () => {
-			// Two generic Namespaces with the same target, so the
-			// specificity order can not break the tie and the Argument really
-			// is an Error — a concrete Namespace beside the stdlib's generic
-			// one would simply win and leave nothing to cascade from.
-			//
-			// The receiver is a bound name. A written List would prove it
-			// holds items and reach `NonEmptyList`, which is more specific than
-			// both of these and would break the tie this test needs.
+			// Two generic Namespaces with one target tie, so the Argument is an
+			// Error. The receiver is a bound name, since a written List would
+			// reach `NonEmptyList` and break the tie.
 			expect(
 				diagnosticsFor(`implementation {
 					namespace AnyList<infer ItemType> for List<ItemType> {
@@ -2407,8 +2359,8 @@ describe("Enricher", () => {
 			expect(constant.nodeType).toBe("ConstantDeclarationStatement")
 
 			if (constant.nodeType === "ConstantDeclarationStatement") {
-				// The applied spelling sticks around as the Union's
-				// display alias — assignability ignores it.
+				// The applied spelling stays as the Union's display alias, which
+				// assignability ignores.
 				expect(constant.declaredType).toEqual({
 					type: "UnionType",
 					alias: {
@@ -2457,15 +2409,9 @@ describe("Enricher", () => {
 			)
 		})
 
-		// The receiver is a Function's declared `Tagged<Integer>` rather
-		// than a `firstItem()` — the stdlib no longer produces a bare Union of
-		// this shape at all. `Optional` is a Choice now, so `[1, 2]::firstItem()`
-		// is a Union of `Optional#Value` and `Optional#Empty`, and matching THAT
-		// against `Tagged<Value>` binds `Value := Optional#Value` and asks
-		// `unwrapped` to take one. What this is about is a Namespace whose
-		// target is an APPLIED Alias, which a hand-written `Tagged` still is —
-		// the second member is a plain String, because the Alias is here to be
-		// applied, not to mean "missing".
+		// A Namespace whose target is an applied Alias, reached through a
+		// declared `Tagged<Integer>`. The second member is a plain String, since
+		// the Alias is there to be applied, not to mean "missing".
 		it("should match Generic Namespaces through applied Alias targets", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
@@ -2604,10 +2550,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// `"use { and } carefully"` — the braces opened a HOLE, and a hole
-		// holds an Expression, so the word between them is read as a name. A
-		// reader who meant the braces to print was told their prose was not
-		// declared and nothing else.
+		// The braces of `"use { and } carefully"` open a hole, so `and` reads as
+		// a name. The report says how to print braces.
 		it("should answer a name that is a whole String hole", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				Terminal.print("use { and } carefully")
@@ -2623,8 +2567,7 @@ describe("Enricher", () => {
 			)
 		})
 
-		// And nothing is added where the hole holds a name that really is
-		// a name — the reader meant the hole, and misspelled what goes in it.
+		// A hole holding a misspelled name gets only the near miss.
 		it("should leave a misspelled name in a hole to the near miss", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant name = "Ada"
@@ -2663,13 +2606,9 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual(["Choose another name."])
 		})
 
-		// The Note has always said that NO declaration may take the name,
-		// and only a Type Alias and a Generic were held to it: a Choice, a
-		// Protocol and a Namespace called `Self` all compiled. Each of the three
-		// is named where a Type is named and reached the way one is, and a
-		// Protocol is the declaration the name is reserved FOR — every signature
-		// inside one says `Self` meaning the Type conforming, and a Protocol of
-		// that name stands where the word resolves.
+		// No declaration may take the name `Self`. A Choice, a Protocol or a
+		// Namespace is named where a Type is, and inside a Protocol `Self` means
+		// the conforming Type.
 		it("should reserve Self for every declaration form", () => {
 			for (let declaration of [
 				"choice Self { Red, Green }",
@@ -2842,11 +2781,8 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toEqual([])
 
-			// `List is Equatable` is CONDITIONAL — a List is equatable
-			// exactly when its items are — so the bounded `Value` is solved by
-			// List's own conformance carrying Integer's as its condition, and
-			// the nested one is collected here alongside it. The generic the
-			// call site had to fill is `Value`; that one is List's.
+			// List's conformance is conditional on its items, so `Value` is
+			// solved by List's conformance carrying Integer's, collected beside it.
 			let namespaceSources = collectConformances(program).filter(
 				(conformance) =>
 					conformance.protocolName === "Equatable" &&
@@ -2907,13 +2843,9 @@ describe("Enricher", () => {
 		})
 
 		it("should report a concrete covering Union against the generic blanket", () => {
-			// The one shape the specificity order leaves ambiguous where
-			// concreteness alone used to decide it: a Namespace for
-			// `List<Integer> | String` covers the binding without spelling it
-			// out, and `List<ItemType>` covers it without being concrete, so
-			// neither target is narrower than the other. Naming the Union in
-			// full is what makes it a real choice, and a hand written
-			// `for List<Integer>` still wins outright.
+			// `List<Integer> | String` and `List<ItemType>` each cover the
+			// binding, and neither is narrower, so the call is ambiguous. A
+			// written `for List<Integer>` would win outright.
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace WideListEquatable for List<Integer> | String is Equatable {
 					is(_ other: List<Integer> | String) -> Boolean { <- true }
@@ -3077,8 +3009,7 @@ describe("Enricher", () => {
 		})
 
 		// The name as the condition wrote it, so the Quick Fix declares the
-		// Parameter the condition goes on reading — a list that gained any other
-		// spelling would leave the condition naming nothing all over again.
+		// Parameter the condition reads.
 		it("should carry that Generic's name as data", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Wrapper<infer Item> for { value: Item }
@@ -3097,9 +3028,8 @@ describe("Enricher", () => {
 		})
 
 		it("should reject a where condition on a Generic the target Type never mentions", () => {
-			// Regression — a phantom Generic's condition can never be
-			// witnessed at a use site, so before this Diagnostic the hidden
-			// conformance Parameter arrived as `undefined` and crashed.
+			// A phantom Generic's condition can never be witnessed at a use site,
+			// so it is refused at the Namespace.
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Weird<infer Ghost, infer Item> for { value: Item }
 					is Comparable where Ghost is Comparable, Item is Comparable
@@ -3136,9 +3066,8 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
-		// A condition naming a Protocol nothing declares is refused at the
-		// Namespace and not carried, so a use site standing above the Namespace
-		// asks nothing of it either.
+		// A condition naming an undeclared Protocol is refused at the Namespace
+		// and not carried to a use site.
 		it("should stay quiet at a use site above a condition it refused", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Sized {
@@ -3225,13 +3154,9 @@ describe("Enricher", () => {
 			)
 
 			expect(failure).toBeDefined()
-			// Two LEVELS, and the report is the level below the ask: the
-			// message names the `List<{ x: Integer }>` the bound was written
-			// on, and the Note names the Record that can not answer. The
-			// chain's head used to be repeated as Note 1 and is dropped where
-			// it says what the message already said, so what is checked here
-			// is that the reader is told where the ask ended rather than told
-			// twice where it began.
+			// The message names the `List<{ x: Integer }>` the bound was written
+			// on, and the Note names the Record that can not answer, without
+			// repeating the message.
 			expect(failure!.message).toContain(
 				"List<{ x: Integer }> does not conform",
 			)
@@ -3258,11 +3183,8 @@ describe("Enricher", () => {
 		})
 
 		it("should reject a List of a non-Comparable Type", () => {
-			// A Record conforms only to Equatable and Printable — sorting
-			// a List of them has no item ordering to lean on. (Transcendental,
-			// which the plan first named here, in fact conforms to Comparable
-			// through the covering `Number` Namespace, so it is not a negative,
-			// and neither is a Boolean any more.)
+			// A Record conforms only to Equatable and Printable, so its List has
+			// no ordering to sort by.
 			let diagnostics = diagnosticsFor(`implementation {
 				constant sorted = [{ x = 1 }, { x = 2 }]::sort()
 			}`)
@@ -3276,9 +3198,8 @@ describe("Enricher", () => {
 	})
 
 	describe("Namespace Generic Merge", () => {
-		// A Namespace Generic reaches a Method only when that Method's
-		// resolved signature mentions it — anything else would be a Type
-		// Parameter no call site could ever bind.
+		// A Namespace Generic reaches a Method only when its resolved signature
+		// mentions it, or no call site could bind it.
 		function methodTypeFor(
 			source: string,
 			namespaceName: string,
@@ -3362,11 +3283,8 @@ describe("Enricher", () => {
 				"ranked",
 			)
 
-			// Exactly one entry, and it is the NAMESPACE's, carrying the
-			// bound this Method wrote — there is no second `Item` for it to
-			// shadow, which is the whole of the form. `infer` stays true: the
-			// Namespace's declaration is what says where the Type comes from,
-			// and a Method bounding it says nothing about that.
+			// One entry, the Namespace's, carrying the Method's bound. `infer`
+			// stays true, since the Namespace says where the Type comes from.
 			expect(genericsOf(method)).toEqual([
 				{
 					name: "Item",
@@ -3425,11 +3343,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// Every head that writes a `<…>` gets the same words, and each
-		// one is a call site of its own — so the list below is what says the
-		// rule is the language's rather than one reader's. Two BOUNDS on one
-		// Parameter is the case that used to pass in silence: the first was
-		// dropped and the body was refused for wanting what it asked for.
+		// Every head that writes a `<…>` reports a repeated Type Parameter in
+		// the same words, two bounds on one Parameter included.
 		it("should refuse a Type Parameter declared twice in every head", () => {
 			let heads = [
 				"function twice<infer T is Comparable, infer T is Printable>(_ v: T) -> T {\n\t\t\t\t\t\t<- v\n\t\t\t\t\t}",
@@ -3449,11 +3364,9 @@ describe("Enricher", () => {
 			}
 		})
 
-		// A Method's list is read apart into the Parameters it declares
-		// and the bounds it puts on the Namespace's, and the bounds are gone
-		// before any other reader sees them — so the repetition is caught where
-		// the written list still is. Per FORM: two Overloads may each name
-		// `Item`, which is not a repetition.
+		// A Method's list is split into its own Parameters and bounds on the
+		// Namespace's, so the repetition is caught while the list is written.
+		// Two Overloads may each name `Item`.
 		it("should refuse two bounds on one Namespace Parameter", () => {
 			let { diagnostics } = enrichSource(
 				`implementation {
@@ -3465,11 +3378,8 @@ describe("Enricher", () => {
 				}`,
 			)
 
-			// And the body's own report beside it, which is not a
-			// cascade: the bound that survived is the LAST, so the sort is
-			// left wanting `Comparable` — and that report is where the
-			// Protocol the body needs is named, which is what the Help above
-			// sends the reader to read.
+			// The last bound survives, so the body's sort reports wanting
+			// `Comparable`, naming the Protocol the Help points to.
 			expect(
 				diagnostics.map((diagnostic) => [
 					diagnostic.code,
@@ -3513,10 +3423,8 @@ describe("Enricher", () => {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([])
 		})
 
-		// `<infer Item>` is NOT a shadow, and the report used to say it
-		// was: with `infer` the receiver binds the entry, which is how this
-		// spelling worked before a bound could be written. It is the
-		// Namespace's own word written twice, and the edit is the removal.
+		// `<infer Item>` is no shadow but the Namespace's own word written
+		// twice, so the edit is its removal.
 		it("should refuse a restated 'infer' that carries no bound", () => {
 			let { diagnostics } = enrichSource(
 				`implementation {
@@ -3543,9 +3451,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// One Help, and the reason it is one: the second used to spell
-		// `'<Item is …>'`, which is not something a reader can write. What the
-		// Protocol is, is `unsatisfied-bound`'s to say once the entry is gone.
+		// One Help, since `unsatisfied-bound` names the Protocol once the entry
+		// is gone.
 		it("should offer one Help for a shadowing re-declaration", () => {
 			let { diagnostics } = enrichSource(
 				`implementation {
@@ -3610,9 +3517,8 @@ describe("Enricher", () => {
 		})
 
 		describe("Nested mentions", () => {
-			// One case per Type shape the walk has to see through — a
-			// missed shape would silently prune a Generic that IS used, leaving
-			// it unbindable at the call site.
+			// One case per Type shape the walk sees through, since a missed shape
+			// would prune a used Generic.
 			const cases: Array<[string, string]> = [
 				["the return Type alone", "produce() -> Item | String"],
 				["a List item Type", "collect(_ items: List<Item>) -> Boolean"],
@@ -3661,10 +3567,8 @@ describe("Enricher", () => {
 		})
 
 		it("should still bound a conditional conformance's fulfilling Method", () => {
-			// Guards the interaction with the conditional-conformance
-			// Generic weaving: `compare` uses `Item`, so it survives pruning
-			// and keeps its retrofitted bound — which is what makes the hidden
-			// conformance Parameter emitted for it.
+			// `compare` uses `Item`, so it survives pruning and keeps the bound
+			// woven in by the conditional conformance.
 			let source = `implementation {
 				namespace Boxes<infer Item> for { value: Item }
 					is Comparable where Item is Comparable
@@ -3690,8 +3594,7 @@ describe("Enricher", () => {
 				},
 			])
 
-			// And the typed Node agrees — its leading Generic is the same
-			// bounded `Item`, so `simplifyFunctionDefinition` emits exactly one
+			// The typed Node agrees, so `simplifyFunctionDefinition` emits one
 			// hidden conformance Parameter, first.
 			let { program } = enrichSource(source)
 
@@ -3716,11 +3619,9 @@ describe("Enricher", () => {
 		})
 
 		it("should retain a bound Generic on a fulfilling Method that never mentions it", () => {
-			// The exception to the merge rule. A `where` bound is
-			// witnessed by `$type.boundConformance`, which curries a witness
-			// onto EVERY fulfilling Method whatever its signature mentions —
-			// so a fulfilling Method keeps the bound Namespace Generic even
-			// when nothing in its signature names it, and both views say so.
+			// `$type.boundConformance` curries a witness onto every fulfilling
+			// Method, so such a Method keeps the bound Namespace Generic even when
+			// its signature does not name it.
 			let source = `implementation {
 				protocol Nameable {
 					static nameOf() -> String
@@ -3760,10 +3661,8 @@ describe("Enricher", () => {
 		})
 
 		it("should retain a bound Generic on every Overload of a fulfilling Method", () => {
-			// Regression guard. Pruning per Overload while the
-			// conformance witness is curried per Method let one Overload emit a
-			// hidden conformance Parameter its Type never declared — the
-			// Argument then landed in the wrong slot at runtime.
+			// The witness is curried per Method, so every Overload keeps the
+			// Generic, and no Overload emits a Parameter its Type lacks.
 			let source = `implementation {
 				protocol Nameable {
 					static nameOf() -> String
@@ -3811,8 +3710,8 @@ describe("Enricher", () => {
 				(node) => node.nodeType === "NamespaceDefinitionStatement",
 			) as common.typed.NamespaceDefinitionStatementNode
 
-			// The typed Node's Overloads carry the SAME leading bounded
-			// `Item` — one hidden conformance Parameter each, first.
+			// Each Overload carries the same leading bounded `Item`, so one
+			// hidden conformance Parameter each.
 			expect(
 				(
 					namespaceNode.methods
@@ -3830,9 +3729,8 @@ describe("Enricher", () => {
 		})
 
 		it("should still reject a call that can not bind a retained bound Generic", () => {
-			// The other half of the same regression — with `Item`
-			// retained, a static call that binds nothing is the compile error
-			// it has always been, rather than a miscompile.
+			// With `Item` kept, a static call that binds nothing is a compile
+			// error.
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Nameable {
 					static nameOf() -> String
@@ -3975,14 +3873,9 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("no-namespace-for-value")
 		})
 
-		// And the cascade of the same shape, which is not the Program's
-		// mistake at all. A refused Invocation still types its Function literal
-		// Argument, from the last candidate it probed — otherwise the literal
-		// would be reported as uninferable on top of the refusal — so the
-		// callback's Parameter stands in the CALLEE's Type Parameter, a name
-		// that is in no Scope the reader can see. Reporting against it names
-		// `Held` in a file that never wrote it, under a call that has already
-		// said what is wrong.
+		// A refused Invocation types its literal from the last probe, so the
+		// callback's Parameter has the callee's Type Parameter, which the reader
+		// can not see. Nothing is reported against it.
 		it("should not report a Method on a Type Parameter of the callee", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				choice Problem {
@@ -4144,12 +4037,9 @@ describe("Enricher", () => {
 			)
 		})
 
-		// Without `infer` the Parameter is opaque and binds to nothing, so
-		// the target Type matches no receiver and the Namespace is never found —
-		// which no Diagnostic used to say. A generic Choice made the silence
-		// dangerous: nothing declared `is`, so the DERIVED equality answered it,
-		// and a Namespace that wrote the Method by hand was contradicted without
-		// a word. Refused at the declaration, which is upstream of all of that.
+		// Without `infer` the Parameter is opaque, so the target matches no
+		// receiver and the Namespace is never found. It is refused at the
+		// declaration.
 		it("should reject Namespace Type Parameters written without 'infer'", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Wrapper<Item> for List<Item> {
@@ -4169,12 +4059,9 @@ describe("Enricher", () => {
 			])
 		})
 
-		// Bounds decide which Overload a call selects, so the SAME
-		// Overload set resolves the same way whichever order its entries were
-		// written in — an Overload whose bound the Argument can not satisfy is
-		// no candidate while another one takes the Argument. Each pair below is
-		// the same call against the same two entries, swapped, and the entry
-		// that accepts a Boolean is the one selected either way.
+		// Bounds decide which Overload is selected, so the order of entries does
+		// not matter. Each pair swaps the same two entries, and the one that
+		// accepts a Boolean wins either way.
 		describe("Overload selection", () => {
 			const boundedFirst = `
 				<infer Value is Showable>(_ value: Value) -> String {
@@ -4211,11 +4098,8 @@ describe("Enricher", () => {
 				}`
 			}
 
-			// `for {}` throughout this block — a Namespace that declares
-			// nothing but STATIC Methods is never reached through a receiver,
-			// so its target is beside the point and the unit Record is the
-			// shortest Type to write that no other Namespace in these sources
-			// also targets.
+			// A Namespace of static Methods is never reached through a receiver,
+			// so its target is `{}`, which nothing else here targets.
 			function staticCall(overloads: string): string {
 				return `implementation {
 					${printableSetup}
@@ -4258,9 +4142,8 @@ describe("Enricher", () => {
 				).toBe(0)
 			})
 
-			// Selecting an Overload solves its bounds, and that solve is
-			// what the call carries — the Overload that wins is not solved a
-			// second time on the way out.
+			// The call carries the conformances solved during selection, not a
+			// second solve.
 			it("should carry the conformances the selected Overload was probed with", () => {
 				let invocation =
 					lastConstantFunctionInvocation(`implementation {
@@ -4291,10 +4174,8 @@ describe("Enricher", () => {
 				).toBe("VectorShowable")
 			})
 
-			// No candidate's bounds hold, so the call keeps the first
-			// matching candidate's own Diagnostic — which bound failed and how
-			// to satisfy it — rather than a bare "no overload accepts these
-			// Arguments" about Arguments that were accepted.
+			// No candidate's bounds hold, so the call keeps the first matching
+			// candidate's Diagnostic about which bound failed.
 			it("should report the first matching Overload's bound when no Overload's bounds hold", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					protocol Showable {
@@ -4324,11 +4205,8 @@ describe("Enricher", () => {
 				expect(diagnostics[0].message).toBe(
 					"Boolean does not conform to 'Showable'",
 				)
-				// The kept Diagnostic whole, Note and Help included —
-				// telling the reader how to satisfy the bound is the entire
-				// reason it is kept over "no Overload accepts these Arguments",
-				// so a report stripped down to its code would pass a test that
-				// only asked for the code.
+				// The kept Diagnostic whole, since its Note and Help say how to
+				// satisfy the bound.
 				expect(diagnostics[0].notes).toEqual([
 					"No Namespace in scope makes Boolean conform to 'Showable'.",
 				])
@@ -4337,9 +4215,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// A candidate whose bound could not be DECIDED must not drop
-			// out silently — the ambiguity is the reason the call fails, and
-			// probing is what would otherwise swallow the report.
+			// A candidate whose bound could not be decided is reported, since
+			// that ambiguity is why the call fails.
 			it("should report an ambiguous conformance that failed the only matching Overload", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					${printableSetup}
@@ -4399,10 +4276,8 @@ describe("Enricher", () => {
 				expect(diagnostics[0].message).toBe(
 					"No overload accepts these Arguments",
 				)
-				// Every candidate, in the order they are written — a call
-				// that matched none is told what it could have passed, which is
-				// what the `::` twin has always said and what this site
-				// promised without saying it.
+				// Every candidate in written order, so a call matching none is
+				// told what it could have passed, as with `::`.
 				expect(diagnostics[0].notes).toEqual([
 					"'Renderer.render' takes 1 Argument: Parameter 1 is Value.",
 					"'Renderer.render' takes 2 Arguments: Parameter 1 is Boolean, Parameter 2 is Boolean.",
@@ -4410,11 +4285,8 @@ describe("Enricher", () => {
 				expect(diagnostics[0].helps).toEqual([])
 			})
 
-			// One entry is the shape a reader is likeliest to meet — an
-			// `overload` block being grown, or a call that simply passed the
-			// wrong thing — and "no overload accepts these Arguments" about a
-			// block with a single entry says nothing at all without the Note
-			// spelling that entry out.
+			// A single entry `overload` block is common, and the report means
+			// nothing without a Note spelling that entry out.
 			it("should list the one signature a single entry Overload block declares", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					namespace Renderer for {} {
@@ -4435,11 +4307,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// A Namespace Generic is not something a caller wrote, so a
-			// Note that spells one leaves them to work out what it stands for.
-			// The signature is read off the Namespace SPECIALIZED against this
-			// receiver instead — `List<Integer>` is told its `prepend` takes an
-			// Integer.
+			// The caller wrote no Namespace Generic, so the Note reads the
+			// signature off the Namespace specialized to the receiver.
 			it("should spell a Namespace Generic as the receiver decided it", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					constant list = [1, 2]::prepend("nope")
@@ -4454,10 +4323,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// The free-Function half of the same site, which only the
-			// standard library can declare — and the half whose Notes carry the
-			// most, since an `overload function`'s entries are told apart by
-			// their Argument LABELS rather than by a receiver.
+			// An `overload function`'s entries differ by their Argument labels,
+			// so the Notes name them.
 			it("should name a free Function's Overloads by the labels they read", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					constant state = loop(startingWith 1)
@@ -4475,12 +4342,9 @@ describe("Enricher", () => {
 				])
 			})
 
-			// Reaching past a candidate whose bound failed means typing the
-			// Arguments against the candidates behind it, and an unannotated
-			// Function literal reports from inside its own body when the Parameter
-			// it is read against is not a signature at all. The literal below is
-			// read against an `Integer` Parameter on the way to the Overload that
-			// takes it — a candidate that loses says nothing.
+			// The literal is read against an `Integer` Parameter of a losing
+			// candidate on the way to the winner. A losing candidate reports
+			// nothing.
 			it("should keep the Arguments of a losing Overload from reporting", () => {
 				expect(
 					lastConstantMethodInvocation(`implementation {
@@ -4505,9 +4369,8 @@ describe("Enricher", () => {
 				).toBe(2)
 			})
 
-			// The same, one stage out: a Namespace that loses the specificity
-			// filter still probes its Overloads, and the Arguments it typed on the
-			// way are not the call's news either.
+			// A Namespace that loses on specificity still probes its Overloads,
+			// and reports nothing either.
 			it("should keep the Arguments of a losing Namespace's Overloads from reporting", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -4535,13 +4398,9 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// The other flavour of the same order-dependence, and not a bound
-			// failing: a prefixed Case construction read against `Holder<Item>` can
-			// not decide its Type Arguments from a Parameter Type that mentions the
-			// call's own unsolved Type Parameter, so it types as Error — which
-			// matches anything and leaves `Item` unbound, so the bound never fails.
-			// The generic candidate is passed over for the one that decides the
-			// construction, whichever order the two are written in.
+			// Against `Holder<Item>` a Case construction types as Error and
+			// leaves `Item` unbound. The candidate that decides the construction
+			// wins in either order.
 			function construction(overloads: string): string {
 				return `implementation {
 					choice Holder<Item is Equatable> {
@@ -4594,15 +4453,9 @@ describe("Enricher", () => {
 	})
 
 	describe("Builtin Protocols", () => {
-		// The safety net for the builtin signatures — every declared
-		// conformance must actually be fulfilled, via the same helper that
-		// drives conformance checking and conformance-value codegen.
-		//
-		// Driven from the ACCESSORS rather than from the TypeScript
-		// tables, so it keeps testing whatever is live. A Namespace declared in
-		// Essence is checked at load, but only the one that is loaded — reading
-		// the tables directly would leave this asserting a property of objects
-		// no compilation touches as the conversion moves them across.
+		// Every builtin conformance must be fulfilled, checked by the helper
+		// that conformance checking and codegen use. It reads the live accessors,
+		// so it tests what a compilation sees.
 		describe("Conformance of builtin Namespaces", () => {
 			const protocols = builtinProtocols()
 			const namespaces = builtinNamespaces().filter(
