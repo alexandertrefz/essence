@@ -23,8 +23,8 @@ describe("Signature Help", () => {
 		expect(help?.activeParameter).toBe(0)
 	})
 
-	// The head of an `if` closed with the brackets alone is an `if`
-	// with no body, which the Parser drops whole — and the call with it.
+	// The head of an `if` closed with the brackets alone is an `if` with no
+	// body, which the Parser drops along with the call.
 	it("should show a signature in the head of an if", () => {
 		let source = [
 			"implementation {",
@@ -134,9 +134,9 @@ describe("Signature Help", () => {
 			"}",
 		].join("\n")
 
-		// The cursor is inside `identity`'s parens — Signature Help
-		// resolves to it, not to the outer `pair` call, and the comma so far
-		// is `identity`'s own, advancing its second Parameter.
+		// The cursor is inside `identity`'s parentheses, so the help is for
+		// `identity` and not `pair`, and the comma so far advances its second
+		// Parameter.
 		let help = findSignatureHelp(source, { line: 8, column: 20 })
 
 		expect(help?.signatures[0].label).toBe(
@@ -145,8 +145,8 @@ describe("Signature Help", () => {
 		expect(help?.activeParameter).toBe(1)
 	})
 
-	// What `)` as a retrigger character is for — the closed call is done,
-	// so the one still being written is the one around it.
+	// What `)` as a retrigger character is for: once a call closes, the call
+	// still being written is the one around it.
 	it("should hand the outer call back once a nested call is closed", () => {
 		let source = [
 			"implementation {",
@@ -209,9 +209,9 @@ describe("Signature Help", () => {
 			"combine(_ Integer, _ Integer) -> Integer",
 		)
 
-		// The Enricher resolves the half written call to the one
-		// Parameter Overload — the second Argument has already ruled it out,
-		// so the Overload that can still take it is the active one.
+		// The Enricher resolves the half-written call to the one-Parameter
+		// Overload, which the second Argument rules out. The Overload that can
+		// take it is active.
 		expect(help?.activeSignature).toBe(1)
 	})
 
@@ -326,8 +326,8 @@ describe("Signature Help for bounded Methods", () => {
 			"compare<ItemType is Comparable>(to: List<ItemType>) -> Ordering",
 		)
 
-		// The bound widens the generics prefix — the range has to keep
-		// pointing at the Parameter, not at a stale offset.
+		// The bound widens the generics prefix, and the range must still point
+		// at the Parameter.
 		let parameter = signature?.parameters[0]
 
 		expect(parameter).toBeDefined()
@@ -338,9 +338,8 @@ describe("Signature Help for bounded Methods", () => {
 	})
 })
 
-// A provided Method's `Self` is never shown. It is the receiver's own
-// Type, worked out from the receiver, and nobody writes it — a reader who wrote
-// `describe(_ prefix: String)` must not be shown `describe<Self is Shape>`.
+// A provided Method's `Self` is never shown. It is the receiver's own Type,
+// and a reader who wrote `describe(_ prefix: String)` never wrote it.
 describe("Signature Help for a Protocol-provided Method", () => {
 	let source = [
 		"implementation {",
@@ -385,11 +384,9 @@ describe("Signature Help for a Protocol-provided Method", () => {
 	})
 })
 
-// Boolean stands in for the standard library as a whole here
-// (`packages/standard-library/sources/Boolean.es`). Signature Help reads a Parameter's text off the
-// Parameter itself, so the `@param other` tag in the source has to be split out
-// of the `§§` block and attached to the Parameter it names, not left in the
-// Method's description.
+// Boolean stands in for the standard library. Signature Help reads a
+// Parameter's text off the Parameter. The `@param` tag in `Boolean.es` must move
+// from the `§§` block's description to the Parameter it names.
 describe("Signature Help for a standard library Method", () => {
 	it("should describe the Parameter of a Method declared in Essence", () => {
 		let source = ["implementation {", "\ttrue::is(", "}"].join("\n")
@@ -406,9 +403,9 @@ describe("Signature Help for a standard library Method", () => {
 		)
 	})
 
-	// `= expression` defaults. A Parameter a call may leave out reads as
-	// `at?: Side` — the FACT of a default, not its text — and the comma count
-	// stops being a Parameter index the moment a label steps over one.
+	// A Parameter a call may leave out reads as `at?: Side`, the fact of a
+	// default and not its text. Once a label steps over one, the comma count
+	// stops being a Parameter index.
 	describe("Default Parameter Values", () => {
 		it("should mark a Parameter a call may leave out", () => {
 			let source = [
@@ -440,16 +437,14 @@ describe("Signature Help for a standard library Method", () => {
 
 			let help = findSignatureHelp(source, { line: 5, column: 12 })
 
-			// One Argument written, and it is the SECOND Parameter — its
-			// label stepped over the first, which has a default. Counting
-			// commas alone would have said Parameter 1.
+			// One Argument written, and it is the second Parameter, since its
+			// label stepped over the first, which has a default.
 			expect(help?.activeParameter).toBe(1)
 		})
 
-		// A partial Record default marks nothing in the label — the `?`
-		// there says the whole Argument may go, which it may not — so the
-		// sentence beside the Argument being typed is where a writer is told
-		// what stopping short would leave to the callee.
+		// A partial Record default marks nothing in the label, where a `?` would
+		// say the whole Argument may go. The sentence beside the Argument says
+		// what stopping short leaves to the callee.
 		describe("a Record Parameter with a partial default", () => {
 			let source = [
 				"implementation {",
@@ -470,10 +465,8 @@ describe("Signature Help for a standard library Method", () => {
 				)
 			})
 
-			// The Alias's name rather than its members — a signature is
-			// shown beside the call the reader is typing, and three members
-			// spelled out there push the Parameter they are looking for off the
-			// line.
+			// The Alias's name rather than its members, since members spelled
+			// out beside the call push the Parameter off the line.
 			it("should name a Record Parameter by its Alias", () => {
 				let help = findSignatureHelp(source, { line: 7, column: 10 })
 
@@ -488,8 +481,8 @@ describe("Signature Help for a standard library Method", () => {
 				)
 			})
 
-			// And which of them a path key may reach INTO, which is the
-			// other half of the same fact.
+			// Which of them a path key may reach into is the other half of the
+			// same fact.
 			it("should say which members a path key may reach into", () => {
 				let nested = [
 					"implementation {",
@@ -513,9 +506,8 @@ describe("Signature Help for a standard library Method", () => {
 	})
 })
 
-// `as bump(` IS a call being written, and the head truncated at the
-// cursor has lost the rest of its arm — so this rests on the arm tails
-// `probe.ts` appends, exactly as the `if` head above rests on its block tail.
+// `as bump(` is a call being written, and the text cut at the cursor has lost
+// the rest of its arm. This rests on the arm tails `probe.ts` appends.
 describe("Signature Help inside a define arm", () => {
 	let source = [
 		"implementation {",
@@ -563,9 +555,8 @@ describe("Signature Help inside a define arm", () => {
 	})
 })
 
-// A call being written under one of the two Keywords is a call being
-// written, and the walk that finds it has to reach through the Keyword to get
-// there.
+// The walk that finds the call being written must reach through `start` and
+// `complete`.
 describe("Signature Help under start and complete", () => {
 	let source = [
 		"implementation {",
