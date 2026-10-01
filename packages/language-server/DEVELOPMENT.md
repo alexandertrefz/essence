@@ -227,3 +227,115 @@ it. A rename there would be silently destructive:
   stops every Program from compiling.
 
 A declaration outside every workspace folder is refused for the same reason: its other uses are not indexed.
+
+## The Workspace
+
+`createWorkspace` in `src/workspace.ts` holds every file of the workspace folders and everything the server derives
+from each. One file is one Module, named by its canonical path. Everything is keyed on that path rather than on a URI.
+An Editor may spell one file several ways, and two spellings would be two Modules whose Types do not mix.
+
+The Workspace keeps three kinds of work apart:
+
+- Discovery walks the workspace folders for `.es` files once, and the file watcher keeps the result current. It skips
+  `skippedDirectories` and whatever the nearest `essence.json` excludes. An excluded file is still linked when a
+  Module imports it, and still analysed when an Editor opens it.
+- Parsing answers what a file imports, exports and declares. Auto-import, workspace symbols and the dependency edges
+  need nothing more, so every file is parsed.
+- Enrichment binds Method Invocations to their Namespaces, which is what joins a Method across files. It links the
+  whole graph a file reaches, so it runs only for the files an analysis or a request touches.
+
+### The cache entry
+
+A `FileEntry` holds what the server derives from one file at one version. That is the parse, the typed Program, the
+rename index, the written annotations and the Diagnostics. The debounced analysis, Hover and Completion all read the
+same entry, and whoever asks first computes it.
+
+The fields derived from enrichment are filled lazily and independently, and none is overwritten before the next
+invalidation. That keeps object identity stable across requests: an index built against one typed Program never finds
+another under it. `invalidateEnrichment` empties them together: the index, the typed Program, the annotations and both
+Diagnostic lists. It keeps the parse, and `module` stays until the next analysis replaces it. A reader that held one
+across a keystroke holds the previous version's answer, which is why each request checks the version itself.
+
+An entry is valid for an open document's version and its text, since an Editor may reuse a version when it reopens a
+document. A file read off disk carries `diskVersion`, and the watcher invalidates it.
+
+### Analysing a graph
+
+`analysisOf` is the one producer. Every typed Program, index, annotation and Diagnostic the server reads is what it
+cached. A Hover that arrives before the debounced analysis does not compile the same text twice.
+
+A Module is enriched against the whole graph it reaches, since only the graph knows what its imports bring in. Alone,
+every imported name would resolve to nothing. So one analysis writes the entry of every Module in its graph. A
+Module's Diagnostics depend on the Module and what it reaches, not on where the graph was loaded from.
+
+- The first graph to reach a Module keeps its typed Program. A Module two graphs reach is enriched twice, and the
+  second copy stays inside its importer. That is sound because nothing compares Types by identity across Modules. The
+  symbol join keys on the declaring file and Position, and member tables key on names. The entry's identity stays
+  stable, which an index built against the first copy needs.
+- A file that writes neither Module section is a Program of its own everywhere in the server. A graph reaching it
+  enriches it under a Module path, so `analyseGraphFrom` drops that result and the file is analysed alone.
+- Annotations are collected for one Module of a graph only. An analysis is anchored at a root, rarely the file under
+  the cursor, so the server names the file being typed in through `annotationsFor`. A Hover over another Module of the
+  component pays for one more link.
+- A graph records its edges as it goes, adding the lexical resolutions of each Module's specifiers. Those also name a
+  file that does not exist yet, whose appearance must invalidate its importer.
+- A Compiler throw becomes one cached Diagnostic with empty annotations, so the next request does not throw again.
+
+### Dependency edges
+
+`outEdges` and `inEdges` record the import edges of the workspace both ways, so an edit need not reread every file's
+imports. They are maintained one file's out-edges at a time, from a linked graph or from a parse.
+
+`invalidateEnrichment` drops the enrichment of the whole undirected component of the edited file, walked over the
+recorded edges without refreshing them. A typed Program is built against its dependencies, so an edit reaches every
+file connected by imports and no further. The recorded edges suffice. An edit changes only the edited file's own
+imports, so every file that reached it still does by a recorded edge. A file writing neither Module section is kept,
+since it was enriched from its own text alone.
+
+A walk that must be exact, such as a rename, a reference search or `rootsReaching`, calls `refreshAllEdges` first. It
+parses each file in `staleEdges` again. A file appearing or disappearing marks every edge stale, because which file a
+specifier resolves to is the one thing a parse alone cannot tell. A deleted file keeps its in-edges, so its return
+invalidates the importers that waited for it.
+
+`dependentsOf` walks the in-edges only. A file that merely shares a dependency with the edited one imports nothing
+from it.
+
+### The symbol join
+
+`joinComponent` joins the rename indexes of a connected component into workspace symbols. Across Modules, a symbol is
+identified by its declaring file and the Position of its declaration. Import and export entries tie one file's
+Declarations to another's, and each tie has two kinds of end:
+
+- A `decl:` site is a Declaration in one file, with its occurrences.
+- An `export:` site is a name a Module publishes, a symbol in its own right. `area as measure` has two, and renaming
+  the public name leaves the local one alone, and the other way round.
+
+The join runs in an order each step depends on:
+
+1. Every Declaration of every file becomes a site.
+2. Each import entry ties its local binding to the dependency's export site, and each export entry ties its export
+   site to what it names. An entry that writes one Identifier for both roles merges the two sites, so a rename writes
+   that Position once. An aliased entry records the alias instead, so `followAliases` can reach the declaring Module.
+   An export without `from` joins every Declaration of its name, so a Type and a Namespace of one name stay one
+   symbol.
+3. Last, the references the file indexes could not bind: Methods called through an imported Namespace, and members of
+   another Module's Protocol. Each needs the entries joined first, to know which file declares it. A conformer's
+   Method joins the Protocol member it answers here too, wherever each is written.
+
+A joined symbol reports where it is written as its declaration, not an import binding. A rename refuses a symbol
+written outside the workspace. With `localOnly`, the join covers one file, which is still a join: an unaliased entry
+and its declaration are one symbol. Document Highlight uses it, since it fires on every cursor move.
+
+### Roots
+
+`roots` chooses the files the whole workspace is analysed from. A root is a file nothing readable imports, where a
+dependency graph starts. Analysing it links every Module beneath it, so the roots between them judge every file,
+whether or not it is open.
+
+A cycle nothing imports has no member without an in-edge. For each such part, `roots` takes the uncovered file that
+reaches the most others, and repeats until every file is covered. The greatest reach is chosen because the root is
+where the Diagnostics about what the graph could not read land. Choosing in that order also means no root reaches
+another.
+
+The walk reads edges only, with no enrichment and no parse beyond what `refreshAllEdges` pays. The result is sorted,
+so which root a batch starts from does not depend on discovery order.

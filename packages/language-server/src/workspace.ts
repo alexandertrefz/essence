@@ -50,22 +50,8 @@ import {
 	type RenameEdit,
 } from "./rename"
 
-// One file is one Module and a Module is named by its canonical path, so
-// everything here is keyed on that rather than on a URI — an Editor may hand
-// the same file over spelled several ways, and two spellings of one path would
-// be two Modules whose Types are not interchangeable.
-//
-// Three costs are kept apart deliberately, because they differ by orders of
-// magnitude:
-//
-//   • DISCOVERY walks the workspace folders for `.es` files. Once, then
-//     maintained by the watcher.
-//   • PARSING answers what a file imports, exports and declares — everything
-//     auto-import, workspace symbols and the dependency graph need. Cheap, and
-//     done for every file.
-//   • ENRICHMENT binds Method Invocations to their Namespaces, which is what
-//     joins a Method across files. It loads the whole graph a file reaches, so
-//     it is done only for the files a request actually touches.
+// The Workspace: every file of the workspace folders, keyed by canonical path,
+// and what the Server derives from each. See "The Workspace" in DEVELOPMENT.md.
 
 export type OpenDocument = {
 	text: string
@@ -73,17 +59,11 @@ export type OpenDocument = {
 }
 
 type WorkspaceOptions = {
-	// The Editor's buffers, which win over disk — an unsaved file is the
-	// only truthful version of itself, and the version is what tells a cached
+	// The Editor's buffers, which win over disk. The version tells a cached
 	// parse from a stale one.
 	openDocument?: (filePath: string) => OpenDocument | undefined
-	// Whether this Workspace types the tests — see `enrichDocument`. It
-	// belongs to the Workspace rather than to a request because a Workspace IS
-	// the cache: one entry holds one enriched Program, so a Workspace that
-	// answers about the section and one that does not are two of them rather
-	// than one flag on a call. The Server's own has it ON: a build drops the
-	// section, so the Editor is the only thing that can say a test does not
-	// type-check while it is being written.
+	// Whether the `tests` section is typed. Set per Workspace, since one cache
+	// entry holds one enriched Program.
 	tests?: boolean
 }
 
@@ -91,27 +71,19 @@ export type WorkspaceOccurrence = {
 	filePath: string
 	position: common.Position
 	access: OccurrenceAccess
-	// How renaming THROUGH this occurrence is written — see
-	// `RenameSite.edits`. Absent everywhere but the two shorthands — a
-	// Pattern's binder and a Record Literal's member — which are the sites
-	// whose name can not simply be overwritten; an entry of an
-	// `import`/`export` block never has any, because a Module's own grammar
-	// already writes the two names apart.
+	// See `RenameSite.edits`. An import or export entry never has any.
 	edits?: Array<RenameEdit> | null
 }
 
-// One symbol as the workspace sees it: the declaration, wherever it is
-// written, and every occurrence of it in every file that reaches it — the
-// entries that carry it across Module boundaries included.
+// One symbol across the workspace: its declaration and every occurrence in
+// every file that reaches it, import and export entries included.
 export type WorkspaceSymbol = {
 	name: string
 	kind: DeclarationKind
-	// The declaring site's mark for a Parameter whose name doubles as its
-	// call site label, which holds a rename of it to the label rules as well.
+	// See `Declaration.labelled`.
 	labelled?: boolean
-	// Null when nothing in the workspace declares it: an entry naming
-	// something no reachable Module exports still joins its own occurrences, so
-	// that renaming it stays possible where it IS written.
+	// Null when nothing in the workspace declares it. An entry naming what no
+	// reachable Module exports still joins its own occurrences.
 	filePath: string | null
 	definition: common.Position | null
 	// Every file a declaration of the symbol is written in: one, unless
@@ -124,24 +96,20 @@ export type WorkspaceSymbol = {
 }
 
 type WorkspaceExport = {
-	// The name the Module publishes it under, which is what an importer
-	// writes — never the name the declaration was given at home.
+	// The name the Module publishes, which an importer writes.
 	name: string
 	kind: DeclarationKind
-	// The Module that PUBLISHES the name, which is the one an entry has to
-	// name: a facade forwarding someone else's declaration is what an importer
-	// writes a specifier for, and importing past it is a different dependency.
+	// The Module that publishes the name, which an entry names even when it
+	// forwards another Module's declaration.
 	filePath: string
-	// Where the declaration behind it is written, which for a re-export is
-	// a Module further along the chain.
+	// Where the declaration is written; for a re-export, further along the
+	// chain.
 	declaredIn: string
 	position: common.Position
 }
 
-// An export of another Module that this file could reach and has not —
-// what Completion offers last, with the entry that would make it resolve. The
-// specifier is already written from the asking file, so accepting the offer
-// needs nothing further worked out.
+// An export of another Module this file does not import yet, offered by
+// Completion with the specifier written from the asking file.
 export type WorkspaceOffer = {
 	name: string
 	kind: DeclarationKind
@@ -154,8 +122,8 @@ export type WorkspaceOffer = {
 export type WorkspaceSymbolEntry = {
 	name: string
 	kind: DocumentSymbolEntry["kind"]
-	// What the symbol is written inside of — a Namespace for a Method, a
-	// Choice for a Case. Null at the top level.
+	// What the symbol is written inside, such as a Method's Namespace. Null at
+	// the top level.
 	container: string | null
 	filePath: string
 	range: common.Position
@@ -165,62 +133,34 @@ export type WorkspaceSymbolEntry = {
 
 export type Workspace = ReturnType<typeof createWorkspace>
 
-// THE cache. One entry is everything this Server ever derives from one
-// file at one version, and every request reads it rather than deriving its own:
-// the parse, the typed Program, the rename index, the written annotations, the
-// Diagnostics, and which other Modules those Diagnostics reached. What used to
-// be three independent pipelines — the debounced analysis, the Hover seam, and
-// the raw parse-and-enrich behind Completion — are three readers of this.
-//
-// Every field below `program` is filled lazily and INDEPENDENTLY, and no filled
-// field is ever overwritten between two invalidations. That is what keeps object
-// identity stable across requests: an index built against one typed Program must
-// not find a different one under it the next time it is read. An invalidation
-// empties them all together (`invalidateEnrichment`), so a reader that held one
-// of them across a keystroke is holding the previous version's answer — which is
-// what every request checking the version for itself is for.
+// Everything the Server derives from one file at one version. See "The cache
+// entry" in DEVELOPMENT.md.
 type FileEntry = {
 	filePath: string
 	sourceText: string
-	// What the cache was built from — an open document's version, or the
-	// sentinel for a file read off disk, which the watcher invalidates by hand.
-	// An Editor may report the same version for a document it re-opened, so the
-	// text is compared as well.
+	// An open document's version, or `diskVersion` for a file read off disk.
+	// An Editor may reuse a version on re-opening, so the text is compared too.
 	version: number
 	program: parser.Program
-	// Kept because an analysis needs them and the parse happens once: a
-	// Diagnostic list that dropped the Parser's half would report a file with a
-	// syntax error as clean.
+	// Kept for the analysis, so a file with a syntax error never reports clean.
 	parseDiagnostics: Array<common.Diagnostic>
 	index: ProgramIndex | null
 	enriched: common.typed.Program | null
-	// Enrichment can legitimately answer with nothing — a Compiler bug
-	// must not take the Server down — so "was it tried" is its own question.
+	// Enrichment may answer with nothing when the Compiler throws.
 	enrichmentAttempted: boolean
-	// The written annotations of THIS file, resolved against its graph —
-	// null until something asks, because the collector can only be opened for
-	// ONE Module of a graph at a time, so the graph-wide analysis fills this for
-	// its entry alone and a Hover elsewhere pays for its own.
+	// This file's written annotations. The collector opens for one Module of a
+	// graph at a time, so a graph's analysis fills this for one file only.
 	annotations: Array<common.TypeAnnotation> | null
-	// This file's own Diagnostics, complete: parse, link, enrichment,
-	// validation and what its dependencies came to. Null until an analysis ran —
-	// this file's, or one for another Module of the same graph, since a Module's
-	// Diagnostics depend on that Module and on what it reaches and on nothing
-	// else.
+	// This file's complete Diagnostics, filled by any analysis of a graph
+	// holding it.
 	diagnostics: Array<common.Diagnostic> | null
-	// Every OTHER Module this file reaches, with the Diagnostics that
-	// belong to it — its transitive dependencies and no more, which is exactly
-	// what analysing this file on its own would have found.
+	// The Diagnostics of every other Module this file reaches.
 	dependencyDiagnostics: Map<string, Array<common.Diagnostic>> | null
-	// What this file's entries resolve to, by the specifier as written.
-	// Memoised because it costs a `realpath` per specifier and is asked for by
-	// every walk of the dependency edges.
+	// What each specifier of either Module section resolves to, memoised
+	// since each costs a `realpath`.
 	dependencies: Map<string, string> | null
-	// What this file was LINKED against, when it is a Module: what its
-	// import block bound, and the surfaces of the graph it was linked in. Kept
-	// beside the typed Program because it belongs to the same link — it is what
-	// lets a probe of this file resolve the names the block brought in without
-	// reading the graph again. Null for a file that is no Module.
+	// What a Module was linked against: its imports and the graph's surfaces,
+	// which let a probe resolve imported names. Null for a file that is no Module.
 	module: ModuleView | null
 }
 
@@ -230,29 +170,19 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	let folders: Array<string> = []
 	let files = new Map<string, FileEntry>()
 	let discovered: Set<string> | null = null
-	// The project file governing each directory, answered once and held —
-	// see `configurationFor`. It is a cache rather than one configuration
-	// because a workspace is not one project: two folders are two of them, and
-	// a nested `essence.json` is a third inside one of those.
+	// The project file governing each directory. A workspace may hold several
+	// projects, one per `essence.json`.
 	let configurations: ConfigurationCache = createConfigurationCache()
 	let openDocument = options.openDocument ?? (() => undefined)
-	// The dependency edges of the workspace, both ways, kept rather than
-	// rebuilt. Rebuilding them meant reading the entries of every known file,
-	// which meant a parse and a `realpath` per specifier per file — on a
-	// keystroke, because that is when a component has to be invalidated. Held as
-	// two maps rather than one undirected one because they are maintained from
-	// the out-edges of one file at a time, and a dependent is what an
-	// invalidation needs to find.
+	// The dependency edges both ways, kept across edits. See "Dependency edges"
+	// in DEVELOPMENT.md.
 	let outEdges = new Map<string, Set<string>>()
 	let inEdges = new Map<string, Set<string>>()
-	// The files whose recorded edges may not match their current text.
-	// Refreshed only where an EXACT component is wanted — a rename, a reference
-	// search — never on the invalidation path.
+	// Files whose recorded edges may not match their text.
 	let staleEdges = new Set<string>()
 
-	// Read through the same host the graph uses, so that a file the
-	// workspace holds parsed and the same file inside a Module graph are the
-	// same text — the Editor's buffer wherever there is one.
+	// The host the Module graph reads through too, so both see the Editor's
+	// buffer.
 	let host: ModuleHost = {
 		readFile(filePath) {
 			let open = openDocument(filePath)
@@ -273,20 +203,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		files.delete(filePath)
 	}
 
-	// A Module's typed Program is built against its dependencies, so an
-	// edit reaches every file connected to it by entries — and no further, which
-	// is why the component is what is dropped rather than the whole workspace: a
-	// file that imports nothing and is imported by nothing invalidates itself
-	// alone. Parses are kept throughout, since the text of the other files did
-	// not change.
-	//
-	// Walked over the RECORDED edges, without refreshing them, and that is
-	// the point: this runs on every keystroke, and refreshing means re-parsing.
-	// The recorded edges are the ones the invalidation needs — an edit to F can
-	// only have changed F's own entries, so every file that reaches F still
-	// reaches it by the edges that were there before the keystroke. A specifier
-	// F gained points at a file that does not depend on F and whose enrichment
-	// therefore did not go stale.
+	// Drops what was derived from the enrichment of every file connected to
+	// this one, keeping the parses. See "Dependency edges" in DEVELOPMENT.md.
 	function invalidateEnrichment(filePath: string): void {
 		for (let affected of connectedComponent(filePath, false)) {
 			let entry = files.get(affected)
@@ -295,15 +213,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				continue
 			}
 
-			// A file that writes neither section is the exception, and it
-			// is a real one — it is the state a Module is in while it is being
-			// written, and the file the reader is typing an `export` block into
-			// is one an importer already names. Such a file can not mention
-			// anything declared anywhere else, and what a graph reaching it made
-			// of it is DROPPED (see `analyseGraphFrom`), so everything held here
-			// was computed from its own text alone. An edit next door can not
-			// have moved it, and dropping it anyway is an enrichment per
-			// keystroke in the importer, for ever.
+			// A file writing neither Module section was enriched from its own
+			// text alone, so an edit elsewhere cannot have moved it.
 			if (!isModule(entry.program, affected)) {
 				continue
 			}
@@ -338,11 +249,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			discovered?.has(filePath) === false
 		) {
 			discovered.add(filePath)
-			// A file that did not exist a moment ago is exactly what an
-			// unresolved specifier in some OTHER file was waiting for, so every
-			// file's edges are suspect — which specifier resolves to what is the
-			// one question a parse alone can not answer. A file appearing is a
-			// watcher event; a keystroke never comes through here.
+			// A new file may be what another file's unresolved specifier names,
+			// so every edge is suspect. Only the watcher reaches this.
 			markEdgesStale()
 		}
 	}
@@ -352,8 +260,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		invalidate(filePath)
 		discovered?.delete(filePath)
 		forgetEdges(filePath)
-		// The mirror of a file appearing: every specifier that resolved to
-		// this one resolves to nothing now.
+		// Every specifier that resolved to this file resolves to nothing now.
 		markEdgesStale()
 	}
 
@@ -365,27 +272,15 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		)
 	}
 
-	// The settings governing one file: those of the nearest
-	// `essence.json` at or above it. A workspace may hold several folders and
-	// nested projects, so each file answers to its own, and the Server reads
-	// the test settings an entry runs under through here too. Answered once per
-	// directory and held: `setFolders` forgets every answer, and
-	// `forgetConfiguration` drops the settings alone, which is all a
-	// `package.json` can ask for.
+	// The settings of the nearest `essence.json` at or above the file, held
+	// per directory until `setFolders` or `forgetConfiguration`.
 	function configurationFor(filePath: string): ProjectConfiguration {
 		return configurations.forFile(filePath)
 	}
 
-	// What every project file the walk has met could not read, one entry
-	// per file holding a mistake: the project files themselves, and any
-	// `package.json` still spelling the old `essence` key. The Server publishes
-	// each of them on its own file.
-	//
-	// Every workspace folder's root is asked about first, so that a stale
-	// manifest at the top of a folder is reported even where no `.es` file sits
-	// beside it — nothing else would ever make the cache read that directory.
-	// De-duplicated by file, since one file's problems are one set however many
-	// configurations were derived along the way.
+	// The problems of every project file the walk met, including an `essence`
+	// key in a `package.json`, one entry per file. Each folder's root is read
+	// first, so a manifest beside no `.es` file is still reported.
 	function configurationProblems(): Array<ProjectProblems> {
 		for (let folder of folders) {
 			configurations.forDirectory(folder)
@@ -404,30 +299,14 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return [...byFile.values()]
 	}
 
-	// The settings alone, without the discovered files and the edges
-	// `setFolders` drops along with them. It is what a `package.json` changing
-	// asks for: the only thing such a file has to say now is that its `essence`
-	// key has moved, so the Diagnostics are read again and nothing else is.
+	// Forgets the settings alone, for a changed `package.json`, which moves no
+	// boundary.
 	function forgetConfiguration(): void {
 		configurations.clear()
 	}
 
-	// What the project itself said is not its source: `exclude` in the
-	// nearest `essence.json` at or above the file. A project holds files that
-	// are `.es` without being ITS: a corpus kept deliberately broken, a vendored
-	// copy of a library, the output some other tool writes into it. Nothing can
-	// tell those from sources by looking at them, and reporting on them is how a
-	// Problems panel that speaks for the whole workspace becomes one nobody
-	// reads.
-	//
-	// Whether the discovery walk stays out of a path — and ONLY the walk.
-	// A file named by an import is still linked, still checked and still
-	// reported, because a file this project imports is this project's whatever
-	// directory it sits in; and an excluded file OPENED in the Editor is
-	// analysed on its own, because a reader looking straight at a file is owed
-	// its Diagnostics (the Server reaches it through `needsOwnEntry`, which
-	// answers for every document no root covers). What exclusion buys is the
-	// half nobody asked for: the files the panel lists unbidden.
+	// Whether the nearest `essence.json` excludes the file from discovery. An
+	// excluded file is still linked when imported, and analysed when opened.
 	function isExcluded(filePath: string): boolean {
 		return isExcludedPath(filePath, configurationFor(filePath).exclude)
 	}
@@ -452,10 +331,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	/* The dependency edges  */
 	/*************************/
 
-	// The out-edges of one file, and the reverse edges that go with them.
-	// A graph that was just linked knows every Module's dependencies exactly
-	// and for free, a refresh reads them off a parse, and a Program that is no
-	// Module has none.
+	// The out-edges of one file, and the in-edges that go with them.
 	function recordEdges(filePath: string, targets: Iterable<string>): void {
 		let next = new Set(targets)
 		let previous = outEdges.get(filePath)
@@ -481,9 +357,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		staleEdges.delete(filePath)
 	}
 
-	// The key goes with the last edge into it, so that a path named once by
-	// a specifier that has since been rewritten is not kept for the process'
-	// lifetime by an empty Set.
+	// The key goes with its last edge, so no empty Set outlives a rewritten
+	// specifier.
 	function dropInEdge(target: string, dependent: string): void {
 		let back = inEdges.get(target)
 
@@ -498,10 +373,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 	}
 
-	// The out-edges go, the IN-edges deliberately stay: a file that was
-	// deleted is one a branch switch may bring back, and the importers waiting
-	// for it are exactly what has to be invalidated when it does. They are
-	// reachable only through this path until then, since nothing resolves to it.
+	// The in-edges stay: a deleted file may come back, and its importers are
+	// what its return invalidates.
 	function forgetEdges(filePath: string): void {
 		for (let target of outEdges.get(filePath) ?? []) {
 			dropInEdge(target, filePath)
@@ -515,11 +388,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		recordEdges(filePath, dependenciesOf(filePath).values())
 	}
 
-	// Everything whose recorded edges may no longer match its text, marked
-	// without asking what is in the workspace: this runs on a watcher
-	// notification, and discovery is a recursive walk of every folder of it. A
-	// walk that has not happened yet marks its own findings stale when it does
-	// (see `knownFiles`), so deferring to it loses nothing.
+	// Marks every known file without running discovery, whose walk marks what
+	// it finds itself (`knownFiles`).
 	function markEdgesStale(): void {
 		for (let filePath of discovered ?? []) {
 			staleEdges.add(filePath)
@@ -530,13 +400,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 	}
 
-	// Every recorded edge brought up to the text as it is now, which is
-	// what a walk that has to be EXACT needs — a rename, a reference search, the
-	// roots an edit obliges the Server to analyse again.
-	//
-	// Drained rather than iterated: reading one file's entries parses it, and a
-	// parse is what makes the NEXT file's edges knowable. The delete is what
-	// guarantees the loop ends, whatever `refreshEdges` finds.
+	// Brings every stale edge up to the current text, for walks that must be
+	// exact. Drained, deleting before each refresh, so the loop ends.
 	function refreshAllEdges(): void {
 		knownFiles()
 
@@ -548,16 +413,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 	}
 
-	// Every file that could possibly hold an occurrence of a symbol
-	// written in this one, and no others. A name crosses a Module boundary only
-	// through an entry, so anything sharing a symbol with this file is connected
-	// to it by entries — walked in BOTH directions, since a dependency holds the
-	// declaration and a dependent holds the uses.
-	//
-	// `exact` is what tells the two callers apart. A rename must see the edges
-	// as the current text writes them, and pays a parse for each file whose text
-	// has moved since the edges were read. An invalidation must not pay
-	// anything, and does not have to: see `invalidateEnrichment`.
+	// Every file that could hold an occurrence of a symbol written in this one,
+	// walking edges both ways. Only `exact` refreshes stale edges first.
 	function connectedComponent(
 		filePath: string,
 		exact: boolean,
@@ -599,16 +456,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return connectedComponent(filePath, true)
 	}
 
-	// This file and everything that reaches it through entries, which is
-	// exactly the set an edit to it can change the meaning of — and therefore the
-	// set whose published Diagnostics have gone stale with it.
-	//
-	// Directed, where `componentOf` is not, and that is the whole point: a file
-	// that merely SHARES a dependency with this one imports nothing from it, so
-	// nothing it means can have moved. Answering with the undirected component
-	// would make one keystroke in a Module thirty files import cost thirty graph
-	// links — one per sibling, since no sibling's graph contains another's, and
-	// whether anything has them open makes no difference to that now.
+	// This file and every file reaching it, the set an edit to it can change
+	// the meaning of. Directed: a file sharing a dependency is unaffected.
 	function dependentsOf(filePath: string): Array<string> {
 		refreshAllEdges()
 
@@ -635,10 +484,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return [...found]
 	}
 
-	// These files and everything they reach through entries, LIVE files
-	// only. A specifier naming a file that is not there records an edge all the
-	// same (see `analyseGraphFrom`), and nothing is covered by one: the file it
-	// names has no text to judge.
+	// These files and the live files they reach. An edge to a missing file
+	// covers nothing.
 	function reachFrom(
 		entryPaths: Iterable<string>,
 		live: Set<string>,
@@ -669,24 +516,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return reached
 	}
 
-	// The files a whole workspace can be analysed FROM: the smallest set
-	// whose graphs cover every file of it. A root is a file nothing imports,
-	// which is where a dependency graph starts — analysing one links every
-	// Module beneath it and fills this cache for all of them, so the roots
-	// between them judge every file the workspace holds, whether or not anything
-	// has it open. That is what lets the Server report on a project rather than
-	// on a set of tabs.
-	//
-	// The second half is what "closest to root" means. A cycle nobody imports
-	// has no member without an in-edge, so the first half covers none of it; the
-	// file of it that reaches the most others is taken as the entry, and again
-	// until nothing is left over. Deliberately the greatest reach rather than
-	// any member: an entry is where the Diagnostics about what the graph could
-	// not READ land, and the file that sees the most has the most to say.
-	//
-	// A walk of the edges and nothing else — no enrichment, and no parse beyond
-	// the ones `refreshAllEdges` pays for. Sorted, because which entry a batch
-	// starts from is a cost, and a test may not have to guess at it.
+	// The files whose graphs between them cover the workspace. See "Roots" in
+	// DEVELOPMENT.md.
 	function roots(): Array<string> {
 		refreshAllEdges()
 
@@ -697,10 +528,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		known.sort()
 
 		let live = new Set(known)
-		// A file whose text can not be read imports nothing — it was
-		// deleted, or it is a standard library source this Workspace
-		// deliberately holds nothing for. Counting one as an importer would
-		// leave everything it names covered by nobody.
+		// An unreadable importer does not count, or what it names would be
+		// covered by nobody.
 		let chosen = known.filter((filePath) =>
 			[...(inEdges.get(filePath) ?? [])].every(
 				(importer) => !live.has(importer),
@@ -739,13 +568,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return chosen.sort()
 	}
 
-	// The roots of the graphs an edit to these files can have moved the
-	// meaning of, which is what the Server owes an analysis to — never all of
-	// them. `invalidateEnrichment` drops the whole UNDIRECTED component, but a
-	// root that does not reach the edited file was judged against text that did
-	// not move, so re-linking it would find exactly what it found before: one
-	// keystroke in a Module thirty files import must not cost a link for every
-	// root that merely shares a dependency with them.
+	// The roots reaching these files. A root that only shares a dependency with
+	// them was judged against text that did not move.
 	function rootsReaching(filePaths: Iterable<string>): Array<string> {
 		let chosen = new Set(roots())
 		let reaching = new Set<string>()
@@ -808,17 +632,10 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	/* The analysis  */
 	/*****************/
 
-	// The one door text comes through, and therefore where the promise that
-	// a Compiler bug never takes this Server down has to be kept: `fileOf` is
-	// called from request handlers, from the edge walk and from the debounced
-	// analysis' own timer callback, none of which sits inside a `try` — and a
-	// throw out of a timer callback is the process.
-	//
-	// Reachable rather than defensive: the Lexer recurs once per nesting level of
-	// an interpolated String and runs out of call stack before the Parser's own
-	// depth guard can refuse it, so a file holding one deep enough throws here.
-	// The empty Program is what every reader then sees, which is what analysing
-	// such a file on its own has always answered with.
+	// Every parse goes through here. `fileOf` runs in timer callbacks outside
+	// any `try`, where a Compiler throw would end the process. Reachable: a deep
+	// enough interpolated String overflows the Lexer's stack before the Parser's
+	// depth guard refuses it.
 	function parseSafely(
 		sourceText: string,
 		filePath: string,
@@ -833,34 +650,15 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 	}
 
-	// The ONE producer. Everything else in this file that answers with a
-	// typed Program, an index, an annotation or a Diagnostic reads what this
-	// left behind — the debounced analysis the Server publishes from included,
-	// which is why a Hover arriving before that debounce fires does not make the
-	// Server compile the same text twice.
-	//
-	// A Module is enriched against the whole graph it reaches, because what an
-	// entry brings in is only known there — enriched on its own, every imported
-	// name resolves to nothing and every Method dispatching through an imported
-	// Namespace stays unbound. That makes a write for one file a write for its
-	// whole component: the graph judged every Module in it, and a Module's
-	// Diagnostics depend on that Module and on what IT reaches, never on the
-	// entry the graph happened to be loaded from.
-	//
-	// The annotations are collected for the asked-about file and no other.
-	// The collector can only be open for one Module of a graph at a time
-	// (`annotationsFor`), so a Hover over a DIFFERENT Module of the same
-	// component pays for one more link — once, for that file at that version.
+	// The one producer of typed Programs, indexes, annotations and Diagnostics;
+	// every reader reads what it cached. See "Analysing a graph" in
+	// DEVELOPMENT.md.
 	function analysisOf(
 		filePath: string,
 		options: {
 			annotations?: boolean
-			// Whose written annotations the graph-wide enrichment should
-			// collect, when that is not the file being analysed. The collector
-			// only opens for ONE Module of a graph at a time, and the analysis
-			// of a component is deliberately anchored at the Module that reaches
-			// the most others — which is rarely the one under the reader's
-			// cursor. The Server passes the document the keystroke landed in.
+			// The file whose annotations the graph collects, when that is not
+			// the analysed one. The Server passes the file being typed in.
 			annotationsFor?: string
 			cancellation?: Cancellation
 		} = {},
@@ -897,15 +695,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				analyseAloneFrom(entry)
 			}
 		} catch (error) {
-			// A Compiler bug must never take the Language Server down, so
-			// an unexpected throw becomes the one Diagnostic that says so — and
-			// it is CACHED, because the alternative is throwing again for every
-			// request over a document that will not compile until it is edited.
-			//
-			// The annotations are part of that: they are what a Hover asks for,
-			// the guard above re-enters whenever they are still null, and a Hover
-			// is the request a reader repeats. Empty is the honest answer — a
-			// document that would not enrich has no written Types to report.
+			// A Compiler throw becomes one cached Diagnostic, so later requests
+			// do not throw again. The annotations are cached empty for the same
+			// reason, since a Hover asks for them.
 			entry.diagnostics ??= [internalError(error)]
 			entry.dependencyDiagnostics ??= new Map()
 			entry.annotations ??= []
@@ -915,13 +707,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return cachedAnalysis(entry)
 	}
 
-	// Whether this file's Diagnostics are cached for the text it holds
-	// NOW, asked without producing any. What it answers is COVERAGE: the Server
-	// analyses a workspace from its roots, and a root that could not be read —
-	// or whose graph could not read one of its Modules — leaves files beneath it
-	// that nothing has judged. Those are analysed as entries of their own, and
-	// this is how they are found. The guard is `fileOf`'s cache test, minus the
-	// half that reads and parses.
+	// Whether this file's Diagnostics are cached for its current text, without
+	// reading or parsing it. The Server's coverage check asks this.
 	function isAnalysed(filePath: string): boolean {
 		let open = openDocument(filePath)
 		let cached = files.get(filePath)
@@ -934,13 +721,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		)
 	}
 
-	// Whether a graph that reaches this file is what judges it. A file
-	// writing NEITHER section is a Program of its own everywhere in this Server,
-	// so `analyseGraphFrom` drops what the graph made of it and this cache holds
-	// nothing for it afterwards — which is not the same thing as nothing having
-	// judged it, and the difference is what the Server's coverage check would
-	// otherwise get wrong. One rule, asked here rather than re-derived, so that
-	// the two can not drift apart.
+	// Whether a graph reaching this file judges it. A file writing neither
+	// Module section is analysed alone, whatever graph reaches it.
 	function isModuleFile(filePath: string): boolean {
 		let entry = fileOf(filePath)
 
@@ -957,14 +739,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}
 	}
 
-	// The entry's own text is handed to the graph rather than read through
-	// the host a second time, so that the parse this cache holds and the parse
-	// inside the graph are of the same bytes — which is what the guard on every
-	// write below compares against.
-	//
-	// False when the work was abandoned, and then NOTHING was written: an
-	// enrichment without the Diagnostics that were being computed from it is a
-	// cache entry that answers for a file it never judged.
+	// The graph reads the entry's own text, so both parses see the same bytes.
+	// False when cancelled, and then nothing was written.
 	function analyseGraphFrom(
 		entry: FileEntry,
 		cancellation: Cancellation | undefined,
@@ -977,8 +753,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 					? entry.sourceText
 					: host.readFile(filePath),
 		})
-		// A file the graph does not hold can not have its annotations
-		// collected from it, and asking for one anyway collects NOBODY's.
+		// Asking for a file the graph does not hold would collect nobody's.
 		let annotated =
 			annotationsFor !== undefined && graph.modules.has(annotationsFor)
 				? annotationsFor
@@ -993,19 +768,11 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			return false
 		}
 
-		// One view per Module of this graph, built once: every Module in
-		// it is linked against the same surfaces, so the file under the cursor
-		// needs no graph of its own to probe against.
+		// One view per Module, so a probe needs no graph of its own.
 		let views = moduleViewsOf(linked)
 
-		// The graph knows every Module's dependencies for free, so the edge
-		// index is maintained from it rather than re-derived — but only the ones
-		// it could READ, and the edge an invalidation most needs is the other
-		// kind: a specifier naming a file that does not exist yet is precisely
-		// what has to be re-analysed when that file appears. Unrecorded, the
-		// importer keeps answering `Error` for a name that now resolves, for
-		// ever. The lexical resolutions know the edge whether the file is there
-		// or not, so both are recorded.
+		// The graph's edges, plus the lexical resolutions, which also name
+		// files that do not exist yet and must invalidate their importers.
 		for (let [modulePath, module] of linked.modules) {
 			recordEdges(modulePath, [
 				...module.module.dependencies,
@@ -1016,9 +783,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		for (let [modulePath, module] of linked.modules) {
 			let moduleEntry = fileOf(modulePath)
 
-			// The text moved between the graph reading it and this cache
-			// reading it, so what the graph produced belongs to a version that
-			// has already gone.
+			// The text moved since the graph read it.
 			if (
 				moduleEntry === null ||
 				moduleEntry.sourceText !== module.module.sourceText
@@ -1026,24 +791,13 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				continue
 			}
 
-			// A file that writes NEITHER section is a Program of its own
-			// everywhere else in this Server — enriched by `enrichDocument`,
-			// whose Choices stay unqualified — while a graph that reaches it as
-			// a dependency enriches it under a Module path instead. Its own
-			// answer is the one every request for it must see, so the graph's is
-			// used for the importer and dropped here.
+			// A file writing neither Module section keeps its own analysis.
 			if (!isModule(moduleEntry.program, modulePath)) {
 				continue
 			}
 
-			// Whichever graph reached this Module first keeps it, so a file
-			// two graphs both reach is enriched twice and only one of the two
-			// typed Programs is ever read for it — the other stays embedded in
-			// the importer that was enriched alongside it. That is sound because
-			// nothing across the seam compares Types by identity: the join is by
-			// (declaring file, Position) and the member tables are by name. What
-			// it buys is the stable identity the entry promises, which an index
-			// built against the first copy depends on.
+			// The first graph to reach a Module keeps its typed Program, so its
+			// identity stays stable. See "Analysing a graph" in DEVELOPMENT.md.
 			if (!moduleEntry.enrichmentAttempted) {
 				moduleEntry.enriched = module.program
 				moduleEntry.enrichmentAttempted = true
@@ -1070,8 +824,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			}
 		}
 
-		// The entry could not be read as a Module at all, so the graph
-		// holds none for it and the Diagnostics saying so are all there is.
+		// The graph could not read the entry as a Module; its Diagnostics say so.
 		if (entry.diagnostics === null) {
 			entry.diagnostics = [...linked.diagnostics]
 			entry.dependencyDiagnostics = new Map()
@@ -1105,11 +858,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		entry.dependencyDiagnostics ??= new Map()
 	}
 
-	// What THIS Module reaches, which is what analysing it on its own
-	// would have found — not the whole graph, which is what the file the graph
-	// was loaded from reaches. The Server publishes these under the other files'
-	// own URIs and owns them afterwards, so answering with a file this Module
-	// never names would make it own a squiggle it can not clear.
+	// The Diagnostics of what this Module reaches, not of the whole graph. The
+	// Server publishes and owns these, so no unreached file may be among them.
 	function reachedDiagnostics(
 		modulePath: string,
 		linked: LinkedGraph,
@@ -1140,10 +890,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return analysisOf(filePath)?.enrichedProgram ?? null
 	}
 
-	// The Hover seam. The same linked enrichment the analysis runs, with
-	// the annotation collector open for this one file — an annotation resolved
-	// WITHOUT the graph answers 'Error' for every imported name it writes, which
-	// is exactly the Hover this exists to prevent.
+	// This file's annotations, resolved against its graph so imported names do
+	// not read as `Error`.
 	function annotationsOf(
 		filePath: string,
 		options: { cancellation?: Cancellation } = {},
@@ -1167,16 +915,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return entry.index
 	}
 
-	// What a request answering about a document needs, in one read: the
-	// parse, the typed Program, the rename index and the Module view.
-	// Completion, Signature Help and every request the Server answers through
-	// `parseAndEnrich` read it.
-	//
-	// The index is deliberately part of it. Building one rebuilds the whole
-	// builtin top level Scope — every builtin value and Type, as fresh
-	// Declarations, because the walk records occurrences onto them — and
-	// Completion, Semantic Tokens and Document Highlight each did it per
-	// request.
+	// What a request about a document needs: the parse, the typed Program, the
+	// rename index and the Module view. The index is cached, since building one
+	// rebuilds the builtin top level Scope.
 	function documentOf(
 		filePath: string,
 		options: { cancellation?: Cancellation } = {},
@@ -1184,10 +925,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		let analysis = analysisOf(filePath, options)
 		let entry = files.get(filePath)
 
-		// Null covers both "there is nothing here" and "the work was
-		// abandoned". Neither is a document a request may answer from: half an
-		// analysis would answer with an unenriched Program, which is a Hover
-		// that says 'Error' about names that are perfectly fine.
+		// Null when there is nothing here or the work was cancelled. Half an
+		// analysis would call good names `Error`.
 		if (analysis === null || analysis.program === null) {
 			return null
 		}
@@ -1208,10 +947,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return fileOf(filePath)?.sourceText ?? null
 	}
 
-	// Both sections, since a re-export is a dependency like any other —
-	// a facade whose only mention of a Module is a `from` clause still depends
-	// on it. Keyed by the specifier as written, which is what an entry names it
-	// by everywhere else.
+	// The files both Module sections name, since a re-export is a dependency
+	// too, keyed by the specifier as written.
 	function dependenciesOf(filePath: string): Map<string, string> {
 		let file = fileOf(filePath)
 		let resolutions = new Map<string, string>()
@@ -1250,11 +987,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return resolutions
 	}
 
-	// What every Module in the workspace publishes, read off the parses.
-	// A re-export forwards a name it never declares, so the kind is asked of the
-	// Module the chain ends in — followed here rather than guessed, and cut off
-	// at a Module already seen so two facades forwarding each other's names
-	// terminate.
+	// What a Module publishes, read off the parses. A re-export's kind comes
+	// from the end of its chain, which stops at a Module already seen.
 	function exportsOf(filePath: string): Array<WorkspaceExport> {
 		let program = programOf(filePath)
 
@@ -1335,21 +1069,16 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return null
 	}
 
-	// Every Module in the workspace that publishes this name, so that an
-	// unknown name can be offered as an import of each. A name two Modules both
-	// export is two offers rather than a guess between them.
+	// Every Module publishing this name, each offered as an import of an
+	// unknown name.
 	function exportersOf(name: string): Array<WorkspaceExport> {
 		return [...knownFiles()].flatMap((candidate) =>
 			exportsOf(candidate).filter((exported) => exported.name === name),
 		)
 	}
 
-	// Every name in the workspace this file could import and has not. A
-	// name it already binds is not offered under any circumstances: an entry
-	// that collided with a declaration or with another entry is refused by the
-	// Compiler, so accepting such an offer would leave the file worse than it
-	// was. Read off the parses — a Completion list is rebuilt on every keystroke
-	// and must not enrich a workspace to be drawn.
+	// Every name this file could import and has not, read off the parses. A
+	// name it already binds is never offered: the Compiler refuses the collision.
 	function offersFor(filePath: string): Array<WorkspaceOffer> {
 		let program = programOf(filePath)
 
@@ -1383,9 +1112,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		})
 	}
 
-	// Every other Module of the workspace as this file would write it in
-	// a `from` — what a specifier is completed from. In canonical order, which
-	// is the order a block lists them in.
+	// Every other Module as this file would write its specifier, sorted.
 	function specifiersFor(filePath: string): Array<string> {
 		return [...knownFiles()]
 			.filter((candidate) => candidate !== filePath)
@@ -1393,10 +1120,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			.sort()
 	}
 
-	// The Namespace Types behind those offers, which is what turns a
-	// Method Completion into an offer to import the Namespace declaring it.
-	// Enriching a Module to answer this is the expensive half, so only the
-	// Modules that publish a Namespace at all are ever asked.
+	// The Namespace Types behind the offers, so a Method Completion can offer
+	// to import its Namespace. Only Modules exporting a Namespace are enriched.
 	function namespaceOffersFor(
 		filePath: string,
 	): Array<{ offer: WorkspaceOffer; namespace: common.NamespaceType }> {
@@ -1406,9 +1131,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		}> = []
 
 		for (let offer of offersFor(filePath)) {
-			// The Module that DECLARES it is the one enriched, not the one
-			// that publishes it — a facade forwarding a Namespace has no
-			// Namespace of its own to read the Type off.
+			// The declaring Module is enriched, since a facade has no Namespace
+			// of its own.
 			let program =
 				offer.kind === "namespace" ? enrichedOf(offer.declaredIn) : null
 
@@ -1416,12 +1140,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				continue
 			}
 
-			// The implementation alone, and deliberately — this answers
-			// what a Module PUBLISHES, and an `export { … }` block can only
-			// name what the implementation declares. A Namespace written in
-			// the `tests { … }` block is reachable inside that block and
-			// nowhere else, so offering it to an importer would offer an
-			// import that can never resolve.
+			// The implementation alone: an export can only name what it
+			// declares, never a Namespace of the `tests` section.
 			for (let node of program.implementation.nodes) {
 				if (
 					node.nodeType === "NamespaceDefinitionStatement" &&
@@ -1429,10 +1149,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 				) {
 					found.push({
 						offer,
-						// Under the name it is PUBLISHED as: an entry
-						// importing it binds a copy of the Type carrying the
-						// local name, and a Completion offering the import has
-						// to name what the reader would actually write.
+						// Under its published name, which the import would bind.
 						namespace: { ...node.type, name: offer.name },
 					})
 				}
@@ -1442,10 +1159,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return found
 	}
 
-	// Answered from the parses, and from the same walk the outline is
-	// built with: a workspace symbol is a document symbol of any file the
-	// workspace holds, open or not, so answering it any other way would be a
-	// second definition of what counts as a symbol.
+	// The document symbols of every file, open or not, read off the parses
+	// with the outline's own walk.
 	function symbols(query: string): Array<WorkspaceSymbolEntry> {
 		let entries: Array<WorkspaceSymbolEntry> = []
 		let lowercased = query.toLowerCase()
@@ -1486,9 +1201,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			}
 
 			for (let symbol of findDocumentSymbols(program)) {
-				// The export block's own entries are left out: they are
-				// the same names again, and a search that answers twice for one
-				// declaration is a search that has to be read twice.
+				// The export entries would repeat the declarations' names.
 				if (symbol.kind === "export") {
 					continue
 				}
@@ -1504,11 +1217,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	/* The symbol join */
 	/*******************/
 
-	// `localOnly` joins the file with itself and nothing else, which is
-	// still a join — an unaliased entry and the declaration it binds are one
-	// symbol inside one file too. It is what Document Highlight rides: that
-	// request is per-file by protocol and fires on every cursor move, so it must
-	// never be the thing that enriches a workspace.
+	// `localOnly` joins this file alone, for Document Highlight. See "The
+	// symbol join" in DEVELOPMENT.md.
 	function symbolAt(
 		filePath: string,
 		cursor: common.Cursor,
@@ -1532,11 +1242,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			programOf,
 			dependenciesOf,
 		)
-		// The join is asked by Position as well as by Declaration,
-		// because half the Identifiers an entry writes are in no file's Scope
-		// at all: the exported side of `PI as Pi` names what another Module
-		// publishes, and the published side of `squared as square` names what
-		// this one does. Neither is a local binding, and both are renameable.
+		// Asked by Position too: in `PI as Pi` and `squared as square`, one
+		// side is in no Scope and still renameable.
 		let symbol =
 			(occurrence === null
 				? null
@@ -1551,8 +1258,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			return null
 		}
 
-		// Nothing crossed a Module boundary, so the file's own answer IS
-		// the workspace's — a Parameter, a local, a Record member.
+		// Nothing crossed a Module boundary, so the file's answer stands.
 		return {
 			name: occurrence.name,
 			kind: occurrence.declaration.kind,
@@ -1610,18 +1316,8 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 /* The symbol join */
 /*******************/
 
-// Symbol identity across Modules is (declaring file, declaration
-// Position), and the entries are what tie one file's answer to another's. Each
-// site below is one END of such a tie:
-//
-//   • a `decl:` site is a Declaration in one file, occurrences and all;
-//   • an `export:` site is the name a Module PUBLISHES, which is a symbol in
-//     its own right — `area as measure` has two, and renaming the public one
-//     must not touch the local one or the other way round.
-//
-// An entry that writes one Identifier for both roles — an unaliased import or
-// export — merges the two sites instead of recording its Identifier twice,
-// which is what keeps one Position out of two edits of the same rename.
+// One end of a tie between files: a `decl:` or an `export:` site. See "The
+// symbol join" in DEVELOPMENT.md.
 type SiteData = {
 	name: string
 	kind: DeclarationKind | null
@@ -1658,9 +1354,8 @@ function joinComponent(
 	let parents = new Map<string, string>()
 	let declarationKeys = new Map<string, Map<Declaration, string>>()
 	let indices = new Map<string, ProgramIndex>()
-	// An aliased import's own site, or the name an aliased export
-	// publishes, to the name it stands for in the Module it comes from. The two
-	// rename apart, so this is the one place they are followed across.
+	// An aliased entry's site to the site it stands for. The two rename apart,
+	// so only this map follows one to the other.
 	let aliases = new Map<string, string>()
 
 	let find = (key: string): string => {
@@ -1710,8 +1405,7 @@ function joinComponent(
 	let exportKey = (filePath: string, name: string) =>
 		`export:${filePath}:${name}`
 
-	// Every Declaration of every file first, so that an entry resolved
-	// below always has something on both ends to tie together.
+	// Every Declaration first, so each entry finds both of its ends.
 	for (let filePath of component) {
 		let index = indexOf(filePath)
 
@@ -1791,9 +1485,7 @@ function joinComponent(
 				local === null ? undefined : keys.get(local.declaration)
 
 			if (entry.alias === null) {
-				// One Identifier, both roles — the entry's own binding and
-				// the reference to what the dependency publishes. Merged rather
-				// than recorded twice, so a rename writes that Position once.
+				// One Identifier in both roles, merged so a rename writes it once.
 				if (localKey !== undefined) {
 					union(remote, localKey)
 				}
@@ -1825,12 +1517,7 @@ function joinComponent(
 			let target: string | undefined
 
 			if (entry.source === null) {
-				// One entry carries the name across every table this
-				// Module binds it in, so a `type Foo` and a Namespace `Foo` are
-				// one exported symbol however separately the file declares
-				// them. Joined here rather than left as two: a rename that
-				// moved one of them would leave the other published under a
-				// name nothing declares any more.
+				// A Type and a Namespace of one name are one exported symbol.
 				for (let declaration of exportedDeclarations(
 					index,
 					entry.name,
@@ -1912,9 +1599,8 @@ function joinComponent(
 		}
 	}
 
-	// The key a symbol's group reaches once every alias on the way to the
-	// Module that declares it is followed, an import's and a forwarding
-	// export's alike.
+	// Follows every alias, of imports and forwarding exports alike, to the
+	// Module that declares the symbol.
 	let followAliases = (key: string): string => {
 		let current = key
 		let seen = new Set<string>()
@@ -2056,10 +1742,7 @@ function joinComponent(
 		return undefined
 	}
 
-	// Last, because a Method dispatching through an imported Namespace can
-	// only be bound once the entry that brought that Namespace in has been
-	// joined — the Declaration it names is in another file, and which file that
-	// is is exactly what the join above answers.
+	// Last, since an imported member is found through its joined entry.
 	for (let filePath of component) {
 		let index = indices.get(filePath)
 
@@ -2176,9 +1859,7 @@ function joinComponent(
 			return key === undefined ? null : symbolOf(key)
 		},
 
-		// Identifiers never span lines, and `end.column` is exclusive —
-		// it is included anyway, so that a rename works with the cursor sitting
-		// directly behind the name. The same rule `occurrenceAt` reads by.
+		// Hit-tested as `occurrenceAt` does.
 		symbolAtPosition(filePath, cursor) {
 			for (let [key, site] of sites) {
 				for (let occurrence of site.occurrences) {
@@ -2198,10 +1879,8 @@ function joinComponent(
 	}
 }
 
-// Every Declaration an export entry with no 'from' names. The local index
-// binds the entry's Identifier to whichever symbol space answered first, so the
-// other one is read off the top level Scope — where a Namespace sits under the
-// same name as the Type it is written for.
+// Every Declaration an export entry without `from` names, in both symbol
+// spaces of the top level Scope.
 function exportedDeclarations(
 	index: ProgramIndex,
 	name: parser.IdentifierNode,
@@ -2232,11 +1911,8 @@ function isDeclaration(site: SiteData): boolean {
 	)
 }
 
-// The one site of a joined symbol that is a declaration in a file rather
-// than a name an entry carries. An `import` binding has a Position too, so it is
-// deliberately not it: what a rename must report as the declaration is where the
-// symbol is WRITTEN, which is the file that would refuse the rename if it were
-// outside the workspace.
+// The site of a joined symbol where it is written, preferred over an import
+// binding.
 function declaringSite(
 	sites: Map<string, SiteData>,
 	find: (key: string) => string,
@@ -2264,10 +1940,8 @@ function declaringSite(
 /* Utilities */
 /*************/
 
-// A Program with nothing in it, standing in for a file the Parser could
-// not read at all. Neither Module section, so every reader treats it as the
-// single declaration space it now is — and its one Diagnostic, the Internal
-// Compiler Error, is what the file actually shows.
+// An empty Program for a file the Parser threw on, with neither Module
+// section.
 function unreadableProgram(sourceText: string): parser.Program {
 	let lines = sourceText.split("\n")
 	let position: common.Position = {
@@ -2310,9 +1984,8 @@ function isSamePosition(a: common.Position, b: common.Position): boolean {
 	)
 }
 
-// The client filters and ranks the list itself, so this only has to be as
-// generous as the protocol allows — a subsequence match, which is what every
-// Editor's own "go to symbol" box does with what is typed into it.
+// A subsequence match, case-insensitive. The client filters and ranks the
+// list itself.
 function matchesQuery(name: string, query: string): boolean {
 	if (query.length === 0) {
 		return true
@@ -2334,16 +2007,8 @@ function matchesQuery(name: string, query: string): boolean {
 	return true
 }
 
-// The kinds a top level declaration can be, off the Parser AST — the same
-// question `modules/link.ts` answers for the export surface, asked here without
-// enriching anything, because auto-import needs it for every file and needs no
-// Type. Workspace symbols read the outline instead (see `symbols`).
-//
-// The tests section is left out on purpose, as it is everywhere the
-// export surface is the question: a name declared there is private to the
-// block, and an entry naming one is a Diagnostic rather than an offer. What a
-// SEARCH finds in a tests section comes from the document outline instead,
-// which reaches the section through `findDocumentSymbols`.
+// The kind of each top level declaration, off the Parser AST, for the export
+// surface. The tests section is private to its block, so it is left out.
 function topLevelDeclarations(
 	program: parser.Program,
 ): Map<string, { kind: DeclarationKind; position: common.Position }> {
@@ -2351,9 +2016,7 @@ function topLevelDeclarations(
 		string,
 		{ kind: DeclarationKind; position: common.Position }
 	>()
-	// Only the FIRST declaration of a name is kept — a second one is a
-	// duplicate the Enricher rejects, and it is not what an export of that name
-	// forwards either.
+	// The first declaration of a name wins; the Enricher rejects a second.
 	let remember = (
 		name: parser.IdentifierNode,
 		kind: DeclarationKind,
@@ -2365,8 +2028,6 @@ function topLevelDeclarations(
 
 	for (let node of program.implementation.nodes) {
 		switch (node.nodeType) {
-			// A Pattern declares one name per binding, and every one of
-			// them is a name this Module could export.
 			case "ConstantDeclarationStatement":
 			case "VariableDeclarationStatement": {
 				let kind =
@@ -2404,8 +2065,8 @@ function topLevelDeclarations(
 	return declarations
 }
 
-// The names a file's top level binds, what it declares and what its import
-// block binds, which the Compiler refuses an import entry of as a duplicate.
+// The names a file's top level binds by declaration or import. The Compiler
+// refuses an import entry of one of them.
 export function namesBoundBy(program: parser.Program): Set<string> {
 	return new Set<string>([
 		...topLevelDeclarations(program).keys(),
@@ -2415,18 +2076,9 @@ export function namesBoundBy(program: parser.Program): Set<string> {
 	])
 }
 
-// A discovery walk, not a watcher — the watcher is the client's, and it
-// keeps this answer current afterwards. Symlinked directories are followed as
-// files rather than descended into, so a link back up the tree can not send the
-// walk round for ever.
-//
-// The exclusions are asked for per DIRECTORY as the walk enters it,
-// rather than taken once for the whole folder, so an `essence.json` inside the
-// tree governs the subtree beneath it: the directory holding a project file is
-// where that project's boundary starts, and a walk that read one list at the
-// top could only ever obey the outermost one. It costs one look for a file
-// that is usually not there per directory entered, beside the `readdir` the
-// walk was going to do anyway.
+// The discovery walk. A symlinked directory is not descended into, so a link
+// up the tree cannot loop. The exclusions are read per directory, so a nested
+// `essence.json` governs its own subtree.
 function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
@@ -2466,9 +2118,8 @@ function collectEssenceFiles(
 
 		let filePath = canonicalPath(entryPath)
 
-		// A standard library source is never a Module — it declares the
-		// builtins rather than importing anything — so it is not part of any
-		// workspace, whichever directory a checkout happens to put it in.
+		// A standard library source declares the builtins and is no Module, so
+		// it belongs to no workspace.
 		if (!isStdlibDocument(filePath)) {
 			found.add(filePath)
 		}
