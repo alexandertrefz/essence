@@ -137,6 +137,86 @@ describe("What an @example becomes", () => {
 		])
 	})
 
+	it("names a test after every declaration it documents", () => {
+		let source = `implementation {
+	§§ @example
+	§§   expect 1::is(1)
+	type Cents = Integer
+
+	§§ @example
+	§§   expect shipping::is(495)
+	constant shipping: Cents = 495
+
+	§§ @example
+	§§   expect count::is(2)
+	variable count = 0
+
+	§§ @example
+	§§   expect low::is(1)
+	constant { low, high } = { low = 1, high = 2 }
+
+	§§ @example
+	§§   expect Size#Small::is(Size#Small)
+	choice Size {
+		Small,
+		Large,
+	}
+
+	§§ @example
+	§§   expect Size#Large::describe()::is("big")
+	protocol Describable {
+		§§ @example
+		§§   expect Size#Small::describe()::is("small")
+		describe() -> String
+
+		§§ @example
+		§§   expect Size#Large::announce()::is("big!")
+		announce() -> String {
+			<- @::describe()::append("!")
+		}
+	}
+
+	§§ @example
+	§§   expect Size.initial::is(Size#Small)
+	namespace Size for Size is Describable {
+		§§ @example
+		§§   expect Size.initial::describe()::is("small")
+		static initial = Size#Small
+
+		describe() -> String {
+			<- match @ -> String {
+				case #Small { <- "small" }
+				case #Large { <- "big" }
+			}
+		}
+	}
+
+	function greet(
+		§§ @example
+		§§   expect greet("Ada")::is("Hello, Ada")
+		_ subject: String,
+	) -> String {
+		<- "Hello, {subject}"
+	}
+
+	count = high
+}`
+
+		expect(namesOf(sectionOf(source))).toEqual([
+			"Cents example",
+			"shipping example",
+			"count example",
+			"{ low, high } example",
+			"Size example",
+			"Describable example",
+			"Describable::describe example",
+			"Describable::announce example",
+			"Size example 2",
+			"Size.initial example",
+			"greet example",
+		])
+	})
+
 	it("reports them under a suite of their own", () => {
 		let section = sectionOf(documented)
 		let suite = section?.nodes[0]

@@ -1,6 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { report } from "../diagnostics/index"
+import { patternBindings } from "../helpers/patterns"
 import { parseTestBody } from "../parser/descent/parse"
 import { documentationPrefix } from "../parser/documentation"
 
@@ -134,77 +135,156 @@ function stripPrefix(line: string): string {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// Every `@example` a Program's own declarations carry, in written order. A
-// Namespace's Methods are named `Namespace::member`, static or not.
+// Every `@example` a Program's own declarations carry, in written order: a
+// declaration's own block, then each of its Parameters'. A Namespace's or a
+// Protocol's Methods are named `Namespace::member`, static or not.
 function findExamples(program: parser.Program): Array<FoundExample> {
 	let found: Array<FoundExample> = []
 
-	let add = (name: string, documentation: common.Documentation | null) => {
-		for (let example of documentation?.examples ?? []) {
-			found.push({ name, example })
+	let add: AddExamples = (name, documentation, parameters = []) => {
+		for (let block of [
+			documentation,
+			...parameters.map((parameter) => parameter.documentation),
+		]) {
+			for (let example of block?.examples ?? []) {
+				found.push({ name, example })
+			}
 		}
 	}
 
 	for (let node of program.implementation.nodes) {
-		if (node.nodeType === "FunctionStatement") {
-			add(node.name.content, node.value.documentation)
-
-			continue
-		}
-
-		if (node.nodeType === "OverloadedFunctionStatement") {
-			add(node.name.content, node.documentation)
-
-			for (let method of node.methods) {
+		switch (node.nodeType) {
+			case "FunctionStatement":
 				add(
 					node.name.content,
-					method.nodeType === "FunctionValue"
-						? method.value.documentation
-						: method.documentation,
+					node.value.documentation,
+					node.value.parameters,
 				)
-			}
+				break
+			case "OverloadedFunctionStatement":
+				add(node.name.content, node.documentation)
 
-			continue
-		}
+				for (let method of node.methods) {
+					addEntry(add, node.name.content, method)
+				}
 
-		if (node.nodeType !== "NamespaceDefinitionStatement") {
-			continue
-		}
-
-		let namespace = node.name.content
-
-		for (let property of Object.values(node.properties)) {
-			add(`${namespace}.${property.name.content}`, property.documentation)
-		}
-
-		for (let method of Object.values(node.methods)) {
-			let name = `${namespace}::${method.name.content}`
-
-			switch (method.nodeType) {
-				case "SimpleMethod":
-				case "StaticMethod":
-					add(name, method.method.value.documentation)
-					break
-				case "SimpleMethodSignature":
-				case "StaticMethodSignature":
-					add(name, method.signature.documentation)
-					break
-				default:
-					// An `overload` block may document itself, and each entry
-					// may too.
-					add(name, method.documentation)
-
-					for (let entry of method.methods) {
-						add(
-							name,
-							entry.nodeType === "FunctionValue"
-								? entry.value.documentation
-								: entry.documentation,
-						)
-					}
-			}
+				break
+			case "ConstantDeclarationStatement":
+			case "VariableDeclarationStatement":
+				add(declaredName(node.name), node.documentation)
+				break
+			case "TypeAliasStatement":
+			case "ChoiceDeclarationStatement":
+				add(node.name.content, node.documentation)
+				break
+			case "ProtocolDeclarationStatement":
+				protocolExamples(node, add)
+				break
+			case "NamespaceDefinitionStatement":
+				namespaceExamples(node, add)
+				break
+			default:
+				break
 		}
 	}
 
 	return found
+}
+
+type AddExamples = (
+	name: string,
+	documentation: common.Documentation | null,
+	parameters?: Array<parser.ParameterNode>,
+) => void
+
+// A Pattern Declaration is named by the names it binds.
+function declaredName(
+	name: parser.IdentifierNode | parser.PatternNode,
+): string {
+	if (name.nodeType === "Identifier") {
+		return name.content
+	}
+
+	let names = patternBindings(name).map((binding) => binding.name.content)
+
+	return `{ ${names.join(", ")} }`
+}
+
+// One entry of an `overload` set, bodied or native.
+function addEntry(
+	add: AddExamples,
+	name: string,
+	entry: parser.FunctionValueNode | parser.NativeMethodSignatureNode,
+): void {
+	if (entry.nodeType === "FunctionValue") {
+		add(name, entry.value.documentation, entry.value.parameters)
+	} else {
+		add(name, entry.documentation, entry.parameters)
+	}
+}
+
+function namespaceExamples(
+	node: parser.NamespaceDefinitionStatementNode,
+	add: AddExamples,
+): void {
+	let namespace = node.name.content
+
+	add(namespace, node.documentation)
+
+	for (let property of Object.values(node.properties)) {
+		add(`${namespace}.${property.name.content}`, property.documentation)
+	}
+
+	for (let method of Object.values(node.methods)) {
+		let name = `${namespace}::${method.name.content}`
+
+		switch (method.nodeType) {
+			case "SimpleMethod":
+			case "StaticMethod":
+				addEntry(add, name, method.method)
+				break
+			case "SimpleMethodSignature":
+			case "StaticMethodSignature":
+				addEntry(add, name, method.signature)
+				break
+			default:
+				// An `overload` block may document itself, and each entry
+				// may too.
+				add(name, method.documentation)
+
+				for (let entry of method.methods) {
+					addEntry(add, name, entry)
+				}
+		}
+	}
+}
+
+// A provided Method's block is its signature's, which its body shares.
+function protocolExamples(
+	node: parser.ProtocolDeclarationStatementNode,
+	add: AddExamples,
+): void {
+	let protocol = node.name.content
+
+	add(protocol, node.documentation)
+
+	for (let method of Object.values(node.methods)) {
+		let name = `${protocol}::${method.name.content}`
+		let signatures =
+			method.nodeType === "SimpleProtocolMethod" ||
+			method.nodeType === "StaticProtocolMethod"
+				? [method.signature]
+				: method.signatures
+
+		if (
+			method.nodeType === "OverloadedProtocolMethod" ||
+			method.nodeType === "OverloadedStaticProtocolMethod"
+		) {
+			add(name, method.documentation)
+		}
+
+		for (let signature of signatures) {
+			add(name, signature.documentation, signature.parameters)
+		}
+	}
 }
