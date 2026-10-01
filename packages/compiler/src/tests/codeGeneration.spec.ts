@@ -47,12 +47,9 @@ import {
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// Runs the same stages the CLI runs, minus bundling — enough to assert
-// on the shape of the emitted JavaScript without touching the file system.
-//
-// `modulePath` enriches the source as a Module, which identifies its
-// Choices by that path — left out, the Program is no Module and its Cases carry
-// the bare tags every other test here asserts on.
+// The CLI's stages without bundling, to assert on the emitted JavaScript.
+// `modulePath` enriches the source as a Module, whose Choices carry its path.
+// Without it, Cases carry the bare tags most specs assert on.
 function generate(
 	source: string,
 	modulePath?: string,
@@ -76,10 +73,8 @@ function generate(
 	)
 }
 
-// Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `Terminal.inspect` calls run. The emitted imports are absolute paths
-// into this repo's runtime, so the module resolves from anywhere; `console.log`
-// is captured to collect the output, then restored.
+// Runs the emitted Program and captures what `Terminal.inspect` prints. The
+// emitted imports are absolute paths, so the module resolves from anywhere.
 async function run(
 	source: string,
 	modulePath?: string,
@@ -107,8 +102,7 @@ async function run(
 	return output
 }
 
-// The counterpart for cases that are supposed to be rejected — returns
-// whatever the first failing stage reported instead of asserting success.
+// For Programs that must be refused: what the first failing stage reported.
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -133,17 +127,10 @@ function hasCode(
 }
 
 describe("Code Generation", () => {
-	// A Namespace's static Property is the one node the code generator
-	// cannot emit on its own. `escodegen` has no `PropertyDefinition` case
-	// upstream and throws on a node type it does not know, so the vendored copy
-	// in `packages/escodegen` carries a twelve-line patch that adds one — see
-	// its `PATCHES.md`. Nothing else in this suite reaches that node: a
-	// Namespace's Methods are `MethodDefinition`s, which upstream handles, so
-	// the whole suite stays green with the patch removed and every Program with
-	// a `static` Property fails at `esc build` with an opaque
-	// "this[type] is not a function". While the patch was pinned by commit SHA
-	// that could not silently happen; vendored, it is a file someone can
-	// re-vendor over, so it needs a test that goes red when they do.
+	// A static Property emits a `PropertyDefinition`, which upstream
+	// `escodegen` cannot print. The vendored copy in `packages/escodegen`
+	// patches it in (see its `PATCHES.md`), and these specs fail if a re-vendor
+	// drops the patch.
 	describe("a Namespace's static Property", () => {
 		it("emits a class field", () => {
 			let generated = generate(`
@@ -174,15 +161,8 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A value the Program computes and drops. Before `collapse-construction`
-	// every one of them was a runtime CALL, which no engine may take away; now a
-	// Record, a List and a Case are object literals, and an object literal whose
-	// value is unused is something an engine may decide not to build. Bun's
-	// decides exactly that — and still evaluates the computed key, which is the
-	// hidden Type SYMBOL every value carries, as a property NAME: converting a
-	// Symbol to a string throws, out of a Statement that was supposed to do
-	// nothing. So a discarded value is bound to a name, and the Statement it was
-	// written as RUNS.
+	// A discarded value is bound to a name rather than dropped. See "Discarded
+	// values" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("a value written for nothing", () => {
 		it("binds a discarded value rather than dropping it", () => {
 			let generated = generate(`
@@ -198,12 +178,8 @@ describe("Code Generation", () => {
 			expect(generated).not.toContain("({\n\t\t[$type.typeKeySymbol]")
 		})
 
-		// Regression test — the name held a `$` and no `_`, and `$` is a
-		// legal Essence identifier character while `_` is a Symbol the Lexer
-		// ends an Identifier at. So `$discarded` was a name a Program could
-		// bind, and one bound HERE around an Expression that READS it was read
-		// before it was initialised: a Program that ran under `--no-optimise`
-		// died with a `ReferenceError` with the passes on.
+		// `$` may appear in an Essence name and `_` may not, so the binding's
+		// `_` keeps it apart from a Program's own `$discarded`.
 		it("holds it under a name no Program can write", async () => {
 			expect(
 				await run(`
@@ -219,9 +195,7 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a call where it stands", () => {
-			// Which is what every Statement of this kind a real Program
-			// writes actually is — a call can not be taken away, because it may
-			// print.
+			// A call cannot be taken away, so it stays as written.
 			let generated = generate(`
 				implementation {
 					Terminal.inspect("done")
@@ -252,12 +226,8 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// Structural printing used to be a free Function read off the runtime
-	// `functions` module. It is `Terminal.inspect` now — an ordinary native
-	// static Method of an ordinary Namespace, emitted as a read off that
-	// Namespace's runtime import like every other native. The observable
-	// behaviour is unchanged, which is why the golden file did not move when
-	// every call site was rewritten.
+	// `Terminal.inspect` is an ordinary native static Method, emitted as a read
+	// off the Namespace's runtime import.
 	describe("Terminal.inspect", () => {
 		it("emits a read off the Terminal module, not the functions one", () => {
 			let generated = generate(`
@@ -267,9 +237,8 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("Terminal.inspect(")
-			// `$_` is the runtime `functions` module, where a native FREE
-			// Function lives. A Namespace member never comes off it, and this is
-			// the assertion that says so.
+			// `$_` is the runtime `functions` module, which holds only native free
+			// Functions.
 			expect(generated).not.toContain("$_.inspect(")
 		})
 
@@ -281,21 +250,17 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// A String prints QUOTED, an Integer bare — the structural
-			// representation `getStringRepresentation` always produced, which is
-			// exactly what tells `inspect` apart from `print`.
+			// A String prints quoted and an Integer bare, which tells `inspect`
+			// from `print`.
 			expect(output).toEqual(['"hello"', "42"])
 		})
 	})
 
-	// The four end-to-end guards for what the runtime PRINTS and what it
-	// calls EQUAL. Each fault below was invisible to every stage before the
-	// emitted Program ran, so each is pinned by running one — the unit-level
-	// counterparts live in `runtimeInternal.spec.ts`.
+	// What the runtime prints and calls equal shows only when a Program runs.
+	// `runtimeInternal.spec.ts` holds the unit-level counterparts.
 	describe("Runtime Printing and Equality", () => {
-		// A Record whose single-line rendering reaches sixty characters
-		// goes multi-line, and every member used to be printed TWICE — once
-		// unindented from the single-line attempt, once indented.
+		// A Record whose single-line rendering reaches sixty characters prints
+		// over several lines, each member once.
 		it("prints each member of a multi-line Record exactly once", async () => {
 			expect(
 				await run(`implementation {
@@ -316,9 +281,8 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// A Function is the one value carrying no Type key, so printing
-		// one — or anything holding one — read `undefined.includes` and threw a
-		// TypeError at run time out of a Program that compiled clean.
+		// A Function carries no Type key, so printing one, or a value holding
+		// one, must not read it.
 		it("prints a Function, and a value holding one, without crashing", async () => {
 			expect(
 				await run(`implementation {
@@ -333,10 +297,8 @@ describe("Code Generation", () => {
 			).toEqual(["Function", "{ callback = Function }", "[ Function ]"])
 		})
 
-		// `String::is` is canonical equivalence — `compare` normalises
-		// to NFC — so a composed and a decomposed `café` are the same String.
-		// Deep equality compared the raw code units, so the same pair came out
-		// unequal the moment it was wrapped.
+		// `String::is` is canonical equivalence, so a composed and a decomposed
+		// `café` are equal, inside a Record too.
 		it("compares Strings inside a Record by canonical equivalence", async () => {
 			expect(
 				await run(`implementation {
@@ -350,9 +312,7 @@ describe("Code Generation", () => {
 			).toEqual(["true", "true", "true"])
 		})
 
-		// `Number::is` is numeric equality — `1 is 1/1` holds — but deep
-		// equality demanded the same member Type on both sides, so a Record
-		// holding the Integer answered unequal to one holding the Rational.
+		// `Number::is` is numeric, so `1 is 1/1` holds inside a Record too.
 		it("compares Numbers inside a Record across the tower", async () => {
 			expect(
 				await run(`implementation {
@@ -369,10 +329,6 @@ describe("Code Generation", () => {
 	})
 
 	describe("Match", () => {
-		// Regression test — the Handlers used to be folded into the
-		// if/else cascade in a way that only kept the first and the last, so
-		// every Match with more than two Handlers silently dropped the ones in
-		// between and fell through to `undefined`.
 		it("emits every Handler of a Match", () => {
 			let generated = generate(`
 				implementation {
@@ -406,12 +362,8 @@ describe("Code Generation", () => {
 				}
 			`
 
-			// Three Handlers produce one `if` plus two `else` branches,
-			// and the chain ends in a third `else` that no Handler owns — the
-			// exhaustiveness fallback, which throws rather than letting the
-			// wrapper answer `undefined`. Asked with `elide-final-match-test`
-			// off, which is the pass that proves the last Handler IS that
-			// third `else` and emits it there.
+			// Without `elide-final-match-test`, the chain ends in an `else` no
+			// Handler owns, which throws.
 			let generated = generate(source, undefined, {
 				enabled: true,
 				disabledPasses: new Set(["elide-final-match-test"]),
@@ -420,17 +372,14 @@ describe("Code Generation", () => {
 			expect(generated.split("else").length - 1).toBe(3)
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 
-			// And with it on, the same chain is two `else`s and no
-			// fallback — the nesting itself is unchanged.
+			// With the pass, the last Handler is that `else`.
 			let elided = generate(source)
 
 			expect(elided.split("else").length - 1).toBe(2)
 			expect(elided).not.toContain("$type.noCaseMatched(_self)")
 		})
 
-		// Regression test — a Union Matcher used to be serialised with
-		// `Object.entries`, which turned its member list into `{ 0: …, 1: … }`
-		// and left the runtime Type check calling Array Methods on an Object.
+		// The runtime Type check reads a Union Matcher's members as an Array.
 		it("serialises the member list of a Union Matcher as an Array", () => {
 			let generated = generate(`
 				implementation {
@@ -463,11 +412,9 @@ describe("Code Generation", () => {
 			expect(generated).toContain("handled the rest")
 		})
 
-		// The matched value's tag is read once for a chain that asks about
-		// it more than once. It is emission rather than a pass — nothing about
-		// the Program changes, the same key is read off the same immutable value
-		// before the same tests — so it is held to account here rather than in
-		// the Optimiser's registry.
+		// A chain asking the tag more than once reads it once. This is emission,
+		// not an Optimiser pass. See "The bound tag" in
+		// packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("binds the matched value's tag where the chain asks for it twice", () => {
 			let generated = generate(`
 				implementation {
@@ -492,9 +439,7 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a chain that asks once reading the key where it stands", () => {
-			// One tag test is one read, and a name for it would say what
-			// the read already says. Two Handlers is one test: the last is the
-			// `else` `elide-final-match-test` proved it is.
+			// Two Handlers make one tag test, since the last is the `else`.
 			let generated = generate(`
 				implementation {
 					variable value: Integer | Boolean = true
@@ -513,10 +458,8 @@ describe("Code Generation", () => {
 		})
 
 		it("binds nothing where the Optimiser left no tag test", () => {
-			// The binding is made off the `tag-test` Nodes
-			// `compile-type-tests` leaves. With the phase off there are none, so
-			// the chain is emitted exactly as it was — which is what makes this
-			// safe under any subset of the registry.
+			// The binding is made off the `tag-test` Nodes `compile-type-tests`
+			// leaves, so without the pass there is none.
 			let generated = generate(
 				`
 				implementation {
@@ -540,10 +483,8 @@ describe("Code Generation", () => {
 	})
 
 	describe("Match Wildcards", () => {
-		// The point of resolving a wildcard to the still-unhandled
-		// members rather than to Unknown — `@` has to keep a Type precise
-		// enough to call Methods on and to return where a member Type is
-		// expected.
+		// `@` in a wildcard has the unhandled members' Type, precise enough to
+		// call Methods on.
 		it("narrows @ inside a wildcard to the unhandled members", () => {
 			expect(() =>
 				generate(`
@@ -588,9 +529,8 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// A literal Matcher is a value comparison, not a Type check
-			// — `anyIs` is already false across differing Types, so it needs
-			// no `isValueOfType` in front of it.
+			// `anyIs` is false across differing Types, so a literal Matcher needs
+			// no Type check.
 			expect(generated).toContain("anyIs")
 		})
 
@@ -610,8 +550,8 @@ describe("Code Generation", () => {
 			expect(generated).toContain("&&")
 		})
 
-		// The rule both features share — a Handler that can decline a
-		// value it Type-matched cannot make the Union exhaustive.
+		// A Handler that can decline a value it Type-matched does not make the
+		// Union exhaustive.
 		it("does not let a literal Matcher discharge its Type", () => {
 			let diagnostics = diagnosticsOf(`
 				implementation {
@@ -643,9 +583,8 @@ describe("Code Generation", () => {
 		})
 
 		it("leaves a literal's Type in the residual of a later wildcard", () => {
-			// `case 0` catches one Integer, so `@` inside the wildcard is
-			// still Integer|Boolean — calling an Integer Method on it has to
-			// stay an error.
+			// `case 0` catches one Integer, so `@` in the wildcard is still
+			// `Integer | Boolean`.
 			let diagnostics = diagnosticsOf(`
 				implementation {
 					variable value: Integer | Boolean = 1
@@ -677,10 +616,9 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A `define` holds no Statements — every half of every arm is an
-	// Expression — so it is emitted as the chain of JavaScript conditionals it
-	// is, where a Match is emitted as a Function holding Statements and called
-	// at once. That is the whole reason the Node exists.
+	// A `define` holds only Expressions, so it is emitted as a chain of
+	// conditionals rather than a Function called at once. See "Define emission"
+	// in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("Define", () => {
 		it("answers with the first arm whose Condition holds", async () => {
 			expect(
@@ -724,11 +662,9 @@ describe("Code Generation", () => {
 			).toEqual(['"one"', '"many"', '"none"'])
 		})
 
-		// The payload slot of a one-member Case offers the Record the
-		// Case carries and the member's own Type at once, and the `define`
-		// settles which of them it answers with — so what reaches the runtime
-		// is the member's value, wrapped into the Record exactly as
-		// `#Value(1)` is.
+		// A one-member Case's payload slot offers both the Record and the
+		// member's Type. The `define` answers the member's value, which is
+		// wrapped as `#Value(1)` would be.
 		it("answers with the payload of a one-member Case", async () => {
 			expect(
 				await run(`
@@ -746,10 +682,8 @@ describe("Code Generation", () => {
 			).toEqual(["Optional#Value(1)"])
 		})
 
-		// `otherwise` is a valid Identifier, so a Method may be named it
-		// — `Optional::otherwise` was one of the standard library's own until
-		// it was renamed. Here the word is a Method's name and an arm's
-		// terminator inside the same `define`, and each reads where it stands.
+		// `otherwise` is a valid Identifier, so it can name a Method and end an
+		// arm in one `define`, each read by where it stands.
 		it("answers through a Method named otherwise", async () => {
 			expect(
 				await run(`
@@ -792,11 +726,8 @@ describe("Code Generation", () => {
 				unoptimisedOptions,
 			)
 
-			// Read with the Optimiser off, so the Conditions stay the
-			// calls the Program wrote and the chain is the only thing the shape
-			// of the output is about. The `.value` on each is the Essence
-			// Boolean being asked as a JavaScript one — an Essence Boolean is an
-			// object, and every object is true.
+			// With the Optimiser off the Conditions stay calls. Each `.value`
+			// reads the Essence Boolean, an object that would always be truthy.
 			expect(generated).toContain('.value ? String.createString("A") : ')
 			expect(generated).toContain(
 				'.value ? String.createString("B") : String.createString("F")',
@@ -808,9 +739,6 @@ describe("Code Generation", () => {
 	})
 
 	describe("Record Matchers", () => {
-		// Regression test — matching a Record used to fall through the
-		// runtime Type check entirely, so `case { a: Integer }` compiled
-		// cleanly and then never matched anything.
 		it("matches a Record structurally", () => {
 			let generated = generate(`
 				implementation {
@@ -890,19 +818,12 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// Record assignability is WIDTH subtyping — every member the expected
-	// Type names has to exist, and a value is free to carry more. So the Type of
-	// a Combination's right-hand side says which members it updates and says
-	// NOTHING about which members it holds, and an update copied whole put
-	// members of other Types into the answer. The projection is what closes
-	// that, and it is not an optimisation: all three of the Optimiser on, the
-	// pass off and the whole Optimiser off have to answer the same.
+	// A right-hand side may carry members its Type does not name, so the update
+	// takes only the named ones, with or without the Optimiser. See "Record and
+	// Dictionary updates" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("a Record Combination's expression right-hand side", () => {
-		// The Program the hole was found with. `partial`'s Type names
-		// `port` alone; the value beside it also carries a `tls` of the wrong
-		// Type, which a whole copy wrote over the Boolean the answer declares —
-		// so `merged.tls::negate()` computed on a String and printed `false`
-		// out of a Program that compiled clean.
+		// `partial`'s Type names `port` alone, but its value also carries a String
+		// `tls`, which must not replace the Boolean.
 		const widened = `implementation {
 	type Server = { port: Integer, tls: Boolean }
 
@@ -937,8 +858,8 @@ describe("Code Generation", () => {
 			).toContain("port: partial.port")
 		})
 
-		// A bare name is read once per member and needs no temporary —
-		// `_self`, which is what `@` lowers to, is one of those names.
+		// A bare name, including the `_self` that `@` lowers to, is read per
+		// member without a temporary.
 		it("reads a bare name and `@` in place", () => {
 			let generated = generate(`
 				implementation {
@@ -975,10 +896,8 @@ describe("Code Generation", () => {
 			expect(generated).not.toContain("=> ({")
 		})
 
-		// Anything that has to be COMPUTED is bound by an arrow first, so
-		// that a right-hand side with two members does not call its call twice —
-		// and so that both operands are still evaluated exactly once, in the
-		// order they were written.
+		// A computed right-hand side is bound by an arrow, so its call runs once.
+		// See "Record and Dictionary updates" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("binds a computed right-hand side once", async () => {
 			const counted = `implementation {
 	type Point = { x: Integer, y: Integer }
@@ -1000,11 +919,9 @@ describe("Code Generation", () => {
 			expect(await run(counted)).toEqual(["{ x = 9, y = 8 }", "1"])
 		})
 
-		// A dotted key is enriched into the nesting an author could have
-		// written by hand, so nothing below the Enricher knows about it at all
-		// — and what is emitted has to be exactly the nesting, spread for
-		// spread. Run as well as read: the value updated must come out
-		// untouched, which is what says the nesting copies rather than writes.
+		// The Enricher writes a dotted key as a hand-written nesting. Running it
+		// shows the nesting copies: the updated value comes out unchanged.
+		// See "Path keys" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		it("nests a dotted key into the update it stands for", async () => {
 			const nested = `implementation {
 	type Tls = { enabled: Boolean, name: String }
@@ -1039,9 +956,7 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// A path key is a nesting the Enricher wrote, so the Optimiser
-		// sees exactly what a hand-written nesting gives it — including with
-		// every pass off, where the Rewriter's own path emits the merge.
+		// With every pass off, the Rewriter's own path emits the nesting.
 		it("nests a dotted key with the Optimiser off", () => {
 			const nested = `implementation {
 	type Tls = { enabled: Boolean }
@@ -1063,10 +978,9 @@ describe("Code Generation", () => {
 			expect(generated).toContain("config.server.tls")
 		})
 
-		// `?` is a legal Essence identifier character and not a legal
-		// JavaScript one, so a projected member is a quoted key on the way in
-		// and a bracketed read on the way out. Written as an identifier either
-		// side, the bundle dies on generated text.
+		// `?` is legal in an Essence name but not in a JavaScript one, so a
+		// projected member is a quoted key and a bracketed read.
+		// See "Escaped names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("projects a member JavaScript can not spell", async () => {
 			const spelling = `implementation {
 	type Flags = { ok?: Boolean, count: Integer }
@@ -1082,9 +996,9 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// The shorthand desugars in the Parser, so everything from the
-	// Enricher down sees `{ x = x }` — these pin that there is nothing else to
-	// it, in each of the four places a Record Literal stands.
+	// The Parser reads `{ x }` as `{ x = x }`, so later stages see only the
+	// written-out form.
+	// See "Record literals and updates" in packages/compiler/src/parser/DEVELOPMENT.md.
 	describe("Property shorthand", () => {
 		it("reads a bare member name as its own value", async () => {
 			expect(
@@ -1150,15 +1064,13 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// Distinct placeholders — two Parameters sharing a name
-			// would be a redeclaration in the emitted Function.
+			// Two Parameters sharing a name would be a redeclaration in JavaScript.
 			expect(generated).toContain("_0")
 			expect(generated).toContain("_1")
 			expect(generated).toContain("_2")
 		})
 
-		// The reason the form is worth having — in a Function Type there
-		// is no body, so a Parameter name could never be referred to anyway.
+		// A Function Type has no body, so its Parameter names are never read.
 		it("accepts a nameless Parameter in a Function Type", () => {
 			expect(() =>
 				generate(`
@@ -1176,10 +1088,9 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A Record default is not a JavaScript default parameter — it fills in
-	// the MEMBERS a caller left out of an Argument it did write, which a
-	// JavaScript default, firing only on `undefined`, can not do. The callee
-	// opens by rebuilding the Parameter member by member.
+	// A Record default fills in the members a caller left out, which a
+	// JavaScript default can not do.
+	// See "Record defaults" in packages/compiler/src/simplifier/DEVELOPMENT.md.
 	describe("Record defaults", () => {
 		const options = `type Options = { host: String, retries: Integer }`
 
@@ -1199,10 +1110,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"a|h|3"', '"a|h|9"'])
 		})
 
-		// A complete default keeps its old meaning — the whole Argument
-		// may be left out — AND takes a partial Argument, so every member is
-		// read through `?.`, the one short-circuiting read an emitted Program
-		// has.
+		// A complete default lets the whole Argument be left out, so each member
+		// is read through `?.`.
 		it("takes a whole Argument, a partial one, or none", async () => {
 			const source = `implementation {
 	${options}
@@ -1220,9 +1129,7 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"d|3"', '"d|1"', '"h|9"'])
 		})
 
-		// Each member's expression is evaluated only where the caller left
-		// THAT member out — the per-call, only-when-needed semantics the
-		// language promises a default, kept member by member.
+		// Each member's expression runs only where the caller left that member out.
 		it("evaluates only the members the caller left out", async () => {
 			const source = `implementation {
 	${options}
@@ -1246,9 +1153,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"a"', '"b"', "1"])
 		})
 
-		// A default that is not a literal can not be taken apart without
-		// being evaluated, so it is hoisted into one `const` and read per member
-		// — once per call, unconditionally.
+		// A default that is not a Literal is hoisted into one `const`, evaluated
+		// once per call.
 		it("hoists a default that is not a literal", async () => {
 			const source = `implementation {
 	${options}
@@ -1288,9 +1194,8 @@ describe("Code Generation", () => {
 			).toEqual(['"self|2"', '"over|5"'])
 		})
 
-		// A Function taken as a value drops its defaults, so every
-		// Argument is written — and the entry merge still runs, which is what
-		// projects a whole Record to the members the Parameter's Type declares.
+		// A Function value drops its defaults, but the entry rebuild still
+		// projects the Argument to the members the Type declares.
 		it("merges an Argument passed through a Function value", async () => {
 			expect(
 				await run(`implementation {
@@ -1307,9 +1212,7 @@ describe("Code Generation", () => {
 			).toEqual(['"v|4"'])
 		})
 
-		// A member name JavaScript can not spell reaches the merge as a
-		// quoted key and a bracketed read, exactly as a projected Combination's
-		// does.
+		// A member JavaScript can not spell is a quoted key and a bracketed read.
 		it("merges a member JavaScript can not spell", async () => {
 			const source = `implementation {
 	type Flags = { ok?: Boolean, count: Integer }
@@ -1325,11 +1228,9 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true|1"'])
 		})
 
-		// A member the default writes as a Record LITERAL is rebuilt one
-		// level further in rather than taken whole, which is what a path key in
-		// an Argument merges into. A caller that wrote the member whole wrote
-		// every one of ITS members — only the top level of an Argument may be
-		// partial — so the same rebuild hands that value straight back.
+		// A member the default writes as a Record Literal is rebuilt one level
+		// further in, so a path key can merge into it. A member the caller writes
+		// whole is complete, so the rebuild hands it back.
 		it("rebuilds a member the default writes as a Record", async () => {
 			const source = `implementation {
 	type Server = { host: String, port: Integer }
@@ -1352,9 +1253,8 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// As deep as the default's own Literal goes, and no deeper: the
-		// nesting is what the default WRITES, so a Type may nest forever without
-		// the prologue growing with it.
+		// The rebuild follows the default's Literal, not the Type, so a deep Type
+		// does not grow the prologue.
 		it("rebuilds as deep as the default's Literal nests", async () => {
 			const source = `implementation {
 	type Tls = { enabled: Boolean, authority: String }
@@ -1374,10 +1274,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"80|self"'])
 		})
 
-		// A member the default does NOT write as a Literal can not be
-		// taken apart without being evaluated, so it is read whole — and a path
-		// key into one is refused where it is written, rather than quietly
-		// replacing the member here.
+		// A member the default names rather than writes can not be taken apart
+		// without being evaluated, so it is read whole.
 		it("takes a member the default names rather than writes", async () => {
 			const source = `implementation {
 	type Server = { host: String, port: Integer }
@@ -1396,10 +1294,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"3|f"'])
 		})
 
-		// An Argument written for a defaulted Record Parameter IS the
-		// right-hand side of `{ default with argument }`, so it takes path keys
-		// on the terms every other right-hand side of a merge does — and means
-		// exactly what the same key means after a `with`.
+		// An Argument for a defaulted Record Parameter is the right-hand side of
+		// `{ default with argument }`, so a path key means what it means after `with`.
 		it("merges a path key into the default's member", async () => {
 			const source = `implementation {
 	type Tls = { enabled: Boolean, authority: String }
@@ -1422,11 +1318,8 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// The Argument carries only the members the path wrote — the merge
-		// is the callee's, which is where the default is. Nothing about the
-		// emitted callee says a path key was ever written: it rebuilds the
-		// member for every call site alike, and a complete one comes back out
-		// unchanged.
+		// The Argument carries only the members the path wrote, and the callee
+		// merges it into the default.
 		it("passes only the members a path key wrote", () => {
 			const generated = generate(`implementation {
 	type Server = { port: Integer, host: String }
@@ -1448,9 +1341,7 @@ describe("Code Generation", () => {
 	})
 
 	describe("String Methods", () => {
-		// String gained Comparable, so a List of Strings sorts with a
-		// real comparator — this pins that `compare` resolves on the String
-		// receiver and the whole pipeline emits.
+		// Pins that `compare` resolves on a String receiver inside a sort callback.
 		it("sorts a List of Strings through String.compare", () => {
 			let generated = generate(`
 				implementation {
@@ -1466,17 +1357,9 @@ describe("Code Generation", () => {
 	})
 
 	describe("Higher-order List Methods", () => {
-		// `map`/`reduce` are the first builtins with a Method-level
-		// Generic and the first to take a contextually typed callback all the
-		// way through codegen. This pins that the callback's body reached the
-		// emitted JavaScript with its Parameters bound and its Types resolved.
-		//
-		// The CALL is no longer here to pin: a walk whose callback is
-		// written AT the call is written out where it stands — `inline-loops` —
-		// so the Method is reached only where the callback is a value instead.
-		// The pass's own spec pins both halves of that; these two pin what the
-		// Enricher and the Simplifier made of the literal, which is the same
-		// either way.
+		// `inline-loops` writes out a walk whose callback is written at the call,
+		// so these pin the callback's body with its Parameters bound and typed.
+		// See "Inlined loops" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("emits map with an inferred callback", () => {
 			let generated = generate(`
 				implementation {
@@ -1499,18 +1382,12 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("let $loop_0_state = $pool_")
-			// `total::add(n)` on two Integers is lowered to the addition
-			// itself — `lower-scalar-operations` — so what says the callback's
-			// body resolved is the operation rather than the call. The
-			// accumulator is the walk's own, so it is carried as the value it
-			// holds and the addition answers one; the item is a List's and is
-			// read through.
+			// `lower-scalar-operations` turns `total::add(n)` into the addition. The
+			// accumulator is carried as a bare value, and the List item is read through.
 			expect(generated).toContain("total + n.value")
 		})
 
-		// And the Method itself, which is reached exactly where the
-		// callback is not written at the call — the same Program with the
-		// literal bound to a name first.
+		// A callback bound to a name is not inlined, so the Method is called.
 		it("emits the call where the callback is a value", () => {
 			let generated = generate(`
 				implementation {
@@ -1527,12 +1404,8 @@ describe("Code Generation", () => {
 	})
 
 	describe("Contextual Function literals", () => {
-		// The whole point is that the inferred Parameter Type reaches
-		// the body's Scope. The comparison is lowered to a bigint one, which
-		// `lower-scalar-operations` does only where the receiver and the
-		// Argument are exactly Integers — so it says what the emitted
-		// `__overload$1` used to say, and says it more strongly: a body typed
-		// as an Error would leave the call standing.
+		// `lower-scalar-operations` lowers the comparison only where both operands
+		// are Integers, so it shows the inferred Parameter Type reached the body.
 		it("types the body from the inferred Parameter", () => {
 			let generated = generate(`
 				implementation {
@@ -1595,9 +1468,9 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
-		// The desugar is the Enricher's, so what the Optimiser inlines is
-		// an ordinary Function literal — the emitted body reads the Parameter
-		// `simplifyParameter` names for a Parameter the source left unnamed.
+		// The Enricher desugars a path into a Function literal whose Parameter is
+		// `_0`, so the Optimiser inlines an ordinary Function.
+		// See "Member paths" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		it("emits the Function literal it stands for", () => {
 			expect(
 				generate(`implementation {
@@ -1621,11 +1494,8 @@ describe("Code Generation", () => {
 			).toEqual(["7"])
 		})
 
-		// The riskiest interaction in the feature — the path's own return
-		// Type is what binds `Key`, and the path is only readable once `Item` is
-		// bound. `deferredArgumentOrder` already holds a Function Parameter back
-		// until the Arguments that name its Types have been matched, and this is
-		// what proves a path rides it.
+		// The path's return Type binds `Key`, and the path is readable only once
+		// `Item` is bound. `deferredArgumentOrder` holds the path back until then.
 		it("binds a Type Parameter from what the path reads", async () => {
 			expect(
 				await run(`implementation {
@@ -1642,11 +1512,8 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
-		// The Type a Parameter here would need is the one thing this site
-		// has not got, since what is missing IS the context that would name it.
-		// So the first Help moves the path to a position that names a Function,
-		// and the second writes both Types out as blanks: a literal standing
-		// outside Argument position takes no Types from around it.
+		// A literal outside Argument position takes no Types from around it, so
+		// the second Help writes both Types out as blanks.
 		it("refuses a path where no Function is expected", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				${product}
@@ -1696,8 +1563,7 @@ describe("Code Generation", () => {
 			expect(diagnostics[0].code).toBe("path-step-not-a-record")
 		})
 
-		// The step that is not there is an unknown MEMBER, not a step off
-		// something with no members — the Record is right, the name is not.
+		// The Record is right and the name is wrong, so this is an unknown member.
 		it("names a member the Record does not declare", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				${product}
@@ -1754,9 +1620,8 @@ describe("Code Generation", () => {
 				Terminal.inspect(describeValue({ x = 1, y = 2 }))
 			}`)
 
-			// The bounded Function gains a hidden trailing parameter, its
-			// body dispatches through it, and the call site packages the
-			// conforming Namespace's Methods into an object literal.
+			// The bounded Function takes a hidden trailing Parameter. The call site
+			// passes the conforming Namespace's Methods as an object literal.
 			expect(code).toContain("Value__conformance")
 			expect(code).toContain("VectorShowable.toString")
 			expect(code).toContain("Value__conformance.toString(")
@@ -1812,9 +1677,8 @@ describe("Code Generation", () => {
 				constant ordered: List<Integer> = [3, 1, 2]::sort()
 			}`)
 
-			// An unconditional witness stays exactly the method-map object
-			// literal — no `boundConformance` wrapper. `Integer.compare` is
-			// native, so the witness is a plain member read.
+			// An unconditional witness is a plain object literal. `Integer.compare`
+			// is native, so its entry is a plain member read.
 			expect(code).toContain("compare: Integer.compare")
 			expect(code).not.toContain("boundConformance")
 		})
@@ -1824,8 +1688,8 @@ describe("Code Generation", () => {
 				constant ordered = [[1, 2], [3]]::sort()
 			}`)
 
-			// `List<List<Integer>>` sorts through List's own `compare`,
-			// curried with the inner Integer ordering — the conditional witness.
+			// `List<List<Integer>>` sorts through `List.compare`, which the
+			// conditional witness curries with the inner Integer ordering.
 			expect(code).toContain("$type.boundConformance(")
 			expect(code).toContain("compare: List.compare")
 			expect(code).toContain("compare: Integer.compare")
@@ -1851,9 +1715,8 @@ describe("Code Generation", () => {
 				Terminal.inspect(a::compare(to b))
 			}`)
 
-			// The hidden conformance Parameters follow the Namespace's
-			// Generic declaration order (Key, then Value), and the call site's
-			// witnesses appear in that same order so they line up.
+			// The hidden conformance Parameters and the call's witnesses both follow
+			// the Namespace's Generic order: `Key`, then `Value`.
 			expect(code).toContain(
 				"compare(_self, other, Key__conformance, Value__conformance)",
 			)
@@ -1866,11 +1729,8 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A free Function's Arguments carry labels exactly as a Method's do —
-	// the standard library's `loop` family is told apart by nothing else — and a
-	// label is spent entirely at compile time: what it decides is which
-	// Parameter, and which Overload, an Argument is matched against, after which
-	// the emitted call is positional and the label appears nowhere in it.
+	// A label decides which Parameter and Overload an Argument matches, and
+	// the emitted call is positional.
 	describe("Labelled Arguments", () => {
 		it("spends the label at compile time and emits the call positionally", async () => {
 			const source = `implementation {
@@ -1883,8 +1743,8 @@ describe("Code Generation", () => {
 
 			const code = generate(source)
 
-			// The internal names survive as the emitted Parameters; the
-			// LABELS are not names the JavaScript has anything to do with.
+			// The internal names become the emitted Parameters, and the labels
+			// appear nowhere.
 			expect(code).toContain("function shout(topic, count)")
 			expect(code).not.toContain("about")
 			expect(code).not.toContain("times")
@@ -1892,11 +1752,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"hi!hi!"'])
 		})
 
-		// The one thing a free Function has instead of a receiver. Both
-		// calls pass the same three Arguments in the same order, and the middle
-		// label is the whole of the difference: `while` steps until the predicate
-		// stops holding, `until` steps until it starts. The predicate holds on the
-		// seed, so a Program that picked the wrong entry prints the other number.
+		// The two calls differ only in the middle label. The predicate holds on
+		// the seed, so picking the wrong Overload prints the other number.
 		it("picks the Overload the label names", async () => {
 			expect(
 				await run(`implementation {
@@ -1916,16 +1773,12 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A default is lowered to the JavaScript default parameter, whose
-	// semantics are the language's term for term. A call that leaves an Argument
-	// out therefore emits SHORT where nothing follows the hole, and passes
-	// `void 0` where something does — the one place "no Argument given" is
-	// deliberately introduced into emitted code, and spelled so that a Program
-	// binding the NAME `undefined` can not capture it.
+	// A default is lowered to a JavaScript default parameter. A call that
+	// leaves out an Argument ends early where nothing follows the hole, and
+	// passes `void 0` where something does.
 	describe("Default Parameter Values", () => {
-		// Asked with `pool-constants` off, so what is read back is the
-		// default itself rather than the name the pool gave it — that pass
-		// reaches a default too, and what IT does is `optimiser.spec`'s.
+		// `pool-constants` is off, so the default is read back rather than the
+		// name the pool gives it.
 		it("should emit a default as the Parameter's own default", () => {
 			expect(
 				generate(
@@ -1969,9 +1822,8 @@ describe("Code Generation", () => {
 			).toMatch(/g\(void 0, \$pool_\d\)/)
 		})
 
-		// The case a naive reading of "trailing omissions are simply not
-		// passed" breaks on — the hidden `__conformance` Argument a bounded
-		// Generic appends comes AFTER the hole, so the hole has to be passed.
+		// The hidden `__conformance` Argument comes after the hole, so the hole
+		// has to be passed.
 		it("should emit void 0 for an omission before a conformance Argument", () => {
 			expect(
 				generate(`implementation {
@@ -1984,11 +1836,8 @@ describe("Code Generation", () => {
 			).toMatch(/show\(\$pool_\d, void 0, \$pool_\d\)/)
 		})
 
-		// `undefined` is a NAME a Program may bind — `constant undefined =
-		// 99` is legal Essence and emits a `const undefined` — so the hole is
-		// spelled `void 0`, which is the same value under a spelling nothing can
-		// rebind. Written as the Identifier, every hole in that Module was
-		// passed the Program's own value.
+		// A Program may bind the name `undefined`, so a hole is spelled `void 0`,
+		// which nothing can rebind.
 		it("should not let a Constant named undefined capture a hole", async () => {
 			let source = `implementation {
 				constant undefined = 99
@@ -2045,9 +1894,8 @@ describe("Code Generation", () => {
 			).toEqual(["1", "5", "7", "5", "3", "9"])
 		})
 
-		// Every branch of a dispatch resolves to a DIFFERENT Method, so
-		// they need not agree on what may be left out — the shared Argument list
-		// holds what the call wrote and each branch opens its own holes.
+		// Each dispatch branch resolves to its own Method, so each opens its own
+		// holes in the shared Argument list.
 		const divergentDispatch = `implementation {
 			namespace Scaled for Integer {
 				measure(_ scale: Integer = 10, to limit: Integer) -> Integer {
@@ -2073,9 +1921,7 @@ describe("Code Generation", () => {
 			expect(await run(divergentDispatch)).toEqual(["30", "3"])
 		})
 
-		// The same Program through the runtime's own search, which is
-		// what `--without-optimisation compile-union-dispatch` builds — the two
-		// have to agree, so the holes are opened in both.
+		// With `compile-union-dispatch` off, the runtime's own search dispatches.
 		it("should let the runtime search open a branch's holes too", () => {
 			expect(
 				generate(divergentDispatch, undefined, {
@@ -2086,10 +1932,9 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A user's `overload` block defines every Overload itself, so the
-	// emitted names run 1, 2, 3 in written order — the same numbering the call
-	// site resolves against the Method Type. Only the Namespaces the standard
-	// library declares can leave a gap, where a native holds the slot.
+	// A user's `overload` block defines every Overload, so the emitted slots
+	// follow written order. Only a standard library Namespace can leave a gap.
+	// See "Overload slots" in packages/compiler/src/simplifier/DEVELOPMENT.md.
 	describe("Overload Numbering", () => {
 		it("should number a Namespace's own Overloads in written order", async () => {
 			const source = `implementation {
@@ -2123,11 +1968,8 @@ describe("Code Generation", () => {
 			}`
 			const code = generate(source)
 
-			// `compile-union-dispatch` writes the search out where it
-			// stands — a test on the receiver's tag and the branch it selects.
-			// With the pass off the same targets are reached through
-			// `$type.dispatchMethod`, which is what this Namespace asked about
-			// before there was a pass to compile it.
+			// `compile-union-dispatch` writes a test on the receiver's tag. With the
+			// pass off, `$type.dispatchMethod` reaches the same targets.
 			expect(code).toContain('value[$type.typeKeySymbol] === "Integer"')
 			expect(
 				generate(source, undefined, {
@@ -2135,10 +1977,9 @@ describe("Code Generation", () => {
 					disabledPasses: new Set(["compile-union-dispatch"]),
 				}),
 			).toContain("$type.dispatchMethod")
-			// One target per member, and the two are spelled differently
-			// on purpose — `Integer.toString` is native, a member read off the
-			// plain import, while `Boolean.toString` is Essence and so is its
-			// own const. Dispatch does not care which.
+			// `Integer.toString` is native, a read off the plain import, and
+			// `Boolean.toString` is Essence, a const of its own.
+			// See "The standard library prelude" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 			expect(code).toContain("Integer.toString")
 			expect(code).toContain("$es_Boolean_toString")
 		})
@@ -2150,27 +1991,17 @@ describe("Code Generation", () => {
 				Terminal.inspect(number::multiply(with 2)::toString())
 			}`)
 
-			// The mangled name survives into both spellings — the
-			// Integer entry is native, a member read off the plain import,
-			// while the Rational entry is Essence and so is its own const.
+			// The mangled name survives in both spellings, the native Integer entry
+			// and the Essence Rational one.
 			expect(code).toContain("Integer.multiply__overload$")
 			expect(code).toContain("$es_Rational_multiply__overload$")
 		})
 
-		// `fallback` is `Item | Boolean`, so `toString` dispatches over a
-		// Union — the `Item` case through the conformance witness, the
-		// `Boolean` case to `Boolean.toString`, which is implemented in
-		// Essence. This is the Union-dispatch-to-an-Essence-Method path: the
-		// case target is the bare `$es_Boolean_toString`, and the reachability
-		// gate has to pull that const in off the emitted branch for the Program
-		// to run — no other expression in the Program names it.
-		//
-		// The Union is spelled out by hand and `Item` is inferred from a
-		// second Parameter, because an argument that lands on the concrete
-		// member leaves `Item` unbound and the call is rejected as
-		// uninferable. An Optional would not do: it is a Choice, so `toString`
-		// on it resolves statically to the native `Optional.toString` and
-		// dispatches over nothing at all.
+		// `fallback` is `Item | Boolean`, so `toString` dispatches over a Union.
+		// Only the emitted branch names `$es_Boolean_toString`, so reachability
+		// has to find the const there. `Item` comes from the first Parameter,
+		// since an Argument on the concrete member leaves it unbound. An Optional's
+		// `toString` is native and resolves statically, so it would not dispatch.
 		it("should dispatch a bounded Type Parameter member through the conformance parameter", async () => {
 			const source = `implementation {
 				function describe <infer Item is Printable>(_ item: Item, or fallback: Item | Boolean) -> String {
@@ -2201,13 +2032,8 @@ describe("Code Generation", () => {
 				Terminal.inspect(describe(1, or true))
 			}`)
 
-			// `lastIndexOf` is what picks the emitted branch out —
-			// `$es_Boolean_toString` is also the name of the prelude const,
-			// which is emitted above every Function and would otherwise be the
-			// occurrence found. The conformance read appears in the chain and
-			// nowhere else, and it comes after: a catch-all accepts every value
-			// there is, so it can only be tried once everything else has
-			// declined.
+			// The prelude const comes before every Function, so `lastIndexOf` finds
+			// the branch. A catch-all accepts every value, so it is tried last.
 			expect(code.lastIndexOf("$es_Boolean_toString")).toBeGreaterThan(-1)
 			expect(code.lastIndexOf("$es_Boolean_toString")).toBeLessThan(
 				code.indexOf("Item__conformance.toString"),
@@ -2258,12 +2084,9 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// A standard library Namespace may be half native and half Essence.
-	// The runtime module is imported under the Namespace's own name, and each
-	// Essence-implemented Method is a top-level const of its own beside it.
-	// `Boolean.isNot` was the first Method to have made the trip; it is
-	// `Equatable`'s provided Method now, and `Boolean.exclusiveOr` — the same
-	// `@::is(other)::negate()` under another name — stands for it here.
+	// Each Method the standard library writes in Essence is a top-level const
+	// beside the Namespace's import.
+	// See "Const names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("Essence Method Names", () => {
 		it("names a Method the standard library implements in Essence", () => {
 			expect(essenceMethodName("Boolean", "exclusiveOr")).toBe(
@@ -2293,10 +2116,8 @@ describe("Code Generation", () => {
 			)
 		})
 
-		// The Properties are asked for separately, because a Property's const
-		// is emitted in a band of its own — but under the same name, so the two
-		// tables must not both answer for one member. No standard library Property
-		// has a value today, so every one of them is a member read.
+		// A Property's const takes the same name a Method's would, so the two
+		// tables must not both answer for one member.
 		it("returns null for a static Property the library gives no value", () => {
 			expect(essencePropertyName("Number", "Pi")).toBeNull()
 			expect(essencePropertyName("Number", "Tau")).toBeNull()
@@ -2311,11 +2132,9 @@ describe("Code Generation", () => {
 	})
 
 	describe("Reserved-word identifiers", () => {
-		// A JavaScript reserved word — `new`, `default`, `delete` — is a
-		// legal Essence identifier, so a Constant or Parameter can be named one.
-		// Emitting it verbatim produced invalid JavaScript (`const new = …`,
-		// `function (…, default)`) that died at runtime; it is now escaped with a
-		// `_` prefix, which no Essence identifier can contain.
+		// A JavaScript reserved word such as `new` is a legal Essence name. It is
+		// emitted with a `_` prefix, which no Essence name can contain.
+		// See "Escaped names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 
 		it("escapes a reserved word as a Constant, at binding and reference", () => {
 			let generated = generate(`
@@ -2362,9 +2181,8 @@ describe("Code Generation", () => {
 		})
 
 		it("keeps a reserved word verbatim as a Record field", async () => {
-			// The counterpart guard — a member/property name is NOT escaped,
-			// because a reserved word is legal as a property key and the read has
-			// to match the key the record literal wrote.
+			// A member name is not escaped, since a reserved word is a legal property
+			// key.
 			expect(
 				await run(`
 					implementation {
@@ -2378,10 +2196,8 @@ describe("Code Generation", () => {
 	})
 
 	describe("Standard Library Prelude", () => {
-		// A synthetic standard library, so a shape the real one does not
-		// have yet can be handed to the Rewriter — the edges are read off the
-		// prelude that comes back, so a prelude the process-wide one knows nothing
-		// about is exactly what these must answer for.
+		// A synthetic standard library hands the Rewriter shapes the real one
+		// lacks. The edges are read off the prelude it returns.
 		function preludeOf(source: string) {
 			return buildStdlibPrelude(
 				loadStdlibFrom([parseStdlibSource("Synthetic.es", source)]),
@@ -2393,11 +2209,8 @@ describe("Code Generation", () => {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
-			// The Namespace is imported under its own name, with no
-			// `$native_` alias and no merged const, and the Essence Method the
-			// Program reaches is a top-level const beside it. The native half stays
-			// a member read off the plain import, which is what keeps it
-			// tree-shakeable.
+			// The Namespace keeps its plain import, with no `$native_` alias and no
+			// merged const. The Essence Method is a top-level const beside it.
 			expect(code).toContain('import * as Boolean from "')
 			expect(code).not.toContain("$native_Boolean")
 			expect(code).not.toContain("const Boolean = {")
@@ -2411,11 +2224,9 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$es_String_")
 		})
 
-		// The const's body names another Namespace — `exclusiveOr` is
-		// `@::is(other)::negate()`, and `Boolean.is` is a native, so it is a
-		// plain member read off the runtime module the plain import binds. The
-		// `negate` around it is not a call any more: `lower-scalar-operations`
-		// writes it out as JavaScript's own `!`.
+		// `exclusiveOr` is `@::is(other)::negate()`. The native `Boolean.is` is a
+		// read off the runtime module, and `lower-scalar-operations` writes
+		// `negate` as `!`.
 		it("emits a body that reads the natives off the runtime module", () => {
 			const code = generate(`implementation {
 				Terminal.inspect(true::exclusiveOr(false))
@@ -2424,11 +2235,9 @@ describe("Code Generation", () => {
 			expect(code).toContain("!Boolean.is(_self, other).value")
 		})
 
-		// An unused const is not free — it still names the runtime Methods
-		// its body reaches, and once a module is in the graph its impure
-		// top-level initialisers can not be dropped — so a Program that never
-		// names the Method must not get its const. The plain import stays and,
-		// unreferenced, the Bundler shakes it away.
+		// An unused const still names the runtime Methods its body reaches, so a
+		// Program that never names the Method gets no const.
+		// See "Prelude reachability" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("emits no const for a Method the Program never names", () => {
 			const code = generate(`implementation {
 				Terminal.inspect("hello")
@@ -2438,10 +2247,8 @@ describe("Code Generation", () => {
 			expect(code).toContain('import * as Boolean from "')
 		})
 
-		// The gate runs over the FINISHED tree, after generation, which is
-		// the only place a conformance witness, a `dispatchMethod` target and a
-		// plain call all look alike — they are `Identifier` nodes. A survey of
-		// the source would have to know every one of those shapes.
+		// Reachability starts from the emitted code, where a conformance witness,
+		// a dispatch target and a plain call are all Identifiers.
 		it("finds a Method named only through a conformance witness", () => {
 			const code = generate(`implementation {
 				function describe <infer Value is Printable>(_ a: Value) -> String {
@@ -2457,11 +2264,8 @@ describe("Code Generation", () => {
 			expect(code).toContain("const $es_Boolean_toString")
 		})
 
-		// A dotted member name is text, not a reference — a Record whose
-		// member is spelled like a Namespace must stay a plain member read, never
-		// be mistaken for an Essence Method and rewritten to a bare `$es_…`
-		// Identifier. `rewriteLookup` routes a Record field through the same
-		// funnel as a static Method, so this is that funnel's guard.
+		// A Record member spelled like a Namespace stays a plain member read.
+		// `rewriteLookup` handles a Record field and a static Method alike.
 		it("does not mistake a member name for a reference", () => {
 			const code = generate(`implementation {
 				constant record = { Boolean = "not the Namespace" }
@@ -2473,13 +2277,9 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$es_")
 		})
 
-		// The regression is the merged const, whose whole cost was the
-		// spread that materialised a module namespace object: `{ ...Number, … }`.
-		// `Everyday.es` reaches an Essence Method and a large runtime module, the
-		// shape that spread, and writes no spread of its own, so an object
-		// literal opening with a spread in its output names the mechanism
-		// directly. The bundle-size ceilings catch it arriving by any other
-		// route.
+		// Spreading a runtime module, `{ ...Number, … }`, builds its module
+		// namespace object. `Everyday.es` reaches an Essence Method and a large
+		// runtime module but writes no spread, so its output should hold none.
 		it("never spreads a runtime module", () => {
 			const source = readFileSync(fixturePath("Everyday.es"), {
 				encoding: "utf-8",
@@ -2488,11 +2288,8 @@ describe("Code Generation", () => {
 			expect(generate(source)).not.toMatch(/\{\s*\.\.\./)
 		})
 
-		// The `$es_` prefix can not collide with a user identifier because
-		// `_` is a Lexer Symbol — no user name contains one.
-		// `$esBooleanexclusiveOr` is the closest a user can write, and it must
-		// survive as its own distinct binding alongside the Rewriter's
-		// `$es_Boolean_exclusiveOr`.
+		// No user name contains `_`, so the `$es_` prefix can not collide.
+		// `$esBooleanexclusiveOr` is the closest a user can write.
 		it("keeps a user identifier near the prefix distinct", async () => {
 			const source = `implementation {
 				constant $esBooleanexclusiveOr = "mine"
@@ -2517,12 +2314,8 @@ describe("Code Generation", () => {
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
 
-		// The conformance witness reads the Essence Method as the bare
-		// `$es_Boolean_toString` const rather than off the runtime module, so a
-		// Boolean that reaches a bounded generic finds the Essence
-		// implementation. `Printable` and not `Equatable`, because Boolean's
-		// own `is` is native, and the `isNot` an Equatable witness carries is
-		// `Equatable`'s provided Method rather than Boolean's.
+		// The witness reads the bare `$es_Boolean_toString` const. It uses
+		// `Printable` because Boolean's `is` is native and `isNot` is `Equatable`'s.
 		it("witnesses Printable with the Essence Method", async () => {
 			const source = `implementation {
 				function describe <infer Value is Printable>(_ a: Value) -> String {
@@ -2537,11 +2330,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"', '"false"'])
 		})
 
-		// A dispatch case reaches an Essence Method as the bare
-		// `$es_…` Identifier, exactly as a plain call does. `Boolean.toString`
-		// is Essence, so this is the Union-dispatch-to-an-Essence-Method path
-		// end to end: the const has to be emitted off the dispatch triple alone
-		// — nothing else in the Program names it — and then run.
+		// A dispatch case reaches an Essence Method as a bare `$es_` Identifier,
+		// and nothing else in the Program names the const.
 		it("dispatches a Union receiver to an Essence Method", async () => {
 			const source = `implementation {
 				constant value: Integer | Boolean = true
@@ -2558,14 +2348,8 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"'])
 		})
 
-		// `Orderable.isBetween` is written in Essence as well, and reaches
-		// other Essence consts in turn. Each of them has to be emitted exactly
-		// when the Program reaches it.
-		//
-		// Both bounds included, both bounds excluded from outside, and a
-		// pair written the other way round, run through the compiled Method. The
-		// last two are what makes the exchange visible: the same range named
-		// backwards holds `5` and does not hold `15`.
+		// `Orderable.isBetween` is Essence and reaches other Essence consts. The
+		// range named backwards holds `5` and not `15`, which shows the exchange.
 		it("runs isBetween from its const", async () => {
 			expect(
 				await run(`implementation {
@@ -2588,13 +2372,9 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// `isBetween` is `Orderable`'s provided Method, over `Self` — the
-		// target of the Namespace whose conformance offered it — so a bound of
-		// another kind is compared on the covering `Number`'s rung, through the
-		// one conformance `Number` declares. π against an Integer and a
-		// Rational bound is that; a Rational against Rational bounds is the
-		// same Method through Rational's own conformance, and its `compare`
-		// alone.
+		// `isBetween` is `Orderable`'s provided Method over `Self`. Mixed bounds
+		// compare through `Number`'s conformance, and Rational bounds through
+		// Rational's.
 		it("runs isBetween across the whole numeric tower", async () => {
 			expect(
 				await run(`implementation {
@@ -2608,9 +2388,7 @@ describe("Code Generation", () => {
 			).toEqual(['"true"', '"false"', '"true"', '"true"'])
 		})
 
-		// Each Essence Method's const is emitted exactly where the Program
-		// reaches it, gated per Method rather than per Namespace, so reaching
-		// `Orderable.isBetween` pulls in no `Boolean` const.
+		// Each const is gated per Method rather than per Namespace.
 		it("emits each Essence Method's const only where it is reached", () => {
 			const both = generate(`implementation {
 				Terminal.inspect(5::isBetween(1, and 10)::exclusiveOr(false))
@@ -2619,7 +2397,7 @@ describe("Code Generation", () => {
 			expect(both).toContain("const $es_Orderable__isBetween")
 			expect(both).toContain("const $es_Boolean_exclusiveOr")
 
-			// `exclusiveOr` alone — a Program that never names a Number.
+			// `exclusiveOr` alone, which names no Number.
 			const booleanOnly = generate(`implementation {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
@@ -2647,9 +2425,8 @@ describe("Code Generation", () => {
 			expect(neither).not.toContain("$es_Boolean_exclusiveOr")
 		})
 
-		// A value-LESS `static PI: Transcendental` is a native — it reaches
-		// no typed Node, so the prelude has nothing to emit for it — and it stays a
-		// plain member read off the runtime module, `Number.Pi`, like every native.
+		// `static Pi: Transcendental` has no value, so it is a native and stays a
+		// member read off the runtime module.
 		it("reads Pi and Tau as native member reads", async () => {
 			const source = `implementation {
 				constant pi: Number = Number.Pi
@@ -2681,11 +2458,9 @@ describe("Code Generation", () => {
 			expect(JSON.stringify(loadStdlib().typedPrograms)).toBe(before)
 		})
 
-		// The `__overload$N` suffix is the Overload's position in the
-		// Method Type. A native holds its slot even though the prelude emits
-		// nothing for it, because the runtime export it binds to already answers
-		// to that name. Emitted under the filtered index, the bodied Overload
-		// would take the native's name, and a call of the native would run it.
+		// A native holds its Overload slot, so the bodied Overload takes the
+		// second name.
+		// See "Overload slots" in packages/compiler/src/simplifier/DEVELOPMENT.md.
 		it("numbers a mixed overload block by its position in the Method Type", () => {
 			let stdlib = loadStdlibFrom([
 				parseStdlibSource(
@@ -2713,12 +2488,9 @@ describe("Code Generation", () => {
 			])
 		})
 
-		// The two tables the Rewriter reads a free Function off. They are
-		// complementary and both derived from the loader's `functionBindings`, so
-		// they can only be right together: a bodied entry is emitted as a
-		// declaration of its own and a native one is a read off the runtime
-		// `functions` module, and an entry that landed in both — or in neither —
-		// is either a name emitted twice or a `ReferenceError` at run time.
+		// The Rewriter reads a free Function off two tables, both derived from the
+		// loader's `functionBindings`. A bodied entry is a declaration of its own,
+		// and a native one is a read off the runtime `functions` module.
 		describe("the standard library's free Functions", () => {
 			it("collects the Essence-bodied entries by their emitted name", () => {
 				expect(
@@ -2736,9 +2508,8 @@ describe("Code Generation", () => {
 				])
 			})
 
-			// The name the Rewriter keys a candidate by has to be the name
-			// the emitted declaration answers to, or the fixed point would pull in
-			// a declaration that defines something else.
+			// The Rewriter keys a candidate by name, so that name has to be the one
+			// the emitted declaration answers to.
 			it("names each one after the Node it hands over", () => {
 				for (let freeFunction of stdlibFreeFunctions()) {
 					expect(freeFunction.node.nodeType).toBe("FunctionStatement")
@@ -2763,10 +2534,8 @@ describe("Code Generation", () => {
 				)
 			})
 
-			// The invariant the two tables exist to keep, read off the
-			// loader's flags rather than off a list written by hand — every
-			// declared entry is accounted for by exactly one of them, under the
-			// `__overload$N` name its SLOT gives it.
+			// Every declared entry is in exactly one table, under the `__overload$N`
+			// name its slot gives it.
 			it("accounts for every declared entry exactly once", () => {
 				let stdlib = loadStdlib()
 				let bodied = new Set(
@@ -2793,11 +2562,9 @@ describe("Code Generation", () => {
 			})
 		})
 
-		// The search has to run to a fixed point: an Essence Method may be
-		// reached only through the body of another one. It is driven here over
-		// a synthetic prelude. The edges are read off the typed body, so
-		// injecting a prelude the process-wide one does not know is exactly
-		// what this must handle.
+		// The search runs to a fixed point, since a Method may be reached only
+		// through another's body.
+		// See "Prelude reachability" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		describe("reachability", () => {
 			// `Outer.quadruple` calls `Inner.double`, and nothing else
 			// mentions `Inner`.
@@ -2817,8 +2584,8 @@ describe("Code Generation", () => {
 	}
 }`
 
-			// An Essence Method is reached as a bare `$es_…` Identifier —
-			// the same shape the user Program's emitted calls take.
+			// An Essence Method is reached as a bare `$es_` Identifier, as in a user
+			// Program's emitted calls.
 			function callOf(
 				namespaceName: string,
 				methodName: string,
@@ -2867,11 +2634,9 @@ describe("Code Generation", () => {
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
 			})
 
-			// The free Functions share the one fixed point with the
-			// Methods, so an edge that crosses between the two kinds has to be
-			// followed like any other. It is driven over a synthetic library
-			// whose chain crosses the boundary twice: Method to free Function,
-			// free Function to free Function, and free Function back to Method.
+			// Free Functions share the fixed point with the Methods. The chain runs
+			// from a Method to a free Function, between free Functions, and back to a
+			// Method.
 			describe("free Functions", () => {
 				const crossing = `declarations {
 	§§ Doubles the value.
@@ -2927,9 +2692,7 @@ describe("Code Generation", () => {
 					)
 				}
 
-				// A free Function is reached as a bare Identifier call —
-				// the emitted spelling of `quadruple(…)`, and of an overloaded
-				// entry's `quadruple__overload$2(…)` alike.
+				// A free Function is reached as a bare Identifier call, overloaded or not.
 				function callOfFunction(
 					name: string,
 				): estree.ExpressionStatement {
@@ -2982,10 +2745,8 @@ describe("Code Generation", () => {
 					expect([...reachable.keys()]).toEqual(["$es_Inner_twice"])
 				})
 
-				// A free Function is emitted as a declaration of its own
-				// rather than as a const — nothing has to hold a Function
-				// expression for it, and the name it answers to is the bare one a
-				// call site resolved to.
+				// A free Function is a declaration of its own, under the bare name a call
+				// site resolved to.
 				it("emits a free Function as its own declaration", () => {
 					let reachable = reachableEssenceMethods(
 						preludeOf(crossing),
@@ -3002,10 +2763,8 @@ describe("Code Generation", () => {
 					).toBe("VariableDeclaration")
 				})
 
-				// The set handed in is what decides an edge, exactly as
-				// `implemented` does for a Method — so a NATIVE free Function,
-				// which is a read off `$_` and reaches no const, drops out along
-				// with everything it would have pulled in.
+				// The set handed in decides an edge, as `implemented` does for a Method.
+				// A native free Function is a read off `$_`, so it drops out.
 				it("draws no edge to a free Function this run does not implement", () => {
 					let reachable = reachableEssenceMethods(
 						preludeOf(crossing),
@@ -3018,12 +2777,8 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// The sweep the emitted Program is held to after every rewrite
-			// — the net under the fixed point above, and the reason a shape the
-			// edge finder does not know about can not reach a user again. Driven
-			// with a hand-built tree, because while the Rewriter is right the
-			// only way to see it fire is to hand it a Program that names a const
-			// nobody emitted.
+			// `checkEssenceMethodsAreDeclared` checks every emitted Program behind the
+			// fixed point. Only a hand-built tree can make it fire.
 			describe("the emitted-name sweep", () => {
 				function programOf(
 					body: Array<estree.Statement>,
@@ -3051,10 +2806,8 @@ describe("Code Generation", () => {
 					)
 				})
 
-				// The sweep reads REFERENCES, so an object literal's key
-				// and a dotted member — text, both of them — are none of its
-				// business. `{ $es_Inner_double: … }` is a witness's method map,
-				// which names a Method it does not call.
+				// The sweep reads references only. A dotted member and an object literal's
+				// key, such as a witness's `{ $es_Inner_double: … }`, are text.
 				it("leaves a member and a key that are only spelled that way alone", () => {
 					expect(() =>
 						checkEssenceMethodsAreDeclared(
@@ -3097,10 +2850,8 @@ describe("Code Generation", () => {
 					).not.toThrow()
 				})
 
-				// A free Function's const is emitted under its bare name,
-				// which a user's own binding can be spelled exactly like — the
-				// prefix is what makes the sweep safe, so everything without it
-				// is left to the fixed point.
+				// A free Function's declaration takes its bare name, which a user binding
+				// can spell too. The sweep checks only `$es_` names.
 				it("says nothing about a name that carries no prefix", () => {
 					expect(() =>
 						checkEssenceMethodsAreDeclared(
@@ -3119,12 +2870,9 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// The edge finder must recognise every shape `namespaceMember`
-			// turns into a `$es_…` Identifier, or a Method reached only through a
-			// missing shape is named in an emitted body while its const is never
-			// pulled in: a `ReferenceError` at run time that compiles green. Each
-			// shape is fed in directly, so none of them rests on what the real
-			// prelude happens to write.
+			// A shape the edge finder misses names a const that is never emitted, a
+			// `ReferenceError` at run time. Each shape is fed in directly.
+			// See "Prelude reachability" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 			describe("edge shapes", () => {
 				const implemented = new Set([
 					"Target instance",
@@ -3179,12 +2927,8 @@ describe("Code Generation", () => {
 						"$es_Target_static",
 					])
 
-					// A static Method passed as a value, not called — the
-					// shape an earlier version missed by only inspecting a
-					// `FunctionInvocation`'s callee. It is an edge for
-					// reachability, since the const is named, and NOT an ordering
-					// constraint on the value band: the body it names runs
-					// whenever whoever was handed it calls it.
+					// A static Method held as a value is an edge but is not evaluated. It
+					// runs only when whoever holds it calls it.
 					let handedOn = essenceMethodReferences(
 						{ nodeType: "Argument", value: lookup },
 						implemented,
@@ -3196,10 +2940,8 @@ describe("Code Generation", () => {
 					expect([...handedOn.evaluatedReferences]).toEqual([])
 				})
 
-				// A static Property READ is the same Node shape as a static
-				// Method reference, so which table holds the pair is the whole of
-				// the difference — and a native Property is in neither, which is why
-				// `Number.Pi` draws no edge to a const nothing emitted.
+				// A static Property read has the shape of a static Method reference, so
+				// the table decides. A native Property such as `Number.Pi` is in neither.
 				it("follows a read of a static Property the prelude gives a value", () => {
 					const lookup = {
 						nodeType: "Lookup",
@@ -3221,9 +2963,7 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([
 						"$es_Target_CONSTANT",
 					])
-					// A Property read is evaluated wherever it stands —
-					// reading the const IS taking the value, so there is no
-					// handing it on the way a Method reference is.
+					// Reading a Property's const takes its value, so the read is evaluated.
 					expect([...refs.evaluatedReferences]).toEqual([
 						"$es_Target_CONSTANT",
 					])
@@ -3234,12 +2974,9 @@ describe("Code Generation", () => {
 					]).toEqual([])
 				})
 
-				// A Method handed to a call is a Method that call may run at
-				// once — `items::map(Boolean.isNot)` and every native taking a
-				// callback — so it counts as evaluated where a stored one does
-				// not. Without this a Property could be emitted above a Property
-				// the Method it passed along reads. The callee here is a native
-				// free Function, the shape whose Arguments the runtime runs.
+				// A call may run a Method it is handed at once, as
+				// `items::map(Boolean.isNot)` does, so the Method counts as evaluated. The
+				// callee here is a native free Function.
 				it("evaluates a static Method given to a call as an Argument", () => {
 					let refs = essenceMethodReferences(
 						{
@@ -3285,9 +3022,8 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([
 						"$es_Target_witnessed",
 					])
-					// A witness holds its Methods, it does not run them —
-					// whoever is handed the witness calls them, later — so the
-					// value band is not ordered against what they read.
+					// A witness holds its Methods without running them, so they are not
+					// evaluated.
 					expect([...refs.evaluatedReferences]).toEqual([])
 				})
 
@@ -3313,12 +3049,8 @@ describe("Code Generation", () => {
 					])
 				})
 
-				// The one shape that draws a free-Function edge instead of a
-				// Method one — a `FunctionInvocation` off a bare Identifier, which
-				// is what an overloaded free Function's call site looks like once
-				// the Simplifier has mangled the callee. The reference IS the bare
-				// name, because that is the key the free Function's own
-				// declaration is emitted under.
+				// A `FunctionInvocation` off a bare Identifier draws a free-Function edge,
+				// keyed by the bare name the declaration is emitted under.
 				it("follows a bare free-Function call", () => {
 					let refs = essenceMethodReferences(
 						{
@@ -3336,10 +3068,8 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual(["loop__overload$2"])
 				})
 
-				// A native free Function is reached off `$_`, and a call on a
-				// Function-typed local or Parameter is the very same Node shape —
-				// neither is in the set, so neither draws an edge to a const that
-				// was never emitted for it.
+				// A native free Function and a call on a Function-typed local share this
+				// shape. Neither is in the set, so neither draws an edge.
 				it("draws no edge to a free Function the run does not implement", () => {
 					let refs = essenceMethodReferences(
 						{
@@ -3357,10 +3087,8 @@ describe("Code Generation", () => {
 					expect([...refs.references]).toEqual([])
 				})
 
-				// One body reaches both kinds, and the two sets decide
-				// independently — the free-Function edge is keyed by the bare name
-				// and the Method edge by the `$es_…` one, so neither filter can
-				// answer for the other.
+				// The free-Function edge is keyed by the bare name and the Method edge by
+				// the `$es_` one, so the two sets decide independently.
 				it("follows a Method and a free Function out of one body", () => {
 					let refs = essenceMethodReferences(
 						{
@@ -3395,8 +3123,8 @@ describe("Code Generation", () => {
 				})
 
 				it("draws no edge to a Method the prelude does not implement", () => {
-					// A Record field access is an Identifier-based `Lookup`
-					// too — it must not be mistaken for a static reference.
+					// A Record field access is a `Lookup` too, and must not be read as a
+					// static reference.
 					let refs = essenceMethodReferences(
 						{
 							nodeType: "Lookup",
@@ -3606,9 +3334,8 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// The real sources and one more file, installed as the library
-			// for the length of the block, so the emitted bodies spell their
-			// consts from the prelude the walk is handed.
+			// The real sources plus one file are installed as the library for this
+			// block. The emitted bodies then spell their consts from that prelude.
 			describe("the edges of a library body", () => {
 				// Appended to the real sources, so its imports resolve to
 				// the real files and `merge` is the library's own.
@@ -3733,9 +3460,8 @@ export {
 					])
 				})
 
-				// `namespaceMember` spells each body's consts and the walk
-				// reads its edges off the typed body, so a shape only one of the
-				// two knows fails here for every body that writes it.
+				// `namespaceMember` spells a body's consts and the walk reads its edges
+				// off the typed body, so a shape only one of them knows fails here.
 				it("draws an edge to every const a library body names", () => {
 					let whole = reachableEssenceMethods(
 						stdlibPrelude(),
@@ -3767,20 +3493,14 @@ export {
 			})
 		})
 
-		// A bodied static Property is emitted as a const of its own, in a
-		// band BELOW every Function-valued member — its value is computed where
-		// the const stands, not when something calls it, so the band is the only
-		// place from which it can read the Methods it needs. No standard library
-		// Property has a value yet, which is what keeps every golden
-		// byte-identical while the machinery below is live; the fixtures are
-		// synthetic for the same reason.
+		// A bodied static Property's value is computed where its const stands, so
+		// it is emitted after every Function-valued member. No standard library
+		// Property has a value, so these fixtures are synthetic.
+		// See "Prelude emission order" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 		describe("a bodied static Property", () => {
-			// `Constants.DOUBLE` reads `Other.BASE` and calls `Other.doubled`
-			// — one edge into the value band and one out of it. The reading
-			// Namespace is written BELOW the one it reads on purpose: a Property's
-			// value is enriched where the `namespace` stands, so it can only name a
-			// Namespace already declared, which is why no cycle among them can be
-			// written in a source at all.
+			// `Constants.DOUBLE` reads `Other.BASE` and calls `Other.doubled`, one edge
+			// into the value band and one out of it. `Other` stands first, since a
+			// Property may name only a Namespace declared before it.
 			const constants = `declarations {
 	namespace Other for Integer {
 		§§ The base value.
@@ -3800,9 +3520,8 @@ export {
 	}
 }`
 
-			// A read of an Essence-implemented member is a bare `$es_…`
-			// Identifier by the time the seed sees it, whether it is a Property's
-			// value or a Method passed as one.
+			// The seed sees an Essence member as a bare `$es_` Identifier, whether it
+			// is a Property's value or a Method passed as one.
 			function referenceOf(name: string): estree.ExpressionStatement {
 				return {
 					type: "ExpressionStatement",
@@ -3834,11 +3553,8 @@ export {
 				])
 			})
 
-			// The fixed point runs over the Properties on the same footing as
-			// the Methods: the Program names one Property, whose value reaches the
-			// other and the Method it calls. The KIND comes back with each, because
-			// nothing about the name or the declaration tells a Method's const from
-			// a Property's.
+			// The fixed point covers Properties as it covers Methods. The kind comes
+			// back with each, since neither name nor declaration tells the two apart.
 			it("emits the value as a const of its own, and reaches what it reads", () => {
 				let reachable = reachableEssenceMethods(preludeOf(constants), [
 					referenceOf("$es_Constants_DOUBLE"),
@@ -3877,12 +3593,8 @@ export {
 				expect([...reachable.keys()]).toEqual(["$es_Other_doubled"])
 			})
 
-			// Both bands in one list. The Map is in DISCOVERY order —
-			// `DOUBLE`, then the members its value reaches — so this is exactly
-			// what the partition and the topological sort are for: every Function
-			// first, and `BASE` above the `DOUBLE` that reads it. Emitted in
-			// discovery order the value band would read `$es_Other_BASE` before its
-			// const existed.
+			// The Map is in discovery order. Ordering puts every Function first, then
+			// `BASE` before the `DOUBLE` that reads it.
 			it("emits the Functions first, then each Property below the one it reads", () => {
 				let ordered = orderEssenceMembers(
 					reachableEssenceMethods(preludeOf(constants), [
@@ -3897,14 +3609,9 @@ export {
 				])
 			})
 
-			// The edge that is only visible through a Method's body, and the
-			// one an earlier version of this band dropped: `Constants.DOUBLE` reads
-			// no Property at all, it CALLS `Reader.readsBase` — and that call runs
-			// where the const stands, so `Other.BASE` is read there and has to be
-			// bound first. Emitted in discovery order, or ordered on
-			// Property-to-Property edges alone, `$es_Constants_DOUBLE` comes out
-			// above the `$es_Other_BASE` its initialiser reads: a `ReferenceError`
-			// at import out of a Program that compiled green.
+			// `Constants.DOUBLE` reads no Property but calls `Reader.readsBase`, which
+			// reads `Other.BASE` where the const stands. Ordered on Property edges
+			// alone, `DOUBLE` would read `BASE` before it exists.
 			it("orders a Property below what the Method it calls reads", () => {
 				const throughAMethod = `declarations {
 	namespace Other for Integer {
@@ -3942,12 +3649,9 @@ export {
 				])
 			})
 
-			// The edge inside ONE Namespace, which is the shape a Namespace
-			// naming itself made writable — `static Tau = Number.Pi` is the
-			// spelling the numeric tower's constants want. It is an ordinary edge
-			// of the band, and it is the only direction there is: a Property
-			// reading one written BELOW it is refused by the Validator, so the
-			// consts of one Namespace reach the band in an order that already runs.
+			// An edge inside one Namespace is an ordinary edge of the band. The
+			// Validator refuses a Property that reads one written after it.
+			// See "Use before declaration" in packages/compiler/src/validator/DEVELOPMENT.md.
 			it("orders a Property below the one it reads in its own Namespace", () => {
 				const ownNamespace = `declarations {
 	namespace Constants for Integer {
@@ -3973,18 +3677,9 @@ export {
 				])
 			})
 
-			// The shapes the band can not survive, handed in directly because
-			// none of them can be written in a source: a Property's value only
-			// names Namespaces above it — or its own, and there only a Property
-			// written above it — so every edge points backwards. They are
-			// refused rather than emitted in an order that happens to run —
-			// whichever const comes first reads one that does not exist yet, which
-			// is a `ReferenceError` at import out of a Program that compiled green.
-			//
-			// The edges are the EVALUATED ones, since those are what the
-			// ordering follows, and a name listed in `functions` is a
-			// Function-valued member — which is how a route from a Property through
-			// a Method and back is written here.
+			// A source can not write a cycle among Properties, so the band is handed
+			// in directly. The edges are the evaluated ones, and a name listed in
+			// `functions` is a Function-valued member.
 			function band(
 				edges: Record<string, Array<string>>,
 				functions: Array<string> = [],
@@ -4014,11 +3709,8 @@ export {
 				)
 			}
 
-			// The seam between the two bands, asked for directly —
-			// the pooled constants are emitted BETWEEN them, so which
-			// declaration is in which band decides whether a Program's
-			// constants can be read where they are needed. `orderEssenceMembers`
-			// above is the same answer with the seam closed up.
+			// The pooled constants are emitted between the two bands, so which band
+			// a declaration is in decides where a Program's constants can be read.
 			it("keeps the Function-valued members apart from the Properties", () => {
 				let bands = essenceMemberBands(
 					band(
@@ -4057,10 +3749,9 @@ export {
 				).toThrow("$es_A_ONE -> $es_A_ONE")
 			})
 
-			// The edge a Method HIDES. `A` calls a Method that reads `B`, and
-			// the call runs inside `A`'s own initialiser, so `B` is read before `A`
-			// is bound and its const has to stand above `A`'s — the Method's own
-			// const is in the band above and constrains nothing.
+			// `A` calls a Method that reads `B` inside `A`'s own initialiser, so `B`
+			// comes first. The Method's const is in the Function band and constrains
+			// nothing.
 			it("orders a Property below the Properties the Method it calls reads", () => {
 				let ordered = orderEssenceMembers(
 					band(
@@ -4080,11 +3771,9 @@ export {
 				])
 			})
 
-			// The same route closing on itself — a temporal dead zone no
-			// order can fix, and the shape the band was blind to while it followed
-			// Property-to-Property edges alone. The refusal names the Methods it
-			// went through, because the two Properties on their own read nothing of
-			// each other.
+			// The same route closing on itself is a cycle no order can fix. The
+			// refusal names the Methods on the route, since the Properties read
+			// nothing of each other directly.
 			it("refuses a Property a Method it calls reads back", () => {
 				expect(() =>
 					orderEssenceMembers(
@@ -4102,9 +3791,8 @@ export {
 				)
 			})
 
-			// Two Methods calling each other is recursion, not a cycle of
-			// this band's kind — the walk over the Function nodes is plain
-			// reachability, so it answers what they read between them and returns.
+			// Two Methods calling each other is recursion, not a cycle. The walk over
+			// the Functions is plain reachability, so it ends.
 			it("orders a Property against what mutually recursive Methods read", () => {
 				let ordered = orderEssenceMembers(
 					band(
@@ -4126,9 +3814,9 @@ export {
 				])
 			})
 
-			// A Property and a Method of one Namespace are emitted under the
-			// one const name, and nothing upstream refuses the overlap — the two
-			// are declared in records of their own — so the prelude does.
+			// A Property and a Method of one Namespace share a const name, and
+			// nothing upstream refuses the pair, so the prelude does.
+			// See "Const names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 			it("refuses a Property spelled like a Method of its own Namespace", () => {
 				expect(() =>
 					preludeOf(`declarations {
@@ -4149,11 +3837,9 @@ export {
 				)
 			})
 
-			// The Method is NATIVE here, so it reaches no typed Node — the
-			// clash is invisible to the prelude's own tables and has to be read
-			// off the loader's `nativeBindings`. Emitted, this is the worse half
-			// of the two: the Method's call sites find no Essence Method of that
-			// name, fall through to the static Property, and call its value.
+			// A native Method reaches no typed Node, so the clash is read off the
+			// loader's `nativeBindings`. Emitted, a call of the Method would call the
+			// Property's value.
 			it("refuses a Property spelled like a native Method of its own Namespace", () => {
 				expect(() =>
 					preludeOf(`declarations {
@@ -4172,10 +3858,8 @@ export {
 				)
 			})
 
-			// And the mirror — a value-LESS static Property is native, so it
-			// reaches no typed Node either, while the Method beside it does. A read
-			// of `Clash.PI` would be routed to the Method's const and hand back the
-			// Function itself.
+			// A static Property with no value is native too. A read of `Clash.PI`
+			// would get the Method's const, the Function itself.
 			it("refuses a native Property spelled like a Method of its own Namespace", () => {
 				expect(() =>
 					preludeOf(`declarations {
@@ -4196,10 +3880,8 @@ export {
 				)
 			})
 
-			// The clash is looked for inside ONE Namespace — the const name
-			// carries the Namespace, so a Property and a Method of the same name in
-			// two different Namespaces are two different consts and collide with
-			// nothing.
+			// The const name carries the Namespace, so one name in two Namespaces is
+			// two consts and no clash.
 			it("allows a Property spelled like another Namespace's Method", () => {
 				let prelude = preludeOf(`declarations {
 	namespace Holder for Boolean {
@@ -4223,24 +3905,13 @@ export {
 				])
 			})
 
-			// Everything above hands the prelude in and reads the answer
-			// back. This block reaches the same machinery the way a PROGRAM
-			// reaches it — the whole standard library with one more file on the
-			// end, installed as THE library for the length of the block, so a
-			// user Program can be compiled and run against a Property that has a
-			// value. No library on disk gives one a value yet (`Number.Pi` is the
-			// primitive every other Transcendental is written from, and nothing
-			// in Essence produces one), so a source of its own is the only way to
-			// compile against the band at all.
+			// This block runs a user Program against a Property with a value. No
+			// library file gives one a value, so the whole standard library plus one
+			// file is installed as the library for the block.
 			describe("read from a user Program", () => {
-				// The three shapes the band has to get right in one file:
-				// a Property whose value CALLS a Method, a Property that reads
-				// another one of its OWN Namespace, and a Namespace declared
-				// below every one it names.
-				// Appended to the REAL sources, so `./Integer.es` resolves
-				// to the real one — a standard library specifier is matched by
-				// file name against the set being loaded, which is what lets a
-				// library assembled in a test name a file it did not write.
+				// `DOUBLE` calls a Method and reads a Property of its own Namespace. It is
+				// appended to the real sources, so `./Integer.es` resolves to the real
+				// file: a library specifier is matched by file name.
 				const constants = `import { from "./Integer.es" { Integer } }
 
 declarations {
@@ -4266,12 +3937,9 @@ declarations {
 				let replacedStdlib: Stdlib | null = null
 
 				beforeAll(() => {
-					// The prelude is extended along with the sources.
-					// Exporting `Constants` from its own file makes it reachable
-					// by the standard library; it takes a line in `Prelude.es`
-					// to make it a name a user Program can write, which is the
-					// whole of the difference between an internal helper and a
-					// builtin.
+					// Exporting `Constants` from its own file makes it reachable by the
+					// standard library. A line in `Prelude.es` makes it a name a user Program
+					// can write.
 					let sources = readStdlibFiles().map(
 						({ filePath, sourceText }) =>
 							parseStdlibSource(
@@ -4290,10 +3958,8 @@ declarations {
 					replacedStdlib = useStdlib(loadStdlibFrom(sources))
 				})
 
-				// Put back, rather than dropped: every consumer of the
-				// standard library reads the one process-wide object, so a test
-				// that left its own in place would compile every file after it
-				// against a library the repository does not have.
+				// Every consumer reads the one process-wide standard library, so the
+				// real one is put back.
 				afterAll(() => {
 					useStdlib(replacedStdlib)
 				})
@@ -4315,21 +3981,16 @@ declarations {
 	Terminal.inspect(Constants.DOUBLE::toString())
 }`)
 
-					// The read is the bare const, not the
-					// `Constants.DOUBLE` member read a native Property emits —
-					// and no import for the Namespace is emitted at all, since
-					// nothing about it is native.
+					// The read is the bare const, not a native Property's member read.
+					// Nothing about the Namespace is native, so it gets no import.
 					expect(code).toContain(
 						"Terminal.inspect(Integer.toString__overload$1($es_Constants_DOUBLE));",
 					)
 					expect(code).not.toContain("Constants.DOUBLE")
 					expect(code).not.toContain('import * as Constants from "')
 
-					// The order the initialisers need: the Method's const
-					// stands above the whole value band, `BASE` above the
-					// `DOUBLE` whose value reads it. Emitted in discovery order
-					// this is a `ReferenceError` at import out of a Program that
-					// compiled green.
+					// The Method's const comes before the value band, and `BASE` before the
+					// `DOUBLE` that reads it.
 					expect(
 						code.indexOf("const $es_Constants_doubled ="),
 					).toBeLessThan(code.indexOf("const $es_Constants_BASE ="))
@@ -4338,9 +3999,8 @@ declarations {
 					).toBeLessThan(code.indexOf("const $es_Constants_DOUBLE ="))
 				})
 
-				// And the proof that the order is not just written down but
-				// runs: the values are computed at import, so a band in the wrong
-				// order throws before the first line of the Program.
+				// The values are computed at import, so a band in the wrong order throws
+				// before the Program's first line.
 				it("runs the value band", async () => {
 					expect(
 						await run(`implementation {
@@ -4352,18 +4012,12 @@ declarations {
 			})
 		})
 
-		// A native Method that declares a default. The native calling
-		// convention has nowhere to put one — a native takes exactly the
-		// Parameters its declaration does, and a JavaScript default parameter
-		// would stop the `Function.length` `builtins.spec.ts` checks — so the
-		// Compiler synthesizes the frame instead, as a const beside the prelude,
-		// and the runtime never learns that defaults exist. `String.slice` is
-		// the library's own case: `slice(from start: Integer = 0, to end:
-		// Integer = @::length())`.
+		// A native takes exactly the Parameters it declares, which
+		// `builtins.spec.ts` checks through each export's `length`. So a shim, a
+		// const beside the prelude, fills its defaults in. `String.slice` is one.
 		describe("a native Method that declares a default", () => {
-			// The whole of what the shim buys, and the whole of what it
-			// costs: a call that writes every Argument is byte for byte the
-			// direct runtime read it always was, and names no const at all.
+			// A call that writes every Argument is the direct runtime read and names
+			// no const.
 			it("emits a full call as the plain native read", () => {
 				let code = generate(`implementation {
 	Terminal.inspect("abcd"::slice(from 1, to 3))
@@ -4387,11 +4041,9 @@ declarations {
 				expect(code).toContain("$es_String_slice($pool_0, $pool_1)")
 			})
 
-			// `@` is `_self`, which is Parameter 0 — so a default reading
-			// the receiver reads a BINDING, and the receiver Expression is
-			// evaluated once however many defaults name it. That property is
-			// exactly what filling a default in at the call site could not
-			// offer, and it is why the shim exists rather than a substitution.
+			// `@` is `_self`, the shim's first Parameter, so the receiver is
+			// evaluated once however many defaults read it. Filling defaults in at
+			// the call site could not promise that.
 			it("reads the receiver as a binding in the shim's own frame", () => {
 				expect(
 					generate(`implementation {
@@ -4412,12 +4064,8 @@ declarations {
 			})
 		})
 
-		// And the other kind of default a native can declare: a RECORD,
-		// which is MERGED into the Argument rather than standing in for one the
-		// call left out. That is a different rule from the one above, and the
-		// difference is what these tests hold: a Record default is needed by a
-		// call that wrote its Argument, because the Argument is a Record literal
-		// that may leave members out. `Http.send` is the library's own case.
+		// A native's Record default is merged into the Argument the call wrote,
+		// which may leave members out. `Http.send` is the library's own case.
 		describe("a native Method that declares a Record default", () => {
 			it("fronts a call that wrote its Argument with the shim all the same", () => {
 				let code = generate(`implementation {
@@ -4431,10 +4079,8 @@ declarations {
 				expect(code).not.toContain("Http.send({")
 			})
 
-			// Every member of the default, merged onto what the call
-			// wrote — `??`, so a member the call DID write survives. The
-			// Argument's own `url` is carried through unchanged, which is what
-			// says the merge is a merge and not a replacement.
+			// Each default member is merged with `??`, so a member the call wrote
+			// survives, and the Argument's own `url` comes through unchanged.
 			it("merges every member the default fills in", () => {
 				let code = generate(`implementation {
 	constant answered = complete Http.send({ url = "http://x.test/" })
@@ -4454,12 +4100,9 @@ declarations {
 				)
 			})
 
-			// The edge the reachability walk has to draw for the two
-			// above to be emittable at all. `Http.get` is an Essence body that
-			// writes `Http.send({ url, method = #Get, headers })` and omits no
-			// Argument, so the const it names is pulled in by a full-arity call
-			// or by nothing, and `checkEssenceMethodsAreDeclared` turns a missing
-			// one into a thrown Compiler bug rather than a broken Program.
+			// `Http.get` calls `Http.send({ url, method = #Get, headers })` and omits
+			// no Argument, so reachability has to draw the edge to the merging shim.
+			// See "Prelude reachability" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 			it("pulls the shim in from an Essence body that calls it at full arity", () => {
 				let code = generate(`implementation {
 	constant answered = complete Http.get("http://x.test/")
@@ -4491,14 +4134,10 @@ declarations {
 		})
 	})
 
-	// A Case's tag is its Choice's identity and its name, so a Module's
-	// Cases are tagged with the Module's path — which is what keeps two files'
-	// same-named Choices apart at runtime as well as in the Type checker, since
-	// `isValueOfType` compares nothing but that tag. Rendering the path
-	// entry-relative is the bundler's business; what is asserted here is that
-	// qualifying a Program changes the tags and NOTHING else about what is
-	// emitted, and that the tags still agree with themselves when the Program
-	// runs.
+	// A Case's tag carries its Module's path, which keeps two files'
+	// same-named Choices apart at run time. Qualifying a Program changes the
+	// tags and nothing else, and the tags still agree when it runs.
+	// See "Case tags and identities" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("Module-qualified Case tags", () => {
 		const MODULE_PATH = "/modules/Colour.es"
 
@@ -4543,12 +4182,9 @@ declarations {
 		})
 	})
 
-	// A doorway is an ordinary Function that takes a bare value, asks a
-	// refinement's question of it, and hands the checked value onwards under the
-	// refined name. It is the whole point of flow narrowing, and it needs no code
-	// generation at all: a refinement erases to its base, so what runs here is the
-	// Program someone would have written without one — which is exactly what these
-	// two assertions together say.
+	// A doorway takes a bare value, asks a refinement's question of it, and
+	// hands it on under the refined name. A refinement erases to its base, so
+	// what runs is the Program written without one.
 	describe("a hand-written doorway", () => {
 		const SOURCE = `implementation {
 	type NonZero = Integer where @::isNot(0)
@@ -4572,9 +4208,8 @@ declarations {
 	Terminal.inspect(doubledOrZero(0))
 }`
 
-		// The same Program with the check taken out, which is the only thing
-		// that makes the run above mean anything — without it the test would pass
-		// just as well with no narrowing and no refinement at all.
+		// The same Program without the check. Its refusal shows the narrowing is
+		// what admits the call.
 		const UNCHECKED = `implementation {
 	type NonZero = Integer where @::isNot(0)
 
@@ -4601,10 +4236,8 @@ declarations {
 		})
 	})
 
-	// A value written DOWN is its own evidence — the predicate is decided
-	// while compiling, so a literal reaches a total operation with no branch in
-	// front of it and no `Optional` coming back. The emitted Program is the plain
-	// one: `3` is `3`, and the proof left no trace to run.
+	// A written value is its own evidence, decided while compiling. A literal
+	// reaches a total operation with no branch, and the proof leaves no trace.
 	describe("an admitted literal", () => {
 		const SOURCE = `implementation {
 	type NonZero = Integer where @::isNot(0)
@@ -4631,9 +4264,8 @@ declarations {
 	Terminal.inspect(shouted("essence"))
 }`
 
-		// The same Program with the values the predicates refuse, which is
-		// what makes the run above mean anything: admission is a decision about
-		// the value, not a hole that lets every literal through.
+		// The same Program with a value the predicate refuses. Admission decides
+		// about the value rather than letting every literal through.
 		const REFUSED = `implementation {
 	type NonZero = Integer where @::isNot(0)
 
@@ -4655,11 +4287,9 @@ declarations {
 		})
 	})
 
-	// A Match Handler's Guard is the doorway a Handler carries with it: the
-	// Matcher's own check is ANDed in front of it, so what it proves holds over
-	// every Statement of the body — of the value the Handler NAMED as much as of
-	// `@`. The emitted Program is a Case tag test and an `if`, which is what
-	// someone would have written with no refinement anywhere.
+	// A Guard runs after the Matcher's own check, so what it proves holds over
+	// the whole body, for the named value as for `@`. The emitted Program is a
+	// Case tag test and an `if`.
 	describe("a Guard over the value a Handler named", () => {
 		const SOURCE = `implementation {
 	type Shout = String where @::hasCharacters()
@@ -4689,9 +4319,8 @@ declarations {
 	Terminal.inspect(shoutedOr(#Empty))
 }`
 
-		// The same Program with the Guard taken out, which is the only thing
-		// that makes the run above mean anything — without it the test would pass
-		// just as well with no narrowing and no refinement at all.
+		// The same Program without the Guard. Its refusal shows the narrowing is
+		// what admits the call.
 		const UNGUARDED = `implementation {
 	type Shout = String where @::hasCharacters()
 
@@ -4729,18 +4358,10 @@ declarations {
 		})
 	})
 
-	// A Guard names a Handler's binding through the `@.member` it stands
-	// for, because the Constant the body reads it through does not exist yet
-	// where a Guard runs. A `define` in that Guard NARROWS the binding, and a
-	// narrowing is a shadow declaration of the very same name — so the arm below
-	// it has to go on reading `@.member` and not the bare name, which is a name
-	// JavaScript either has never heard of or, worse, has heard of from
-	// somewhere else entirely.
-	//
-	// Every source here runs the value through `divide(by:)`, whose total
-	// Overload takes a `NonZeroInteger` — so the narrowing is what makes the
-	// Program compile at all, and the answer it prints is what says which value
-	// it divided.
+	// A Guard reads a Handler's binding as `@.member`, since the body's
+	// Constant does not exist yet. A `define` there narrows the binding, and
+	// its arms must still read `@.member`. Each source divides by the narrowed
+	// value through the total `divide(by:)`, so the output names the divisor.
 	describe("a define inside a Match Guard", () => {
 		it("reads the Handler's binding through the '@' its Guard lent it", async () => {
 			expect(
@@ -4773,10 +4394,8 @@ declarations {
 			).toEqual(['"large"', '"small"', '"nothing"'])
 		})
 
-		// The silent half of the same mistake. Emitted as a bare name, the
-		// arm read the Parameter the binding shadows — a Constant that exists,
-		// holds a different value, and divides without complaining. 100 over the
-		// outer 1 is large where 100 over the bound 50 is not.
+		// A bare name in the arm would read the shadowed outer Parameter.
+		// Dividing 100 by the outer 1 is large, and by the bound 50 it is not.
 		it("does not read an outer name the binding shadows", async () => {
 			expect(
 				await run(`
@@ -4802,10 +4421,9 @@ declarations {
 			).toEqual(['"small"'])
 		})
 
-		// And the outer name need not even be a Number. The shadow types
-		// what it declares by what the Guard proved of `@.n`, so a String
-		// Constant of that name compiled clean and reached the stdlib as a
-		// `NonZeroInteger` — where it threw out of `BigInt`.
+		// The shadow takes its Type from what the Guard proved of `@.n`. An
+		// outer String of that name would reach the standard library as a
+		// `NonZeroInteger`.
 		it("does not read an outer name of another Type", async () => {
 			expect(
 				await run(`
@@ -4861,9 +4479,8 @@ declarations {
 			).toEqual(['"large"', '"small"'])
 		})
 
-		// The counterpart that was always right, pinned so it stays that
-		// way: in the BODY the binding is a Constant the Program can name, and a
-		// `define` there narrows it under that name.
+		// In the body the binding is a Constant, and a `define` there narrows it
+		// under its own name.
 		it("still narrows the same binding in the Handler's body", async () => {
 			expect(
 				await run(`
@@ -4891,13 +4508,9 @@ declarations {
 		})
 	})
 
-	// The doorway nobody has to write. A Match on a bare Integer takes the
-	// VALUE apart, and its Cases are evidence in both directions: the Case
-	// answering for the rest is reached only by a value none of the Cases above it
-	// named, and a Case that NAMES a value proves that. So both total operations
-	// below are reached with no `if`, no doorway Function and nothing at all to run
-	// — the evidence erases, and what is emitted is the value comparison someone
-	// would have written anyway.
+	// A Match on an Integer's values is evidence both ways. A Case that names
+	// a value proves it, and the last Case proves the value is none of those
+	// named. What is emitted is a plain value comparison.
 	describe("a Match on values", () => {
 		const SOURCE = `implementation {
 	type NonZero = Integer where @::isNot(0)
@@ -4925,10 +4538,7 @@ declarations {
 	Terminal.inspect(namedOrDoubled(0))
 }`
 
-		// The same Match with a different value named, which is what makes the
-		// run above mean anything: what the last Case knows is decided by the Cases
-		// that were actually written, and a Match naming `1` proves nothing about
-		// zero.
+		// The same Match naming `1`, which proves nothing about zero.
 		const UNCHECKED = `implementation {
 	type NonZero = Integer where @::isNot(0)
 
@@ -4958,11 +4568,8 @@ declarations {
 		})
 	})
 
-	// The same doorway over a GENERIC refinement, which is the one shape
-	// where the Type the branch establishes was written nowhere: `Filled<String>`
-	// is worked out from the receiver standing in front of the question. What runs
-	// is still the Program someone would have written without a refinement
-	// anywhere — the evidence erases, and a List is a List.
+	// Over a generic refinement, the branch works out `Filled<String>` from
+	// the receiver. The evidence erases, so a List is a List.
 	describe("a doorway over a generic refinement", () => {
 		const SOURCE = `implementation {
 	type Filled<Item> = List<Item> where @::hasItems()
@@ -4992,9 +4599,8 @@ declarations {
 	Terminal.inspect(firstOf(proven))
 }`
 
-		// The same Program with the check taken out, which is the only thing
-		// that makes the run above mean anything — without it the test would pass
-		// just as well with no narrowing and no refinement at all.
+		// The same Program without the check. Its refusal shows the narrowing is
+		// what admits the call.
 		const UNCHECKED = `implementation {
 	type Filled<Item> = List<Item> where @::hasItems()
 
@@ -5009,10 +4615,8 @@ declarations {
 	Terminal.inspect(firstOrEmpty(["a", "b"]))
 }`
 
-		// And the same Program asking about a List of the wrong items, which
-		// is what says that the Type Arguments are part of the evidence: the branch
-		// proves `hasItems` of a `List<Integer>` and proves nothing whatever about a
-		// `Filled<String>`.
+		// The branch proves `hasItems` of a `List<Integer>`, which says nothing
+		// about a `Filled<String>`. The Type Arguments are part of the evidence.
 		const WRONG_ITEMS = `implementation {
 	type Filled<Item> = List<Item> where @::hasItems()
 
@@ -5048,12 +4652,9 @@ declarations {
 		})
 	})
 
-	// The doorway an `else` opens, which is the one this campaign added.
-	// No Method is declared to be another's contrary anywhere: `isZero` is
-	// written `<- @::is(0)` and `isNegative` `<- @::isLessThan(0)`, so the leaf
-	// each `else` proves is that call asked the other way round — and the two
-	// Types the standard library declares by exactly those leaves are what the
-	// branches reach. What runs is a Program with no refinement in it.
+	// An `else` proves the leaf of its condition asked the other way round.
+	// `isZero` and `isNegative` call `is` and `isLessThan`, and the standard
+	// library declares Types by exactly those leaves.
 	describe("a doorway an else branch opens", () => {
 		const SOURCE = `implementation {
 	§ Total because the exponent is proven whole, and because the divisor is
@@ -5090,8 +4691,7 @@ declarations {
 	Terminal.inspect(safelyShared(9, among 0))
 }`
 
-		// The same Program with the branches taken out, which is the only
-		// thing that makes the run above mean anything.
+		// The same Program without the branches, which is refused.
 		const UNCHECKED = `implementation {
 	function raised(_ base: Integer, by exponent: NonNegativeInteger) -> Integer {
 		<- base::raise(to exponent)
@@ -5115,12 +4715,8 @@ declarations {
 		})
 	})
 
-	// The same total operation over a Parameter whose Type Argument the CALL
-	// works out, which is the one position where nothing has spelled the refinement
-	// at all: `NonEmptyList<Item>` is a Type only once something says what `Item` is,
-	// and the written List is the only thing that ever could. What runs is again the
-	// Program with no refinement in it — `firstItem` answers the item itself rather
-	// than an Optional, and that is the whole difference.
+	// The call works out `Item` in `NonEmptyList<Item>` from the written List.
+	// `firstItem` then answers the item itself rather than an Optional.
 	describe("a refined Parameter whose Type Argument is inferred", () => {
 		const SOURCE = `implementation {
 	§ Total for the same reason as ever, and generic on top: there is no first item
@@ -5135,8 +4731,7 @@ declarations {
 	Terminal.inspect(firstOf([1, 2]))
 }`
 
-		// The empty List is what says the evidence is still being read: it
-		// decides no 'Item' AND answers the predicate with a no, either of which is
+		// The empty List decides no `Item` and fails the predicate, and either is
 		// enough to refuse it.
 		const EMPTY = `implementation {
 	function firstOf<infer Item>(_ items: NonEmptyList<Item>) -> Item {
@@ -5157,16 +4752,10 @@ declarations {
 		})
 	})
 
-	// The one operation that KEEPS the evidence — a product of two proven
-	// Integers is proven too — and the one whose Namespace the Optimiser writes
-	// out. `lower-scalar-operations` lowers `NonZeroInteger.multiply` exactly as
-	// it lowers `Integer.multiply`: the refinement erases before the first pass
-	// runs, so what the call had in its hands was two Integers holding bigints,
-	// and the runtime Method it would have reached is Integer's own product
-	// re-exported. What runs has to be the same product either way, which is what
-	// the two runs below say — bigint arithmetic beyond what a double can hold,
-	// and a sign, so that a lowering to the wrong operator could not read as
-	// right.
+	// A product of two proven Integers is proven too. The refinement erases
+	// first, so `lower-scalar-operations` lowers `NonZeroInteger.multiply` as
+	// it lowers `Integer.multiply`. The runs use bigint values and a sign, so
+	// a wrong operator shows.
 	describe("the product of two proven Integers", () => {
 		const SOURCE = `implementation {
 	§ Both Parameters are proven, so this reaches the Namespace declared for
@@ -5196,9 +4785,8 @@ declarations {
 			])
 		})
 
-		// The same Program with the Optimiser off answers the same thing,
-		// which is the whole contract a pass is held to — there it is the runtime
-		// Method that multiplies, and here it is JavaScript's own operator.
+		// With the Optimiser off the runtime Method multiplies instead of the
+		// JavaScript operator, and the answer is the same.
 		it("answers the same with the Optimiser off", async () => {
 			let generated = generate(SOURCE, undefined, {
 				enabled: false,
