@@ -5,34 +5,23 @@ import { quotedText } from "@essence-lang/runtime/String"
 
 import { Lexer } from "../lexer/index"
 
-// THE PROMISE `quotedText` MAKES, held to by the two halves that make it:
-// the runtime's printer and this Compiler's Lexer, standing beside each other in
-// one process. Whatever `quote()`, `Terminal.inspect` or any structural
-// rendering prints, pasted into a source file as it stands, is a String Literal
-// that reads back to the very value it came from.
-//
-// It was not true before `\u{…}` existed. `"a\{b\}"::quote()` printed `"a{b}"`,
-// whose `{` opens an interpolation hole when it is read back, and every control
-// character was already printed as `\u{1B}` — an escape the Lexer then refused
-// twice over. Both halves of that are what this holds.
+// The runtime's `quotedText` and this Compiler's Lexer, side by side. Whatever
+// the printer writes is a String Literal that reads back to the value it came
+// from. See "Quoting a String" in packages/runtime/DEVELOPMENT.md.
 //
 // A property test rather than a table, because the interesting values are
-// the COMBINATIONS: a backslash in front of a brace, a quote in front of a
-// control character, half of a surrogate pair beside a whole one. A table is
-// the list of cases somebody thought of, and the two bugs above were both in
-// the part nobody did.
+// combinations. Examples are a backslash before a brace, or a quote before a
+// control character.
 
-// The alphabet the cases are drawn from — every character that has ever
-// been a reason to escape one, and enough ordinary text around them that a case
-// is a String rather than a pile of controls. Drawn as code points and joined,
-// so an astral character arrives whole.
+// Every character that is a reason to escape, with enough ordinary text around
+// them. Drawn as code points and joined, so an astral character arrives whole.
 const ALPHABET: Array<string> = [
-	// The five with a spelling of their own, and the two that open and close a
-	// hole.
+	// The characters with a short escape, including the braces of a hole.
 	...'\\"\n\r\t{}',
-	// Ordinary text, which is most of what a real value is made of.
+	// Ordinary text.
 	..."abcXYZ 019.,-_/:é日",
-	// Every C0 control and DEL, C1, and the three the standard hides.
+	// Every C0 control, DEL, the ends of C1, the line and paragraph separators
+	// and the byte order mark.
 	...Array.from({ length: 0x20 }, (_, code) => String.fromCodePoint(code)),
 	"\u007F",
 	"\u0080",
@@ -40,8 +29,8 @@ const ALPHABET: Array<string> = [
 	"\u2028",
 	"\u2029",
 	"\uFEFF",
-	// The bidi controls — the ones that make a printed line read as something
-	// other than what it holds.
+	// The bidi controls, which make a printed line read as something other than
+	// what it holds.
 	"\u061C",
 	"\u200E",
 	"\u200F",
@@ -54,8 +43,7 @@ const ALPHABET: Array<string> = [
 	"\u2067",
 	"\u2068",
 	"\u2069",
-	// The invisible ones that are deliberately left alone, so a case that draws
-	// one proves they still read back.
+	// Invisible characters the printer leaves alone, which must still read back.
 	"\u200B",
 	"\u200C",
 	"\u200D",
@@ -68,22 +56,19 @@ const ALPHABET: Array<string> = [
 	"\u{1D11E}",
 	"\u0301",
 	"\u{1F469}\u200D\u{1F4BB}",
-	// A carriage return and line feed written together, which is one line
-	// ending and two characters.
+	// One line ending of two characters.
 	"\r\n",
-	// The replacement character itself, so it is told apart from what a lone
-	// surrogate is printed as.
+	// The replacement character itself, told apart from what a lone surrogate
+	// is printed as.
 	"\uFFFD",
-	// Text that LOOKS like an escape without being one.
+	// Text that looks like an escape without being one.
 	"\\u{1B}",
 	"\\{",
 	"u{1B}",
 ]
 
-// The Lexer reading one String Literal, which is the half of the promise
-// this file can not write itself. A refusal or a second Token is a failure of
-// the printer, not of the case: what was handed in was the printer's own
-// output, and the printer's claim is that this reads.
+// The Lexer reads one String Literal. A refusal or a second Token is a failure
+// of the printer, since the input is the printer's own output.
 function readBack(literal: string): string {
 	let lexer = new Lexer()
 
@@ -107,9 +92,8 @@ function readBack(literal: string): string {
 	return token?.value ?? ""
 }
 
-// The runtime's own seeded source, so a failing run names a seed that
-// draws the same cases again — and so the generator is one this repository
-// already trusts rather than a second one written here.
+// The runtime's own seeded source, so a failing run names a seed that draws
+// the same cases again.
 function casesFrom(seed: number, count: number): Array<string> {
 	let source = createRandomness(seed)
 	let cases: Array<string> = []
@@ -128,16 +112,14 @@ function casesFrom(seed: number, count: number): Array<string> {
 	return cases
 }
 
-// FIXED seeds, and several of them. One seed is one sequence of cases and
-// would pass forever once it did; several spread over the alphabet without
-// making the suite's result depend on the day it ran.
+// Several fixed seeds spread over the alphabet without making the result
+// depend on the day it ran.
 const SEEDS = [0x5eed_1, 0x5eed_2, 0x5eed_3, 0xc0ffee, 0x1f600]
 
 describe("The printer reads back", () => {
 	it("draws cases holding every reason to escape one", () => {
-		// A guard on the generator. A draw that stopped reaching the
-		// interesting half of the alphabet would leave every property below
-		// passing over `abc`.
+		// A guard on the generator: a draw that missed the interesting half of
+		// the alphabet would pass every property over plain text.
 		let drawn = SEEDS.flatMap((seed) => casesFrom(seed, 200)).join("")
 
 		for (let character of [
@@ -164,10 +146,8 @@ describe("The printer reads back", () => {
 		})
 	}
 
-	// The cases a generator reaches only by luck, written down so they are
-	// reached every run. Each of these was a real reading: a bare brace opening
-	// a hole, `\` and `{` written flush so the printed `\\` and `\{` must not
-	// run together into `\\{`, and an escape-looking run that is text.
+	// Cases a generator reaches only by luck. A bare brace opens a hole. A
+	// printed `\\` and `\{` must not run together. An escape-looking run is text.
 	it("round-trips the readings a draw only reaches by luck", () => {
 		let written = [
 			"",
@@ -194,20 +174,16 @@ describe("The printer reads back", () => {
 		}
 	})
 
-	// What the printed text may NOT hold, read off the output rather than
-	// off the value. It is the round-trip said the other way round, and it
-	// catches the one failure a round-trip over a finite alphabet could miss:
-	// an escape spelled in a way the Lexer happens to accept as something else.
+	// What the printed text may not hold, read off the output. It catches an
+	// escape the Lexer happens to accept as something else.
 	it("prints no bare brace and no raw control character", () => {
 		for (let seed of SEEDS) {
 			for (let text of casesFrom(seed, 200)) {
 				let printed = quotedText(text)
 
-				// Stepping OVER each escape rather than looking behind
-				// each character: the braces of a `\u{2066}` are part of one,
-				// and a test that read them as bare would be a test of its own
-				// naivety. The step is the Lexer's own reading — two characters
-				// for the short escapes, and through the `}` for the long one.
+				// Step over each escape as the Lexer reads it, since the braces
+				// of a `\u{2066}` are not bare. A short escape is two characters,
+				// a long one runs through the `}`.
 				let index = 1
 
 				while (index < printed.length - 1) {
@@ -241,13 +217,9 @@ describe("The printer reads back", () => {
 	})
 })
 
-// The one value the promise is NOT made about, said out loud. A lone
-// surrogate is half of a character; no Literal spells one, `String.of(codePoint
-// 55296)` answers nothing, and segmenting never splits a pair — one can only
-// have crossed the embedding boundary from a JavaScript host. There is no
-// escape that reads back to it, because the Lexer refuses `\u{D800}` on
-// purpose, so it is printed as what encoding the text would turn it into
-// anyway.
+// The one value that does not read back. A lone surrogate can only arrive from
+// a JavaScript host, and the Lexer refuses `\u{D800}`. It is printed as the
+// replacement character, which encoding produces anyway.
 describe("A lone surrogate", () => {
 	it("is printed as the replacement character's escape", () => {
 		expect(quotedText("a\uD800b")).toBe('"a\\u{FFFD}b"')

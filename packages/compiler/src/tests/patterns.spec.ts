@@ -13,8 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The full pipeline minus bundling, mirroring choices.spec — a Pattern
-// is only implemented once every stage agrees on it.
+// The full pipeline minus bundling, since every stage has a part in a Pattern.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -97,8 +96,7 @@ describe("Patterns", () => {
 			).toEqual([`"y axis at 7"`])
 		})
 
-		// The value is written right there, so there is nothing for a name
-		// to say that the Matcher has not said already.
+		// The value is written in the Matcher, so no name is bound for it.
 		it("binds nothing for a member constrained by value", () => {
 			expect(
 				codesOf(`implementation {
@@ -128,8 +126,7 @@ describe("Patterns", () => {
 			).toEqual([`"diagonal at 3"`])
 		})
 
-		// `@` is the scrutinee narrowed to what the Matcher established,
-		// which is exactly what a whole-value binder would name a second time.
+		// `@` is already the scrutinee narrowed to what the Matcher established.
 		it("refuses a whole-value binder, naming '@'", () => {
 			let source = `implementation {
 				${input}
@@ -141,17 +138,14 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("redundant-pattern-binder")
-			// Both edits. Rewriting the body alone leaves the binder
-			// standing, which is what is refused.
+			// Both edits: rewriting the body alone leaves the refused binder.
 			expect(helpsOf(source)).toContain(
 				"Drop the 'as whole' and write '@' where 'whole' was meant.",
 			)
 		})
 
-		// Regression test — the same annotated-plus-nested-binder hole in
-		// plain Matcher position: the requirement vanished, the Match passed as
-		// exhaustive without a wildcard, and the arm ran for a value without
-		// the member it bound.
+		// A member with an annotation and a nested binder requires the nested
+		// members too, so the arm can decline and the Match is not exhaustive.
 		it("declines on an annotated member's nested requirements", async () => {
 			const wrapped = `type Click = { x: Integer, y: Integer }
 				type KeyPress = { key: String }
@@ -244,9 +238,8 @@ describe("Patterns", () => {
 			).toEqual(["10"])
 		})
 
-		// Regression test — the `as` binder was typed as only the members
-		// the Pattern named, so `box.height` was refused though the tag test
-		// proves the value is a #Rectangle, which declares it.
+		// The tag test proves the value is a `#Rectangle`, so the binder has
+		// every member it declares, not only those the Pattern names.
 		it("gives the 'as' binder every member the Case declares", async () => {
 			expect(
 				await run(`implementation {
@@ -284,9 +277,8 @@ describe("Patterns", () => {
 			).toEqual(["8"])
 		})
 
-		// Construction answers the same fork by trying the payload
-		// Record first, and the Matcher mirrors it, so a reader who knows how a
-		// value is built knows how it comes apart.
+		// Construction tries the payload Record first, and the Matcher mirrors
+		// it.
 		it("reads a one-member payload as the Record where that fits", async () => {
 			expect(
 				await run(`implementation {
@@ -301,9 +293,7 @@ describe("Patterns", () => {
 			).toEqual(["7"])
 		})
 
-		// …and falls back to the shorthand reading only where the Record
-		// one does not fit, which is what makes the nested spelling worth
-		// having at all.
+		// The shorthand reading applies only where the Record one does not fit.
 		it("falls back to the shorthand reading when the Record one does not fit", async () => {
 			expect(
 				await run(`implementation {
@@ -332,10 +322,9 @@ describe("Patterns", () => {
 			).toEqual(["8", "6"])
 		})
 
-		// The Rewriter keys a member comparison by the DOTTED spine that
-		// reaches it, which is what lets a nested member constrain by value.
-		// Both arms are asked: a constraint that is written and then ignored
-		// would take the FIRST arm for both values, which is what this once did.
+		// The Rewriter keys a member comparison by the dotted spine that reaches
+		// it. Both arms are asked, since an ignored constraint would take the
+		// first arm for both values.
 		it("constrains a nested member by value, and declines on it", async () => {
 			const drawn = `choice Drawn {
 					Framed { box: { width: Integer, height: Integer } },
@@ -414,9 +403,8 @@ describe("Patterns", () => {
 			).toEqual(['[ "a1", "b2" ]'])
 		})
 
-		// A `loop` callback's return Type is inferred from its body, and
-		// that pass declares the Parameters itself — a Pattern there has to
-		// reach it, or a perfectly well-typed body reports no return Type.
+		// Return Type inference declares a `loop` callback's Parameters itself,
+		// so a Pattern there must reach that pass too.
 		it("reaches a callback whose return Type is inferred from its body", async () => {
 			expect(
 				await run(`implementation {
@@ -450,8 +438,8 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("refutable-pattern")
-			// …and the refused member still BINDS, so the body reading it
-			// is not told a second time that the name does not exist.
+			// The refused member still binds, so the body reading it is not told
+			// the name does not exist.
 			expect(codesOf(source)).not.toContain("unknown-name")
 		})
 	})
@@ -470,9 +458,8 @@ describe("Patterns", () => {
 			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
 		})
 
-		// The Declaration holds ONE Expression, so it runs once — an
-		// author reading `partition(…)` twice is not what was written. This is
-		// the property the synthesized base Constant exists for.
+		// The synthesized base Constant evaluates the value once. See "Pattern
+		// declarations" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		it("evaluates the value exactly once", async () => {
 			expect(
 				await run(`implementation {
@@ -504,8 +491,7 @@ describe("Patterns", () => {
 			).toEqual(["12"])
 		})
 
-		// Only the bindings follow the Declaration's own keyword — the
-		// value itself is held once whatever it was written as.
+		// Only the bindings follow the Declaration's own keyword.
 		it("gives a 'variable' Pattern reassignable names", async () => {
 			expect(
 				await run(`implementation {
@@ -542,8 +528,8 @@ describe("Patterns", () => {
 			).toContain("refutable-pattern")
 		})
 
-		// A Matcher naming a member no arm carries merely writes an arm
-		// nothing takes; a Declaration naming one has bound a name to nothing.
+		// Unlike a Matcher, a Declaration naming a missing member binds a name
+		// to nothing.
 		it("reports a member the value has not got", () => {
 			let source = `implementation {
 				constant { widht } = { width = 3 }
@@ -568,12 +554,8 @@ describe("Patterns", () => {
 			).toContain("duplicate-variable")
 		})
 
-		// The base is synthesized in that no source wrote its NAME, but
-		// what it holds is the Declaration's own value Expression — so it keeps
-		// its Position like any other Statement. Dropping it was tried and is
-		// wrong: an unmapped statement is how the debug adapter recognises
-		// Compiler glue, so it answered a Step Over there with a step OUT, and
-		// one step across a Pattern Declaration abandoned the rest of the body.
+		// The base keeps its Position, or Step Over would leave the body. See
+		// "Pattern declarations" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		it("gives every Statement it emits a Position", () => {
 			let parsed = parseWithDiagnostics(`implementation {
 				constant { width, height } = { width = 1, height = 2 }
@@ -594,10 +576,8 @@ describe("Patterns", () => {
 		})
 	})
 
-	// A Pattern PROMISES to be the Constants an author could have written,
-	// so it may not admit what those are refused for. Every one of these
-	// compiled clean and crashed at runtime before the Diagnostic each names
-	// was wired up.
+	// A Pattern stands for the Constants an author could have written, so it
+	// refuses what they are refused for.
 	describe("is the Constant it claims to desugar into", () => {
 		it("refuses a member of a Union the way a written Lookup does", () => {
 			let source = `implementation {
@@ -641,9 +621,8 @@ describe("Patterns", () => {
 		})
 	})
 
-	// A payload Pattern has to say what must BE there, not only where to
-	// read — otherwise the arm accepts every value of its Case and reads
-	// members off a payload that has none.
+	// A payload Pattern requires the members it reads, so the arm declines a
+	// payload without them.
 	describe("a payload Pattern's requirements", () => {
 		const event = `type Click = { x: Integer, y: Integer }
 			type KeyPress = { key: String }
@@ -669,8 +648,8 @@ describe("Patterns", () => {
 			).toEqual([`"key a"`])
 		})
 
-		// The requirement has to be tested BEFORE any value comparison,
-		// because a comparison may read down the very spine it establishes.
+		// The requirement is tested before any value comparison, which may read
+		// down the spine it establishes.
 		it("are tested before a nested value comparison reads down them", async () => {
 			expect(
 				await run(`implementation {
@@ -691,10 +670,8 @@ describe("Patterns", () => {
 			).toEqual([`"other"`])
 		})
 
-		// A requirement is a NARROWING, so the arm binds what it proved
-		// and not what the Case declared — the same answer the equivalent
-		// Record Matcher gives, which is the point of the two spellings meaning
-		// one thing. The arm below could not use the value it had just narrowed.
+		// A requirement narrows, so the arm binds what it proved rather than
+		// what the Case declared, as the equivalent Record Matcher does.
 		it("narrow what the arm binds, not only what it tests", async () => {
 			expect(
 				await run(`implementation {
@@ -713,10 +690,8 @@ describe("Patterns", () => {
 			).toEqual(["8"])
 		})
 
-		// The Validator reads only `matcher` for a Case Matcher, which is
-		// the tag — so a member nothing carries is invisible to it, and the
-		// emitted test demanded a member nothing has: the arm never ran, and
-		// nothing was said.
+		// An arm requiring a member no payload has would never run, so it is
+		// reported.
 		it("report a member the payload has not got", () => {
 			let source = `implementation {
 				type Click = { x: Integer, y: Integer }
@@ -738,12 +713,8 @@ describe("Patterns", () => {
 			expect(codesOf(source)).toContain("unknown-member")
 		})
 
-		// Regression test — a member with BOTH an annotation and a nested
-		// binder kept only the annotation, so the nested Pattern's requirements
-		// were dropped: the arm ran for a payload without the members it read,
-		// bound them as nothing, and retired its Case as if nothing could
-		// decline. The requirement is the annotation with the nested members
-		// merged in, so the arm declines and the Match is conditional again.
+		// The requirement is the annotation with the nested members merged in,
+		// so the arm can decline and the Match is not exhaustive.
 		it("keep a nested binder's requirements beside a written annotation", async () => {
 			expect(
 				codesOf(`implementation {
@@ -776,9 +747,8 @@ describe("Patterns", () => {
 			).toEqual([`"declined"`])
 		})
 
-		// …and a Pattern naming only what the Case already declares asks
-		// nothing new, so the arm stays UNCONDITIONAL and a Match over a Choice
-		// is still exhaustive without a 'case _'.
+		// A Pattern naming only what the Case declares requires nothing new, so
+		// the Match stays exhaustive without a 'case _'.
 		it("do not make an ordinary payload Pattern conditional", () => {
 			expect(
 				codesOf(`implementation {
@@ -798,8 +768,8 @@ describe("Patterns", () => {
 		})
 	})
 
-	// `as` is a Keyword only where a binder can follow it, which the
-	// Module grammar already established for its own use of the word.
+	// `as` is contextual. See "Contextual keywords" in
+	// packages/compiler/src/parser/DEVELOPMENT.md.
 	it("lets a member be called 'as'", async () => {
 		expect(
 			await run(`implementation {

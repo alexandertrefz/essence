@@ -13,13 +13,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The full pipeline minus bundling, mirroring codeGeneration.spec — the
-// `loop` family and the early-stopping `reduce` are only proven once every stage
-// agrees on them AND the emitted JavaScript runs. In the loop and reduce blocks
-// every `Step` is READ, by the native drivers; the final block compares them
-// with `::is` instead, now that the derived Equatable for a generic Choice has
-// merged and the builtin `Step` earns its equality across the stdlib boundary
-// exactly like a Choice a Program declares for itself.
+// The full pipeline minus bundling, and the emitted JavaScript runs.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -40,9 +34,8 @@ async function run(source: string): Promise<Array<string>> {
 
 	writeFileSync(file, js)
 
-	// Both doors, into one buffer in writing order — `Terminal.inspect`
-	// ends its line through `console.log`, `Terminal.print` writes its own to
-	// the stream, and `Loops.es` prints.
+	// Both outputs into one buffer in writing order: `Terminal.inspect` goes
+	// through `console.log`, and `Terminal.print` writes to the stream.
 	let written = ""
 	let originalLog = console.log
 	let originalOut = process.stdout.write
@@ -81,8 +74,7 @@ describe("loop", () => {
 	})
 
 	it("answers the seed when the counted loop's end is below its start", async () => {
-		// The count only runs up, so this body never runs. The direction
-		// is what the label says, exactly as `List.of` reads it.
+		// `through` only counts up, as in `List.of`, so this body never runs.
 		expect(
 			await run(`implementation {
 				constant untouched = loop(from 10, through 1, startingWith 42,
@@ -94,8 +86,7 @@ describe("loop", () => {
 	})
 
 	it("counts down through the end the downTo entry names", async () => {
-		// 3, then 2, then 1 — the same direction `List.of(downTo:)`
-		// counts, so the appended digits read "321".
+		// 3, then 2, then 1, as `List.of(downTo:)` counts.
 		expect(
 			await run(`implementation {
 				constant digits = loop(from 3, downTo 1, startingWith "",
@@ -107,8 +98,8 @@ describe("loop", () => {
 	})
 
 	it("always takes the first turn of a down count", async () => {
-		// The first Integer is always seen, which is the promise
-		// `List.of(integersFrom:downTo:)` carries into its Type.
+		// The first Integer is always seen, as `List.of(integersFrom:downTo:)`
+		// promises in its Type.
 		expect(
 			await run(`implementation {
 				constant digits = loop(from 3, downTo 9, startingWith "",
@@ -131,7 +122,7 @@ describe("loop", () => {
 	})
 
 	it("steps while a condition holds", async () => {
-		// 1, 2, 4, 8, … the first power of two that is not below 100.
+		// The first power of two that is not below 100.
 		expect(
 			await run(`implementation {
 				constant doubled = loop(startingWith 1,
@@ -180,9 +171,8 @@ describe("loop", () => {
 	})
 
 	it("finishes the general loop on the first #Done, threading a Record State", async () => {
-		// A Record State threaded with `{ state with … }`, stopping with
-		// the single-payload `#Done(state.total)` shorthand rather than the full
-		// `#Done({ value = … })`. Sums 1 through 5 = 15.
+		// Stops with the single-member shorthand `#Done(state.total)` rather
+		// than `#Done({ value = … })`.
 		expect(
 			await run(`implementation {
 				constant total = loop(startingWith { index = 1, total = 0 },
@@ -201,8 +191,7 @@ describe("loop", () => {
 	})
 
 	it("finishes the general loop with a Result of a different Type than the State", async () => {
-		// The State is an Integer counter, the Result a String — the
-		// general loop's two Type Parameters are independent.
+		// The general loop's State and Result Type Parameters are independent.
 		expect(
 			await run(`implementation {
 				constant word = loop(startingWith 0,
@@ -217,12 +206,8 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
-	// A general loop inside another general loop's `step`, each finishing
-	// with a Result of its own Type — the inner one with the Integer it counted
-	// to, the outer one with a String. `<-` returns from the callback it is
-	// written in, so each `#Done` belongs to its own loop, and the inner Result
-	// has to survive being read where the outer one is expected: the inner walk
-	// is compared as the Integer it is before the outer one stops on it.
+	// Each `#Done` belongs to the loop whose callback it is written in. The
+	// inner Result is an Integer, the outer a String.
 	it("nests a general loop inside another general loop's step", async () => {
 		expect(
 			await run(`implementation {
@@ -247,11 +232,8 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
-	// The callback writes its return Type here, where the bare-sigil
-	// version above leaves it out. A Choice's Type Parameters are applied, never
-	// inferred: the bare `#Done` is read off whatever the position expects and,
-	// where nothing expects anything, off the body — but the PREFIXED spelling
-	// asks for a decision, and an unannotated callback has none to give.
+	// A prefixed Case without Type Arguments reads them off the position, so
+	// the callback must write its return Type.
 	it("uses the prefixed #Continue / #Done spelling in the general loop", async () => {
 		expect(
 			await run(`implementation {
@@ -267,14 +249,9 @@ describe("loop", () => {
 		).toEqual(['"6"'])
 	})
 
-	// The two spellings of the one walk, run side by side. A bare
-	// construction whose payload leaves one of its Choice's Type Parameters
-	// standing is refused now, and this is the shape that must never be caught by
-	// that: `#Done("done")` names `Result` and says nothing about `State`, so
-	// what decides `State` is the position — read a SECOND time, once the call
-	// has committed and its bindings are final. The annotated twin decides the
-	// same thing at the callback's own `->`, and the two walks agree, value for
-	// value.
+	// `#Done("done")` decides `Result` but not `State`, so the position decides
+	// `State` once the call has committed. See "Instantiating a generic Case
+	// from its payload" in packages/compiler/src/enricher/DEVELOPMENT.md.
 	it("agrees with itself whether the callback writes its return Type or not", async () => {
 		let walk = (returnType: string, sigil: string): string =>
 			`implementation {
@@ -296,16 +273,12 @@ describe("loop", () => {
 	})
 })
 
-// The three counted entries whose body answers a `Step`. They share every
-// label with the run-to-the-end entries beside them and are told apart by the
-// last one — `step` against a positional body — which is the whole reason the
-// family was relabelled: a callback's answer Type is not what an Overload is
-// chosen by, so the counted early exit had no spelling before.
+// The counted entries whose body answers a `Step` are told apart from the
+// others by the `step` label alone. An Overload is not chosen by a callback's
+// answer Type.
 describe("a counted loop whose body answers a Step", () => {
 	it("leaves the count on the first #Done", async () => {
-		// 1 + 2 + 3 + 4 = 10, and 10 + 5 = 15 is the first total above
-		// ten — so the answer is 15 rather than the 5050 the whole count
-		// reaches. That is proof no Integer past the #Done was visited.
+		// 15 is the first total past ten. The whole count would reach 5050.
 		expect(
 			await run(`implementation {
 				constant total = loop(from 1, through 100, startingWith 0,
@@ -388,9 +361,8 @@ describe("a counted loop whose body answers a Step", () => {
 		).toEqual(['"543"', '"321"', '"3"'])
 	})
 
-	// The label is the whole of the difference, so the pair has to be
-	// checked side by side: the same Arguments under the same labels reach two
-	// different entries and answer two different things.
+	// The same Arguments under the same labels reach two entries, told apart
+	// by the `step` label.
 	it("is a different entry from the positional body under the same labels", async () => {
 		expect(
 			await run(`implementation {
@@ -411,11 +383,9 @@ describe("a counted loop whose body answers a Step", () => {
 	})
 })
 
-// Every counted entry has two implementations that have to agree: the
-// Essence body in `Loop.es`, and the `for` the Optimiser writes where the call
-// stands. `inline-loops` only writes the walk out where every callback is
-// written AT the call, so binding the body to a name is what reaches the Essence
-// body — and these run the same walks both ways.
+// Every counted entry has an Essence body in `Loop.es` and a `for` the
+// Optimiser writes at the call. `inline-loops` inlines only a callback written
+// at the call, so a named body reaches the Essence one.
 describe("the counted entries answer alike inlined and not", () => {
 	it("agrees on the up count, the down count and the empty range", async () => {
 		expect(
@@ -455,10 +425,8 @@ describe("the counted entries answer alike inlined and not", () => {
 		])
 	})
 
-	// The Step-answering counted entries have one implementation rather
-	// than two — they are written on the general driver, which is inlined inside
-	// their own prelude bodies rather than at the call — so this reads the same
-	// walk through a named body to be sure the Essence is what runs.
+	// The Step-answering counted entries are written on the general driver,
+	// so a named body runs their Essence.
 	it("answers alike where a Step body is bound to a name", async () => {
 		expect(
 			await run(`implementation {
@@ -492,9 +460,7 @@ describe("reduce(startingWith:step:)", () => {
 	})
 
 	it("stops the fold on the first #Done and visits no later item", async () => {
-		// The accumulator counts the items the combiner has seen. It stops
-		// itself at two, so the Result is 2 rather than the five it would reach
-		// folding the whole List — proof no item past the #Done was visited.
+		// The accumulator counts the items seen and stops at two, not five.
 		expect(
 			await run(`implementation {
 				constant seen = [1, 2, 3, 4, 5]::reduce(startingWith 0,
@@ -524,12 +490,8 @@ describe("reduce(startingWith:step:)", () => {
 	})
 })
 
-// The untested combination once WP4 and WP6 both merged — the builtin,
-// generic `Step` compared with its DERIVED Equatable. Every value here is a
-// `Step<State, Result>` instantiation, and every comparison routes through the
-// widened `boundChoiceIs` descriptor computed for a GenericAlias that lives in
-// the stdlib scope rather than the Program's — the one thing neither slice
-// could prove alone, since WP6 deliberately never wrote `::is` on a `Step`.
+// The builtin generic `Step` compared by its derived Equatable. Its Alias
+// lives in the standard library's scope rather than the Program's.
 describe("a Step compares by its derived Equality", () => {
 	it("holds two #Done payloads equal, and a #Done apart from a #Continue", async () => {
 		expect(
@@ -577,10 +539,7 @@ describe("a Step compares by its derived Equality", () => {
 		).toEqual(['"true"', '"false"', '"true"'])
 	})
 
-	// The point of routing a generic payload through a witness rather than
-	// the flat structural comparison — `1/2` and `2/4` are equal by Rational's
-	// own `is`, and only the Rational witness threaded into `Step`'s descriptor
-	// carries that across the stdlib boundary.
+	// A generic payload compares through its own witness, here Rational's.
 	it("compares a Rational payload by its own equality, not by structure", async () => {
 		expect(
 			await run(`implementation {
