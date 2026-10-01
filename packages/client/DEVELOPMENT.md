@@ -51,3 +51,23 @@ in the outer position unchanged. An `Optional` is flattened too, because it is s
 collides with nothing. It reaches a Descriptor in two shapes. `describeUnion` collapses a Union of exactly its two
 Cases into an `optional` node. In a larger Union the two Cases stay apart, the `#Value` carrying a String collides with
 `#Up`, and `#Empty` adds nothing.
+
+## Rounding a Rational to a double
+
+`toNumber` in `rational.ts` answers the nearest double, rounded once. When both parts are at most `2 ** 53`, a double
+holds each exactly, and one hardware division rounds correctly, as IEEE 754 requires. Larger parts would each be
+rounded on conversion, and dividing two roundings can misround the quotient by an ulp.
+
+Past that fast path, `dividedMagnitude` still rounds exactly once:
+
+- The quotient is taken to 64 bits, and a nonzero remainder sets its low bit. Any later rounding to 53 bits or fewer
+  then reads this quotient as halfway exactly when the true quotient is halfway.
+- Converting that quotient to a double is the one rounding. Scaling it back by a power of two is exact.
+- A subnormal answer has fewer significant bits than the conversion keeps, so converting would round twice. When the
+  exponent is under -1022, `roundedShift` rounds the quotient to a multiple of `2 ** -1074` in bigint arithmetic, half to
+  even. The result converts exactly. A tie it sees is a true tie, since an inexact quotient has its low bit set.
+
+`scaledByPowerOfTwo` multiplies in steps of at most `2 ** 1023`, the largest power of two a double holds. One
+multiplication can underflow. For `1/2 ** 1020` the quotient `2 ** 64` scales back by `2 ** -1084`, which is `0` as a
+double, while the answer is the normal `8.9e-308`. Stepping keeps every intermediate in range. The loop stops early at
+`0` and at `Infinity`, which no further step changes.
