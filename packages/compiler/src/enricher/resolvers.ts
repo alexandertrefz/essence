@@ -6397,7 +6397,7 @@ function declaresConformanceFor(
 }
 
 // Said where the name a report spells binds another Protocol in this Scope,
-// or no Protocol, which a reader would take the report to be about.
+// or no Protocol. A reader would take the report to be about that.
 function homonymNotes(
 	identity: string,
 	scope: enricher.Scope,
@@ -6751,8 +6751,8 @@ function namespaceParameterBound(
 	}
 }
 
-// The Namespace Method a Diagnostic is being reported from inside, read
-// through the Scope chain — see `Scope.methodName`.
+// The Namespace Method a Diagnostic is reported from inside. See
+// `Scope.methodName`.
 function enclosingMethodName(scope: enricher.Scope): string | null {
 	for (
 		let current: enricher.Scope | null = scope;
@@ -6810,17 +6810,15 @@ export function resolveConformances(
 		// is in the caller's names.
 		let binding = bound
 
-		// The bound is the Protocol the callee's Module resolved, and the
-		// caller needs no name for it. A bound refused where it is written is
-		// not carried, and asks nothing of the call.
+		// The callee's Module resolved the bound, so the caller needs no name
+		// for it. A bound refused where written is not carried.
 		let spelling = protocolSpelling(generic.constraint, scope)
 
-		// A GenericUse binding keeps its own tailored Diagnostic — the
-		// bound was carried by an unbounded Type Parameter, which is a distinct
-		// mistake from a Type that simply has no conforming Namespace.
+		// A Type Parameter bound to an unbounded Type Parameter gets a report
+		// of its own.
 		if (binding.type === "GenericUse") {
-			// As in `solveConformance` — a bound Protocol answers for the
-			// Protocols it extends, and the one witness serves them all.
+			// As in `solveConformance`, a bound answers for the Protocols it
+			// extends.
 			if (
 				binding.constraint !== undefined &&
 				protocolGrants(binding.constraint, generic.constraint, scope)
@@ -6834,26 +6832,14 @@ export function resolveConformances(
 					},
 				})
 			} else if (binding.refusedBound !== true) {
-				// Under the name the SOURCE wrote. A callee's Generics
-				// are alpha-renamed for the span of one invocation — `ItemType`
-				// becomes `ItemType`, a zero-width space and a counter — and a
-				// Parameter that never bound is still carrying the fresh name
-				// when it arrives here. Only the separator is invisible, so the
-				// report read `Type Parameter 'ItemType57'`; and the counter is
-				// process-wide, so the same file analysed twice in one process
-				// named a different Parameter each time. See
-				// `displayGenericName`.
-				//
-				// The same name is what the rest of the report is built
-				// from. `typeParameterBoundReport` looks the Parameter up in
-				// Scope, where a fresh name is not, and the Quick Fix behind
-				// `data` edits the DECLARATION — which is written under the name
-				// the source wrote and under no other.
+				// The name the source wrote, without the fresh suffix of one
+				// invocation (`displayGenericName`). The Scope lookup and the
+				// Quick Fix both need it.
 				let shown = displayGenericName(binding.name)
 				let carried = binding.constraint ?? null
 				let wanted = describeProtocol(generic.constraint, scope)
-				// Where no name here binds the Protocol, the bound can be
-				// written only beside an import of it, which the fix writes too.
+				// Where no name here binds the Protocol, the fix writes an
+				// import too.
 				let importing =
 					spelling === null
 						? protocolImport(generic.constraint, scope)
@@ -6879,10 +6865,8 @@ export function resolveConformances(
 						labels: [
 							primary(
 								position,
-								// A Parameter that carries a DIFFERENT
-								// bound is not unbounded, and a label that says
-								// it is sends the reader looking for a bound
-								// that is written right there.
+								// A Parameter with another bound is not
+								// unbounded.
 								carried === null
 									? "bound here to an unbounded Type Parameter"
 									: `bound here to a Type Parameter bounded by '${describeProtocol(carried, scope)}'`,
@@ -6918,19 +6902,9 @@ export function resolveConformances(
 													importing,
 												),
 											],
-						// The Type Parameter the bound has to be written
-						// on, beside the Protocol it has to be bound by — a
-						// Quick Fix writes it somewhere that is nowhere near the
-						// call this is reported at, and WHERE depends on whose
-						// Parameter it is: a Function's own declaration, or the
-						// `<…>` of the Method this call stands in.
-						//
-						// Carried from the report above rather than decided
-						// again: `bounded` is `none` exactly where the text
-						// withheld its edit, and a Quick Fix offered there is
-						// the refused edit — applying it turned one error into
-						// two. Left out too where the Protocol can not be named
-						// here or imported under the name it is published as.
+						// Where the Quick Fix writes the bound, decided by the
+						// report's `bounded`. None where the text withholds the
+						// edit, or the Protocol can not be named here.
 						...(bound.bounded === "none" || written === null
 							? {}
 							: {
@@ -6976,18 +6950,13 @@ export function resolveConformances(
 			continue
 		}
 
-		// An empty chain means the failure (ambiguity, a nonconforming
-		// Namespace) was already reported — stay silent.
+		// An empty chain was reported already.
 		if (result.chain.length === 0) {
 			continue
 		}
 
-		// The Type the reader has to do something about is the LAST link
-		// of the chain, not the one the bound was written on — for a
-		// `Result<String, Problem>` that is `Problem`, and a Namespace declared
-		// `for Result<String, Problem>` answers this one call while leaving
-		// every other Result unprintable. A single-level chain's culprit is the
-		// binding itself, which is how the plain case comes out unchanged.
+		// The culprit is the chain's last link, `Problem` in a
+		// `Result<String, Problem>`, or else the binding itself.
 		let culprit = result.culprit?.type ?? binding
 		let culpritProtocol = result.culprit?.protocolName ?? generic.constraint
 		let missing = missingConformance(
@@ -7000,10 +6969,8 @@ export function resolveConformances(
 		let wanted = describeProtocol(generic.constraint, scope)
 		let message = `${describeType(binding)} does not conform to '${wanted}'`
 
-		// A single-level chain is the plain "no Namespace conforms" case
-		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
-		// a conditional conformance whose `where` condition failed — its
-		// because-chain becomes the notes of `unsatisfied-conformance-condition`.
+		// One link is `unsatisfied-bound`. More are a failed `where`, reported
+		// as `unsatisfied-conformance-condition` with the chain as Notes.
 		if (result.chain.length === 1) {
 			reportError(message, position, {
 				code: "unsatisfied-bound",
@@ -7060,9 +7027,8 @@ export function resolveConformances(
 	return conformances
 }
 
-// An unknown Protocol name where it is written. The Helps name the Modules
-// this one reaches that declare it, then the near miss in scope; the import
-// itself is the Language Server's to offer, from the name under the cursor.
+// An unknown Protocol name. The Helps name the Modules declaring it, then the
+// near miss; the language server offers the import.
 export function reportUnknownProtocol(
 	identifier: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -7087,10 +7053,8 @@ export function reportUnknownProtocol(
 	})
 }
 
-// How this file could come to name a Protocol it binds no name for: an
-// import of it under the name its Module publishes it as, which needs a name of
-// its own where that one is `taken` here. Null where there is no such import to
-// write.
+// The import that would name a Protocol this file binds no name for, with
+// `taken` set where its published name is bound here. Null where none can.
 export function protocolImport(
 	identity: string,
 	scope: enricher.Scope,
@@ -7129,9 +7093,8 @@ export function protocolImport(
 			}
 }
 
-// `taken` where this Module binds the name an import of it would, so that
-// the import needs a name of its own, and `writing` says where the name the
-// import binds goes where no other Help writes it already.
+// The Help naming a Protocol's declaring Module. `writing` says where the
+// imported name goes, where no other Help says so.
 function declaredInHelp(
 	protocolName: string,
 	{ modulePath, declares, exportedAs }: enricher.ProtocolDeclaration,
@@ -7155,10 +7118,9 @@ function declaredInHelp(
 				: `'${protocolName}' is declared in ${fileName}, which exports it as '${imported}' — ${importing}.`
 }
 
-// The result of checking one conformance clause that holds — its
-// Protocol, the validated `where` conditions, and the map from each Protocol
-// Method to the fulfilling Namespace Method. Handed back to the Enricher so it
-// can thread each conditional clause's bounds into the fulfilling Methods.
+// A conformance clause that holds: its Protocol, `where` conditions and the
+// Method map, so the enricher can weave the bounds into the fulfilling
+// Methods.
 export type CheckedConformance = {
 	// Identities, as the conditions' Protocols are.
 	protocolName: string
@@ -7166,12 +7128,9 @@ export type CheckedConformance = {
 	methodMap: Record<string, string>
 }
 
-// Why a `where` condition can not become an assumption, or null when it
-// can. The two conformance checks — the reporting one below and the silent twin
-// hoisting runs — share this so they can not drift into disagreeing about which
-// conditions a clause carries: the bounds woven into the fulfilling Methods are
-// read off exactly that list, and a Method bound in one pass and not the other
-// would emit a hidden conformance Parameter its call sites do not fill.
+// Why a `where` condition can not be assumed, or null. Both conformance
+// checks share it, so the bounds woven into the Methods agree between the
+// hoist and the reporting pass.
 type WhereConditionRejection =
 	| { kind: "unknown-generic" }
 	| { kind: "unwitnessable" }
@@ -7189,10 +7148,8 @@ function whereConditionRejection(
 		return { kind: "unknown-generic" }
 	}
 
-	// A condition is proven at the use site by unifying the target Type
-	// against the receiver — a Generic the target never mentions can never be
-	// bound there, so its witness could never be produced and the hidden
-	// conformance Parameter would arrive as `undefined` at runtime.
+	// A condition is proven by unifying the target with the receiver, so a
+	// Type Parameter the target never mentions has no witness.
 	if (!typeMentionsGeneric(targetType, condition.generic.content)) {
 		return { kind: "unwitnessable" }
 	}
@@ -7232,9 +7189,9 @@ function clauseBodyWriter(
 	return null
 }
 
-// The first requirement a Namespace owes that a Method written as declared
-// would not answer for another clause's Protocol, whose body it replaces. Where
-// there is one, no stub is offered and the conformance moves to its own Namespace.
+// The first requirement whose Method, written as declared, would not answer
+// for another clause's Protocol, whose body it replaces. Then the conformance
+// moves to a Namespace of its own.
 function clauseRefusingRequirement(
 	node: parser.NamespaceDefinitionStatementNode,
 	solving: common.ProtocolType,
@@ -7284,9 +7241,9 @@ function clauseProvidersIn(
 	)
 }
 
-// A value bounded by a Protocol can be handed to a bound on one it
-// extends, which then reads its witness, so a Namespace conforming to both has
-// to answer each provided name of the extended one with the same body.
+// A value bounded by a Protocol can be handed to a bound on one it extends,
+// which reads its witness. So a Namespace conforming to both answers each
+// provided name of the extended one with one body.
 function reportSplitProvidedBodies(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
@@ -7369,9 +7326,8 @@ function reportSplitProvidedBodies(
 				let spelled = describeProtocol(extending, scope)
 				let ancestor = describeProtocol(extended, scope)
 				let entry = protocolOf(extending, scope).methods[methodName]!
-				// The clauses whose Protocols declare the name apart, so a
-				// Method written as `extending` declares it does not answer them,
-				// and they move to a Namespace of their own before it is written.
+				// The clauses whose Protocols declare the name otherwise. They
+				// move to a Namespace of their own.
 				let refusing = clauses
 					.filter(({ protocol }) =>
 						[
@@ -7430,21 +7386,15 @@ function reportSplitProvidedBodies(
 	}
 }
 
-// What `checkProtocolConformance` would find, with nothing reported and
-// nothing derived. Hoisting needs the clauses that HOLD — they are what says
-// which Methods carry a conditional conformance's bound — and can not report
-// while it looks: a Diagnostic during speculative resolution keeps the whole
-// Namespace out of Scope. A clause a Choice's derived equality fulfils names no
-// Namespace Method, so leaving the derive out costs no bound.
-// `computeConformanceMethodMap` is pure, so running it here declares nothing.
+// What `checkProtocolConformance` would find, silently and without derives,
+// for the hoist: a Diagnostic there keeps the Namespace out of Scope. A
+// derived clause names no Method, so it carries no bound.
 export function silentCheckedConformances(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
 	scope: enricher.Scope,
-	// The Protocol names still waiting to hoist. A clause naming one can
-	// not be checked yet, and checking it anyway would silently drop its bounds
-	// — so the Namespace is thrown back to the hoist loop, which retries it a
-	// round later, the same way a Type Alias naming a later declaration waits.
+	// The Protocols still to hoist. A clause naming one throws
+	// `NotHoistedYet` rather than drop its bounds.
 	pendingProtocols: ReadonlySet<string>,
 ): Array<CheckedConformance> {
 	let checked: Array<CheckedConformance> = []
