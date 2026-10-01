@@ -256,6 +256,28 @@ describe("Validator", () => {
 			})
 		})
 
+		// A Matcher covers every application of its Case, so a second Handler
+		// for another application would be unreachable.
+		it("should name a Case two applications leave unhandled once", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Box<Item> { Full { item: Item }, Empty }
+
+				function describe(_ b: Box<Integer> | Box<String>) -> String {
+					<- match b -> String {
+						case #Empty { <- "empty" }
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Add 'case Box#Full', or a 'case _' that covers the rest.",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-case",
+				unhandled: ["Box#Full"],
+			})
+		})
+
 		it("should warn about unreachable Match cases", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Value = Integer | Rational

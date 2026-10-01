@@ -5877,6 +5877,31 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
+		// A second arm for another application would be unreachable.
+		it("should scaffold one arm for two applications of a Case", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Box<Item> { Full { item: Item }, Empty }",
+				"\tconstant boxed: Box<Integer> | Box<String> = Box<Integer>#Empty",
+				"\tconstant described = boxed",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, {
+				start: { line: 4, column: 24 },
+				end: { line: 4, column: 24 },
+			})
+			let result = applied(lines, refactor)
+
+			expect(result.slice(3, 7)).toEqual([
+				"\tconstant described = match boxed -> Box<Integer> | Box<String> {",
+				"\t\tcase Box#Full {}",
+				"\t\tcase Box#Empty {}",
+				"\t}",
+			])
+			expect(codesOf(result)).not.toContain("unreachable-case")
+		})
+
 		it("should scaffold a Union of Types under its member Types", () => {
 			let lines = [
 				"implementation {",

@@ -71,9 +71,14 @@ function scaffoldFor(
 	program: common.typed.Program,
 ): Array<CodeActionEntry> {
 	let { value, answers } = scaffold
-	let matchers = flattenUnionMembers(value.type as common.UnionType).map(
-		describeMatcher,
-	)
+	// One Matcher answers for every application of a Case.
+	let matchers = [
+		...new Set(
+			flattenUnionMembers(value.type as common.UnionType).map(
+				describeMatcher,
+			),
+		),
+	]
 	let writable = matchers.filter(isWritableMatcher)
 	// As in the `missing-case` fix, one `case _` covers the members no
 	// Matcher can name.

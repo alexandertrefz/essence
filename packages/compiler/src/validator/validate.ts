@@ -1294,9 +1294,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		)
 
 		// One Diagnostic for every unhandled member, which share a cause and
-		// a fix.
+		// a fix. One Matcher answers for every application of a Case.
 		if (unhandledTypes.length > 0) {
-			let descriptions = unhandledTypes.map(describeMatcher)
+			let descriptions = [...new Set(unhandledTypes.map(describeMatcher))]
 
 			reportError(
 				`This Match Expression does not handle every Case`,
