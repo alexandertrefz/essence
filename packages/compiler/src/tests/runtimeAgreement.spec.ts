@@ -21,26 +21,14 @@ import { loadStdlib } from "../enricher/stdlib"
 import { applyGenericBindings } from "../helpers/types"
 import { acceptsAllAtRuntime, overlapsAtRuntime } from "../validator/index"
 
-// The Validator decides which Handlers of a Match can run by asking what
-// a Type NAMES; the runtime decides it by asking what a value IS. No one
-// announces it when those two answers drift apart — a Handler the Validator
-// called impossible runs anyway (an empty `List<Integer>` walking into `case
-// List<String>`), or one it counted on never does and the Match falls off its
-// chain. `acceptsAllAtRuntime` and `overlapsAtRuntime` are the two edges the
-// Validator reasons between, and this file sandwiches `isValueOfType` inside
-// them: whatever the first accepts ALL of, the runtime has to accept, and
-// whatever the second says can not overlap, the runtime has to refuse. What is
-// left between the two is slack both sides know about.
+// The Validator decides which Handlers can run from Types, the runtime from
+// values. `isValueOfType` must accept whatever `acceptsAllAtRuntime` accepts
+// all of, and refuse whatever `overlapsAtRuntime` says can not overlap. See
+// "Runtime overlap" in packages/compiler/src/validator/DEVELOPMENT.md.
 
-// One Type together with values OF that Type, built the way the emitted
-// JavaScript builds them — the runtime is handed values, never Types.
-//
-// Sampled exactly as the Type names them: no Record here carries a member
-// its Type does not declare. A wider Record is assignable to a narrower one and
-// the runtime's Record check is open, while the Validator's edges are written
-// on the members a Type declares — whether that width should be assignable at
-// all is an open question, and sampling it here would restate that question
-// instead of the agreement this file is about.
+// One Type with values of it, built the way the emitted JavaScript builds
+// them. No Record here carries a member its Type does not declare, since the
+// edges reason about declared members only.
 type Sample = { name: string; type: common.Type; values: Array<AnyType> }
 
 const integerType: common.Type = { type: "Integer" }
@@ -53,25 +41,18 @@ const callbackType: common.Type = {
 	returnType: integerType,
 }
 
-// A Function reaches the runtime as a bare JavaScript function carrying
-// no Type key at all, which `AnyType` deliberately does not describe — and a
-// Case instance carries a tag where `AnyType` describes a kind, for the same
-// reason. Both are values the emitted code passes to these checks daily.
+// A Function reaches the runtime as a bare JavaScript function with no Type
+// key, and a Case instance carries a tag. `AnyType` describes neither.
 const callback = () => ((value: never) => value) as unknown as AnyType
 const caseValue = (tag: string, payload?: Record<string, AnyType>) =>
 	createCase(tag, payload) as unknown as AnyType
 
-// `Number` and `Ordering` are taken from the standard library rather than
-// spelled out here — they are the Union and the Choice real Programs match on,
-// and reading them out of the Scope the Enricher starts from is what keeps this
-// table from describing a language the Compiler no longer has.
+// `Number` and `Ordering` are read out of the standard library, so the table
+// describes the Types real Programs match on.
 const stdlibTypes = loadStdlib().types
 
-// `Optional` is read out of the standard library for the same reason, and
-// with more riding on it: it is the Choice every fallible Signature in the
-// language answers with, so the applied `Optional<Integer>` below is the real
-// declaration with its Type Argument substituted in rather than a second
-// hand-written copy of a shape only `Optional.es` gets to decide.
+// `Optional` too, with its Type Argument substituted into the real
+// declaration.
 function optionalOf(itemType: common.Type): common.Type {
 	let optional = stdlibTypes.Optional
 
@@ -109,8 +90,8 @@ let samples: Array<Sample> = [
 	{
 		name: "Algebraic",
 		type: { type: "Algebraic" },
-		// √2 — `createAlgebraic` answers a Rational for a radicand that
-		// collapses, which the sampling test below is what catches.
+		// √2. `createAlgebraic` answers a Rational for a radicand that
+		// collapses, which the sampling spec would catch.
 		values: [
 			createAlgebraic(
 				{ numerator: 0n, denominator: 1n },
@@ -252,10 +233,8 @@ let samples: Array<Sample> = [
 		type: { type: "UnionType", types: [integerType, stringType] },
 		values: [createInteger(1n), createString("here")],
 	},
-	// Fallibility, spelled the only way the language spells it. This used
-	// to be `Integer | Nothing`, a Union whose SHAPE meant "might be missing";
-	// `Optional` is a nominal Choice now, so what the two edges have to agree
-	// about is a Union of two Cases whose tags the runtime reads off the value.
+	// `Optional` is a Choice, so the edges agree about a Union of two Cases
+	// whose tags the runtime reads off the value.
 	{
 		name: "Optional<Integer>",
 		type: optionalOf(integerType),
@@ -272,14 +251,9 @@ let samples: Array<Sample> = [
 			createEmpty() as unknown as AnyType,
 		],
 	},
-	// A GenericUse and an Unknown carry no values of their own. As a
-	// Matcher each takes everything, which the accepting half below asserts
-	// against every value in the table. As a member Type neither NAMES any
-	// value — a Type Parameter's Argument could be anything, and
-	// `overlapsAtRuntime` deliberately declines to guess, because otherwise
-	// every Match written inside a generic Namespace would report an overlap
-	// on the very Type Parameter its Handlers are there to sort out — so
-	// sampling them would ask the refusing half a question it does not answer.
+	// A GenericUse and an Unknown carry no values of their own. As a Matcher
+	// each takes every value in the table. As a member Type neither names a
+	// value, and `overlapsAtRuntime` does not count it as an overlap.
 	{
 		name: "ItemType",
 		type: { type: "GenericUse", name: "ItemType" },
@@ -289,9 +263,8 @@ let samples: Array<Sample> = [
 ]
 
 describe("Runtime Agreement", () => {
-	// The premise the two halves below rest on. A value sampled under the
-	// wrong Type would make them assert something about a Type nothing in the
-	// table is a value of, and they would still pass.
+	// The premise of the agreement specs: a value sampled under the wrong Type
+	// would let them pass vacuously.
 	it("should sample every Type with values of that Type", () => {
 		let mistaken: Array<string> = []
 
@@ -332,10 +305,8 @@ describe("Runtime Agreement", () => {
 
 		expect(disagreements).toEqual([])
 
-		// An edge that answered false everywhere would walk this loop
-		// without a single value reaching the runtime, so what was asked is
-		// counted as well — every Type in the table accepts all of itself, and
-		// the erasing Matchers accept all of every other.
+		// An edge that answered false everywhere would ask the runtime
+		// nothing, so the questions are counted too.
 		expect(checked).toBeGreaterThan(samples.length)
 	})
 
@@ -365,11 +336,8 @@ describe("Runtime Agreement", () => {
 		expect(checked).toBeGreaterThan(samples.length)
 	})
 
-	// The one place the two edges are deliberately apart, and the whole
-	// reason there are two of them: an empty List holds no item to disagree
-	// about, so it is a value of every List Type there is. `case List<String>`
-	// above `case List<Integer>` therefore RUNS for an empty `List<Integer>` —
-	// which the Validator may neither call unreachable nor count on.
+	// An empty List is a value of every List Type, so `case List<String>`
+	// before `case List<Integer>` takes an empty `List<Integer>`.
 	it("should leave the empty List between the two edges", () => {
 		let strings: common.Type = { type: "List", itemType: stringType }
 
@@ -382,14 +350,8 @@ describe("Runtime Agreement", () => {
 		)
 	})
 
-	// A checked refinement is the third thing that erases, and it is not
-	// sampled as a row of its own for exactly that reason: no value ever reaches
-	// the runtime UNDER one. `isValueOfType` is never handed a refinement — the
-	// Optimiser stage takes them out of the tree and the Rewriter refuses one
-	// outright — so what has to be true is not that the runtime agrees about a
-	// refinement, but that both edges answer about one EXACTLY as they answer
-	// about its base. That is what makes the sandwich above cover refined Types
-	// too: every question asked of one is a question already answered here.
+	// No value reaches the runtime under a refinement, so it is not sampled.
+	// Both edges must answer about one exactly as about its base.
 	describe("A checked refinement", () => {
 		function refined(base: common.Type): common.Type {
 			return {
@@ -407,10 +369,8 @@ describe("Runtime Agreement", () => {
 			}
 		}
 
-		// Every base in the table, against every Type in it, on both sides
-		// of both edges — because a refinement can stand wherever its base can,
-		// and an unwrap written at one head and forgotten at the other would
-		// leave a Match reachable one way and dead the other.
+		// Every base against every Type, on both sides of both edges, since a
+		// refinement can stand wherever its base can.
 		it("should answer at both edges exactly as its base does", () => {
 			let disagreements: Array<string> = []
 
@@ -454,9 +414,8 @@ describe("Runtime Agreement", () => {
 			expect(disagreements).toEqual([])
 		})
 
-		// And a refinement nested inside a Type is unwrapped too — the head
-		// of each edge erases the whole Type rather than one layer of it, so a
-		// refined item Type is a `List<Integer>` to both of them.
+		// Each edge erases the whole Type, so a List of refined items is a
+		// `List<Integer>` to both.
 		it("should answer the same for one buried in a List", () => {
 			let refinedItems: common.Type = {
 				type: "List",
