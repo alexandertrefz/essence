@@ -48,15 +48,8 @@ import {
 	withOptimiserOptions,
 } from "./stdlibPrelude"
 
-// The builtin Namespaces with a runtime module, re-exported from the file
-// that holds the list — every emission site here reads it, and so does
-// `pool-constants`, which may not reach this Module without closing a cycle.
 export { runtimeNamespaceNames }
 
-// The emit target, re-exported from the file that holds it, because this
-// is where a caller with a graph to rewrite already is. `esc` keys its cache by
-// one before it has decided to emit anything at all, and reaches it through
-// `rewriter/emitTarget` instead — a name is not worth loading a Rewriter for.
 export {
 	BUNDLE_TARGET,
 	type EmitTarget,
@@ -64,35 +57,20 @@ export {
 	RUNTIME_PACKAGE,
 } from "./emitTarget"
 
-// The Rewriter is a typed simple Program in, JavaScript source text out —
-// no bundling, no minifying, nothing written to disk; that is the Bundler's job.
-// It is synchronous and deterministic: the same Program always produces the same
-// text. It does read the file system once, indirectly — the standard library
-// prelude is built from the sources the loader reads at startup — so "pure" here
-// means same input, same output, not "touches nothing".
-//
-// This is the single-file form and stays the DEFAULT: one Program, its
-// whole prelude inline, no ESM list either way — a Program's Module sections are
-// ignored here, because a lone Program is a bundle of one and has nobody to
-// import from or publish to. `rewriteModules` is the other form, and the two
-// emit through the same helpers rather than through two copies of them.
+// One Program in, the JavaScript text of one module out, the same text for
+// the same Program. See "A lone Program and a graph" in DEVELOPMENT.md.
 export function rewrite(
 	program: common.typedSimple.Program,
-	// The Options the Program was optimised under, so the prelude built
-	// below is built under them too — the standard library's bodies are
-	// optimised where they are collected, and a Program compiled with a pass
-	// turned off must not import a prelude that kept it on.
+	// The options the Program was optimised under, which the prelude is
+	// optimised under too.
 	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
 ): string {
 	return withOptimiserOptions(optimiserOptions, () => rewriteProgram(program))
 }
 
 function rewriteProgram(program: common.typedSimple.Program): string {
-	// The Program's own Protocol-provided Methods join the standard
-	// library's prelude rather than being emitted where they were written. That
-	// is what makes ONE const answer for every conformer: the reachability fixed
-	// point below already emits each candidate at most once, and the band it
-	// emits into is the one every reference resolves in.
+	// The Program's own Protocol-provided Methods join the prelude, so one
+	// const answers for every conformer.
 	const protocolMembers = protocolPreludeNamespaces([program])
 	const prelude = [...stdlibPrelude(), ...protocolMembers]
 
@@ -110,26 +88,15 @@ function rewriteLoneProgram(
 	program: common.typedSimple.Program,
 	prelude: Array<PreludeNamespace>,
 ): string {
-	// The user Program is rewritten FIRST, so that which merged Namespaces
-	// it needs can be answered from the finished tree rather than guessed at from
-	// the source. Every reference to a Namespace — a plain `Boolean.isNot(…)`
-	// call, a conformance witness's `isNot: Boolean.isNot`, a `dispatchMethod`
-	// target, an argument to `boundConformance` — is a literal `Identifier` node
-	// by this point, however indirectly it was written. A source-level survey
-	// would have to know about each of those shapes and would silently drop a
-	// Namespace the moment a new one was added.
+	// The Program is rewritten first, so reachability reads the finished
+	// tree. See "A lone Program and a graph" in DEVELOPMENT.md.
 	const freeFunctions = stdlibFreeFunctions()
-	// One pool for the whole file, because a lone Program is one emitted
-	// Module: the standard library's pooled constants and the Program's own are
-	// declared side by side and a constant both of them want is declared once.
+	// One pool for the whole file, shared by the prelude and the Program.
 	const { value: rewritten, pool } = collectingConstantPool(() => {
 		let implementation = rewriteImplementationSection(
 			program.implementation,
 		)
-		// Inside the pool's collection, and reaching the fixed point
-		// below with the implementation: a test body calls the same standard
-		// library Methods a Program does, and a pooled constant a test names
-		// has to be declared in the band above it.
+		// Tests share the pool and the reachability of the implementation.
 		let tests =
 			program.tests === null ? [] : rewriteTestsSection(program.tests)
 
@@ -161,34 +128,15 @@ function rewriteLoneProgram(
 		type: "Program",
 		sourceType: "module",
 		body: [
-			// Every runtime module, whether this Program names it or not:
-			// esbuild shakes an unused `import * as <Name>` away, so the head of
-			// a lone Program costs nothing and stays what it always was. A
-			// Module of a bundle asks for what it names instead — there are
-			// twenty heads to read through there rather than one.
+			// See "Module layout" in DEVELOPMENT.md.
 			...runtimeImports(lonelyRuntimeNames(program)),
-			// And the coverage counter directly under them, ahead of
-			// everything a counter could stand in.
 			...(program.coverage === null
 				? []
 				: coverageHead(program.coverage, null)),
-			// Imports first — an Essence Method's const reads the runtime
-			// modules those imports bind. Then the Essence-implemented members,
-			// in the two bands `essenceMemberBands` puts them in: the
-			// Function-valued ones in any order, and the static Properties, whose
-			// values are computed HERE, after them.
 			...bands.functions,
-			// The pooled constants sit BETWEEN the two, and that is the
-			// only place they can sit. A pooled conformance witness reads the
-			// Function-valued consts above it, and a static Property's value —
-			// which runs where its const is emitted — may read a pooled
-			// constant, so the band has to stand between what it reads and what
-			// reads it.
 			...constantPool,
 			...bands.values,
 			...rewritten.implementation,
-			// The tests come last, after everything the Program declares
-			// — a test reads the implementation and nothing reads a test.
 			...rewritten.tests,
 			...(program.tests === null ? [] : [testEntryPointsExport()]),
 		],
@@ -213,19 +161,14 @@ const generateFormat = {
 	quotes: "double",
 }
 
-// What `generateProgram` needs to emit a real source map — the Essence
-// text of every Module a `loc.source` can name, keyed by canonical path, so
-// the map carries the sources verbatim as `sourcesContent` and a debugger
-// needs nothing of the machine that compiled.
+// The Essence text of every Module a `loc.source` can name, keyed by
+// canonical path. See "Source maps" in DEVELOPMENT.md.
 export type SourceMapOptions = {
 	sourceTexts: ReadonlyMap<string, string>
 }
 
-// The shape `sourceMapWithCode` answers with. The fork's own
-// declarations keep to upstream's documented surface, which predates both the
-// `sourceMap: true` mode — each emitted node reads its source off its own
-// `loc.source`, which is what lets one Module's map name several real files —
-// and this return shape, so the one call is cast, here and nowhere else.
+// The shape `sourceMapWithCode` answers with. The escodegen fork's
+// declarations omit this mode and this shape, so the call is cast.
 type GeneratedWithSourceMap = {
 	code: string
 	map: {
@@ -263,50 +206,25 @@ function generateProgram(
 	return `${code}\n${sourceMapComment(json)}`
 }
 
-// The map rides INSIDE the module's text, as an inline data URL —
-// esbuild reads a `sourceMappingURL` comment off the contents a plugin serves
-// and composes it into the bundle's map, which is the one seam the in-memory
-// `essence:` scheme offers; a file next to something that never touches disk
-// does not exist.
+// The map rides inside the module's text, since esbuild composes an inline
+// map a plugin serves. See "Source maps" in DEVELOPMENT.md.
 function sourceMapComment(map: object): string {
 	let encoded = Buffer.from(JSON.stringify(map)).toString("base64")
 
 	return `//# sourceMappingURL=data:application/json;base64,${encoded}`
 }
 
-// The prelude gets no map — not even an empty one, which esbuild
-// ignores outright and self-maps anyway. Its lines arrive in the bundle's map
-// labelled with the synthetic specifier, and the Bundler's final pass strips
-// every source that is not an on-disk `.es` file, prelude and inlined runtime
-// alike, so a debugger sees the glue as unmapped code to step over.
-
-// One Module of a bundle: the canonical path it is keyed by — which is
-// also what the Choices it declares take their identity from — and the Program
-// that path parsed into.
+// One Module of a bundle: its canonical path, which its Choices take their
+// identity from, and its Program.
 export type ModuleInput = {
 	filePath: string
 	program: common.typedSimple.Program
-	// The Module's Essence source, verbatim — read only when source maps
-	// are emitted, where it becomes the map's `sourcesContent` entry.
+	// The Module's Essence source, read only for a source map.
 	sourceText?: string
 }
 
-// A whole graph of Modules, emitted as one bundle's worth of JavaScript.
-//
-// The prelude is what makes this more than N calls to `rewrite`. A Program's
-// Essence-implemented standard library Methods are emitted as top-level
-// `$es_<Namespace>_<member>` consts, and rewriting each Module on its own would
-// give every one of them its own copy — a bundle carrying as many `List::sorted`
-// as there are Modules that reach it. So the bodies are rewritten first, the
-// existing reachability fixed point is run ONCE over their union, and the
-// consts are emitted into one synthetic Module every other one imports what it
-// names from.
-//
-// The runtime Namespace imports are per Module and per name here, where a
-// single-file Program emits all of them unconditionally. Both answers are
-// correct — esbuild shakes an unused `import * as <Name>` away — and this one
-// keeps a Module's emitted head to what its body actually reads, which is worth
-// having when there are twenty of them to read through.
+// A whole graph of Modules, emitted as one bundle's worth of JavaScript with
+// a shared prelude Module. See "A lone Program and a graph" in DEVELOPMENT.md.
 export function rewriteModules(
 	modules: Array<ModuleInput>,
 	entryPath: string,
@@ -346,9 +264,8 @@ function rewriteModuleGraph(
 				)
 			: null
 
-	// One table for the whole graph — a Protocol declared in one Module
-	// and reached from another names ONE const, which the shared prelude Module
-	// below holds and every Module that names it imports.
+	// One table for the whole graph, so a Protocol's provided Method is one
+	// const in the shared prelude Module.
 	let protocolMembers = protocolPreludeNamespaces(
 		modules.map((module) => module.program),
 	)
@@ -357,21 +274,16 @@ function rewriteModuleGraph(
 
 	return withEmission({ spellings, target, providedMembers }, () => {
 		let freeFunctions = stdlibFreeFunctions()
-		// A pool per Module, because a Module's constants are declared in
-		// it and a name declared in one Module is not in scope in another. The
-		// band is built here, before anything is asked of the Module's names:
-		// what a Module READS includes what its pooled constants read, and the
-		// runtime imports and the prelude import are both decided by that.
+		// A pool per Module, since a Module's names are not in scope in
+		// another. It is built first, because its constants' reads decide the
+		// Module's imports.
 		let bodies = modules.map((module) => {
 			let { value: body, pool } = collectingConstantPool(() =>
 				withSourcePath(module.filePath, () => [
 					...rewriteImplementationSection(
 						module.program.implementation,
 					),
-					// In the Module's own pool collection: a test reads
-					// the standard library exactly as the implementation beside
-					// it does, and a constant pooled for a test is declared in
-					// this Module's band.
+					// Tests share the Module's pool.
 					...(module.program.tests === null
 						? []
 						: rewriteTestsSection(module.program.tests)),
@@ -388,16 +300,8 @@ function rewriteModuleGraph(
 					bodies.flatMap((rewritten) => rewritten.body),
 					freeFunctions,
 					bodies.map((rewritten) => rewritten.pool),
-					// A host's prelude holds the WHOLE standard library,
-					// because what a graph reaches is a property of the graph
-					// and the prelude is served to the host under one name for
-					// every graph the build compiles. Two entries would
-					// otherwise agree on the name and disagree on what is in
-					// it, and whichever the host loaded first would answer for
-					// both — the other's Modules importing consts that are not
-					// there. Emitting all of them is what makes the answer a
-					// function of the standard library alone, and the host
-					// shakes away what its own build never names.
+					// A host's prelude holds the whole standard library. See
+					// "Emit targets" in DEVELOPMENT.md.
 					target.mode === "host" ? "whole" : "reached",
 				),
 			)
@@ -409,11 +313,8 @@ function rewriteModuleGraph(
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
-		// A bundle publishes ONE way in to the tests of every Module in
-		// it, and what a bundle exports is what its entry exports — so the
-		// entry carries it whether or not the entry itself wrote a `tests`
-		// block. A `Foo.tests.es` importing the Module it tests is exactly
-		// that shape.
+		// The entry exports the test entry points whenever any Module has
+		// tests, because a bundle exports what its entry exports.
 		let testRegistry = modules.some(
 			(module) => module.program.tests !== null,
 		)
@@ -425,10 +326,8 @@ function rewriteModuleGraph(
 					? [testEntryPointsExport()]
 					: []),
 			]
-			// Ahead of `referencedNames`, because the head NAMES the
-			// test runtime: a Module instrumented for coverage imports
-			// `$testing` for the counters alone, whether or not it wrote a
-			// `tests` block of its own.
+			// Built before `referencedNames`, because the coverage head names
+			// `$testing`.
 			let head =
 				module.program.coverage === null
 					? []
@@ -452,9 +351,8 @@ function rewriteModuleGraph(
 								),
 							]),
 					...moduleImports(module.program, spellings),
-					// Under the imports and above everything else, so
-					// that a top-level Statement's own counter finds the name
-					// bound.
+					// Above everything else, so a top-level Statement's counter
+					// finds its name bound.
 					...head,
 					...pool,
 					...body,
@@ -482,12 +380,8 @@ function rewriteModuleGraph(
 	})
 }
 
-// The shared prelude, as its own Module: the runtime imports its consts
-// read, the consts themselves in the two bands `essenceMemberBands` puts them
-// in, and one export list naming every one of them. Every const is exported
-// whether or not anything imports it — esbuild shakes the unimported ones away,
-// and deciding here which are named would mean running the fixed point once per
-// Module to find out.
+// The shared prelude as its own Module, exporting every const it holds.
+// See "A lone Program and a graph" in DEVELOPMENT.md.
 function preludeModule(
 	members: Map<string, EssenceMember>,
 	pool: Map<string, PooledConstant>,
@@ -513,28 +407,21 @@ function preludeModule(
 	}
 }
 
-// The runtime modules every emission site reads under an alias of the
-// Compiler's own rather than as a builtin Namespace.
+// The runtime modules emitted code reads under an alias of the compiler's own
+// rather than as a builtin Namespace.
 const runtimeModuleAliases = [
 	["$_", "functions"],
 	["$type", "type"],
 	["$helpers", "internalHelpers"],
-	// The test runtime, which only a test compile ever names — a Program
-	// that wrote no `tests` block never mentions it, and esbuild shakes the
-	// import away with the module behind it.
+	// The test runtime, which only a test or coverage compile names.
 	["$testing", "Testing"],
-	// Asynchrony's own module, which is ALSO the `Future` Namespace's
-	// runtime module — one file in two roles, because the Namespace's name and
-	// the module's are the same name and splitting them would put the
-	// description of a future and the machinery that runs one in two places. The
-	// alias is what the emission of `start` and `complete` reads it by; the
-	// Namespace import beside it is what a Method call on a Future reads. A
-	// Program that waits for nothing names neither, and esbuild shakes both away.
+	// Also the `Future` Namespace's runtime module. `start` and `complete`
+	// emit through this alias.
 	["$future", "Future"],
 ] as const
 
-// What a lone Program's head imports — every runtime module, and the test
-// runtime beside them exactly when the Program has tests to register.
+// What a lone Program's head imports: every runtime module, and the test
+// runtime when the Program has tests or coverage.
 function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
 	let names = allRuntimeNames()
 
@@ -545,11 +432,8 @@ function lonelyRuntimeNames(program: common.typedSimple.Program): Set<string> {
 	return names
 }
 
-// A lone Program's head is every runtime module whether the Program names
-// one or not — esbuild shakes an unused `import * as <Name>` away, so it costs
-// nothing and the head stays what it always was. The TEST runtime is the one
-// exception: only a test compile can name it, and a build that carried the
-// import would say a Program has tests in it when it has none.
+// Every runtime module but the test runtime, whose import would claim the
+// Program has tests. See "Runtime imports" in DEVELOPMENT.md.
 function allRuntimeNames(): Set<string> {
 	return new Set([
 		...runtimeNamespaceNames,
@@ -559,12 +443,8 @@ function allRuntimeNames(): Set<string> {
 	])
 }
 
-// The `import * as <Name>` head of one emitted module, restricted to the
-// runtime modules the given names mention — the whole set for a lone Program,
-// what its body reads for a Module of a bundle. `referencedNames` over-collects,
-// which is the safe direction: an import nothing reads costs a line esbuild
-// removes, while a missing one is a `ReferenceError` out of a Program that
-// compiled green.
+// The `import * as <Name>` head of one emitted module, for the runtime
+// modules `names` mentions.
 function runtimeImports(
 	names: ReadonlySet<string>,
 ): Array<estree.ImportDeclaration> {
@@ -587,14 +467,9 @@ function runtimeImports(
 	return imports
 }
 
-// What one Module imports from the others, grouped per Module so the
-// emitted head reads like the source's own block. An entry whose name erases —
-// a Type Alias, a Choice, a Protocol — contributes nothing to bind, but the
-// Module it names still has to RUN before this one, and in the order the source
-// states: so a dependency left without a single named binding gets a bare
-// `import "…"` instead. Without it a Module whose only export is a Type would
-// have its top-level Statements run wherever the bundler happened to place it,
-// or not at all.
+// What one Module imports from the others, grouped per Module in source
+// order. A dependency that binds nothing still gets a bare `import "…"`, so it
+// runs first. See "Module layout" in DEVELOPMENT.md.
 function moduleImports(
 	program: common.typedSimple.Program,
 	spellings: ReadonlyMap<string, string>,
@@ -628,9 +503,7 @@ function moduleImports(
 		}
 	}
 
-	// A re-export names a Module this one never binds anything from, and
-	// it is a dependency all the same — a facade whose only mention of a Module
-	// is one of these still has to run it.
+	// A re-exported Module is a dependency too.
 	for (let entry of program.exports?.entries ?? []) {
 		let specifier = specifierOf(entry.modulePath, spellings)
 
@@ -644,11 +517,9 @@ function moduleImports(
 	)
 }
 
-// What one Module publishes, under the name its export block gave it. A
-// re-export forwards straight from the Module it names — it was never bound
-// here, so there is nothing local to forward — and an entry whose name erases
-// publishes nothing at all: `moduleImports` above is what keeps that Module's
-// body running anyway.
+// What one Module publishes, under the names its export block gave. A
+// re-export forwards straight from the Module it names, and an erased name
+// publishes nothing.
 function moduleExports(
 	program: common.typedSimple.Program,
 	spellings: ReadonlyMap<string, string>,
@@ -738,12 +609,9 @@ function namedExport(
 	}
 }
 
-// What is being emitted, for the emission sites that can not be handed it
-// — the spellings of every Module of the graph, and the target they were
-// spelled for. Empty and `bundle` outside `rewriteModules`: a single-file
-// Program's Case tags and Type descriptors come out byte for byte as they did
-// before Modules, because a Choice identified by its bare name has no path in
-// it to render.
+// What is being emitted, for emission sites too deep to be handed it: the
+// graph's Module spellings and their target. Empty and `bundle` outside
+// `rewriteModules`.
 type Emission = {
 	spellings: ReadonlyMap<string, string>
 	target: EmitTarget
@@ -756,9 +624,8 @@ let emission: Emission = {
 	providedMembers: new Map(),
 }
 
-// `finally`, for the same reason the Namespace scope stack has one: a
-// throw out of the emission of one bundle must not leave the next Program in
-// this process rendering its tags against a graph it is not part of.
+// Restored in `finally`, so a throw out of one bundle can not leave the next
+// rendering its tags against another graph.
 function withEmission<Value>(next: Emission, emit: () => Value): Value {
 	let outer = emission
 
@@ -771,10 +638,8 @@ function withEmission<Value>(next: Emission, emit: () => Value): Value {
 	}
 }
 
-// The canonical path of the Module currently being emitted — what a
-// node's `loc` names as its source. Null everywhere outside `rewriteModules`'
-// per-Module pass: the prelude and the single-file form then attach no `loc`
-// and emit no mapping.
+// The canonical path of the Module being emitted, which a node's `loc`
+// names. Null outside a Module's pass in `rewriteModules`, so nothing is mapped.
 let currentSourcePath: string | null = null
 
 function withSourcePath<Value>(
@@ -791,19 +656,13 @@ function withSourcePath<Value>(
 	}
 }
 
-// What the Compiler emits of its OWN accord, which no source names and
-// nothing should map to. It is the same answer `locOf` gives outside a Module —
-// no source path, no `loc`, no mapping — asked for deliberately rather than by
-// standing where no Module is being emitted.
+// Emits code the compiler writes of its own accord without a mapping.
 function unmapped<Value>(emit: () => Value): Value {
 	return withSourcePath(null, emit)
 }
 
-// An Essence Position is 1-based on both axes, while escodegen reads
-// estree's convention — 1-based lines, 0-based columns. Undefined whenever the
-// node carries no position (the Simplifier synthesized it) or no Module is
-// being emitted; escodegen then emits the segment unmapped, which is exactly
-// what a debugger should see of code no source was written for.
+// An Essence Position counts columns from 1, estree from 0. Undefined for a
+// node with no Position or outside a Module's pass, which leaves it unmapped.
 function locOf(
 	position: common.Position | undefined,
 ): estree.SourceLocation | undefined {
@@ -824,18 +683,9 @@ function locOf(
 	}
 }
 
-// One nominal identity as the emitted Modules spell it. A Case tag is
-// `<Choice identity>#<Case>` and a Choice identity is `<Module path>#<Choice>`,
-// so what arrives here carries the canonical path of the Module that declared
-// it — which is a place on the machine that compiled and must not be emitted.
-// The path is replaced by the spelling the target decided and nothing else
-// changes, so the tag a value is stamped with and the tag a Type descriptor
-// compares it against are rendered by this one answer and can not disagree.
-//
-// Every string of an emitted Type descriptor comes through here, not just
-// the ones known to be tags. Over-rendering is impossible rather than merely
-// unlikely: a Module path is absolute, and no other string a descriptor can
-// hold — a Type's `type`, a Namespace's name, a Record member — is.
+// One nominal identity as the emitted Modules spell it, with the declaring
+// Module's path replaced by its spelling. See "Case tags and identities" in
+// DEVELOPMENT.md.
 function renderIdentity(text: string): string {
 	for (let [modulePath, spelling] of emission.spellings) {
 		if (text.startsWith(`${modulePath}#`)) {
@@ -846,19 +696,9 @@ function renderIdentity(text: string): string {
 	return text
 }
 
-// The same answer for a caller that holds one identity and the compile it
-// belongs to, and no graph — a host building a Case value has to stamp it with
-// the tag the emitted values carry, and that tag is spelled relative to
-// something. The rule is stated once, above; this reaches it from outside, and
-// takes the target so that a descriptor written beside a host's Modules agrees
-// with the Modules rather than with a bundle nobody emitted.
-//
-// Where a Module path ENDS is decided by the last `#` rather than by the
-// spellings map, because a Choice name can hold no `#` — the same split
-// `displayChoiceName` reads a Choice's name by. An identity with no `#` at all
-// is a builtin Choice's bare name (`Optional`, `Ordering`), which is emitted
-// verbatim, and a prefix that is not absolute is not a Module path, so neither
-// is rewritten.
+// `renderIdentity` for a caller with one identity and no graph, such as a
+// host building a Case value. See "Case tags and identities" in
+// DEVELOPMENT.md.
 export function emittedIdentity(
 	entryPath: string,
 	identity: string,
@@ -880,9 +720,8 @@ export function emittedIdentity(
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	// The outermost block a user Namespace can be declared in, and a Scope
-	// of its own for the same reason every inner block is one — the Enricher
-	// refuses a top-level `namespace List` today, but nothing here rests on that.
+	// The outermost block a user Namespace can be declared in is a Scope like
+	// every inner block.
 	return withNamespaceScope(() =>
 		implementation.nodes.flatMap((node) => rewriteStatements(node)),
 	)
@@ -890,22 +729,15 @@ function rewriteImplementationSection(
 
 // #region Statements
 
-// One Statement in, the Statements it emits out — plural, because two
-// shapes emit more than one. A Variable Declaration whose value a lowered
-// Statement computes declares its name BEFORE the block that computes it, so the
-// name outlives the block; the other is a turn of a looped Function. Every other
-// Statement is one, and each of them carries the Position of the Node it came
-// from.
+// One Statement in, its emitted Statements out, each carrying the node's
+// Position. An intrinsic Statement and a looped Function's turn emit several.
 function rewriteStatements(
 	node: common.typedSimple.ImplementationNode,
 ): Array<estree.Statement> {
 	let statements =
 		node.nodeType === "IntrinsicStatement"
 			? rewriteIntrinsicStatement(node)
-			: // The other Statement that emits more than one — a turn of a
-				// looped Function holds what it evaluated, what it assigned and the
-				// `continue` that takes it.
-				node.nodeType === "TailCallStatement"
+			: node.nodeType === "TailCallStatement"
 				? rewriteTailCallStatement(node)
 				: [rewriteStatementByKind(node)]
 
@@ -975,10 +807,8 @@ function rewriteVariableDeclarationStatement(
 function rewriteNamespaceDefinitionStatement(
 	node: common.typedSimple.NamespaceDefinitionStatementNode,
 ): estree.ClassDeclaration {
-	// Declared BEFORE the body is rewritten, because a Namespace is in
-	// scope inside its own Methods — `quadrupledValue` calling `@::doubledValue()`
-	// is a reference to the class being declared — so the two have to agree on
-	// the escaped name from the first Method onward.
+	// Declared before the body, because a Namespace is in scope inside its own
+	// Methods: `quadrupledValue` calling `@::doubledValue()` names this class.
 	declareUserNamespace(node.name.name)
 
 	return {
@@ -1021,24 +851,12 @@ function rewriteNamespaceDefinitionStatement(
 	}
 }
 
-// One Essence-implemented standard library Method, emitted as its own
-// top-level const:
+// One bodied standard library Method as its own top-level const, named as
+// the Simplifier mangled it:
 //
 //   const $es_Boolean_isNot = function (_self, other) { … }
 //
-// A native of the same Namespace stays a member read off the plain
-// `import * as <Namespace>`, so the two live side by side without either being
-// a member of the other — which is the whole point: nothing has to materialise
-// a module namespace object, so the natives the Program does not use stay
-// shakeable. `builtins.spec` fails a Method implemented in BOTH a runtime export
-// and here, so the TypeScript is deleted in the same commit that writes the
-// Essence.
-//
-// The member name is taken exactly as the Simplifier produced it, so an
-// Overload's const is named for its position in the METHOD TYPE's Overloads,
-// not among the bodied ones — a block that binds Overload 1 to the runtime and
-// writes Overload 2 in Essence emits `$es_X_m__overload$2`, and the native's
-// `X.m__overload$1` is untouched.
+// `builtins.spec.ts` fails a bodied Method that the runtime also exports.
 function rewriteEssenceMember(
 	name: string,
 	method: common.typedSimple.Method,
@@ -1056,17 +874,13 @@ function rewriteEssenceMember(
 	}
 }
 
-// The frame a native Method's default is evaluated in, emitted as its own
-// top-level const beside the Essence-implemented Methods:
+// The frame a native Method's default is evaluated in, as its own const:
 //
 //   const $es_String_trim = (_self, side = $type.createCase("Side#BothEnds")) =>
 //       String.trim(_self, side)
 //
-// It hands EVERY Parameter on, in order, so the native it fronts sees exactly
-// the Arguments its declaration takes — the generated native contract does not
-// change at all, which is the whole point of the shim. The callee is spelled by
-// hand rather than through `namespaceMember`, which would answer with this very
-// const and write the shim into itself.
+// It passes every Parameter on, so the native's contract is unchanged. The
+// callee is spelled by hand, since `namespaceMember` would answer with the shim.
 function rewriteNativeShim(
 	namespaceName: string,
 	shim: common.typedSimple.NativeShimNode,
@@ -1102,10 +916,7 @@ function rewriteNativeShim(
 				},
 				init: {
 					type: "ArrowFunctionExpression",
-					// A block only where a Record default has to be merged
-					// in before the native is called; every other shim is the
-					// one-expression arrow it has always been, and emits
-					// byte-identically.
+					// A block only where a Record default is merged in first.
 					expression: shim.prologue.length === 0,
 					params: shim.parameters.map((parameter) =>
 						rewriteParameter(parameter),
@@ -1131,20 +942,10 @@ function rewriteNativeShim(
 	}
 }
 
-// One Essence-implemented standard library Property, emitted as its own
-// top-level const — the value band's counterpart of `rewriteEssenceMember`. A
-// `static EMPTY: String = ""` becomes:
+// One standard library static Property with a value, as its own const in
+// the value band. `static EMPTY: String = ""` becomes:
 //
 //   const $es_String_EMPTY = String.createString("")
-//
-// The name is the ONE `essenceMethodIdentifier` spells, so a read of the Property
-// and a call of a Method are indistinguishable to everything downstream — which
-// is why a Namespace may not spell a Property and a Method alike.
-//
-// What makes this a band of its own rather than another const beside the
-// Methods: the initialiser runs where the const is emitted. A value-LESS static
-// Property is a native and never reaches here, so a Namespace's constants keep
-// binding to the runtime until someone gives one a body.
 function rewriteEssenceProperty(
 	namespaceName: string,
 	memberName: string,
@@ -1166,34 +967,21 @@ function rewriteEssenceProperty(
 	}
 }
 
-// The two edge sets one body draws. `references` is every `$es_…` const it
-// names at all, which is what reachability follows — a const named anywhere in an
-// emitted body has to be emitted. `evaluatedReferences` is the subset whose value
-// the body needs THE MOMENT IT RUNS: a static Property, read for its value, and a
-// Function it CALLS rather than hands on. That subset is what orders the value
-// band, and it is a subset because a Function named as a value runs later — a
-// conformance witness's `{ isNot: Boolean.isNot }` and a
-// `static F = Boolean.isNot` alike — so ordering against what its body reads
-// would refuse a Program that runs.
+// The `$es_` consts a body names, which reachability follows, and the subset
+// it needs as soon as it runs. See "Prelude emission order" in DEVELOPMENT.md.
 export type EssenceMemberReferences = {
 	references: Set<string>
 	evaluatedReferences: Set<string>
 }
 
-// One member the emitted Program needs, and the KIND that decides which
-// band it is emitted in. The kind can NOT be read back off the declaration or
-// the name: a Method's const and a Property's const are both a
-// `VariableDeclaration` named `$es_<Namespace>_<member>`, and the Map they arrive
-// in is in discovery order, which is the user Program's business rather than the
-// library's. The edges come along for the same reason — which Properties a
-// Property reads is what orders the value band.
+// One member the emitted Program needs, with the kind that picks its band.
+// The kind can not be read off the declaration.
 export type EssenceMember = {
 	kind: "function" | "value"
 	declaration: estree.VariableDeclaration | estree.FunctionDeclaration
 } & EssenceMemberReferences
 
-// The two bands of `essenceMemberBands` as one list, the Function-valued
-// members first. Only the tests ask for it: the emitter needs the seam.
+// The bands of `essenceMemberBands` as one list, for the tests.
 export function orderEssenceMembers(
 	members: Map<string, EssenceMember>,
 ): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
@@ -1202,41 +990,10 @@ export function orderEssenceMembers(
 	return [...bands.functions, ...bands.values]
 }
 
-// The reachable members in the order they are emitted, in two bands.
-//
-// A Function-valued member — an Essence Method's const, a bodied free Function's
-// declaration — may sit anywhere: its body runs only when something CALLS it,
-// long after every const is initialised, so one naming another, or naming
-// itself, resolves at call time regardless of declaration order. They keep
-// discovery order, which is what makes an ordinary Program's emission
-// byte-identical.
-//
-// A static Property's const holds the value itself, computed the moment the
-// const is reached, so the band is ordered: a Property that reads another must
-// be emitted below it. That ordering follows a Property's evaluated references
-// THROUGH the Function-valued members it calls: a Method called from inside a
-// Property's value runs there, in the value band, so every Property that Method
-// reads — and every Property read by the Methods it calls in turn — is read
-// before this const and has to stand above it. Only the Properties are ordered,
-// because only their consts hold a value; the route a Property took to reach one
-// is carried along for the refusal below to name.
-//
-// A cycle is refused rather than emitted in some arbitrary order, and a
-// SELF-edge is a cycle like any other: a Property that reads itself — directly,
-// or through a Method that reads it back — is a temporal dead zone,
-// `ReferenceError` at import out of a Program that compiled green, where a
-// Method that calls itself is only recursion. Neither shape can be written in a
-// standard library source as it stands — a Property's value is enriched where its
-// `namespace` is, so it can only read a Namespace already declared, or its OWN,
-// and of that one only a Property written above it, which is what the Validator
-// refuses to let past — so every edge points backwards. This answers for the day
-// that changes, rather than for a mistake anyone has made yet.
-//
-// The two bands are handed back apart, because one thing is emitted
-// BETWEEN them: the pooled constants. A pooled conformance witness reads the
-// Function-valued consts, and a static Property's value — which runs where its
-// const is emitted — may read a pooled constant, so the pool has to stand
-// between what it reads and what reads it.
+// The reached members in emission order: Function-valued members in
+// discovery order, then static Properties ordered by what they read. Returned
+// apart, since the pool stands between them. See "Prelude emission order" in
+// DEVELOPMENT.md.
 export function essenceMemberBands(members: Map<string, EssenceMember>): {
 	functions: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
 	values: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
@@ -1257,12 +1014,9 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 		}
 	}
 
-	// Which Properties a Function-valued member reads once it is called, and
-	// the chain of Functions the read sits at the end of. Breadth first, so the
-	// chain a refusal names is the shortest one, and memoised per Function because
-	// several Properties reach the same Method. Two Methods calling each other is
-	// ordinary recursion and no cycle here — this is plain reachability over the
-	// Function nodes, which a cycle among them can not disturb.
+	// The Properties a Function reads once called, each with the chain of
+	// Functions leading to it. Breadth first, so an error names the shortest
+	// chain.
 	let readsThroughFunctions = new Map<string, Map<string, Array<string>>>()
 
 	let readsThrough = (functionName: string): Map<string, Array<string>> => {
@@ -1303,12 +1057,9 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 		return reads
 	}
 
-	// The Properties one Property's value reads before its own const is
-	// bound, each with the Functions it was reached through — a direct read is
-	// reached through none. A reference the value only HANDS ON rather than
-	// evaluates is not here, which is what keeps a `static F = Boolean.isNot`
-	// from being ordered against everything `isNot` reads when it is eventually
-	// called.
+	// The Properties a Property's value reads before its const is bound, each
+	// with the Functions it was reached through. A reference only handed on is
+	// not a read.
 	let readsOf = (
 		member: EssenceMember,
 	): Array<{ target: string; through: Array<string> }> => {
@@ -1375,26 +1126,17 @@ export function essenceMemberBands(members: Map<string, EssenceMember>): {
 
 // #region The constant pool
 
-// One constant the emitted Module builds once and reads by name ever
-// after. `marker` is a placeholder name, not the emitted one: which constants
-// are DECLARED is only known when the Module is finished — the search above
-// rewrites every candidate standard library body and keeps a fraction of them,
-// so a name handed out while rewriting would leave the band numbered in gaps.
-// So each site is given a marker, the finished Module is read for the markers
-// that survived, and those are numbered `$pool_0` upward and renamed in place.
+// One constant the emitted module builds once. `marker` is a placeholder
+// until `constantPoolBand` names the survivors. See "The constant pool" in
+// DEVELOPMENT.md.
 type PooledConstant = { marker: string; value: estree.Expression }
 
-// Ambient, like the source path and the Namespace scopes, and for the
-// same reason: a pooled reference is emitted deep inside expression rewriting,
-// several layers below anything that knows which Module is being emitted.
+// Module state, because a pooled reference is emitted deep inside expression
+// rewriting.
 let pooledConstants = new Map<string, PooledConstant>()
 
-// One pool per emitted Module, because a name declared in one Module is
-// not in scope in another. The single-Program form above is one Module, so its
-// standard library prelude and its own code share a pool and a constant both
-// want is declared once. A BUILD is the other form whatever it is given: one
-// file or twenty, it emits the prelude as a Module of its own and each Module
-// beside it, so there each has a pool of its own.
+// One pool per emitted module, since a name declared in one module is not in
+// scope in another.
 function collectingConstantPool<Value>(emit: () => Value): {
 	value: Value
 	pool: Map<string, PooledConstant>
@@ -1410,10 +1152,8 @@ function collectingConstantPool<Value>(emit: () => Value): {
 	}
 }
 
-// `_` in both, so neither can collide with anything a user writes — the
-// Lexer reads `_` as a Symbol, so no Essence identifier holds one, which is the
-// same guarantee `$es_` rests on. The marker carries `at` so that a marker and
-// a finished name can never be confused for one another either.
+// No Essence identifier contains `_`, so neither prefix collides with a
+// user's name, and `at` keeps a marker apart from a finished name.
 const POOL_MARKER_PREFIX = "$pool_at_"
 const POOL_NAME_PREFIX = "$pool_"
 
@@ -1423,26 +1163,8 @@ function pooledReference(
 	let known = pooledConstants.get(node.key)
 
 	if (known === undefined) {
-		// The value is emitted at MODULE scope, which is where its const
-		// stands — even a deferred one, which stands below a Statement of the
-		// Module and not inside a block. A user Namespace shadowing a builtin
-		// does so for its own block, and a constant hoisted out of that block
-		// is no longer in it. `pool-constants` refuses to pool anything that
-		// could read such a name in the first place; this is the other half of
-		// the same answer, so that the two can not disagree.
-		//
-		// Rewritten BEFORE it is recorded, because the value may itself
-		// hold a pooled reference — a conditional conformance's witnesses are
-		// conformances — and recording the inner one first is what puts it
-		// above this one in the band.
-		//
-		// And rewritten UNMAPPED. The value still carries the Position of
-		// a site it was hoisted out of — whichever site was rewritten first,
-		// which is an arbitrary one of however many wrote the same constant —
-		// and a debugger stepping the band would be sent to a line the constant
-		// has nothing in particular to do with. The band is machinery no source
-		// was written for, so it maps to no source; the REFERENCE at each site
-		// keeps its own Position, which is where the value is read.
+		// Rewritten at module scope, before recording and unmapped. See
+		// "The constant pool" in DEVELOPMENT.md.
 		let value = unmapped(() =>
 			atModuleScope(() => rewriteExpression(node.value)),
 		)
@@ -1470,24 +1192,14 @@ function atModuleScope<Value>(emit: () => Value): Value {
 	}
 }
 
-// The band, and the renaming that finishes it. `roots` is everything the
-// emitted Module will hold apart from the band itself, read for the markers
-// that survived — a constant collected while rewriting a standard library
-// Method the Program turned out not to reach is not declared, because its
-// marker is nowhere. The survivors pull in what THEY read, so a witness kept
-// for one site keeps the witnesses curried onto it.
-//
-// The order is the order the constants were recorded, which is the order
-// they must be declared in: a value is recorded after everything inside it, so
-// a constant reading another always stands below it.
+// The band, in recording order, of the constants whose markers survive in
+// `roots`, and what those read. Renames every marker in place.
 function constantPoolBand(
 	pool: Map<string, PooledConstant>,
 	roots: unknown,
-	// The Module's own Statements, where a constant that can not stand in
-	// the band goes instead — see `deferredPoolPositions`. Spliced IN PLACE, so
-	// that `roots` (which holds this same array) still reaches every reference
-	// when the markers are renamed below. Null where there is no such body to
-	// splice into: the shared prelude Module declares no Namespace of its own.
+	// The module's own Statements, into which `deferredPoolPositions`'
+	// constants are spliced in place, so `roots` still reaches them. Null for
+	// the prelude Module.
 	body: Array<estree.ModuleDeclaration | estree.Statement> | null = null,
 ): Array<estree.VariableDeclaration> {
 	if (pool.size === 0) {
@@ -1563,8 +1275,7 @@ function constantPoolBand(
 		standing.push(declaration)
 	}
 
-	// Back to front, so that an index computed over the original body is
-	// still the index of the same Statement when the splice happens.
+	// Back to front, so each index still names its Statement when spliced.
 	if (body !== null) {
 		for (let index of [...deferredBands.keys()].sort((a, b) => b - a)) {
 			body.splice(index + 1, 0, ...deferredBands.get(index)!)
@@ -1577,18 +1288,9 @@ function constantPoolBand(
 	return band
 }
 
-// Which constants can NOT stand in the band, and which Statement each has
-// to stand below instead. A witness naming a top-level Namespace the Program
-// declares is the one shape this is about: the Namespace is emitted as
-// `var X = class …`, which is not hoisted, so a const above it reads
-// `undefined`. Its const goes directly below that Statement, where every read
-// of it is below too — a top-level use above the declaration is
-// `use-before-declaration`, and a body's use runs when the body is CALLED,
-// which for a Program that runs at all is below as well.
-//
-// A constant reading a DEFERRED constant is deferred with it, below whichever
-// of the two stands lower. The recording order puts an inner constant before
-// the constant that reads it, so one pass in that order settles both.
+// The constants that read a top-level declaration of the module, each with
+// the index of the Statement it must follow. See "The constant pool" in
+// DEVELOPMENT.md.
 function deferredPoolPositions(
 	constants: Array<PooledConstant>,
 	used: ReadonlySet<string>,
@@ -1629,10 +1331,8 @@ function deferredPoolPositions(
 	return deferred
 }
 
-// What each top-level Statement of the emitted Module BINDS, by index.
-// Read structurally rather than from the Program the Module came from: what a
-// constant can read is a name in the emitted JavaScript, and this is the one
-// place that says where such a name comes into being.
+// The names each top-level Statement of the emitted module binds, by index,
+// read off the emitted JavaScript.
 function topLevelDeclarationIndices(
 	body: Array<estree.ModuleDeclaration | estree.Statement>,
 ): Map<string, number> {
@@ -1657,11 +1357,8 @@ function topLevelDeclarationIndices(
 	return declaredAt
 }
 
-// The markers replaced by the names the band declares, in place. A marker
-// can stand nowhere but where this Module put one — no Essence identifier holds
-// a `_`, and nothing else in emission spells one — so a name match IS the
-// reference, and every position is looked at rather than only the ones a
-// reference is expected in.
+// Replaces the markers with the band's names, in place. Only a pool reference
+// can match a marker, so every Identifier is checked.
 function renamePooledReferences(
 	root: unknown,
 	names: ReadonlyMap<string, string>,
