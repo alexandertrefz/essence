@@ -191,16 +191,29 @@ Statement travels as written, its `§§` block included, rather than printed bac
 
 `readsMovableNames` decides whether the move is safe. Every name the Statement reads must mean the same thing in
 the Module it lands in. It does so if it is a builtin, declared in the Statement, or published by this file, which
-the landing Module then imports back. A name this file imports is let through but not imported into the landing
-Module, which then reports `unknown-name`. A name this file keeps to itself means nothing there, so the move is
+the landing Module then imports back. A name this file imports means the same once the landing Module imports it
+from the same file under the same name. A name this file keeps to itself means nothing there, so the move is
 refused. The question is asked of the rename index, which already answers what each name resolves to. A Method is
 reached through a Type rather than by name, but the Namespace declaring it must be in reach too. So a Method of a
 private Namespace refuses the move as well.
+
+Some uses write no name, and `implicitUses` reads them off the typed tree: the Namespace a call dispatches through, the
+Protocol whose body answers a provided Method, and the Choice a bare Case or a Case Matcher resolves through. A Method
+derived for a Choice, such as `is`, needs the Choice too, and derived printing needs the Namespace that states the
+Choice `is Printable`. An import entry such a use reaches travels with the Statement like one it names. A Protocol or
+Choice of this file it reaches must be published, like a name.
 
 The destinations are the other Modules in the same directory, plus a new Module named after the Declaration where
 no such file exists. A Module further away is not offered, since the move a reader means is nearly always into a
 file they can see. A Module that forwards the name is not offered either. Moving the Declaration into it would turn
 an export entry into the Declaration it forwards.
+
+`landingImports` turns away a destination that binds one of those names to something else, since the Statement would
+read that instead. A destination that already imports the same declaration, directly or through a Module that
+forwards it, needs no second entry for a use that writes no name. Where the Statement writes the name under another
+one, the destination gets a second entry, unless the name binds a Namespace, a Protocol or a Choice. Those turn the
+destination away, since two entries for one Namespace make its calls ambiguous. A destination the name is imported
+from needs no import, as long as it declares the name under the one the Statement writes.
 
 The edits follow from who still names the Declaration:
 
@@ -208,6 +221,9 @@ The edits follow from who still names the Declaration:
   export block.
 - An import of it in the landing Module is dropped, since a Module does not import what it declares.
 - This file stops publishing it, and imports it back where its body still reads it.
+- The landing Module imports what the Statement read through this file's imports. This file drops an entry that
+  nothing outside the Statement uses, by name or by a use the typed tree records. An entry for a Choice stays, since
+  the Choice's derived Methods need it where the typed tree records nothing.
 - Each other Module's entry is made to name the landing Module. A group holding only this name gets its specifier
   rewritten, which keeps its `as` and Comments. A shared group loses the entry, which is added to a group for
   the landing Module.
@@ -215,7 +231,7 @@ The edits follow from who still names the Declaration:
 Removing the Statement also removes the one blank line that no longer separates anything. No doubled blank line,
 and no blank line against a brace, is left behind.
 
-The landing Module may lose import entries and gain others in one move. `rewriteImports` computes both as one set of
+Either Module may lose import entries and gain others in one move. `rewriteImports` computes both as one set of
 edits, because an editor refuses edits that overlap. A group that loses an entry and gains others has that entry
 rewritten as the new ones, rather than being deleted and written into at once.
 

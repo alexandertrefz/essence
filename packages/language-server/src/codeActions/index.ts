@@ -265,7 +265,9 @@ export function findCodeActions(
 	)
 
 	if (wanted("refactor.move")) {
-		entries.push(...moveActions(imports, lines, range, indexed))
+		entries.push(
+			...moveActions(imports, enrichedProgram, lines, range, indexed),
+		)
 	}
 
 	if (wanted("refactor.extract")) {

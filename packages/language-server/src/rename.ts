@@ -586,7 +586,7 @@ function declareImports(
 
 // What the implementation declares at its top level, asked before the walk.
 // The tests section is a child Scope, whose names shadow an entry.
-function topLevelNames(program: parser.Program): Set<string> {
+export function topLevelNames(program: parser.Program): Set<string> {
 	let names = new Set<string>()
 
 	for (let node of program.implementation.nodes) {

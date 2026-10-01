@@ -1,5 +1,10 @@
 import * as path from "node:path"
 
+import {
+	derivedEnumerableNamespaceName,
+	derivedEquatableNamespaceName,
+	derivedPrintableNamespaceName,
+} from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -18,12 +23,15 @@ import {
 	type DeclarationKind,
 	type ProgramIndex,
 	type RenameIndex,
+	topLevelNames,
 } from "../rename"
 import type { ImportContext } from "./fixes"
 import {
+	closesItsLine,
 	containsRange,
 	insertBeforeClosingBrace,
 	lineAt,
+	opensItsLine,
 	overlaps,
 	removeLinesEdit,
 	removeMemberEdit,
@@ -70,6 +78,33 @@ type Naming = {
 	entries: Array<NamedEntry>
 }
 
+// An import entry of this Module the Statement reads, and the file it names.
+type ReadImport = {
+	entry: parser.ImportNode
+	filePath: string
+	// Whether the Statement writes the entry's local name, rather than only
+	// dispatching through what it binds.
+	named: boolean
+	// Whether it binds a Namespace, a Protocol or a Choice, which a second
+	// entry under another name would make ambiguous.
+	implicit: boolean
+	// Whether this Module may still use it once the Statement is gone.
+	keptHere: boolean
+}
+
+// A use the typed tree records without a written name. A Namespace a call
+// dispatches through is named by the name it is reachable under. A Protocol or
+// a Choice that answers a provided Method or a bare Case is named by identity.
+type ImplicitUse = { position: common.Position } & RecordedUse
+
+type RecordedUse = {
+	local: string | null
+	identity: string | null
+	// Set where derived printing answers the call, which also needs the
+	// Namespace that states the Choice `is Printable`.
+	conformers?: true
+}
+
 // Everything about the move that does not depend on its destination.
 type Move = {
 	context: ImportContext
@@ -81,6 +116,8 @@ type Move = {
 	// The published names of this Module the Statement reads, which the
 	// destination imports.
 	needed: Array<string>
+	// The destination imports these from the Modules they name.
+	imports: Array<ReadImport>
 	removal: CodeActionEdit
 	// The edit that stops this Module publishing it, or null where it never
 	// did.
@@ -93,15 +130,17 @@ const implementationKeyword = "implementation"
 
 export function moveActions(
 	context: ImportContext | null,
+	enrichedProgram: common.typed.Program | null,
 	lines: Array<string>,
 	range: common.Position,
 	indexed: () => ProgramIndex,
 ): Array<CodeActionEntry> {
-	if (context === null) {
+	// Without the typed tree, what a call dispatches through is unknown.
+	if (context === null || enrichedProgram === null) {
 		return []
 	}
 
-	let move = movableAt(context, lines, range, indexed)
+	let move = movableAt(context, enrichedProgram, lines, range, indexed)
 
 	if (move === null) {
 		return []
@@ -118,6 +157,7 @@ export function moveActions(
 // not offer it.
 function movableAt(
 	context: ImportContext,
+	enrichedProgram: common.typed.Program,
 	lines: Array<string>,
 	range: common.Position,
 	indexed: () => ProgramIndex,
@@ -157,9 +197,16 @@ function movableAt(
 		// The Workspace's cached index, since indexing costs what a Rename
 		// does.
 		let { index } = indexed()
-		let needed = readsMovableNames(program, index, span)
+		let uses = implicitUses(enrichedProgram)
+		let reads = readsMovableNames(context, index, uses, span)
 
-		if (needed === null) {
+		if (reads === null) {
+			return null
+		}
+
+		let imports = importsRead(context, index, uses, span, reads.imports)
+
+		if (imports === null) {
 			return null
 		}
 
@@ -178,7 +225,8 @@ function movableAt(
 			context,
 			lines,
 			name,
-			needed,
+			needed: reads.needed,
+			imports,
 			span,
 			text: sliceOf(lines, {
 				start: { line: span.start.line, column: 1 },
@@ -227,19 +275,23 @@ function declarationOf(node: parser.ImplementationNode): Declared | null {
 }
 
 // Whether every name the Statement reads means the same in its destination.
-// Null refuses the move; otherwise the published names it reads, which the
-// destination imports. See "Moving a Declaration" in DEVELOPMENT.md.
+// Null refuses the move; otherwise the published names and the imports it
+// reads, which the destination imports. See "Moving a Declaration" in
+// DEVELOPMENT.md.
 function readsMovableNames(
-	program: parser.Program,
+	context: ImportContext,
 	index: RenameIndex,
+	uses: Array<ImplicitUse>,
 	span: common.Position,
-): Array<string> | null {
+): { needed: Array<string>; imports: Array<Declaration> } | null {
+	let program = context.program
 	let published = new Set(
 		(program.exports?.entries ?? [])
 			.filter((entry) => entry.source === null)
 			.map((entry) => entry.name.content),
 	)
 	let needed = new Set<string>()
+	let imports = new Set<Declaration>()
 
 	for (let occurrence of index) {
 		let declaration = occurrence.declaration
@@ -271,7 +323,13 @@ function readsMovableNames(
 			continue
 		}
 
-		if (declaration.builtin || declaration.kind === "import") {
+		if (declaration.builtin) {
+			continue
+		}
+
+		if (declaration.kind === "import") {
+			imports.add(declaration)
+
 			continue
 		}
 
@@ -290,7 +348,408 @@ function readsMovableNames(
 		needed.add(occurrence.name)
 	}
 
-	return [...needed]
+	// A provided Method or a bare Case reaches a Protocol or a Choice of this
+	// file without naming it.
+	for (let use of uses) {
+		let owner = use.identity === null ? null : ownerOf(use.identity)
+
+		if (
+			owner === null ||
+			owner.filePath !== context.filePath ||
+			!containsRange(span, use.position)
+		) {
+			continue
+		}
+
+		let declared = program.implementation.nodes.find(
+			(node) =>
+				(node.nodeType === "ProtocolDeclarationStatement" ||
+					node.nodeType === "ChoiceDeclarationStatement") &&
+				node.name.content === owner.name,
+		)
+
+		if (declared !== undefined && containsRange(span, declared.position)) {
+			continue
+		}
+
+		if (!published.has(owner.name)) {
+			return null
+		}
+
+		needed.add(owner.name)
+	}
+
+	return { needed: [...needed], imports: [...imports] }
+}
+
+// The file and name an identity is made of, or null for one the standard
+// library or a nested Protocol holds, which no entry names.
+function ownerOf(identity: string): { filePath: string; name: string } | null {
+	let at = identity.lastIndexOf("#")
+	let name = identity.slice(at + 1)
+
+	if (at === -1 || name.includes("@")) {
+		return null
+	}
+
+	return { filePath: identity.slice(0, at), name }
+}
+
+// See `ImplicitUse`. A Type is not entered: a Namespace's Type lists every
+// Method, and the Protocols those provide are no use of anything.
+function implicitUses(program: common.typed.Program): Array<ImplicitUse> {
+	let uses: Array<ImplicitUse> = []
+
+	let visit = (node: unknown, position: common.Position | null): void => {
+		if (Array.isArray(node)) {
+			for (let item of node) {
+				visit(item, position)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (typeof record["type"] === "string" && !("nodeType" in record)) {
+			return
+		}
+
+		let here = isPosition(record["position"])
+			? record["position"]
+			: position
+
+		if (here !== null) {
+			for (let use of usesRecordedOn(record)) {
+				uses.push({ position: here, ...use })
+			}
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value, here)
+		}
+	}
+
+	visit(program, null)
+
+	return uses
+}
+
+// The fields the linker counts as uses of an import. See "Unused imports" in
+// packages/compiler/src/modules/DEVELOPMENT.md.
+function usesRecordedOn(record: Record<string, unknown>): Array<RecordedUse> {
+	let uses: Array<RecordedUse> = []
+	let namespace = record["namespace"] as { name?: unknown } | undefined
+	let type = record["type"] as
+		| { type?: unknown; choice?: unknown }
+		| undefined
+
+	if (
+		record["nodeType"] === "MethodInvocation" &&
+		typeof namespace?.name === "string"
+	) {
+		uses.push({ local: namespace.name, identity: null })
+
+		let member = (record["member"] as { name: string }).name
+
+		// A Protocol's body answers the call through the receiver's own
+		// witness, which the call passes as `Self`.
+		for (let conformance of record[
+			"conformances"
+		] as Array<common.Conformance>) {
+			let provider =
+				conformance.genericName === "Self" &&
+				conformance.source.kind === "namespace"
+					? conformance.source.providedMethods?.[member]
+					: undefined
+
+			if (provider !== undefined) {
+				uses.push({ local: null, identity: provider })
+			}
+		}
+
+		uses.push(...derivedUses(namespace.name, record["base"]))
+	}
+
+	if (typeof record["namespaceName"] === "string") {
+		uses.push({ local: record["namespaceName"], identity: null })
+		uses.push(
+			...derivedUses(record["namespaceName"], {
+				type: record["memberType"],
+			}),
+		)
+	}
+
+	if (record["kind"] === "namespace" && typeof record["name"] === "string") {
+		uses.push({ local: record["name"], identity: null })
+	}
+
+	if (typeof record["providedBy"] === "string") {
+		uses.push({ local: null, identity: record["providedBy"] })
+	}
+
+	if (
+		record["nodeType"] === "CaseValue" &&
+		record["choice"] === null &&
+		type?.type === "Case" &&
+		typeof type.choice === "string"
+	) {
+		uses.push({ local: null, identity: type.choice })
+	}
+
+	// A Match Handler, whose Case Matcher narrows `@` to the declared Choice
+	// where that Choice is in scope.
+	let matcher = record["matcher"] as
+		| { type?: unknown; choice?: unknown }
+		| undefined
+
+	if (matcher?.type === "Case" && typeof matcher.choice === "string") {
+		uses.push({ local: null, identity: matcher.choice })
+	}
+
+	return uses
+}
+
+// A Choice's derived Methods answer through a Namespace no source names, and
+// need the Choice in scope. The receiver's Type says which Choice it is.
+const derivedNamespaces = new Set([
+	derivedEnumerableNamespaceName,
+	derivedEquatableNamespaceName,
+	derivedPrintableNamespaceName,
+])
+
+function derivedUses(
+	namespaceName: string,
+	receiver: unknown,
+): Array<RecordedUse> {
+	if (!derivedNamespaces.has(namespaceName)) {
+		return []
+	}
+
+	let type = (receiver as { type?: common.Type } | undefined)?.type
+	let members = type?.type === "UnionType" ? type.types : [type]
+	let choices = new Set(
+		members.map((member) =>
+			member !== undefined && "type" in member && member.type === "Case"
+				? member.choice
+				: null,
+		),
+	)
+
+	let conformers =
+		namespaceName === derivedPrintableNamespaceName
+			? { conformers: true as const }
+			: {}
+
+	return [...choices].flatMap((choice) =>
+		choice === null
+			? []
+			: [{ local: null, identity: choice, ...conformers }],
+	)
+}
+
+function isPosition(value: unknown): value is common.Position {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"start" in value &&
+		"end" in value
+	)
+}
+
+// The import entries the Statement reads, by name or by an implicit use, each
+// with the file it names. Null refuses the move, where an entry names no file.
+function importsRead(
+	context: ImportContext,
+	index: RenameIndex,
+	uses: Array<ImplicitUse>,
+	span: common.Position,
+	declarations: Array<Declaration>,
+): Array<ReadImport> | null {
+	let workspace = context.workspace
+	let resolutions = workspace.dependenciesOf(context.filePath)
+	let read: Array<ReadImport> = []
+
+	for (let entry of context.program.imports?.entries ?? []) {
+		let local = entry.alias ?? entry.name
+		let filePath = resolutions.get(entry.source.path) ?? null
+		let binding =
+			filePath === null
+				? null
+				: bindingOf(workspace, filePath, entry.name.content)
+		let usesEntry = (use: ImplicitUse): boolean =>
+			use.local === local.content ||
+			(use.identity !== null &&
+				binding !== null &&
+				(binding.identities.has(use.identity) ||
+					(use.conformers === true &&
+						binding.targets.has(use.identity))))
+		let named = declarations.some(
+			(candidate) =>
+				candidate.definition !== null &&
+				isSamePosition(candidate.definition, local.position),
+		)
+
+		if (
+			!named &&
+			!uses.some(
+				(use) => usesEntry(use) && containsRange(span, use.position),
+			)
+		) {
+			continue
+		}
+
+		if (filePath === null || binding === null) {
+			return null
+		}
+
+		read.push({
+			entry,
+			filePath,
+			named,
+			implicit: binding.implicit,
+			keptHere:
+				binding.reachedUnseen ||
+				readOutside(index, local.position, span) ||
+				uses.some(
+					(use) =>
+						usesEntry(use) && !containsRange(span, use.position),
+				),
+		})
+	}
+
+	return read
+}
+
+// What an entry binds, as the identities of the declarations behind its name,
+// and of the Choices a Namespace it binds is written for. A Choice's derived
+// Methods need the Choice in scope where the typed tree records no use of it,
+// so `reachedUnseen` keeps its entry. So does an entry whose declaration is not
+// found.
+function bindingOf(
+	workspace: ImportContext["workspace"],
+	filePath: string,
+	name: string,
+): {
+	identities: Set<string>
+	targets: Set<string>
+	implicit: boolean
+	reachedUnseen: boolean
+} {
+	let identities = new Set<string>()
+	let targets = new Set<string>()
+	let implicit = false
+	let reachedUnseen = false
+
+	for (let exported of workspace.exportsOf(filePath)) {
+		let text = workspace.sourceOf(exported.declaredIn)
+		let program = workspace.programOf(exported.declaredIn)
+
+		if (exported.name !== name || text === null || program === null) {
+			continue
+		}
+
+		let declared = sliceOf(text.split("\n"), exported.position)
+
+		identities.add(`${exported.declaredIn}#${declared}`)
+
+		for (let node of program.implementation.nodes) {
+			if (
+				node.nodeType === "ChoiceDeclarationStatement" &&
+				node.name.content === declared
+			) {
+				reachedUnseen = true
+			}
+
+			if (
+				(node.nodeType === "ChoiceDeclarationStatement" ||
+					node.nodeType === "ProtocolDeclarationStatement" ||
+					node.nodeType === "NamespaceDefinitionStatement") &&
+				node.name.content === declared
+			) {
+				implicit = true
+			}
+
+			if (
+				node.nodeType === "NamespaceDefinitionStatement" &&
+				node.name.content === declared &&
+				node.targetType?.nodeType === "IdentifierTypeDeclaration"
+			) {
+				let target = choiceNamed(
+					workspace,
+					exported.declaredIn,
+					program,
+					node.targetType.type.content,
+				)
+
+				if (target !== null) {
+					targets.add(target)
+				}
+			}
+		}
+	}
+
+	return {
+		identities,
+		targets,
+		implicit: implicit || identities.size === 0,
+		reachedUnseen: reachedUnseen || identities.size === 0,
+	}
+}
+
+// The identity of the Choice a name means in a Module, declared there or
+// imported straight from its declaring Module.
+function choiceNamed(
+	workspace: ImportContext["workspace"],
+	filePath: string,
+	program: parser.Program,
+	name: string,
+): string | null {
+	if (
+		program.implementation.nodes.some(
+			(node) =>
+				node.nodeType === "ChoiceDeclarationStatement" &&
+				node.name.content === name,
+		)
+	) {
+		return `${filePath}#${name}`
+	}
+
+	let entry = program.imports?.entries.find(
+		(candidate) => (candidate.alias ?? candidate.name).content === name,
+	)
+	let dependency =
+		entry === undefined
+			? undefined
+			: workspace.dependenciesOf(filePath).get(entry.source.path)
+	let declaring =
+		dependency === undefined ? null : workspace.programOf(dependency)
+
+	if (entry === undefined || dependency === undefined || declaring === null) {
+		return null
+	}
+
+	return choiceNamed(workspace, dependency, declaring, entry.name.content)
+}
+
+// Whether anything outside the Statement reads the entry's local name.
+function readOutside(
+	index: RenameIndex,
+	local: common.Position,
+	span: common.Position,
+): boolean {
+	return index.some(
+		(occurrence) =>
+			occurrence.declaration.kind === "import" &&
+			occurrence.declaration.definition !== null &&
+			isSamePosition(occurrence.declaration.definition, local) &&
+			!isSamePosition(occurrence.position, local) &&
+			!containsRange(span, occurrence.position),
+	)
 }
 
 // Whether the destination can see the Namespace a dispatch resolved to. Null
@@ -484,7 +943,15 @@ function rewriteImports(
 			})
 			gone = gone.slice(1)
 		} else if (gone.length === group.entries.length) {
-			edits.push(removeLinesEdit(lines, group.position))
+			// A group sharing its line loses its span alone. A new group
+			// written beside it then meets the deletion rather than landing
+			// inside it.
+			edits.push(
+				opensItsLine(lines, group.position.start) &&
+					closesItsLine(lines, group.position.end)
+					? removeLinesEdit(lines, group.position)
+					: { range: group.position, newText: "" },
+			)
 
 			continue
 		}
@@ -602,17 +1069,18 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 		edits.push(move.unpublish)
 	}
 
-	if (move.usedHere) {
-		let edit = insertImportEdit(
+	// This Module drops the imports only the Statement read, and imports the
+	// Declaration back where it still reads it.
+	edits.push(
+		...rewriteImports(
 			move.context.documentText,
 			move.context.program,
-			{ name: move.name, alias: null, specifier },
-		)
-
-		if (edit !== null) {
-			edits.push(edit)
-		}
-	}
+			move.imports
+				.filter((read) => !read.keptHere)
+				.map((read) => read.entry),
+			move.usedHere ? [{ name: move.name, alias: null, specifier }] : [],
+		),
+	)
 
 	for (let naming of otherNamings) {
 		edits.push(...retargetEdits(move, naming, target.filePath))
@@ -632,8 +1100,8 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 }
 
 // What lands in the destination: the Statement, its export entry where
-// needed, and the names it reads from this Module. The destination's own
-// imports of the name go, since it now declares it.
+// needed, and the imports it reads through. The destination's own imports of
+// the name go, since it now declares it.
 function landingEdits(
 	move: Move,
 	target: Target,
@@ -642,12 +1110,11 @@ function landingEdits(
 ): Array<CodeActionEdit> | null {
 	let sourceText = target.sourceText
 	let program = target.program
-	// Imported back from this Module, which still publishes them.
-	let imports = move.needed.map((name) => ({
-		name,
-		alias: null,
-		specifier: relativeSpecifier(target.filePath, move.context.filePath),
-	}))
+	let imports = landingImports(move, target)
+
+	if (imports === null) {
+		return null
+	}
 
 	// A new or blank file gets a whole Program.
 	if (sourceText === null || program === null || sourceText.trim() === "") {
@@ -729,6 +1196,114 @@ function landingEdits(
 	}
 
 	return edits
+}
+
+// What the destination imports for the Statement: the names it reads that
+// this Module publishes, and the entries it reads this Module's imports
+// through. Null refuses the destination, where it binds one of those names to
+// something else.
+function landingImports(move: Move, target: Target): Array<ImportEntry> | null {
+	let workspace = move.context.workspace
+	let reads = [
+		...move.needed.map((name) => ({
+			name,
+			alias: null,
+			filePath: move.context.filePath,
+			named: true,
+			implicit: bindingOf(workspace, move.context.filePath, name)
+				.implicit,
+		})),
+		...move.imports.map(({ entry, filePath, named, implicit }) => ({
+			name: entry.name.content,
+			alias: entry.alias?.content ?? null,
+			filePath,
+			named,
+			implicit,
+		})),
+	]
+	let program = target.program
+	let declared = program === null ? new Set<string>() : topLevelNames(program)
+	let resolutions = workspace.dependenciesOf(target.filePath)
+	let imports: Array<ImportEntry> = []
+
+	for (let read of reads) {
+		let local = read.alias ?? read.name
+
+		// The name comes from the destination itself, which needs no import
+		// where it declares the name under the one the Statement writes.
+		if (read.filePath === target.filePath) {
+			if (
+				(read.alias === null || !read.named) &&
+				publishesOwn(program, read.name)
+			) {
+				continue
+			}
+
+			return null
+		}
+
+		// A use that writes no name is served under any name. A second entry
+		// would make a Namespace's calls ambiguous, so only a name with no
+		// implicit use gets one. An entry through a Module that forwards the
+		// declaration binds it too.
+		let identities = bindingOf(
+			workspace,
+			read.filePath,
+			read.name,
+		).identities
+		let same = program?.imports?.entries.find((entry) => {
+			let filePath = resolutions.get(entry.source.path)
+
+			return (
+				filePath !== undefined &&
+				[
+					...bindingOf(workspace, filePath, entry.name.content)
+						.identities,
+				].some((identity) => identities.has(identity))
+			)
+		})
+
+		if (same !== undefined) {
+			if (!read.named || (same.alias ?? same.name).content === local) {
+				continue
+			}
+
+			if (read.implicit) {
+				return null
+			}
+		}
+
+		if (
+			declared.has(local) ||
+			program?.imports?.entries.some(
+				(entry) => (entry.alias ?? entry.name).content === local,
+			) === true
+		) {
+			return null
+		}
+
+		imports.push({
+			name: read.name,
+			alias: read.alias,
+			specifier: relativeSpecifier(target.filePath, read.filePath),
+		})
+	}
+
+	return imports
+}
+
+// Whether a Module declares the name and publishes it as itself.
+function publishesOwn(program: parser.Program | null, name: string): boolean {
+	return (
+		program !== null &&
+		topLevelNames(program).has(name) &&
+		(program.exports?.entries ?? []).some(
+			(entry) =>
+				entry.source === null &&
+				entry.alias === null &&
+				entry.name.content === name,
+		)
+	)
 }
 
 function moduleText(

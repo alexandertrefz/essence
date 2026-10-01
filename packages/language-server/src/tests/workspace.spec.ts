@@ -4446,6 +4446,288 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
+			const helping = [
+				"implementation {",
+				"\tfunction helper(_ n: Integer) -> Integer {",
+				"\t\t<- n::add(1)",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\thelper",
+				"}",
+				"",
+			].join("\n")
+
+			// The import goes with the Statement, and this Module drops it once
+			// nothing here reads it.
+			it("should carry an import the Declaration reads to the Module it lands in", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+					"C.es": helping,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant one = 1",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tone",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The entry travels under the name the Statement reads it by, and
+			// stays here while another Statement reads it too.
+			it("should carry an aliased import and keep one this Module still reads", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper as bump }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- bump(n)",
+						"\t}",
+						"",
+						"\tconstant once = bump(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": helping,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					[
+						"import {",
+						'\tfrom "./C.es" { helper as bump }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = bump(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./C.es" { helper as bump }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- bump(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The Module the name comes from declares it, so it imports nothing.
+			// This Module's entry for the name it no longer reads becomes the
+			// entry that imports the Declaration back.
+			it("should move a Declaration into the Module it imports from", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"",
+						"\tconstant once = run(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": helping,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./C.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					[
+						"import {",
+						'\tfrom "./C.es" { run }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = run(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("C.es")]).toBe(
+					[
+						"implementation {",
+						"\tfunction helper(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(1)",
+						"\t}",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\thelper",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("C.es"))).toEqual([])
+			})
+
+			// A call dispatching into an imported Namespace needs that
+			// Namespace in reach, though no name of it is written.
+			it("should carry the import of a Namespace a call dispatches to", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": [
+						"implementation {",
+						"\tnamespace IntegerExtras for Integer {",
+						"\t\tdoubled() -> Integer {",
+						"\t\t\t<- @::multiply(with 2)",
+						"\t\t}",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tIntegerExtras",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { IntegerExtras }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
 			// The Module it lands in drops its entry for the Declaration and
 			// gains one for `STEP` in the same group. The one replaces the other.
 			it("should import what the Declaration reads in place of the entry that named it", () => {
@@ -4502,6 +4784,667 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("Main.es"))).toEqual(
 					[],
 				)
+			})
+
+			const sizing = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\ttwice() -> Integer {",
+				"\t\t\t<- @::size()::multiply(with 2)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype BoxValue = { n: Integer }",
+				"",
+				"\tnamespace Box for BoxValue is Sized {",
+				"\t\tstatic of(_ n: Integer) -> BoxValue {",
+				"\t\t\t<- { n }",
+				"\t\t}",
+				"",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- @.n",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tBox",
+				"\tBoxValue",
+				"\tSized",
+				"}",
+				"",
+			].join("\n")
+
+			const suits = [
+				"implementation {",
+				"\tchoice Suit { Hearts, Spades }",
+				"",
+				"\tfunction paint(_ suit: Suit) -> String {",
+				"\t\t<- match suit -> String {",
+				'\t\t\tcase #Hearts { <- "red" }',
+				'\t\t\tcase #Spades { <- "black" }',
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tSuit",
+				"\tpaint",
+				"}",
+				"",
+			].join("\n")
+
+			// `twice` is answered by the body `Sized` provides, which needs
+			// `Sized` in scope though the call never writes it.
+			it("should carry the Protocol whose provided Method the Declaration calls", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Box Sized }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- Box.of(n)::twice()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": sizing,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Box Sized }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			it("should keep an import whose Protocol a provided Method here still calls", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Box Sized }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction measured<Item is Sized>(_ item: Item) -> Integer {",
+						"\t\t<- item::size()",
+						"\t}",
+						"",
+						"\tconstant once = Box.of(2)::twice()",
+						"}",
+						"",
+						"export {",
+						"\tmeasured",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": sizing,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"measured",
+					"Move 'measured' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Box Sized }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The linker counts no bare Case as a use of its Choice, so it warns
+			// about each entry a bare Case needs.
+			it("should carry the Choice a bare Case in the Declaration resolves through", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Suit paint }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction favourite() -> String {",
+						"\t\tconstant chosen = #Hearts",
+						"",
+						"\t\t<- paint(chosen)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tfavourite",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": suits,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"favourite",
+					"Move 'favourite' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Suit paint }',
+				)
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([
+					"unused-import",
+				])
+			})
+
+			// `is` on a Case is derived, which needs the Choice in scope though
+			// the call never writes it.
+			it("should carry the Choice a derived Method in the Declaration needs", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Suit pick }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction check() -> Boolean {",
+						"\t\t<- pick()::is(pick())",
+						"\t}",
+						"",
+						"\tconstant favourite: Suit = #Hearts",
+						"}",
+						"",
+						"export {",
+						"\tcheck",
+						"\tfavourite",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": [
+						"implementation {",
+						"\tchoice Suit { Hearts, Spades }",
+						"",
+						"\tfunction pick() -> Suit {",
+						"\t\t<- Suit#Spades",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tSuit",
+						"\tpick",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"check",
+					"Move 'check' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Suit pick }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// Derived printing also needs the Namespace that states the Choice
+			// `is Printable`. The linker counts no use of that Namespace, so it
+			// warns about the entry.
+			it("should carry the Namespace that makes a Choice printable", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Suit SuitShow pick }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction shown() -> String {",
+						"\t\t<- pick()::toString()",
+						"\t}",
+						"",
+						"\tconstant favourite: Suit = #Hearts",
+						"}",
+						"",
+						"export {",
+						"\tfavourite",
+						"\tshown",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": [
+						"implementation {",
+						"\tchoice Suit { Hearts, Spades }",
+						"",
+						"\tnamespace SuitShow for Suit is Printable {",
+						"\t}",
+						"",
+						"\tfunction pick() -> Suit {",
+						"\t\t<- Suit#Spades",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tSuit",
+						"\tSuitShow",
+						"\tpick",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"shown",
+					"Move 'shown' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Suit SuitShow pick }',
+				)
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([
+					"unused-import",
+				])
+			})
+
+			// The bare `#Hearts` left behind still resolves through `Suit`.
+			it("should keep an import of a Choice this Module reaches through a bare Case", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { Suit paint }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction isRed(_ suit: Suit) -> Boolean {",
+						"\t\t<- suit::is(Suit#Hearts)",
+						"\t}",
+						"",
+						"\tconstant chosen = #Hearts",
+						"\tconstant painted = paint(chosen)",
+						"}",
+						"",
+						"export {",
+						"\tisRed",
+						"\tpainted",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": suits,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"isRed",
+					"Move 'isRed' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { Suit paint }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([
+					"unused-import",
+				])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			const extras = [
+				"implementation {",
+				"\tnamespace IntegerExtras for Integer {",
+				"\t\tstatic seed() -> Integer {",
+				"\t\t\t<- 10",
+				"\t\t}",
+				"",
+				"\t\tdoubled() -> Integer {",
+				"\t\t\t<- @::multiply(with 2)",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tIntegerExtras",
+				"}",
+				"",
+			].join("\n")
+
+			// `F.es` forwards the very Namespace the Statement dispatches
+			// through, so the entry for it already serves.
+			it("should dispatch through a Namespace the Module it lands in reaches through a forwarding Module", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./F.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = 1::doubled()",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": extras,
+					"F.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n").slice(0, 3)).toEqual([
+					"import {",
+					'\tfrom "./F.es" { IntegerExtras }',
+					"}",
+				])
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// A second entry for one Namespace would make every call through it
+			// ambiguous, its own Module's included.
+			it("should dispatch through a Namespace the Module it lands in imports under another name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras as Extras }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = 1::doubled()",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": extras,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./C.es" { IntegerExtras as Extras }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The Statement writes `Extras`, which `B.es` and `C.es` both bind
+			// to the Namespace under another name.
+			it("should not offer a Module that binds a Namespace the Declaration names under another name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras as Extras }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- Extras.seed()::add(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./C.es" { IntegerExtras }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = 1::doubled()",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": extras,
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 6, "run").map(
+						(action) => action.title,
+					),
+				).toEqual(["Move 'run' to a new Module"])
+			})
+
+			// A Function bound twice is no ambiguity, so the name the
+			// Statement writes joins the one already there.
+			it("should write a second entry for a Function the Module it lands in imports under another name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./C.es" { helper as bump }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant once = bump(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": helping,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The group that goes shares its line with the new one written
+			// before it. The Formatter closes up the space it leaves.
+			it("should swap a group in an import block written on one line", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						'import { from "./C.es" { helper } }',
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"",
+						"\tconstant once = run(1)",
+						"}",
+						"",
+						"export {",
+						"\tonce",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"C.es": helping,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]?.split("\n")[0]).toBe(
+					'import { from "./B.es" { run }  }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// The name would read the destination's own `helper` there.
+			it("should not offer a Module that binds an imported name to something else", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"implementation {",
+						"\tfunction helper(_ n: Integer) -> Integer {",
+						"\t\t<- n",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": helping,
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 6, "run").map(
+						(action) => action.title,
+					),
+				).toEqual([
+					"Move 'run' to ./C.es",
+					"Move 'run' to a new Module",
+				])
 			})
 
 			// A Type is one of those names too, and a Module the file
