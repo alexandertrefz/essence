@@ -1,16 +1,6 @@
-// The runtime module of the `PositiveRational` Namespace — the Rationals
-// a Program has proven are above zero. The Simplifier emits
-// `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
-// this is the whole of it: every entry is a Function another module already
-// holds, under the name this Namespace gives it.
-//
-// Nothing is written a second time here, and that is the point rather
-// than a shortcut, for the reason `PositiveInteger.ts` gives. What the
-// Namespace adds is only what each answer's Type says — that a sum with a
-// non-negative Rational and a product with a positive one are above zero, and
-// that the root of a positive ratio of perfect squares is. `squareRoot` is
-// `NonNegativeRational`'s, which reads the root off `Rational`'s Optional entry
-// — a positive Rational is a non-negative one, and the root is the same root.
+// The `PositiveRational` Namespace: other modules' Functions under its names.
+// A positive Rational is a non-negative one, so `squareRoot` is
+// `NonNegativeRational`'s. See "Refined Namespaces" in DEVELOPMENT.md.
 export {
 	add__overload$1 as add,
 	multiply__overload$1 as multiply,

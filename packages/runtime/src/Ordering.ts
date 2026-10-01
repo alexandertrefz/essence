@@ -1,17 +1,12 @@
 import { typeKeySymbol } from "./type"
 
-// `Ordering` is the builtin Choice — its values carry Case tags
-// (`"Ordering#Less"`) exactly like user-declared Cases do.
+// A builtin Choice. See "Builtin Choices" in DEVELOPMENT.md.
 export type LessType = { [typeKeySymbol]: "Ordering#Less" }
 export type EqualType = { [typeKeySymbol]: "Ordering#Equal" }
 export type GreaterType = { [typeKeySymbol]: "Ordering#Greater" }
 export type OrderingType = LessType | EqualType | GreaterType
 
-// Shared unit instances for the compare Methods — Case equality goes
-// by tag, so these being singletons is an optimisation, not a semantic. The
-// numeric tower and every other `compare` return these, so they stay native
-// even though `is`, `isNot` and `toString` are all derived from the Choice —
-// see `packages/standard-library/sources/Ordering.es`.
+// What every native `compare` answers.
 export const less: LessType = { [typeKeySymbol]: "Ordering#Less" }
 export const equal: EqualType = { [typeKeySymbol]: "Ordering#Equal" }
 export const greater: GreaterType = { [typeKeySymbol]: "Ordering#Greater" }
