@@ -13,10 +13,9 @@ import {
 	snippetsFor,
 } from "../snippets"
 
-// Every member of `SnippetContext`, written out. TypeScript already
-// refuses a body that names one that is not there; what this catches is the
-// other direction — a context added to the union and given no home, and a
-// context spelled in a test that no body ever declares.
+// Every member of `SnippetContext`, written out. TypeScript refuses a body
+// naming a missing one. This catches a context added with no home, and one a
+// spec spells that no body declares.
 const contexts: Array<SnippetContext> = [
 	"top",
 	"implementation",
@@ -33,19 +32,17 @@ const contexts: Array<SnippetContext> = [
 	"define",
 ]
 
-// The contexts that exist to REFUSE — a Case list, a list of overload
-// signatures and a Parameter list each take one shape of writing, and no
-// snippet here is it. Written out so that a body claiming one fails the test
-// above rather than quietly being offered where nothing parses.
+// The contexts that exist to refuse. A Case list, an `overload` group and a
+// Parameter list each take a shape no snippet writes, so a body claiming one
+// fails a spec.
 const refusingContexts: Array<SnippetContext> = [
 	"choice",
 	"overload",
 	"parameters",
 ]
 
-// The same walk `renderPlaceholders` takes, kept here rather than
-// exported beside it: what it answers is a fact about a MALFORMED body, which
-// the Server has no reader for.
+// The walk `renderPlaceholders` takes, kept here rather than exported, since
+// it answers about a malformed body the Server never reads.
 function placeholderDepth(text: string): number {
 	let open = 0
 	let index = 0
@@ -97,11 +94,9 @@ describe("the snippet table", () => {
 		}
 	})
 
-	// `$0` is where the Editor leaves the cursor once every tab stop has
-	// been visited, and a body without one leaves it at the end of what was
-	// written — which for a four-line scaffold is the line below it rather than
-	// the hole it opened. A body that IS a complete value has nothing left to
-	// fill in and says so by carrying none.
+	// `$0` is where the Editor leaves the cursor after the last tab stop.
+	// Without one the cursor lands after the scaffold, not in the hole it opened.
+	// A body that is a complete value carries none.
 	it("leaves the cursor somewhere in every body that opens a hole", () => {
 		const complete = new Set(["dictionary-empty"])
 
@@ -125,9 +120,8 @@ describe("the snippet table", () => {
 				snippet.prefix,
 				0,
 			])
-			// A `$` left in the rendered text is a tab stop the renderer
-			// did not recognise — `${1` with no colon and no close, which an
-			// Editor writes out verbatim.
+			// A `$` left in the rendered text is a tab stop the renderer did not
+			// recognise, such as an unclosed `${1`. An Editor writes it out verbatim.
 			expect([snippet.prefix, renderPlaceholders(body)]).toEqual([
 				snippet.prefix,
 				renderPlaceholders(body).replace(/\$/g, ""),
@@ -135,12 +129,9 @@ describe("the snippet table", () => {
 		}
 	})
 
-	// `implementation` covers the top of a section as well as a Function
-	// body, and the top of a section has nothing to return FROM. Every body
-	// offered there is held against the whole pipeline rather than against the
-	// Parser alone, because `top-level-return` is the Enricher's to report —
-	// the unknown names the placeholders leave behind are the reader's to fill
-	// in and are not.
+	// `implementation` covers the top of a section, which has nothing to return
+	// from. The Enricher reports `top-level-return`, so these bodies go through
+	// the whole pipeline. The placeholders' unknown names are not checked.
 	it("returns from nothing at the top of a section", () => {
 		for (let snippet of snippetsFor("implementation")) {
 			let source = `implementation {\n${renderPlaceholders(
@@ -156,9 +147,8 @@ describe("the snippet table", () => {
 		}
 	})
 
-	// The label detail a Completion list shows is the head of the body
-	// with its tab stops rendered, so an empty one is an entry that says
-	// nothing about what accepting it writes.
+	// The label detail is the body's head with its tab stops rendered. An empty
+	// one says nothing about what accepting the entry writes.
 	it("renders a first line for every body", () => {
 		for (let snippet of snippets) {
 			expect([
@@ -169,24 +159,15 @@ describe("the snippet table", () => {
 	})
 })
 
-// The test that keeps the table honest. Every body is rendered as an
-// Editor would write it out untouched, wrapped in the smallest Program its
-// context implies, and handed to the Parser — so a body that does not parse
-// where it is offered fails here rather than in a reader's file.
-//
-// Parsed as a standard library document throughout, which is the one thing
-// that decides whether `declarations { … }` is allowed. Nothing else about a
-// document changes what the Parser accepts, so the permission costs every
-// other body nothing.
+// Every body, rendered as an Editor writes it untouched, is wrapped in the
+// smallest Program its context implies and parsed. Each is parsed as a standard
+// library document, the only kind that allows `declarations { … }`.
 describe("every snippet body", () => {
 	const documentPath = path.join(STDLIB_DIRECTORY, "SnippetProbe.es")
 
-	// A bare tab stop carries no text of its own, and what stands in for
-	// it is decided by where it stands. One written alone on its line is where
-	// the next Statement or member goes, and a block with nothing written in it
-	// yet is an empty block — while one written INSIDE a line, `<- $0` or
-	// `expect $0`, stands where a value goes, and leaving that empty would be a
-	// Parser error about the table rather than about the body.
+	// A bare tab stop alone on its line becomes nothing, leaving an empty
+	// block. One inside a line, such as `<- $0`, stands where a value goes and
+	// renders as `value`.
 	function rendered(body: Array<string>): string {
 		let lines = body.map((line) =>
 			/^\s*\$\{?\d+\}?$/.test(line) ? "" : line,
@@ -195,10 +176,9 @@ describe("every snippet body", () => {
 		return renderPlaceholders(lines.join("\n"), "value")
 	}
 
-	// A `top` body stands beside the sections rather than inside one, and
-	// which side decides what has to be written around it: an import block goes
-	// above the implementation and an export block below it, while a body that
-	// opens a section of its own is already a whole Program.
+	// A `top` body stands beside the sections. An import block goes before the
+	// implementation and an export block after it, and a body opening a section
+	// is already a whole Program.
 	function programAround(context: SnippetContext, body: string): string {
 		switch (context) {
 			case "top":
@@ -231,13 +211,12 @@ describe("every snippet body", () => {
 				return `implementation {\n\tconstant value = match subject -> Integer {\n${body}\n\t}\n}`
 			case "define":
 				return `implementation {\n\tconstant value = define {\n${body}\n\t\tas 0 otherwise\n\t}\n}`
-			// An Expression inside a Namespace Method, which is the one
-			// place `@` names anything.
+			// An Expression inside a Namespace Method, where `@` names the
+			// receiver.
 			case "method":
 				return `implementation {\n\tnamespace Name for Integer {\n\t\tmethod() -> Integer {\n\t\t\tconstant value = ${body}\n\n\t\t\t<- 1\n\t\t}\n\t}\n}`
-			// The three contexts that exist to REFUSE. No body lists one,
-			// so nothing is ever wrapped in them — a snippet that starts
-			// claiming one has to say here what it parses inside.
+			// The refusing contexts. No body lists one, so a snippet claiming one
+			// must say here what it parses inside.
 			case "choice":
 			case "overload":
 			case "parameters":
@@ -283,9 +262,8 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("case")
 	})
 
-	// A Module has one of each section, so the snippet that opens one is
-	// an answer only where that section is missing — accepting it otherwise
-	// writes a second, which is a Diagnostic and four lines the reader deletes.
+	// A Module has one of each section, so a section snippet is offered only
+	// where that section is missing.
 	it("withholds a section the file already writes", () => {
 		let offered = snippetsAt(
 			["", "implementation {", "}", "", "tests {", "}"],
@@ -300,10 +278,9 @@ describe("Snippet completion", () => {
 		expect(offered).toContain("export")
 	})
 
-	// A file being started from scratch is the ONE document where the
-	// sections are the whole answer — and the Parser recovers it into a Program
-	// whose implementation section spans nothing, which used to read as a
-	// cursor standing inside a body that is not there.
+	// In a file started from scratch the sections are the whole answer. The
+	// Parser recovers it into a Program whose implementation spans nothing, which
+	// must not read as a cursor inside a body.
 	it("offers the sections in a file with nothing in it", () => {
 		for (let lines of [[""], ["\n"], ["i"], ["§ only a comment", ""]]) {
 			let offered = snippetsAt(lines, { line: 1, column: 1 })
@@ -375,9 +352,8 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("function")
 	})
 
-	// A Method's body is a Statement body wherever it is written, so the
-	// Namespace around it is not what the cursor stands in — the Function
-	// literal it opened is.
+	// A Method's body is a Statement body wherever it is written. The cursor
+	// stands in the Function literal, not in the Namespace around it.
 	it("reads a Method's own body as a Statement body", () => {
 		let offered = snippetsAt(
 			[
@@ -446,9 +422,8 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("namespace")
 	})
 
-	// The two Keywords are values like any other where they are offered,
-	// and the completing body is a Statement — so the three land on the two
-	// sides of the same line the `closure` and `function` snippets do.
+	// `start` and `complete` are values, and the completing Function is a
+	// Statement, as the `closure` and `function` snippets are.
 	it("offers the asynchrony bodies where each of them parses", () => {
 		let value = snippetsAt(
 			["implementation {", "\tconstant value = ", "}"],
@@ -521,10 +496,8 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("with")
 	})
 
-	// The context that earns its place by what it refuses. Nothing but
-	// arms may be written between a `define`'s braces, and no body in the table
-	// is one — so the answer there is nothing at all, rather than the
-	// Statements a block that is not one would offer.
+	// Only arms may be written between a `define`'s braces, and no body in the
+	// table is one, so nothing is offered there.
 	it("offers nothing between a define's arms", () => {
 		let offered = snippetsAt(
 			[
@@ -542,11 +515,8 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
-	// A Handler that has just been opened has written no Statement, so it
-	// spans nothing of its own and the `match` around it used to answer — which
-	// offered the `case` that goes OUTSIDE the Handler to a reader standing
-	// inside it. An empty body is spanned from its Matcher to the next Handler
-	// instead.
+	// A Handler just opened has no Statement to span. Its empty body spans from
+	// its Matcher to the next Handler, so the `match` around it does not answer.
 	it("reads an empty match Handler as a Statement body", () => {
 		let offered = snippetsAt(
 			[
@@ -575,9 +545,8 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
-	// And an `overload` group, which takes signatures. Every member the
-	// Namespace around it offers is a Parser Diagnostic written between those
-	// braces.
+	// An `overload` group takes signatures only. A member the Namespace around
+	// it offers would be a Parser Diagnostic there.
 	it("offers nothing inside an overload group", () => {
 		let offered = snippetsAt(
 			[
@@ -595,9 +564,8 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
-	// And a Parameter list, which is neither a Statement position nor a
-	// value one — a name, a Type and a default are the whole of what goes
-	// there. A default IS a value, and keeps the values.
+	// A Parameter list takes a name, a Type and a default. A default is a value
+	// and keeps the values.
 	it("offers nothing inside a written Parameter list", () => {
 		let signature = [
 			"implementation {",
@@ -630,8 +598,8 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
-	// The bodies reach the Editor as snippet text, which is what makes a
-	// tab stop a tab stop rather than four literal characters.
+	// The bodies reach the Editor as snippet text, or a tab stop would be
+	// literal characters.
 	it("hands the body over as snippet text, and says what it writes", () => {
 		let entry = findCompletions(
 			["implementation {", "}", "", "tests {", "\t", "}"].join("\n"),
@@ -645,8 +613,8 @@ describe("Snippet completion", () => {
 		expect(entry?.detail).toBe("A test — one named body of assertions.")
 	})
 
-	// The Keyword and the block that share a label are two entries, and
-	// the kind is the whole of what tells them apart.
+	// The Keyword and the block that share a label are two entries, told apart
+	// by their kind.
 	it("offers a Keyword and its block side by side", () => {
 		let entries = findCompletions(
 			["implementation {", "}", "", "tests {", "\t", "}"].join("\n"),
@@ -668,8 +636,7 @@ describe("Snippet completion", () => {
 		).toEqual([])
 	})
 
-	// No body names a Type, so the Type space offers none — the rule the
-	// Keywords are held to, for the same reason.
+	// No body names a Type, so the Type space offers none, as with Keywords.
 	it("offers no snippet in the Type space", () => {
 		expect(
 			snippetsAt(["implementation {", "\tconstant value: ", "}"], {
@@ -679,9 +646,8 @@ describe("Snippet completion", () => {
 		).toEqual([])
 	})
 
-	// Where nothing parses there is no Program to read a block off, and
-	// the text reading is what is left: it still tells a value position from a
-	// Statement one, and the bodies that need to know more are not offered.
+	// Where nothing parses, the text reading still tells a value position from
+	// a Statement one. The bodies that need more are not offered.
 	it("falls back to the text where the document does not parse", () => {
 		let offered = snippetsAt(
 			["implementation {", "\tnamespace Name for {{{", "\t", "}"],
@@ -693,17 +659,14 @@ describe("Snippet completion", () => {
 	})
 })
 
-// `snippetsFor` is what Completion asks, so a context nobody answers is
-// a context nobody can reach — and the two spellings of that mistake are a
-// body listing a context that is never resolved to, and a context resolved to
-// that no body lists.
+// `snippetsFor` is what Completion asks, so a body listing a context nothing
+// resolves to is never offered.
 describe("the contexts", () => {
 	it("answers with only the bodies that named the context", () => {
 		for (let context of contexts) {
 			for (let snippet of snippetsFor(context)) {
-				// `method` is a narrower reading of `expression`, so it
-				// answers with what a value position answers with besides its
-				// own — see `widerContext`.
+				// `method` narrows `expression` and answers with its bodies too.
+				// See `widerContext`.
 				expect(snippet.contexts).toContain(
 					context === "method" && !snippet.contexts.includes("method")
 						? "expression"
@@ -713,8 +676,8 @@ describe("the contexts", () => {
 		}
 	})
 
-	// And the narrowing itself: everything a value position offers is
-	// offered inside a Method, and `{ @ with … }` is offered nowhere else.
+	// Everything a value position offers is offered inside a Method, and
+	// `{ @ with … }` is offered nowhere else.
 	it("offers a Method body everything a value position offers", () => {
 		let value = snippetsFor("expression").map((snippet) => snippet.prefix)
 		let method = snippetsFor("method").map((snippet) => snippet.prefix)
