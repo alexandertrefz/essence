@@ -49,6 +49,60 @@ All of that resolution is `launch.js`, pure functions of their arguments with
 the file system, environment and shell handed in; `tests/launch.spec.ts`
 covers every branch without an extension host.
 
+## Finding the runtimes
+
+`launch.js` decides where everything the extension spawns comes from. Its
+functions are pure: the file system, the environment and the shell are handed
+in, so `tests/launch.spec.ts` covers every branch.
+
+`PATH` cannot be trusted. VS Code reads the shell environment once, at launch,
+by running the user's login shell. When that probe times out, for example on a
+slow `.zshrc`, every extension host of the session runs on the bare launchd
+`PATH`. Neither Bun nor a user-installed Node is on it.
+
+So a bundle runs on the Node that VS Code ships, which needs no lookup. That
+covers the bundled server, a configured `.js` server and a `.js` CLI. Anything
+that needs a runtime is resolved by `resolveRuntime`, in this order:
+
+1. The explicit setting, such as `essence.bun.path`. A path that does not
+   exist is an error rather than a reason to look elsewhere, since the user
+   asked for that one.
+2. `PATH`, which is what the user configured and what every other tool runs.
+3. The usual install locations of Bun's installer, Homebrew and the Node
+   version managers. They come after `PATH`, so a stray install never shadows
+   a chosen version.
+4. An interactive login shell asked `command -v`, which repeats the probe VS
+   Code failed, bounded here to five seconds. Its output is read from the
+   bottom up, past any greeting, and only an existing absolute path counts.
+
+The answer's `source` names the step, so the output channel can tell a user
+with a broken `PATH` how the runtime was found. `describeEnvironment`
+recognises the bare launchd `PATH` and says to quit and reopen VS Code, since
+Reload Window keeps the old environment.
+
+When a configured server cannot run, `resolveServer` offers the bundled one as
+`fallback`. The extension runs it with a warning, so diagnostics keep coming
+while the setting is fixed.
+
+`resolveCli` picks the CLI the debug adapter runs through. The setting comes
+first, then a checkout open in the workspace, whose `bin/essence` runs on Bun,
+then an installed `essence`.
+
+## Restarting the server
+
+Every start and stop of the Language Server runs on one promise chain,
+`lifecycle`, through `queue`. The restart command is bound to the status bar
+item, where a second click is one gesture away. Two overlapping restarts would
+leak a server. The second would see the `client = undefined` the first wrote,
+skip the stop, and start a client. The first would then overwrite that client
+when its own stop resolved. That client would never be stopped, and its server
+would live until the window closed. On the chain, a restart begins only once
+the one before it has finished starting, so it always has that client to stop.
+
+`queue` catches a failure so that the chain stays usable, since a rejected
+link would skip every step queued behind it. The start and the stop each
+report their own failures as well.
+
 ## The debugging walkthrough
 
 The debugger has no extension-host test harness, so a release is checked by

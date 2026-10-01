@@ -1,17 +1,8 @@
 import path from "node:path"
 
-// Where everything the extension spawns is decided — pure functions of
-// their arguments, with the file system, the environment and the shell handed
-// in, so the specs can exercise every branch without an extension host.
-//
-// The premise throughout is that PATH cannot be trusted. VS Code reads the
-// shell environment once, at launch, by running the user's login shell; when
-// that probe times out — a slow `.zshrc`, an agent waiting on a passphrase —
-// every extension host for the rest of the session runs on the bare launchd
-// PATH, where neither Bun nor a user-installed Node exists. So a bundle runs on
-// the Node VS Code itself ships, which needs no lookup at all, and anything
-// that does need a runtime is looked for in PATH, then where its installer
-// puts it, then by asking the login shell directly — the probe VS Code failed.
+// Where everything the extension spawns comes from, as pure functions with the
+// file system, environment and shell handed in. `PATH` cannot be trusted. See
+// "Finding the runtimes" in DEVELOPMENT.md.
 
 const macosLaunchdPath = "/usr/bin:/bin:/usr/sbin:/sbin"
 
@@ -19,18 +10,16 @@ function isBlank(value) {
 	return typeof value !== "string" || value.trim() === ""
 }
 
-// A `.js` (or `.cjs`/`.mjs`) entry is a built bundle, and only that can
-// run on Node. Everything else — a TypeScript entry point, or the compiler's
-// extensionless `bin/esls` and `bin/essence` launchers — is source that needs
-// Bun.
+// Only a built `.js`, `.cjs` or `.mjs` bundle runs on Node. A TypeScript entry
+// point or an extensionless launcher such as `bin/esls` needs Bun.
 export function isBundle(filePath) {
 	return /\.(js|cjs|mjs)$/.test(filePath)
 }
 
-// What a path setting may say. `${workspaceFolder}` and a relative path
-// are what let a checkout commit a working `.vscode/settings.json` instead of
-// one author's absolute path, and `~` is how a path is written in a shell.
 /**
+ * A path setting may use `${workspaceFolder}`, a relative path or `~`, so a
+ * checkout can commit a `.vscode/settings.json` that works for everyone.
+ *
  * @param raw
  * @param {{ workspaceRoot?: string, home?: string }} [where]
  */
@@ -52,11 +41,9 @@ export function expandPath(raw, { workspaceRoot, home } = {}) {
 	return value
 }
 
-// Which directories to look in beyond PATH, by executable. These are
-// where each installer writes, which is what the user's shell configuration
-// would have added to PATH had VS Code managed to read it: Bun's own
-// installer, Homebrew on either architecture, the version managers. `essence`
-// is installed globally through Bun or npm, so it lands in any of them.
+// Where each installer writes, which the user's shell would have added to
+// `PATH`: Bun's installer, Homebrew and the Node version managers. A global
+// `essence` may land in any of them.
 function usualDirectories(name, { env, home, platform, list }) {
 	let directories = []
 	let add = (...segments) => {
@@ -75,9 +62,8 @@ function usualDirectories(name, { env, home, platform, list }) {
 		add(home, ".local", "share", "fnm", "aliases", "default", "bin")
 		add(home, ".fnm", "aliases", "default", "bin")
 
-		// nvm keeps every installed version side by side and selects
-		// one per shell, which nothing outside a shell can ask about; the
-		// newest is the one a fresh install would pick.
+		// nvm selects a version per shell, which cannot be asked from
+		// outside one, so the newest comes first.
 		if (typeof home === "string") {
 			let versions = path.join(home, ".nvm", "versions", "node")
 
@@ -147,11 +133,9 @@ function executableNames(name, platform) {
 	return platform === "win32" ? [`${name}.exe`, `${name}.cmd`, name] : [name]
 }
 
-// PATH first, because that is what the user configured and what every
-// other tool would run; the usual locations only when PATH has nothing, so a
-// deliberately chosen version is never shadowed by a stray install. Every
-// directory looked in is answered back, for the output channel to name when
-// nothing is found.
+// `PATH` first, then the usual locations, so a stray install never shadows a
+// chosen version. The directories searched are answered for the output
+// channel.
 export function findExecutable(name, { env, home, platform, exists, list }) {
 	let delimiter = platform === "win32" ? ";" : ":"
 	let onPath = (env.PATH ?? "")
@@ -184,13 +168,9 @@ export function findExecutable(name, { env, home, platform, exists, list }) {
 	return { searched }
 }
 
-// The last resort is the question VS Code asks at launch, asked again:
-// an interactive login shell, which sources the same files that put the
-// runtime on the user's PATH. `run` is handed in — it spawns the shell with a
-// timeout and answers its stdout, or nothing — and the answer is read from the
-// bottom up, because an interactive shell may print a greeting or a prompt
-// before `command -v` says anything, and only an absolute path that exists
-// is believed.
+// Asks an interactive login shell, as VS Code does at launch. `run` spawns it
+// with a timeout. The output is read from the bottom up, past any greeting,
+// and only an existing absolute path counts.
 export async function probeLoginShell(name, { platform, shell, run, exists }) {
 	if (platform === "win32" || isBlank(shell)) {
 		return undefined
@@ -216,12 +196,9 @@ export async function probeLoginShell(name, { platform, shell, run, exists }) {
 	return undefined
 }
 
-// The one answer for "which `bun` (or `node`, or `essence`)". The
-// explicit setting wins and is not second-guessed — a path that does not exist
-// is an error, not a reason to go looking elsewhere, because the user asked
-// for that one. After that, PATH, the usual locations, and the login shell, in
-// that order; `source` says which, so the output channel can tell a user whose
-// PATH is broken how the runtime was found anyway.
+// Which `bun`, `node` or `essence` to run. A configured path that does not
+// exist is an error rather than a reason to look elsewhere. See "Finding the
+// runtimes" in DEVELOPMENT.md.
 export async function resolveRuntime(
 	name,
 	configured,
@@ -242,9 +219,8 @@ export async function resolveRuntime(
 
 	let found = findExecutable(name, { env, home, platform, exists, list })
 
-	// Spelled out rather than `return found`, so every return here is a
-	// fresh literal and the inferred type gives each branch the others' fields
-	// as absent — which is what lets a caller ask `.error` of the answer.
+	// A fresh literal rather than `found`, so the inferred type marks the
+	// other branches' fields absent and a caller may ask for `.error`.
 	if (found.path !== undefined) {
 		return {
 			path: found.path,
@@ -274,11 +250,9 @@ export async function resolveRuntime(
 	}
 }
 
-// The environment explained, for when a lookup fails or succeeds only
-// by the usual locations. The bare launchd PATH is the signature of VS Code
-// having given up on the shell probe, and that has one fix — a full relaunch,
-// which Reload Window is not, since the window inherits the environment from
-// the process that failed.
+// The environment explained, for a lookup that fails or needs the usual
+// locations. The bare launchd `PATH` means VS Code's shell probe failed, which
+// only a full relaunch fixes.
 export function describeEnvironment({ env, platform }) {
 	let currentPath = env.PATH ?? ""
 	let lines = [`PATH as the extension host sees it: '${currentPath}'`]
@@ -292,14 +266,9 @@ export function describeEnvironment({ env, platform }) {
 	return lines
 }
 
-// Which Language Server to run, and how. A bundle — the one shipped in
-// `server/`, or a configured `.js` — is run as a `module`, which is
-// vscode-languageclient forking it on the Node VS Code itself ships: no
-// lookup, so the default install cannot be broken by PATH. A configured source
-// entry point needs Bun, resolved through `resolveBun`. When the configured
-// server cannot run, the bundled one is offered as the `fallback`, so the
-// user keeps diagnostics while the setting is repaired; the caller decides
-// whether to take it, and says so if it does.
+// Which Language Server to run, and how. A bundle runs as a `module` on VS
+// Code's own Node; a configured source entry point needs Bun. When the
+// configured server cannot run, the bundled one is offered as `fallback`.
 export async function resolveServer(
 	configured,
 	{ workspaceRoot, extensionPath, home, exists, resolveBun },
@@ -359,13 +328,9 @@ export function describeServer(server) {
 		: `${which}, run with '${server.command}'`
 }
 
-// Which CLI the Debug Adapter runs through — the same shape of answer
-// as the Language Server's. The order is the one a user would want debugging
-// a checkout: the explicit setting wins, a checkout open in the workspace is
-// next — its `bin/essence` launcher runs on Bun — and otherwise `essence` is
-// expected to be installed, wherever that put it. `kind` says what the caller
-// still has to resolve: a `module` runs on VS Code's Node, `bun` wants Bun
-// found, and `installed` wants `essence` itself found.
+// Which CLI the Debug Adapter runs through: the setting, then a checkout open
+// in the workspace, then an installed `essence`. `kind` says what is left to
+// resolve: nothing for a `module`, Bun for `bun`, `essence` for `installed`.
 export function resolveCli(configured, { workspaceRoot, home, exists }) {
 	if (!isBlank(configured)) {
 		let cliPath = expandPath(configured, { workspaceRoot, home })
