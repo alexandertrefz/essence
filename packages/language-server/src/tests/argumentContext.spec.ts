@@ -188,3 +188,23 @@ describe("Argument context inside a refused value", () => {
 		})
 	})
 })
+
+// A valid predicate is a Method call on `@`, but while one is being typed a
+// call there offers what any call offers.
+describe("Argument context inside a refinement predicate", () => {
+	let source = [
+		"implementation {",
+		"\tfunction limit (_ value: Integer, upTo bound: Integer) -> Boolean {",
+		"\t\t<- value::isLessThan(bound)",
+		"\t}",
+		"",
+		"\ttype Small = Integer where limit(@, upTo 10)",
+		"}",
+	].join("\n")
+
+	it("should offer the callee's Parameters at the call", () => {
+		expect(contextAt(source, { line: 6, column: 37 })?.kind).toBe(
+			"arguments",
+		)
+	})
+})

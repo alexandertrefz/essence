@@ -319,7 +319,10 @@ function visitNode(
 			}
 
 			return
+		// A predicate is a Boolean, which expects no Record shape.
 		case "TypeAliasStatement":
+			visitPresent(node.predicate, state)
+			return
 		case "Identifier":
 		case "Self":
 		case "StringValue":
@@ -327,6 +330,15 @@ function visitNode(
 		case "RationalValue":
 		case "BooleanValue":
 			return
+	}
+}
+
+function visitPresent(
+	node: common.typed.ImplementationNode | null,
+	state: State,
+) {
+	if (node !== null) {
+		visitNode(node, null, state)
 	}
 }
 
