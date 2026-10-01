@@ -24,9 +24,8 @@ function tokenAt(source: string, line: number, column: number) {
 }
 
 describe("Semantic Tokens", () => {
-	// Every step of a dotted key colours as the member it names —
-	// the first because the key list was written, the rest because the Lookups
-	// the Enricher synthesized stand exactly where the steps do.
+	// The first step colours because the key list was written, and the rest
+	// because the Lookups the Enricher synthesized stand where the steps do.
 	it("should classify every step of a path key as a property", () => {
 		let source = [
 			"implementation {",
@@ -47,10 +46,9 @@ describe("Semantic Tokens", () => {
 		expect(tokenAt(source, 10, 43)?.type).toBe("property")
 	})
 
-	// A Literal merged into a default carries path keys too, and there
-	// are no synthesized Lookups under one — every step but the first is a key
-	// of a list that exists nowhere in the written source, coloured off the
-	// occurrences `memberPositions` puts in the rename index.
+	// A Literal merged into a default has path keys but no synthesized Lookups.
+	// Its later steps colour off the occurrences `memberPositions` puts in the
+	// rename index.
 	it("should classify every step of a merged path key as a property", () => {
 		let source = [
 			"implementation {",
@@ -109,9 +107,8 @@ describe("Semantic Tokens", () => {
 		expect(use?.modifiers).not.toContain("declaration")
 	})
 
-	// A PROVIDED Method's body is walked as the Function Definition it is,
-	// so the names inside it colour like the names inside any other body — a
-	// Parameter is a Parameter, and the Protocol an extension names is a Type.
+	// A provided Method's body is walked as a Function Definition. A Parameter
+	// colours as a Parameter, and the Protocol an extension names as a Type.
 	it("should colour the names inside a provided Protocol Method", () => {
 		let source = [
 			"implementation {",
@@ -247,7 +244,7 @@ describe("Semantic Tokens", () => {
 			])
 
 			expect(data).toEqual([
-				// First Token — deltas are from line 1, column 1.
+				// First Token: deltas are from line 1, column 1.
 				1,
 				10,
 				5,
@@ -318,9 +315,8 @@ describe("Semantic Tokens for Cases", () => {
 	})
 
 	it("should leave the Choice prefix of a qualified Case a Type", () => {
-		// The `#` sits between the two Tokens and belongs to neither —
-		// the Case's Position covers its name alone, exactly as at its
-		// declaration.
+		// The `#` belongs to neither Token, since the Case's Position covers its
+		// name alone, as at its declaration.
 		let value = tokenAt(source, 13, 19)
 		let matcher = tokenAt(source, 9, 9)
 
@@ -383,8 +379,8 @@ describe("Semantic Tokens for the standard library", () => {
 })
 
 describe("the Semantic Token legend", () => {
-	// Tokens are encoded as indices into these arrays, so entries may
-	// only ever be appended — an insertion recolours everything past it.
+	// Tokens are encoded as indices into these arrays, so entries are only
+	// appended. An insertion recolours everything after it.
 	it("should carry the new entries at its end", () => {
 		expect(semanticTokenTypes.at(-1)).toBe("enumMember")
 		expect(semanticTokenModifiers.at(-1)).toBe("defaultLibrary")
@@ -432,8 +428,8 @@ describe("Semantic Tokens in where clauses", () => {
 	})
 })
 
-// A `= #Case` default would go uncoloured otherwise — the Case walk
-// descends into bodies, and a default is not one.
+// The Case walk descends into bodies, and a default is not one, so a
+// `= #Case` default needs a case of its own.
 describe("Semantic Tokens of a Case written in a default", () => {
 	it("should colour a bare Case as an enum member", () => {
 		let source = [
@@ -453,13 +449,9 @@ describe("Semantic Tokens of a Case written in a default", () => {
 	})
 })
 
-// A Record Literal's bare member is two symbols at ONE Position — the
-// member it writes and the value it reads — and the protocol forbids
-// overlapping Tokens, so `sortTokens` keeps exactly one of them. Which one is
-// not a coin toss: the value is recorded by the lexical walk and the member by
-// the Record-shape pass that follows it, so the value wins, the same way a
-// Pattern's bare binder colours as the local it binds rather than as the member
-// it names. The two shorthands read alike, which is the point.
+// A bare member is two symbols at one Position, and Tokens may not overlap.
+// `sortTokens` keeps the first, and the rename index records the value before
+// the member, so it colours as a Pattern's bare binder does.
 describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 	let source = [
 		"implementation {",
@@ -485,8 +477,8 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 		expect(tokenAt(source, 6, 31)?.type).toBe("property")
 	})
 
-	// One Token, not two — an overlapping pair would corrupt every
-	// Token after it, since the encoding is a chain of deltas.
+	// An overlapping pair would corrupt every later Token, since the encoding
+	// is a chain of deltas.
 	it("writes one Token at the bare member, not two", () => {
 		expect(
 			tokensOf(source).filter(
@@ -499,9 +491,8 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 // A `#Case` written into a Case payload's default would go uncoloured
 // otherwise, for the same reason a Parameter default's would.
 describe("Semantic Tokens of a Case written in a payload default", () => {
-	// A default value may NAME a Constant of the Module, whose value is
-	// baked into the Case Type — and the name is coloured as the Constant it is,
-	// because what the walk meets is an Expression like any other.
+	// A default may name a Constant of the Module, whose value is baked into
+	// the Case Type. The walk meets an Expression like any other.
 	it("should colour a Constant a default names as a readonly variable", () => {
 		let source = [
 			"implementation {",
@@ -539,9 +530,8 @@ describe("Semantic Tokens of a Case written in a payload default", () => {
 		expect(tokenAt(source, 8, 44)?.type).toBe("enumMember")
 	})
 
-	// A path's steps carry no code of their own here — they colour
-	// because the rename index records them off the Lookups the Enricher
-	// synthesizes, each standing at the span of the step that spelled it.
+	// A path's steps colour because the rename index records them off the
+	// Lookups the Enricher synthesizes, each at the span of its step.
 	it("should colour every step of a member path as a property", () => {
 		let source = [
 			"implementation {",
@@ -580,9 +570,8 @@ describe("Semantic Tokens inside a define", () => {
 		"}",
 	].join("\n")
 
-	// A Case resolves through its Choice rather than through a Scope, so
-	// it is the one construct coloured off the Parser AST — which means the
-	// walk has to reach both halves of an arm on its own.
+	// A Case resolves through its Choice, not a Scope, so Cases are coloured
+	// off the Parser AST. That walk must reach both halves of an arm itself.
 	it("should classify a Case written in an arm's value as an enumMember", () => {
 		expect(tokenAt(source, 9, 8)?.type).toBe("enumMember")
 		expect(tokenAt(source, 10, 8)?.type).toBe("enumMember")
@@ -593,11 +582,9 @@ describe("Semantic Tokens inside a define", () => {
 	})
 })
 
-// The two Types are builtins like every other, so they colour off the
-// index — what is asserted here is that they REACH it. A Case written under one
-// of the Keywords is the other half: Cases are collected from the Parser AST by
-// a walk of this file's own, which reaches nothing under a `start` without a
-// case for it.
+// The two Types are builtins and colour off the index, which they must reach.
+// `collectCases` walks the Parser AST and reaches a Case under `start` only
+// through a case for the Keyword.
 describe("Semantic Tokens around start and complete", () => {
 	let source = [
 		"implementation {",
