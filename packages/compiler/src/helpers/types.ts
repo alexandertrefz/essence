@@ -3194,22 +3194,9 @@ export function matchArguments(
 	}
 }
 
-// Which Argument answers which Parameter, decided from LABELS and
-// `hasDefault` alone and never from a Type. That is what makes it cheap enough
-// to run once per Overload candidate, and it is also what keeps everything that
-// has to know a call's shape before its Arguments are typed working: overload
-// probing, the deferred-Argument order, and Completion offering labels into a
-// call that is still half written.
-//
-// The walk is greedy — take the Argument when the labels agree, skip the
-// Parameter when it has a default — and `indistinguishable-default-parameter`
-// is what makes greedy complete: with no defaulted Parameter followed by a
-// same-label one, an Argument has at most one Parameter it could be, so there
-// is nothing to search and nothing to backtrack.
-//
-// `null` is an arity mismatch. A Program that declares no default anywhere pays
-// one `some()` over the Parameter list and then answers with the identity
-// pairing it always had.
+// Which Argument answers which Parameter, from labels and `hasDefault` alone,
+// so it is cheap and works before typing. The walk is greedy, which
+// `indistinguishable-default-parameter` makes complete. Null is an arity mismatch.
 export function pairArguments(
 	parameters: common.BaseFunction["parameterTypes"],
 	matchableArguments: Array<MatchableArgument>,
@@ -3234,9 +3221,8 @@ export function pairArguments(
 			forParameter.push(null)
 			omittedParameterIndices.push(forParameter.length - 1)
 		} else if (argument !== undefined) {
-			// A required Parameter and an Argument whose label disagrees
-			// — paired anyway, so that the loop above reports it as the label
-			// mismatch it is rather than as a count nobody miscounted.
+			// A required Parameter and a disagreeing label are paired anyway, so the
+			// mismatch is reported as a label, not a count.
 			forParameter.push(next)
 			next++
 		} else {
@@ -3244,11 +3230,8 @@ export function pairArguments(
 		}
 	}
 
-	// Left-over Arguments mean the greedy walk skipped past a default
-	// that a wrongly labelled Argument was meant for. Where the counts agree
-	// after all, the identity pairing is what the writer wrote and reports the
-	// label mismatch against the Parameter they clearly meant; where they do
-	// not, the call really does pass the wrong number of Arguments.
+	// Left-over Arguments mean the walk skipped a default a mislabelled Argument
+	// was meant for. Where the counts agree, the identity pairing reports the label.
 	if (next !== matchableArguments.length) {
 		return parameters.length === matchableArguments.length
 			? identityPairing(parameters.length)
@@ -3258,11 +3241,8 @@ export function pairArguments(
 	return { forParameter, omittedParameterIndices }
 }
 
-// The answer for every signature that declares no default — Argument `i`
-// answers Parameter `i`, nothing left out. It is asked once per Overload
-// candidate of every call in the Program, so it is CACHED by arity rather than
-// built: nothing ever writes into a pairing, and one shared Array per arity is
-// indistinguishable from a fresh one that counts to the same number.
+// Argument `i` answers Parameter `i`. Cached per arity, since nothing writes
+// into a pairing.
 const identityPairings: Array<ArgumentPairing> = []
 
 function identityPairing(length: number): ArgumentPairing {
@@ -3279,11 +3259,8 @@ function identityPairing(length: number): ArgumentPairing {
 	return cached
 }
 
-// The pairing read the other way round — for Argument `i`, the Parameter
-// it answers. Built only where something has to NAME that Parameter: a
-// Diagnostic about a mismatching Argument, and Completion reading a Record
-// literal against the Type it will be held to. The forward direction is what
-// every call pays for, so the inverse is not built alongside it.
+// For Argument `i`, the Parameter it answers, built only where something must
+// name that Parameter.
 export function argumentPairingInverse(
 	pairing: ArgumentPairing,
 ): Array<number> {
