@@ -118,8 +118,8 @@ function planRecordTests(
 	try {
 		for (let [name, required] of Object.entries(matcher.members)) {
 			let memberPath = [...path, name]
-			// What every arriving Record declares for the member. Where one declares
-			// nothing, openness leaves the member unconstrained.
+			// What every arriving Record declares for the member. Where one
+			// declares nothing, openness leaves the member unconstrained.
 			let declared: Array<common.Type> = []
 			let isCarried = true
 
@@ -152,7 +152,8 @@ function planRecordTests(
 				continue
 			}
 
-			// Vacuously true where no Record can arrive, which the tag test then fails.
+			// Vacuously true where no Record can arrive, which the tag test
+			// then fails.
 			if (declared.every((type) => checkIsImplied(required, type))) {
 				continue
 			}
@@ -226,7 +227,8 @@ export function matcherIsRefuted(
 ): boolean {
 	let members = unionMembersOf(valueType)
 
-	// Unreachable, since a Type is its own member, but no members proves nothing.
+	// Unreachable, since a Type is its own member, but no members proves
+	// nothing.
 	return (
 		members.length > 0 &&
 		members.every((member) => checkIsRefuted(matcher, member))
@@ -326,7 +328,8 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 				matcher.keyType.type === "Unknown" &&
 				matcher.valueType.type === "Unknown"
 			)
-		// The unit Type `{}` and a payload-less Case have nothing under the tag.
+		// The unit Type `{}` and a payload-less Case have nothing under the
+		// tag.
 		case "Record":
 		case "Case":
 			return Object.keys(matcher.members).length === 0
@@ -426,8 +429,8 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				)
 			}
 
-			// Otherwise the runtime walks every item, so a `GenericList` value can not be
-			// promised to pass.
+			// Otherwise the runtime walks every item, so a `GenericList` value
+			// can not be promised to pass.
 			return (
 				valueType.type === "List" &&
 				checkIsImplied(matcher.itemType, valueType.itemType)
@@ -439,8 +442,8 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				valueType.type === "GenericDictionary"
 			)
 		case "Dictionary": {
-			// Slot by slot. An `Unknown` slot is not walked, and a checked slot can not be
-			// promised for a value whose own slot is unknown.
+			// Slot by slot. An `Unknown` slot is not walked, and a checked slot
+			// can not be promised for a value whose own slot is unknown.
 			let keysImplied =
 				matcher.keyType.type === "Unknown" ||
 				(valueType.type === "Dictionary" &&
@@ -457,7 +460,8 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 				valuesImplied
 			)
 		}
-		// Structural and open: the value must declare every member the Matcher names.
+		// Structural and open: the value must declare every member the Matcher
+		// names.
 		case "Record":
 			return (
 				valueType.type === "Record" &&

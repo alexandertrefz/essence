@@ -48,8 +48,9 @@ function collapseCase(
 		return node
 	}
 
-	// A payload Record literal is already a `direct-record` here, since the walk
-	// is bottom-up. Any other payload is spread, as `createCase` spreads it.
+	// A payload Record literal is already a `direct-record` here, since the
+	// walk is bottom-up. Any other payload is spread, as `createCase` spreads
+	// it.
 	if (
 		node.value.nodeType === "Intrinsic" &&
 		node.value.kind === "direct-record"

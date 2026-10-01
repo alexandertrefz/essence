@@ -55,8 +55,8 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 
 			return node
 		},
-		// Names a lowered Statement holds, counted though none can be a droppable
-		// Constant, since a miss would be a `ReferenceError`.
+		// Names a lowered Statement holds, counted though none can be a
+		// droppable Constant, since a miss would be a `ReferenceError`.
 		statement: (node) => {
 			if (node.nodeType === "IntrinsicStatement") {
 				readIntrinsicStatementNames(node, read)

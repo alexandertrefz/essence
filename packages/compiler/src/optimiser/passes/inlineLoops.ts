@@ -10,8 +10,9 @@ import { rewriteNodes } from "../walk"
 export const inlineLoops: OptimiserPass = {
 	name: "inline-loops",
 	run: (program, namespaces) => {
-		// A nested `List` or `NonEmptyList` Namespace may declare its own walks. The
-		// free `loop` entries need no guard, since no name a Program writes holds a `_`.
+		// A nested `List` or `NonEmptyList` Namespace may declare its own
+		// walks. The free `loop` entries need no guard, since no name a Program
+		// writes holds a `_`.
 		let shadowed = namespaces.nested
 		let inlining = new Inlining(shadowed)
 
@@ -51,8 +52,8 @@ class Inlining {
 	}
 
 	// A loop in a Statement position needs no arrow around it.
-	// `lower-matches-to-statements` runs earlier and never sees it, so the lifting
-	// is done here.
+	// `lower-matches-to-statements` runs earlier and never sees it, so the
+	// lifting is done here.
 	statement(
 		node: common.typedSimple.ImplementationNode,
 	): common.typedSimple.ImplementationNode {
@@ -84,7 +85,8 @@ class Inlining {
 			case "IntrinsicStatement":
 				return node
 			default:
-				// An Expression written for its effects, whose answer goes nowhere.
+				// An Expression written for its effects, whose answer goes
+				// nowhere.
 				return this.lifted(node, { kind: "discard" }, node)
 		}
 	}
@@ -112,8 +114,8 @@ class Inlining {
 	private driverOf(
 		node: common.typedSimple.ExpressionNode,
 	): common.typedSimple.InlineLoopDriver | null {
-		// A call that left an Argument out stays, since the callee's defaults have no
-		// binding in the written-out body.
+		// A call that left an Argument out stays, since the callee's defaults
+		// have no binding in the written-out body.
 		if (node.nodeType === "FunctionInvocation") {
 			return node.omitsArguments === true ? null : this.freeLoop(node)
 		}
@@ -132,10 +134,11 @@ class Inlining {
 			return null
 		}
 
-		// The mangled number follows the order of `Loop.es`, so each entry also checks
-		// its labels, in order.
+		// The mangled number follows the order of `Loop.es`, so each entry also
+		// checks its labels, in order.
 		switch (node.name.name) {
-			// The `while` walk, and `until`, which reads the condition the other way.
+			// The `while` walk, and `until`, which reads the condition the
+			// other way.
 			case "loop__overload$1":
 				return this.conditionLoop(node, "while", false)
 			case "loop__overload$2":
@@ -144,8 +147,8 @@ class Inlining {
 				return this.countedLoop(node, "through", false)
 			case "loop__overload$4":
 				return this.generalLoop(node)
-			// The down-counting entry. The `Step` counted entries are written on the
-			// general loop instead.
+			// The down-counting entry. The `Step` counted entries are written
+			// on the general loop instead.
 			case "loop__overload$6":
 				return this.countedLoop(node, "downTo", true)
 			default:
@@ -241,8 +244,8 @@ class Inlining {
 			return null
 		}
 
-		// `NonEmptyList` re-declares `map` as `List`'s own, so the same walk runs.
-		// No other walk is declared on both.
+		// `NonEmptyList` re-declares `map` as `List`'s own, so the same walk
+		// runs. No other walk is declared on both.
 		if (node.base.name === "NonEmptyList") {
 			return node.member.name === "map" ? this.mapWalk(node) : null
 		}
@@ -254,8 +257,8 @@ class Inlining {
 		switch (node.member.name) {
 			case "map":
 				return this.mapWalk(node)
-			// The filter is mangled, since `everyItem(alsoIn:)` stands beside it as a
-			// native with no walk to write out.
+			// The filter is mangled, since `everyItem(alsoIn:)` stands beside
+			// it as a native with no walk to write out.
 			case "everyItem__overload$1":
 				return this.keepWalk(node)
 			case "reduce__overload$1":

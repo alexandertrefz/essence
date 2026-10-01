@@ -19,8 +19,8 @@ function collapse(
 		return node
 	}
 
-	// A spread takes the left-hand side's brand, so a left-hand side that is not
-	// statically a Record keeps the `Object.assign` emission.
+	// A spread takes the left-hand side's brand, so a left-hand side that is
+	// not statically a Record keeps the `Object.assign` emission.
 	if (node.lhs.type.type !== "Record") {
 		return node
 	}
@@ -42,7 +42,8 @@ function collapse(
 		}
 	}
 
-	// Any other right-hand side is projected to the members its Record Type names.
+	// Any other right-hand side is projected to the members its Record Type
+	// names.
 	if (node.rhs.type.type !== "Record") {
 		return node
 	}

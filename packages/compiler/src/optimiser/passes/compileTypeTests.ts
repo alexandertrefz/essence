@@ -66,9 +66,9 @@ function compileHandler(
 			: { ...handler, memberTests }
 	}
 
-	// A literal Matcher's compiled comparison goes where a Type check's would. The
-	// `literal` stays, for `elide-final-match-test` and for builds without this
-	// pass.
+	// A literal Matcher's compiled comparison goes where a Type check's would.
+	// The `literal` stays, for `elide-final-match-test` and for builds without
+	// this pass.
 	if (handler.literal !== null) {
 		let compiled = literalTest(valueType, handler.literal)
 

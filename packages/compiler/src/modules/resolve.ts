@@ -25,7 +25,8 @@ export type SpecifierResolver = (
 ) => SpecifierResolution
 
 // A Module's canonical path is its identity, and every caller of this stage
-// keys on it. Two paths for one file would make two Modules with distinct Types.
+// keys on it. Two paths for one file would make two Modules with distinct
+// Types.
 export { canonicalPath }
 
 // Resolved against the importer's directory, so a specifier means the same

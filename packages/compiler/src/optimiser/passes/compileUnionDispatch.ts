@@ -64,7 +64,8 @@ function compile(
 
 		temporaries.push({ name, value: operand })
 
-		// No Position. The held Expression keeps its own, where a debugger stops.
+		// No Position. The held Expression keeps its own, where a debugger
+		// stops.
 		return (): common.typedSimple.ExpressionNode => ({
 			nodeType: "Identifier",
 			name,
@@ -133,8 +134,8 @@ function planBranches(
 			dispatchCase.memberType,
 			memberTypes,
 		)
-		// An `always` branch makes the cases after it unreachable, so they go. The
-		// last branch is untested only where its check is a tag comparison.
+		// An `always` branch makes the cases after it unreachable, so they go.
+		// The last branch is untested only where its check is a tag comparison.
 		let isDecided =
 			residual.kind === "always" ||
 			(index === cases.length - 1 && residual.kind === "tag")
@@ -211,7 +212,8 @@ function holdPlan(
 		return !writesOperandsOut && !isReReadable(operand)
 	})
 
-	// Back to front, since a held operand after a name makes it unsafe to leave.
+	// Back to front, since a held operand after a name makes it unsafe to
+	// leave.
 	let heldAfter = false
 
 	for (let index = operands.length - 1; index >= 0; index--) {

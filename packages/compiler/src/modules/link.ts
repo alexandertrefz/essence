@@ -1230,7 +1230,8 @@ function reportExportProblems(
 					],
 					// "Declare it as a Constant" is withheld where the Module
 					// assigns to the name, whose `constant-reassignment` Help
-					// asks for the `variable` back. The quick fix reads this text.
+					// asks for the `variable` back. The quick fix reads this
+					// text.
 					helps: isAssignedIn(state.module, entry.name.content)
 						? ["Export a Function that answers with its value."]
 						: [

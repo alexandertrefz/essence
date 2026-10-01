@@ -12,8 +12,8 @@ import { rewriteStatements } from "../walk"
 export const lowerMatchesToStatements: OptimiserPass = {
 	name: "lower-matches-to-statements",
 	run: (program, namespaces) => {
-		// For the one thing this pass drops: a discarded Handler answer, which a
-		// Program's own Namespace could make observable.
+		// For the one thing this pass drops: a discarded Handler answer, which
+		// a Program's own Namespace could make observable.
 		let shadowed = namespaces.nested
 		let lowering = new Lowering(shadowed)
 
@@ -57,8 +57,9 @@ class Lowering {
 						node,
 					) ?? node
 				)
-			// Declarations, and Statements whose Expressions have nowhere to write an
-			// answer. `unbox-conditions` reads a Conditional's condition.
+			// Declarations, and Statements whose Expressions have nowhere to
+			// write an answer. `unbox-conditions` reads a Conditional's
+			// condition.
 			case "ConditionalStatement":
 			case "NamespaceDefinitionStatement":
 			case "ProtocolDeclarationStatement":
@@ -71,13 +72,14 @@ class Lowering {
 			case "IntrinsicStatement":
 				return node
 			default:
-				// An Expression written for its effects, whose answer goes nowhere.
+				// An Expression written for its effects, whose answer goes
+				// nowhere.
 				return this.statement(node, { kind: "discard" }, node) ?? node
 		}
 	}
 
-	// One Expression in one Statement position, or null where there is nothing to
-	// write.
+	// One Expression in one Statement position, or null where there is nothing
+	// to write.
 	private statement(
 		value: common.typedSimple.ExpressionNode,
 		result: common.typedSimple.StatementResult,
@@ -87,7 +89,8 @@ class Lowering {
 			return this.statementMatch(value, result, source)
 		}
 
-		// A chain holding nothing is a plain conditional Expression with no wrapper.
+		// A chain holding nothing is a plain conditional Expression with no
+		// wrapper.
 		if (
 			value.nodeType === "Intrinsic" &&
 			value.kind === "dispatch-chain" &&
@@ -132,7 +135,8 @@ class Lowering {
 	}
 
 	// Drops a discarded Handler's final Return of a pure value, which the
-	// simplifier adds to every body. A Return elsewhere is control flow and stays.
+	// simplifier adds to every body. A Return elsewhere is control flow and
+	// stays.
 	private withoutDiscardedAnswer(
 		handler: common.typedSimple.MatchHandler,
 	): common.typedSimple.MatchHandler {

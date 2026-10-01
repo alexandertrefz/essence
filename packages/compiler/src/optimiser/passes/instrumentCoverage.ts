@@ -42,9 +42,9 @@ function instrument(
 		return points.length - 1
 	}
 
-	// A Statement position takes a value-less counter, and an Expression position
-	// one that answers with its value. `leads` says which side of the value it
-	// counts on.
+	// A Statement position takes a value-less counter, and an Expression
+	// position one that answers with its value. `leads` says which side of the
+	// value it counts on.
 	let counter = (
 		point: number,
 		position: common.Position,
@@ -59,8 +59,8 @@ function instrument(
 		position,
 	})
 
-	// The implementation is instrumented whole. The tests section counts only Case
-	// constructions, which are claims about what the tests did.
+	// The implementation is instrumented whole. The tests section counts only
+	// Case constructions, which are claims about what the tests did.
 	let implementation = rewriteNodes(
 		{ ...program, tests: null },
 		{
@@ -79,8 +79,8 @@ function instrument(
 
 	let choices = choicesOf(program)
 
-	// A Module with nothing to count or declare carries no table, and stays out of
-	// every report.
+	// A Module with nothing to count or declare carries no table, and stays out
+	// of every report.
 	if (points.length === 0 && choices.length === 0) {
 		return program
 	}
@@ -212,7 +212,8 @@ function instrumentExpression(
 }
 
 // A `define` arm is a branch point that wraps the arm's answer, since it has no
-// body. The `otherwise` point is a refinement where an arm's complement narrows.
+// body. The `otherwise` point is a refinement where an arm's complement
+// narrows.
 function instrumentArms(
 	node: common.typedSimple.DefineNode,
 	mark: Mark,

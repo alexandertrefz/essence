@@ -30,7 +30,8 @@ export function isPureExpression(
 			return Object.values(node.members).every(isPure)
 		case "ListValue":
 			return node.values.every(isPure)
-		// Building a Dictionary compares keys through a witness, which runs nothing.
+		// Building a Dictionary compares keys through a witness, which runs
+		// nothing.
 		case "DictionaryValue":
 			return node.entries.every(
 				(entry) => isPure(entry.key) && isPure(entry.value),
@@ -60,15 +61,16 @@ export function isPureExpression(
 		// A Match runs Statement bodies, which this function does not read.
 		case "Match":
 			return false
-		// A `define` holds only Expressions. Every Condition is weighed, including
-		// those that never run.
+		// A `define` holds only Expressions. Every Condition is weighed,
+		// including those that never run.
 		case "Define":
 			return (
 				node.arms.every(
 					(arm) => isPure(arm.condition) && isPure(arm.value),
 				) && isPure(node.otherwise)
 			)
-		// A trace writes into the test's trace buffer, which is its whole point.
+		// A trace writes into the test's trace buffer, which is its whole
+		// point.
 		case "TestTrace":
 			return false
 		// A counter writes into the Module's coverage table.
@@ -163,8 +165,8 @@ function isPureIntrinsic(
 		case "essence-boolean":
 		case "raw-boolean":
 			return isPure(node.value)
-		// The site holds a name. `pool-constants` asks a stricter question of the
-		// value.
+		// The site holds a name. `pool-constants` asks a stricter question of
+		// the value.
 		case "pooled-reference":
 			return true
 		case "type-test":
@@ -189,8 +191,8 @@ function isPureIntrinsic(
 		case "raw-equals":
 		case "raw-arithmetic":
 			return isPure(node.left) && isPure(node.right)
-		// The fallback counts though it may not run, since the question is whether
-		// moving this observes anything.
+		// The fallback counts though it may not run, since the question is
+		// whether moving this observes anything.
 		case "member-or-default":
 			return isPure(node.base) && isPure(node.fallback)
 		case "direct-record":
@@ -202,8 +204,8 @@ function isPureIntrinsic(
 			)
 		case "direct-list":
 			return node.values.every(isPure)
-		// Only an inlined loop holds a build, and loops are refused, but the items
-		// are weighed anyway.
+		// Only an inlined loop holds a build, and loops are refused, but the
+		// items are weighed anyway.
 		case "list-build":
 			return node.additions.every((addition) => isPure(addition.value))
 		case "spread-combination":

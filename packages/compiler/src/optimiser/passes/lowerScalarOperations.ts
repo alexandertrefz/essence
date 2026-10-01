@@ -12,8 +12,9 @@ import { rewriteExpressions } from "../walk"
 export const lowerScalarOperations: OptimiserPass = {
 	name: "lower-scalar-operations",
 	run: (program, namespaces) => {
-		// A nested Namespace named after a builtin may answer anything, so its name is
-		// refused for the whole Program, here and in the purity question.
+		// A nested Namespace named after a builtin may answer anything, so its
+		// name is refused for the whole Program, here and in the purity
+		// question.
 		let shadowed = namespaces.nested
 
 		return rewriteExpressions(program, (node) => lower(node, shadowed))
@@ -45,9 +46,9 @@ function lower(
 	switch (node.base.name) {
 		case "Integer":
 			return lowerInteger(node, member)
-		// A refinement's Method still carries its Namespace's name. Its `multiply` is
-		// Integer's own product, and `scalarOperands` refuses the entries that scale
-		// an irrational.
+		// A refinement's Method still carries its Namespace's name. Its
+		// `multiply` is Integer's own product, and `scalarOperands` refuses the
+		// entries that scale an irrational.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
 		// Their `add` and `multiply` are Integer's own sum and product.

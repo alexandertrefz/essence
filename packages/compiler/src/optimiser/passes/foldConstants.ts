@@ -25,7 +25,8 @@ export const foldConstants: OptimiserPass = {
 		// A nested Namespace named after a builtin may answer anything.
 		let shadowed = namespaces.nested
 
-		// A fold answers an Expression with an Expression, so defaults are safe.
+		// A fold answers an Expression with an Expression, so defaults are
+		// safe.
 		return rewriteExpressions(program, (node) => fold(node, shadowed), {
 			parameterDefaults: true,
 		})
@@ -122,9 +123,9 @@ function foldInvocation(
 	switch (node.base.name) {
 		case "Integer":
 			return foldInteger(node, member, shadowed)
-		// A refinement's Method keeps its Namespace's name. These entries are one
-		// bigint operation each, and `foldInteger` refuses the ones that scale an
-		// irrational.
+		// A refinement's Method keeps its Namespace's name. These entries are
+		// one bigint operation each, and `foldInteger` refuses the ones that
+		// scale an irrational.
 		case "NonZeroInteger":
 			return member === "multiply" ||
 				member === "negate" ||
@@ -139,8 +140,8 @@ function foldInvocation(
 				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
-		// A written `1/2` is a `NonZeroRational`. Its `negate` and `absolute` fold as
-		// Rational's do. `reciprocal` is not folded.
+		// A written `1/2` is a `NonZeroRational`. Its `negate` and `absolute`
+		// fold as Rational's do. `reciprocal` is not folded.
 		case "NonZeroRational":
 			return member === "multiply" ||
 				member === "negate" ||
@@ -426,8 +427,8 @@ function renderedHole(
 					? "true"
 					: "false"
 				: null
-		// Lowest terms, the numerator alone where the denominator is one, so `4/2`
-		// renders `2`.
+		// Lowest terms, the numerator alone where the denominator is one, so
+		// `4/2` renders `2`.
 		case "Rational": {
 			let rational = rationalOf(value)
 

@@ -12,8 +12,8 @@ import { rewriteExpressions } from "../walk"
 // A payload-less Case has nothing beyond its tag to compare, so the tag is the
 // whole answer. A Function carries no Type key, so it compares false, as
 // `anyIs` answers. A generic Choice's descriptor is checked to name no members
-// for the tag. A comparison reached through a Union dispatch is a dispatch case,
-// not an Invocation, and is left alone.
+// for the tag. A comparison reached through a Union dispatch is a dispatch
+// case, not an Invocation, and is left alone.
 
 export const lowerUnitCaseEquality: OptimiserPass = {
 	name: "lower-unit-case-equality",
@@ -27,8 +27,9 @@ function lower(
 		return node
 	}
 
-	// The Namespace the enricher fabricates for a Choice declaring `is Equatable`
-	// without writing it, which the rewriter turns into the runtime helper.
+	// The Namespace the enricher fabricates for a Choice declaring `is
+	// Equatable` without writing it, which the rewriter turns into the runtime
+	// helper.
 	if (node.base.name !== derivedEquatableNamespaceName) {
 		return node
 	}
@@ -42,8 +43,8 @@ function lower(
 		return node
 	}
 
-	// The simplifier's order: the receiver under `@`, the one Parameter, then any
-	// conformance witnesses. Any other shape keeps the runtime helper.
+	// The simplifier's order: the receiver under `@`, the one Parameter, then
+	// any conformance witnesses. Any other shape keeps the runtime helper.
 	let [receiver, compared, ...witnesses] = node.arguments
 
 	if (receiver === undefined || compared === undefined) {
@@ -54,8 +55,8 @@ function lower(
 		return node
 	}
 
-	// The witnesses are dropped with the call, which is safe only for values that
-	// are built rather than run.
+	// The witnesses are dropped with the call, which is safe only for values
+	// that are built rather than run.
 	if (!witnesses.every((witness) => isConformanceArgument(witness.value))) {
 		return node
 	}
@@ -85,8 +86,8 @@ function tagTest(
 	tag: string,
 	negated: boolean,
 ): common.typedSimple.ExpressionNode {
-	// The raw test wrapped in the interned Boolean the Invocation answered. Both
-	// carry the Invocation's Position, the span of the whole comparison.
+	// The raw test wrapped in the interned Boolean the Invocation answered.
+	// Both carry the Invocation's Position, the span of the whole comparison.
 	return {
 		nodeType: "Intrinsic",
 		kind: "essence-boolean",
@@ -122,8 +123,8 @@ function unitCaseTagOf(
 		return null
 	}
 
-	// A generic Choice compares the members its plan names for the tag, so a plan
-	// naming any is refused.
+	// A generic Choice compares the members its plan names for the tag, so a
+	// plan naming any is refused.
 	if (descriptor !== undefined) {
 		let members = descriptor[node.tag]
 

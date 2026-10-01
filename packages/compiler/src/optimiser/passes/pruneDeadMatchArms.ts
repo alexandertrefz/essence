@@ -32,8 +32,8 @@ function prune<
 
 	let last = node.handlers.length - 1
 	let handlers = node.handlers.filter((handler, index) => {
-		// A final Handler written as the `else` stays, since a pass may not assume
-		// `elide-final-match-test` would not have chosen it.
+		// A final Handler written as the `else` stays, since a pass may not
+		// assume `elide-final-match-test` would not have chosen it.
 		if (node.finalHandlerIsElse && index === last) {
 			return true
 		}

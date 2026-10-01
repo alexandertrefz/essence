@@ -394,7 +394,8 @@ function walkImplementationChildren(
 			return value === node.value ? node : { ...node, value }
 		}
 		// The Arguments a turn evaluates, then the values it assigns, in the
-		// order they run. None is offered as a Statement, which a pass could move.
+		// order they run. None is offered as a Statement, which a pass could
+		// move.
 		case "TailCallStatement": {
 			let bindings = mapArray(node.bindings, (binding) => {
 				let value = walkExpression(binding.value, rewrites)
@@ -676,8 +677,9 @@ function walkChildren(
 		case "UnionMethodInvocation": {
 			let base = walkExpression(node.base, rewrites)
 			let args = walkArguments(node.arguments, rewrites)
-			// A dispatch case's own Arguments, its witnesses and the Function literals
-			// compiled for its Method, are Expressions the Program evaluates.
+			// A dispatch case's own Arguments, its witnesses and the Function
+			// literals compiled for its Method, are Expressions the Program
+			// evaluates.
 			let cases = mapArray(node.cases, (dispatch) => {
 				let conformanceArguments = walkArguments(
 					dispatch.conformanceArguments,
@@ -823,7 +825,8 @@ function walkChildren(
 			return { ...node, value, handlers }
 		}
 		// In evaluation order: each arm's Condition, then its value, and the
-		// `otherwise` value last. Passes that hoist or pool read the run order here.
+		// `otherwise` value last. Passes that hoist or pool read the run order
+		// here.
 		case "Define": {
 			let arms = mapArray(node.arms, (arm) => {
 				let condition = walkExpression(arm.condition, rewrites)
@@ -988,13 +991,14 @@ function walkIntrinsicChildren(
 	rewrites: NodeRewrites,
 ): ExpressionNode {
 	switch (node.kind) {
-		// A `tag-test`'s value and an `essence-boolean`'s test are offered like any
-		// other. A pass may not answer the raw JavaScript test with an Essence Boolean,
-		// which would leave an object where a condition belongs.
+		// A `tag-test`'s value and an `essence-boolean`'s test are offered like
+		// any other. A pass may not answer the raw JavaScript test with an
+		// Essence Boolean, which would leave an object where a condition
+		// belongs.
 		case "tag-test":
 		case "essence-boolean":
-		// A `raw-boolean`'s value is an Essence Boolean, though the Node answers a raw
-		// one.
+		// A `raw-boolean`'s value is an Essence Boolean, though the Node
+		// answers a raw one.
 		case "raw-boolean":
 		// A pooled reference's value may not change without its `key`. Only the
 		// rewriter reads it, since `pool-constants` runs last.
@@ -1013,13 +1017,14 @@ function walkIntrinsicChildren(
 
 			return { ...node, value, descriptor }
 		}
-		// The leaves. An `omitted-argument` is a position held open, not a value.
+		// The leaves. An `omitted-argument` is a position held open, not a
+		// value.
 		case "type-descriptor":
 		case "direct-method":
 		case "omitted-argument":
 			return node
-		// A lowered operation's operands are the Invocation's Arguments, in their
-		// order.
+		// A lowered operation's operands are the Invocation's Arguments, in
+		// their order.
 		case "raw-boolean-op": {
 			let operand = walkExpression(node.operand, rewrites)
 			let other =
@@ -1045,8 +1050,8 @@ function walkIntrinsicChildren(
 
 			return { ...node, left, right }
 		}
-		// The base is the Parameter being rebuilt and the fallback is the default's
-		// own Expression. `member` is a name, not a Node.
+		// The base is the Parameter being rebuilt and the fallback is the
+		// default's own Expression. `member` is a name, not a Node.
 		case "member-or-default": {
 			let base = walkExpression(node.base, rewrites)
 			let fallback = walkExpression(node.fallback, rewrites)
@@ -1098,8 +1103,8 @@ function walkIntrinsicChildren(
 
 			return additions === node.additions ? node : { ...node, additions }
 		}
-		// In evaluation order: the held Expressions, the reads of them, then each
-		// branch's test and its own Arguments.
+		// In evaluation order: the held Expressions, the reads of them, then
+		// each branch's test and its own Arguments.
 		case "dispatch-chain": {
 			let temporaries = mapArray(node.temporaries, (temporary) => {
 				let value = walkExpression(temporary.value, rewrites)
@@ -1184,8 +1189,8 @@ function walkIntrinsicChildren(
 
 			return { ...node, lhs, members, rhs }
 		}
-		// The same loop as the Statement form, wrapped in an arrow where no Statement
-		// can stand.
+		// The same loop as the Statement form, wrapped in an arrow where no
+		// Statement can stand.
 		case "inline-loop": {
 			let driver = walkInlineLoopDriver(node.driver, rewrites)
 

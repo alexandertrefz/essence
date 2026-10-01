@@ -11,7 +11,8 @@ import { rewriteNodes } from "../walk"
 export const buildListsInPlace: OptimiserPass = {
 	name: "build-lists-in-place",
 	run: (program, namespaces) => {
-		// A nested `List` or `NonEmptyList` Namespace may declare its own `append`.
+		// A nested `List` or `NonEmptyList` Namespace may declare its own
+		// `append`.
 		if (
 			namespaces.nested.has("List") ||
 			namespaces.nested.has("NonEmptyList")
@@ -139,8 +140,9 @@ function rebuiltCallback(
 	return { ...callback, body }
 }
 
-// The Statement kinds that can hold the walk's answer, as `redirectedStatements`
-// writes them. Everything else is left to the mention check.
+// The Statement kinds that can hold the walk's answer, as
+// `redirectedStatements` writes them. Everything else is left to the mention
+// check.
 function rebuiltBody(
 	nodes: Array<common.typedSimple.ImplementationNode>,
 	name: string,
@@ -181,8 +183,8 @@ function rebuiltStatement(
 				: { ...node, trueBody, falseBody }
 		}
 		case "IntrinsicStatement":
-			// A lowered Statement that returns is answering the walk. One that answers a
-			// name of its own holds no answer of the walk's.
+			// A lowered Statement that returns is answering the walk. One that
+			// answers a name of its own holds no answer of the walk's.
 			return node.result.kind === "return"
 				? rebuiltIntrinsic(node, name, stepped)
 				: node
@@ -217,8 +219,8 @@ function rebuiltIntrinsic(
 
 			return expression === null ? null : { ...node, expression }
 		}
-		// A nested walk answers through a name, a State written whole, which has no
-		// slot here.
+		// A nested walk answers through a name, a State written whole, which
+		// has no slot here.
 		case "inline-loop":
 			return null
 	}

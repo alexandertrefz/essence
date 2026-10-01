@@ -6,7 +6,8 @@ import { rewriteNodes } from "../walk"
 
 // Emits an exhaustive Match's last Handler as the chain's `else`, dropping the
 // throw after it. Only a check that reduces to a tag comparison or nothing,
-// with nothing else that could decline, is elided. See "elide-final-match-test" in DEVELOPMENT.md.
+// with nothing else that could decline, is elided. See "elide-final-match-test"
+// in DEVELOPMENT.md.
 
 export const elideFinalMatchTest: OptimiserPass = {
 	name: "elide-final-match-test",

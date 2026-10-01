@@ -60,17 +60,18 @@ function poolKeyOf(
 		case "StringValue":
 			return `string:${node.value}`
 		case "RationalValue":
-			// The parts as written, since a Rational stores what it was given: `4/2` and
-			// `2/1` are two constants.
+			// The parts as written, since a Rational stores what it was given:
+			// `4/2` and `2/1` are two constants.
 			return `rational:${node.numerator}/${node.denominator}`
-		// `createCase` already interns a unit Case, so this saves the call and lookup.
+		// `createCase` already interns a unit Case, so this saves the call and
+		// lookup.
 		case "CaseValue":
 			return node.value === null ? `case:${node.tag}` : null
 		case "ConformanceValue":
 			return conformanceKeyOf(node, declaredNamespaces)
 		case "Intrinsic":
-			// Keyed by the Type the rewriter emits, without a Record's display name, so
-			// one shape reached two ways is one constant.
+			// Keyed by the Type the rewriter emits, without a Record's display
+			// name, so one shape reached two ways is one constant.
 			return node.kind === "type-descriptor"
 				? `descriptor:${serializeKey(
 						withoutRecordNames(node.descriptor),
@@ -157,8 +158,8 @@ function conformanceKeyOf(
 		curried: node.curriedWith ?? null,
 		witnesses,
 		descriptor: node.derivedDescriptor ?? null,
-		// Every derived listing and routed Record shares one Namespace and map, so
-		// only these tell two Choices, or two Records, apart.
+		// Every derived listing and routed Record shares one Namespace and map,
+		// so only these tell two Choices, or two Records, apart.
 		cases: node.derivedCases ?? null,
 		members: node.derivedMembers ?? null,
 		conditions,

@@ -563,7 +563,8 @@ type MutationContext = {
 	// Aliases and from the constructions, in the order the walk meets them.
 	choices: Map<string, Array<common.CaseType>>
 	// Every Node of a condition that narrows in either direction. It is
-	// gathered first, since the walk reaches a condition's Nodes before its `if`.
+	// gathered first, since the walk reaches a condition's Nodes before its
+	// `if`.
 	narrowed: Set<common.typedSimple.ExpressionNode>
 }
 
