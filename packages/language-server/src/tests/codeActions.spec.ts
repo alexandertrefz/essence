@@ -44,9 +44,8 @@ import { mergeModifierAction } from "../codeActions/testFixes"
 import { typedExpressionAt } from "../codeActions/typedLookups"
 import { applyEdits } from "./textEdits"
 
-// Fixtures are joined line arrays with literal `\t`, so an assertion on
-// an inserted arm's indentation is an assertion on the exact characters —
-// which is the whole point of the missing-case fix.
+// Fixtures are joined line arrays with literal `\t`, so an assertion on an
+// inserted arm's indentation checks the exact characters.
 function actionsOf(
 	lines: Array<string>,
 	range?: common.Position,
@@ -76,44 +75,36 @@ function titles(entries: Array<CodeActionEntry>): Array<string> {
 	return entries.map((entry) => entry.title)
 }
 
-// A misspelled Case reports beside whatever the misspelling made of the
-// surrounding Types, so the fix under test has to be picked out by its code
-// rather than taken as the first one offered.
+// A misspelled Case reports beside whatever the misspelling did to the Types
+// around it, so the fix is picked out by its code.
 function unknownCaseFixes(lines: Array<string>): Array<CodeActionEntry> {
 	return quickFixes(lines).filter(
 		(entry) => entry.diagnosticCode === "unknown-case",
 	)
 }
 
-// What the buffer looks like once the action is applied — an assertion
-// on the resulting text catches an off-by-one in a range that an assertion on
-// the range itself only encodes.
+// The buffer once the action is applied. An assertion on the text catches an
+// off-by-one that an assertion on the range would encode.
 function applied(lines: Array<string>, entry: CodeActionEntry): Array<string> {
 	return applyEdits(lines.join("\n"), entry.edits).split("\n")
 }
 
-// What the Compiler makes of the buffer the action produced — the only
-// answer to "is this Match exhaustive now" that is not the fix marking its own
-// homework. An arm the fix scaffolds is empty, so a `missing-return` behind it
-// is expected and is the reader's to fill in.
+// What the Compiler makes of the buffer the action produced. An arm the fix
+// scaffolds is empty, so a `missing-return` behind it is expected.
 function codesOf(lines: Array<string>): Array<common.DiagnosticCode> {
 	return analyse(lines.join("\n")).map((diagnostic) => diagnostic.code)
 }
 
-// The same question asked of a compile that wanted the TESTS, which is
-// what a Code Action request is answered from. A `tests { … }` block is dropped
-// by a build, so the codes reported inside one — and the stray value comment,
-// which only a test compile has anything to answer — are absent from the
-// analysis above and an assertion against it would hold for the wrong reason.
+// The same, from a compile with the tests, as a Code Action request is
+// answered. A build drops the `tests { … }` block and the codes inside it.
 function testCodesOf(lines: Array<string>): Array<common.DiagnosticCode> {
 	return analyse(lines.join("\n"), undefined, { tests: true }).map(
 		(diagnostic) => diagnostic.code,
 	)
 }
 
-// A span by what it points AT rather than by a column counted out by
-// hand — the fixtures are tab-indented, so a counted column is a fact about the
-// whitespace rather than about the text under it.
+// A span by what it points at. The fixtures are tab-indented, so a column
+// counted by hand would be a fact about the whitespace.
 function spanOf(
 	lines: Array<string>,
 	line: number,
@@ -131,11 +122,9 @@ function spanOf(
 	}
 }
 
-// A Diagnostic as a DEBOUNCED Editor hands one back: the code and the
-// span it was reported at, over a buffer that has been edited since. Every fix
-// reads its span back off the buffer before it writes, and handing the two
-// apart is the only way to ask one whether it really does — an analysis run on
-// the text under test agrees with it by construction.
+// A Diagnostic as a debounced Editor hands one back, over a buffer edited
+// since. Every fix reads its span back off the buffer before it writes, which
+// only a stale span can test.
 function staleDiagnostic(
 	code: common.DiagnosticCode,
 	position: common.Position,
@@ -154,23 +143,18 @@ function staleDiagnostic(
 	}
 }
 
-// The honesty check a generator gets, over and above the Diagnostics: a
-// fix that SYNTHESIZES code has to write code, and the Formatter is the one
-// reader that refuses outright anything it can not read back as a whole
-// Program. Null is "nothing to say about it", which is what every applied
-// generator below has to leave behind.
+// A fix that writes code must write code the Formatter can read back as a
+// whole Program. Null means the Formatter has nothing to say.
 function refusalOf(lines: Array<string>): unknown {
 	return format(lines.join("\n")).refusal
 }
 
-// The URI a refactoring needs to hand its rename command a document. Any
-// path with no import or export block beside it is analysed on its own, which is
-// what every fixture here is.
+// The URI a refactoring hands its rename command. A path with no import or
+// export block is analysed on its own, as every fixture here is.
 const DOCUMENT = "file:///repo/Sample.es"
 
-// The refactorings of one kind, offered on a range and against a document
-// — a Code Action that ends by opening rename has a URI to name, and the
-// helpers above deliberately hand none over.
+// The refactorings of one kind on a range in a document. An action that ends
+// by opening rename needs a URI, which the other helpers do not pass.
 function refactorsOf(
 	lines: Array<string>,
 	range: common.Position,
@@ -181,9 +165,8 @@ function refactorsOf(
 	)
 }
 
-// A range spelled as the text it covers, so a fixture gaining a line
-// takes no assertion with it. The first line holding the text answers, which is
-// what every fixture below is written to make unambiguous.
+// A range spelled as the text it covers, so a fixture gaining a line breaks
+// no assertion. The first line holding the text answers.
 function rangeOf(lines: Array<string>, text: string): common.Position {
 	let line = lines.findIndex((candidate) => candidate.includes(text)) + 1
 	let column = (lines[line - 1] as string).indexOf(text) + 1
@@ -194,8 +177,8 @@ function rangeOf(lines: Array<string>, text: string): common.Position {
 	}
 }
 
-// From the start of one span to the end of another — the selection a
-// reader drags over several lines.
+// From the start of one span to the end of another, as a selection over
+// several lines.
 function rangeFrom(
 	lines: Array<string>,
 	from: string,
@@ -204,24 +187,17 @@ function rangeFrom(
 	return { start: rangeOf(lines, from).start, end: rangeOf(lines, to).end }
 }
 
-// What the Compiler makes of the buffer a refactoring produced, with the
-// tests section enriched — `findCodeActions` reads a file that way, so a
-// refactoring inside a `tests { … }` block has to be measured against the same
-// reading.
+// What the Compiler makes of a refactoring's result, with the tests section
+// enriched, as `findCodeActions` reads a file.
 function refactoredCodesOf(lines: Array<string>): Array<common.DiagnosticCode> {
 	return analyse(lines.join("\n"), undefined, { tests: true }).map(
 		(diagnostic) => diagnostic.code,
 	)
 }
 
-// The three things every refactoring here promises. The fixture compiles
-// to begin with — a refactoring is offered on code the Compiler has nothing to
-// say about, and one measured against a fixture with a mistake in it would be
-// measured against the wrong baseline. What it produces compiles too, which is
-// the whole of what makes it a refactoring rather than an edit: a quick fix
-// answers a Diagnostic and may leave a hole behind, and this may not. And the
-// Formatter accepts the result, because source the Formatter refuses is source
-// nobody can go on editing.
+// Every refactoring promises that the fixture compiles, that its result
+// compiles, and that the Formatter accepts the result. Unlike a quick fix, a
+// refactoring may leave no hole behind.
 function expectRefactored(before: Array<string>, after: Array<string>) {
 	expect(refactoredCodesOf(before)).toEqual([])
 	expect(refactoredCodesOf(after)).toEqual([])
@@ -331,8 +307,8 @@ describe("Code Actions", () => {
 			expect(applied(lines, inner)[8]).toBe("\t\t\t\tcase Integer {}")
 		})
 
-		// A Match written on one line has no line to insert whole arms
-		// on, so the fix opens one rather than refusing.
+		// A Match written on one line has no line to insert arms on, so the
+		// fix opens one.
 		it("should break the line for a Match written on one", () => {
 			let lines = [
 				"implementation {",
@@ -371,9 +347,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("missing-case")
 		})
 
-		// One unwritable member used to cost the reader every other arm
-		// as well. The named Cases are what the Compiler already knows, and
-		// only the Signature has to fall to the catch-all.
+		// The fix writes the named Cases it can, and only the Signature falls
+		// to the catch-all.
 		it("should keep the named arms it can write beside the 'case _'", () => {
 			let lines = [
 				"implementation {",
@@ -402,8 +377,8 @@ describe("Code Actions", () => {
 				"}",
 			])
 
-			// Exhaustive, and the catch-all sits last — a `case _` above
-			// the named arm would have made it unreachable instead.
+			// Exhaustive, with the catch-all last, since a `case _` before the
+			// named arm would make it unreachable.
 			expect(codesOf(result)).not.toContain("missing-case")
 			expect(codesOf(result)).not.toContain("unreachable-case")
 		})
@@ -560,10 +535,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The two that made the rule. `add` and `pad` are two edits apart
-		// on a name of three letters, `noon` and `loop` two on four, and each
-		// was offered as the PREFERRED fix — so the lightbulb's first entry
-		// wrote a word the reader had never heard of into their file.
+		// `add` and `pad` are two edits apart on three letters, and `noon` and
+		// `loop` two on four. Neither pair is close enough for a spelling fix.
 		it("should offer no spelling fix for a Method two edits away", () => {
 			let lines = [
 				"implementation {",
@@ -593,8 +566,8 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).not.toContain("Change to 'loop'")
 		})
 
-		// And what stands there instead — the Namespace the static is
-		// reached through, which the Compiler had in hand all along.
+		// What the fix writes instead: the Namespace the static is reached
+		// through.
 		it("should write the Namespace in front of its own static", () => {
 			let lines = [
 				"implementation {",
@@ -644,8 +617,8 @@ describe("Code Actions", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// Which Namespace was meant is the reader's to settle, so the
-		// report lists them and nothing writes one of them into the file.
+		// Which Namespace was meant is the reader's to settle, so the report
+		// lists them and no fix writes one.
 		it("should offer no fix where several Namespaces declare the static", () => {
 			let lines = [
 				"implementation {",
@@ -663,10 +636,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// A reach written over the name of a Record Literal's shorthand is
-		// refused as `shorthand-on-path-key` — `{ Http.head }` is not a Record.
-		// The member is spelled out instead, which is what the reader wrote in
-		// the first place plus the reach they left out.
+		// A reach written over a shorthand member's name would be refused as
+		// `shorthand-on-path-key`, so the member is spelled out with the reach.
 		it("should spell out the member where the name is a shorthand", () => {
 			let lines = [
 				"implementation {",
@@ -702,9 +673,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The bare `#Case` spelling is the one this codebase's own style
-		// prefers, so it is the form the fix has to reach — the Choice-prefixed
-		// site above resolves through a different path in the Enricher.
+		// The bare `#Case` spelling resolves through a different path in the
+		// Enricher from the Choice-prefixed one.
 		it("should suggest a Case for the bare sigil form", () => {
 			let lines = [
 				"implementation {",
@@ -739,10 +709,8 @@ describe("Code Actions", () => {
 			expect(applied(lines, fix)[4]).toBe('\t\tcase #Add { <- "add" }')
 		})
 
-		// The prefixed Matcher resolves through a path of its own, and it
-		// underlines the NAME rather than the whole Matcher for exactly this
-		// reason: the fix writes the suggestion over what is underlined, and
-		// the prefix the reader wrote stays where it is.
+		// The prefixed Matcher underlines the name rather than the whole
+		// Matcher, so the fix writes over the name and keeps the prefix.
 		it("should suggest a Case for a prefixed Matcher", () => {
 			let lines = [
 				"implementation {",
@@ -768,10 +736,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The near miss for a mode is drawn from the Choice the Parameter
-		// takes, so the fix writes a Case that will resolve — the scan over
-		// every Choice in scope could offer one from an unrelated Choice, which
-		// would compile into a second refusal.
+		// The near miss is drawn from the Choice the Parameter takes, so the fix
+		// writes a Case that resolves.
 		it("should suggest a Case from the Choice a Parameter takes", () => {
 			let lines = [
 				"implementation {",
@@ -788,9 +754,7 @@ describe("Code Actions", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// A guess is only worth offering when it is close. A name nothing
-		// resembles must leave the Diagnostic to speak for itself rather than
-		// send the reader to an unrelated Case.
+		// A guess is offered only when it is close.
 		it("should offer nothing when no Case is close", () => {
 			let lines = [
 				"implementation {",
@@ -802,12 +766,9 @@ describe("Code Actions", () => {
 			expect(unknownCaseFixes(lines)).toEqual([])
 		})
 
-		// The one fix eight codes share is preferred, so a span a
-		// keystroke stale is written over without anybody being asked. Each of
-		// these lands on something that is not a whole name — a member step
-		// taken with the `.` in front of it, a Method name with the `(` behind
-		// it, a Case name with its sigil — and each of them used to be written
-		// over regardless.
+		// This fix is preferred, so a stale span is written over unasked. Each
+		// span here lands on something that is not a whole name, and the fix
+		// offers nothing.
 		it("should stay silent where the span does not stand on a name", () => {
 			let member = [
 				"implementation {",
@@ -848,8 +809,7 @@ describe("Code Actions", () => {
 			expect(spelled(holding, 3, "#Ad", "Add")).toBeNull()
 		})
 
-		// And where the span stands on a name whose NEIGHBOUR is a name
-		// character, which is the shape a span one column short of its Node has.
+		// A span one column short of its Node has a name character beside it.
 		it("should stay silent where the span cuts a name in half", () => {
 			let lines = [
 				"implementation {",
@@ -889,10 +849,8 @@ describe("Code Actions", () => {
 			expect(applied(lines, fix)[1]).toBe("\tvariable count = 1")
 		})
 
-		// A `§§` block above the Declaration must not drag the keyword
-		// span up into the Comment — the fix verifies the source slice before
-		// it rewrites anything, so this would come back as no action at all
-		// rather than as a mangled Comment.
+		// A `§§` block before the Declaration must not move the keyword span
+		// into the Comment. The fix checks the source slice before it rewrites.
 		it("should rewrite the keyword under a documentation block", () => {
 			let lines = [
 				"implementation {",
@@ -909,11 +867,9 @@ describe("Code Actions", () => {
 	})
 
 	describe("redundant-parameter-label", () => {
-		// A Function literal passed to a call is the only place this
-		// Diagnostic can fire — a Parameter carrying a label everywhere else
-		// is annotated, and an annotated label is legal. The label is the ONLY
-		// thing wrong with this Program, so the buffer analyses clean once the
-		// fix is applied, which is what the fix claims to do.
+		// The Diagnostic fires on a Function literal's unannotated Parameter,
+		// which takes its label from the expected signature. The label is all
+		// that is wrong here, so the fixed buffer analyses clean.
 		it("should keep only the internal name", () => {
 			let lines = [
 				"implementation {",
@@ -934,9 +890,8 @@ describe("Code Actions", () => {
 	})
 
 	describe("redundant-pattern-binder", () => {
-		// A dropped binder leaves every read of its name unresolved, so
-		// the arm reports an `unknown-name` beside it and the fix under test has
-		// to be picked out by its code rather than taken as the first offered.
+		// A dropped binder leaves its reads unresolved, so `unknown-name` reports
+		// beside it and the fix is picked out by its code.
 		function binderFixes(lines: Array<string>): Array<CodeActionEntry> {
 			return quickFixes(lines).filter(
 				(entry) => entry.diagnosticCode === "redundant-pattern-binder",
@@ -950,8 +905,7 @@ describe("Code Actions", () => {
 			"",
 		]
 
-		// The binder goes and every read of it becomes `@`, which names
-		// the very same value — the Help applied, and the Program compiles.
+		// The binder goes and every read of it becomes `@`, the same value.
 		it("should write '@' where the binder was read", () => {
 			let lines = [
 				...MATCHED,
@@ -998,9 +952,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A binder on a line of its own takes the line break and the
-		// indentation with it, or what is left behind is a line of trailing
-		// whitespace.
+		// A binder on a line of its own takes the line break and indentation
+		// with it.
 		it("should take the whole line a binder stands alone on", () => {
 			let lines = [
 				...MATCHED,
@@ -1028,10 +981,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A nested Match rebinds `@` to ITS scrutinee, so a read in one of
-		// its arms would be rewritten into a different value. The whole action
-		// is turned away rather than applied to the reads around it: an arm half
-		// in one spelling and half in the other is worse than none.
+		// A nested Match rebinds `@` to its own scrutinee, so the whole action is
+		// withheld rather than applied to some reads.
 		it("should offer nothing for a read under a nested Match", () => {
 			let lines = [
 				...MATCHED,
@@ -1076,8 +1027,7 @@ describe("Code Actions", () => {
 			expect(binderFixes(lines)).toEqual([])
 		})
 
-		// And a Declaration in the body spelling the same name means the
-		// reads after it are that Declaration's, not the binder's.
+		// A Declaration of the same name in the body takes the reads after it.
 		it("should offer nothing where the body declares the name", () => {
 			let lines = [
 				...MATCHED,
@@ -1095,8 +1045,8 @@ describe("Code Actions", () => {
 			expect(binderFixes(lines)).toEqual([])
 		})
 
-		// A Match the arm is written ON still reads the arm's `@`, so the
-		// scrutinee of a nested Match is rewritten like any other read.
+		// A nested Match's scrutinee still reads the arm's `@`, so it is
+		// rewritten like any other read.
 		it("should rewrite a nested Match's own scrutinee", () => {
 			let lines = [
 				"implementation {",
