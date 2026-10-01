@@ -2606,13 +2606,9 @@ function caseName(tag: string): string {
 	)}`
 }
 
-// What an `Optional` holds, or `null` where the shape is not one. The
-// sibling of `dts.ts`'s `optionalItem`, with `admitsAbsence` beside it — that is
-// the copy a change to the Optional rule has to be kept in step with, since it
-// decides what a DECLARATION says about the same shape. The Compiler's
-// `describeUnion` states the rule a third time, from the other side of the seam:
-// it is where the pair of Cases becomes the one node both of these read. All
-// three are asked of a Union because a lone `#Value` arm can reach one.
+// What an `Optional` holds, or `null`. INVARIANT: this and `admitsAbsence`
+// agree with `optionalItem` in `dts.ts`, and with `describeUnion` in the
+// compiler, which collapses the pair of Cases.
 function optionalItemOf(descriptor: Descriptor): Descriptor | null {
 	switch (descriptor.kind) {
 		case "optional":
@@ -2637,10 +2633,7 @@ function optionalItemOf(descriptor: Descriptor): Descriptor | null {
 	}
 }
 
-// Whether `undefined` is a value of this shape — which is exactly whether
-// an `Optional`'s `#Empty` is reachable in it. What it decides is whether an
-// `Optional` is about to be put inside another one, and both levels spelled as
-// nothing.
+// Whether an `Optional`'s `#Empty`, and so `undefined`, is reachable here.
 function admitsAbsence(descriptor: Descriptor): boolean {
 	switch (descriptor.kind) {
 		case "optional":
@@ -2654,13 +2647,9 @@ function admitsAbsence(descriptor: Descriptor): boolean {
 	}
 }
 
-// Whether a plain object could BE a value of this shape — a Record anywhere
-// it reaches without a tag in the way: itself, an arm of a Union, the item of an
-// `Optional`, which is transparent on this side. A Case does not count, because
-// its object spelling always carries `$case`, which no set of labels is — and a
-// unit Choice's Case is not an object at all, being the string it crosses as.
-// What it decides is whether a single labelled Parameter's labelled call is
-// ambiguous — see `labelsOf`.
+// Whether a plain object could be a value of this shape: a Record reached
+// through Unions and `Optional`s. A Case's object always carries `$case`, so
+// it does not count. `labelsOf` asks this.
 function admitsRecord(descriptor: Descriptor): boolean {
 	switch (descriptor.kind) {
 		case "record":
@@ -2681,9 +2670,8 @@ function admitsRecord(descriptor: Descriptor): boolean {
 	}
 }
 
-// The signatures a shape declares a Function to have, for the way OUT — one
-// is the wrap, none is the passthrough, and two are a refusal, because an
-// untagged value can not say which of them it is.
+// The signatures a shape declares for a Function coming out: one wraps it, none
+// passes it through, and more are refused.
 function callableSignatures(
 	descriptor: Descriptor | null,
 ): Array<FunctionDescriptor> {
@@ -2701,11 +2689,8 @@ function callableSignatures(
 	}
 }
 
-// What a container's pieces were DECLARED as, where the Descriptor says —
-// asked on the way out only for the sake of the one value that carries no tag of
-// its own. A Union offering two Lists (or two Records) does not decide, and `null`
-// is the honest answer: the pieces still cross as their tags say, and a Function
-// among them passes through raw exactly as it would with nothing declared at all.
+// What a List's items were declared as, for the sake of a Function among them.
+// A Union offering two Lists decides nothing, so it answers `null`.
 function listItemOf(descriptor: Descriptor | null): Descriptor | null {
 	if (descriptor === null) {
 		return null
@@ -2726,10 +2711,7 @@ function listItemOf(descriptor: Descriptor | null): Descriptor | null {
 	}
 }
 
-// The two slots a Dictionary's pieces were DECLARED as, read for the same
-// reason `listItemOf` reads a List's item and answering `null` under the same
-// rule: a Union offering two Dictionaries does not decide, and the entries still
-// cross as their own tags say.
+// A Dictionary's declared slots, under the rule `listItemOf` follows.
 function dictionaryPartsOf(
 	descriptor: Descriptor | null,
 ): { key: Descriptor; value: Descriptor } | null {
@@ -2779,11 +2761,9 @@ function recordMembersOf(
 	}
 }
 
-// The Case a value's own tag names, where what was declared carries that
-// Case — its payload, so a Function inside one crosses out wrapped like any
-// other member, and whether it is a unit Choice's Case, which nothing but a
-// Descriptor knows. Both tags are the bundle's spelling, because a Descriptor
-// bakes the one `emittedIdentity` writes.
+// The declared Case a value's tag names, which says whether it is a unit
+// Choice's and how to wrap a Function in its payload. Both tags are the
+// bundle's, as `emittedIdentity` writes them.
 function caseFor(
 	descriptor: Descriptor | null,
 	tag: string,
@@ -2811,12 +2791,9 @@ function caseFor(
 	}
 }
 
-// The `typeof` families a Descriptor's reader could take a value from,
-// or `null` for one that has to be tried to be known. Conservative on purpose:
-// a family named here is one the arm MIGHT take, and a family left out is one
-// it can not — a bare Case names `object` as well as `string`, because the
-// `$case` object it used to cross as is met there and refused in a sentence of
-// its own, and that sentence is the arm's to give.
+// The `typeof` kinds a reader might take, or `null` where it must be tried. A
+// bare Case names `object` too, so its arm refuses a `$case` object in its own
+// words.
 function familiesOf(descriptor: Descriptor): Set<string> | null {
 	switch (descriptor.kind) {
 		case "integer":
@@ -2865,11 +2842,7 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 		}
 		case "function":
 			return new Set(["function"])
-		// Neither can take a value at all on the way in, and both are
-		// answered the way `refused` is rather than with an empty Set: an arm
-		// that has to be TRIED is an arm whose own sentence is the one a reader
-		// gets, and "work can not be built from a JavaScript value" is worth
-		// more than the Union's own mismatch.
+		// These take no value, but are tried, so their own refusal is reported.
 		case "future":
 		case "started":
 		case "refused":
@@ -2877,11 +2850,8 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 	}
 }
 
-// Every string a Union of bare Cases takes, under the tag it answers —
-// both spellings of every Case — or `null` where the Union holds anything
-// else, which is a Union that has to be searched. Nested Unions of bare Cases
-// are read through, since that is how a Choice's Cases reach a Union that
-// names the Choice beside another.
+// Both spellings of every Case of a Union of bare Cases, by tag, through nested
+// Unions. `null` where the Union holds anything else.
 function bareCaseTable(descriptor: Descriptor): Map<string, string> | null {
 	let table = new Map<string, string>()
 
@@ -2911,13 +2881,9 @@ function collectBareCaseTable(
 	}
 }
 
-// Which arm of a Union of CASES each `$case` a host could write names —
-// both spellings of every Case that crosses as an object — or `null` where any
-// arm is something else. Cases only, because the search below lets the FIRST
-// arm that takes a value win, and an arm that is not a Case is one whose
-// answer for an object carrying a `$case` can not be read off the tag; a Choice
-// is the shape this is for, and a Choice is Cases and nothing else. A tag
-// written twice keeps its first arm, as the search would.
+// The arm each `$case` spelling names in a Union of Cases alone, or `null`. Any
+// other arm might take a `$case` object before the tag's arm does. A tag written
+// twice keeps its first arm, as the search would.
 function caseArmTable(descriptor: {
 	arms: Array<Descriptor>
 }): Map<string, number> | null {
@@ -2942,20 +2908,9 @@ function caseArmTable(descriptor: {
 	return table.size === 0 ? null : table
 }
 
-// Every Case of a unit Choice a whole Module names, under its tag and
-// answering the bare string it crosses as. Read ONCE, when an interpreter is
-// built, because it is a property of the declarations rather than of anything
-// that happens afterwards — and read at all because the general walk has no
-// other way to learn it: `caseFor` above can only answer where the position
-// being crossed declared the Case, and a `toJS` with nothing declared is the
-// door a host reaches for exactly when it has no Type to hand over.
-//
-// The whole Descriptor rather than its Choice exports alone. A Choice a
-// Module does not export by name still reaches a host through the Type of
-// something it does — a Function's return, a Record's member, a Namespace's
-// property — and a table holding only the named ones would spell those Cases
-// one way at a declared position and another way at an undeclared one, which is
-// the disagreement this table exists to prevent.
+// Every unit Choice Case the whole Descriptor names, by tag. A Choice the Module
+// does not export by name still reaches a host through an export's Type. See
+// "Bare Case names" in DEVELOPMENT.md.
 function bareCaseNames(module: ModuleDescriptor): Map<string, string> {
 	let found = new Map<string, string>()
 
@@ -3006,19 +2961,13 @@ function bareCaseNames(module: ModuleDescriptor): Map<string, string> {
 	return found
 }
 
-// No guard against walking a node twice, because a Descriptor is a TREE —
-// `describe` answers a Type that reaches itself with a `refused` node rather
-// than following it — which is the same reason compiling a node's children
-// while compiling the node terminates.
+// No guard against a second visit, since a Descriptor is a tree.
 function collectBareCases(
 	descriptor: Descriptor,
 	found: Map<string, string>,
 ): void {
 	switch (descriptor.kind) {
-		// A Future and a Started are walked THROUGH, because what they
-		// answer with is a value that crosses: a `Future<Direction>` answered by
-		// a Function puts that Choice's Cases on this boundary exactly as a
-		// `List<Direction>` does.
+		// Work is walked through, since what it answers with crosses.
 		case "list":
 		case "optional":
 		case "future":
@@ -3066,15 +3015,9 @@ function collectBareCases(
 	}
 }
 
-// A JavaScript object with members, and nothing that merely is one: an
-// Array is a List's shape, an `EssenceRational` is a Rational's and a `Map` is a
-// Dictionary's, so admitting any of them as a Record would make the shape that
-// named it unreachable.
-//
-// A labelled call asks the very same question of its one Argument — an
-// `EssenceRational` passed to a Function whose labels happen to be `numerator`
-// and `denominator` is a Rational, not a labelled call — which is why `readCall`
-// reads through this rather than through a spelling of its own.
+// A plain object, which an Array, an `EssenceRational` and a `Map` are not,
+// since each is another shape's spelling. `readCall` asks this of a labelled
+// call's one Argument too.
 function plainObject(value: unknown): Record<string, unknown> | null {
 	if (
 		value === null ||
