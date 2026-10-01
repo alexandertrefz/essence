@@ -644,16 +644,22 @@ describe("A Type in want of a conformance", () => {
 		).toBe(true)
 	})
 
+	// A standard library Namespace is no value at all (`namespace-as-value`),
+	// so the value here is one the Program declares.
 	it("should declare nothing for a Namespace read as a value", () => {
 		let diagnostic = firstOf(
 			`implementation {
-				Terminal.print(String)
+				namespace Clock for Integer {
+					static noon = 43_200
+				}
+
+				Terminal.print(Clock)
 			}`,
 			"unsatisfied-bound",
 		)
 
 		expect(diagnostic.notes).toContain(
-			"No Namespace can be declared for Namespace 'String' — no Type Annotation can spell it, so no 'for' clause can name it.",
+			"No Namespace can be declared for Namespace 'Clock' — no Type Annotation can spell it, so no 'for' clause can name it.",
 		)
 		expect(
 			diagnostic.helps.filter((help) => help.startsWith("Declare")),

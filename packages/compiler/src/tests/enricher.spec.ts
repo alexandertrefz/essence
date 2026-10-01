@@ -5821,6 +5821,48 @@ describe("Enricher", () => {
 	// A static Method takes no receiver, so its call passes only the written
 	// Arguments and its definition has no `_self` Parameter.
 	describe("Static Methods", () => {
+		// Emission binds a standard library Namespace to nothing, so the Program
+		// would stop where it reads one. `print` asks no conformance of it after.
+		it("should reject a standard library Namespace used as a value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				Terminal.inspect(String)
+				Terminal.print(Integer)
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+				]),
+			).toEqual([
+				[
+					"namespace-as-value",
+					"Namespace 'String' can not be used as a value",
+				],
+				[
+					"namespace-as-value",
+					"Namespace 'Integer' can not be used as a value",
+				],
+			])
+		})
+
+		// A Program's own Namespace is emitted as a class, and a member read off
+		// a standard library one is no value of the Namespace.
+		it("should accept a declared Namespace as a value and a member read off a builtin", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Clock for Integer {
+						static noon = 43_200
+					}
+
+					constant clock = Clock
+
+					Terminal.inspect(clock.noon)
+					Terminal.inspect(String.isEmpty(""))
+				}`),
+			).toEqual([])
+		})
+
 		it("should reject a static Method called on a value", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Maker for Integer {

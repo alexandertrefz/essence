@@ -267,6 +267,8 @@ implementation {
 
 An overloaded method is not a value, because a value cannot hold several signatures at once. `constant add = Integer.add` is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value), and its label reads "this names all 4 overloads at once". Calling it on its namespace works, since the call's arguments pick one: `Integer.add(1, 2)` returns `3`.
 
+A library namespace is not a value either. Its methods are compiled one by one, so nothing stands for `String` itself, and `Terminal.inspect(String)` is [`namespace-as-value`](/docs/reference/diagnostics#namespace-as-value). Read a member off it instead, as in `String.uppercase`.
+
 Here is every `::` and `.` form in one place:
 
 | You write | What it is | How the compiler finds it |

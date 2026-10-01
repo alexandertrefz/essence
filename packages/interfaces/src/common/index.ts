@@ -404,6 +404,7 @@ export type DiagnosticCode =
 	| "define-without-cases"
 	// Protocols and conformance.
 	| "protocol-as-value"
+	| "namespace-as-value"
 	| "protocol-as-type"
 	| "unsatisfied-bound"
 	| "interpolation-not-printable"

@@ -4170,6 +4170,33 @@ Use the protocol in a bound or a conformance clause.
 
 Taught on: [Protocols › What a protocol is not](/docs/language/protocols#what-a-protocol-is-not)
 
+### `namespace-as-value`
+
+**Error.** A standard library namespace is used as a value, as in `Terminal.inspect(String)`. It holds methods and statics, and the compiled program has no value for it. A namespace your program declares or imports is compiled to a value, so this does not apply to it.
+
+<div class="error-output">
+
+```
+[namespace-as-value]
+Error: Namespace 'String' can not be used as a value
+   ╭─┤ Inspect.es:2:19 │
+   │
+ 2 │     Terminal.inspect(String)
+   │                      ───┬──  
+   │                         ╰──── this names a standard library Namespace
+   │ 
+   │ Help: Read one of its members, as in 'String.…', or name another value in its place.
+   │ 
+   │ Note: A standard library Namespace holds Methods and statics, and has no value of its own while the Program runs.
+───╯
+```
+
+</div>
+
+Read a member off the namespace, as in `String.isEmpty("")`, or pass a value in its place.
+
+Taught on: [Namespaces and methods › Statics and the dot](/docs/language/namespaces-and-methods#statics-and-the-dot)
+
 ### `protocol-as-type`
 
 **Error.** A protocol name is used as a type, for example in an annotation. Unlike a TypeScript interface, a protocol is not a type.
