@@ -2,16 +2,9 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { matcherValueExpressions } from "./matchHandlerChildren"
 
-// `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` are
-// Statements, and every Expression they hold hangs off them directly — there is
-// no body to descend into. So a walker that has no case for them descends into
-// nothing at all, and the whole of a test body is invisible to it. This is the
-// one answer to "what is written inside an assertion", asked the way
-// `matchHandlerChildren` asks it of a Match Handler, so that the walkers
-// reading it can not disagree about it.
-//
-// Returned in SOURCE order — the Matcher stands left of the `=` — so a walker
-// searching for the first match in a document finds it where it lexically is.
+// What is written inside an assertion, which holds its Expressions directly,
+// in source order with the Matcher first, as `matchHandlerChildren` answers
+// for a Match Handler.
 
 type ParsedAssertion = parser.ExpectStatementNode | parser.RequireStatementNode
 
@@ -19,9 +12,8 @@ type TypedAssertion =
 	| common.typed.ExpectStatementNode
 	| common.typed.RequireStatementNode
 
-// A Matcher's own Expressions are the values it constrains members
-// against, the `3` of `require { points = 3 } = standing`, which is the same
-// question a Match Handler asks, reached from the other side of the grammar.
+// A Matcher's own Expressions are the values it constrains members against,
+// the `3` of `require { points = 3 } = standing`.
 export function assertionExpressions(
 	node: ParsedAssertion,
 ): Array<parser.ExpressionNode> {
@@ -31,10 +23,8 @@ export function assertionExpressions(
 	]
 }
 
-// The typed side. Where a Matcher was written, `value` is the NAME of the
-// Constant holding the asserted value rather than the Expression itself — that
-// Expression is the Statement standing in front of this one, which every walker
-// reaches on its own.
+// The typed side. With a Matcher, `value` names the Constant holding the
+// asserted value, whose Statement stands before this one.
 export function typedAssertionExpressions(
 	node: TypedAssertion,
 ): Array<common.typed.ExpressionNode> {

@@ -1,15 +1,8 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-// A typed Match Handler holds Expressions outside its body — the value a
-// literal Matcher compares against, one per by-value member of a Record
-// Matcher, and the Guard. They are ordinary Expressions with ordinary
-// Positions, so every walker that descends into `body` has to descend into
-// them as well or the whole of `case 1 where …` is invisible to Hovers,
-// Completion, Inlay Hints and the rename index.
-//
-// Returned in source order — the Matcher's own Expressions first, then the
-// Guard — so that a walker searching for the first match in a document finds
-// it where it lexically is.
+// A typed Match Handler's Expressions outside its body: a literal Matcher's
+// value, each by-value member of a Record Matcher, and the Guard, in source
+// order. Every walker into `body` must reach these too.
 
 type Handler = common.typed.MatchNode["handlers"][number]
 
@@ -23,12 +16,9 @@ export function typedHandlerExpressions(
 	].filter((expression) => expression !== null)
 }
 
-// The same question asked of a PARSED Matcher: the written values its
-// Pattern constrains members against, in source order, however deeply nested
-// and whether the Pattern stands in the Matcher itself or in a Case payload.
-// They are the only part of a Matcher smaller than the Matcher — a literal
-// Matcher's value spans the whole of it — so they are what a walker looking for
-// the innermost thing under a cursor has to descend into.
+// The written values a parsed Matcher's Pattern constrains members against,
+// in source order at any depth. They are the only part of a Matcher smaller
+// than the Matcher.
 export function matcherValueExpressions(
 	matcher: parser.MatcherNode,
 ): Array<parser.ExpressionNode> {

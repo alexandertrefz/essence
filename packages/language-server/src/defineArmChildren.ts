@@ -1,21 +1,6 @@
-// `define { as VALUE if CONDITION … as VALUE otherwise }` holds nothing
-// but Expressions. An arm has no body to descend into — that is what keeps a
-// `define` an Expression — so a walker with no case for it descends into
-// nothing at all, and the whole of `as total if hasRun` is invisible to Hovers,
-// Completion, Inlay Hints and the rename index. This is the one answer to "what
-// is written inside a define", asked the way `matchHandlerChildren` asks it of a
-// Match Handler, so that the walkers reading it can not come to disagree — and
-// in particular so that none of them forgets the `otherwise` arm, which is a
-// field of its own rather than another entry in `arms`.
-//
-// Returned in SOURCE order — the value stands left of the `if`, and the
-// `otherwise` arm stands below every conditional one — so a walker searching for
-// the first match in a document finds it where it lexically is.
-//
-// One set of functions answers for the Parser AST and for the typed one
-// alike: an arm is a value and a Condition either side of enrichment, and only
-// the Expression Type differs. Shaped after `parameterDefaults`, which is
-// written generically over the same two ASTs for the same reason.
+// What is written inside a `define`: Expressions only, since an arm has no
+// body. In source order, the `otherwise` arm included, for the Parser and the
+// typed AST alike, as `matchHandlerChildren` answers for a Match Handler.
 
 type Arm<Expression> = {
 	value: Expression
@@ -27,8 +12,7 @@ type Define<Expression> = {
 	otherwise: { value: Expression }
 }
 
-// One arm, for the walkers that have something to say about the arm
-// itself — a Position of its own to put on a selection chain.
+// One arm, for walkers that put the arm's own Position on a selection chain.
 export function defineArmExpressions<Expression>(
 	arm: Arm<Expression>,
 ): Array<Expression> {
@@ -44,12 +28,8 @@ export function defineExpressions<Expression>(
 	]
 }
 
-// The same enumeration split by what the two halves are read AGAINST,
-// for the walkers that thread an expected Type down: every value answers the
-// `define` and so is read against the Type the position expects of it, while a
-// Condition is a Boolean that expects nothing of its own. Split here rather
-// than at each call site so that the `otherwise` arm's value is counted as a
-// value everywhere, which is what it is.
+// The same, split into values, read against the expected Type, and
+// Conditions, which are Booleans.
 export function defineValues<Expression>(
 	node: Define<Expression>,
 ): Array<Expression> {

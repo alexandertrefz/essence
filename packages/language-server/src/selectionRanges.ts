@@ -11,10 +11,8 @@ import { matcherValueExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
 import { type ParserSection, programSections } from "./sections"
 
-// "Expand selection" wants the chain of ever-larger constructs
-// containing the cursor. Collecting every Position on the path down the
-// Parser AST gives exactly that, innermost first — the client turns the chain
-// into nested ranges and steps through them.
+// The chain of ever larger constructs containing the cursor, innermost first,
+// for "Expand selection".
 
 export function findSelectionRanges(
 	program: parser.Program,
@@ -22,12 +20,9 @@ export function findSelectionRanges(
 ): Array<common.Position> {
 	let chain: Array<common.Position> = []
 
-	// The innermost Section the cursor is in, and the Sections around it —
-	// so expanding out of a Statement inside a test reaches the test, then the
-	// suite, then the `tests { … }` block, each as the form it is written as.
-	// The implementation is filtered out along the way for a cursor inside the
-	// tests block: the two are Scopes one inside the other and spans side by
-	// side, and only a span containing the cursor belongs in the chain.
+	// The innermost Section and those around it, so expanding from a test reaches
+	// the suite and the `tests` block. The implementation is filtered out for a
+	// cursor in the tests block, whose span lies beside it.
 	let section = innermostSection(programSections(program), cursor)
 
 	if (section !== null) {
@@ -40,14 +35,13 @@ export function findSelectionRanges(
 		collectFromBody([...section.head, ...section.nodes], cursor, chain)
 	}
 
-	// Innermost first, and duplicates dropped — a Statement wrapping a
-	// single Expression often shares its Position exactly.
+	// Innermost first, without repeats: a Statement often shares its
+	// Expression's Position.
 	return dropRepeats(chain.reverse())
 }
 
-// The LAST Section containing the cursor, which is the innermost one:
-// `programSections` hands them out outermost first, so anything nested in a
-// Section stands after it.
+// The last Section containing the cursor is the innermost, since
+// `programSections` is outermost first.
 function innermostSection(
 	sections: Array<ParserSection>,
 	cursor: common.Cursor,
@@ -106,10 +100,8 @@ function collectFromBody(
 	}
 }
 
-// A Parameter's `= expression` default is a span of its own, inside no
-// body — so expanding a selection from inside `= @::length()` has to descend
-// here or it jumps straight to the whole Declaration. Answers whether the cursor
-// was in one, since a cursor inside a default is not in the body.
+// A Parameter default is a span inside no body, so a cursor in
+// `= @::length()` descends here. Answers whether the cursor was in one.
 function collectFromDefaults(
 	parameters: Array<parser.ParameterNode>,
 	cursor: common.Cursor,
@@ -147,15 +139,14 @@ function collectFromNode(
 			return
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
-				// A native static Property has no value to descend into.
+				// A native static Property has no value.
 				if (property.value !== null) {
 					descend(property.value, cursor, chain)
 				}
 			}
 
 			for (let member of Object.values(node.methods)) {
-				// Only bodied Methods have a block to select within — the
-				// body-less native signatures (declarations mode) are skipped.
+				// Only bodied Methods have a block; native signatures are skipped.
 				let methods: Array<parser.FunctionValueNode> = []
 
 				if (
@@ -228,9 +219,7 @@ function collectFromNode(
 
 			return
 		case "ChoiceDeclarationStatement":
-			// A Case payload's `= { … }` is a span inside no body, like a
-			// Parameter's — without this, expanding a selection from inside one
-			// jumps straight to the whole Choice.
+			// A Case payload's default is a span inside no body, like a Parameter's.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				descend(defaultValue, cursor, chain)
 			}
@@ -259,10 +248,8 @@ function collectFromNode(
 			descend(node.value, cursor, chain)
 
 			for (let handler of node.handlers) {
-				// A Pattern's by-value members are the only part of a
-				// Matcher that is smaller than the Matcher itself — a literal
-				// Matcher's value spans the whole Matcher, so it would only
-				// repeat a range the chain already has.
+				// A Pattern's by-value members are the only part of a Matcher smaller than
+				// itself.
 				for (let value of matcherValueExpressions(handler.matcher)) {
 					descend(value, cursor, chain)
 				}
@@ -275,11 +262,8 @@ function collectFromNode(
 			}
 
 			return
-		// The ARM stands on the chain between what is written in it and
-		// the whole `define`, for the reason a Dictionary entry does below: an
-		// arm has a Position of its own covering `as VALUE if CONDITION`, so
-		// widening from `total` reaches the arm it answers in before it reaches
-		// the braces. A Match Handler carries no Position and can not do this.
+		// The arm, which has a Position covering `as VALUE if CONDITION`, stands
+		// between what is in it and the whole `define`. A Match Handler has none.
 		case "Define":
 			for (let arm of node.arms) {
 				if (!contains(arm.position, cursor)) {
@@ -319,12 +303,8 @@ function collectFromNode(
 
 			return
 		case "DictionaryValue":
-			// The ENTRY stands on the chain between the key or value and
-			// the whole literal, because a Dictionary entry is the one
-			// member-shaped Node in the language that has a Position of its own
-			// covering `key = value`. A Record member has none, which is why a
-			// Record can not do this and a Dictionary can: widening from `39`
-			// reaches `"alex" = 39` before it reaches the brackets.
+			// The entry, which has a Position covering `key = value`, stands between its
+			// key or value and the literal. A Record member has none.
 			for (let entry of node.entries) {
 				if (!contains(entry.position, cursor)) {
 					continue
@@ -359,9 +339,7 @@ function collectFromNode(
 		case "Lookup":
 			descend(node.base, cursor, chain)
 			return
-		// The operand is a span of its own inside the Keyword's, so widening
-		// from inside `complete headline(url)` reaches the call first and the whole
-		// `complete …` after it.
+		// The operand is a span inside the Keyword's, so the call comes first.
 		case "Start":
 		case "Complete":
 			descend(node.expression, cursor, chain)
@@ -375,9 +353,7 @@ function collectFromNode(
 			}
 
 			return
-		// The path itself was pushed by whoever descended into it; what
-		// is left is the one step the cursor stands on, so expanding a
-		// selection from `city` reaches `.address.city` and then the Argument.
+		// The step the cursor stands on, so `city` widens to `.address.city`.
 		case "MemberPath":
 			for (let step of node.steps) {
 				if (contains(step.position, cursor)) {
