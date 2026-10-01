@@ -418,3 +418,44 @@ refusal names the whole Type.
 An `Optional` is that Union with its arms run through. Absence, `undefined` or `null`, is `#Empty`, and anything else
 is `#Value`. `null` is admitted because JSON has only that one, and `undefined` is what comes back out. `#Empty` never
 reaches inside a value, so a refusal from inside the `#Value` arm is the one reported.
+
+### Callbacks
+
+`buildCallbackIn` turns a JavaScript Function into an Essence one. It mirrors `wrapFunction`, and it is the one place
+the boundary is crossed by a call the Module makes. The Module hands the callback its own values, which cross out. The
+callback's answer is built against the declared return, and crosses in.
+
+The Module calls a callback by position, never by label. Labels are how Essence writes its calls. A JavaScript
+Function takes its Arguments in order, and the package invents no calling convention for code it did not write. For
+the same reason, a callback that answers work is not handed the run's context. A host that wants to be stopped closes
+over an `AbortController` of its own.
+
+A refusal inside a callback is spelled from where the callback arrived, as in `argument 2 → return value`, since that
+names the Function the host passed. The path is spelled once, when the callback arrives. A callback that answers work
+meets the Future door's check on arrival too, while a host can still be told.
+
+A callback declared `-> Future<T>` is how work crosses into a Module. The host writes an ordinary Function answering a
+`Promise`, and the Module gets a Future. A Future is a description, so the host is called at every start and no sooner.
+A host's `(url) => fetch(url)` handed to such a Parameter makes no request until started, and `::attempt(times 3)` over
+it makes three. The Arguments cross when the Module calls the callback, rather than when the work starts. They belong
+to the moment the Module built the Future. A `Started` answer has no door, since a host can not start a run of the
+Module's own work. It meets the refusal in `buildIn`.
+
+### The way out
+
+The way out is not the mirror of the way in. A value coming out says what it is, so a compiled reader only checks the
+tag against the shape its position declared. Where the two agree, nothing inside the value needs deciding. Otherwise,
+as for a value from an arm the Descriptor did not name, the reader hands the value to the general walk, `toJS`. The compiled reader is an optimisation of that walk, not a second reading.
+
+An Integer always comes out as a bigint. The runtime holds an Integer as a number while it fits one and as a bigint
+beyond. Passing that split on would make the Type a host receives depend on the size of the answer.
+
+An `Optional` is transparent: its Case does not appear in the answer, and the path gains no segment for it. A lone
+`Optional` Case, as an unannotated constant infers it, goes to the walk that owns absence. `collectCases` leaves a
+Union's `Optional` arms to that walk in the same way.
+
+For a Union, the reader compiles the choosing: one reader per Case the Union offers, under the tag its values carry.
+Every other arm goes through the general walk. A Union the way in refuses for colliding bare Cases is refused going out
+too. A host is never handed a value it could not hand back.
+
+A Function is the one untagged value, so only the Descriptor of its position says what a call to it means.
