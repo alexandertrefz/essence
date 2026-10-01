@@ -13,7 +13,6 @@
 	"packages/compiler/src/tests/corpusFiles.spec.ts": {"sentence-length": 10, "em-dash": 6, "all-caps": 8},
 	"packages/compiler/src/tests/decimalLiterals.spec.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 1},
 	"packages/compiler/src/tests/diagnosticFactory.ts": {"sentence-length": 1, "em-dash": 2},
-	"packages/compiler/src/tests/dictionaries.spec.ts": {"sentence-length": 40, "em-dash": 21, "all-caps": 42, "position": 5, "block-length": 8},
 	"packages/compiler/src/tests/dictionaryAdditions.spec.ts": {"sentence-length": 18, "em-dash": 4, "all-caps": 8, "position": 1, "block-length": 1},
 	"packages/compiler/src/tests/dictionaryBenchmarks.spec.ts": {"sentence-length": 1},
 	"packages/compiler/src/tests/dictionaryRefinements.spec.ts": {"sentence-length": 21, "em-dash": 14, "all-caps": 4, "block-length": 1},

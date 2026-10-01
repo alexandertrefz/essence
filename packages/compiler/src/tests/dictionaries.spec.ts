@@ -13,17 +13,12 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// A Dictionary is a generation-stamped store shared between every box
-// that was ever written from one — see `packages/runtime/src/Dictionary.ts` —
-// and the promise the design rests on is that nothing of that is visible from
-// Essence. What a box answers, what order it answers it in, and which two keys
-// are one key are all claims about a Program that RUNS, so every one of them is
-// compiled and executed here rather than only type-checked.
+// A Dictionary shares a store between every box written from one, and none of
+// that may show from Essence. See "Dictionaries" in
+// packages/runtime/DEVELOPMENT.md.
 //
-// `packages/runtime/src/tests/dictionaries.spec.ts` drives the store
-// itself — the repack rules, the generations, the encodings. This file asks the
-// language the same questions through the Namespace, which is the only door a
-// Program has.
+// These specs compile and run Programs that ask through the Namespace.
+// `packages/runtime/src/tests/dictionaries.spec.ts` drives the store itself.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -61,9 +56,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// A conformance condition is the Enricher's answer, so this stops where
-// the failure is reported rather than running the Validator over a Program the
-// Enricher already refused.
+// Stops at the first stage that reports an Error.
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -80,11 +73,8 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	return validate(enriched.program)
 }
 
-// The receiver every group below reads, written once. There is no
-// Dictionary literal in this slice, so a Dictionary is built from a List of
-// entry Records and the empty one from an annotated empty List — `Dictionary.of`
-// reads both Type Arguments off the entries it is handed, and no entry carries
-// either.
+// The receiver most groups read, built with `Dictionary.of` from entry
+// Records. `Dictionary.of` reads both Type Arguments off the entries.
 const ages = `constant ages = Dictionary.of([
 		{ key = "alex", value = 39 },
 		{ key = "sam", value = 25 },
@@ -105,8 +95,8 @@ describe("Dictionary", () => {
 			).toEqual(['"[\\"alex\\" = 39, \\"sam\\" = 25]"', "2"])
 		})
 
-		// The later value wins and the key keeps the place its FIRST
-		// occurrence gave it, which is the same rule an overwrite follows.
+		// The later value wins in the first occurrence's place, as an overwrite
+		// does.
 		it("collapses a duplicate key onto its first position", async () => {
 			expect(
 				await run(`implementation {
@@ -164,9 +154,7 @@ describe("Dictionary", () => {
 	})
 
 	describe("Order", () => {
-		// The entries are read off a Dictionary of short names, because
-		// `Terminal.inspect` wraps a structure whose single line reaches sixty
-		// characters and this asserts on one line per call.
+		// Short names keep each `Terminal.inspect` answer on one line.
 		it("answers its keys, values and entries in one order", async () => {
 			expect(
 				await run(`implementation {
@@ -188,10 +176,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// The two halves of one design rule. An overwrite is not a
-		// removal followed by an insertion — the key keeps the place it had —
-		// and a key that was genuinely REMOVED is new when it comes back, so it
-		// lands at the end. `keys()` is what says which of the two happened.
+		// An overwritten key keeps its place. A removed key is new when it comes
+		// back, so it lands at the end.
 		it("keeps a key's place when its value is overwritten", async () => {
 			expect(
 				await run(`implementation {
@@ -230,9 +216,7 @@ describe("Dictionary", () => {
 			).toEqual(['[ "alex", "sam", "kim" ]'])
 		})
 
-		// The receiver of a write still answers what it answered. Every
-		// box is a view of the shared store at its own generation, and this is
-		// the claim that says so from the language's side.
+		// The receiver of a write still answers what it answered.
 		it("leaves the Dictionary a write was made from untouched", async () => {
 			expect(
 				await run(`implementation {
@@ -251,9 +235,8 @@ describe("Dictionary", () => {
 	})
 
 	describe("Transforming", () => {
-		// Every callback a Dictionary Method takes is handed the ENTRY
-		// Record, which is what lets a Pattern take it apart in the Parameter
-		// list rather than reading two members out of a name inside the body.
+		// Every callback is handed the entry Record, so a Pattern can take it
+		// apart in the Parameter list.
 		it("hands each entry to 'map' and keeps the keys", async () => {
 			expect(
 				await run(`implementation {
@@ -292,12 +275,9 @@ describe("Dictionary", () => {
 			).toEqual(['"[\\"alex\\" = 39]"', '"[\\"sam\\" = 25]"', '"[=]"'])
 		})
 
-		// Both filters are native and share the receiver's key encodings,
-		// so a filtered Dictionary answers a lookup the way the receiver did,
-		// whatever its keys are — and neither asks for an `Equatable` bound,
-		// since keeping some of the receiver's keys can not make two collide.
-		// The Function below holds an UNBOUNDED Dictionary, on which
-		// `remove(at:)` is `unsatisfied-bound`.
+		// Keeping some of the receiver's keys can not make two collide, so
+		// neither filter asks for an `Equatable` bound. The Function holds an
+		// unbounded Dictionary.
 		it("filters a Dictionary of any keys without asking for a bound", async () => {
 			expect(
 				await run(`implementation {
@@ -390,8 +370,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// The Argument wins on a key both hold, and the `choosing:` entry
-		// hands the receiver's value first and the Argument's second.
+		// The Argument wins on a shared key. The `choosing:` entry hands the
+		// receiver's value first and the Argument's second.
 		it("merges, letting the Argument win or the caller decide", async () => {
 			expect(
 				await run(`implementation {
@@ -417,8 +397,7 @@ describe("Dictionary", () => {
 	})
 
 	describe("Equality and printing", () => {
-		// Order-INSENSITIVE, which is what the design says two
-		// Dictionaries mean by equal: the same keys, each with an equal value.
+		// Equal means the same keys, each with an equal value, in any order.
 		it("compares by entries rather than by order", async () => {
 			expect(
 				await run(`implementation {
@@ -441,9 +420,8 @@ describe("Dictionary", () => {
 			).toEqual(["true", "false", "false", "true"])
 		})
 
-		// `[=]` rather than `[]`, which is the whole reason the empty
-		// Dictionary is spelled with the `=` a Program writes an entry with: a
-		// reader has to be able to tell it from the empty List.
+		// `[=]` rather than `[]`, so the empty Dictionary is told apart from the
+		// empty List.
 		it("writes itself the way a Program writes one down", async () => {
 			expect(
 				await run(`implementation {
@@ -461,13 +439,9 @@ describe("Dictionary", () => {
 	})
 
 	describe("Keys of any Type", () => {
-		// `Record::is` is the universal structural comparison over the
-		// members — it never asks a member's own Namespace, which is what
-		// `Record.es` says of it — so its witness carries the `structural`
-		// brand and a Record whose members all encode is found in one step,
-		// under a text spelled from those members. The members can arrive in
-		// either order and spell one key. See `compositeText` in
-		// `packages/runtime/src/Dictionary.ts`.
+		// `Record::is` compares members structurally, so its witness is
+		// branded and a Record key is found by its encoded members, in either
+		// order. See `compositeText` in `packages/runtime/src/keyEncoding.ts`.
 		it("finds a Record key by its members, on the encoded path", async () => {
 			let source = `implementation {
 				constant seats = Dictionary.of([
@@ -496,12 +470,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// The equality the language derives for a Choice is its own —
-		// the tag decides the Case and the payload compares as a Record — so
-		// the derived witness is branded like `Record`'s, and a Case is found
-		// under a text spelled from its tag and its payload. A Dictionary keyed
-		// by a payload-free Choice is the most ordinary Dictionary there is,
-		// and this is what keeps it off the scan path.
+		// A Choice's derived equality reads the tag and the payload, so its
+		// witness is branded like `Record`'s and a Case is found by its encoding.
 		it("finds a Choice key by its tag, on the encoded path", async () => {
 			let source = `implementation {
 				choice Colour { Red, Green, Blue }
@@ -526,9 +496,9 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// A payload spelled two ways is one key exactly where the derived
-		// `is` calls the two equal: a whole Rational is the Integer it equals,
-		// and the members of a payload stand in any order.
+		// A payload spelled two ways is one key where the derived `is` calls
+		// them equal. A whole Rational is its Integer, and members stand in any
+		// order.
 		it("finds a Choice key with a payload through every member", async () => {
 			expect(
 				await run(`implementation {
@@ -559,11 +529,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// A Namespace that writes an `is` for its Choice REPLACES the
-		// derivation, and its witness arrives under the Namespace's own name
-		// rather than the derived one — so it is not branded, and every lookup
-		// asks the written `is`. Every Colour is one key here, which no tag
-		// encoding could have said.
+		// A written `is` replaces the derived one, so its witness is not
+		// branded and every lookup asks it. Here every Colour is one key.
 		it("finds a Choice key through a written 'is' rather than by its tag", async () => {
 			let source = `implementation {
 				choice Colour { Red, Green, Blue }
@@ -590,13 +557,9 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// A generic Choice's derived witness is CONDITIONAL on its Type
-		// Arguments' witnesses, so the brand rides on its method map and
-		// `boundConformance` settles it at run time, branding the witness it
-		// builds only where every condition arrived branded. Here the one Type
-		// Argument is an Integer, so the key is found in one step. The scan
-		// cases live under "Keys of a generic Choice" below, where a Type
-		// Argument carries an `is` a Program wrote.
+		// A generic Choice's witness is branded at run time by
+		// `boundConformance`, only where every condition is branded. The scan
+		// cases are under "Keys of a generic Choice".
 		it("finds a generic Choice key in one step under branded Arguments", async () => {
 			let source = `implementation {
 				choice Wrap<Item> { Some { item: Item }, None }
@@ -624,11 +587,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// `Number.is` answers by VALUE across the numeric kinds, so `3`
-		// and `3/1` have to be one key under a covering key Type, and `1/2` and
-		// `2/4` have to be one under any. The key box the Dictionary keeps is
-		// the one that arrived FIRST, which is why the keys read back as they
-		// were written rather than as the encoding they share.
+		// `Number.is` answers by value across the numeric kinds, so `3` and
+		// `3/1` are one key. The Dictionary keeps the key that arrived first.
 		it("holds one key where two spellings are one Number", async () => {
 			expect(
 				await run(`implementation {
@@ -656,23 +616,12 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// A Namespace may write its own `is` for a refinement of a key
-		// kind the store knows how to encode, and then the encoding is WRONG
-		// about which two keys are one key — `"Ada"` and `"ada"` encode apart
-		// and this witness calls them equal. So the Compiler brands the
-		// witnesses whose `is` is the standard library's own structural one,
-		// the store takes its one-lookup fast path only for a branded witness,
-		// and everything else walks the entries asking the witness. See
-		// `encodeKey` in `packages/runtime/src/Dictionary.ts` and
-		// `isStructurallyEquatable` in the Rewriter.
+		// A written `is` for a refined String makes "Ada" and "ada" one key,
+		// which the encoding would not. An unbranded witness takes the scan path.
+		// See `encodeKey` in `packages/runtime/src/keyEncoding.ts`.
 		//
-		// The two sides are read as plain Strings before they are
-		// compared. `namespace NonEmptyString` carries the proof through
-		// `lowercase`, so a lower-cased NonEmptyString is a NonEmptyString
-		// again — and asking IT `is` would reach this very Method, which
-		// answers by asking `is` once more. Declaring the Type the comparison
-		// is made at is what stops the witness from being written in terms of
-		// itself.
+		// The sides are compared as plain Strings, since a lower-cased
+		// `NonEmptyString` would reach this Method again.
 		it("finds a refined String key through a written 'is'", async () => {
 			expect(
 				await run(`implementation {
@@ -702,8 +651,7 @@ describe("Dictionary", () => {
 			).toEqual(["1", '[ "Ada" ]', "true", "Optional#Value(2)", "false"])
 		})
 
-		// The same rule over a refined Integer, so the branding is not
-		// something only String's witness happens to get right.
+		// The same rule over a refined Integer.
 		it("finds a refined Integer key through a written 'is'", async () => {
 			expect(
 				await run(`implementation {
@@ -729,13 +677,9 @@ describe("Dictionary", () => {
 			).toEqual(["1", "[ 1 ]", 'Optional#Value("second")'])
 		})
 
-		// A user Namespace may SHADOW one of the branded names inside a
-		// Function, and it arrives at the Rewriter under that name. The brand
-		// is decided by the same lexical answer every member read is decided
-		// by, so the shadowing Namespace's own `is` is what finds the keys —
-		// branding it would have put "Ada" and "ada" in two slots. The body
-		// reaches no String Method, because inside that scope `String` IS the
-		// shadowing Namespace.
+		// A user Namespace may shadow a branded name inside a Function. The
+		// brand follows the lexical answer, so the shadowing `is` finds the keys.
+		// Inside that scope `String` is the shadowing Namespace.
 		it("finds a key through a written 'is' in a Namespace shadowing 'String'", async () => {
 			let source = `implementation {
 				function borrowers() -> Integer {
@@ -762,13 +706,9 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// `List<ItemType> is Equatable where ItemType is Equatable` is
-		// conditional, and a conditional conformance carries the brand only
-		// where its conditions do — which `boundConformance` settles, so the
-		// brand stands in the emitted map and the witness built from it is the
-		// one that has it. A List key is found under `l<count>:` and its items'
-		// own texts, which is what makes the obvious memo table for a pair of
-		// coordinates flat rather than quadratic.
+		// A List's conformance is conditional, so `boundConformance` brands its
+		// witness only where the item witness is branded. A List key encodes as
+		// its count and its items.
 		it("finds a List key by its items, on the encoded path", async () => {
 			let source = `implementation {
 				constant none: Dictionary<List<Integer>, String> = [=]
@@ -791,11 +731,8 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// The brand is recursive, because the condition it is asked of is
-		// itself a List's. A `List<List<Integer>>` key is branded exactly when
-		// the Integer witness at the bottom is, and the count in each head is
-		// what keeps `[[1], [2]]` and `[[1, 2]]` two keys — and `[[]]` and `[]`
-		// two more.
+		// The brand is recursive. The count in each head keeps `[[1], [2]]` and
+		// `[[1, 2]]` apart, and `[[]]` and `[]`.
 		it("finds a nested List key, counts and all", async () => {
 			expect(
 				await run(`implementation {
@@ -819,18 +756,9 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// THE CASE THE BRAND EXISTS FOR. A Namespace that writes an `is`
-		// for the ITEM Type is handed to `List::is` as the item witness, so two
-		// Lists are equal exactly where that `is` says their items are — and
-		// the canonical encoding would have said something else. Here every
-		// NonEmptyString is every other one, so the two Lists are ONE key, and
-		// only the scan path can say that: the answer below is the assertion.
-		//
-		// The brand does stand in the emitted map, because a List's is
-		// CONDITIONAL and the map is what carries it to `boundConformance` —
-		// which is where it is refused, the `Loose` witness curried onto it
-		// having none. So what is asserted of the emitted text is that the item
-		// witness arrives unbranded; the rest of the claim is the run.
+		// A written item `is` makes the two Lists one key, which only the scan
+		// path can find. The List's map carries the brand, and `boundConformance`
+		// withholds it because the `Loose` item witness has none.
 		it("leaves a List key on the scan path under a written item 'is'", async () => {
 			let source = `implementation {
 				function names() -> Integer {
@@ -857,11 +785,8 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// A refinement declares no `is` of its own, so its conformance
-		// resolves to the base Namespace's and arrives under the base's name —
-		// which holds at both ends of a List key: `NonEmptyList<T>` emits
-		// `List`'s witness and `NonEmptyString` items emit `String`'s, so the
-		// pair is branded exactly as the unrefined pair is.
+		// A refinement's conformance resolves to its base Namespace's, so a
+		// refined List of refined items is branded as the unrefined pair is.
 		it("finds a refined List key of refined items on the encoded path", async () => {
 			let source = `implementation {
 				constant words: NonEmptyList<NonEmptyString> = ["ada", "bob"]
@@ -879,21 +804,9 @@ describe("Dictionary", () => {
 		})
 	})
 
-	// A GENERIC CHOICE'S KEYS, which is the same rule as a List's met on
-	// the other kind of container. `Optional<ItemType> is Equatable where
-	// ItemType is Equatable` compares two Cases by their tag and then their
-	// payload through the ITEM's own witness — so the canonical text may stand
-	// in for it exactly when that witness is branded, and never otherwise.
-	// `Result` carries two conditions and a user Choice carries one per Type
-	// Parameter; the rule is the same and the answer is `every`.
-	//
-	// THE SCAN CASES STAND FIRST, and they are the ones that matter. A
-	// branded witness is a claim that the encoding says what the Program's own
-	// `is` says, and the way to get that wrong is to brand where a Namespace
-	// wrote an `is` of its own. Each of these puts a written `is` somewhere
-	// inside a generic Choice key and asserts the ANSWER — every `Loose`
-	// receiver below calls its values equal, so the Dictionary holds ONE key
-	// and only the scan path can say so.
+	// A generic Choice key follows a List's rule: its witness is branded only
+	// where every Type Argument's witness is. Each scan case hides a written
+	// `is` that calls all values equal, so only the scan path finds one key.
 	describe("Keys of a generic Choice", () => {
 		const loose = `namespace Loose for NonEmptyString is Equatable {
 						is(_ other: NonEmptyString) -> Boolean {
@@ -921,9 +834,8 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// The written `is` one container further in, so the refusal is the
-		// recursion rather than a single lookup: the List's own witness is
-		// conditional, carries `Loose`, and arrives at the Optional unbranded.
+		// The written `is` one container further in, so the List's witness
+		// arrives at the Optional unbranded.
 		it("leaves an Optional key on the scan path under a written item 'is' inside a List", async () => {
 			let source = `implementation {
 				function names() -> Integer {
@@ -940,9 +852,8 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// A Result's SECOND condition, which is the one a witness asking
-		// `some` where it should ask `every` would let through: the value Type
-		// is branded and the failure Type is not.
+		// A Result's second condition: the value Type is branded and the
+		// failure Type is not.
 		it("leaves a Result key on the scan path under a written failure 'is'", async () => {
 			let source = `implementation {
 				function names() -> Integer {
@@ -959,8 +870,7 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// And its FIRST condition, so neither order of the two is the one
-		// that happens to be read.
+		// And its first condition.
 		it("leaves a Result key on the scan path under a written value 'is'", async () => {
 			let source = `implementation {
 				function names() -> Integer {
@@ -977,10 +887,8 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// A Choice the PROGRAM declares, whose equality is derived rather
-		// than written — the witness is `boundChoiceIs` over a descriptor, which
-		// asks the Type Arguments' witnesses at the members that name a Type
-		// Parameter and compares the rest structurally. Same rule, same answer.
+		// A Program's own Choice derives `boundChoiceIs` over a descriptor, which
+		// asks the Type Arguments' witnesses at the members naming them.
 		it("leaves a user generic Choice key on the scan path under a written 'is'", async () => {
 			let source = `implementation {
 				choice Pair<LeftType, RightType> {
@@ -1005,12 +913,9 @@ describe("Dictionary", () => {
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// A GENERIC CHOICE WHOSE OWN NAMESPACE WRITES THE `is`, which is
-		// the rule that already held for a Choice with no Type Parameters, met
-		// where the conformance is conditional. `Wrap`'s witness arrives under
-		// its own name rather than the derived one and is on neither list, so
-		// the conditions are never even asked — and here the written `is` calls
-		// every Wrap every other one, so the table holds ONE key.
+		// A generic Choice whose own Namespace writes the `is`: its witness is
+		// not branded, whatever its conditions. The written `is` calls every
+		// Wrap equal, so the table holds one key.
 		it("leaves a generic Choice key on the scan path under its own written 'is'", async () => {
 			let source = `implementation {
 				choice Wrap<ItemType> {
@@ -1034,22 +939,17 @@ describe("Dictionary", () => {
 				Terminal.inspect(table::length())
 			}`
 
-			// The method map is read by name rather than the whole
-			// emitted text, because the Integer witness beside it IS branded
-			// and would answer the broader question for it.
+			// The method map is read by name, since the Integer witness beside
+			// it is branded.
 			expect(generate(source)).toContain(
 				"$type.boundConformance({ is: Wrap.is }, [",
 			)
 			expect(await run(source)).toEqual(["1"])
 		})
 
-		// The witness FORWARDED through generic Functions rather than
-		// built where the Dictionary is, one hop and two — which is the shape
-		// the Rewriter has no name for and `boundConformance` settles at run
-		// time. The second pair spells the callee's Type Parameter the same as
-		// the caller's, which is the name collision `genericWitnessArity.spec.ts`
-		// is about: the witness that arrives a level too deep would be branded
-		// on the strength of the wrong conditions.
+		// The witness forwarded through generic Functions, one hop and two, is
+		// settled by `boundConformance` at run time. The second hop reuses the
+		// Type Parameter's name, as in `genericWitnessArity.spec.ts`.
 		it("leaves a forwarded generic Choice key on the scan path under a written 'is'", async () => {
 			let source = `implementation {
 				function counted<infer KeyType is Equatable>(
@@ -1098,12 +998,9 @@ describe("Dictionary", () => {
 		})
 	})
 
-	// Both conformances are conditional, so a Dictionary is printable
-	// exactly when its keys and its values are. The two Diagnostics below are
-	// the same failure met at two depths, and the Enricher tells them apart by
-	// the length of the because-chain: `toString`'s own bound is one level and
-	// reports `unsatisfied-bound`, while a Type Parameter bound to the whole
-	// Dictionary is two and reports the condition that failed underneath it.
+	// A Dictionary is printable exactly when its keys and values are. The
+	// failure one level deep is `unsatisfied-bound`, and two levels deep it
+	// reports the condition that failed.
 	describe("Conditional conformance", () => {
 		const handlers = `constant handlers = Dictionary.of([
 				{ key = "a", value = (_ n: Integer) -> Integer { <- n } },
@@ -1131,10 +1028,8 @@ describe("Dictionary", () => {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"unsatisfied-conformance-condition",
 			])
-			// The head of the because-chain is dropped where it only
-			// repeats the message above it, so every Note says something the
-			// reader has not been told. The last one is why no Help follows:
-			// no `for` clause can name a Function Type.
+			// The head of the because-chain repeats the message, so it is
+			// dropped. No Help follows, since no `for` clause names a Function Type.
 			expect(diagnostics[0]!.notes).toEqual([
 				"(_: Integer) -> Integer does not conform to 'Printable'.",
 				"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
