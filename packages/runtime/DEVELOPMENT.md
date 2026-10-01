@@ -518,6 +518,10 @@ silently open two slots for one key.
 The index holds every slot the store ever opened, including slots opened after a given box. A lookup therefore
 checks that the box can see the slot. On the tip, where every write looks, that check always passes.
 
+`keyEncoding.ts` imports `runsOf` from `List.ts` rather than reaching a List through the kind registry. Through the
+registry, a List key would encode only where something had registered the reader first. The answer would then depend
+on what else the Program calls.
+
 ### Dictionary equality
 
 `is` is order-insensitive: the same keys, each with an equal value. Equal lengths are checked first, so walking one
