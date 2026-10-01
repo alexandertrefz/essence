@@ -13,29 +13,18 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The Namespace every other spec here PRINTS through, tested on its own
-// terms. `stdlibGolden.spec.ts` can not cover it — that harness works by
-// calling `Terminal.inspect`, so a `Terminal.print` beside it would print
-// twice and a `Terminal.write` would put text in the middle of a captured line
-// — so this is where the behaviour of the Methods that write is pinned.
-//
-// What has to be true, and is not true of any other standard library
-// Method: `print` renders through `Printable` and ENDS THE LINE, `inspect`
-// renders the STRUCTURE of any value at all and answers with it unchanged, and
-// `write` adds NOTHING. Every one of those is invisible to every stage before
-// the emitted Program runs, so every one of them is checked by running one.
+// `Terminal` on its own terms. `stdlibGolden.spec.ts` captures through
+// `Terminal.inspect`, so it cannot pin the Methods that write. `print` renders
+// through `Printable` and ends the line. `inspect` renders the structure of any
+// value and answers it unchanged. `write` adds nothing. Only running a Program
+// shows any of that.
 
-// Both streams are intercepted, not just `console.log`. `inspect` goes
-// through `console.log` because a structural rendering is a whole line by
-// construction; `write` goes through `process.stdout.write`/`process.stderr.write`
-// because there is no way to spell "no newline" through the console. So a test
-// that only captured one of the two would see half of what a Program wrote —
-// and the missing newline, which is the whole difference between `print` and
-// `write`, would be exactly what it missed.
+// `inspect` writes through `console.log`, while `write` uses the process's
+// streams, since the console cannot leave a line open. A capture of only one
+// would miss the newline that tells `print` from `write`.
 type Written = {
-	// The raw text each stream received, concatenated in order. Raw
-	// rather than split into lines: what is being asserted is often the
-	// ABSENCE of a line break.
+	// The raw text each stream received, in order, since a spec often asserts
+	// that a line break is absent.
 	output: string
 	error: string
 }
@@ -65,10 +54,7 @@ async function write(source: string): Promise<Written> {
 	let originalOut = process.stdout.write
 	let originalError = process.stderr.write
 
-	// `console.log` appends the newline its callers rely on, so the
-	// interception has to append one too — otherwise an `inspect` and a `print`
-	// of the same value would look alike here, which is the one distinction
-	// this file exists to make.
+	// `console.log` appends a newline, so the interception appends one too.
 	console.log = (...args: Array<unknown>) => {
 		written.output += `${args.map((arg) => String(arg)).join(" ")}\n`
 	}
@@ -115,10 +101,8 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 
 describe("Terminal", () => {
 	describe("print", () => {
-		// THE distinction. A String is a Printable whose `toString` is
-		// itself, so `print` writes its text; `inspect` writes the Literal a
-		// reader would have to type to get it back, quotes included. Getting
-		// this backwards is what made every fixture read like a debugger.
+		// A String's `toString` is itself, so `print` writes its text, while
+		// `inspect` writes the Literal with its quotes.
 		it("writes a String's text, without the quotes a Literal carries", async () => {
 			let written = await write(`implementation {
 				Terminal.print("hello")
@@ -128,8 +112,7 @@ describe("Terminal", () => {
 			expect(written.error).toBe("")
 		})
 
-		// The newline is `print`'s, added in Essence around the value's
-		// rendering — so two prints are two lines with nothing between them.
+		// `print` adds the newline in Essence, so two prints are two lines.
 		it("ends each line, and adds nothing else", async () => {
 			let written = await write(`implementation {
 				Terminal.print("one")
@@ -139,10 +122,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe("one\ntwo\n")
 		})
 
-		// Rendered through the value's OWN `Printable` conformance, not
-		// through the structural printer — an Integer reads as its digits and a
-		// Choice as whatever its Namespace's `toString` says, which for
-		// `Ordering` is the bare word.
+		// A Choice prints as its Namespace's `toString` says, which for
+		// `Ordering` is the bare Case name.
 		it("renders through the value's own Printable conformance", async () => {
 			let written = await write(`implementation {
 				Terminal.print(42)
@@ -153,10 +134,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe("42\ntrue\nLess\n")
 		})
 
-		// The `to` Overload picks the stream, and nothing else changes —
-		// same rendering, same newline, other file handle. The stream-less entry
-		// IS this one applied to `#Output`, so a Program that never names a
-		// Stream is writing to one all the same.
+		// The `to` Argument picks the stream and changes nothing else. Left
+		// out, it defaults to `#Output`.
 		it("writes to the Stream the call names", async () => {
 			let written = await write(`implementation {
 				Terminal.print("fine", to #Output)
@@ -167,14 +146,11 @@ describe("Terminal", () => {
 			expect(written.error).toBe("broken\n")
 		})
 
-		// `Printable` is a BOUND, so a value that conforms to nothing is
-		// refused where a Program asks for it to be printed — and refused at the
-		// call, with a Diagnostic, rather than rendered as whatever the runtime
-		// could make of it.
+		// `Printable` is a bound, so a value that conforms to nothing is refused
+		// at the call.
 		it("refuses a value that conforms to no Printable", () => {
-			// A Choice derives `Equatable` from its tags and nothing
-			// else — `Printable` is a decision about how it should READ, so it
-			// has to be written, and this one does not write it.
+			// A Choice is Printable only where a Namespace declares it, and
+			// this one has none.
 			let diagnostics = diagnosticsOf(`implementation {
 				choice Colour {
 					Red,
@@ -191,9 +167,7 @@ describe("Terminal", () => {
 	})
 
 	describe("write", () => {
-		// The primitive. No newline, no quotes, no separator — three
-		// writes are one line, which is the whole reason it exists beside
-		// `print`.
+		// No newline, quotes or separator, so three writes make one line.
 		it("adds nothing at all to the text it is given", async () => {
 			let written = await write(`implementation {
 				Terminal.write("a")
@@ -214,10 +188,7 @@ describe("Terminal", () => {
 			expect(written.error).toBe("err")
 		})
 
-		// A String and nothing else. `write` is about TEXT — a value with
-		// a `Printable` conformance is what `print` takes, and routing one
-		// through here would silently make `write` a second `print` without the
-		// newline.
+		// `write` takes text only. A Printable value goes through `print`.
 		it("refuses a value that is not a String", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				Terminal.write(42)
@@ -228,9 +199,7 @@ describe("Terminal", () => {
 	})
 
 	describe("inspect", () => {
-		// The structural form, for the Program's AUTHOR — a String comes
-		// back with the quotes a Literal is written with, which is exactly what
-		// `print` leaves off.
+		// The structural form, for the Program's author, keeps a String's quotes.
 		it("writes a String with its quotes", async () => {
 			let written = await write(`implementation {
 				Terminal.inspect("hello")
@@ -239,10 +208,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe('"hello"\n')
 		})
 
-		// Any value at all, conformance or none. The Record below belongs
-		// to a Namespace that declares no `toString`, so `print` would refuse it
-		// — and `inspect` lays it out anyway, which is the other half of why the
-		// two are separate Methods.
+		// The Record's Namespace declares no `toString`, so `print` would refuse
+		// it, while `inspect` lays out any value.
 		it("takes a value that conforms to no Printable", async () => {
 			let written = await write(`implementation {
 				choice Colour {
@@ -258,10 +225,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe("Colour#Red\n")
 		})
 
-		// It answers with the very value it was handed, so it can be
-		// wrapped around any Expression without changing what that Expression
-		// evaluates to. That is what let every printing call site in this
-		// repository become a `Terminal.inspect` without the golden file moving.
+		// It answers the value it was handed, so it can wrap any Expression
+		// without changing what it evaluates to.
 		it("answers with the value it was given", async () => {
 			let written = await write(`implementation {
 				constant total = Terminal.inspect(1)::add(Terminal.inspect(2))
@@ -274,10 +239,8 @@ describe("Terminal", () => {
 	})
 
 	describe("describe", () => {
-		// The same rendering `inspect` writes, handed back as a String —
-		// so a Program can put a value's structure in a message rather than on
-		// a line of its own. A String comes back with the quotes a Literal
-		// carries, which `print` then writes as text.
+		// The rendering `inspect` writes, answered as a String, so a message can
+		// carry a value's structure. A String keeps its Literal quotes.
 		it("answers a String's structural form, quotes included", async () => {
 			let written = await write(`implementation {
 				Terminal.print(Terminal.describe("hello"))
@@ -286,9 +249,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe('"hello"\n')
 		})
 
-		// THE reason the Method exists. `inspect` can only write, so a
-		// failure message, a log line or an error payload could not carry a
-		// value's structure at all.
+		// `inspect` can only write, so this is how a failure message or a log
+		// line carries a value's structure.
 		it("puts a value's structure inside a message", async () => {
 			let written = await write(`implementation {
 				constant total = { won = 2, lost = 1 }
@@ -299,10 +261,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe("unexpected: { won = 2, lost = 1 }\n")
 		})
 
-		// Every container the structural walk knows, in one call: a
-		// Record holding a List, a Dictionary, and a Case. The Strings inside
-		// each are quoted, which is the rule a structure is rendered under and
-		// the one thing `print` of the same value would not do.
+		// A Record holding a List, a Dictionary and a Case, so every container
+		// the structural walk knows is rendered. The Strings inside are quoted.
 		it("lays out a Record, a List, a Dictionary and a Case", async () => {
 			let written = await write(`implementation {
 				Terminal.print(Terminal.describe({ name = "x", tags = ["a", ""] }))
@@ -322,9 +282,7 @@ describe("Terminal", () => {
 			)
 		})
 
-		// Any value at all, conformance or none — the half of `inspect`
-		// that makes it the Method for a Program's author rather than for its
-		// reader.
+		// Any value, with or without a conformance.
 		it("takes a value that conforms to no Printable", async () => {
 			let written = await write(`implementation {
 				choice Colour {
@@ -340,9 +298,7 @@ describe("Terminal", () => {
 			expect(written.output).toBe("Colour#Red\n")
 		})
 
-		// One walk, two doors. `inspect` writes exactly the String this
-		// answers, which is what lets a Program that was printing its structure
-		// keep printing the same thing while a message carries it too.
+		// `inspect` writes exactly the String this answers.
 		it("answers exactly what inspect writes", async () => {
 			let written = await write(`implementation {
 				constant value = { name = "x", scores = [1, 2] }
@@ -359,18 +315,13 @@ describe("Terminal", () => {
 		})
 	})
 
-	// The Optimiser may never take one of these away. `isPureExpression`
-	// answers "can this be left unevaluated" and its enumeration of pure Method
-	// calls names no `Terminal` entry — but the enumeration is an allowlist, and
-	// an allowlist is exactly the kind of thing a later entry can widen by
-	// accident. A print that stops happening leaves no Diagnostic and no crash,
-	// so it is pinned by running a Program whose print stands where a pass would
-	// most like to drop it.
+	// The Optimiser must never drop a `Terminal` call. `isPureExpression` names
+	// no `Terminal` entry, but its allowlist could widen by accident, and a lost
+	// print leaves no Diagnostic. So a Program puts a print where a pass would
+	// drop it.
 	describe("purity", () => {
-		// `and` short-circuits in JavaScript and does not in Essence, so
-		// `lower-scalar-operations` may only compile it to `&&` when the right
-		// operand can be left unevaluated. A print there is the case it must
-		// refuse.
+		// `&&` short-circuits and Essence's `and` does not, so
+		// `lower-scalar-operations` uses `&&` only when the right operand is pure.
 		it("keeps a print standing as the Argument of a short-circuiting call", async () => {
 			let written = await write(`implementation {
 				function noisy () -> Boolean {
@@ -387,11 +338,8 @@ describe("Terminal", () => {
 			expect(written.output).toBe("the Argument ran\nfalse\n")
 		})
 
-		// A READ is the other kind of effect, and the one a pass is most
-		// likely to take for a pure Function: it takes no Argument, so two
-		// calls of it look alike to anything that compares Expressions. They
-		// are not alike — the first answers one line and the second the next —
-		// so both have to survive into the emitted Program.
+		// A read takes no Argument, so two reads look alike to a pass that
+		// compares Expressions. They answer different lines, so both must stay.
 		it("emits both reads of an expression that reads twice", () => {
 			let javaScript = compile(`implementation {
 				constant joined = Terminal.readLine()::value(defaultingTo "")::append(
