@@ -167,11 +167,8 @@ describe("Lexer", () => {
 			expect(lexer.errors[0].code).toBe("invalid-escape")
 		})
 
-		// The `\u{…}` escape, read end to end here and reported on in
-		// `parserDiagnostics.spec.ts`, where a Diagnostic's whole text is. What
-		// belongs here is what the VALUE turns out to be, because that is the
-		// question the rest of the Compiler and the round-trip property both
-		// ask: the decoded character, and nothing at all where it was refused.
+		// These specs hold the value a `\u{…}` escape decodes to, and nothing for
+		// a refused one. `parserDiagnostics.spec.ts` holds the reports.
 		it("should decode a Unicode escape into the character it names", () => {
 			let lexer = new Lexer()
 
@@ -184,9 +181,8 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 
-		// U+0000 is a Unicode scalar value like any other, so it is a
-		// character a Literal may name. Nothing downstream terminates on it:
-		// the emitted JavaScript writes it as `\0`.
+		// U+0000 is a Unicode scalar value like any other. The emitted
+		// JavaScript writes it as `\0`.
 		it("should accept the null character", () => {
 			let lexer = new Lexer()
 
@@ -199,10 +195,8 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 
-		// The hexadecimal digits are read in either case, and the VALUE
-		// is the same either way. What the file keeps of the reader's own
-		// spelling is the formatter's business — it reprints a Literal from the
-		// source — and there is nothing of it left by the time the value exists.
+		// The value does not keep the digits' case. The formatter reprints a
+		// Literal from the source, so the reader's spelling survives there.
 		it("should read hexadecimal digits in either case", () => {
 			let lexer = new Lexer()
 
@@ -214,18 +208,10 @@ describe("Lexer", () => {
 			})
 		})
 
-		// NOT normalised at lex time. `"e\u{301}"` is an `e` and a
-		// combining acute, two code points of text that the runtime's own
-		// comparison then treats as equal to the one composed `é` — that is the
-		// String semantics, and it belongs to `is` and `compare` rather than to
-		// the Literal. A Lexer that composed here would leave a Program no way
-		// to write the decomposed spelling down at all.
-		//
-		// The expected value is written with a JavaScript escape rather
-		// than as the two characters themselves. The file MUST hold the
-		// decomposed bytes for this test to mean what it says, and a source
-		// file taken through any normalising tool composes them in silence —
-		// the test would then pass against a Lexer that composed too.
+		// A Literal is not normalised. Equating `e\u{301}` with `é` belongs to `is`
+		// and `compare`, and a composing Lexer would leave no way to write the
+		// decomposed spelling. The expectation uses a JavaScript escape, since a
+		// normalising tool would compose the raw characters in this file.
 		it("should leave the code points it was given uncomposed", () => {
 			let lexer = new Lexer()
 
@@ -238,14 +224,9 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 
-		// And the character that composes ON ITS OWN, which is the half a
-		// combining mark can not test. U+2126 OHM SIGN normalises to U+03A9
-		// GREEK CAPITAL LETTER OMEGA and U+212A KELVIN SIGN to a plain `K`,
-		// each of them one code point to one code point — so a Lexer that
-		// normalised the decoded CHARACTER rather than the decoded chunk leaves
-		// `"e\u{301}"` alone and quietly rewrites these instead. A Literal is
-		// the code points it was written with, and for these two there is no
-		// other way to write them down at all.
+		// The ohm sign U+2126 normalises to U+03A9 and the kelvin sign U+212A to
+		// `K`, one code point each. A Lexer normalising each decoded character
+		// would pass the combining-mark spec and still rewrite these.
 		it("should leave a character that composes by itself alone", () => {
 			for (let [written, value] of [
 				["\\u{2126}", "\u2126"],
@@ -263,10 +244,8 @@ describe("Lexer", () => {
 			}
 		})
 
-		// A refused escape contributes no character — see
-		// `readUnicodeEscape`. Every one of these leaves the rest of the String
-		// to be read as itself, which is the half of the recovery that matters:
-		// the closing quote is still the closing quote.
+		// A refused escape contributes no character, and the rest of the String
+		// still lexes. See "Recovery" in packages/compiler/src/lexer/DEVELOPMENT.md.
 		it("should refuse every malformed Unicode escape and keep lexing", () => {
 			let refusals: Array<[string, string, string]> = [
 				['"a\\u{}b"', "ab", "malformed-unicode-escape"],
@@ -275,8 +254,7 @@ describe("Lexer", () => {
 				['"a\\u{110000}b"', "ab", "unicode-escape-out-of-range"],
 				['"a\\u{D800}b"', "ab", "surrogate-unicode-escape"],
 				['"a\\u{DFFF}b"', "ab", "surrogate-unicode-escape"],
-				// `\u001Bz` takes FOUR digits and leaves the `z`, which
-				// is JavaScript's own reading of it — see `readUnbracedEscape`.
+				// `\u001Bz` takes four digits and leaves the `z`, as JavaScript does.
 				['"a\\u001Bz"', "az", "unbraced-unicode-escape"],
 				['"a\\u1B}z"', "az", "unbraced-unicode-escape"],
 				['"a\\uz"', "az", "unbraced-unicode-escape"],
@@ -298,11 +276,8 @@ describe("Lexer", () => {
 			}
 		})
 
-		// `\u{` with no `}` is the one refusal that could swallow the
-		// file. The scan stops at the characters that end the reading of the
-		// Literal and does not consume them, so the closing quote still closes
-		// the String and the `{` still opens its hole — which is what keeps the
-		// unclosed-String and hole recoveries reporting what they reported.
+		// An unclosed `\u{` could swallow the file. The scan stops before the
+		// closing quote or a hole's `{`, so each still does its work.
 		it("should stop an unclosed Unicode escape at the closing quote", () => {
 			let lexer = new Lexer()
 
@@ -338,9 +313,8 @@ describe("Lexer", () => {
 			])
 		})
 
-		// A `\u{…}` inside a hole's own String Literal is a String
-		// Literal's escape like any other — the hole is lexed by driving
-		// `lexToken`, so nothing here knows it is nested.
+		// A hole is lexed through `lexToken`, so a String inside it reads its
+		// escapes like any other.
 		it("should read a Unicode escape inside a hole's own String", () => {
 			let lexer = new Lexer()
 
@@ -360,8 +334,7 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 
-		// `\u` is an escape now, so `\{u{1B}}` has to go on meaning what
-		// it meant before it was one: an escaped brace, a `u`, and a hole.
+		// `\{u{1B}}` is an escaped brace, a `u`, and a hole, not a `\u` escape.
 		it("should leave an escaped brace in front of a 'u' alone", () => {
 			let lexer = new Lexer()
 
@@ -906,11 +879,9 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
-		// A Keyword to the Lexer and a name to the Parser — `otherwise`
-		// is on `identifierTokenTypes`, so `constant otherwise = 1` and
-		// `value::otherwise(0)` are the Program they read as. The word is
-		// lexed as itself either way; where it stands is what decides, and
-		// nothing here should be changed to make it an `Identifier` Token.
+		// `otherwise` lexes as a Keyword everywhere, and the Parser reads it as a
+		// name by its place. See "Contextual keywords" in
+		// packages/compiler/src/parser/DEVELOPMENT.md.
 		it("should lex otherwise", () => {
 			let lexer = new Lexer()
 			let input: string
@@ -1135,10 +1106,8 @@ describe("Lexer", () => {
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
-		// The four Module Keywords are contextual — `from` and `as` are
-		// Argument labels the standard library writes, so the Lexer hands them
-		// over as Keywords and the Parser reads them as Identifiers everywhere a
-		// Module section is not being parsed.
+		// `from` and `as` lex as Keywords even as Argument labels. See
+		// "Contextual keywords" in packages/compiler/src/parser/DEVELOPMENT.md.
 		it("should lex a Module Keyword written as an Argument label", () => {
 			let lexer = new Lexer()
 			let input: string
@@ -1515,10 +1484,8 @@ describe("Lexer", () => {
 			expect(lexer.errors).toEqual([])
 		})
 
-		// Essence has no hexadecimal, binary or exponent form, so each of
-		// these is a Number Literal holding something no Number can hold. They
-		// used to be taken as written — `0xFF` became 255 — or to reach the
-		// Rewriter and fail there, with no position to point at.
+		// Essence has no hexadecimal, binary or exponent form. See "Number
+		// Literals" in packages/compiler/src/lexer/DEVELOPMENT.md.
 		for (let malformed of ["0xFF", "0b101", "0o17", "1e5", "12abc"]) {
 			it(`should report ${malformed} as an invalid Number`, () => {
 				let lexer = new Lexer()
@@ -1639,13 +1606,9 @@ describe("Lexer", () => {
 		})
 	})
 
-	// `start` and `end` are absolute offsets into the source, and the
-	// contract they have to keep is that `source.slice(start, end)` is the
-	// Token as it was WRITTEN — which is not the Token's value wherever the two
-	// differ: a String does not carry its quotes, an escape decodes to
-	// something shorter than it was spelled, and a malformed Number keeps only
-	// its leading digits. `stripPosition` takes them off everywhere else, so
-	// this is where they are held to it.
+	// `source.slice(start, end)` must be the Token as written, which differs
+	// from its value for a quoted String, a decoded escape or a malformed Number.
+	// `stripPosition` hides the offsets from every other spec.
 	describe("Offsets", () => {
 		function offsetsOf(input: string): Array<[number, number, string]> {
 			let lexer = new Lexer()
@@ -1711,10 +1674,8 @@ describe("Lexer", () => {
 			])
 		})
 
-		// The `}` that closes a hole belongs to no Token — the Lexer reads
-		// it to know the hole ended and drops it, exactly as it drops the `{`
-		// into the chunk before it — so the spans of an interpolated String do
-		// not cover every character between its quotes.
+		// The `}` that closes a hole belongs to no Token, so the spans of an
+		// interpolated String do not cover every character between its quotes.
 		it("should slice the written Token back out of the source", () => {
 			let source = 'constant greeting = "Hello, {name}!"\n§ note\n'
 			let lexer = new Lexer()

@@ -7,7 +7,6 @@
 	"packages/compiler/src/tests/conformanceHelps.spec.ts": {"sentence-length": 15, "em-dash": 14, "all-caps": 12, "history": 4, "block-length": 3},
 	"packages/compiler/src/tests/dispatchResolution.spec.ts": {"sentence-length": 60, "em-dash": 45, "all-caps": 25, "history": 5, "position": 4, "block-length": 8},
 	"packages/compiler/src/tests/helpers.spec.ts": {"sentence-length": 78, "em-dash": 64, "all-caps": 52, "history": 4, "position": 5, "block-length": 12},
-	"packages/compiler/src/tests/lexer.spec.ts": {"sentence-length": 13, "em-dash": 13, "all-caps": 17, "history": 1, "block-length": 3},
 	"packages/compiler/src/tests/recovery.spec.ts": {"sentence-length": 22, "em-dash": 14, "all-caps": 19, "history": 1, "position": 3, "block-length": 2},
 	"packages/compiler/src/tests/sourceMaps.spec.ts": {"sentence-length": 16, "em-dash": 15, "all-caps": 9, "position": 2},
 	"packages/compiler/src/tests/stdlib.spec.ts": {"sentence-length": 14, "em-dash": 12, "all-caps": 5, "position": 1, "block-length": 2},
