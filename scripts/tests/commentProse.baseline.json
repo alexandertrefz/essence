@@ -434,7 +434,6 @@
 	"packages/runtime/src/Division.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 1},
 	"packages/runtime/src/Future.ts": {"sentence-length": 38, "em-dash": 29, "all-caps": 30, "position": 2, "block-length": 10},
 	"packages/runtime/src/FutureList.ts": {"sentence-length": 1, "em-dash": 1},
-	"packages/runtime/src/Generators.ts": {"sentence-length": 78, "em-dash": 50, "all-caps": 47, "position": 2, "block-length": 15},
 	"packages/runtime/src/GroupedList.ts": {"sentence-length": 10, "em-dash": 7, "all-caps": 3, "block-length": 2},
 	"packages/runtime/src/Http.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 19, "position": 2, "block-length": 3},
 	"packages/runtime/src/HttpMethod.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 1},

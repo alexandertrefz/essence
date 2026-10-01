@@ -22,27 +22,17 @@ import {
 	typeKeySymbol,
 } from "./type"
 
-// THE generator interpreter a property test runs on. What the Compiler
-// emits is a DESCRIPTION of a Type — this file is the one place that turns such
-// a description into values, and the one place that makes a failing value
-// smaller. Both halves live together on purpose: a generator that knew how to
-// build a value but not how to shrink one would leave a reader with whatever
-// the source happened to draw first, which is usually a wall of digits.
-//
-// Nothing here reaches a Program. Every value it builds is built through
-// the same constructors emitted code builds values with, so a generated value
-// is indistinguishable from a written one — including its hidden Type key,
-// which is what lets `is`, `toString` and a Match read it.
+// The interpreter of the generator descriptions a property test runs on. See
+// "Property-test generators" in DEVELOPMENT.md.
 
 // #region The description
 
 export type Narrowing = {
-	// Integer bounds, in digits — an Integer beyond safe range is a
-	// bigint at run time, and no JSON number spells every one of them.
+	// Integer bounds as digits, since a bigint has no JSON number.
 	atLeast?: string
 	atMost?: string
 	notEqualTo?: Array<string>
-	// Lists and Strings, counted in items and in characters.
+	// Lengths, in items, characters or entries.
 	minimumLength?: number
 	maximumLength?: number
 }
@@ -55,10 +45,8 @@ export type Generator =
 	| { kind: "rational" }
 	| { kind: "string" }
 	| { kind: "list"; item: Generator }
-	// `keyConformance` is the key Type's own Equatable witness, carried
-	// from the call site the Compiler derived this plan at. It decides which
-	// drawn keys are ONE key, which is what a Dictionary is built by — see
-	// `dictionaryOf`.
+	// `keyConformance` is the key Type's own Equatable witness, which decides
+	// which drawn keys are one key.
 	| {
 			kind: "dictionary"
 			key: Generator
@@ -75,11 +63,8 @@ export type Generator =
 			checks: Array<(value: AnyType) => { value: boolean }>
 			narrowing: Narrowing
 	  }
-	// A Namespace's own `Generatable` conformance, both halves of it:
-	// `generate` builds a value, and `shrink` answers the smaller values a
-	// failing one is reported as instead. `shrink` is `Generatable`'s provided
-	// Method where the Namespace writes none, and answers an empty List there,
-	// so every conformance carries one and only a written body says anything.
+	// A Namespace's own `Generatable` conformance. `shrink` is the Protocol's
+	// provided Method where the Namespace writes none, and answers an empty List.
 	| {
 			kind: "generated"
 			name: string
@@ -87,26 +72,15 @@ export type Generator =
 			shrink: (value: AnyType) => AnyType
 	  }
 
-// The witness a Dictionary is built with where the PLAN carries none.
-// The Compiler resolves the key Type's Equatable conformance at the site it
-// derived the plan from and carries it as `keyConformance`, which is the one
-// answer that can not be wrong — a Namespace may write an `is` of its own, and
-// two keys it calls equal are one key however they are spelled.
-//
-// Where no plan carries one, this stands in: the universal comparison,
-// branded `structural` because for every kind whose keys encode it decides
-// exactly what the standard library's own `is` decides — which is the claim the
-// encoding itself is written on. What it can not stand in for is a written
-// `is`, and that is why the plan carries one.
+// The witness a Dictionary is built with where the plan carries none: the
+// universal comparison. It can not stand in for a written `is`.
 const drawnKeyEquatable: EquatableWitness<AnyType> = {
 	is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
 	isNot: (a: AnyType, b: AnyType) => createBoolean(!anyIs(a, b)),
 	structural: true,
 }
 
-// The entries of a drawn Dictionary, in insertion order — the same live
-// view every other reader of a box takes, read through the runtime's Type Module
-// so that this one is not a second reading of the same rule.
+// The entries of a Dictionary, in insertion order.
 function entriesOf(value: AnyType): Array<[AnyType, AnyType]> {
 	return liveEntriesOf(value as AnyDictionary)
 }
@@ -124,9 +98,8 @@ function dictionaryOf(
 	return createDictionary(entries, conformance) as AnyType
 }
 
-// What a refinement whose predicate nothing could satisfy answers with.
-// It is a failure of the RUN rather than of the property: the test asserted
-// nothing, and a report that said "passed" would be claiming otherwise.
+// A refinement no draw could satisfy. It fails the run rather than the
+// property, since the test asserted nothing.
 export class GenerationFailure extends Error {
 	constructor(name: string, attempts: number) {
 		super(
@@ -138,30 +111,22 @@ export class GenerationFailure extends Error {
 	}
 }
 
-// How hard a generator tries before it gives up on a refinement. It is
-// generous because a filter is drawn from a distribution that knows nothing
-// about the predicate, and cheap because every attempt is one draw.
+// Draws a refinement tries before it gives up. Each attempt is one draw.
 const REFINEMENT_ATTEMPTS = 500
 
-// The most items a List and the most characters a String is drawn with,
-// whatever the case number grew the size to. A property that needs a bigger one
-// says so by building it.
+// The most items or characters a List or String is drawn with.
 const MAXIMUM_LENGTH = 64
 
-// How many keys a step that ADDS an entry, and a smallest Dictionary that
-// needs more than one key, may draw before they give up on finding one the
-// Dictionary does not already hold. Each attempt draws a little larger than the
-// last, so the count is a bound on a search that widens rather than a number of
-// tries at one size.
+// How many keys an added entry, or a smallest Dictionary, draws before giving
+// up on a new one. Each attempt draws larger than the last.
 const ADDITION_ATTEMPTS = 16
 
 // #endregion
 
 // #region Building a value
 
-// `size` grows with the case number: the first cases are small, so a
-// failure found early is already close to minimal, and the last ones are big
-// enough to meet the assumptions a small value never breaks.
+// `size` grows with the case number. See "Drawing generated values" in
+// DEVELOPMENT.md.
 export function generate(
 	generator: Generator,
 	source: RandomnessType,
@@ -187,11 +152,8 @@ export function generate(
 
 			return createList(items)
 		}
-		// The key and the value drawn independently, entry by entry. A key
-		// drawn twice OVERWRITES, exactly as a written `Dictionary.of` collapses
-		// a repeated key — so what comes out may hold fewer entries than were
-		// drawn for it, and a narrowing that asks for a minimum length is held to
-		// by the admission check rather than by the draw.
+		// A key drawn twice overwrites, so the Dictionary may be shorter than its
+		// draw. The admission check holds a minimum length.
 		case "dictionary": {
 			let length = drawLength(source, size, narrowing)
 			let entries: Array<[AnyType, AnyType]> = []
@@ -225,10 +187,7 @@ export function generate(
 		case "refined": {
 			let merged = mergeNarrowing(narrowing, generator.narrowing)
 
-			// A narrowing that contradicts itself — `@::isGreaterThan(10)
-			// ::and(@::isLessThan(5))` — describes no value at all. Drawing
-			// against it would answer a bound rather than nothing, which is a
-			// value the Type says is impossible; the run says so instead.
+			// A narrowing that contradicts itself describes no value at all.
 			if (unsatisfiable(merged)) {
 				throw new GenerationFailure(generator.name, 0)
 			}
@@ -253,10 +212,7 @@ export function generate(
 	}
 }
 
-// `CaseInstanceType` is deliberately not part of `AnyType` — its
-// `[typeKeySymbol]: string` would defeat the tag-based narrowing every runtime
-// helper relies on — so a Case value is cast where it is built, exactly as
-// emitted code does. It is a Case at run time either way.
+// Cast, since `CaseInstanceType` stays out of `AnyType`.
 function caseValue(tag: string, members?: Record<string, AnyType>): AnyType {
 	return (members === undefined
 		? createCase(tag)
@@ -277,20 +233,9 @@ function drawMembers(
 	return drawn
 }
 
-// An Integer inside whatever bounds a refinement narrowed it to, and
-// inside a window that grows with the size otherwise. One draw in eight is
-// taken from a much wider window, because the assumptions an Integer breaks are
-// usually about a value no small window holds.
-//
-// The wide window reaches a hundred spans, twenty thousand at full size,
-// and no further. A value is not what grows past that — every one of them is
-// a handful of bits — but what a value is fed to can: a power's digits and a
-// range's items both grow with the Integer itself. A JavaScript engine holds
-// a BigInt of about a million bits and no more, and a hundred spans raised to
-// a hundred spans stays well inside that, where a draw in the hundred
-// thousands is already past it — and a draw in the billions asks `List.of`
-// for a List nobody was going to build. The assumptions a small number never
-// breaks are all broken by twenty thousand as well.
+// An Integer inside the narrowing's bounds and a window that grows with the
+// size. One draw in eight takes a window a hundred times wider, which stays
+// bounded because powers and ranges grow with the Integer they are fed.
 function drawWhole(
 	source: RandomnessType,
 	size: number,
@@ -318,10 +263,8 @@ function drawWhole(
 		}
 	}
 
-	// Every draw landed on an excluded value, which means the range holds
-	// almost nothing else. Walking it is what answers rather than drawing again
-	// for ever; a range holding nothing at all answers its own bound, and the
-	// refinement's own checks refuse it.
+	// Every draw was excluded, so the range holds little else: walk it. An empty
+	// range answers its bound, which the refinement's checks then refuse.
 	for (let candidate = lowest; candidate <= highest; candidate += 1n) {
 		if (!excluded.includes(candidate)) {
 			return candidate
@@ -331,9 +274,7 @@ function drawWhole(
 	return lowest
 }
 
-// A Rational as a numerator over one of the small denominators a reader
-// recognises, so a counterexample reads as `3/4` rather than as a ratio of two
-// forty-digit numbers.
+// Small denominators, so a counterexample reads as `3/4`.
 const DENOMINATORS = [1n, 2n, 3n, 4n, 5n, 8n, 10n, 100n]
 
 function drawRational(source: RandomnessType, size: number): AnyType {
@@ -358,9 +299,7 @@ function drawCharacters(
 	return characters.join("")
 }
 
-// THE length window, spelled once — what a draw obeys is what a
-// neighbour obeys, or a mutated List could grow past anything a draw of the
-// same generator would ever build.
+// The length window draws and neighbours both obey.
 function lengthBounds(
 	narrowing: Narrowing,
 	size: number,
@@ -443,14 +382,8 @@ function unsatisfiable(narrowing: Narrowing): boolean {
 	)
 }
 
-// Whether a candidate has EARNED the refinement — every check answered
-// `true`, and the value is inside whatever the narrowing states.
-//
-// The narrowing is asked about the value rather than trusted to have shaped it,
-// because a narrowing that holds the whole predicate leaves no check to run:
-// where a draw or a shrink answers a bound it could not honour — an excluded
-// value in a range holding nothing else, a step past one — nothing else would
-// notice.
+// Whether every check holds and the value is inside the narrowing. The
+// narrowing is checked rather than trusted to have shaped the value.
 function admitted(
 	generator: Extract<Generator, { kind: "refined" }>,
 	narrowing: Narrowing,
@@ -465,8 +398,8 @@ function admitted(
 	return inside(narrowing, value)
 }
 
-// What a narrowing says about a value that is already built. A value of a
-// kind the narrowing says nothing about is inside it by definition.
+// Whether a built value is inside a narrowing. A kind the narrowing says
+// nothing about is inside it.
 function inside(narrowing: Narrowing, value: AnyType): boolean {
 	let key = (value as unknown as Record<symbol, string>)[typeKeySymbol]
 
@@ -477,15 +410,8 @@ function inside(narrowing: Narrowing, value: AnyType): boolean {
 		)
 	}
 
-	// A Dictionary is counted in ENTRIES, which is what its `length()`
-	// answers and what a `minimumLength` narrowing means about one. The box
-	// carries that count for the generation it sees, so nothing has to be walked
-	// to read it.
-	//
-	// A List is counted through `runsOf`, for the reason `List.length`
-	// counts that way: counting is not reading, and there is no item here to
-	// read. The trimming reader would decide a representation question for a
-	// caller that only wants the count.
+	// A Dictionary counts entries, which its box holds. A List counts through
+	// `runsOf`, since counting reads no item.
 	let length =
 		key === "String"
 			? [...(value as unknown as { value: string }).value].length
@@ -509,30 +435,14 @@ function inside(narrowing: Narrowing, value: AnyType): boolean {
 
 // #region Moving one step from a value
 
-// How hard a mutation tries to stay inside a refinement before it draws a
-// fresh value instead. It is far below `REFINEMENT_ATTEMPTS` because a
-// neighbour the predicate keeps refusing is a neighbourhood the predicate says
-// nothing about — walking it eight more times would answer no faster than a
-// draw does, and the draw is what makes this function TOTAL.
+// Neighbours a refinement tries before it draws a fresh value instead.
 const MUTATION_ATTEMPTS = 8
 
-// How often a Union's neighbour is taken from another ARM: one time in
-// four. A neighbour is worth having because it keeps most of what the value
-// already reached, so most of them stay where the value is; a search that could
-// never cross between `#Value(…)` and `#Empty` would be searching half a Type.
+// One Union neighbour in this many comes from another arm.
 const CROSS_ARM = 4
 
-// ONE structural neighbour of a value — the same value with one part of
-// it moved, rather than a fresh draw. It lives beside `generate` and `shrink`
-// for the reason those two live together: what a value is MADE OF is one
-// question, and building one, making one smaller and stepping one away from one
-// are three answers that would drift apart if they were written apart.
-//
-// What asks is the coverage-guided search in `Testing.ts`. A case whose
-// run reached ground no case before it had is worth looking AROUND, and looking
-// around means keeping every coordinate of it but one. Every choice below draws
-// from `source` and from nothing else, which is what makes the whole search
-// replay under the run's own seed.
+// One neighbour of a value: the same value with one part moved. See
+// "Neighbouring generated values" in DEVELOPMENT.md.
 export function mutate(
 	generator: Generator,
 	value: AnyType,
@@ -541,14 +451,9 @@ export function mutate(
 	narrowing: Narrowing = {},
 ): AnyType {
 	switch (generator.kind) {
-		// A Boolean has exactly one neighbour, and it is the other one.
 		case "boolean":
 			return createBoolean(!(value as { value: boolean }).value)
-		// A leaf is REDRAWN rather than nudged. What a nudge would mean is
-		// a distance, and the assumptions a number breaks are not about the
-		// small distances — `drawWhole` already reaches far past a small window
-		// one draw in eight, which is the whole of what a neighbour of a number
-		// is worth.
+		// Leaves are redrawn rather than nudged.
 		case "integer":
 			return createInteger(drawWhole(source, size, narrowing))
 		case "rational":
@@ -567,9 +472,7 @@ export function mutate(
 				size,
 				(members) => createRecord(members),
 			)
-		// A payload-free Case is the only value of its own shape — there
-		// is nothing in it to move, no word of randomness to spend, and the
-		// value itself is its whole neighbourhood.
+		// A payload-free Case is its own whole neighbourhood.
 		case "case":
 			return generator.members.length === 0
 				? value
@@ -605,30 +508,17 @@ export function mutate(
 				}
 			}
 
-			// A neighbourhood the predicate kept refusing. A draw is what
-			// always answers an ADMITTED value — the same admission `generate`
-			// enforces, reached the way `generate` reaches it, including the
-			// failure a predicate nothing satisfies raises.
+			// A fresh draw answers an admitted value, or throws `GenerationFailure` as
+			// `generate` does.
 			return generate(generator, source, size, narrowing)
 		}
-		// A Namespace's own generator says how to BUILD a value and
-		// nothing about what one is made of, so the nearest thing to a
-		// neighbour of one is another value it built. It is the same silence
-		// `encode` answers with, for the same reason.
-		//
-		// Its `shrink` is no neighbourhood either. What that answers is
-		// SMALLER values, and a search that stepped towards them would walk one
-		// way only — down, away from the values a property has yet to be asked
-		// about.
+		// A Namespace's own generator does not say what a value is made of.
 		case "generated":
 			return generator.generate(source)
 	}
 }
 
-// A List's neighbour: one item redrawn, one dropped, or one inserted.
-// Which of the three is a seeded choice among the ones the narrowing leaves
-// available — a List that must stay full can not drop an item, and one already
-// at its longest can not take another.
+// One item redrawn, dropped or inserted, among the moves the length allows.
 function mutateList(
 	item: Generator,
 	value: AnyType,
@@ -654,8 +544,7 @@ function mutateList(
 
 	let move = moves[below(source, moves.length)]
 
-	// A narrowing that pins the length to nothing at all leaves an empty
-	// List with no neighbour, which is the one value it can answer with.
+	// No move is left only for a List pinned empty.
 	if (move === undefined) {
 		return createList(items)
 	}
@@ -684,14 +573,8 @@ function mutateList(
 	])
 }
 
-// A Dictionary's neighbour: one entry's VALUE redrawn, one entry dropped,
-// or one entry added. Which of the three is a seeded choice among the ones the
-// narrowing leaves available, exactly as a List's is.
-//
-// A key is never moved. A Dictionary is read BY its keys, so redrawing one
-// is not a step from the value — every lookup the property makes would miss, and
-// what came back would be a different Dictionary rather than a neighbouring one.
-// What a step does keep is the key set; what it moves is what is under a key.
+// One value redrawn, one entry dropped or one added. A key is never moved,
+// since a Dictionary is read by its keys.
 function mutateDictionary(
 	generator: {
 		key: Generator
@@ -723,17 +606,8 @@ function mutateDictionary(
 	let move: "redraw" | "drop" | "add" | undefined =
 		moves[below(source, moves.length)]
 
-	// A move that ADDS has to draw a key the Dictionary does not already
-	// hold: a key it holds is an OVERWRITE, which leaves the length where it
-	// was and is the redraw move under another name — so the step would not
-	// have been a step. Each draw is offered to the Dictionary itself, so the
-	// question "is this key already held" is asked by the equality the entries
-	// are organised by rather than by a second one written here.
-	//
-	// The draw grows with each attempt, because a key drawn small is
-	// drawn from few values — a Boolean key has two, and a Dictionary holding
-	// both has no key left to add. Where every attempt collides the step falls
-	// back to another move rather than answering the value it was handed.
+	// An added key must be new, which the Dictionary itself decides by its own
+	// equality. Draws grow with each attempt, then another move is taken.
 	if (move === "add") {
 		for (let attempt = 0; attempt < ADDITION_ATTEMPTS; attempt++) {
 			let grown = dictionaryOf(
@@ -759,8 +633,7 @@ function mutateDictionary(
 				: undefined
 	}
 
-	// A narrowing that pins the length to nothing at all leaves an empty
-	// Dictionary with no neighbour, which is the one value it can answer with.
+	// No move is left only for a Dictionary pinned empty.
 	if (move === undefined) {
 		return dictionaryOf(entries, conformance)
 	}
@@ -785,10 +658,8 @@ function mutateDictionary(
 	)
 }
 
-// ONE member moved and every other one kept exactly as it stands. Sharing
-// them is safe because every value here is immutable, and it is the POINT: what
-// a neighbour is for is holding on to everything the case already reached while
-// one part of it moves.
+// One member moved and the rest shared, which is safe since values are
+// immutable.
 function mutateMembers(
 	members: Array<GeneratorMember>,
 	value: AnyType,
@@ -821,10 +692,8 @@ function mutateMembers(
 	return build(moved)
 }
 
-// A Union's neighbour usually stays in the arm the value inhabits — which
-// is what keeps a mutation a small move rather than a fresh case — and one time
-// in four is drawn from another arm instead. `claims` is what finds the arm,
-// exactly as it does for a shrink and for an encoding.
+// Usually a neighbour inside the value's own arm, and one time in `CROSS_ARM`
+// a draw from another arm.
 function mutateUnion(
 	members: Array<Generator>,
 	value: AnyType,
@@ -834,15 +703,13 @@ function mutateUnion(
 ): AnyType {
 	let own = members.findIndex((member) => claims(member, value))
 
-	// A value no arm claims is a value this Union never built. There is
-	// no neighbourhood to stay inside, so a draw is the honest answer.
+	// A value no arm claims has no neighbourhood, so a draw answers.
 	if (own === -1) {
 		return generate({ kind: "union", members }, source, size, narrowing)
 	}
 
 	if (members.length > 1 && below(source, CROSS_ARM) === 0) {
-		// A pick over every arm but the value's own — one draw, the own
-		// index stepped over, no copy of the arms per mutation.
+		// One draw over the other arms, stepping over the value's own index.
 		let pick = below(source, members.length - 1)
 
 		if (pick >= own) {
@@ -859,9 +726,8 @@ function mutateUnion(
 
 // #region Making a failing value smaller
 
-// The candidates worth trying instead of a value that failed, smallest
-// first. Every one of them is a value of the same Type — a shrink that left the
-// Type behind would report a counterexample the property was never asked about.
+// Smaller values of the same Type to try in place of a failing one, smallest
+// first. See "Shrinking a failing value" in DEVELOPMENT.md.
 export function shrink(
 	generator: Generator,
 	value: AnyType,
@@ -910,18 +776,8 @@ export function shrink(
 				admitted(generator, merged, candidate),
 			)
 		}
-		// A Namespace's own generator says how to BUILD a value and
-		// nothing about what a smaller one is, so the conformance is asked:
-		// `Generatable::shrink` is the half of it that answers that, in the
-		// order the body wrote them. A Namespace that writes none keeps the
-		// Protocol's provided body, which answers no candidates, and a
-		// counterexample it drew is reported as it was drawn.
-		//
-		// A candidate that IS the failing value is dropped, the way
-		// `shrinkWhole` drops the value it was handed. Such a candidate can not
-		// be a smaller counterexample, and a body that answers its receiver
-		// where it can go no smaller would otherwise spend the whole shrink
-		// budget re-running the property on the value it already has.
+		// Asks the conformance's own `shrink`, dropping a candidate equal to the
+		// failing value so it can not spend the shrink budget on itself.
 		case "generated":
 			return itemsOf(generator.shrink(value)).filter(
 				(candidate) => !anyIs(candidate, value),
@@ -929,16 +785,9 @@ export function shrink(
 	}
 }
 
-// The smallest value a generator can build, where it can build one at
-// all. It is what a Union shrinks TOWARDS — a `#Value(…)` reported as `#Empty`
-// is the shortest true thing a report can say — and what nothing answers for a
-// Namespace's own generator or for a refinement no small value satisfies.
-//
-// A conformance answering `shrink` does not change that. A shrink is
-// asked about a value it makes smaller, and this is asked about a Type with no
-// value in hand: drawing one to shrink would answer whatever the source drew,
-// which is a value of the arm rather than the smallest one, and a Union would
-// then trade a small counterexample for a random value of a simpler arm.
+// The smallest value a generator can build, or `null`, which is what a Union
+// shrinks towards. A Namespace's own generator answers `null`, since it can
+// only draw.
 export function minimal(
 	generator: Generator,
 	narrowing: Narrowing = {},
@@ -970,12 +819,8 @@ export function minimal(
 
 			return createList(items)
 		}
-		// As many entries as the narrowing demands and no more, all under
-		// the smallest value there is and each under a key of its own — which is
-		// the one place a smallest Dictionary has to build keys at all. DISTINCT
-		// keys are what a length needs, and where the key Type has too few
-		// values to make that many it answers nothing rather than answering a
-		// shorter Dictionary than it promised.
+		// As many entries as the narrowing demands, under distinct keys. `null`
+		// where the key Type has too few values.
 		case "dictionary": {
 			let length = Math.max(0, narrowing.minimumLength ?? 0)
 			let conformance = witnessOf(generator)
@@ -1036,18 +881,8 @@ export function minimal(
 	}
 }
 
-// AS MANY DISTINCT KEYS AS A LENGTH DEMANDS, the first of them the
-// smallest key there is. The rest are drawn rather than derived, because
-// "smaller" is an ordering the language owns for numbers and not for keys —
-// there is no next Record after the smallest one — and a drawn key is at least
-// a key the generator says is possible. The source is seeded fixedly, so the
-// same Dictionary comes back every time this is asked.
-//
-// Distinctness is decided by a Dictionary rather than by a comparison
-// written here: each candidate is offered to `set`, and a key already held
-// leaves the length where it was. That is the key Type's OWN equality, witness
-// and all, which is the only answer that can not disagree with the Dictionary
-// the keys are for.
+// `count` distinct keys, the smallest first and the rest drawn from a fixed
+// seed. `set` decides distinctness, with the key Type's own equality.
 function smallestKeys(
 	generator: { key: Generator },
 	count: number,
@@ -1117,9 +952,8 @@ function shrinkWhole(
 
 	candidates.push(target)
 
-	// Halving the distance to the target, which finds a boundary in a
-	// logarithmic number of steps rather than a linear one, and then the step
-	// beside the value itself, which is what pins an off-by-one down.
+	// Halving the distance finds a boundary in logarithmic steps, and the step
+	// beside the value pins an off-by-one.
 	let distance = current - target
 
 	while (distance !== 0n && distance !== 1n && distance !== -1n) {
@@ -1135,8 +969,7 @@ function shrinkWhole(
 		.map((candidate) => createInteger(candidate))
 }
 
-// The Integer a shrink walks towards: zero, or the nearest bound the
-// narrowing admits where zero is outside it.
+// Zero, or the nearest admitted bound where zero is outside the narrowing.
 function smallestWhole(narrowing: Narrowing): bigint {
 	let low = narrowing.atLeast === undefined ? null : BigInt(narrowing.atLeast)
 	let high = narrowing.atMost === undefined ? null : BigInt(narrowing.atMost)
@@ -1183,8 +1016,8 @@ function shrinkRational(value: {
 		candidates.push(createRational(value.numerator / 2n, value.denominator))
 	}
 
-	// A whole number is simpler to read than a fraction, so the
-	// denominator is walked down before the numerator is finished with.
+	// A whole number reads more simply, so the denominator goes before the
+	// numerator is finished.
 	if (value.denominator !== 1n) {
 		candidates.push(createRational(value.numerator, 1n))
 	}
@@ -1200,9 +1033,7 @@ function shrinkRational(value: {
 	return candidates
 }
 
-// Halves first, then one character at a time, then the characters
-// themselves simplified — which is what turns `"kQ9é x"` into `"aa"` rather
-// than into a shorter run of the same noise.
+// Shorter first, then each character simplified to `a`.
 function shrinkString(value: string, narrowing: Narrowing): Array<string> {
 	let characters = [...value]
 	let lowest = Math.max(0, narrowing.minimumLength ?? 0)
@@ -1268,9 +1099,7 @@ function shrinkList(
 		}
 	}
 
-	// The items themselves, one at a time — a List of the right length
-	// holding one huge number shrinks to a List of the right length holding a
-	// small one.
+	// Then each item made smaller at the same length.
 	for (let index = 0; index < items.length; index++) {
 		for (let smaller of shrink(item, items[index]!)) {
 			candidates.push([
@@ -1284,13 +1113,8 @@ function shrinkList(
 	return candidates.map((entries) => createList(entries))
 }
 
-// A Dictionary shrinks the way a List does — fewer entries first, then a
-// smaller value under a kept key — with one difference the keys force: a KEY is
-// never shrunk. Two keys that shrink towards the same smaller key would collapse
-// into one entry, so the candidate would be a Dictionary of another LENGTH, and
-// a counterexample that lost an entry on the way down is a report about a value
-// the property never saw. The values carry the digits a reader has to read, and
-// they shrink freely.
+// Like a List, but a key never shrinks: two keys shrinking into one would
+// change the length.
 function shrinkDictionary(
 	generator: {
 		key: Generator
@@ -1369,9 +1193,7 @@ function shrinkMembers(
 	return candidates
 }
 
-// A Union shrinks in two directions: towards the smallest value one of
-// its SIMPLER arms can build — an `#Empty` beside a `#Value(…)` — and within
-// the arm the value belongs to.
+// Towards the smallest value of a simpler arm, and within the value's own arm.
 function shrinkUnion(
 	members: Array<Generator>,
 	value: AnyType,
@@ -1397,18 +1219,8 @@ function shrinkUnion(
 		: [...candidates, ...shrink(own, value)]
 }
 
-// Whether an arm of a Union is the one a value belongs to. A Case says so
-// by its tag, and everything else by the hidden Type key every value carries —
-// which is the same question `isValueOfType` asks, answered here without a Type
-// descriptor because a generator already knows the shape it built.
-//
-// The key alone is not enough where two arms share one: a Union of two
-// Record shapes, or of two refinements of one base, answered its FIRST arm for
-// every value — and a search that mutates or shrinks under the wrong arm
-// rebuilds the value as something else entirely. So a Record arm also asks for
-// its own member names, a refined arm asks its own predicate, and a List arm
-// asks its items — one level down, which is as far as two arms of a written
-// Union ever need telling apart.
+// Whether a value belongs to this arm. Arms that share a Type key look one
+// level down. See "Shrinking a failing value" in DEVELOPMENT.md.
 function claims(generator: Generator, value: AnyType): boolean {
 	let key = (value as unknown as Record<symbol, string>)[typeKeySymbol]
 
@@ -1435,9 +1247,7 @@ function claims(generator: Generator, value: AnyType): boolean {
 				return false
 			}
 
-			// One entry deep, as a List arm asks about one item — far
-			// enough to tell two arms of a written Union apart, and an empty
-			// Dictionary has nothing to be told apart by, so it is claimed.
+			// One entry deep. An empty Dictionary is claimed.
 			let entries = entriesOf(value)
 			let first = entries[0]
 
@@ -1469,9 +1279,7 @@ function claims(generator: Generator, value: AnyType): boolean {
 				return false
 			}
 
-			// The predicate is asked, and a predicate that THROWS on a
-			// value from another arm's world is a predicate that did not claim
-			// it.
+			// A predicate that throws on the value does not claim it.
 			try {
 				return admitted(generator, generator.narrowing, value)
 			} catch {
@@ -1483,11 +1291,8 @@ function claims(generator: Generator, value: AnyType): boolean {
 	}
 }
 
-// How complicated a value of this generator is to read, which is the
-// order a Union's arms are shrunk towards. The numbers say nothing on their own
-// — only their order matters — and a payload-free Case is deliberately below
-// everything, because "it was `#Empty`" is the shortest true thing a report can
-// say.
+// How hard a value is to read, which orders a Union's arms for shrinking. Only
+// the order matters, and a payload-free Case ranks lowest.
 function complexity(generator: Generator): number {
 	switch (generator.kind) {
 		case "case":
@@ -1506,9 +1311,7 @@ function complexity(generator: Generator): number {
 			return 5 + complexity(generator.item)
 		case "record":
 			return 6 + membersComplexity(generator.members)
-		// The most complicated structure there is to read, because an entry
-		// is a key AND a value: a reader has to hold the pairing in their head
-		// as well as both parts of it.
+		// An entry pairs a key with a value, so a Dictionary starts above a Record.
 		case "dictionary":
 			return 8 + complexity(generator.key) + complexity(generator.value)
 		case "union":
@@ -1548,60 +1351,34 @@ function itemsOf(value: AnyType): Array<AnyType> {
 
 // #region Writing a failing value down
 
-// A counterexample as DATA, so that the value a search found once is
-// asked about again on every later run. It is here beside `generate` and
-// `shrink` for the same reason those two live together: writing a value down
-// and building one back are one question asked from both ends, and a pair that
-// drifted apart would answer with something the Type says is impossible.
-//
-// Neither the printed form nor the seed would do. What a report prints is
-// for a reader and does not read back — `3/4` is a Rational, a String and a
-// piece of a sentence, and nothing in it says which. A seed draws the case the
-// search STARTED from, and the value worth keeping is the one the shrink ended
-// at, which no draw ever produced.
-//
-// The encoding is shaped by the GENERATOR rather than self-describing:
-// the generator is what says how to read the data back, so what is written down
-// is only what the generator can not know by itself. That is what makes a Type
-// which has changed under a stored value answer nothing at all, rather than
-// answer a value of a shape the property was never asked about.
+// A counterexample as data, shaped by the generator that reads it back. See
+// "Writing a counterexample down" in DEVELOPMENT.md.
 export type EncodedValue =
 	| { kind: "boolean"; value: boolean }
-	// Digits rather than a JSON number — an Integer beyond safe range is
-	// a bigint at run time, and no JSON number spells every one of them. It is
-	// the same spelling `Narrowing.atLeast` is written in, for the same reason.
+	// Digits, as in `Narrowing.atLeast`.
 	| { kind: "integer"; value: string }
 	| { kind: "rational"; numerator: string; denominator: string }
 	| { kind: "string"; value: string }
 	| { kind: "list"; items: Array<EncodedValue> }
-	// A LIST of pairs rather than a record keyed by the key, because a key
-	// is a value of any Type at all — a Record, a Case, a Rational — and only
-	// some of those spell as a JSON member name. The pairs are written in the
-	// Dictionary's own order, which is what reading them back rebuilds.
+	// Pairs in the Dictionary's order, since a key of any Type may not spell as
+	// a JSON member name.
 	| {
 			kind: "dictionary"
 			entries: Array<{ key: EncodedValue; value: EncodedValue }>
 	  }
 	| { kind: "record"; members: Record<string, EncodedValue> }
 	| { kind: "case"; tag: string; members: Record<string, EncodedValue> }
-	// Which ARM of a Union the value belongs to, by its index among them.
-	// A Union that was written in another order, or that lost an arm, is a Union
-	// the index no longer names what it was written for — which is exactly the
-	// change a stored value has to be refused over.
+	// The arm's index, so a Union reordered or shortened refuses the value.
 	| { kind: "union"; member: number; value: EncodedValue }
 	| { kind: "refined"; value: EncodedValue }
 
-// What a value looks like written down, and NOTHING where it can not be
-// written down at all. It never throws: what asks is a run that has already
-// found a counterexample and still has to report it, so a value that does not
-// answer the generator's shape costs the corpus rather than the report.
+// The value written down, or `null` where it can not be. It never throws,
+// since a run that found a counterexample still has to report it.
 export function encode(
 	generator: Generator,
 	value: AnyType,
 ): EncodedValue | null {
-	// One question at the top rather than one per kind. `claims` is what a
-	// Union already asks to find the arm a value belongs to, and a value the
-	// generator does not claim is one the encoding could only get wrong.
+	// A value the generator does not claim could only be encoded wrong.
 	if (!claims(generator, value)) {
 		return null
 	}
@@ -1693,10 +1470,8 @@ export function encode(
 
 			return encoded === null ? null : { kind: "refined", value: encoded }
 		}
-		// A Namespace's own generator says how to BUILD a value and
-		// nothing about what one is made of, which is the whole of what writing
-		// one down would need. A property test with such a Parameter keeps no
-		// corpus at all — the same silence a shrink answers with.
+		// A Namespace's own generator does not say what a value is made of, so a
+		// test with such a Parameter keeps no corpus.
 		case "generated":
 			return null
 	}
@@ -1728,16 +1503,8 @@ function encodeMembers(
 	return encoded
 }
 
-// `generate`'s switch with the randomness taken out. Every value is built
-// through the very constructors a draw builds through, so a replayed
-// counterexample is indistinguishable from a drawn one — hidden Type key and
-// all, which is what lets `is`, `toString` and a Match read it.
-//
-// Nothing is trusted. The data came off a file that a hand, a merge or an
-// older Compiler may have been through, and the Types it was written against
-// may have changed since — so every mismatch answers nothing, and the entry
-// that held it is dropped rather than reported as a value of a shape nobody
-// asked about.
+// `generate` without the randomness, through the same constructors. Nothing
+// is trusted: any mismatch answers `null`, and the stored entry is dropped.
 export function decode(
 	generator: Generator,
 	data: EncodedValue,
@@ -1770,8 +1537,6 @@ export function decode(
 			let denominator = wholeFrom(data.denominator)
 
 			// A denominator of zero is a Rational nothing ever built.
-			// `createRational` would answer one all the same, and it would print
-			// and compare as a value the Type says is impossible.
 			return numerator === null ||
 				denominator === null ||
 				denominator === 0n
@@ -1809,9 +1574,7 @@ export function decode(
 			let entries: Array<[AnyType, AnyType]> = []
 
 			for (let entry of data.entries) {
-				// Nothing is trusted, here least of all — a pair missing
-				// either half is a Dictionary that lost an entry rather than one
-				// that held a shorter one.
+				// A pair missing either half is a lost entry.
 				if (typeof entry !== "object" || entry === null) {
 					return null
 				}
@@ -1838,9 +1601,7 @@ export function decode(
 			return members === null ? null : createRecord(members)
 		}
 		case "case": {
-			// The tag as well as the kind. A Case that was renamed is a
-			// Case the stored value is no longer about, whatever its payload
-			// still looks like.
+			// A renamed Case no longer matches its stored value.
 			if (data.kind !== "case" || data.tag !== generator.tag) {
 				return null
 			}
@@ -1873,24 +1634,19 @@ export function decode(
 			let merged = mergeNarrowing(narrowing, generator.narrowing)
 			let value = decode(generator.base, data.value, merged)
 
-			// The predicate is asked AGAIN rather than taken on trust. A
-			// stored value was admitted by whatever the refinement said the day
-			// it was written down, and one that has narrowed since no longer
-			// admits it — which is a stale entry rather than a counterexample.
+			// The predicate is asked again, since the refinement may have
+			// narrowed since the value was written down.
 			return value !== null && admitted(generator, merged, value)
 				? value
 				: null
 		}
-		// Nothing was written down, so there is nothing to read back.
 		case "generated":
 			return null
 	}
 }
 
-// Exactly the members the generator names, and no others. A Record that
-// gained one has a stored value saying nothing about it; one that lost a member
-// has a stored value carrying a member the Type no longer has. Both are the
-// Type having changed under the entry, which is what makes it stale.
+// Exactly the members the generator names. A gained or lost member means the
+// Type changed under the stored value.
 function decodeMembers(
 	members: Array<GeneratorMember>,
 	data: Record<string, EncodedValue>,
@@ -1924,9 +1680,8 @@ function decodeMembers(
 	return decoded
 }
 
-// What `BigInt` would take and should not: it reads an empty String as
-// zero, reads whitespace around digits as nothing at all, and throws on the
-// rest — none of which is an answer a file on disk has earned.
+// `BigInt` reads an empty or padded String as a number, so digits are checked
+// first.
 const DIGITS = /^-?\d+$/
 
 function wholeFrom(text: string): bigint | null {

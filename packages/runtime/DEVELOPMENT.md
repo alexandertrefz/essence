@@ -370,3 +370,87 @@ core.
 buffer can not be decided yet, since the next byte may be its `\n`. So `readLine` pulls again first. The search for a
 break resumes where the last one stopped, so a long line arriving over many reads stays linear. `readAll` answers
 everything left, its final break included, so a Program that echoes its input writes what it was given.
+
+## Property-test generators
+
+A property test asks for values of its Parameters' Types. The Compiler emits a `Generator` for each Type: a plain
+description of its shape. `Generators.ts` interprets that description four ways. `generate` draws a value, and
+`mutate` steps to a neighbouring value. `shrink` offers smaller values in place of a failing one. `encode` and
+`decode` write a counterexample down and read it back. They live together because each asks what a
+value is made of, and answers written apart would drift. Every value is built through the constructors emitted code
+uses, so a generated value is indistinguishable from a written one.
+
+Every random choice draws from the `source` it is handed and nothing else, so a run replays under its seed.
+
+### Drawing generated values
+
+`size` grows with the case number. Early cases are small, so a failure found early is already close to minimal. Later
+ones are large enough to break the assumptions small values never break.
+
+An Integer is drawn from a window that grows with the size, and one draw in eight from a window a hundred times
+wider. The wide window is still bounded, because what an Integer is fed to can grow with it: a power's digits, or a
+range's items. A Rational is a numerator over one of a few readable denominators, so a counterexample reads as
+`3/4`. A List or a String takes a length inside the narrowing's bounds and `MAXIMUM_LENGTH`.
+
+A Dictionary draws its keys and values entry by entry. A key drawn twice overwrites, as in a written
+`Dictionary.of`, so a drawn Dictionary may hold fewer entries than were drawn. The key Type's own Equatable witness
+decides which keys are one key. The Compiler carries it as `keyConformance`, since a Namespace may write an `is` of
+its own. Where a plan carries none, `drawnKeyEquatable` stands in with the universal comparison.
+
+A refinement draws from its base under the narrowing the Compiler derived from its predicate: integer bounds,
+excluded values and length bounds. Each candidate is then admitted only if every check holds and the value is inside
+the narrowing. The narrowing is checked rather than trusted, because a draw or a shrink may answer a bound it could
+not honour. A narrowing that contradicts itself fails the run at once, and a predicate that admits nothing in
+`REFINEMENT_ATTEMPTS` draws fails it too. A failure to generate fails the run rather than the property, since the
+test asserted nothing.
+
+### Neighbouring generated values
+
+The coverage-guided search in `Testing.ts` looks around a case that reached new ground, by keeping every part of it
+but one. `mutate` answers one such neighbour.
+
+- A Boolean's neighbour is the other Boolean. A number or a String is redrawn, since the assumptions a number breaks
+  are not about small distances.
+- A List redraws, drops or inserts one item, choosing among the moves its length bounds allow.
+- A Dictionary redraws one value, drops one entry or adds one. A key is never moved, since a Dictionary is read by
+  its keys and every lookup would miss. An added key has to be new, so the draw grows with each attempt and falls
+  back to another move after `ADDITION_ATTEMPTS`.
+- A Record or a Case moves one member and shares the rest, which is safe because values are immutable.
+- A Union usually stays in the arm its value belongs to, and one time in `CROSS_ARM` draws from another arm.
+- A refinement tries `MUTATION_ATTEMPTS` neighbours its predicate admits, then draws a fresh value as `generate`
+  does. When nothing is admitted it fails the run the same way.
+- A Namespace's own `Generatable` conformance says how to build a value but not what one is made of, so its
+  neighbour is a fresh value. Its `shrink` only steps down, so it is no neighbourhood either.
+
+### Shrinking a failing value
+
+`shrink` answers candidates smallest first, every one a value of the same Type. An Integer moves towards zero, or
+the nearest bound the narrowing admits, by halving the distance and then trying the value beside it. A String, a
+List and a Dictionary try fewer items first, then each item made smaller. A String's characters are simplified to
+`a`, so noise shrinks to `"aa"` rather than to shorter noise. A Dictionary's keys never shrink, since two keys that
+shrank to one would leave a Dictionary of another length.
+
+A Union also shrinks towards the smallest value of a simpler arm. `complexity` ranks the arms. A payload-free
+Case ranks lowest, since `#Empty` is the shortest true thing a report can say. `minimal` builds that smallest
+value. For a Dictionary it needs as many distinct keys as the narrowing demands. The first is the smallest key. The
+rest are drawn from a fixed seed, and each is kept when it makes the Dictionary grow.
+
+A Namespace with its own `Generatable` conformance shrinks through its `shrink` Method, which answers no candidates
+unless the Namespace writes one. A candidate equal to the failing value is dropped, so it can not spend the shrink
+budget on itself.
+
+`claims` decides which arm of a Union a value belongs to. A Case answers by its tag and other values by their Type
+key. Two arms may share a key. So a Record arm also checks its member names, and a List or Dictionary arm checks its
+first item or entry. A refined arm asks its predicate. A predicate that throws on the value does not claim it.
+
+### Writing a counterexample down
+
+A counterexample found once is asked about again on every later run, so it is written down as data. Neither the
+printed form nor the seed would do. The printed form does not read back. A seed draws the case the search started
+from, not the one the shrink ended at.
+
+The encoding is shaped by the generator rather than self-describing. It records the values themselves, with an
+Integer as digits, a Union's arm as its index, a Case's tag and a Dictionary's entries as pairs. So
+when the Type changes under a stored value, `decode` answers `null` rather than a value of the wrong shape, and the
+entry is dropped. `decode` trusts nothing: it checks every kind, tag, member set and digit string, and asks a
+refinement's predicate again. A value of a Namespace's own generator is never written down.
