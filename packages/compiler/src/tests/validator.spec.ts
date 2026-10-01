@@ -3130,16 +3130,37 @@ describe("Validator", () => {
 			expect(diagnosticsFor(source("-3"))).toHaveLength(1)
 		})
 
-		// A bound the entry can not read leaves the conjunct undecided. This
-		// `isLessThan` is Integer's Rational entry, and `1/2` is no Integer.
-		it("should not admit against a bound it can not read", () => {
-			expect(
-				diagnosticsFor(`implementation {
-					type BelowHalf = Integer where @::isLessThan(1/2)
+		// The standard library compares an Integer with a Rational by value, so a
+		// fraction bound decides a written Integer exactly.
+		describe("a fraction bound on an Integer", () => {
+			function codesFor(predicate: string, value: string): Array<string> {
+				return diagnosticsFor(`implementation {
+					type Bounded = Integer where ${predicate}
 
-					constant d: BelowHalf = 0
-				}`),
-			).toHaveLength(1)
+					function placed(_ value: Bounded) -> Integer {
+						<- value::add(1)
+					}
+
+					Terminal.inspect(placed(${value}))
+				}`).map((diagnostic) => diagnostic.code)
+			}
+
+			// This `isLessThan` is Integer's Rational entry.
+			it("should decide Integer's own comparison", () => {
+				expect(codesFor("@::isLessThan(5/2)", "2")).toEqual([])
+				expect(codesFor("@::isLessThan(5/2)", "3")).toEqual([
+					"argument-type-mismatch",
+				])
+			})
+
+			// A fraction bound is no Integer, so this `isBetween` is the one
+			// `Number`'s conformance answers.
+			it("should decide the comparison Number answers", () => {
+				expect(codesFor("@::isBetween(0, and 9/2)", "4")).toEqual([])
+				expect(codesFor("@::isBetween(0, and 9/2)", "5")).toEqual([
+					"argument-type-mismatch",
+				])
+			})
 		})
 
 		// String equality is canonical equivalence over NFC, so a composed and a

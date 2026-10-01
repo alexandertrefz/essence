@@ -321,32 +321,41 @@ type PredicateEvaluator = (
 	args: Array<string | boolean>,
 ) => boolean | null
 
-// The comparisons over Integers, keyed by the Namespace whose conformance
-// answered, whether Integer wrote the entry or `Orderable` provides it.
+// The comparisons over Integers and Rationals, keyed by the Namespace whose
+// conformance answered, whether a member wrote the entry or `Orderable`
+// provides it. The standard library compares the two kinds by value, so each
+// entry reads either kind of value and bound exactly.
 const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
-	is: integerComparison((value, other) => value === other),
-	isLessThan: integerComparison((value, other) => value < other),
-	isGreaterThan: integerComparison((value, other) => value > other),
+	is: numericComparison((value, other) => compareExact(value, other) === 0),
+	isLessThan: numericComparison(
+		(value, other) => compareExact(value, other) < 0,
+	),
+	isGreaterThan: numericComparison(
+		(value, other) => compareExact(value, other) > 0,
+	),
 
 	// Both bounds included, in either order, as the standard library's body reads.
 	isBetween: (value, args) => {
-		let integer = integerLiteral(value)
+		let number = exactLiteral(value)
 
-		if (integer === null || args.length !== 2) {
+		if (number === null || args.length !== 2) {
 			return null
 		}
 
-		let first = integerScalar(args[0])
-		let second = integerScalar(args[1])
+		let first = rationalScalar(args[0])
+		let second = rationalScalar(args[1])
 
 		if (first === null || second === null) {
 			return null
 		}
 
-		let lower = first <= second ? first : second
-		let upper = first <= second ? second : first
+		let exchanged = compareExact(first, second) > 0
+		let lower = exchanged ? second : first
+		let upper = exchanged ? first : second
 
-		return integer >= lower && integer <= upper
+		return (
+			compareExact(number, lower) >= 0 && compareExact(number, upper) <= 0
+		)
 	},
 }
 
@@ -425,88 +434,20 @@ const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
 // canonicalises one, so `1/2` and `2/4` read alike.
 type ExactValue = { numerator: bigint; denominator: bigint }
 
-// The comparisons over Rationals, keyed `Rational::…`. Each takes a Rational or
-// an Integer bound, read as `n/1`.
-const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
-	is: rationalComparison((value, other) => compareExact(value, other) === 0),
-	isLessThan: rationalComparison(
-		(value, other) => compareExact(value, other) < 0,
-	),
-	isGreaterThan: rationalComparison(
-		(value, other) => compareExact(value, other) > 0,
-	),
-
-	// Both bounds included, in either order, as in the Integer entry.
-	isBetween: (value, args) => {
-		let rational = rationalLiteral(value)
-
-		if (rational === null || args.length !== 2) {
-			return null
-		}
-
-		let first = rationalScalar(args[0])
-		let second = rationalScalar(args[1])
-
-		if (first === null || second === null) {
-			return null
-		}
-
-		let exchanged = compareExact(first, second) > 0
-		let lower = exchanged ? second : first
-		let upper = exchanged ? first : second
-
-		return (
-			compareExact(rational, lower) >= 0 &&
-			compareExact(rational, upper) <= 0
-		)
-	},
-}
-
 // Rational's own question.
 const RATIONAL_QUESTIONS: Record<string, PredicateEvaluator> = {
 	// Rational's body reads the lowest-terms denominator, so `4/2` is whole.
 	isWholeNumber: rationalQuestion((value) => value.denominator === 1n),
 }
 
-// `Number` answers for whichever kind is in front of it, so it reads both
-// tables. Each entry reads one kind of value and bound, so an Integer receiver
-// with a fraction bound stays undecided.
-const NUMBER_COMPARISONS: Record<string, PredicateEvaluator> = eitherTable(
-	NUMERIC_COMPARISONS,
-	RATIONAL_COMPARISONS,
-)
-
-// The entry that decides the value. Each refuses the kind it does not read, so
-// at most one answers.
-function eitherTable(
-	first: Record<string, PredicateEvaluator>,
-	second: Record<string, PredicateEvaluator>,
-): Record<string, PredicateEvaluator> {
-	let composed: Record<string, PredicateEvaluator> = { ...first }
-
-	for (let [methodName, evaluator] of Object.entries(second)) {
-		let existing = composed[methodName]
-
-		composed[methodName] =
-			existing === undefined
-				? evaluator
-				: (value, args) =>
-						existing(value, args) ?? evaluator(value, args)
-	}
-
-	return composed
-}
-
-function rationalComparison(
+function numericComparison(
 	compare: (value: ExactValue, other: ExactValue) => boolean,
 ): PredicateEvaluator {
 	return (value, args) => {
-		let rational = rationalLiteral(value)
+		let number = exactLiteral(value)
 		let other = args.length === 1 ? rationalScalar(args[0]) : null
 
-		return rational === null || other === null
-			? null
-			: compare(rational, other)
+		return number === null || other === null ? null : compare(number, other)
 	}
 }
 
@@ -533,8 +474,15 @@ function rationalLiteral(value: LiteralItem): ExactValue | null {
 	return value.kind === "Rational" ? value : null
 }
 
-// Reads a Rational bound, written as digits with a slash, or as bare digits for
-// an Integer bound read as `n/1`. `integerScalar` refuses a fraction.
+// An Integer read as `n/1`, so one comparison reads both kinds.
+function exactLiteral(value: LiteralItem): ExactValue | null {
+	return value.kind === "Integer"
+		? { numerator: value.value, denominator: 1n }
+		: rationalLiteral(value)
+}
+
+// Reads a numeric bound, written as digits with a slash, or as bare digits for
+// an Integer bound read as `n/1`.
 function rationalScalar(scalar: string | boolean): ExactValue | null {
 	if (typeof scalar !== "string") {
 		return null
@@ -600,9 +548,9 @@ export function reducedRationalSpelling(
 // property an Object carries of its own.
 const PREDICATES: Record<string, PredicateEvaluator> = {
 	...keyedByNamespace("Integer", NUMERIC_COMPARISONS),
-	...keyedByNamespace("Number", NUMBER_COMPARISONS),
+	...keyedByNamespace("Number", NUMERIC_COMPARISONS),
 	...keyedByNamespace("Integer", INTEGER_QUESTIONS),
-	...keyedByNamespace("Rational", RATIONAL_COMPARISONS),
+	...keyedByNamespace("Rational", NUMERIC_COMPARISONS),
 	...keyedByNamespace("Rational", RATIONAL_QUESTIONS),
 	...keyedByNamespace("String", STRING_PREDICATES),
 	...keyedByNamespace("List", LIST_PREDICATES),
@@ -637,19 +585,6 @@ function evaluateConjunct(
 	let answer = evaluator(value, conjunct.args)
 
 	return answer === null ? null : answer !== conjunct.negated
-}
-
-function integerComparison(
-	compare: (value: bigint, other: bigint) => boolean,
-): PredicateEvaluator {
-	return (value, args) => {
-		let integer = integerLiteral(value)
-		let other = args.length === 1 ? integerScalar(args[0]) : null
-
-		return integer === null || other === null
-			? null
-			: compare(integer, other)
-	}
 }
 
 function integerQuestion(ask: (value: bigint) => boolean): PredicateEvaluator {
@@ -697,8 +632,8 @@ function stringLiteral(value: LiteralItem): string | null {
 	return value.kind === "String" ? value.value : null
 }
 
-// A conjunct keeps an Integer bound as its digits. Any other spelling, such as
-// a fraction, is refused, which keeps a Rational bound out of Integer comparisons.
+// An Integer Literal keeps its digits as a String. Any other spelling is no
+// Integer.
 function integerScalar(scalar: string | boolean): bigint | null {
 	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
 		? BigInt(scalar)

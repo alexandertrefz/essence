@@ -186,8 +186,8 @@ needs a branch, as any other value does.
 
 The key can be trusted because a Program can not redeclare a standard library Namespace: `namespace Integer for
 Integer` is refused as a duplicate name. So an `Integer::isNot` conjunct is the standard library's `isNot`. The key
-holds no Overload. An entry that can not decode the Arguments it is given refuses, so `@::isLessThan(1/2)` on an
-Integer is not decided.
+holds no Overload, so an entry reads every Argument kind its Overloads take. An entry that can not decode the
+Arguments it is given refuses, and the conjunct stays undecided.
 
 The table holds only primitives, since a conjunct is stored resolved: `isGreaterThanOrEqualTo` arrives as a negated
 `isLessThan`. Which Methods resolve to which is read off the standard library's bodies. The census in
@@ -241,8 +241,11 @@ for an update that writes an entry, and nothing for one that writes none.
 A conjunct names the Namespace whose conformance answered. An Integer receiver's `isLessThan` is Integer's own
 entry, and its `isBetween` is the one `Orderable` provides, and both are keyed `Integer::…`. Negated forms such as
 `isNot` and `isGreaterThanOrEqualTo` have no rows, since a conjunct arrives resolved with its flag turned over.
-`isBetween` includes both bounds and reads them in either order, as the standard library's body does. A Rational
-entry takes an Integer bound too, read as `n/1`.
+`isBetween` includes both bounds and reads them in either order, as the standard library's body does. With a bound
+that is no Integer, an Integer receiver's `isBetween` is `Number`'s instead.
+
+The standard library compares an Integer and a Rational by value, so the Integer, Rational and `Number` rows are one
+table. Each reads an Integer value or bound as `n/1`, so `@::isLessThan(5/2)` on an Integer is decided exactly.
 
 String equality compares NFC forms, as the runtime's `is` does, so a composed and a decomposed accent are one
 String. An `isNot` over the raw code units would prove something false. `isEmpty` reads the code units, since a
