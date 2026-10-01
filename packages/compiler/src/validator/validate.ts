@@ -3214,14 +3214,8 @@ function checkNamespaceIsDeclared(
 	)
 }
 
-// The `require` line that takes THIS value apart, or null where there is
-// nothing to take apart. The first Case of the Choice or Union, because any of
-// them is a shape the line could ask for and the first is the one a reader
-// reads first; a payload is bound only where the Case declares members, since
-// `#Empty(item)` is refused. The value is NAMED where a name is what was
-// written — the one spelling a reader reads straight back — and written as a
-// schematic otherwise, because this stage holds Nodes rather than the text they
-// were read from.
+// The `require` line that takes this value apart by its first Case, or null
+// where it holds none. A name is spelled back, anything else as `…`.
 function takingItApart(value: common.typed.ExpressionNode): string | null {
 	let members =
 		value.type.type === "UnionType"
@@ -3242,31 +3236,20 @@ function takingItApart(value: common.typed.ExpressionNode): string | null {
 	return `Or take it apart instead: 'require ${matcher} = ${named}'.`
 }
 
-// `expect EXPR` asks the same question an `if` does — is this true — and
-// is refused for the same reason where the answer is not a Boolean: Essence has
-// no truthiness, so there is nothing for an assertion over a Standing to mean.
-//
-// `require MATCHER = EXPR` asks a different question and is not checked here:
-// what a Matcher may be written against was settled where it was resolved,
-// exactly as a Match Handler's is.
+// An assertion without a Matcher or a snapshot must be a Boolean, as an `if`
+// Condition must. A Matcher was checked where it was resolved.
 function validateAssertion(
 	node: common.typed.ExpectStatementNode | common.typed.RequireStatementNode,
 ): common.typed.ImplementationNode {
-	// A snapshot asserts nothing of its own — what it compares is the
-	// value RENDERED, which the Enricher already demanded be Printable.
+	// A snapshot compares the rendered value, which the enricher required to
+	// be Printable.
 	if (
 		node.matcher === null &&
 		node.snapshot === null &&
 		node.value.type.type !== "Boolean" &&
 		node.value.type.type !== "Error"
 	) {
-		// Taking a value apart is an answer only where it HAS parts. An
-		// Integer has no Cases, and the Help sent a reader to
-		// `require #Value(item) = value` — which answers `unknown-case` about
-		// `#Value` and `unknown-name` about `item`, two reports for a line the
-		// Help itself wrote. So it is offered only for a Choice or a Union, and
-		// spelled with a Case the value really holds, binding a payload only
-		// where that Case carries one.
+		// Taking the value apart is offered only where it holds a Case.
 		let taking = takingItApart(node.value)
 
 		reportError("An assertion has to be a Boolean", node.value.position, {
@@ -3302,10 +3285,8 @@ function validateAssertion(
 	return node
 }
 
-// An `if`, an `else if` and a Match Handler's Guard all pick a path from
-// a value, and Essence has no truthiness — only a Boolean can decide. One
-// check for all of them, so the rule can not hold in one place and lapse in
-// another; `description` is what names the Condition in the message.
+// Every Condition must be a Boolean, since Essence has no truthiness.
+// `description` names the Condition in the message.
 function validateCondition(
 	condition: common.typed.ExpressionNode,
 	description: string,
@@ -3329,9 +3310,7 @@ function validateCondition(
 	validateExpression(condition)
 }
 
-// The Help a Condition that is not a Boolean gets. `booleanQuestionFor`
-// lives beside the other Diagnostic vocabulary, because the refinement clause in
-// the Enricher asks the same question of the same Types.
+// The Help for a Condition that is not a Boolean.
 function booleanQuestionHelp(type: common.Type): string {
 	return `Ask a question that answers a Boolean — '::${booleanQuestionFor(type)}' reads ${withArticle(describeType(type))}.`
 }
@@ -3340,9 +3319,7 @@ function validateDefiniteReturn(
 	definition: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): void {
-	// The inner Type for a completing body, for the reason a `<-` is held
-	// to it: `-> Future<{}>` is a body that answers nothing, and asking it for a
-	// `<-` would refuse every `complete Async.sleep(…)` written on its own line.
+	// The inner Type for a completing body, so `-> Future<{}>` needs no `<-`.
 	let returnType = returnedTypeOf(
 		definition.returnType,
 		definition.completing === true,
@@ -3356,9 +3333,7 @@ function validateDefiniteReturn(
 		return
 	}
 
-	// A body the Parser did not read whole is a body whose `<-` may be
-	// exactly what went missing — see `partiallyRead`. Falling off the end is a
-	// claim about every path through what was WRITTEN, and this is not that.
+	// A body the parser did not read whole may have lost its `<-`.
 	if (partiallyRead(position)) {
 		return
 	}
@@ -3367,21 +3342,14 @@ function validateDefiniteReturn(
 		reportError("Not every path through this Function returns", position, {
 			code: "missing-return",
 			labels: [primary(position, "this path falls off the end")],
-			// A completing body is not described as DECLARING the Type its
-			// `<-` answers with, because it does not: the signature says
-			// `Future<Integer>` and the body answers `Integer`, and a note about
-			// the declaration would name a Type the reader can not find in it.
+			// A completing body answers its Future's inner Type, which its
+			// signature does not spell.
 			notes: [
 				definition.completing === true
 					? `This body waits, so its '<-' answers with ${describeType(returnType)}; every path must yield one.`
 					: `The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
 			],
-			// A path that falls off the end is answered either by giving
-			// it a value or by giving the branching an `else`, and the two are
-			// different Programs — an `if` with no `else` returns from one path
-			// and walks out of the other, and which of those the reader meant is
-			// theirs to say. Both are named; neither is spelled with a value,
-			// because what to answer with is the judgement this can not make.
+			// A final `<-` or an `else`, which are different Programs.
 			helps: [
 				`Write a '<-' answering ${withArticle(describeType(returnType))} at the end of the body.`,
 				"Or give every branch one — an 'if' with no 'else' leaves the path around it falling through.",
@@ -3390,34 +3358,9 @@ function validateDefiniteReturn(
 	}
 }
 
-// Whether a value fits where it was written — assignability, plus the one
-// thing assignability alone can not see. A refinement demands evidence, and a
-// value written DOWN carries its own: its predicate is decided while compiling,
-// so `constant d: NonZeroInteger = 3` needs no branch in front of it while `= 0`
-// is still refused. The Enricher admits the same literals as it matches
-// Arguments, and this is that question asked again over the finished tree, at
-// every position the Enricher does not resolve one against the other.
-// A hole on either side is answered as a FIT, which is the whole of how
-// this Validator stays quiet about mistakes it has already been told about. The
-// Enricher writes an Error wherever it could not establish a Type and reports
-// why, once, where the reading failed; a value of that Type then fits nothing,
-// and every position it travels to would refuse it again in words about Types
-// the reader never wrote. One hole, one Diagnostic.
-//
-// Asked here rather than at the six positions that call this, because they all
-// want the same answer: a Constant's annotation, a Variable's, a Property's, an
-// assignment, a `<-` and a `define` arm each measure a written value against a
-// written Type, and none of them has anything to say when one of the two is a
-// hole.
-//
-// The two sides are asked DIFFERENT questions, and the difference is what
-// keeps this from swallowing mismatches that are real. An Error anywhere in the
-// EXPECTED Type means the annotation did not resolve, so there is nothing left
-// to hold the value to. On the VALUE's side only a Type that IS an Error
-// counts: an Error buried inside one is a slot nothing bound, which
-// `Result::flatten` leaves behind on a Program the Enricher had no complaint
-// about — the value is a Union of Results either way, and a `String` annotation
-// over it is a mismatch the Error has no part in.
+// Whether a value fits where it was written. A written literal carries its
+// own evidence for a refinement, so `constant d: NonZeroInteger = 3` fits. A
+// hole fits. See "Holes" in DEVELOPMENT.md.
 function fitsExpectedType(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -3429,18 +3372,9 @@ function fitsExpectedType(
 	return fitsWritten(expected, value)
 }
 
-// What a mismatch against a refinement has to say beyond naming the two
-// Types. A base value arriving where evidence is demanded is not a spelling
-// mistake — the value may well satisfy the predicate, and nothing has asked —
-// so the Diagnostic names the question that went unanswered and the two places
-// an answer comes from. Empty for every other Type, which is what lets the sites
-// below spread it without asking first.
-//
-// Named as it was APPLIED, because a generic refined Alias' bare name is not
-// a Type anything can be written as — a help offering to pass a value of
-// 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
-// refinement carrying none spells as its name alone, which is every non-generic
-// one.
+// What a mismatch against a refinement adds: the unasked predicate and where
+// an answer comes from. Empty for other Types. The refinement is named as
+// applied, with its Type Arguments.
 function refinementEvidence(
 	expected: common.Type | undefined,
 	value?: common.typed.ExpressionNode,
@@ -3491,15 +3425,9 @@ function refinementEvidence(
 	}
 }
 
-// An Argument is asked the same question the Enricher asked it, and for a
-// reason beyond the Diagnostic: a committed Overload whose Arguments do not
-// match is an ICE here, so a call the Enricher admitted a literal into would
-// fail the compile outright if this asked only about assignability.
-//
-// Which is why the question is asked in full, `refinementDecidedBy` and all: a
-// Parameter whose Type Arguments the call worked out is a refinement nothing
-// spelled, and asking about it as it STANDS would refuse the very literal the
-// Enricher admitted — an ICE out of a Program that is perfectly well typed.
+// Arguments are asked exactly what the enricher asked them, literals and
+// `refinementDecidedBy` included. A committed Overload that fails to match is
+// an internal error here.
 function matchableArgumentsFromTypedNodes(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): Array<MatchableArgument> {

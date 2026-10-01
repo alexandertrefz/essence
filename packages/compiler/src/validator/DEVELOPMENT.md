@@ -87,8 +87,8 @@ walk: it breaks real sources at many sites and holds the walk to never throwing.
 
 A Namespace is emitted as a `class`, whose binding does not exist until its Declaration runs. So code that runs
 before a top-level Namespace's Declaration and names it compiles clean and then fails. `checkNamespaceIsDeclared`
-reports it as `use-before-declaration`. It covers every way a Namespace is named: a Method's home, a dispatch
-branch's target, a static member's base, a bare reference, and a `namespace` witness a call spells in.
+reports it as `use-before-declaration`. It covers a Method's home, a dispatch branch's target,
+a static member's base, a bare reference, and a `namespace` witness a call spells in.
 
 `topLevelNamespaces` records each top-level Namespace's index in the Statement list and its name's Position. It is
 read off the typed Statements, because a hoisted Namespace never enters the enricher's declarations and its Type
@@ -112,6 +112,12 @@ A Signature holding one measures no call. A hole in a positional Argument shifts
 shifts nothing, and the rest of the call is still measured. A Match whose
 value or runtime Matchers hold a hole gets no exhaustiveness or reachability verdict. The Handlers' bodies are
 still walked, since a mistake inside one is its own.
+
+`fitsExpectedType` answers a hole on either side as a fit. Every position that measures a written value against a
+written Type asks it: an annotation, an assignment, a `<-` and a `define` arm. The two sides are asked different
+questions. An Error anywhere in the expected Type means the annotation did not resolve, so nothing is left to hold
+the value to. On the value's side only a Type that is an Error counts. An Error nested inside a value's Type can be a slot nothing bound. `Result::flatten` leaves one in a Program the
+enricher accepted, and a mismatch around it is real.
 
 ## Match
 
