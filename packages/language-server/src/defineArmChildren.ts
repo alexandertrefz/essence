@@ -12,18 +12,11 @@ type Define<Expression> = {
 	otherwise: { value: Expression }
 }
 
-// One arm, for walkers that put the arm's own Position on a selection chain.
-export function defineArmExpressions<Expression>(
-	arm: Arm<Expression>,
-): Array<Expression> {
-	return [arm.value, arm.condition]
-}
-
 export function defineExpressions<Expression>(
 	node: Define<Expression>,
 ): Array<Expression> {
 	return [
-		...node.arms.flatMap((arm) => defineArmExpressions(arm)),
+		...node.arms.flatMap((arm) => [arm.value, arm.condition]),
 		node.otherwise.value,
 	]
 }

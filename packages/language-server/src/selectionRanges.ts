@@ -1,14 +1,9 @@
 import {
-	caseDefaults,
-	memberExpression,
-	parameterDefaults,
-} from "@essence-lang/compiler/helpers"
+	findParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { assertionExpressions } from "./assertionChildren"
-import { defineArmExpressions } from "./defineArmChildren"
-import { matcherValueExpressions } from "./matchHandlerChildren"
-import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains } from "./positions"
 import { type ParserSection, programSections } from "./sections"
 
@@ -101,300 +96,164 @@ function collectFromBody(
 	}
 }
 
-// A Parameter default is a span inside no body, so a cursor in
-// `= @::length()` descends here. Answers whether the cursor was in one.
-function collectFromDefaults(
-	parameters: Array<parser.ParameterNode>,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-): boolean {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		if (contains(defaultValue.position, cursor)) {
-			chain.push(defaultValue.position)
-			collectFromNode(defaultValue, cursor, chain)
-
-			return true
-		}
-	}
-
-	return false
+// The walk down to the cursor, and the node whose children it visits.
+type Walk = {
+	cursor: common.Cursor
+	chain: Array<common.Position>
+	holder: ParserNode
 }
 
-// A default comes before the body, and the cursor is in at most one.
-function collectFromDefinition(
-	definition: parser.FunctionDefinitionNode,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-) {
-	if (!collectFromDefaults(definition.parameters, cursor, chain)) {
-		collectFromBody(definition.body, cursor, chain)
+// A level holding the cursor is pushed and entered, and the walk stops at the
+// first. Nodes the Parser recovered may share a boundary, and the chain must
+// nest. A node between levels is entered wherever it stands, and answers
+// `true` once a level inside it has been.
+function visitChild(
+	child: ParserNode,
+	walk: Walk,
+	field: string,
+): true | undefined {
+	if (holdsNoLevel(field, walk.holder)) {
+		return undefined
 	}
+
+	// Only a level is passed over by its Position. The span of a node between
+	// levels, such as a Parameter's, need not cover its children.
+	if (!levelKinds.has(child.nodeType) || bindingFields.has(field)) {
+		return collectFromNode(child, walk.cursor, walk.chain)
+	}
+
+	let { position } = child as parser.ImplementationNode
+
+	if (!contains(position, walk.cursor)) {
+		return undefined
+	}
+
+	walk.chain.push(position)
+	collectFromNode(child, walk.cursor, walk.chain)
+
+	return true
 }
+
+// A name, such as a Declaration's, a member's or a label, and a Type hold no
+// level. A call's `name` is its callee, read like any value, and a snapshot's
+// `name` is a String written in the source.
+const leafFields: ReadonlySet<string> = new Set([
+	"name",
+	"member",
+	"caseName",
+	"choice",
+	"externalName",
+	"internalName",
+	"namespaceSpecifier",
+	"steps",
+	"type",
+	"returnType",
+	"generics",
+	"typeArguments",
+	"targetType",
+	"conformsTo",
+])
+
+function holdsNoLevel(field: string, holder: ParserNode): boolean {
+	return (
+		leafFields.has(field) &&
+		holder.nodeType !== "FunctionInvocation" &&
+		holder.nodeType !== "Snapshot"
+	)
+}
+
+// What a Matcher binds is no level, but a Pattern written there compares
+// members against values, which are.
+const bindingFields: ReadonlySet<string> = new Set(["binding", "binder"])
+
+// Statements and Expressions are the levels. The nodes between them, such as
+// a Matcher, a Parameter or an Argument, are not.
+const levelKindTable: Record<parser.ImplementationNode["nodeType"], true> = {
+	MethodInvocation: true,
+	FunctionInvocation: true,
+	RecordValue: true,
+	StringValue: true,
+	InterpolatedStringValue: true,
+	IntegerValue: true,
+	RationalValue: true,
+	BooleanValue: true,
+	FunctionValue: true,
+	ListValue: true,
+	DictionaryValue: true,
+	Lookup: true,
+	MemberPath: true,
+	Self: true,
+	Identifier: true,
+	Combination: true,
+	Match: true,
+	Define: true,
+	CaseValue: true,
+	Start: true,
+	Complete: true,
+	RefusedValue: true,
+	ConstantDeclarationStatement: true,
+	VariableDeclarationStatement: true,
+	VariableAssignmentStatement: true,
+	NamespaceDefinitionStatement: true,
+	ProtocolDeclarationStatement: true,
+	TypeAliasStatement: true,
+	ChoiceDeclarationStatement: true,
+	IfElseStatement: true,
+	IfStatement: true,
+	ReturnStatement: true,
+	FunctionStatement: true,
+	OverloadedFunctionStatement: true,
+	ExpectStatement: true,
+	RequireStatement: true,
+}
+
+const levelKinds: ReadonlySet<string> = new Set(Object.keys(levelKindTable))
 
 function collectFromNode(
-	node: parser.ImplementationNode,
+	node: ParserNode,
 	cursor: common.Cursor,
 	chain: Array<common.Position>,
-) {
+): true | undefined {
 	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			descend(node.value, cursor, chain)
-			return
-		case "FunctionStatement":
-			collectFromDefinition(node.value, cursor, chain)
-			return
-		case "NamespaceDefinitionStatement": {
-			for (let property of Object.values(node.properties)) {
-				// A native static Property has no value.
-				if (property.value !== null) {
-					descend(property.value, cursor, chain)
-				}
-			}
-
-			// A native signature has no block, but its defaults are spans.
-			for (let member of Object.values(node.methods)) {
-				collectFromOverloads(methodsOf(member), cursor, chain)
-				collectFromOverloads(nativeSignaturesOf(member), cursor, chain)
-			}
-
-			return
-		}
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let signatures =
-					member.nodeType === "OverloadedProtocolMethod" ||
-					member.nodeType === "OverloadedStaticProtocolMethod"
-						? member.signatures
-						: [member.signature]
-
-				for (let { body } of signatures) {
-					if (body !== null && contains(body.position, cursor)) {
-						chain.push(body.position)
-
-						if (
-							!collectFromDefaults(
-								body.value.parameters,
-								cursor,
-								chain,
-							)
-						) {
-							collectFromBody(body.value.body, cursor, chain)
-						}
-
-						return
-					}
-				}
-			}
-
-			return
-		case "OverloadedFunctionStatement":
-			collectFromOverloads(node.methods, cursor, chain)
-			return
-		case "TypeAliasStatement":
-			descend(node.predicate, cursor, chain)
-			return
-		case "ChoiceDeclarationStatement":
-			// A Case payload's default is a span inside no body, like a Parameter's.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				descend(defaultValue, cursor, chain)
-			}
-
-			return
-		case "IfStatement":
-			descend(node.condition, cursor, chain)
-			collectFromBody(node.body, cursor, chain)
-			return
-		case "IfElseStatement":
-			descend(node.condition, cursor, chain)
-			collectFromBody(node.trueBody, cursor, chain)
-			collectFromBody(node.falseBody, cursor, chain)
-			return
-		case "ReturnStatement":
-			descend(node.expression, cursor, chain)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of assertionExpressions(node)) {
-				descend(expression, cursor, chain)
-			}
-
-			descendSnapshot(node.snapshot, cursor, chain)
-			return
-		case "Match":
-			descend(node.value, cursor, chain)
-
-			for (let handler of node.handlers) {
-				// A Pattern's by-value members are the only part of a Matcher smaller than
-				// itself.
-				for (let value of matcherValueExpressions(handler.matcher)) {
-					descend(value, cursor, chain)
-				}
-
-				if (handler.guard !== null) {
-					descend(handler.guard, cursor, chain)
-				}
-
-				collectFromBody(handler.body, cursor, chain)
-			}
-
-			return
 		// The arm, which has a Position covering `as VALUE if CONDITION`, stands
 		// between what is in it and the whole `define`. A Match Handler has none.
 		case "Define":
 			for (let arm of node.arms) {
-				if (!contains(arm.position, cursor)) {
-					continue
-				}
-
-				chain.push(arm.position)
-
-				for (let expression of defineArmExpressions(arm)) {
-					descend(expression, cursor, chain)
+				if (contains(arm.position, cursor)) {
+					chain.push(arm.position)
 				}
 			}
 
 			if (contains(node.otherwise.position, cursor)) {
 				chain.push(node.otherwise.position)
-				descend(node.otherwise.value, cursor, chain)
 			}
 
-			return
-		case "FunctionValue":
-			collectFromDefinition(node.value, cursor, chain)
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				descend(memberExpression(member), cursor, chain)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				descend(value, cursor, chain)
-			}
-
-			return
+			break
+		// The entry, which has a Position covering `key = value`, stands between its
+		// key or value and the literal. A Record member has none.
 		case "DictionaryValue":
-			// The entry, which has a Position covering `key = value`, stands between its
-			// key or value and the literal. A Record member has none.
 			for (let entry of node.entries) {
-				if (!contains(entry.position, cursor)) {
-					continue
-				}
-
-				chain.push(entry.position)
-				descend(entry.key, cursor, chain)
-				descend(entry.value, cursor, chain)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					descend(segment.expression, cursor, chain)
+				if (contains(entry.position, cursor)) {
+					chain.push(entry.position)
 				}
 			}
 
-			return
-		case "MethodInvocation":
-			descend(node.base, cursor, chain)
-			descendArguments(node.arguments, cursor, chain)
-			return
-		case "FunctionInvocation":
-			descend(node.name, cursor, chain)
-			descendArguments(node.arguments, cursor, chain)
-			return
-		case "Combination":
-			descend(node.lhs, cursor, chain)
-			descend(node.rhs, cursor, chain)
-			return
-		case "Lookup":
-			descend(node.base, cursor, chain)
-			return
-		// The operand is a span inside the Keyword's, so the call comes first.
-		case "Start":
-		case "Complete":
-			descend(node.expression, cursor, chain)
-			return
-		case "RefusedValue":
-			descend(node.base, cursor, chain)
-			return
-		case "CaseValue":
-			descend(node.value, cursor, chain)
-			return
+			break
 		// The step the cursor stands on, so `city` widens to `.address.city`.
 		case "MemberPath":
 			for (let step of node.steps) {
 				if (contains(step.position, cursor)) {
 					chain.push(step.position)
 
-					return
+					return true
 				}
 			}
 
-			return
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
-	}
-}
-
-// An `overload` block, which only the standard library writes, may mix bodied
-// Functions with native signatures, whose defaults are spans inside no body.
-// A Namespace's Methods are read the same way.
-function collectFromOverloads(
-	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-) {
-	for (let method of methods) {
-		if (method.nodeType === "FunctionValue") {
-			descend(method, cursor, chain)
-		} else {
-			collectFromDefaults(method.parameters, cursor, chain)
-		}
-	}
-}
-
-// A stored snapshot's name and an inline one's recorded text are Strings
-// written in the source.
-function descendSnapshot(
-	snapshot: parser.SnapshotNode | null,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-) {
-	if (snapshot !== null) {
-		descend(snapshot.name, cursor, chain)
-		descend(snapshot.value, cursor, chain)
-	}
-}
-
-// A missing node, such as an absent predicate, holds nothing.
-function descend(
-	node: parser.ImplementationNode | null,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-) {
-	if (node === null || !contains(node.position, cursor)) {
-		return
+			return undefined
+		// A literal Matcher's value is the whole Matcher, and a Matcher is no level.
+		case "LiteralMatcher":
+			return undefined
 	}
 
-	chain.push(node.position)
-	collectFromNode(node, cursor, chain)
-}
-
-function descendArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-	cursor: common.Cursor,
-	chain: Array<common.Position>,
-) {
-	for (let argument of nodeArguments) {
-		descend(argument.value, cursor, chain)
-	}
+	return findParserChild(node, visitChild, { cursor, chain, holder: node })
 }

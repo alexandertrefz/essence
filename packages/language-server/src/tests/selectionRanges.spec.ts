@@ -133,8 +133,8 @@ describe("Selection Ranges", () => {
 	})
 })
 
-// A default is a span inside no body. Without a case for it, the selection
-// jumps from the name to the whole Declaration.
+// A default is a span inside no body. A walk that missed it would jump from
+// the name to the whole Declaration.
 describe("Selection Ranges inside a default", () => {
 	it("should widen from a name in a default out through the default", () => {
 		let source = [
@@ -156,8 +156,8 @@ describe("Selection Ranges inside a default", () => {
 	})
 })
 
-// A Case payload's default is a span inside no body either. Without a case for
-// it, the selection jumps from the name to the whole Choice.
+// A Case payload's default is a span inside no body either. A walk that missed
+// it would jump from the name to the whole Choice.
 describe("Selection Ranges inside a Case payload default", () => {
 	it("should widen from a name in a payload default out through the default", () => {
 		let source = [
@@ -256,8 +256,8 @@ describe("Selection Ranges inside a define", () => {
 })
 
 // The operand is a span inside the Keyword's, so a selection widens from the
-// call to the whole `complete …`, then to the Statement. A walk with no case
-// for the Keywords would jump from the call to the Statement.
+// call to the whole `complete …`, then to the Statement. A walk that missed the
+// Keywords would jump from the call to the Statement.
 describe("Selection Ranges around start and complete", () => {
 	let source = [
 		"implementation {",
@@ -451,5 +451,82 @@ describe("Selection Ranges inside a snapshot", () => {
 			{ start: { line: 4, column: 2 }, end: { line: 6, column: 3 } },
 			{ start: { line: 3, column: 1 }, end: { line: 7, column: 2 } },
 		])
+	})
+})
+
+// An unclosed String swallows lines, and the Statements recovered after it
+// share its last column. A chain must nest, so only the first one counts.
+describe("Selection Ranges in a half-typed body", () => {
+	it("should widen from the first Statement holding the cursor", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet(count: Integer) -> String {",
+			'\t\t<- "Hello, {co',
+			"\t}",
+			"",
+			'\tTerminal.print(greet(first "Hello!", second "Hi"))',
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 6, column: 30 })).toEqual([
+			{ start: { line: 3, column: 6 }, end: { line: 6, column: 30 } },
+			{ start: { line: 3, column: 3 }, end: { line: 6, column: 30 } },
+			{ start: { line: 2, column: 2 }, end: { line: 6, column: 49 } },
+			{ start: { line: 1, column: 1 }, end: { line: 6, column: 49 } },
+		])
+	})
+})
+
+// Statements and Expressions are the levels of the chain. What stands between
+// them, and is written inside one of them, widens to the level around it.
+describe("Selection Ranges around names, Types and Matchers", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Holder {",
+		"\t\tFull { amount: Integer },",
+		"\t\tEmpty,",
+		"\t}",
+		"",
+		"\tfunction weigh(_ holder: Holder) -> Integer {",
+		"\t\tconstant total: Integer = 2",
+		"\t\t<- match holder -> Integer {",
+		"\t\t\tcase #Full(content) { <- content.amount::add(total) }",
+		"\t\t\tcase #Empty { <- 0 }",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tconstant label = match 3 -> String {",
+		'\t\tcase 0 { <- "none" }',
+		'\t\tcase Integer { <- "some" }',
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should give a declared name no range of its own", () => {
+		expect(selectionRangesOf(source, { line: 8, column: 12 })[0]).toEqual({
+			start: { line: 8, column: 3 },
+			end: { line: 8, column: 30 },
+		})
+	})
+
+	it("should give a Type annotation no range of its own", () => {
+		expect(selectionRangesOf(source, { line: 8, column: 19 })[0]).toEqual({
+			start: { line: 8, column: 3 },
+			end: { line: 8, column: 30 },
+		})
+	})
+
+	it("should give a Matcher's binding no range of its own", () => {
+		expect(selectionRangesOf(source, { line: 10, column: 15 })[0]).toEqual({
+			start: { line: 9, column: 6 },
+			end: { line: 12, column: 4 },
+		})
+	})
+
+	it("should give a literal Matcher's value no range of its own", () => {
+		expect(selectionRangesOf(source, { line: 16, column: 8 })[0]).toEqual({
+			start: { line: 15, column: 19 },
+			end: { line: 18, column: 3 },
+		})
 	})
 })
