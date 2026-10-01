@@ -518,3 +518,39 @@ under `contentsOf`. `NonEmptyList` re-declares the second without a mangled numb
 List still reaches the `List` Overload. `prepend` is not read, since a build pushes onto the back of its Array.
 The pass does nothing where the Program declares a nested `List` or `NonEmptyList`, whose `append` could do
 anything.
+
+### lower-scalar-operations
+
+`a::isLessThan(b)` on two Integers becomes `a.value < b.value`, in place of a Namespace call that compares,
+builds an `Ordering` Case and tests it. The standard library is made of such calls: `isLessThanOrEqualTo` is
+`@::isGreaterThan(other)::negate()` and `subtract` is `@::add(other::negate())`. Inside those bodies the
+receiver is exactly `Integer`, so they lower too, and every Program is compiled against the lowered prelude.
+
+The Types have to be exact. `Integer` means an Integer, not a Union holding one or a Type Parameter. So the value is
+the runtime's branded object, holding a number or a bigint under `value` as its canonical form dictates. Each lowering
+does what the runtime Method does to that, without the call:
+
+- Comparisons are `<`, `>`, `<=` and `>=`, a total order with no value unequal to itself.
+- Equality is `===`, since the canonical form leaves one spelling per value. String equality goes through a
+  runtime helper instead, since Strings compare by their NFC forms.
+- `add`, `subtract` and `multiply` are exact. `divide` answers an Optional and stays, and `quotient`,
+  `remainder` and `raise` stay too.
+- `and`, `or` and `negate` work on raw booleans.
+
+Mixed kinds stay, since an Integer beside a Rational is a widening the covering Namespace decides. The refinements
+of Integer lower only their `add` and `multiply`, which are Integer's own operations. Their other entries, and the
+`NonZeroInteger::multiply` that scales an irrational, fail the exact-operand check. A Method a Protocol provided
+is lowered only for `Equatable`'s `isNot`, whose trailing witness is dropped, since a method map is built rather
+than run.
+
+Essence evaluates every Argument before the call, while `&&` and `||` may skip their right operand. So `and` and
+`or` lower only where `isPureExpression` holds for the whole right operand. Otherwise the call stays, since
+keeping both operands would need temporaries, which are Statements this pass does not write.
+
+The walk is bottom-up, so `negate` meets an operand that is already a raw test. `rawBooleanOf` unwraps it, and
+`negated` asks the opposite test rather than adding `!`. The opposite of `<` is `>=`, of `===` is `!==`, and of
+a tag test its negation. `!` over `!` is the operand again.
+
+A nested Namespace named `Integer` may answer `isLessThan` however it likes, so a nested name refuses its calls
+across the whole Program. The same set answers the purity question, since a call that may not be lowered may not
+be skipped either.

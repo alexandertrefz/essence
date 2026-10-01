@@ -4,57 +4,16 @@ import type { OptimiserPass } from "../index"
 import { isPureExpression, withoutOverloadSuffix } from "../purity"
 import { rewriteExpressions } from "../walk"
 
-// The primitive operations of the language, written out where they were
-// called. `a::isLessThan(b)` on two Integers is `a.value < b.value`, and it was
-// a call into a Namespace whose Method called `Integer.compare`, which built an
-// `Ordering` Case, which was compared against `#Less` — three calls and an
-// allocation to decide something JavaScript decides with one `<`, on the
-// bigints both values were holding all along.
-//
-// It matters far past the sites a Program writes, because the standard
-// library's own bodies are optimised alongside it and this is what THEY are
-// made of: `isLessThanOrEqualTo` is `@::isGreaterThan(other)::negate()`,
-// `subtract` is `@::add(other::negate())`, `isNot` is `@::is(other)::negate()`.
-// Inside those bodies the receiver is `_self`, typed exactly `Integer`, so they
-// lower like any other site and every Program is compiled against the lowered
-// ones.
-//
-// What makes it safe is that the Types are EXACT. `Integer` means an
-// Integer and nothing else — not a Union it is a member of, not a Type
-// Parameter that could be one — so the value at run time is the branded object
-// the runtime's own constructor built, holding a number or a bigint under
-// `value` and holding whichever of the two the canonical invariant gives that
-// value. Every operation below is then what the runtime Method does to what is
-// under there, with the call taken out: exact arithmetic, a total order, and
-// structural equality. Equality is `===` because the invariant leaves one
-// spelling per value; the arithmetic carries the guard that keeps it that way.
-// Mixed kinds are left alone — an Integer beside a Rational is a widening the
-// covering Namespace decides, and cross-multiplication is not `===`.
-//
-// And that ARGUMENT ORDER survives. Essence evaluates every Argument
-// before the call, so a lowering may not put one behind a JavaScript operator
-// that might skip it: `&&` and `||` are used only over an operand that can be
-// proven to observe nothing, and otherwise the call stays exactly as it was.
-// `not` has one operand and is always evaluated, so it is never in question.
+// Writes the primitive operations on exact `Integer`, `String` and `Boolean`
+// operands as JavaScript operators, such as `a.value < b.value`. `and` and `or`
+// lower only over a pure right operand, since `&&` may skip it. See
+// "lower-scalar-operations" in DEVELOPMENT.md.
 
 export const lowerScalarOperations: OptimiserPass = {
 	name: "lower-scalar-operations",
 	run: (program, namespaces) => {
-		// A Program may write `namespace Integer for Integer` in a block
-		// of its own and give it an `isLessThan` that answers whatever it likes
-		// — the name is free there, and it stands in front of the builtin for
-		// the rest of the block. Such an Invocation carries the same Namespace
-		// name and the same Types as the one this pass is written for, and the
-		// only thing telling them apart is that the standard library's own
-		// Namespaces are declared at a Program's top level and a Program's are
-		// not. So a name a Program declares below its top level is refused for
-		// the whole Program, which costs a Program that writes one nothing it
-		// can measure.
-		//
-		// The same set answers the purity question, and has to. Refusing
-		// to LOWER `5::isLessThan(3)` says nothing about whether that call may
-		// be skipped where it stands as the Argument of an `and` — and it may
-		// not, for exactly the reason it may not be lowered.
+		// A nested Namespace named after a builtin may answer anything, so its name is
+		// refused for the whole Program, here and in the purity question.
 		let shadowed = namespaces.nested
 
 		return rewriteExpressions(program, (node) => lower(node, shadowed))
@@ -75,11 +34,8 @@ function lower(
 
 	let member = withoutOverloadSuffix(node.member.name)
 
-	// A PROVIDED Method is named by the Namespace whose conformance put it
-	// in reach — `Integer` for `5::isNot(3)`, `String` for two Strings — so the
-	// Protocol that WROTE the body is the only thing that says which lowering
-	// applies. Asked before the Namespace name, which would otherwise send an
-	// `Equatable::isNot` and its trailing witness into `Integer`'s own `isNot`.
+	// A provided Method is named by its conformer's Namespace, so only
+	// `providedBy` says which Protocol wrote the body.
 	if (node.providedBy !== undefined) {
 		return node.providedBy === "Equatable"
 			? lowerProvidedEquatable(node, member)
@@ -89,33 +45,12 @@ function lower(
 	switch (node.base.name) {
 		case "Integer":
 			return lowerInteger(node, member)
-		// A refinement is erased before the first pass runs, so the
-		// operands and the answer are plain Integers by the time this reads them
-		// — but the Method the Simplifier emitted is still the refined
-		// Namespace's, and a name is all this pass has to go by. `NonZeroInteger`
-		// answers `multiply` by re-exporting Integer's own product for two proven
-		// Integers: the same bigints, the same operator, and evidence that was
-		// spent while compiling.
-		//
-		// That name now covers THREE entries. The other two scale an
-		// Algebraic or a Transcendental, and each is a call into the irrational's
-		// own arithmetic that no bigint operator stands for. The overload index is
-		// not what tells them apart — `withoutOverloadSuffix` took it off above,
-		// and reading it back would tie this pass to the Simplifier's numbering —
-		// the OPERANDS are: `scalarOperands` demands two Integers and answers null
-		// for anything else, which is the same guard `Integer`'s own case rests
-		// on. Every other member of the Namespace is left alone until somebody
-		// weighs it — `raise` among them, which `lowerInteger` refuses in any case,
-		// because the answer's size is the exponent's value rather than its length.
+		// A refinement's Method still carries its Namespace's name. Its `multiply` is
+		// Integer's own product, and `scalarOperands` refuses the entries that scale
+		// an irrational.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
-		// The two other refinements of Integer, and the one holding both
-		// proofs, for the same reason. Each closes over `add` or `multiply` or
-		// both by re-exporting Integer's own sum and product — the same
-		// operator over the same operands, with the proof already spent — so
-		// `length::add(1)` lowers to the `+` it lowered to before the count
-		// carried a proof. Nothing else these Namespaces declare is a bigint
-		// operator: `raise` and `squareRoot` are refused for `Integer` as well.
+		// Their `add` and `multiply` are Integer's own sum and product.
 		case "NonNegativeInteger":
 		case "PositiveInteger":
 			return member === "add" || member === "multiply"
@@ -130,17 +65,8 @@ function lower(
 	}
 }
 
-// `isNot` is a Protocol's PROVIDED Method — one body over `Self`, shared
-// by every conformer — so its Invocation carries the conformance witness as a
-// trailing Argument. Everything the lowering rests on is unchanged: the
-// receiver's Type is still exactly an Integer or exactly a String, and what the
-// body does with the witness is call the `is` that Type's Namespace wrote,
-// which is the Method lowered here. The witness goes with the call, and
-// dropping it observes nothing — it is a method map, built rather than run.
-//
-// `providedBy` and not the Namespace name: the Invocation is named after the
-// Namespace whose conformance offered the Method, and only the flag the
-// Simplifier set says a Protocol wrote the body.
+// `Equatable`'s provided `isNot` calls the `is` lowered here. Its trailing
+// witness is a method map, built rather than run, so dropping it is safe.
 function lowerProvidedEquatable(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -162,10 +88,8 @@ function lowerProvidedEquatable(
 		: equality(node, kind, operands[0], operands[1], true)
 }
 
-// The comparison family, equality, and the three exact operations.
-// `divide` is absent because it answers an Optional — dividing by zero is
-// empty — and `quotient`, `remainder` and `raise` for the same reason or
-// because their cost is in the answer's size rather than in the call.
+// Comparisons, equality and the exact operations. `divide` answers an
+// Optional, and `quotient`, `remainder` and `raise` stay calls.
 function lowerInteger(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -202,13 +126,8 @@ function lowerInteger(
 	}
 }
 
-// Equality of two Strings is NOT `===` on what they hold. A String
-// compares by its characters after canonical normalisation, so an accent
-// written as one code point equals the same accent written as two — which is
-// what `String.compare` decides and what `String.is` is written on. The
-// lowering calls one runtime helper that decides exactly that, rather than
-// writing the double normalisation out at every site: it is two allocations
-// where the Strings differ, and worth one call to keep in one place.
+// Strings are equal when their NFC forms are, so equality calls one runtime
+// helper rather than `===`.
 function lowerString(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -242,9 +161,7 @@ function lowerBoolean(
 
 	let booleanType = node.type
 
-	// `negate` is the language's `not`, and it takes only the receiver —
-	// which is evaluated wherever the answer comes from, so there is no
-	// Argument to skip and nothing to prove about one.
+	// `negate` has only its receiver, which is always evaluated.
 	if (member === "negate") {
 		let [receiver] = node.arguments
 
@@ -275,18 +192,8 @@ function lowerBoolean(
 
 	let [left, right] = operands
 
-	// THE ONE PLACE THIS PASS CAN BE WRONG, and the reason
-	// `isPureExpression` exists. `a::and(b)` evaluates `b` and then calls; `a &&
-	// b` evaluates `b` only when `a` is true. Where `b` prints, assigns, or is a
-	// call that might do either — or might not come back at all — the two are
-	// different Programs, and this one stays the call it was. Lowering it
-	// instead would need both operands in temporaries, which is a Statement,
-	// which is a shape this pass does not produce.
-	//
-	// The whole SUBTREE is asked, not the Node standing at its top. What
-	// `and` skips is everything the Argument would have evaluated, so an
-	// Invocation on a shadowed Namespace nested three Expressions down is as
-	// much a reason to leave the call alone as one written directly.
+	// `a::and(b)` evaluates `b`, while `a && b` may skip it. So the whole right
+	// operand has to be pure, or the call stays.
 	if (!isPureExpression(right, shadowed)) {
 		return node
 	}
@@ -306,17 +213,8 @@ function lowerBoolean(
 	)
 }
 
-// The receiver and the one declared Parameter, both of EXACTLY the named
-// kind — and null for anything else, which is where every Type question this
-// pass rests on is asked. A Union-typed operand, a Type Parameter, a second
-// Parameter (`is(_ other, comparing sensitivity)` is a different Method) or an
-// Invocation shape the Simplifier did not produce all answer null and are left
-// to the Namespace that understands them.
-//
-// `arity` is the whole Argument count the Invocation must have, and it is
-// asked rather than assumed: a Protocol's provided Method carries the
-// conformance witness behind the declared Parameters, so its `isNot` is three
-// Arguments where the written one was two.
+// The receiver and the one declared Parameter, both exactly of `kind`, or null.
+// `arity` counts every Argument, a provided Method's trailing witness included.
 function scalarOperands(
 	node: common.typedSimple.MethodInvocationNode,
 	kind: "Integer" | "String" | "Boolean",
@@ -421,9 +319,7 @@ function arithmetic(
 	}
 }
 
-// A raw test as an Essence Boolean. Both Nodes carry the Invocation's
-// Position, which is the span of the whole operation as it was written — there
-// is no smaller piece of source for the test alone to point at.
+// A raw test as an Essence Boolean, carrying the whole operation's Position.
 function essenceBoolean(
 	value: common.typedSimple.ExpressionNode,
 	type: common.BooleanType,
@@ -438,11 +334,8 @@ function essenceBoolean(
 	}
 }
 
-// A Boolean value as the JavaScript boolean inside it — and, where the
-// value is one this pass just built, the test it was built from. The walk is
-// bottom-up, so `@::isGreaterThan(other)::negate()` reaches `negate` with its
-// operand already lowered: unwrapping is what keeps the answer one comparison
-// rather than a comparison, an interned Boolean, and a read back off it.
+// A Boolean's raw value, or the test it was just built from, since the walk is
+// bottom-up.
 function rawBooleanOf(
 	node: common.typedSimple.ExpressionNode,
 	type: common.BooleanType,
@@ -460,15 +353,8 @@ function rawBooleanOf(
 	}
 }
 
-// The opposite of a raw test, asked rather than negated wherever the test
-// has an opposite to ask. Each rewrite below is an identity over the values
-// that can reach it: the Integers a `raw-compare` reads are totally ordered
-// whichever of their two representations each is holding, with no value unequal
-// to itself the way a floating-point NaN is, so `!(a < b)` and `a >= b` decide
-// the same thing; `!(a === b)` is
-// `a !== b`; and a tag either is the tag or is not. What is left over —
-// anything else — becomes JavaScript's own `!`, and `!` over a `!` is the
-// operand again.
+// The opposite test where there is one: Integers are totally ordered, so
+// `!(a < b)` is `a >= b`. Anything else gets `!`, and `!` over `!` cancels.
 function negated(
 	test: common.typedSimple.ExpressionNode,
 	type: common.BooleanType,
