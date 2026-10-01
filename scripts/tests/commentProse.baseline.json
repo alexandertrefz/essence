@@ -19,7 +19,6 @@
 	"packages/cli/src/context.ts": {"sentence-length": 2, "em-dash": 2, "all-caps": 1, "block-length": 1, "stacked": 1},
 	"packages/cli/src/execute.ts": {"sentence-length": 5, "em-dash": 5},
 	"packages/cli/src/help.ts": {"sentence-length": 4, "em-dash": 4},
-	"packages/cli/src/index.ts": {"sentence-length": 11, "em-dash": 9, "all-caps": 5, "block-length": 2},
 	"packages/cli/src/init.ts": {"sentence-length": 8, "em-dash": 3, "all-caps": 1, "history": 1},
 	"packages/cli/src/inputs.ts": {"sentence-length": 1, "em-dash": 1, "all-caps": 1},
 	"packages/cli/src/json.ts": {"sentence-length": 1, "em-dash": 1},
