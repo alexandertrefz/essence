@@ -96,7 +96,8 @@ so the check stays silent for them.
 
 `executingTopLevelIndex` is the index of the top-level Statement whose execution is being validated. A Function or
 Method body runs when it is called, not where it is written. While one is walked the index is null, and nothing in
-it is a top-level use. A Parameter's default runs in the body's frame and is held to the same rules.
+it is a top-level use. A Parameter's default runs in the body's frame and is held to the same rules. A refinement's
+predicate is asked of a value and never runs where it is written, so it is walked with the index null too.
 
 Static Properties are the same fault one level in. They are emitted as static fields, initialised in written order.
 An initialiser that reads a Property of its own Namespace written at or after itself reads `undefined`.

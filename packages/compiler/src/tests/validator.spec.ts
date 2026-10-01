@@ -1842,6 +1842,19 @@ describe("Validator", () => {
 			])
 		})
 
+		// A predicate is asked of a value, never run where it is written.
+		it("leaves a refinement's predicate naming a Namespace declared below it alone", () => {
+			expect(
+				diagnosticsFor(`implementation {
+				type Small = Integer where @::isSmall()
+
+				namespace Smalls for Integer {
+					isSmall() -> Boolean { <- @::isLessThan(10) }
+				}
+			}`),
+			).toEqual([])
+		})
+
 		it("reports a static Property read above the Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				Terminal.inspect(Greeter.greeting)
@@ -2853,6 +2866,18 @@ describe("Validator", () => {
 					"Every value of 'Healthy' has been proven to answer '@::isAtLeast(5)'.",
 				])
 			})
+		})
+
+		it("should report a zero denominator in a refinement's predicate", () => {
+			let source = `implementation {
+				type Weird = Integer where @::isGreaterThan(1/0)
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"zero-denominator",
+			])
+			expect(underlinedBy(source, diagnostics[0]?.labels[0])).toBe("1/0")
 		})
 
 		it("should admit a written value into a declared refinement", () => {

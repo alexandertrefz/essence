@@ -28,12 +28,7 @@ import {
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { conformanceParameterName } from "../helpers/names"
-import {
-	admittedTypeOf,
-	describePredicate,
-	fitsWritten,
-	unadmittedWrittenItem,
-} from "../helpers/predicateEval"
+import { admittedTypeOf, fitsWritten } from "../helpers/predicateEval"
 import { bodyDefinitelyReturns } from "../helpers/returns"
 import {
 	applyGenericBindings,
@@ -54,6 +49,7 @@ import {
 	typeContainsError,
 	typeContainsUnknown,
 } from "../helpers/types"
+import { refinementEvidence } from "./refinementEvidence"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
@@ -2608,7 +2604,7 @@ function validateStatement(
 		case "VariableAssignmentStatement":
 			return validateVariableAssignmentStatement(node)
 		case "TypeAliasStatement":
-			return node
+			return validateTypeAliasStatement(node)
 		case "ChoiceDeclarationStatement":
 			return validateChoiceDeclarationStatement(node)
 		case "ProtocolDeclarationStatement":
@@ -2624,6 +2620,27 @@ function validateStatement(
 		case "FunctionStatement":
 			return validateFunctionStatement(node)
 	}
+}
+
+// Only an admitted predicate is kept on the node. It is asked of a value, not
+// run where it is written, so like a body it may name a Namespace declared
+// below it.
+function validateTypeAliasStatement(
+	node: common.typed.TypeAliasStatementNode,
+): common.typed.TypeAliasStatementNode {
+	let enclosingIndex = executingTopLevelIndex
+
+	executingTopLevelIndex = null
+
+	try {
+		if (node.predicate !== null) {
+			validateExpression(node.predicate)
+		}
+	} finally {
+		executingTopLevelIndex = enclosingIndex
+	}
+
+	return node
 }
 
 function validateConstantDeclarationStatement(
@@ -3367,59 +3384,6 @@ function fitsExpectedType(
 	}
 
 	return fitsWritten(expected, value)
-}
-
-// What a mismatch against a refinement adds: the unasked predicate and where
-// an answer comes from. Empty for other Types. The refinement is named as
-// applied, with its Type Arguments.
-function refinementEvidence(
-	expected: common.Type | undefined,
-	value?: common.typed.ExpressionNode,
-): {
-	labels: Array<common.DiagnosticLabel>
-	notes: Array<string>
-	helps: Array<string>
-} {
-	if (expected !== undefined && value !== undefined) {
-		let refused = unadmittedWrittenItem(expected, value)
-
-		if (refused !== null) {
-			let predicate = describePredicate(refused.refinement)
-			let spelling = describeType(refused.refinement)
-
-			return {
-				labels: [
-					secondary(
-						refused.value.position,
-						`this ${refused.part} is ${withArticle(describeType(refused.value.type))}`,
-					),
-				],
-				notes: [
-					`Every ${refused.part} has to be ${withArticle(spelling)}, and every value of that Type has been proven to answer '${predicate}'.`,
-				],
-				helps: [
-					`Check '${predicate}' on the ${refused.part} in an 'if' or a 'match', or write ${refused.part === "item" ? "an item" : `a ${refused.part}`} that already has Type '${spelling}'.`,
-				],
-			}
-		}
-	}
-
-	if (expected === undefined || expected.type !== "Refinement") {
-		return { labels: [], notes: [], helps: [] }
-	}
-
-	let predicate = describePredicate(expected)
-	let spelling = describeType(expected)
-
-	return {
-		labels: [],
-		notes: [
-			`Every value of '${spelling}' has been proven to answer '${predicate}'.`,
-		],
-		helps: [
-			`Check '${predicate}' on the value in an 'if' or a 'match', or pass a value that already has Type '${spelling}'.`,
-		],
-	}
 }
 
 // Arguments are asked exactly what the enricher asked them, literals and
