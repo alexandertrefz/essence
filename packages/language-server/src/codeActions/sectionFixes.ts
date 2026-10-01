@@ -10,18 +10,14 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findVariableDeclaration } from "./lookups"
 
-// The Diagnostics about a Program's SECTIONS rather than about anything
-// written inside one — which keyword opens it, which files its imports name, and
-// what its export block is allowed to publish. Each of them is answered from a
-// span the section itself carries, so none of them reads a body.
+// Fixes for a Program's sections: the keyword that opens one, the files its
+// imports name, and what its export block may publish. None reads a body.
 
 const declarationsKeyword = "declarations"
 const implementationKeyword = "implementation"
 
-// The Diagnostic spans exactly the `declarations` keyword, and the whole
-// of what is wrong is that word: the block behind it is parsed as an
-// implementation section either way, so swapping the keyword is what makes the
-// source say what the Parser already read.
+// Replaces `declarations` with `implementation`, which is how the Parser
+// already reads the block.
 export function implementationHeaderAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -40,10 +36,8 @@ export function implementationHeaderAction(
 	}
 }
 
-// One group per dependency, in both sections — `from "./A.es" { … }` is
-// written the same way whether it imports names or forwards them — so a
-// Diagnostic reported on a specifier names exactly one of these, and which
-// section it stands in is what says how much removing it costs.
+// The group a Diagnostic's specifier names, and its section. Both sections
+// write `from "./A.es" { … }` alike, but mean different things by it.
 type SpecifierGroup = {
 	group: parser.ImportGroupNode | parser.ExportGroupNode
 	section: "import" | "export"
@@ -68,17 +62,10 @@ function groupOf(
 	return null
 }
 
-// One action per section, because the two sections mean opposite things by
-// the same group. An IMPORT group naming this file asks for names that are in
-// scope inside it already, so the whole group goes and the Program provably
-// answers what it answered before — preferred, and the whole group rather than
-// one entry, since the specifier the Diagnostic is reported on is the group's.
-//
-// An EXPORT group naming this file publishes names this Module DECLARES, written
-// the forwarding way. Deleting it takes the Module's public surface with it,
-// which is the one thing the writer did not ask for — so the names are written
-// bare instead, which is the edit the Help spells. Never preferred: what a
-// Module publishes is a decision, and an Editor does not make it on its own.
+// A group naming this file. An import group imports what is in scope already,
+// so it goes whole, preferred. An export group publishes this Module's own
+// names, so they are written bare instead, as the Help says. That is not
+// preferred, since what a Module publishes is the author's decision.
 export function removeSelfImportAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -107,18 +94,15 @@ export function removeSelfImportAction(
 		return null
 	}
 
-	// An `as` is kept. A bare entry renames the same way a forwarded one
-	// does, so `area as squareArea` says the same thing on either side of this
-	// edit and the Module goes on publishing the name it published.
+	// An `as` is kept, since a bare entry renames as a forwarded one does.
 	let written = entries.map((entry) =>
 		entry.alias === null
 			? entry.name.content
 			: `${entry.name.content} as ${entry.alias.content}`,
 	)
 
-	// Laid out the way the group was — one name per line under the
-	// group's own indentation where it stood on a line of its own, and beside
-	// each other where it shared its line with something else.
+	// One name per line when the group opened its line, side by side
+	// otherwise.
 	let separator = opensItsLine(lines, found.group.position.start)
 		? `\n${indentationOf(lines, found.group.position.start.line)}`
 		: " "
@@ -138,14 +122,9 @@ export function removeSelfImportAction(
 	}
 }
 
-// Read off the Diagnostic's own Help rather than worked out again here.
-// Which specifiers are refused and what each of them should have said is
-// `reportRejection`'s to decide — four rejections share this code and only two
-// of them have a concrete answer at all — and re-deriving that rule in the
-// Editor would offer a rewrite for the two that do not. The shape of the Help is
-// the contract between the two, and the check below is what keeps a reworded one
-// from writing nonsense: the specifier it spells has to be the written one with
-// a `./` in front or a `.es` behind, and nothing else is accepted.
+// The rewrite `reportRejection` spells in the Help. The suggested specifier
+// must be the written one with `./` before it or `.es` after it. See "Reading
+// a Help" in DEVELOPMENT.md.
 const specifierHelpPattern = /^Write '([^']+)'/
 const quotedSpecifierPattern = /^"(.*)"$/
 
@@ -170,10 +149,8 @@ export function moduleSpecifierActions(
 			return []
 		}
 
-		// Preferred only for the extension. The `.es` a specifier ends in
-		// is part of the path this Module names and nothing else could have been
-		// meant; a `./` in front of it is a guess at where the file sits, which
-		// the Help itself says out loud — "if the file sits beside this one".
+		// Only the `.es` fix is preferred. A `./` guesses where the file
+		// sits, as the Help itself says.
 		let isExtension = suggested === `${written}.es`
 
 		if (!isExtension && suggested !== `./${written}`) {
@@ -201,20 +178,12 @@ export function moduleSpecifierActions(
 const variableKeyword = "variable"
 const constantHelpPrefix = "Declare it as a Constant"
 
-// The mirror of `constantToVariableAction`, answering the other direction:
-// a name the export block publishes has to be a Constant, so the Declaration the
-// Diagnostic points back at is the one to rewrite.
+// The reverse of `constantToVariableAction`: an exported name must be a
+// Constant. Offered only where the Help offers it, which excludes an assigned
+// Variable. See "Reading a Help" in DEVELOPMENT.md.
 //
-// Offered only where the Diagnostic's own Help offers it, which is the contract
-// `moduleSpecifierActions` above is written to as well. A Variable that anything
-// in the Module ASSIGNS to has the clause withheld, because rewriting the
-// Declaration answers `constant-reassignment` at every one of those assignments
-// — whose Help asks for the `variable` back, and the two codes close a loop with
-// this fix as its only door.
-//
-// Never preferred even then. The Declaration is somebody's statement that the
-// value changes, and reading that back is a conversation rather than an edit an
-// Editor may make on its own.
+// Not preferred: `variable` says the value changes, which only the author can
+// take back.
 export function variableToConstantAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -246,9 +215,8 @@ export function variableToConstantAction(
 		},
 	}
 
-	// The Statement's Position starts at its keyword, but a `§§` block or
-	// a Declaration this Parser recovered from could move it — replacing a span
-	// that does not read `variable` would corrupt the line silently.
+	// A `§§` block or a recovered Declaration could move the keyword, so the
+	// span must read `variable`.
 	if (sliceOf(lines, keyword) !== variableKeyword) {
 		return null
 	}

@@ -22,3 +22,10 @@ Match, the members a Record Literal lacks, or a Protocol's Methods. Where a valu
 `{}`. A blank would not parse, and a buffer that does not parse loses every other report with it. `{}` is the unit
 value. It parses and is visibly not an answer, and where a Type is expected it is refused with a Diagnostic the
 reader can act on.
+
+## Reading a Help
+
+Where the compiler decides which answers a Diagnostic has, a fix reads them off the Diagnostic's Help rather than
+working the rule out again. Working it out twice would let the two disagree, and offer a rewrite where the compiler
+has none. The Help's wording is then the contract between the two. Each such fix checks the Help's shape and offers
+nothing when it differs, so a reworded Help cannot make it write nonsense.
