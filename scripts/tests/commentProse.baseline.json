@@ -299,7 +299,6 @@
 	"packages/interfaces/src/common/index.ts": {"sentence-length": 130, "em-dash": 118, "all-caps": 78, "position": 2, "block-length": 28},
 	"packages/interfaces/src/common/typedNodes.ts": {"sentence-length": 94, "em-dash": 93, "all-caps": 51, "position": 6, "block-length": 24},
 	"packages/interfaces/src/common/typedSimpleNodes.ts": {"sentence-length": 159, "em-dash": 135, "all-caps": 102, "position": 5, "block-length": 35},
-	"packages/interfaces/src/enricher.ts": {"sentence-length": 32, "em-dash": 25, "all-caps": 22, "position": 2, "block-length": 9},
 	"packages/interfaces/src/parser.ts": {"sentence-length": 93, "em-dash": 96, "all-caps": 46, "history": 1, "position": 2, "block-length": 21},
 	"packages/language-server/src/codeActions/assertionFixes.ts": {"sentence-length": 7, "em-dash": 7, "all-caps": 1, "position": 1, "block-length": 3},
 	"packages/language-server/src/codeActions/constants.ts": {"sentence-length": 6, "em-dash": 4, "all-caps": 1},
