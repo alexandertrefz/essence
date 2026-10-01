@@ -3,19 +3,11 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import type { InlayHint } from "./inlayHints"
 
-// The ghost text a live session draws beside a test — the values a run
-// RECORDED, shown where they were recorded. Three kinds, all from the same
-// events and all from the same trace mechanism underneath:
-//
-// - a `probe`, which is a `§?` line and every Constant a test body wrote;
-// - a failed `expect`, whose ghost is what the comparison held;
-// - nothing at all for a passing `expect`, because "it held" is what the gutter
-//   and the absence of a squiggle already say, and a value beside every line
-//   that is fine is a line nobody reads.
+// The values a live session's test run recorded, drawn where they were
+// recorded. A `probe` comes from a `§?` line or a Constant a test body wrote.
+// A failed `expect` shows its values; a passing one draws nothing.
 
-// How much of a value is drawn inline. A Record or a List renders to
-// whatever it renders to, and a hint is a margin note rather than a document —
-// what does not fit is read on hover, where the whole of it is.
+// How much of a value is drawn inline. The rest is read on hover.
 const MAXIMUM_LENGTH = 60
 
 function clipped(value: string): string {
@@ -26,10 +18,8 @@ function clipped(value: string): string {
 		: `${single.slice(0, MAXIMUM_LENGTH - 1)}…`
 }
 
-// A value Hint carries no edit — there is nothing to accept — and sits at
-// the END of the line the value was recorded on rather than at the end of the
-// span. A `§?` comment stands between the two, and ghost text drawn in front of
-// a comment reads as part of it.
+// A value Hint has no edit. It sits at the end of its line, after any `§?`
+// comment, so it never reads as part of the comment.
 function valueHint(
 	line: number,
 	lines: Array<string>,
@@ -49,9 +39,8 @@ function comparisonLabel(
 	let comparison = event.comparison
 
 	if (comparison !== null && comparison.left !== null) {
-		// A snapshot's two sides are not an equality that failed but a
-		// recording and a run that differ, and saying "is" of them would claim
-		// the very thing the failure is about.
+		// A snapshot's two sides are a recording and a run that differ, not a failed
+		// equality.
 		if (comparison.kind === "snapshot") {
 			return `recorded ${comparison.left}, held ${comparison.right}`
 		}
@@ -61,9 +50,7 @@ function comparisonLabel(
 		} ${comparison.right}`
 	}
 
-	// Every sub-expression the assertion evaluated, in the order they
-	// were written — which is what the report shows as Labels and the closest
-	// thing to an explanation a single line has room for.
+	// Every sub-expression the assertion evaluated, in written order.
 	let values = event.values
 		.filter(
 			(value) => value.span !== null && value.value !== value.span.source,
@@ -73,11 +60,8 @@ function comparisonLabel(
 	return values.length === 0 ? `this ${event.form} failed` : values.join(", ")
 }
 
-// The Hints for one file, out of the events its tests produced. Sorted by
-// line, and at most one per line: two tests may record at one place — a suite's
-// setup runs once per test — and a reader looking at that line wants one answer
-// rather than one per test. The LAST one is kept, which is the most recent run
-// of that line.
+// The Hints for one file, sorted by line, one per line. A suite's setup may
+// record once per test; the last recording wins.
 export function findValueHints(
 	events: Array<TestEvent>,
 	sourceText: string,

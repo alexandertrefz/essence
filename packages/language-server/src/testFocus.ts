@@ -1,18 +1,10 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-// A `focused` test silences every other test of the run, which is exactly
-// what it is for while somebody is iterating and exactly what must not be left
-// behind. The command line refuses a plain run that still holds one; an Editor
-// can not refuse anything, so it says so where the word is written — a warning
-// on the Modifier itself, with the one edit that answers it.
-//
-// Per file and per parse, unlike the tag Diagnostics next door: whether a
-// test is focused is something its own source says, and no other file can
-// change the answer.
+// A `focused` test silences the rest of the run. The command line refuses a
+// plain run that holds one, so the Editor warns on the Modifier and offers to
+// remove it. Per file, since only a test's own source can focus it.
 
-// A `focused` that is also `skipped` narrows nothing — the test does not
-// run either way — and is not what has to go. The command line reads it the
-// same way.
+// A `focused` that is also `skipped` narrows nothing, as on the command line.
 function isSkipped(modifiers: Array<parser.TestModifierNode>): boolean {
 	return modifiers.some((modifier) => modifier.name.content === "skipped")
 }
@@ -50,8 +42,8 @@ function focusDiagnostic(
 			"A focused test silences every other test of the run, so a run " +
 				"nobody narrowed has not answered the question it was asked.",
 		],
-		// Single quotes, as every other Help here spells a keyword and a
-		// flag. Backticks are Markdown, and a Diagnostic is read in a terminal.
+		// Single quotes, as every Help spells a keyword: a Diagnostic is read in a
+		// terminal too.
 		helps: [
 			"Remove 'focused' before this lands, or narrow the run with " +
 				"'--filter' or '--tag' while you are iterating.",

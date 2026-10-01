@@ -498,6 +498,19 @@ its verdict.
 - A property test draws fresh values every run, so its attribution is one sample. A narrowed cycle runs every property
   test of the reached entries.
 
+`affectedTests` decides from the attribution alone, as a function of its arguments. An entry's attribution covers
+every instrumented Module its bundle reached, so an edit to a library finds the tests in another file that reached it.
+For each changed Module, `changedRange` compares the text the attribution was measured in with the current text. It
+answers the span from the first differing line to the last, which overstates a scattered edit, the safe direction.
+`affectedTests` answers null, and the files run whole, whenever it cannot be sure the set is complete:
+
+- A changed file the entry reaches is missing from its table, or has no stored text, such as a file changed on disk.
+- The change added or removed lines. Every later point moved, so the table does not describe the file. An edit
+  within the existing lines moves nothing, which is the loop narrowing is for.
+- The change touches a point reached at load, by no single test, such as a top-level Constant or a suite's setup. A
+  test that read the load-time result never touched the point itself. This is checked before the point's tests.
+- No test is affected. Narrowing to nothing would be a guess.
+
 A narrowed cycle replaces only the tests it ran and leaves the rest of each file's results as they were.
 
 ### Coverage

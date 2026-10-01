@@ -1,22 +1,12 @@
 import { editDistance } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
-// What the tags of a whole workspace say about each other. Two questions,
-// both of which can only be asked once every file has been read — which is why
-// they are the Language Server's rather than the Compiler's: a compile sees one
-// Module, and `tagged netwrok` is perfectly well-formed inside it.
-//
-// - `similar-tags`: two tags one typo apart. Reported on the RARER of the two,
-//   because that is the one that is probably the mistake, and offered as a
-//   rename to the common one.
-// - `lonely-tag`: a tag exactly one test carries. Not wrong — a tag is a way to
-//   name a set, and a set of one is a set — but it is what a tag that was meant
-//   to catch on and did not looks like, and what a typo nothing is close enough
-//   to look like.
+// What the tags of the whole workspace say about each other, which no single
+// compile sees. `similar-tags` marks the rarer of two tags one typo apart,
+// with a rename; `lonely-tag` marks a tag only one test carries.
 
-// Two edits, which is a typo. Three is a different word. The distance is
-// the Compiler's own — the same one every "did you mean" in the toolchain is
-// measured by, counting the swap of two adjacent characters as one edit.
+// At most two edits apart, by the Compiler's own distance, where swapping two
+// adjacent characters is one edit.
 const MAXIMUM_DISTANCE = 2
 
 // The tag's own span, so a rename edits the word and not the Modifier.
@@ -28,17 +18,14 @@ type TagSite = {
 
 type TagUsage = {
 	tag: string
-	// How many TESTS carry it, which is not how many places wrote it: a
-	// `suite "…" tagged slow` holding four tests is one site and four tests,
-	// and "used by exactly one test" is a claim about the tests.
+	// How many tests carry it, not how many places wrote it: a suite's tag counts
+	// once per test under it.
 	tests: number
 	sites: Array<TagSite>
 }
 
-// Every tag every test in this Program carries, with the place each one
-// was written. A test's effective tags are its own plus every enclosing suite's
-// — the same rule the Enricher applies — because a tag on a suite is a tag on
-// what is under it.
+// Every tag each test of this Program carries, with where it was written. A
+// test's tags include every enclosing suite's, as in the Enricher.
 function tagSitesOf(
 	filePath: string,
 	program: parser.Program,
@@ -97,9 +84,7 @@ export function tagUsages(
 
 	for (let file of files) {
 		for (let sites of tagSitesOf(file.filePath, file.program)) {
-			// Deduplicated per TEST. A test writing `tagged slow, slow`
-			// carries the tag once, and counting it twice would make a lonely
-			// tag look used.
+			// Once per test, so `tagged slow, slow` does not make a lonely tag look used.
 			let counted = new Set<string>()
 
 			for (let site of sites) {
@@ -134,10 +119,8 @@ export function tagUsages(
 	return usages
 }
 
-// Which of two similar tags is the mistake: the one fewer tests carry,
-// and where they are carried by as many, the one that sorts later — so that the
-// answer does not depend on the order the workspace happened to read its files
-// in, and a reader who fixes one is not offered the reverse next time.
+// Which of two similar tags is the mistake: the one fewer tests carry, else
+// the one sorting later. The answer never depends on reading order.
 function rarer(left: TagUsage, right: TagUsage): TagUsage {
 	if (left.tests !== right.tests) {
 		return left.tests < right.tests ? left : right
@@ -193,9 +176,8 @@ function lonelyTagDiagnostic(site: TagSite): common.Diagnostic {
 	}
 }
 
-// Every tag Diagnostic of the workspace, grouped by the file it belongs
-// in. A file with nothing to say is not in the answer at all, which is what
-// lets the Server clear a file it published for a moment ago.
+// Every tag Diagnostic of the workspace by file. A file with none is absent,
+// so the Server clears it.
 export function tagDiagnostics(
 	files: Array<{ filePath: string; program: parser.Program }>,
 ): Map<string, Array<common.Diagnostic>> {
@@ -212,9 +194,7 @@ export function tagDiagnostics(
 		}
 	}
 
-	// One report per PAIR, on the rarer side. Three tags within two edits
-	// of each other report twice on whichever is rarest, which is right: it is
-	// nearly the same as two different tags and the reader has to pick one.
+	// One report per pair, on the rarer side.
 	for (let index = 0; index < usages.length; index += 1) {
 		for (let other = index + 1; other < usages.length; other += 1) {
 			let left = usages[index]!

@@ -4,11 +4,8 @@ import {
 } from "@essence-lang/compiler/enricher/tests"
 import type { common, parser } from "@essence-lang/interfaces"
 
-// An identity is spelled by the Enricher's own two functions rather than
-// by a second reading of them here. The Language Server holds the PARSER's tree,
-// where nothing has been enriched — but what a name TEMPLATE is and how the
-// steps of an id are escaped are one answer, and two spellings of one identity
-// is exactly the drift the structural identity exists to prevent.
+// Identities are spelled by the Enricher's own functions, so the lenses and
+// the run never disagree about one.
 function identityKey(
 	modulePath: string,
 	suitePath: Array<string>,
@@ -18,11 +15,8 @@ function identityKey(
 	return testIdentityKey({ modulePath, suitePath, name }, row)
 }
 
-// Every id one written test stands for — one for an ordinary test, and
-// one per ROW of a table test, because a row is a test in its own right and
-// carries its row number as the last step of its identity. The rows are counted
-// off the written List, which is the only reason a table test's rows have to be
-// written where the test is.
+// Every id one written test stands for: one, or one per row of a table test,
+// counted off its written List.
 function identitiesOf(
 	node: parser.TestNode,
 	modulePath: string,
@@ -43,43 +37,27 @@ function identitiesOf(
 	)
 }
 
-// The Run and Debug lenses above every `test` and every `suite`. The
-// Server produces the lens and the COMMAND it carries; what the command does is
-// the extension's, because running is an Editor gesture — a Test Explorer item,
-// a terminal, a debug session — and the Server has no idea which of them the
-// reader is looking at.
-//
-// A lens sits on the KEYWORD's line, which is where the item begins and
-// the only Position a reader can point at. A suite's lens runs everything under
-// it: the ids of every test it holds, gathered here rather than expanded by the
-// client, because the structural identity of a test is the Compiler's business
-// and no client should be spelling one.
+// The Run and Debug lenses on the keyword line of every `test` and `suite`.
+// The extension decides what a command does. A suite's lens carries the ids of
+// every test under it, so no client has to spell an identity.
 
 type TestLensCommand =
-	// The three the extension must bind. `essence.test.run` runs the ids;
-	// `essence.test.debug` runs them under the debug adapter;
-	// `essence.test.acceptSnapshot` re-runs them and RECORDS whatever they
-	// produce, which is `essence test --update` narrowed to what a reader is
-	// looking at, and is offered only where a run left something to accept.
-	// All three take one argument — see `TestLensArguments` — so a client binds
-	// three commands and reads one shape.
+	// The commands the extension binds: `essence.test.run`,
+	// `essence.test.debug`, and `essence.test.acceptSnapshot`, which re-runs the
+	// tests recording snapshots. All take `TestLensArguments`.
 	"essence.test.run" | "essence.test.debug" | "essence.test.acceptSnapshot"
 
 type TestLensArguments = {
-	// Structural ids, exactly as every event spells them. A suite carries
-	// the ids of the tests under it; a test carries its own.
+	// Structural ids, as events spell them; a suite's are its tests'.
 	ids: Array<string>
-	// The file the item was written in, so that a client which has no
-	// results yet — nothing has run, so no id is known — can still run the file
-	// and narrow afterwards.
+	// The file the item was written in, so a client with no results can run it.
 	filePath: string
 	// What to call the run in a progress message.
 	title: string
 }
 
 type TestLens = {
-	// The keyword's own span. A client renders the lens on the line it
-	// starts on.
+	// The keyword's span, whose line the lens sits on.
 	position: common.Position
 	title: string
 	command: TestLensCommand
@@ -89,18 +67,15 @@ type TestLens = {
 export function findTestLenses(
 	program: parser.Program,
 	filePath: string,
-	// The tests whose last run left a snapshot to accept — one nothing
-	// had recorded, or one that differs. A lens to accept a snapshot is offered
-	// only over those: an "Accept snapshot" above every test in the file would
-	// be a button that usually does nothing.
+	// The tests whose last run left a snapshot to accept. Only they get an
+	// "Accept snapshot" lens.
 	pendingSnapshots: ReadonlySet<string> = new Set(),
 ): Array<TestLens> {
 	let lenses: Array<TestLens> = []
 	let accepting = (ids: Array<string>): boolean =>
 		ids.some((id) => pendingSnapshots.has(id))
 
-	// The ids under a node, gathered as the walk unwinds, so that a suite
-	// carries what its tests carry and the walk is one pass.
+	// The ids under a node, gathered as the walk unwinds.
 	let walk = (
 		nodes: Array<parser.TestsNode>,
 		suitePath: Array<string>,
@@ -147,9 +122,7 @@ export function findTestLenses(
 
 			gathered.push(...inside)
 
-			// A suite holding no test at all gets no lens: there would be
-			// nothing for the command to run, and an Editor offering a button
-			// that does nothing is worse than offering none.
+			// A suite without tests gets no lens, since its command would do nothing.
 			if (inside.length === 0) {
 				continue
 			}
