@@ -4,10 +4,8 @@ export {
 	type RuntimeBridge,
 	runtimeBridgeOf,
 } from "./bridge"
-// The other half of the bridge, re-exported from the Compiler, which is
-// where a bundle is BUILT with one. A host driving the emit itself — writing its
-// own bundles out of `compileToMemory` — needs exactly these, and should not
-// have to know that only one of the two halves needs a Compiler.
+// The half of the bridge that writes one into a bundle, from the compiler. A
+// host that emits its own bundles out of `compileToMemory` needs these.
 export {
 	BRIDGE_KEY,
 	BRIDGE_SPECIFIER,
@@ -16,15 +14,13 @@ export {
 export { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 export {
 	EssenceCompileError,
-	// The Diagnostic report an `EssenceCompileError` carries, rendered
-	// again — with colour, this time, for a host that knows it is writing to a
-	// terminal. It is on the root because that is where the Error is.
+	// Renders the report an `EssenceCompileError` carries again, with colour
+	// for a host that writes to a terminal.
 	renderGroups,
 } from "./compile-error"
-// The Compiler-side half of the boundary. `describe` and its context are
-// NOT here: they are how a Descriptor is built one Type at a time, which is a
-// thing to reach for on the door it lives behind — and `describe` is a name a
-// host has other plans for.
+// The compiler's half of the boundary. `describe` builds a Descriptor one Type
+// at a time and stays behind `./descriptor`, since a host has other uses for the
+// name.
 export {
 	type CaseDescriptor,
 	type ChoiceDescriptor,
@@ -52,8 +48,8 @@ export {
 	EssenceCallError,
 	EssenceMarshalError,
 } from "./errors"
-// And the run-time half. A host holding a bundle and a Descriptor has
-// everything `loadModule` has, which is the whole point of there being one.
+// The run-time half. A host holding a bundle and its Descriptor can do
+// everything `loadModule` does.
 export {
 	bind,
 	type BindOptions,
@@ -82,10 +78,8 @@ export {
 	type EsbuildResolveArguments,
 	type EsbuildResolveResult,
 } from "./esbuild-plugin"
-// `wrapperFor` is on the root because it is the whole of what a plugin
-// does that a host could not have written itself: the Module a build imports,
-// spelled out of a Descriptor. A host bundler none of the plugins fits needs
-// that and hooks of its own.
+// `wrapperFor` writes the Module a build imports out of a Descriptor. A host
+// bundler that no plugin fits needs it beside hooks of its own.
 export {
 	declarationsPath,
 	type Diagnostics,
@@ -100,10 +94,8 @@ export {
 	wrapperFor,
 	type WrapperOptions,
 } from "./plugin-core"
-// The other way in, for a Module that was compiled already: a bundle and
-// the Descriptor beside it, bound without a Compiler. Reached through the root
-// like everything else, and importable on its own — `@essence-lang/client/prebuilt`
-// pulls in nothing but the interpreter.
+// A Module compiled already: a bundle and its Descriptor, bound without a
+// compiler. `@essence-lang/client/prebuilt` loads the interpreter and no compiler.
 export {
 	descriptorPath,
 	loadPrebuilt,
@@ -118,20 +110,15 @@ export {
 } from "./vite-plugin"
 export type { Input } from "./input"
 export { EssenceRational } from "./rational"
-// Re-exported so a host can spell what `raw` holds — the JavaScript name
-// an Essence one is bound under — without importing the Compiler itself.
+// So a host can spell the JavaScript names `raw` binds without importing the
+// compiler.
 export { escapeName } from "@essence-lang/compiler/rewriter"
-// The Compiler's own vocabulary, as far as the signatures below name it.
-// A host writing `let host: ModuleHost` or `function report(groups:
-// Array<DiagnosticGroup>)` should not have to take a direct dependency on the
-// Compiler to spell what this package already handed it — which is the same
-// reason `escapeName` is re-exported above.
+// The compiler's types that this package's signatures name, so a host can
+// spell them without depending on the compiler.
 export type { DiagnosticGroup } from "@essence-lang/compiler/embed"
 export type { ExportSurface, ModuleHost } from "@essence-lang/compiler/modules"
 export type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 
-// Essence from JavaScript, in one call — see `./load` — and the same
-// call kept up to date with its sources, in `./watch`.
 export {
 	attemptLoad,
 	type EssenceModule,

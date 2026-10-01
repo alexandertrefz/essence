@@ -1,34 +1,7 @@
 import type { EssenceRational } from "./rational"
 
-// What a JavaScript caller may HAND the boundary where the Module declared
-// `T` — as opposed to what it gets back, which is `T` itself. The two differ in
-// exactly one place: an Integer comes out as a `bigint`, always, so a call's Type
-// does not depend on how big its answer was; but going in the interpreter takes
-// a safe `number` as readily, and hands both to the runtime's own canonicaliser.
-// A declaration that said `bigint` at a Parameter would send every caller
-// through `BigInt(i)` to satisfy a checker the runtime never needed satisfied.
-//
-// A mapped Type rather than a second declaration of every alias, so that a
-// Parameter still reads `Input<Rectangle>` and hovers to the shape, rather than
-// spelling a Record out at every place it is passed. It walks what a value
-// walks: down a List, through both slots of a Dictionary, into a Record's
-// members, across the arms of a Union (a naked `T` distributes) — and it stops
-// where marshalling does. A Rational is a class and crosses as itself. A
-// Function is not widened, because a callback going in is CALLED by the Module:
-// its Parameters are the Module's own values coming out, and its declared shape
-// is already the one whoever writes it really answers.
-//
-// A `Map` is named before the object below rather than left to it. The
-// mapped Type would walk its METHODS — every member `keyof Map` names — and
-// answer a shape that has a `get` and a `set` and no widened key at all, which
-// is the one thing a Parameter of a Dictionary needs said.
-//
-// And a `Promise` is named for the same reason. It is what work crosses
-// as — a call's answer, and a callback declared to answer a Future — so the
-// mapped Type would otherwise walk `then`, `catch` and `finally` and hand back
-// a shape with three Functions in it and nothing awaitable about it. It stops
-// here whole: what the promise HOLDS is spelled by the declaration that printed
-// it, which is where the direction was already decided.
+// What a caller may pass where the Module declared `T`: an Integer may also be a
+// safe `number`. See "Input types" in DEVELOPMENT.md.
 export type Input<T> = T extends bigint
 	? bigint | number
 	: T extends EssenceRational

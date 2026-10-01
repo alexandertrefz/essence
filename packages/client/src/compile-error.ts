@@ -5,19 +5,11 @@ import {
 import type { DiagnosticGroup } from "@essence-lang/compiler/embed"
 import type { common } from "@essence-lang/interfaces"
 
-// The one failure that is the COMPILER's to report, kept apart from the
-// three in `errors.ts` for exactly that reason: rendering a Diagnostic takes
-// the Compiler's own renderer, and `errors.ts` is imported by the half of this
-// package that runs where no Compiler exists. A marshalling refusal is a
-// sentence about a value and travels anywhere; a compile failure is an excerpt
-// of a source file with an underline under it, and only a machine that has the
-// sources can draw one.
+// The one failure the compiler reports. It stays out of `errors.ts` because it
+// needs the compiler's renderer, and `errors.ts` runs where no compiler exists.
 
-// The message IS the report — the same Ariadne output `esc` prints, one
-// block per file against that file's own source. Rendering it here rather than
-// handing back a list is what makes a bare `throw` out of `loadModule` as
-// readable as the command line: a host that does nothing at all still shows the
-// excerpt, the underline and the Help.
+// The message is the report `esc` prints, one block per file. An uncaught throw
+// out of `loadModule` still shows the excerpt, the underline and the Help.
 export class EssenceCompileError extends Error {
 	readonly entryPath: string
 	readonly diagnostics: Array<common.Diagnostic>
@@ -26,10 +18,8 @@ export class EssenceCompileError extends Error {
 	constructor(
 		entryPath: string,
 		diagnosticGroups: Array<DiagnosticGroup>,
-		// Plain by default. An Error's message is read out of a log, a
-		// serialised crash report and a test assertion at least as often as it is
-		// read off a terminal, and escape codes are noise in all three. A host
-		// that knows it is writing to a terminal renders the groups again.
+		// Plain by default, since a message is read from logs and assertions as
+		// often as from a terminal. A terminal host renders the groups again.
 		options: { color?: boolean } = {},
 	) {
 		super(renderGroups(diagnosticGroups, options.color ?? false))
@@ -41,24 +31,16 @@ export class EssenceCompileError extends Error {
 			(group) => group.diagnostics,
 		)
 
-		// Readable, and not printed. Bun and Node print an uncaught
-		// Error's own enumerable properties under its message, and these three
-		// are the whole report a second time as objects — every Diagnostic and
-		// every source text — under the report as it was meant to be read. A
-		// host reads them off the Error the same as before.
+		// Not enumerable, because Bun and Node print an uncaught Error's own
+		// enumerable properties under its message, repeating the whole report.
 		for (let name of ["entryPath", "diagnostics", "diagnosticGroups"]) {
 			Object.defineProperty(this, name, { enumerable: false })
 		}
 	}
 }
 
-// The blocks run together with the trailing newline trimmed, because what
-// this becomes is a `message` — whatever prints it adds the line break, and a
-// message ending in one prints a blank line under every stack trace.
-//
-// Both the renderer and the rule a file is NAMED under are the Compiler's
-// own, so a host reading this report reads the one `esc` prints, down to how the
-// path above each excerpt is spelled.
+// The trailing newline is trimmed, since whatever prints a message adds one.
+// The renderer and `displayPath` are the compiler's, so this matches `esc`.
 export function renderGroups(
 	groups: Array<DiagnosticGroup>,
 	color = false,
