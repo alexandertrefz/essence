@@ -128,3 +128,23 @@ belong to the run, so they cross once per Worker in an `init` message.
 The driver waits on each mutant for `mutantTimeout`. It listens for `exit` as well as `error`, since a Worker can
 vanish without an error. Only terminating stops a hung mutant, so a timeout, a dead Worker or an answer
 that could not cross the port all replace the Worker.
+
+## When compiles go to workers
+
+Booting a worker and importing the Compiler into it takes a fixed time, so `src/pool.ts` only uses workers when a batch
+holds enough divisible work. `shouldUseWorkers` decides:
+
+- An explicit `--jobs` decides alone, so either choice can be measured against the other.
+- A single entry stays in process. One entry is one graph, which one worker would compile anyway.
+- Emitting costs a fixed amount per entry: one esbuild run, and the shared standard library prelude rewritten into
+  each bundle. So the entry count predicts the gain, and `PARALLEL_ENTRIES` is the threshold.
+- Checking costs in proportion to the source to enrich. The standard library comes from a snapshot rather than being
+  enriched in each process, so little is left to divide, and `PARALLEL_BYTES` is high.
+
+A build whose bundles are all cached costs what a check costs and would be faster in process. That is only known after
+linking, which is the work itself. The pool assumes the build is cold, because a cold build loses more in process than
+a cached build loses in workers. A watch rebuild needs no rule of its own: it nearly always wakes a single entry.
+
+`MAX_WORKERS` is small and does not follow the core count, because esbuild runs threads of its own in every worker.
+Workers share nothing, so `groupEntries` groups the entries whose graphs overlap, judged one import deep, and each
+group goes to one worker.
