@@ -35,10 +35,8 @@ import {
 	LIST_ITEMS_SOURCE,
 } from "../render"
 
-// Both travel to the debuggee as source text — evaluating them here, the
-// way `Runtime.callFunctionOn` does over there, proves they are genuinely
-// self-contained: a captured binding would throw the moment it runs outside its
-// module.
+// Evaluated from source text, as `Runtime.callFunctionOn` does, so a binding
+// captured from the module throws here.
 const describeBatch = (0, eval)(`(${DESCRIBE_BATCH_SOURCE})`) as (
 	...values: Array<unknown>
 ) => string
@@ -61,11 +59,9 @@ const integers = (...values: Array<number>): ListType<IntegerType> =>
 const valuesOf = (items: Array<unknown>): Array<number | bigint> =>
 	items.map((item) => (item as IntegerType).value)
 
-// `anyIs` is the runtime's own structural comparison, branded
-// `structural` exactly as the Compiler brands the standard library's own
-// equality — so this is the witness a Dictionary of Strings in a debugged
-// Program is really built through, and the store below is the store one really
-// has.
+// The runtime's structural comparison, branded `structural` as the compiler
+// brands the standard library's equality. A debugged Dictionary of Strings is
+// built through this witness.
 const equality = {
 	is: (first: AnyType, second: AnyType) =>
 		createBoolean(anyIs(first, second)),
@@ -86,10 +82,8 @@ const dictionary = (
 		equality,
 	)
 
-// One key's slot, written down as the versions its value has had, each
-// with the generation of the write that gave it that value — `[2, 9]` is "the
-// second write made this 9", and `TOMBSTONE` in that place is the removal that
-// took the key away.
+// One key's slot as the versions its value has had. `[2, 9]` means the write
+// of generation 2 made it 9; `TOMBSTONE` as the value is a removal.
 const slotOf = (
 	key: string,
 	...versions: Array<[number, number | typeof TOMBSTONE]>
@@ -102,13 +96,9 @@ const slotOf = (
 	})),
 })
 
-// A box built BY HAND rather than through the runtime's own writes, so
-// that everything a view has to be right about can stand in one store at once:
-// a value SUPERSEDED by a later write, a key REMOVED, and a slot opened by a
-// write the box came before. `DictionaryType` in runtime/src/Dictionary.ts is
-// the authority for every field, and the two indexes are left EMPTY on purpose
-// — a view is read off the slots and their stamps and off nothing else, which
-// is the claim these tests are here to hold.
+// A box built by hand, so one store can hold a superseded value, a removed key
+// and a slot written after the box. The indexes stay empty, since a view reads
+// only the slots and their generations.
 function boxAt(
 	generation: number,
 	...slots: Array<Slot<AnyType, AnyType>>
@@ -159,20 +149,14 @@ const pairsOf = (entries: Array<unknown>): Array<[string, number | bigint]> =>
 	})
 
 describe("the in-debuggee renderer", () => {
-	// The display contract is `getStringRepresentation` itself — the
-	// REAL runtime values, built by the REAL constructors, must render to the
-	// very line `Terminal.inspect` would have printed.
+	// Runtime values built by the runtime's constructors render to the line
+	// `getStringRepresentation` prints.
 	it("agrees with the runtime's own printer", () => {
 		let values = [
 			createInteger(42n),
 			createString("hello"),
-			// The Strings that make the display rule worth sharing. The
-			// renderer drew a String with its quotes and NOTHING else until
-			// `quoted` was inlined into it, so a value holding a line break
-			// split the Variables view across two rows and one holding a
-			// control character, a brace or a bidi override drew something
-			// other than what it was. Each of these is a line
-			// `Terminal.inspect` prints, so each is a line the debugger owes.
+			// Strings that need escaping: line breaks, braces, controls,
+			// bidi overrides, a byte order mark and a lone surrogate.
 			createString('say "hi"\n\ttwice'),
 			createString("a{b}"),
 			createString("esc\u001B[0m"),
@@ -189,34 +173,24 @@ describe("the in-debuggee renderer", () => {
 			createList([createInteger(1n), createInteger(2n)]),
 			createCase("Ordering#Less"),
 			createCase("Shape#Circle", { radius: createInteger(2n) }),
-			// And the same Cases as a PROGRAM's Choice declares them —
-			// tagged with the declaring Module as well, which is the half the
-			// shown text drops. Without these the agreement held only for the
-			// standard library's own Choices, whose tags carry no Module
-			// already, so this renderer and the runtime's could have disagreed
-			// about every Choice a reader writes and nothing would have said so.
+			// Cases of a Program's Choices, whose tags also carry the
+			// declaring Module, which the shown text drops.
 			createCase("./Ordering.es#Ordering#Less"),
 			createCase("./Shapes.es#Shape#Circle", {
 				radius: createInteger(2n),
 			}),
 			createCase("./Shapes.es#Shape#Square", {
 				side: createInteger(1n),
-				// The cast every runtime module that nests a Case makes —
-				// `CaseInstanceType` is deliberately outside `AnyType`, for the
-				// reason `Generators.ts` gives.
+				// Cast, since `CaseInstanceType` stays out of `AnyType`.
 				door: createCase("./Doors.es#Door#Shut") as never,
 			}),
-			// Built UNREDUCED, which is the only way a Rational is worth
-			// asking about here. `createRational` settles the sign and zero and
-			// reduces nothing, so `6/2` is a value a Program really holds — and
-			// the printer it is held against answers lowest terms.
+			// Unreduced, as `createRational` leaves them, while the printer
+			// answers lowest terms.
 			createRational(6n, 2n),
 			createRational(2n, 4n),
 			createRational(-4n, 6n),
-			// Both asynchronous kinds, which render as their bare names
-			// and hold no parts: a reader paused in a debugger is shown what
-			// the Program has — work, or one run of it — and never the closure
-			// or the promise underneath.
+			// Both asynchronous kinds render as bare names, never the closure
+			// or promise they hold.
 			futureOf(() => createInteger(1n)),
 			futureStart(
 				futureOf(() => createInteger(1n)),
@@ -246,8 +220,8 @@ describe("the in-debuggee renderer", () => {
 		).toBe("record")
 	})
 
-	// The one deliberate divergence — a Variables row is one line, so
-	// what the runtime would print across several is truncated instead.
+	// Where the renderer differs from the runtime on purpose: a Variables row
+	// is one line, so a value printed across several is truncated.
 	it("caps what one line can hold", () => {
 		let wide = createRecord({
 			first: createString("a very long member value indeed"),
@@ -277,12 +251,9 @@ describe("the in-debuggee renderer", () => {
 	})
 })
 
-// A List's runs are SHARED with the other boxes of its chain, so what a
-// box holds and what it VIEWS come apart the moment either end is added to.
-// Both ways that happens are held here: an inner Array grown past its box by
-// somebody else's append, and a first item living in a second run stored
-// backwards. A debugger drawing a box of four items as five is wrong in the
-// way a debugger is not allowed to be.
+// A List's runs are shared with its chain, so a box's view and its Arrays come
+// apart when either end grows. Another box may append, or a front run may be
+// stored backwards.
 describe("the in-debuggee renderer, over shared List runs", () => {
 	it("draws what a box views, not what its Array holds", () => {
 		let base = integers(1, 2, 3)
@@ -322,9 +293,8 @@ describe("the in-debuggee renderer, over shared List runs", () => {
 		let display = describeOne(upgraded).display
 
 		expect(display).toBe("[ 1, 2, 3, 4 ]")
-		// Second, because the runtime's printer materialises what it
-		// prints — the renderer has to have gone first to have been the one
-		// reading a box still in two runs.
+		// After the renderer, since the runtime's printer materialises
+		// the box it prints.
 		expect(display).toBe(getStringRepresentation(upgraded as never))
 	})
 
@@ -344,9 +314,8 @@ describe("the in-debuggee renderer, over shared List runs", () => {
 	})
 })
 
-// What the Variables view expands a List row into. The items must be the
-// LIVE ones — each is handed back to the view by reference, and expanding one
-// of them again is how a nested value is opened.
+// What the Variables view expands a List row into. The items are the live
+// ones, so expanding one opens the nested value.
 describe("the in-debuggee List reader", () => {
 	it("answers the items a box views, in order", () => {
 		let base = integers(2, 3)
@@ -382,16 +351,12 @@ describe("the in-debuggee List reader", () => {
 	})
 })
 
-// A Dictionary's store is SHARED with the other boxes of its chain, and
-// what separates them is a stamp rather than a copy: every write pushes a
-// version onto the one store, and a box holds whichever version of each key was
-// the newest when it was made. So a store carries values this box was written
-// before, values it was written after, and tombstones for keys it no longer
-// holds — three ways for a debugger to draw entries a Program cannot reach, all
-// of them held here against one store three boxes view.
+// A Dictionary's store is shared with its chain. It carries superseded
+// values, values written after a box, and tombstones, none of which a box
+// shows.
 describe("the in-debuggee renderer, over a Dictionary's shared store", () => {
-	// `a` written twice, `b` removed, `c` added last — one store, and a
-	// box before each of the three writes that made it.
+	// `a` written twice, `b` removed and `c` added last, viewed by boxes of
+	// different generations.
 	let slots = () => [
 		slotOf("a", [0, 1], [2, 9]),
 		slotOf("b", [0, 2], [1, TOMBSTONE]),
@@ -417,10 +382,6 @@ describe("the in-debuggee renderer, over a Dictionary's shared store", () => {
 		).toBe("[=]")
 	})
 
-	// The display contract, here as everywhere in this file: what a
-	// Variables row shows is the very line `Terminal.inspect` prints, down to
-	// the padding inside the brackets and the `[=]` that is an empty Dictionary
-	// rather than an empty List.
 	it("agrees with the runtime's own printer", () => {
 		let ages = dictionary(["alex", 39], ["sam", 25])
 		let empty = createDictionary([], equality)
@@ -434,12 +395,9 @@ describe("the in-debuggee renderer, over a Dictionary's shared store", () => {
 			getStringRepresentation(empty as never),
 		)
 
-		// And a Rational on both sides of the `=`, written UNREDUCED. A
-		// store keeps the first key box that arrived, so `6/2` is the very box
-		// a Dictionary holds after `3` was set into it a second time — and the
-		// two spellings are one key, which is why the entry is the earlier one.
-		// Drawn raw, this row would read `6/2 = 2/4`: a spelling the Program it
-		// belongs to can not print.
+		// A store keeps the first key box that arrived, which may be an
+		// unreduced Rational such as `6/2`. It is drawn reduced, as the Program
+		// prints it.
 		let fractions = createDictionary(
 			[
 				[createRational(6n, 2n), createRational(2n, 4n)] as [
@@ -503,11 +461,8 @@ describe("the in-debuggee renderer, over a Dictionary's shared store", () => {
 	})
 })
 
-// What the Variables view expands a Dictionary row into: one row per
-// entry the box VIEWS, each the Record `{ key, value }` the language writes an
-// entry as, holding the live key and the live value — so opening an entry opens
-// what the Dictionary actually holds, and a superseded value, a tombstoned key
-// and a slot written past the box are all absent.
+// What the Variables view expands a Dictionary row into: one `{ key, value }`
+// Record per entry the box views, holding the live key and value.
 describe("the in-debuggee Dictionary reader", () => {
 	it("answers the entries a box views, in insertion order", () => {
 		let written = [
@@ -551,9 +506,8 @@ describe("the in-debuggee Dictionary reader", () => {
 		expect(entry.value).toBe(value)
 	})
 
-	// The entry wears the BOX's own tag rather than one this reader
-	// mints, which is what makes it a Record to the renderer that draws the row
-	// and to the view that expands it into a `key` and a `value`.
+	// The entry carries the box's own tag symbol, so the renderer reads it as
+	// a Record.
 	it("answers entries the renderer draws as the Records they are", () => {
 		let entry = dictionaryEntries(dictionary(["alex", 39]))[0]
 

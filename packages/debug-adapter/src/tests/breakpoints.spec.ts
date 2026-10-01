@@ -5,9 +5,8 @@ import { SourceMapGenerator } from "source-map"
 import { planBreakpoints } from "../breakpoints"
 import { BundleMap } from "../maps"
 
-// A hand-built map standing in for a compiled bundle: two statements of
-// `/work/App.es` — lines 3 and 5 — landing on generated lines 10 and 12, and
-// a runtime line that maps to nothing.
+// A hand-built map for a compiled bundle: lines 3 and 5 of `/work/App.es`
+// land on generated lines 10 and 12.
 function testMap(): BundleMap {
 	let generator = new SourceMapGenerator({ file: "App.js" })
 
@@ -32,12 +31,10 @@ describe("planBreakpoints", () => {
 
 		expect(plan!.verified).toBe(true)
 		expect(plan!.line).toBe(3)
-		// 0-based, CDP's convention — the map spoke 1-based line 10.
+		// 0-based, as CDP counts; the map's line 10 is 1-based.
 		expect(plan!.generated).toEqual({ line: 9, column: 0 })
 	})
 
-	// A breakpoint on a blank line slides forward to the next
-	// statement, and the answered line says so.
 	it("slides an unmapped line to the next statement", () => {
 		let [plan] = planBreakpoints(testMap(), "/work/App.es", [4])
 

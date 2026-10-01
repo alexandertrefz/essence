@@ -14,24 +14,14 @@ import {
 
 import { DESCRIBE_BATCH_SOURCE, LIST_ITEMS_SOURCE } from "../render"
 
-// THE UNDO REPLAY EXISTS FOUR TIMES, and nothing held the copies
-// together. A positional write changes a run Array in place and counts a
-// version up, so a box left behind on that run has to undo the writes made
-// since it looked before its items can be read — `runtime/src/listWrites.ts`
-// is the authority, and `caughtUp` there is the original. The renderer in
-// `render.ts` carries two copies, one for the line the Variables view shows
-// and one for expanding a List, and the client package carries the other two,
-// in its boundary and in its bench (guarded in
-// `packages/client/src/tests/undoReplay.spec.ts`, which is the same idea
-// pointed at those).
+// A box left behind on a written run undoes the writes made since its version
+// before its items can be read. `caughtUp` in `runtime/src/listWrites.ts` does
+// this, and the renderer in `render.ts` copies it, since it runs inside the
+// debuggee and imports nothing. `packages/client/src/tests/undoReplay.spec.ts`
+// guards the client's copies.
 //
-// The copies are not a mistake to be collapsed. This source is evaluated
-// INSIDE the debuggee through `Runtime.callFunctionOn`, where nothing else of
-// this module exists, so it can import nothing — which is exactly why it needs
-// a guard rather than a refactor. What follows is that guard: random boxes
-// left behind in every way a chain can leave one behind, read through the
-// shipped source EXACTLY as the debuggee reads it, and compared against what
-// the runtime itself answers for the same box.
+// This spec reads random stale boxes through the shipped source, as the
+// debuggee does, and compares the answer with the runtime's.
 const describeBatch = (0, eval)(`(${DESCRIBE_BATCH_SOURCE})`) as (
 	...values: Array<unknown>
 ) => string
@@ -45,9 +35,8 @@ const integer = (value: number) => createInteger(BigInt(value))
 const integers = (values: Array<number>): ListType<IntegerType> =>
 	createList(values.map(integer))
 
-// A counted generator rather than `Math.random`, so a seed names one
-// schedule for good — the same shape `positionalWrites.spec.ts` uses, and for
-// the same reason.
+// A seeded generator rather than `Math.random`, so a seed always names the
+// same schedule, as in `positionalWrites.spec.ts`.
 const generatorFrom = (seed: number): (() => number) => {
 	let state = seed * 2654435761 + 1
 
@@ -61,16 +50,13 @@ const generatorFrom = (seed: number): (() => number) => {
 	}
 }
 
-// What the runtime says the box holds — through `materialise`, which
-// catches a stale box up and hands back an Array whose whole length is the
-// box's view. This is the answer every other copy is measured against.
+// What the runtime says the box holds. `materialise` catches a stale box up
+// and answers an Array of exactly the box's view.
 const runtimeItems = (box: ListType<IntegerType>): Array<number> =>
 	materialise(box).map((each) => Number(each.value))
 
-// What the DEBUGGER says, twice over: the items it would expand the box
-// into, and the line it would print for it. Both run the replay, and a copy
-// that got it wrong would disagree with the runtime about a box that is
-// perfectly intact.
+// What the debugger says: the items it expands the box into, and the line it
+// prints for it. Both run the replay.
 const debuggerItems = (box: ListType<IntegerType>): Array<number> =>
 	listItems(box).map((each) => Number((each as IntegerType).value))
 
@@ -82,10 +68,8 @@ const debuggerLine = (box: ListType<IntegerType>): string => {
 	return described[0]!.display ?? ""
 }
 
-// The line the renderer draws is elided past sixty characters, which is
-// a display rule rather than anything about the replay — so it is compared
-// against the runtime's own items drawn by the SAME rule rather than against
-// the items themselves.
+// The renderer elides a line past sixty characters, so the runtime's items
+// are drawn by the same rule for comparison.
 const lineFor = (items: Array<number>): string => {
 	if (items.length === 0) {
 		return "[]"
@@ -96,10 +80,9 @@ const lineFor = (items: Array<number>): string => {
 	return line.length < 60 ? line : `[ ${items[0]}, … ]`
 }
 
-// EVERY WAY A CHAIN CAN LEAVE A BOX BEHIND, built at random and kept:
-// several versions of one written run, windows of a written run, boxes with a
-// front run the writes never touch, and siblings made by a tip push. What every
-// one of them has in common is that the Array it holds has moved on without it.
+// Random boxes whose Array has moved on without them. They are versions and
+// windows of one written run, boxes with an untouched front run, and siblings
+// made by a tip push.
 const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 	let next = generatorFrom(seed)
 	let size = 6 + Math.floor(next() * 10)
@@ -107,8 +90,8 @@ const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 	let kept: Array<ListType<IntegerType>> = []
 	let latest = integers(items)
 
-	// The first write copies and attaches the log to the COPY, so every
-	// box kept from here on shares one written Array.
+	// The first write copies and attaches the log to the copy, so every box
+	// kept from here on shares one written Array.
 	latest = replace(latest, integer(items[0]!), integer(0))
 	kept.push(latest)
 
@@ -136,15 +119,12 @@ const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 }
 
 describe("the debugger's copy of the undo replay", () => {
-	// Twelve seeds, which is a few milliseconds and covers every shape
-	// above many times over. Written out rather than counted, so a failing one
-	// can be pulled while it is being fixed without renumbering the rest.
+	// Written out rather than counted, so one seed can be removed without
+	// renumbering the rest.
 	for (let seed of [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]) {
 		it(`answers what the runtime answers, seed ${seed}`, () => {
-			// The debugger is asked FIRST and the runtime second, because
-			// reading a box through the runtime REPAIRS it — ask the runtime
-			// first and every box handed to the debugger is already current,
-			// which is the one state a broken replay would survive.
+			// The debugger is asked first, because reading a box through the
+			// runtime repairs it and would hide a broken replay.
 			for (let box of staleBoxesFrom(seed)) {
 				let shown = debuggerItems(box)
 				let line = debuggerLine(box)
@@ -156,10 +136,8 @@ describe("the debugger's copy of the undo replay", () => {
 		})
 	}
 
-	// And the shape the arithmetic is really about, written out rather
-	// than drawn from a seed: one run, three versions of it, every version
-	// still held. Each box owes the items it was made with, and the debugger
-	// owes the same.
+	// One run with three versions, all still held. Each box answers the items
+	// it was made with.
 	it("answers each version of one written run", () => {
 		let first = replace(integers([0, 1, 2, 3, 4]), integer(0), integer(0))
 		let second = replace(first, integer(91), integer(1))
@@ -174,10 +152,9 @@ describe("the debugger's copy of the undo replay", () => {
 		expect(runtimeItems(third)).toEqual([0, 91, 2, 92, 4])
 	})
 
-	// THE OTHER HALF OF WHAT THE DEBUGGER OWES: looking at a paused
-	// Program may not change it. The replay copies rather than repairing, so a
-	// box the debugger has read must still be stale — and must still answer
-	// its own items when the Program is resumed.
+	// Looking at a paused Program must not change it. The replay copies rather
+	// than repairs, so a box the debugger read stays stale and still answers its
+	// own items.
 	it("leaves the box it read exactly as stale as it found it", () => {
 		let first = replace(integers([0, 1, 2, 3, 4]), integer(0), integer(0))
 		let second = replace(first, integer(91), integer(1))

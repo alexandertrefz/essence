@@ -5,9 +5,8 @@ import { SourceMapGenerator } from "source-map"
 import { type CdpCallFrame, presentFrames } from "../frames"
 import { BundleMap } from "../maps"
 
-// A bundle whose lines 20-24 belong to `/work/App.es` and whose line 40
-// belongs to nothing — the shape a real bundle has after the map was confined
-// to Essence sources.
+// A bundle whose lines 20 to 24 map to `/work/App.es` and whose line 40 maps
+// to nothing, as runtime code does.
 function testMap(): BundleMap {
 	let generator = new SourceMapGenerator({ file: "App.js" })
 
@@ -86,9 +85,8 @@ describe("presentFrames", () => {
 		expect(presented[0]!.source).toBeNull()
 	})
 
-	// The match merge — one construct, two frames, and the anonymous
-	// one absorbs its caller's name while keeping its own position and its
-	// own call frame, whose scope chain holds the handler's bindings.
+	// The anonymous frame keeps its own position and call frame, whose scope
+	// chain holds the arm's bindings.
 	it("collapses a match's IIFE into its caller", () => {
 		let presented = presentFrames(
 			[frame("", 21, 0), frame("greet", 19, 1), frame("main", 23, 2)],
@@ -101,10 +99,8 @@ describe("presentFrames", () => {
 		expect(presented[0]!.source?.line).toBe(7)
 	})
 
-	// A Function value handed to the standard library also arrives
-	// anonymous — but it sits over glue, not over a user frame, so it is NOT
-	// absorbed; it reads as `match`, the one anonymous thing user code emits
-	// in place.
+	// A Function value passed to the standard library is anonymous too, but
+	// sits over glue, so it keeps its frame and reads as `match`.
 	it("does not absorb an anonymous frame that sits over glue", () => {
 		let presented = presentFrames(
 			[
