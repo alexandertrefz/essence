@@ -52,8 +52,8 @@ export function inlineConstantActions(
 	}
 
 	// A `§§` block documents the name, and would be left documenting the next
-	// Statement.
-	if (statement.documentation !== null) {
+	// Statement. A written Type decides the value's Type, which no copy keeps.
+	if (statement.documentation !== null || statement.type !== null) {
 		return []
 	}
 

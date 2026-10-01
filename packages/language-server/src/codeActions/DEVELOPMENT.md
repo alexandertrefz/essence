@@ -162,6 +162,9 @@ the value reads is then in scope at each read, unless shadowed, which `readsAgre
 A read inside a Function literal is refused for the same reason, since it runs once per call of the literal. An
 exported Constant, one with a `§§` block, and one written over several lines are left alone too.
 
+A Constant that writes its Type is not inlined either. The written Type decides the value's, as `List<Number>` does
+for `[1, 2]`, and a copy would take the Type its own text gives it.
+
 ## Writing a table test
 
 `tableTestActions` rewrites a test that says one thing about several values as the table test it already is. What

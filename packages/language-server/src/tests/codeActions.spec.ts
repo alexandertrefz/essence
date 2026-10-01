@@ -7736,7 +7736,7 @@ describe("Inline a Constant", () => {
 	it("is offered from a read as well as from the declaration", () => {
 		let lines = [
 			"implementation {",
-			"\tconstant limit: Integer = 10",
+			"\tconstant limit = 10",
 			"\tconstant doubled = limit::add(1)",
 			"\tconstant halved = limit::subtract(1)",
 			"}",
@@ -7803,17 +7803,20 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "twice ="))).toEqual([])
 	})
 
+	// An empty List compiles only under a written Type, which is refused too.
 	it("offers nothing for a bare Case or an empty List", () => {
 		let lines = [
 			"implementation {",
-			"\tconstant missing: Optional<Integer> = #Empty",
+			"\tchoice Suit { Hearts, Spades }",
+			"\tconstant chosen = #Hearts",
 			"\tconstant empty: List<Integer> = []",
-			"\tconstant described = missing::value(defaultingTo 0)",
+			"\tconstant matched = chosen::is(#Spades)",
 			"\tconstant counted = empty::length()",
 			"}",
 		]
 
-		expect(inlines(lines, rangeOf(lines, "missing:"))).toEqual([])
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "chosen ="))).toEqual([])
 		expect(inlines(lines, rangeOf(lines, "empty:"))).toEqual([])
 	})
 
@@ -7904,6 +7907,20 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "answer ="))).toEqual([])
 		expect(inlines(lines, rangeOf(lines, "running ="))).toEqual([])
 		expect(inlines(lines, rangeOf(lines, "box ="))).toEqual([])
+	})
+
+	// A copy takes its Type from where it is read, so `[1, 2]` there would be
+	// a `List<Integer>` that refuses `1/2`.
+	it("offers nothing for a Constant that writes its Type", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant mixed: List<Number> = [1, 2]",
+			"\tconstant longer = mixed::append(1/2)",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "mixed:"))).toEqual([])
 	})
 
 	// A read inside a Function literal runs once per call of that literal.
