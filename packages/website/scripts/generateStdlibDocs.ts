@@ -5,29 +5,8 @@
  *   bun scripts/generateStdlibDocs.ts          write the pages that do not exist yet
  *   bun scripts/generateStdlibDocs.ts --sync   rewrite every page from the sources
  *
- * ── What it will and will not touch ───────────────────────────────────────
- *
- * A library page is generated whole — from `packages/standard-library/sources`
- * by way of `stdlibSurface.ts`, placed by the rules in `libraryPages.ts` and
- * grouped by `libraryTable.ts` — except for two things a person writes: the
- * frontmatter `description` and the "Taught on" line under the lede. The
- * generator seeds both when it creates a page and never overwrites either.
- * Everything else on the page is a fact about the library, and has to be able
- * to travel when the library changes, so `--sync` rewrites it.
- *
- * Without `--sync`, a page that exists is left alone. `--sync` also removes a
- * generated page the library no longer has, told apart from a hand-written one
- * such as `overview.mdx` by the marker comment every generated body opens
- * with; a hand-written page standing where a generated one belongs stops it.
- *
- * ── Why generated at all ──────────────────────────────────────────────────
- *
- * Because the alternative is hundreds of members that fall out of date one at
- * a time, silently, and a reference that lies is worse than no reference. The
- * gate in `tests/stdlibMembers.spec.ts` is the other half: it fails when a
- * member has no place, or a place the library no longer backs, so adding a
- * Method breaks the build until somebody decides where it goes and runs
- * `--sync`.
+ * A person writes only a page's `description` and its "Taught on" line; the
+ * rest is regenerated. See "Generated pages" in DEVELOPMENT.md.
  */
 
 import { spawnSync } from "node:child_process"
@@ -70,10 +49,8 @@ function sameManifest(existing: string | null, manifest: unknown): boolean {
 }
 
 /*
- * The manifests are JSON the repository's formatter also reads, so they are
- * handed to it once written — `bun run check` then leaves a freshly generated
- * tree alone. Where the formatter is not installed they stay as written, and
- * nothing that reads them cares: the gate compares what they say.
+ * Formats the written manifests, so `bun run check` leaves a fresh tree alone.
+ * Without the formatter they stay as written, which no reader minds.
  */
 function format(files: string[]): void {
 	let formatter = path.join(REPOSITORY, "node_modules/.bin/oxfmt")
@@ -109,11 +86,9 @@ function main(): void {
 	}
 
 	/*
-	 * Not an error, and not something this can fix: an entry that takes an
-	 * argument nothing has been written about gets a Parameters row with an
-	 * empty description. The `@param` has to be written in the standard
-	 * library, where the editor will show it too. Said out loud on every run,
-	 * because the page it produces looks finished.
+	 * A Parameter without a `@param` line gets an empty description, which only
+	 * the standard library can fix. Every run warns, since the page looks
+	 * finished.
 	 */
 	let undescribed = surface.namespaces.flatMap((namespace) =>
 		namespace.members.flatMap((member) =>

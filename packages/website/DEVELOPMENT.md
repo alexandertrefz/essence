@@ -73,3 +73,34 @@ a listed page nothing lands on.
 Inside a page, the reader groups come from `scripts/libraryTable.ts`, keyed `Namespace::member`. Every member placed
 on a page, provided and derived ones included, must sit in exactly one of its groups, or the generator throws. A
 Method the sources gain needs a decision about where a reader will look for it.
+
+### Generated pages
+
+`scripts/generateStdlibDocs.ts` writes one page per Type and a member manifest beside each. A page is generated whole
+from `packages/standard-library/sources`, by way of `scripts/stdlibSurface.ts`, placed by `scripts/libraryPages.ts`
+and grouped by `scripts/libraryTable.ts`. A person writes only two things on it: the frontmatter `description` and
+the "Taught on" line under the lede. The generator seeds both when it creates a page and never overwrites either.
+Everything else is a fact about the library, so `--sync` rewrites it.
+
+Without `--sync`, a page that exists is left alone. `--sync` also removes a generated page whose Type the library
+lacks. The marker comment every generated body opens with tells it apart from a hand-written page such as
+`overview.mdx`. A hand-written page standing where a generated one belongs stops the generator.
+
+The reference is generated because hundreds of hand-kept members would go stale one at a time, silently.
+`tests/stdlibMembers.spec.ts` is the other half: it fails when a member has no place, or a place the library does not
+back. So adding a Method breaks the build until someone decides where it goes and runs `--sync`.
+
+### Heading ids
+
+A generated page is a skeleton of Markdown headings and component calls. The components draw what goes under each
+heading from the manifest, so a signature is written in one place. The headings stay Markdown because Astro collects a
+page's headings from Markdown only, for the on-page rail and the search index.
+
+A reader arrives at a member with its name spelled as hover or completion spells it, so `/docs/library/list#firstItem`
+has to land. Astro gives a Markdown heading the id github-slugger makes of its text, `firstitem`, and offers no way to
+set another without a plugin. So the heading keeps that lowercase id, and its text is wrapped in a `<span>` whose
+`id` is the name as written.
+
+`scripts/libraryRender.ts` simulates the slugger for ASCII, which is all a heading here holds. So the writer knows
+every id a page will carry, records them in the manifest, and refuses a page where two things would share one.
+`tests/stdlibMembers.spec.ts` checks the simulation against the real slugger.

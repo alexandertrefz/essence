@@ -1,34 +1,12 @@
 /*
- * A library page as MDX, and the manifest that goes beside it.
- *
- * The page is a skeleton of headings and component calls: the components draw
- * what goes under each heading from the manifest, so a signature is written in
- * exactly one place. The headings themselves are Markdown on purpose. Astro
- * collects a page's headings from its Markdown — never from JSX — for the
- * on-page rail and for the search index, and a member heading written as an
- * `<h3>` element would be invisible to both.
- *
- * ── Two ids per heading ─────────────────────────────────────────────────────
- *
- * A reader arrives at a member with its name as hover or completion spelled
- * it, so `/docs/library/list#firstItem` has to land. Astro gives a Markdown
- * heading the id github-slugger makes of its text — `firstitem`, always lower
- * case — and offers no way to set another without a plugin. So the heading
- * keeps that id, which is the lowercase alias the addressing scheme promises
- * as well, and its text is wrapped in a `<span>` that carries the name
- * verbatim. Both land on the same heading.
- *
- * The slugger is simulated here, for ASCII, which is all a heading here ever
- * is: the writer knows every id the rendered page will carry, records them in
- * the manifest, and refuses a page on which two things would carry the same
- * one. `tests/stdlibMembers.spec.ts` checks the simulation against the real
- * slugger.
+ * A library page as MDX, and the manifest that goes beside it. Each member
+ * heading answers to two ids. See "Heading ids" in DEVELOPMENT.md.
  */
 
 import { modesTitle, type PageManifest } from "./libraryManifest.ts"
 import type { LibraryPage } from "./libraryPages.ts"
 
-/** The first line of every generated body — and how `--sync` tells a generated page from a hand-written one. */
+/** The first line of every generated body, which `--sync` recognises generated pages by. */
 export const GENERATED_MARKER =
 	"{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}"
 
@@ -97,10 +75,8 @@ export class Slugger {
 }
 
 /*
- * A brace outside a code span opens an expression in MDX and an angle bracket
- * opens an element, and a `§§` block that shows a Record — `{ x = 1 }` — or a
- * generic Type in prose would be read as one and fail the build. Inside a code
- * span they are already inert, so only the text between spans is escaped.
+ * Escapes braces and angle brackets outside code spans, where MDX would read a
+ * Record or a generic Type as an expression or an element.
  */
 function escapeMdx(text: string): string {
 	return text
@@ -124,9 +100,8 @@ function yamlList(items: string[]): string {
 		: `\n${items.map((item) => `  - ${quoted(item)}`).join("\n")}`
 }
 
-// Null where a page is taught NOWHERE — a Type the Language pages have
-// not reached yet — so the page says nothing rather than saying "Taught on: ."
-// The line comes back the moment a page teaches it.
+// Null where no Language page teaches the Type, so the page omits the line
+// rather than printing an empty one.
 function taughtOnLine(slugs: string[]): string | null {
 	if (slugs.length === 0) {
 		return null
@@ -212,8 +187,8 @@ class Layout {
 			this.anchors.push(candidate)
 		}
 
-		// The first extra id wraps the text, so the element it names has a box
-		// for a link to scroll to; any further ones sit empty in front of it.
+		// The first extra id wraps the text, giving a link a box to scroll to.
+		// Any further ones sit empty in front of it.
 		let [wrap, ...rest] = extra
 		let inner =
 			wrap === undefined ? text : `<span id="${wrap}">${text}</span>`
@@ -271,8 +246,8 @@ export function renderPage(
 	let component = (name: string, props: Record<string, unknown>) =>
 		`<${name} ${Object.entries(props)
 			// Every prop as an expression, strings included. A quoted MDX
-			// attribute is taken literally, escapes and all, so a declaration that
-			// spans lines rendered its `\n` and `\t` as text.
+			// attribute is taken literally, so a multi-line declaration's `\n` and
+			// `\t` would render as text.
 			.map(([key, value]) => `${key}={${JSON.stringify(value)}}`)
 			.join(" ")} />`
 
