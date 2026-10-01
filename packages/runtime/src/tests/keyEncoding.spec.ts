@@ -34,31 +34,25 @@ import {
 	typeKeySymbol,
 } from "../type"
 
-// THE DIFFERENTIAL SPEC FOR THE CANONICAL KEY ENCODING. Every fast path
-// in `keyEncoding.ts` rests on one claim — two keys that both encode spell one
-// text exactly when the equality they are compared by calls them equal — and
-// the only way to hold a claim of that shape is to draw values at random from
-// the grammar the language can build and check every pair. The seeds are fixed,
-// so a failure is reproducible and a green run is the same green run tomorrow.
+// Every fast path in `keyEncoding.ts` rests on one claim: two keys that both
+// encode share a text exactly when their equality calls them equal. So pairs
+// are drawn at random from the values the language builds, over fixed seeds.
 
 const asValue = (value: unknown) => value as AnyType
 const integer = (value: number | bigint): IntegerType =>
 	createInteger(BigInt(value))
 const text = createString
 
-// The branded structural witness, which is what the Compiler hands a
-// Dictionary whose key Type's `is` is the standard library's own. `anyIs` is
-// that equality for every kind these tests draw.
+// The branded witness the Compiler hands a Dictionary whose key Type uses the
+// standard library's own `is`.
 const equality = {
 	is: (first: AnyType, second: AnyType) =>
 		createBoolean(anyIs(first, second)),
 	structural: true as const,
 }
 
-// The same equality with NO brand — the shape a Namespace-written `is`
-// arrives in. A Dictionary built through it answers the same things by
-// scanning, which is what the differential below holds the encoded path
-// against.
+// The same equality unbranded, as a Namespace's own `is` arrives. A Dictionary
+// built through it scans.
 const scanning = { is: equality.is }
 
 // The witness the Rewriter emits for a `List<T>` key: `List.is` curried
@@ -72,18 +66,15 @@ const listEquality = (item: unknown) =>
 		structural?: true
 	}
 
-// The rule the STORE routes an encoding by, written out: a text lives in
-// an index of its own, so a String key spelling `l0:` and the empty List are
-// two keys however alike the two texts read. Anything that compares encodings
-// has to compare them the way the two indexes do.
+// A text lives in an index of its own, so a String key spelling `l0:` and the
+// empty List are two keys. Encodings compare as the store's indexes do.
 const sameEncoding = (first: EncodedKey, second: EncodedKey): boolean =>
 	typeof first === "object"
 		? typeof second === "object" && first.text === second.text
 		: typeof second !== "object" && first === second
 
-// mulberry32 — four lines, no dependency, and the same sequence on every
-// engine, which is the whole of what a test needs of a generator. It is the one
-// `dictionaries.spec.ts` draws its chains with.
+// mulberry32, as `dictionaries.spec.ts` uses: no dependency, and the same
+// sequence on every engine.
 const seededRandom = (seed: number): (() => number) => {
 	let state = seed >>> 0
 
@@ -98,27 +89,14 @@ const seededRandom = (seed: number): (() => number) => {
 	}
 }
 
-// The two spellings of one accented String, BUILT from their code points
-// rather than written down, and an astral character, which is two code units
-// and so two of whatever a length prefix counts.
-//
-// Built rather than written because `oxfmt` rewrites a `é` escape as
-// the character it spells — which would leave the composed and the decomposed
-// forms standing side by side in the source as two runs of bytes that an
-// editor, a diff tool or a later formatter may normalise into each other. A
-// pair of constants that quietly became one would take the NFC half of this
-// spec with it and leave every test green. `String.fromCodePoint` can not be
-// normalised.
+// Two spellings of one accented String, built from code points so that no editor
+// can normalise them into each other. The astral character is two code units.
 const composedAccent = `caf${String.fromCodePoint(0xe9)}`
 const decomposedAccent = `cafe${String.fromCodePoint(0x301)}`
 const astral = "\u{1D11E}"
 
-// THE LEAVES. Deliberately FEW and deliberately overlapping: several
-// spellings of one value (`3` and `3/1` and `6/2`, the two accents), and
-// several values that spell texts looking like one another's (`"a,b"` beside
-// `"a"` and `"b"`, a String holding what an encoded List of one Integer reads
-// as). A grammar of mostly-distinct leaves would draw mostly-unequal pairs and
-// prove nothing.
+// Few leaves, overlapping on purpose: several spellings of one value, and values
+// whose texts look alike. Mostly distinct leaves would draw mostly unequal pairs.
 const leaves: Array<AnyType> = [
 	integer(0),
 	integer(1),
@@ -149,18 +127,14 @@ const leaves: Array<AnyType> = [
 	createBoolean(false),
 	asValue(createCase("Colour#Red")),
 	asValue(createCase("Colour#Blue")),
-	// The payload-free Cases of the two GENERIC Choices below. They are
-	// interned per tag, so `Wrap<Integer>#None` and `Wrap<String>#None` are one
-	// value and one text — which is why no instantiation can be told from
-	// another here, and why none has to be.
+	// Payload-free Cases are interned per tag, so `Wrap<Integer>#None` and
+	// `Wrap<String>#None` are one value and one text.
 	asValue(createCase("Wrap#None")),
 	asValue(createCase("Pair#Neither")),
 ]
 
-// A value of the whole grammar, depth-limited. A List is drawn at every
-// width the attacks below care about — none, one, two, three — because the
-// count in its head is what tells `[[1], [2]]` from `[[1, 2]]`, and a fuzzer
-// that never drew two widths of the same items could not meet that pair.
+// A value of the whole grammar, depth-limited. Lists are drawn zero to three
+// wide, since the count in a List's head tells `[[1], [2]]` from `[[1, 2]]`.
 function draw(random: () => number, depth: number): AnyType {
 	let roll = random()
 
@@ -176,11 +150,8 @@ function draw(random: () => number, depth: number): AnyType {
 			items.push(draw(random, depth - 1))
 		}
 
-		// Half of the Lists are built by PREPENDING, so the encoding
-		// meets a box carrying a front run as often as it meets a flat one.
-		// Two Lists holding the same items are one key whichever way round
-		// they are stored, and a reader that walked only the back Array would
-		// have spelled the front's items away.
+		// Half the Lists are built by prepending, so the encoding meets a front
+		// run as often as a flat box.
 		if (random() < 0.5) {
 			let built = createList<AnyType>([])
 
@@ -209,12 +180,9 @@ function draw(random: () => number, depth: number): AnyType {
 	}
 
 	if (roll < 0.96) {
-		// Three Cases carrying a payload, and two of the three are the
-		// Cases of a GENERIC Choice — one member and two. A generic Choice's
-		// derived equality asks a Type Argument's witness at each member naming
-		// a Type Parameter, so the encoding has to agree with THAT as well as
-		// with `anyIs`, and the two-member Case is where a text that forgot to
-		// name its members apart would show.
+		// `Wrap` and `Pair` are generic Choices, whose equality asks a Type
+		// Argument's witness per member. `Pair#Both` has two members, where a
+		// text that did not name its members apart would show.
 		let shape = random()
 
 		if (shape < 0.34) {
@@ -237,10 +205,8 @@ function draw(random: () => number, depth: number): AnyType {
 		)
 	}
 
-	// A Dictionary has no canonical text — its entries are organised by a
-	// store of its own and its equality is order-insensitive — so it is here to
-	// be DECLINED, and to check that a Record or a List holding one declines
-	// with it rather than spelling a text that ignores it.
+	// A Dictionary has no canonical text, so it must be declined, and a Record or
+	// a List holding one must decline with it.
 	return createDictionary<AnyType, AnyType>(
 		[[text("k"), integer(Math.floor(random() * 3))]],
 		equality,
@@ -250,11 +216,8 @@ function draw(random: () => number, depth: number): AnyType {
 const seeds = [1, 2, 3, 5, 8, 13, 21, 34]
 
 describe("the encoding agrees with the equality it stands in for", () => {
-	// THE CLAIM ITSELF, over every pair of a drawn population. Both
-	// directions matter and they fail differently: a text two unequal keys
-	// share MERGES two slots and loses an entry, and two texts one pair of
-	// equal keys is split across opens a second slot for a key the Dictionary
-	// already holds.
+	// A text shared by two unequal keys merges two slots and loses an entry. Two
+	// texts for one key open a second slot for it.
 	test.each(seeds)("no pair is merged or split, seed %i", (seed) => {
 		let random = seededRandom(seed)
 		let population: Array<AnyType> = []
@@ -287,10 +250,8 @@ describe("the encoding agrees with the equality it stands in for", () => {
 		expect(compared).toBeGreaterThan(1000)
 	})
 
-	// And the witness path beside it. A `List<T>` key is compared by
-	// `List::is` through the item witness rather than by `anyIs`, and the
-	// encoding stands in for BOTH — so the two have to answer alike wherever
-	// the item witness is the structural one.
+	// A `List<T>` key is compared by `List::is` through the item witness, and the
+	// encoding stands in for both. So they must agree under a structural witness.
 	test.each(seeds)("List::is answers what anyIs answers, seed %i", (seed) => {
 		let random = seededRandom(seed)
 		let lists: Array<ListType<AnyType>> = []
@@ -312,17 +273,10 @@ describe("the encoding agrees with the equality it stands in for", () => {
 		}
 	})
 
-	// AND THE WITNESS A GENERIC CHOICE IS ACTUALLY COMPARED BY. A generic
-	// Choice's derived `is` is not `anyIs` — it is `boundChoiceIs` walking a
-	// descriptor that routes each member naming a Type Parameter through that
-	// Argument's own witness and compares the rest by the universal rule. The
-	// encoding stands in for THAT, so the two have to answer alike over every
-	// pair, exactly as `List::is` does above.
-	//
-	// The descriptor names EVERY payload member, because a member it does
-	// not name is a member `casesEqual` never compares — so a descriptor that
-	// forgot one would call two different keys equal, and the encoding, which
-	// spells every member, would not. That is the disagreement this draws for.
+	// A generic Choice's derived `is` is `boundChoiceIs`, which routes each member
+	// naming a Type Parameter through that Argument's witness. The encoding stands
+	// in for it too. The descriptor names every payload member, since
+	// `casesEqual` compares only the members it names.
 	const genericChoice = boundChoiceIs({
 		"Wrap#Some": { item: { k: "w", i: 0 } },
 		"Wrap#None": {},
@@ -377,10 +331,9 @@ describe("the encoding agrees with the equality it stands in for", () => {
 		},
 	)
 
-	// A value holding a part with no text has no text itself, which is
-	// the whole of what keeps a Dictionary correct where one key encodes and
-	// another does not: the store keeps both kinds of slot and falls through to
-	// the scan for the second.
+	// A value holding a part with no text has none itself, so its slot stays on
+	// the scan path. See "Finding a Dictionary key" in
+	// packages/runtime/DEVELOPMENT.md.
 	test.each(seeds)(
 		"a held Dictionary declines all the way up, seed %i",
 		(seed) => {
@@ -426,12 +379,9 @@ function holdsADictionary(value: AnyType): boolean {
 	return false
 }
 
-// THE OTHER DIFFERENTIAL — a Dictionary driven by random writes down the
-// ENCODED path against the very same writes down the SCAN path. The two
-// witnesses decide the same equality and differ only in the brand, so the two
-// boxes have to hold the same entries in the same order and answer the same
-// thing for every key. This is the test that would catch an encoding that is
-// injective and still disagrees with `is`.
+// The same random writes down the encoded path and the scan path must leave the
+// same entries in the same order. This catches an encoding that is injective
+// but disagrees with `is`.
 describe("the encoded path answers what the scan path answers", () => {
 	test.each(seeds)("a random chain of writes agrees, seed %i", (seed) => {
 		let random = seededRandom(seed)
@@ -464,9 +414,8 @@ describe("the encoded path answers what the scan path answers", () => {
 			)
 		}
 
-		// The ORDER as well as the entries, because a slot's place is
-		// part of what a Dictionary promises and the two paths open slots
-		// through different code.
+		// The order too, since a slot's place is part of what a Dictionary
+		// promises.
 		let encodedKeys = materialise(keysOf(encoded))
 		let scannedKeys = materialise(keysOf(scanned))
 
@@ -480,10 +429,8 @@ describe("the encoded path answers what the scan path answers", () => {
 			materialise(entriesOf(scanned)).length,
 		)
 
-		// And every key ever written asked of both, including the ones
-		// that were removed — a key the encoded path lost track of answers
-		// nothing where the scan still finds it, and that is the failure this
-		// whole file is for.
+		// Every key ever written is asked of both, removed ones included. A key
+		// the encoded path lost would answer nothing where the scan finds it.
 		for (let key of keys) {
 			expect(heldOf(valueAt(encoded, key, equality))).toBe(
 				heldOf(valueAt(scanned, key, scanning)),
@@ -501,8 +448,7 @@ function heldOf(answer: {
 		: Number((answer.item as IntegerType).value)
 }
 
-// The attacks a generator is unlikely to draw and a reader is likely to
-// worry about, written down by hand so they are named rather than hoped for.
+// Attacks a generator is unlikely to draw, written down by hand.
 describe("the injectivity attacks, by hand", () => {
 	const textOf = (value: AnyType): EncodedKey =>
 		encodeKey(value, equality) as EncodedKey
@@ -579,9 +525,8 @@ describe("the injectivity attacks, by hand", () => {
 		expect(anyIs(createList([]), createList([]))).toBeTrue()
 	})
 
-	// The cross-kind rules a part inherits from the comparison it stands
-	// in for: an Integer and the whole Rational it equals are one item, and two
-	// canonically equivalent Strings are one item.
+	// A part keeps the cross-kind rules of the comparison it stands in for. An
+	// Integer and the Rational it equals are one item, as are equivalent Strings.
 	test("a List spells the cross-kind rules its items are compared by", () => {
 		expect(
 			sameEncoding(
@@ -597,10 +542,8 @@ describe("the injectivity attacks, by hand", () => {
 		).toBeTrue()
 	})
 
-	// A List built at the front holds its first items in a second run,
-	// stored reversed. Two Lists holding the same items are one key whichever
-	// way round they are stored, so the encoding has to read the runs rather
-	// than the Array.
+	// A List built at the front holds its first items in a reversed run, so the
+	// encoding reads the runs rather than the Array.
 	test("a prepended List spells what the flat one spells", () => {
 		let flat = createList([integer(1), integer(2), integer(3)])
 		let built = prepend(
@@ -612,12 +555,9 @@ describe("the injectivity attacks, by hand", () => {
 	})
 })
 
-// PERSISTENT USE. A List box is read again after a newer box was derived
-// from it, and the two share a run Array: `append` pushes onto the very Array
-// the older box views, and what keeps the older box honest is the count it
-// stamped rather than the Array's length. An encoding that asked the Array how
-// long it was would have started spelling items that were never added to the
-// key — and a Dictionary would have stopped finding the key it holds.
+// A box read again after a newer box was derived from it shares its run Array.
+// The encoding must spell the count the box stamped, not the Array's length, or
+// a Dictionary would stop finding the key.
 describe("a key read again after a newer value was derived from it", () => {
 	test("keeps the text it had before the append", () => {
 		let key = createList([integer(1), integer(2)])
@@ -630,11 +570,8 @@ describe("a key read again after a newer value was derived from it", () => {
 		).toBeTrue()
 	})
 
-	// The same claim for a box that was NEVER encoded before the append,
-	// which is the half the memo can not answer for: the one above would pass
-	// on a remembered text however the walk read the run, and only this one
-	// asks what the walk reads. The box views two items of an Array that now
-	// holds three.
+	// Never encoded before the append, so no remembered text answers. The box
+	// views two items of an Array that now holds three.
 	test("spells its own two items, never having been encoded before", () => {
 		let key = createList([integer(1), integer(2)])
 
@@ -643,7 +580,7 @@ describe("a key read again after a newer value was derived from it", () => {
 		expect(encodeKey(key, equality)).toEqual({ text: "l2:i1;i2;" })
 	})
 
-	// And the same for a front run, which `prepend` grows the same way.
+	// The same for a front run, which `prepend` grows the same way.
 	test("spells its own front items after a second prepend", () => {
 		let base = prepend(createList([integer(2)]), integer(1))
 
@@ -670,9 +607,8 @@ describe("a key read again after a newer value was derived from it", () => {
 		).toBe(10)
 	})
 
-	// The same in the other direction — a box that PREPENDED shares its
-	// front run with whatever prepends next, and its own count is what fixes
-	// where its view of that run stops.
+	// A prepended box shares its front run with the next prepend, and its own
+	// count fixes where its view stops.
 	test("keeps the text it had before a second prepend", () => {
 		let base = prepend(createList([integer(2)]), integer(1))
 		let before = encodeKey(base, equality) as EncodedKey
@@ -685,12 +621,9 @@ describe("a key read again after a newer value was derived from it", () => {
 	})
 })
 
-// REENTRANT USE. `removeDuplicates(on:)` takes a Function, and a Function
-// may append to the very List being walked — `List.ts` states the rule: a
-// native fixes its item counts once and never asks a run Array for its length
-// again. The keys are encoded inside that walk, so the walk has to cover the
-// items the box viewed when it started, exactly as it did when every operation
-// copied.
+// The Function `removeDuplicates(on:)` calls may append to the List being
+// walked. A native fixes its item counts once, so the walk covers the items the
+// box viewed when it began.
 describe("a callback that edits the List being walked", () => {
 	test("covers the items the receiver viewed when the walk began", () => {
 		let items = createList([integer(1), integer(2), integer(3)])
@@ -712,18 +645,12 @@ describe("a callback that edits the List being walked", () => {
 	})
 })
 
-// The brand on a CONDITIONAL conformance means "structural if the
-// conditions are", and `boundConformance` settles that with `every`. `Result`
-// and a generic Choice's derived witness can carry two conditions, and a
-// two-condition conformance branded because ONE of its conditions is structural
-// would send a key down the encoded path while the other condition's written
-// `is` is what the Program asked for. So the rule is held here directly, with
-// both conditions branded, each one alone, and neither.
+// A conditional conformance is structural only if every condition is. A brand
+// from one structural condition would send a key down the encoded path past the
+// other condition's written `is`.
 describe("a conditional conformance branded across two conditions", () => {
-	// Two Methods, because the currying is the other half of what
-	// `boundConformance` does and it must not change with the brand: whatever
-	// the conditions say about `structural`, both entries come back as
-	// Functions that were handed the conditions as trailing Arguments.
+	// Two Methods, since `boundConformance` also curries, whatever the brand:
+	// each comes back handed the conditions as trailing Arguments.
 	const twoConditions = (first: unknown, second: unknown) =>
 		boundConformance(
 			{
@@ -753,9 +680,8 @@ describe("a conditional conformance branded across two conditions", () => {
 		expect(twoConditions(written, written).structural).toBeUndefined()
 	})
 
-	// And a map that never carried the brand does not gain one from its
-	// conditions — the brand is the NAMESPACE's claim, which the conditions can
-	// only take away.
+	// The brand is the Namespace's claim, which the conditions can only take
+	// away.
 	test("is not branded when the method map never claimed it", () => {
 		expect(
 			boundConformance({ is: (...args: Array<unknown>) => args }, [
@@ -765,8 +691,8 @@ describe("a conditional conformance branded across two conditions", () => {
 		).toBeUndefined()
 	})
 
-	// The currying, unchanged in the branded case and the refused one
-	// alike. Both conditions arrive behind the call's own Arguments, in order.
+	// Branded or not, both conditions arrive behind the call's own Arguments, in
+	// order.
 	test("curries both conditions onto every Method either way", () => {
 		for (let [first, second] of [
 			[branded, branded],
