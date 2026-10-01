@@ -10021,9 +10021,8 @@ describe("Enricher", () => {
 		})
 	})
 
-	// A Match on an Integer or String value: a Case naming a value proves it,
-	// and the Case for the rest proves the value is none of the named ones. The
-	// Matchers themselves are untouched.
+	// In a Match on an Integer or String value, a Case naming a value proves it.
+	// The Case for the rest proves the value is none of the named ones.
 	describe("Refinement match narrowing", () => {
 		function handlersOf(
 			source: string,
@@ -10083,9 +10082,8 @@ describe("Enricher", () => {
 			).toEqual(["Zero", "Integer"])
 		})
 
-		// Every Case above contributes, so a refinement asking about two values
-		// is established by the two Cases that named them — and set INCLUSION means a
-		// refinement asking about one of them is established too.
+		// Every earlier Case contributes, so two named values establish a
+		// refinement asking about both, or about either.
 		it("should read every value the Cases above named", () => {
 			expect(
 				selfTypesOf(`implementation {
@@ -10120,10 +10118,8 @@ describe("Enricher", () => {
 			).toEqual(["String", "NotBlank"])
 		})
 
-		// The evidence is read off the Matchers alone, so it holds whatever the
-		// Validator makes of the Match's shape — a Guarded value Case is refused
-		// there, and it hands nothing down here either. Asked of a Union, where such
-		// a Case is legal and the Handlers below it really do see the value it named.
+		// A Guarded value Case hands nothing down, since its value may still
+		// reach later Cases. Asked of a Union, where such a Case is legal.
 		it("should not read a value a Guarded Case named", () => {
 			expect(
 				selfTypesOf(`implementation {
@@ -10141,8 +10137,8 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// A Guard runs AFTER the Matcher matched, not instead of it, so what the
-		// Handler's own Case named still holds inside its body.
+		// A Guard runs after the Matcher, so the Case's own value still holds in
+		// its body.
 		it("should keep the value its own Guarded Case named", () => {
 			expect(
 				selfTypesOf(`implementation {
@@ -10162,9 +10158,8 @@ describe("Enricher", () => {
 			).toBe("Zero")
 		})
 
-		// Nothing about the Match itself changes — the Matcher is the Type the
-		// runtime check is emitted from, and evidence is not a runtime question. This
-		// is the invariant that leaves the Rewriter needing no change at all.
+		// INVARIANT: the Matchers stay as written, since the runtime check is
+		// emitted from them.
 		it("should leave every Matcher as it was", () => {
 			expect(
 				handlersOf(`implementation {
@@ -10181,9 +10176,8 @@ describe("Enricher", () => {
 			).toEqual(["Integer", "Integer"])
 		})
 
-		// Two questions about the same value are not the same question. A String
-		// that is not the empty one HAS content, and the Compiler has no way to know
-		// that — the same rule an `if` narrows by.
+		// A String that is not empty has content, but the Compiler can not know
+		// that, as with an `if`.
 		it("should not narrow on a differently spelled predicate", () => {
 			expect(
 				selfTypesOf(`implementation {
@@ -10219,14 +10213,11 @@ describe("Enricher", () => {
 		})
 	})
 
-	// A value written DOWN needs no branch in front of it — its predicate is
-	// decided while compiling. What the Enricher does with that is choose an
-	// Overload by it, which is what these assert; the Statements a Program writes
-	// one into are the Validator's, and `validator.spec.ts` asserts those.
+	// A written value's predicate is decided while compiling, and the Enricher
+	// chooses Overloads by it. `validator.spec.ts` asserts the Statements.
 	describe("Refinement literal admission", () => {
-		// Two entries under one name, told apart by exactly the evidence the
-		// first one demands — so which one answered says whether the Argument was
-		// admitted, with no Diagnostic and no narrowing anywhere in the source.
+		// Two entries told apart by the evidence the first demands, so the one
+		// that answers says whether the Argument was admitted.
 		function scaled(argument: string): string {
 			return `implementation {
 				type NonZero = Integer where @::isNot(0)
@@ -10259,10 +10250,7 @@ describe("Enricher", () => {
 			).toBe(1)
 		})
 
-		// The evaluator reads a value that is WRITTEN. A name is a value the
-		// Program computes, however plainly it was computed a line above — deciding
-		// that would need an interpreter, which is what the allowlist exists not to
-		// be.
+		// A name is a computed value, and deciding it would need an interpreter.
 		it("should not admit a value the Program computes", () => {
 			expect(
 				lastConstantMethodInvocation(`implementation {
@@ -10325,10 +10313,7 @@ describe("Enricher", () => {
 				).toBe(1)
 			})
 
-			// An Integer bound standing where a Rational is compared is
-			// the same question about the same number — `Rational::isLessThan`
-			// declares an entry for each kind, and `1/2::isLessThan(1)` asks
-			// what `1/2::isLessThan(1/1)` asks.
+			// `1/2::isLessThan(1)` asks what `1/2::isLessThan(1/1)` asks.
 			function belowOne(argument: string): string {
 				return `implementation {
 					type BelowOne = Rational where @::isLessThan(1)
@@ -10361,11 +10346,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The whole reason admission answers a POSITION rather than writing
-		// the refinement onto the Node: the first entry here admits the Argument it
-		// is asked about and loses anyway, on the Argument after it. Nothing it
-		// admitted may reach the entry that wins — and nothing does, because there
-		// was never anywhere to leave it.
+		// Admission answers a position rather than writing onto the Node, so
+		// what a losing entry admitted can not reach the winner.
 		it("should leave nothing behind on a Node a losing candidate admitted", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
 				type NonZero = Integer where @::isNot(0)
@@ -10398,11 +10380,8 @@ describe("Enricher", () => {
 			).toEqual(["Integer", "Integer"])
 		})
 
-		// The RECEIVER of a Namespace over a refinement is a refinement in
-		// every entry, and it is not evidence any of them asked for — it can not
-		// tell two entries apart. Counting it put them all in one partition, which
-		// left the order they were written in, which is the one order an APPENDED
-		// refined entry can never win from.
+		// A refined receiver is in every entry, so it is not counted as
+		// evidence, and an appended refined entry is still probed first.
 		it("should probe an appended refined entry first under a refined receiver", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
 				type NonZero = Integer where @::isNot(0)
@@ -10428,17 +10407,12 @@ describe("Enricher", () => {
 			expect(printType(invocation.type)).toBe("Integer")
 		})
 
-		// The one position where the refinement standing there is not yet a
-		// Type: a Parameter written `NonEmptyList<Item>` whose `Item` the CALL has to
-		// work out. Asked as it stands, its base is `List<Item>` and no written List
-		// is of that Type at all — so what the value is asked about is the refinement
-		// the value itself DECIDES, the declared base unified against the written
-		// List's own Type. The Parameter is then bound through the base, exactly as an
-		// unrefined `List<Item>` would bind it.
+		// A `NonEmptyList<Item>` Parameter whose `Item` the call infers is not
+		// yet a Type. The value is asked about the refinement its own Type
+		// decides, and binds `Item` as an unrefined `List<Item>` would.
 		describe("a Type Argument the call infers", () => {
-			// The evidence is all that tells the two entries apart — the second
-			// one pins the items rather than inferring them, so the List that decides
-			// nothing still has an entry to fall to and the answer says which.
+			// Only the evidence tells the two entries apart. The second pins the
+			// items, so an undecided List still has an entry to fall to.
 			function counted(argument: string): string {
 				return `implementation {
 					namespace Counting for {} {
@@ -10464,11 +10438,8 @@ describe("Enricher", () => {
 				).toBe(0)
 			})
 
-			// An empty List decides nothing — `List<Item>` accepts a
-			// `List<Unknown>` without saying what `Item` is, and a refinement over a
-			// base nobody decided would hand the call a Type nobody wrote. So the
-			// unrefined entry answers, as it does for a List the predicate simply
-			// fails.
+			// An empty List decides no `Item`, so the unrefined entry answers, as
+			// for a List the predicate fails.
 			it("should not admit a written List that decides no Type Argument", () => {
 				expect(
 					lastConstantFunctionInvocation(counted("[]"))
@@ -10476,10 +10447,8 @@ describe("Enricher", () => {
 				).toBe(1)
 			})
 
-			// A Type Parameter binds the BASE and never the refinement — the v1
-			// rule, asked of the one Parameter a refinement is what decided. The
-			// return Type IS the binding here, and `firstItem` is total for it: the
-			// whole point of the Parameter having been admitted.
+			// A Type Parameter binds the base, never the refinement. The return
+			// Type is the binding, and `firstItem` is total for the admitted value.
 			it("should bind the Type Parameter to the base's items", () => {
 				expect(
 					printType(
@@ -10496,12 +10465,9 @@ describe("Enricher", () => {
 		})
 	})
 
-	// A RECEIVER is the one position that asks a value nothing. A
-	// Parameter, a declared Constant, a return position and an Argument matched
-	// against a refined entry each hand a written value a question; dispatch
-	// reads whatever the receiver's Type came to and looks a Namespace up in it.
-	// So the receiver asks ITSELF, of every refinement in scope at once, and
-	// carries the conjunction of everything admitted.
+	// No position asks a receiver a question, so a written receiver asks every
+	// refinement in scope itself and carries the conjunction admitted. See
+	// "Written receivers" in packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("A written receiver", () => {
 		function receiverTypeOf(body: string): string {
 			return printType(
@@ -10519,9 +10485,8 @@ describe("Enricher", () => {
 			)
 		}
 
-		// `3` proves both builtin predicates over an Integer, and
-		// `PositiveInteger` is the Alias whose conjuncts are exactly the two —
-		// so the conjunction has a name to print and prints under it.
+		// `3` proves both builtin Integer predicates, whose conjunction is
+		// `PositiveInteger`.
 		it("should carry every refinement the value is admitted into", () => {
 			expect(receiverTypeOf("constant text = 3::toString()")).toBe(
 				"PositiveInteger",
@@ -10537,11 +10502,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// Where no declared Alias proves the whole conjunction, the Type
-		// prints as the Declaration a reader would have to write for it — the
-		// conjuncts in the order they are compared, joined the way a chain is.
-		// It names the proof; like every other predicate spelling, it is not
-		// offered as something to paste.
+		// With no declared Alias for the whole conjunction, the Type prints as
+		// its conjuncts chained in comparison order.
 		it("should spell a conjunction no declared name covers", () => {
 			expect(
 				receiverTypeOf(`type Even = Integer where @::isEven()
@@ -10573,10 +10535,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// A written String proves `NonEmptyString`, and the Namespace over
-		// that proof declares no `trim` — trimming is one of the three Methods
-		// that CAN empty a String. So the call falls to `String`'s own, which
-		// is what a refinement adding Methods and taking none away means.
+		// `NonEmptyString` declares no `trim`, which can empty a String, so the
+		// call falls to `String`'s own.
 		it("should reach the base Namespace where nothing targets the proof", () => {
 			expect(receiverTypeOf('constant text = "abc"::trim()')).toBe(
 				"NonEmptyString",
@@ -10584,10 +10544,8 @@ describe("Enricher", () => {
 			expect(answerOf('constant text = "abc"::trim()')).toBe("String")
 		})
 
-		// And where the proof IS targeted, every answer it tightens says
-		// so: the count is above zero, the characters are a List with
-		// something in it, and either end is a character rather than an
-		// Optional.
+		// Where the proof is targeted, the answers tighten: a count above zero,
+		// characters in a proven List, and bare ends.
 		it("should spend the proof a written String carries", () => {
 			expect(answerOf('constant count = "abc"::length()')).toBe(
 				"PositiveInteger",
@@ -10613,10 +10571,8 @@ describe("Enricher", () => {
 			).toBe("Optional<Character>")
 		})
 
-		// A written List is counted by its BRACKETS, and an empty pair
-		// counts nothing — so the one predicate it could have proven is false
-		// of it and the receiver stays the List it is written as. A Boolean
-		// beside it, whose Type no refinement may even be written over.
+		// An empty written List proves nothing, and no refinement may be
+		// written over a Boolean.
 		it("should prove nothing about a written value the predicates refuse", () => {
 			expect(receiverTypeOf("constant grown = []::append(1)")).toBe(
 				"List<Unknown>",
@@ -10626,12 +10582,9 @@ describe("Enricher", () => {
 			)
 		})
 
-		// The other side of the same rule. A value the Program COMPUTES is
-		// a value nothing has decided anything about, however plainly it was
-		// computed a line above — which is what keeps every unproven entry
-		// reachable. A DIFFERENCE, because it is the arithmetic no refinement
-		// of Integer closes over: a sum and a product of two written Integers
-		// each answer a `PositiveInteger` and carry that proof on.
+		// A computed receiver proves nothing. A difference is used, since no
+		// Integer refinement closes over it, while sums and products of written
+		// Integers carry proofs.
 		it("should prove nothing about a computed receiver", () => {
 			expect(
 				answerOf(`constant two = 3::subtract(1)
@@ -10656,12 +10609,8 @@ describe("Enricher", () => {
 			).toBe("Algebraic")
 		})
 
-		// What the proof may never do is make an answer WIDER. A power at
-		// a non-negative exponent and a sum are whole numbers whatever the
-		// receiver proves, and each answers the tightest Integer the operands
-		// prove between them. A receiver proving only that it is not negative
-		// reaches no `raise` of its own, so a negative exponent there is still
-		// the entry that can come back empty.
+		// A proof never widens an answer. A power at a non-negative exponent and
+		// a sum answer the tightest Integer their operands prove.
 		it("should never widen an answer the base already gave", () => {
 			expect(answerOf("constant power = 2::raise(to 10)")).toBe(
 				"PositiveInteger",
@@ -10672,12 +10621,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// And where the proof tightens the answer it says so — a product
-		// of two proven Integers is proven itself, which is what `namespace
-		// NonZeroInteger` was written to carry. Two written factors prove both
-		// halves of the sign as well, and `namespace PositiveInteger` is
-		// narrower than either of the two it holds the proofs of, so it is the
-		// one the call reaches.
+		// A product of proven Integers is proven. Two written factors reach
+		// `PositiveInteger`, the narrowest Namespace holding both proofs.
 		it("should answer with the refinement a refined entry declares", () => {
 			expect(answerOf("constant product = 2::multiply(with 3)")).toBe(
 				"PositiveInteger",
