@@ -1077,3 +1077,57 @@ every key, not only the unencoded ones, as a Dictionary does in "Finding a Dicti
 A `KeyCount` counts each key for `mode`, keeping keys in the order each was first met. It takes no witness. The
 Namespaces that count hold Integers, Rationals or both, whose equality is the standard library's own, and every one
 of those encodes. A key with no encoding there is a mistake in a declaration, and `countKey` throws.
+
+## Universal equality
+
+`anyIs` in `internalHelpers.ts` is the structural equality used where no witness is in hand. It compares a Record's
+members, a Case's payload, and a List inside one of those. It has to answer what each kind's own `is` answers.
+Otherwise a value would equal its equal on its own but not inside a Record. A Dictionary keyed by such a Record would
+then open two slots for one key.
+
+It asks identity first. Equality here is reflexive: there is no NaN, and a Function compares by identity anyway. And
+identical operands are common, since Booleans, payload-free Cases and pooled literals are shared instances. A
+Function carries no tag, so it is answered before any tag is read.
+
+Two values with different tags are unequal, apart from an Integer and a Rational, which spell one value two ways.
+Those cross-multiply, as `Number.compare` does. `anyIs` does not call `Number.compare`, since every Program imports
+this module and that would bring the numeric tower in. An Algebraic or a Transcendental is irrational, and no number
+is both, so each can equal only a value of its own kind.
+
+- A String compares through `stringEquals`: the same code units, or failing that the same NFC form, which
+  `normalisedFormOf` remembers. That is the answer `String::is` gives. The Optimiser's `lower-scalar-operations`
+  compiles `a::is(b)` on two Strings to a call of it.
+- An Integer compares by `===`, since one Integer has one representation.
+- A Rational cross-multiplies its raw parts.
+- An Algebraic's radicand is not canonical past the trial-division bound, so the stored fields can differ for one
+  number. `a + b·√d` equals `a' + b'·√e` when the rational parts are equal, the coefficients share a sign, and
+  `b²·d = b'²·e`. All three are bigint products, so no interval arithmetic is imported.
+- A Transcendental is held in canonical form and compares field by field.
+- A Record compares through `Record.is`, and a List item by item through `anyIs`.
+- Any other tag asks the kind registry. Failing that, a tag holding a `#` is a Case whose payload compares as a
+  Record, and anything else is unequal.
+
+### Derived conformances
+
+A Choice whose Namespace writes no `is`, `toString` or `cases` gets them from helpers in `internalHelpers.ts`.
+`choiceIs` and `choiceIsNot` wrap `anyIs` in a Boolean. `choiceName` reads a payload-free Case's name after the last
+`#` of its tag, since a user Choice's tag carries its Module. `choiceCases` is curried with the tags in declaration
+order, since the Method is static and has no receiver to read them from. It builds a fresh List at every call, so it
+does not rely on every List operation leaving a shared Array's items alone.
+
+A generic Choice's payload may hold a Type Parameter whose equality is its own. `boundChoiceIs` is curried with a
+descriptor that says, for each tag, how each payload member compares. `eq` compares through `anyIs` and `w` through
+the witness at an index, and `list`, `dictionary`, `record`, `case` and `union` recurse. A List member seals both
+runs, since a witness is user code. A Dictionary member asks the kind registry's `equalsBy`. A Union member finds the
+arm each side belongs to, by tag and, where arms share a tag, by shape. Both sides must land on one arm. The one
+untagged and unshaped arm is the fallback, and two of them is a Compiler bug.
+
+`boundRecordIs` compares a Record some of whose declared members have a Namespace that writes its own `is`. Those
+members compare through their witnesses, and every other member through `anyIs`. The member sets must still match,
+since a Record may carry members its static Type does not show. The routed names stay an Array searched with
+`indexOf`, since a routed Record names few members. There is no `boundRecordIsNot`. `Record.es` writes no `isNot`,
+so `Equatable`'s provided body negates the routed `is`.
+
+`boundRecordToString` prints such a Record through the structural rendering, with a renderer for each routed member,
+as "The structural rendering" describes. Its table of renderers has no prototype. The walk reads the table by member
+name, and a member named `toString` or `constructor` would otherwise find `Object.prototype`'s Function.
