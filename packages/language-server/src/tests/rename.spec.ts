@@ -23,8 +23,8 @@ function findOccurrence(source: string, cursor: common.Cursor) {
 	return findRenameableOccurrence(program, cursor, enrichedProgram)
 }
 
-// Applies a rename textually so that the expectations below can state
-// full programs instead of position lists.
+// Applies a rename textually, so an expectation can state a whole Program
+// rather than a list of Positions.
 function rename(source: string, cursor: common.Cursor, newName: string) {
 	let occurrence = findOccurrence(source, cursor)
 
@@ -34,10 +34,9 @@ function rename(source: string, cursor: common.Cursor, newName: string) {
 
 	let lines = source.split("\n")
 
-	// Applied through `renameEdits`, which is what the Server applies —
-	// so a Pattern's shorthand expansion is exercised here rather than only
-	// described. One site can write more than one edit, and an edit's span is
-	// its own: a binder added after a Type is an INSERTION at an empty span.
+	// Applied through `renameEdits`, as the Server applies it, so a shorthand
+	// expansion is exercised. One site may write several edits, and a binder
+	// added after a Type is an insertion at an empty span.
 	let edits = occurrence.declaration.occurrences
 		.flatMap((site) => renameEdits(site, newName))
 		.sort(
@@ -59,11 +58,8 @@ function rename(source: string, cursor: common.Cursor, newName: string) {
 }
 
 describe("Rename", () => {
-	// A file being edited is a file that does not compile, so every walk
-	// here runs over trees with refusals in them. This is the one walk where
-	// missing a Node writes a WRONG answer rather than none: the name in front
-	// of a refused index is an occurrence a reader can see, and skipping it
-	// would leave the file naming two things where it named one.
+	// A file being edited holds refusals. The name in front of a refused index
+	// is an occurrence a reader can see. Skipped, it would name a second thing.
 	it("should reach the name a refused index was written on", () => {
 		let source = [
 			"implementation {",
@@ -233,9 +229,8 @@ describe("Rename", () => {
 		)
 	})
 
-	// A Method bounding the Namespace's Parameter MENTIONS it rather than
-	// declaring it, so a rename of the Namespace's own declaration has to reach
-	// into the Method's `<…>` as well — the two names are one name.
+	// A Method bounding the Namespace's Parameter mentions it rather than
+	// declaring it, so the rename reaches into the Method's `<…>` as well.
 	it("should rename a per-Method bound along with the Parameter", () => {
 		let source = [
 			"implementation {",
@@ -396,8 +391,8 @@ describe("Rename of argument labels", () => {
 			"}",
 		].join("\n")
 
-		// From the Parameter, from the body and from the call site
-		// label — all three rename the same symbol.
+		// The Parameter, the body and the call site label all rename the same
+		// symbol.
 		expect(rename(source, { line: 2, column: 18 }, "name")).toBe(renamed)
 		expect(rename(source, { line: 3, column: 6 }, "name")).toBe(renamed)
 		expect(rename(source, { line: 6, column: 8 }, "name")).toBe(renamed)
@@ -414,7 +409,7 @@ describe("Rename of argument labels", () => {
 			"}",
 		].join("\n")
 
-		// Renaming the internal name never touches the label…
+		// Renaming the internal name never touches the label.
 		expect(rename(source, { line: 3, column: 6 }, "amount")).toBe(
 			[
 				"implementation {",
@@ -427,8 +422,8 @@ describe("Rename of argument labels", () => {
 			].join("\n"),
 		)
 
-		// …and renaming the label — from its declaration or from the
-		// call site — never touches the internal name.
+		// Renaming the label, from its declaration or the call site, never
+		// touches the internal name.
 		let labelRenamed = [
 			"implementation {",
 			"\tfunction apply (via value: Integer) -> Integer {",
@@ -493,12 +488,9 @@ describe("Rename of argument labels", () => {
 		)
 	})
 
-	// The same Parameter, and the name the rename may NOT be given. The
-	// Parser reuses one Identifier for the binding and the call site label, so
-	// a rename to `start` rewrites `compute(seed 1)` into `compute(start 1)` —
-	// which the Parser reads as a `start` of `1`, with the label gone and the
-	// call refused by `argument-label-mismatch`. The declaration is marked for
-	// exactly that, and the mark is what picks the stricter of the two rules.
+	// One Identifier is both the binding and the call site label, so a rename
+	// to `start` would write `compute(start 1)`, a `start` of `1`. The mark picks
+	// the stricter of the two rules.
 	it("should mark a Parameter whose name doubles as its label", () => {
 		let source = [
 			"implementation {",
@@ -518,9 +510,8 @@ describe("Rename of argument labels", () => {
 		expect(isValidBindingLabelName("amount")).toBe(true)
 	})
 
-	// And a Parameter with a label of its own is two symbols, so renaming
-	// the BINDING never touches a call site and either word is a name it may
-	// take.
+	// A Parameter with a label of its own is two symbols. Renaming the binding
+	// never touches a call site, so either word is a name it may take.
 	it("should leave a Parameter behind its own label unmarked", () => {
 		let source = [
 			"implementation {",
@@ -537,9 +528,8 @@ describe("Rename of argument labels", () => {
 		expect(occurrence?.declaration.labelled).toBeUndefined()
 	})
 
-	// `with` is a Keyword the grammar's Identifier rule reads as an
-	// ordinary Identifier in label position — the standard library's own
-	// dominant label — so a label may be renamed to it and the result parses.
+	// The grammar reads `with` as an Identifier in label position, as the
+	// standard library writes it, so a label may be renamed to it.
 	it("should rename an explicit label to a Keyword the grammar accepts there", () => {
 		let source = [
 			"implementation {",
@@ -569,9 +559,8 @@ describe("Rename of argument labels", () => {
 })
 
 describe("Rename in an overload function block", () => {
-	// `overload function` is a declarations-mode form — the standard
-	// library's alone — so these parse with its header and rename off the
-	// Parser index, exactly as the Server indexes a standard library source.
+	// `overload function` is the standard library's form alone, so these parse
+	// with its header and rename off the Parser index, as the Server does there.
 	function renameDeclarations(
 		source: string,
 		cursor: common.Cursor,
@@ -786,8 +775,8 @@ describe("Rename of Methods and Record members", () => {
 			"}",
 		].join("\n")
 
-		// `person` also has a `name`, but its shape is neither a
-		// subset nor a superset of `box` — it stays untouched.
+		// `person` also has a `name`, but its shape is neither a subset nor a
+		// superset of `box`, so it stays untouched.
 		expect(rename(source, { line: 4, column: 23 }, "label")).toBe(
 			[
 				"implementation {",
@@ -809,9 +798,8 @@ describe("Rename of Methods and Record members", () => {
 		expect(findOccurrence(source, { line: 2, column: 31 })).toBeNull()
 	})
 
-	// Both bind in the typed pass, which used to see nothing but a
-	// Handler's body — a Method invoked only from a Guard renamed at its
-	// declaration and nowhere else, which silently broke the Program.
+	// The typed pass walks a Guard as well as a Handler's body, so a Method
+	// invoked only from a Guard renames there too.
 	it("should rename a Method invoked from a Match Guard", () => {
 		let source = [
 			"implementation {",
@@ -875,8 +863,8 @@ describe("Rename of Methods and Record members", () => {
 	})
 
 	it("should rename a Case Matcher's payload binding from Matcher, Guard and body", () => {
-		// The Case's own member keeps its name — a payload binding is a
-		// local name for the value, not a second spelling of the member.
+		// The Case's own member keeps its name, since a payload binding is a
+		// local name for the value.
 		let source = [
 			"implementation {",
 			"\tchoice Shape {",
@@ -1052,16 +1040,14 @@ describe("isValidIdentifierName", () => {
 		expect(isValidIdentifierName("match")).toBe(false)
 		expect(isValidIdentifierName("choice")).toBe(false)
 		expect(isValidIdentifierName("true")).toBe(false)
-		// `define` opens an Expression, so a Declaration named after it
-		// is read as one: `constant define = 1` is a syntax error, and so is
-		// every line that names it afterwards.
+		// `define` opens an Expression, so `constant define = 1` is a syntax
+		// error, and so is every line that names it.
 		expect(isValidIdentifierName("define")).toBe(false)
 	})
 
-	// And the two words that are NOT reserved, though they are Keywords.
-	// Both are contextual — the Keyword only in front of an Expression — so a
-	// binding may carry either name, and the standard library's own fold seeds
-	// and range positions do.
+	// The asynchrony Keywords are contextual, read as Keywords only in front
+	// of an Expression, so a binding may carry either name. The standard library
+	// binds `start`.
 	it("should accept the two asynchrony Keywords", () => {
 		expect(isValidIdentifierName("start")).toBe(true)
 		expect(isValidIdentifierName("complete")).toBe(true)
@@ -1089,10 +1075,9 @@ describe("isValidLabelName", () => {
 		expect(isValidLabelName("1value")).toBe(false)
 	})
 
-	// The one position the two asynchrony Keywords may not stand in, and
-	// the only place a label is stricter than a binding. A label is written
-	// directly in front of its value, which is where the prefix form opens, so
-	// `compute(start 1)` is a `start` of `1` and the label is gone.
+	// A label stands directly in front of its value, where the prefix form
+	// opens, so `compute(start 1)` is a `start` of `1`. See "Names a rename may
+	// write" in packages/language-server/DEVELOPMENT.md.
 	it("should refuse the two asynchrony Keywords a binding may take", () => {
 		expect(isValidLabelName("start")).toBe(false)
 		expect(isValidLabelName("complete")).toBe(false)
@@ -1100,9 +1085,8 @@ describe("isValidLabelName", () => {
 	})
 })
 
-// And the name a Parameter whose name DOUBLES as its label may take,
-// which is neither rule on its own: `with` binds nothing and `start` labels
-// nothing, so what is left is what both admit.
+// A Parameter whose name doubles as its label may take only what both rules
+// admit: `with` binds nothing and `start` labels nothing.
 describe("isValidBindingLabelName", () => {
 	it("should refuse what only a label may be", () => {
 		expect(isValidBindingLabelName("with")).toBe(false)
@@ -1122,10 +1106,8 @@ describe("isValidBindingLabelName", () => {
 	})
 })
 
-// Accepting a name is only half of it — what the rename WRITES has to
-// still be the Program it was. Both words are read as Keywords in front of an
-// Expression, so every position here is re-parsed rather than only compared,
-// and the standard library's own sources write each of them.
+// What the rename writes must still be the Program it was. Both words read as
+// Keywords in front of an Expression, so every result is parsed again.
 describe("Rename to an asynchrony Keyword", () => {
 	function parsesCleanly(source: string): Array<common.Diagnostic> {
 		return parseWithDiagnostics(source).diagnostics
@@ -1176,8 +1158,8 @@ describe("Rename to an asynchrony Keyword", () => {
 	})
 })
 
-// A provided body is a Method body like any other, so the call it makes
-// to another Method of its Protocol is an occurrence of that Method.
+// A provided body is a Method body like any other, so its call to another
+// Method of its Protocol is an occurrence of that Method.
 const PROVIDED_BODY_CALL = [
 	"implementation {",
 	"\tprotocol Sizable {",
@@ -1343,9 +1325,8 @@ describe("findOccurrences (Document Highlight)", () => {
 		expect(occurrencesOf(source, { line: 2, column: 2 })).toEqual([])
 	})
 
-	// The Server's Document Highlight falls back to this for anything
-	// the workspace join has no symbol for — a builtin above all — so builtins
-	// highlight exactly as References already finds them.
+	// Document Highlight falls back to this where the workspace join has no
+	// symbol, as for a builtin, so builtins highlight as References finds them.
 	it("should report occurrences of builtins, like References", () => {
 		let source = [
 			"implementation {",
@@ -1468,9 +1449,8 @@ describe("identifierPattern", () => {
 			)
 		})
 
-		// Declared INSIDE the body. A provided Method may not read what
-		// the Program declares around it — it is emitted above the Program —
-		// so a Constant of its own is the only one a body can hold.
+		// Declared inside the body, since a provided Method may not read what
+		// the Program declares around it.
 		it("should rename a Constant a provided Method's body reads", () => {
 			let source = [
 				"implementation {",
@@ -1491,11 +1471,9 @@ describe("identifierPattern", () => {
 			)
 		})
 
-		// A provided Method is a Method of every conformer, so a rename
-		// asked at a call has to move the Protocol's declaration and every
-		// other call with it. The call resolves through the PROTOCOL — the
-		// Namespace it names is the Protocol's pseudo one — which is why the
-		// index keeps a table of Protocol members beside the Namespace one.
+		// A provided Method is a Method of every conformer, so a rename asked at
+		// a call moves the Protocol's declaration and every other call. The call
+		// resolves through the Protocol's members.
 		const SIZABLE = [
 			"implementation {",
 			"\tprotocol Sizable {",
@@ -1533,10 +1511,8 @@ describe("identifierPattern", () => {
 			)
 		})
 
-		// The Namespace spelling reads the same Method off the Namespace
-		// whose conformance put it in reach, so it has to move with the rest —
-		// left behind, it names a member the Namespace does not declare and the
-		// renamed Program no longer compiles.
+		// The Namespace spelling reads the same Method off the conforming
+		// Namespace, so it moves with the rest.
 		it("should rename a provided Method from its Namespace spelling", () => {
 			expect(rename(SIZABLE, { line: 21, column: 24 }, "vacant")).toBe(
 				SIZABLE.replaceAll("isEmpty", "vacant"),
@@ -1581,7 +1557,7 @@ describe("identifierPattern", () => {
 
 		// The member is declared in the standard library, which no rename
 		// reaches, so renaming the Method alone would break the conformance.
-		// `Boxes` reaches it through an extension.
+		// `Boxes` conforms through an extension.
 		it("should not rename a Method that answers a builtin Protocol's member", () => {
 			let source = [
 				"implementation {",
@@ -1756,8 +1732,8 @@ describe("identifierPattern", () => {
 			).toBe(REQUIREMENTS.replaceAll("empty", "blank"))
 		})
 
-		// Left behind, the override would stop overriding and every
-		// call through `Sizable` would quietly run the provided body instead.
+		// Left behind, the override would stop overriding, and every call
+		// through `Sizable` would run the provided body.
 		it("should rename a conformer's override of a provided Method with it", () => {
 			expect(rename(REQUIREMENTS, { line: 6, column: 3 }, "vacant")).toBe(
 				REQUIREMENTS.replaceAll("isEmpty", "vacant"),
@@ -2054,11 +2030,9 @@ describe("Rename through where clauses", () => {
 	})
 })
 
-// A Pattern's bare member names TWO things with one Identifier — the
-// Record's member and the local it binds — so renaming either end has to spell
-// the other out beside it. Everything here is about that one fact; a Pattern
-// that already writes its binder needs nothing special and is asserted to stay
-// ordinary.
+// A Pattern's bare member names the Record's member and the local it binds,
+// so renaming either end spells the other out beside it. See "Shorthand
+// edits" in packages/language-server/DEVELOPMENT.md.
 describe("Rename with Patterns", () => {
 	const declaration = [
 		"implementation {",
@@ -2085,9 +2059,8 @@ describe("Rename with Patterns", () => {
 	})
 
 	it("expands a shorthand binder the other way when the MEMBER is renamed", () => {
-		// Started from the Record literal, because a cursor ON the binder
-		// always finds the local first — the member half is reached from any of
-		// the sites that write the member itself.
+		// Started from the Record literal, since a cursor on the binder finds
+		// the local first.
 		expect(rename(declaration, { line: 2, column: 19 }, "breadth")).toBe(
 			[
 				"implementation {",
@@ -2202,15 +2175,13 @@ describe("Rename with Patterns", () => {
 	})
 
 	// `as` separates a member from the name it binds under, so a binder
-	// renamed to it would read as the separator it is.
+	// renamed to it would read as the separator.
 	it("refuses 'as' as a rename target", () => {
 		expect(isValidIdentifierName("as")).toBe(false)
 	})
 
 	// The grammar is `Identifier ":" Type "as" Binder`, so the binder goes
-	// after the Type. Writing it straight after the name produced
-	// `{ breadth as width: Integer }`, which is not a Pattern — a plain rename
-	// turned a clean file into a syntax error.
+	// after the Type. `{ breadth as width: Integer }` is not a Pattern.
 	it("writes the expansion AFTER the Type when the member is renamed", () => {
 		let source = [
 			"implementation {",
@@ -2235,9 +2206,8 @@ describe("Rename with Patterns", () => {
 		)
 	})
 
-	// Every step of a spine carries the span it was WRITTEN at. Given the
-	// innermost binder's span instead, renaming the outer member overwrote the
-	// inner binders and destroyed the whole Pattern.
+	// Every step of a spine carries the span it was written at, so renaming
+	// the outer member leaves the inner binders alone.
 	it("renames a nested Pattern's outer member without touching its binders", () => {
 		let source = [
 			"implementation {",
@@ -2262,9 +2232,9 @@ describe("Rename with Patterns", () => {
 		)
 	})
 
-	// A Guard's use of a binding lowers to a Lookup off `@`, and that
-	// Lookup is indexed. Given the USE's span for its member step, renaming the
-	// member overwrote the Guard's own identifier and left the binder behind.
+	// A Guard's use of a binding lowers to an indexed Lookup off `@`. Its
+	// member step must not carry the use's span, or renaming the member would
+	// overwrite the Guard's own Identifier.
 	it("renames a member without rewriting a Guard's use of the binding", () => {
 		let source = [
 			"implementation {",
@@ -2298,7 +2268,7 @@ describe("Rename with Patterns", () => {
 	})
 
 	// An annotation inside a nested Pattern is a Type reference like any
-	// other; one left out of the index is one a rename leaves dangling.
+	// other, and one left out of the index would dangle.
 	it("renames a Type named inside a nested Pattern", () => {
 		let source = [
 			"implementation {",
@@ -2318,12 +2288,9 @@ describe("Rename with Patterns", () => {
 	})
 })
 
-// A Record Literal's bare member is the Pattern's shorthand read the
-// other way round — `{ width }` WRITES the member and READS a value, with one
-// Identifier for both — so renaming either end has to spell the other out
-// beside the new name. The expansion is what the author would have written by
-// hand, and it is the only way to rename one end at all: the two names are the
-// same characters.
+// A Record Literal's bare member writes the member and reads a value with one
+// Identifier, so renaming either end spells the other out beside it. See
+// "Shorthand edits" in packages/language-server/DEVELOPMENT.md.
 describe("Rename with Record shorthand", () => {
 	const source = [
 		"implementation {",
@@ -2356,9 +2323,8 @@ describe("Rename with Record shorthand", () => {
 	})
 
 	it("expands a shorthand member the other way when the MEMBER is renamed", () => {
-		// Started from the Type, because a cursor ON the member always
-		// finds the value first — exactly as it finds a Pattern's local first.
-		// The member half is reached from any site that writes the member.
+		// Started from the Type, since a cursor on the member finds the value
+		// first, as it finds a Pattern's local first.
 		expect(rename(source, { line: 2, column: 17 }, "across")).toBe(
 			[
 				"implementation {",
@@ -2375,9 +2341,8 @@ describe("Rename with Record shorthand", () => {
 		)
 	})
 
-	// The value is renamed from a site of its own here, so the rename
-	// starts nowhere near the shorthand — the expansion still has to happen,
-	// because the member's braces are where the name is written.
+	// The rename starts at another use of the value, far from the shorthand,
+	// and the shorthand still expands.
 	it("expands from a use of the value elsewhere in the file", () => {
 		let elsewhere = [
 			"implementation {",
@@ -2426,10 +2391,8 @@ describe("Rename with Record shorthand", () => {
 		)
 	})
 
-	// The two ends stay two symbols at one Position. Highlighting the
-	// value must not light up the member's other sites, or the shorthand would
-	// read as one name meaning one thing — which is the very confusion the
-	// expansion exists to prevent.
+	// The two ends stay two symbols at one Position, so highlighting the value
+	// does not light up the member's other sites.
 	it("keeps the member and the value apart in Document Highlight", () => {
 		let { program } = parseWithDiagnostics(source)
 		let { program: enrichedProgram } = enrich(program)
@@ -2446,8 +2409,7 @@ describe("Rename with Record shorthand", () => {
 	})
 
 	// A shorthand inside an update's braced right-hand side is a Record
-	// Literal like any other — the key list is the one place it can not be
-	// written, and the rename index must not confuse the two.
+	// Literal like any other. A bare key list cannot hold one.
 	it("expands a shorthand inside an update's braced right-hand side", () => {
 		let merged = [
 			"implementation {",
@@ -2475,11 +2437,9 @@ describe("Rename with Record shorthand", () => {
 	})
 })
 
-// One file's own view of the two Module sections. What crosses a file
-// boundary is the workspace index's business — `workspace.spec.ts` — and what
-// is asserted here is the half that has to hold without one: an entry binds a
-// name, uses of it resolve to that entry, and an export entry reads the
-// declaration it publishes.
+// One file's own view of the Module sections: an entry binds a name, its uses
+// resolve to it, and an export entry reads its declaration. `workspace.spec.ts`
+// covers what crosses files.
 describe("Rename through the Module sections", () => {
 	it("should rename an import entry together with every use of it", () => {
 		let source = [
@@ -2513,9 +2473,8 @@ describe("Rename through the Module sections", () => {
 		)
 	})
 
-	// An aliased entry binds the alias and nothing else — the name on the
-	// other side of the `as` is what the exporting Module publishes, and one
-	// file has no business renaming that.
+	// An aliased entry binds the alias alone. The name before the `as` is what
+	// the exporting Module publishes.
 	it("should bind an aliased import under its alias alone", () => {
 		let source = [
 			"import {",
@@ -2555,9 +2514,8 @@ describe("Rename through the Module sections", () => {
 		)
 	})
 
-	// A local declaration wins the name over an entry that also binds it —
-	// the Compiler refuses that entry, so a use of the name resolves to the
-	// declaration, and renaming it must not reach into the import block.
+	// The Compiler refuses an entry that a local declaration also binds. A use
+	// resolves to the declaration, and the rename stays out of the import block.
 	it("should let a declaration of the same name win over an entry", () => {
 		let source = [
 			"import {",
@@ -2583,10 +2541,8 @@ describe("Rename through the Module sections", () => {
 	})
 })
 
-// The headline regression this feature could introduce: a default is an
-// Expression written outside every body, so a walker that only descends into
-// bodies leaves the occurrence inside `= …` behind — silently, and the rename
-// produces code that no longer compiles.
+// A default is an Expression written outside every body, so a walk of bodies
+// alone would leave the occurrence inside `= …` behind.
 describe("Rename of a name a default reads", () => {
 	it("renames a module Constant read by a default", () => {
 		let source = [
@@ -2612,8 +2568,8 @@ describe("Rename of a name a default reads", () => {
 		)
 	})
 
-	// A default sees the Parameters to its LEFT, so one of them can be
-	// renamed from inside it — and the two occurrences are one symbol.
+	// A default sees the Parameters before it, so one of them can be renamed
+	// from inside it.
 	it("renames a Parameter a later default reads", () => {
 		let source = [
 			"implementation {",
@@ -2635,9 +2591,7 @@ describe("Rename of a name a default reads", () => {
 	})
 })
 
-// The same hole one level over: a Case payload's `= { … }` is written
-// outside every body too, so a walk that stops at bodies leaves the occurrence
-// inside it behind and the rename produces a Choice that no longer compiles.
+// A Case payload's `= { … }` is written outside every body too.
 describe("Rename of a name a Case payload default reads", () => {
 	it("renames a module Constant read by a payload default", () => {
 		let source = [
@@ -2663,9 +2617,8 @@ describe("Rename of a name a Case payload default reads", () => {
 		)
 	})
 
-	// Renamed FROM inside the default, which is the direction that only
-	// works if the walk bound the occurrence there rather than merely skipping
-	// over it.
+	// Renamed from inside the default, which works only if the walk bound the
+	// occurrence there.
 	it("renames from the occurrence inside the default", () => {
 		let source = [
 			"implementation {",
@@ -2690,10 +2643,9 @@ describe("Rename of a name a Case payload default reads", () => {
 		)
 	})
 
-	// A path spells member names and nothing else, and it is indexed off
-	// the Lookups the Enricher synthesizes for it — each standing at the span of
-	// the step that spelled it. That invariant is what earns rename here with no
-	// code of its own, so it is pinned from both ends.
+	// A path is indexed off the Lookups the Enricher synthesizes for it, each
+	// at the span of its step. Rename relies on that, so it is pinned from both
+	// ends.
 	describe("member paths", () => {
 		let source = [
 			"implementation {",
@@ -2724,12 +2676,9 @@ describe("Rename of a name a Case payload default reads", () => {
 		})
 	})
 
-	// Every step of a dotted key is a member occurrence, and no two of
-	// them are reached the same way. The first is a key of the list that was
-	// written; the ones after it are the member Identifiers of the Lookups the
-	// Enricher synthesized, which stand exactly where the steps do; the LAST is
-	// a key of a list that exists nowhere in the written source at all, and is
-	// carried by `memberPositions`.
+	// Every step of a dotted key is a member occurrence. The first is a key of
+	// the written list, the middle ones are synthesized Lookups at the steps'
+	// spans, and `memberPositions` carries the last.
 	describe("path keys", () => {
 		let source = [
 			"implementation {",
@@ -2772,9 +2721,8 @@ describe("Rename of a name a Case payload default reads", () => {
 			)
 		})
 
-		// A braced descend reaches its members the same way — its own
-		// keys are a written list the lexical walk sees, and a path inside it
-		// carries on through the Lookups the desugar wrote.
+		// A braced descend's keys are a written list the lexical walk sees, and
+		// a path inside it goes on through the Lookups the desugar wrote.
 		it("renames a member a braced descend writes", () => {
 			let descended = [
 				"implementation {",
@@ -2795,11 +2743,9 @@ describe("Rename of a name a Case payload default reads", () => {
 			)
 		})
 
-		// An Argument merged into a default carries path keys too, and
-		// there are no synthesized Lookups under one — the levels ARE the
-		// Record Literals the merge is made of, so every step but the first is
-		// a key of a list that exists nowhere in the written source and is
-		// carried by `memberPositions` alone.
+		// An Argument merged into a default has path keys but no synthesized
+		// Lookups, so `memberPositions` alone carries every step after the
+		// first.
 		describe("in an Argument merged into a default", () => {
 			let merged = [
 				"implementation {",
@@ -2859,9 +2805,8 @@ describe("Rename of a name a Case payload default reads", () => {
 	})
 })
 
-// A `define` opens no Scope of its own — an arm is read in the very Scope
-// the Keyword stands in — so every name written in one is an occurrence of a
-// Declaration made outside it.
+// A `define` opens no Scope of its own, so every name written in an arm is an
+// occurrence of a Declaration made outside it.
 describe("Rename inside a define", () => {
 	it("should rename a Parameter read in both halves of an arm", () => {
 		let source = [
@@ -2922,10 +2867,8 @@ describe("Rename inside a define", () => {
 	})
 })
 
-// What a rename has to reach through: a name read under one of the two
-// Keywords is a read like any other, and a walk that stopped at the Keyword
-// would rename the declaration and leave the use behind — a Program that no
-// longer compiles.
+// A name read under `start` or `complete` is a read like any other. A walk
+// that stopped at the Keyword would leave the use behind.
 describe("Rename through start and complete", () => {
 	it("should rewrite a name read under either Keyword", () => {
 		let source = [
@@ -2953,12 +2896,9 @@ describe("Rename through start and complete", () => {
 		)
 	})
 
-	// The typed walk as well as the Parser one — a Method resolved through
-	// its receiver's Type is indexed by the second, and renaming a Namespace
-	// member is what asks it. The call sits INSIDE the operand, which is where a
-	// Method call written with a `complete` always sits: the Keyword takes the
-	// whole postfix chain, so `complete x::m()` is the chain completed rather
-	// than a Method called on what was waited for.
+	// The typed walk indexes a Method resolved through its receiver's Type.
+	// The Keyword takes the whole postfix chain, so the call sits inside the
+	// operand.
 	it("should rewrite a Method called inside the operand", () => {
 		let source = [
 			"implementation {",
