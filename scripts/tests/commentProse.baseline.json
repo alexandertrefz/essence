@@ -105,7 +105,7 @@
 	"packages/compiler/src/enricher/builtins.ts": {"sentence-length": 69, "em-dash": 48, "all-caps": 47, "position": 12, "block-length": 15, "counts": 1, "citation": 1},
 	"packages/compiler/src/enricher/contracts.ts": {"sentence-length": 31, "em-dash": 19, "all-caps": 17, "position": 1, "block-length": 4},
 	"packages/compiler/src/enricher/enrich.ts": {"sentence-length": 115, "em-dash": 87, "all-caps": 67, "position": 4, "block-length": 25},
-	"packages/compiler/src/enricher/enrichers.ts": {"sentence-length": 1019, "em-dash": 739, "all-caps": 620, "history": 17, "position": 46, "block-length": 241, "stacked": 1, "counts": 1, "citation": 2},
+	"packages/compiler/src/enricher/enrichers.ts": {"sentence-length": 922, "em-dash": 653, "all-caps": 556, "history": 13, "position": 40, "block-length": 219, "stacked": 1, "counts": 1, "citation": 2},
 	"packages/compiler/src/enricher/examples.ts": {"sentence-length": 11, "em-dash": 7, "all-caps": 1},
 	"packages/compiler/src/enricher/primitives.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 7, "position": 2, "block-length": 1},
 	"packages/compiler/src/enricher/resolvers.ts": {"sentence-length": 549, "em-dash": 391, "all-caps": 338, "history": 8, "position": 44, "block-length": 129, "stacked": 1, "counts": 3},

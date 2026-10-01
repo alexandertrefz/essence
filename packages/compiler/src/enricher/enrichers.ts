@@ -2343,17 +2343,14 @@ function enrichFunctionValue(
 	}
 }
 
-// The Scopes the Function literals currently being enriched were written
-// in, innermost last. A name resolving AT or ABOVE one of them is captured
-// rather than local, and a capture is the one thing a later assignment can not
-// repair: the body is checked once, here, against the Type the captured name
-// has at this moment.
+// The Scopes of the Function literals being enriched, innermost last. A name
+// resolving at or above one is captured, and the body is checked once against
+// the Type the captured name has now.
 let captureBoundaries: Array<enricher.Scope> = []
 
-// Whether `declaringScope` is the Scope the innermost Function literal
-// was written in, or one it can see — walking OUTWARDS from the boundary, so
-// that the literal's own Parameters and locals, which live in a Scope below it,
-// are not mistaken for captures.
+// Whether `declaringScope` is the innermost literal's Scope or an ancestor of
+// it. The literal's own Parameters and locals live below the boundary and are
+// no captures.
 function isCapturedFrom(
 	boundary: enricher.Scope,
 	declaringScope: enricher.Scope,
@@ -2371,12 +2368,9 @@ function isCapturedFrom(
 	return false
 }
 
-// Narrowing decides an undecided Type at the assignment that decides it,
-// which is too late for a Function literal written above one: its body was
-// already checked against the undecided Type, and `List<Unknown>` fits every
-// List, so a captured `items` could be returned as a List of Strings and hold
-// Integers at runtime. The capture is refused instead — it is the one place
-// where nothing later can make the body's Types true.
+// A capture of an undecided Type, such as a `List<Unknown>` from `[]`, is
+// refused. The body was checked against a Type that fits every List, and a
+// later assignment can not make that check true.
 function reportUninferableCapture(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -2395,18 +2389,9 @@ function reportUninferableCapture(
 	}
 
 	let declarationPosition = declaringScope.declarations[node.content] ?? null
-	// A Dictionary has no item Type — it has two slots, and an empty
-	// `[=]` decides neither — so the sentence a List is refused with is not a
-	// sentence about one. The Help above all: 'variable ages: List<Integer> =
-	// []' written under a Declaration whose value is `[=]` is advice that does
-	// not compile.
-	//
-	// Both are read off the Declaration rather than assumed. The Help used to
-	// spell one Type and one keyword whatever it was answering, and a `constant
-	// f = Async.deferred(() { <- [] })` — a blank two containers deep, under a
-	// name that can not be assigned to at all — was told to write 'variable f:
-	// List<Integer> = []'. The annotation is the captured Type with its blanks
-	// filled at the depth they stand, under the keyword the Declaration used.
+	// A Dictionary has two slots rather than an item Type. The Help's
+	// annotation is the captured Type with its blanks filled where they stand,
+	// under the Declaration's own keyword.
 	let annotation = undecidedSlotAnnotation(
 		type,
 		declaringScope.constants.has(node.content) ? "constant" : "variable",
@@ -2440,11 +2425,8 @@ function reportUninferableCapture(
 					? "An empty Dictionary Literal leaves its key and value Types unknown until an assignment decides them, and this Function was checked before that happened."
 					: "An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
 			],
-			// An example, and said to be one. Nothing was refused here — a
-			// capture is turned away for being read before anything decided it —
-			// so there is no value to read the blank off, and the Type printed is
-			// made up. A reader shown `List<Integer>` with no hedge reasonably
-			// reads it as the answer.
+			// The printed Type is made up, since nothing decided the blank, so
+			// the Help says it is an example.
 			helps: [
 				`Annotate the declaration — '${annotation.annotation}', for instance — so the Function is checked against the ${dictionary ? "Types" : "Type"} it will hold.`,
 			],
@@ -2454,11 +2436,8 @@ function reportUninferableCapture(
 	capturesReportedUndecided.add(node)
 }
 
-// The captures already refused for being read before their Type was
-// decided. The call AROUND such a capture has an undecided receiver, so every
-// Type Parameter that receiver would have bound is unbound too —
-// `items::length()` over a `variable items = []` reported the capture and then
-// reported `ItemType` on top of it, which is the same mistake counted twice.
+// Captures already refused for an undecided Type. The call around one has an
+// undecided receiver, so its unbound Type Parameters are not reported again.
 let capturesReportedUndecided = new WeakSet<parser.IdentifierNode>()
 
 function enrichListValue(
@@ -2466,10 +2445,9 @@ function enrichListValue(
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
 ): common.typed.ListValueNode {
-	// A List's items stand in the item position of whatever the List is
-	// expected to be, so that is the expected Type they are enriched under —
-	// `constant items: List<Box<Integer>> = [Box#Empty]` is the same decision the
-	// annotation makes for a Case written directly under it.
+	// The items are read under the expected List's item Type, so `constant
+	// items: List<Box<Integer>> = [Box#Empty]` decides the Case as an
+	// annotation would.
 	let expectedItemType = expectedListItemType(expectedType)
 
 	let values = node.values.map((expr) =>
@@ -2487,16 +2465,10 @@ function enrichListValue(
 	}
 }
 
-// `["alex" = 39, "sam" = 25]` and `[=]` — the second written container,
-// and the first with two Types to decide. Both slots are decided the way a
-// List's one is: the Union of the distinct written Types, in first-seen order,
-// and Unknown where nothing was written, which is the slot every Dictionary
-// Type accepts until an assignment pins it.
-//
-// A written Dictionary COMPARES its keys, which a written List never
-// does — so a literal with entries in it carries an Equatable witness, resolved
-// here and emitted as the trailing Argument of the construction. That is the
-// whole of what makes this more than a List with two Expressions per item.
+// `["alex" = 39, "sam" = 25]` and `[=]`. Each slot is decided as a List's item
+// Type is, and is Unknown where nothing was written. A Dictionary compares its
+// keys, so a literal with entries carries an Equatable witness for the
+// construction.
 function enrichDictionaryValue(
 	node: parser.DictionaryValueNode,
 	scope: enricher.Scope,
@@ -2520,10 +2492,8 @@ function enrichDictionaryValue(
 		entries,
 		position: node.position,
 		type,
-		// The empty Dictionary is asked for no witness. Its key Type is
-		// Unknown, which conforms to nothing, and there is no key in it for
-		// anything to be compared against — so asking would report a bound
-		// nobody wrote about a Type nobody decided.
+		// The empty Dictionary has an Unknown key Type and no key to compare,
+		// so it asks for no witness.
 		keyConformance:
 			entries.length === 0
 				? null
@@ -2531,20 +2501,16 @@ function enrichDictionaryValue(
 	}
 }
 
-// One bracket list's entries, enriched and checked for keys that are the
-// same value written twice. Shared by the literal and by the key list of an
-// update, which is one bracket list on the same terms — an entry written twice
-// there is the same mistake, and the base is no part of it.
+// One bracket list's entries, enriched and checked for a key written twice.
+// Shared by the literal and by the key list of an update.
 function enrichDictionaryEntries(
 	entries: Array<parser.DictionaryEntryNode>,
 	scope: enricher.Scope,
 	expectedKeyType: common.Type | null,
 	expectedValueType: common.Type | null,
 ): Array<common.typed.DictionaryEntryNode> {
-	// Each half stands in the slot the Dictionary is expected to have, so
-	// a bare `#Red` resolves under a `Dictionary<Suit, Integer>` exactly as it
-	// does under a `List<Suit>` — the same decision the annotation makes for a
-	// Case written directly beneath it.
+	// Each half is read under the expected slot, so a bare `#Red` resolves
+	// under a `Dictionary<Suit, Integer>` as under a `List<Suit>`.
 	let enriched = entries.map((entry) => ({
 		key: enrichExpression(entry.key, scope, expectedKeyType),
 		value: enrichExpression(entry.value, scope, expectedValueType),
@@ -2556,11 +2522,8 @@ function enrichDictionaryEntries(
 	return enriched
 }
 
-// What the key and value positions of an expected Type want, for the
-// Expressions that react to one — the twin of `expectedListItemType`, unwrapping
-// a Union the same way and answering `null` where nothing there is a Dictionary
-// at all. Both slots come back together because one walk answers both, and a
-// Literal always asks for both.
+// The key and value Types an expected Type wants, unwrapping a Union as
+// `expectedListItemType` does. `null` where no arm is a Dictionary.
 function expectedDictionarySlots(
 	expectedType: common.Type | null,
 ): { keyType: common.Type; valueType: common.Type } | null {
@@ -2586,16 +2549,9 @@ function expectedDictionarySlots(
 	}
 }
 
-// The Equatable witness a construction compares its keys through,
-// resolved exactly as a bounded Method call resolves the witness for its own
-// bound Type Parameter — because that is what a written Dictionary is. The same
-// `resolveConformances` answers `Dictionary.of`'s bound, so a key Type refused
-// here is refused there, in the same words: `unsatisfied-bound` where no
-// Namespace conforms, `unsatisfied-conformance-condition` where a conditional
-// conformance's `where` did not hold, each naming the key Type in its notes.
-//
-// `null` where the bound went unsatisfied, which is a reported Program that
-// never reaches emission.
+// The Equatable witness a construction compares its keys through. It resolves
+// as the bound of `Dictionary.of` does, so both refuse a key Type in the same
+// words. `null` where the bound went unsatisfied and was reported.
 function equatableKeyConformance(
 	keyType: common.Type,
 	scope: enricher.Scope,
@@ -2618,14 +2574,9 @@ function equatableKeyConformance(
 	)
 }
 
-// Two keys in ONE bracket list that are the same value. The runtime rule
-// is that a later duplicate wins, and that rule is for keys worked out while
-// the Program runs — a key written down twice is not a rule being used, it is
-// one of the two entries being lost, silently, in a list short enough to read.
-//
-// Only keys the Compiler can compare AS WRITTEN are reported. Anything else is
-// left to the runtime rule, which is the honest division: the Compiler refuses
-// what it can see and promises nothing about what it can not.
+// Two keys in one bracket list that are the same value. At runtime the later
+// one silently wins, so a key written twice loses an entry. Only keys
+// comparable as written are reported.
 function reportDuplicateKeys(
 	entries: Array<common.typed.DictionaryEntryNode>,
 ): void {
@@ -2660,18 +2611,10 @@ function reportDuplicateKeys(
 	}
 }
 
-// What makes two written keys THE SAME key, or null for a key this can
-// not decide. It is the compile-time half of the runtime's canonical key
-// encoding and agrees with it kind by kind: a String is compared NFC-normalised
-// because Essence's String equality is canonical equivalence, a Rational is
-// compared in lowest terms because `2/4` and `1/2` are one number, and a whole
-// Rational is compared as the Integer it is because `3/1` and `3` encode to one
-// key.
-//
-// A unit Case is its tag. A Case with a payload is not read at all: a Namespace
-// may write its own `is` for a Choice, so two payloads that look alike need not
-// be one key — which is the very reason the runtime puts such keys on the scan
-// path rather than encoding them.
+// What makes two written keys the same key, or null where this can not decide.
+// It agrees with the runtime's key encoding: Strings compare NFC-normalised,
+// Rationals in lowest terms, and `3/1` as the Integer `3`. A Case with a
+// payload is not read, because a Namespace may define its own `is` for it.
 function writtenKeyIdentity(key: common.typed.ExpressionNode): string | null {
 	switch (key.nodeType) {
 		case "IntegerValue":
@@ -2702,10 +2645,8 @@ function writtenKeyIdentity(key: common.typed.ExpressionNode): string | null {
 	}
 }
 
-// The value a member is read off, enriched with the MEMBER's name in
-// hand, which is what this position knows and the base does not. It is read by
-// one thing: `user?.name` is one Identifier — a `?` ends no name — and the Help
-// it is answered with offers `user::map(.name)` rather than `.member`.
+// The base of a Lookup, enriched knowing the member's name. `user?.name` is one
+// Identifier, and its Help offers `user::map(.name)`.
 function enrichLookupBase(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
@@ -2722,17 +2663,15 @@ function enrichLookupBase(
 function enrichLookup(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
-	// Whether the Lookup is what an Invocation calls — see
-	// `enrichCalleeExpression`. Read for one thing: a member that is not there
-	// and is CALLED is a Method call written with the separator another language
-	// uses, and the Diagnostic for that says so.
+	// Whether an Invocation calls this Lookup. A missing member that is called
+	// is a Method call written with another language's separator, and the
+	// Diagnostic says so.
 	isCalled = false,
 ): common.typed.LookupNode {
-	// A base naming a TYPE rather than a value — a Choice, or a
-	// Protocol-bounded Type Parameter — reads its member off a Namespace nobody
-	// declared. Asked before the base is enriched, because enriching it is what
-	// reports `unknown-name`, and answered only for a member that Namespace
-	// offers, so every other name reports exactly as it did.
+	// A base naming a Type, such as a Choice or a bounded Type Parameter, reads
+	// its member off a Namespace nobody declared. Asked before enriching the
+	// base, which would report `unknown-name`, and only for a member that
+	// Namespace offers.
 	let named = namespaceNamedByType(node, scope)
 	let base: common.typed.ExpressionNode =
 		named === null || node.base.nodeType !== "Identifier"
@@ -2741,35 +2680,29 @@ function enrichLookup(
 					nodeType: "Identifier",
 					content: node.base.content,
 					position: node.base.position,
-					// Typed as what the author NAMED rather than as the
-					// Namespace fabricated to read the member off. Hover
-					// answers with this Node, and neither `Choice_Enumerable`
-					// nor `Mode__conformance` is a name a reader has seen.
+					// Typed as what the author named, not as the fabricated
+					// Namespace, whose name Hover would otherwise show.
 					type: named.targetType ?? { type: "Error" },
 				}
-	// A Method a conformance put in reach is read off the Namespace it is
-	// in reach through, exactly as a written one is — `Number.isLessThan(a, b)`
-	// beside `Number.compare(a, to b)`. Asked before `lookupTypeOf`, which would
-	// report `unknown-member` for a name the Namespace does not declare, and
-	// asked only for such a name so that nothing a Namespace writes is affected.
+	// A Method a conformance puts in reach is read off the Namespace, as in
+	// `Number.isLessThan(a, b)`. Asked before `lookupTypeOf`, and only for a
+	// name the Namespace does not declare.
 	let provided =
 		base.type.type === "Namespace" &&
 		!Object.hasOwn(base.type.properties, node.member.content) &&
 		!Object.hasOwn(base.type.methods, node.member.content)
 			? providedNamespaceMember(base.type, node.member.content, scope)
 			: null
-	// And a Method no Namespace holds at all — a Choice's derived
-	// `cases`, and what a bounded Type Parameter's conformance answers. Both
-	// carry what the emission needs beside the Type, because neither is a
-	// member of anything the Rewriter could read it off.
+	// A Method no Namespace holds: a Choice's derived `cases`, or what a
+	// bounded Type Parameter's conformance answers. Both carry what the
+	// emission needs.
 	let fabricated = fabricatedMember(
 		named,
 		base.type,
 		node.member.content,
 		scope,
 	)
-	// The Lookup and its member Identifier share one Type — the member's
-	// Type *is* the Lookup's Type, so it is resolved once and handed to both.
+	// The Lookup and its member Identifier share one Type.
 	let type =
 		provided?.type ??
 		fabricated?.type ??
@@ -2808,11 +2741,9 @@ function enrichLookup(
 	}
 }
 
-// The base of a Lookup as the reader wrote it — a name, or a run of
-// members read off one — and null for everything else. Exactly the two shapes
-// that ARE their own spelling, which is the same line `writtenValueText` draws
-// in the Parser and for the same reason: a Help prints the reader's own text or
-// it prints nothing.
+// The base of a Lookup as the reader wrote it, a name or a run of members read
+// off one, and null otherwise. A Help prints the reader's own text or nothing,
+// as `writtenValueText` in the Parser does.
 function spelledLookupBase(base: parser.ExpressionNode): string | null {
 	if (base.nodeType === "Identifier") {
 		return base.content
@@ -2827,14 +2758,10 @@ function spelledLookupBase(base: parser.ExpressionNode): string | null {
 	return null
 }
 
-// What a Lookup that finds no member is answered with — see
-// `MemberAccessContext`. The Method question is a thunk because the Namespace
-// walk behind it is what a Method call costs, and a Lookup that finds its member
-// never asks.
-//
-// Null for a Namespace base. A `.` is how a Namespace's own members are
-// reached, so there is no separator to suspect there, and the Namespaces
-// targeting a Namespace are nobody's question.
+// What a Lookup that finds no member is answered with; see
+// `MemberAccessContext`. The Method question is a thunk, so a Lookup that finds
+// its member never walks the Namespaces. Null for a Namespace base, whose
+// members a `.` reaches.
 function memberAccessContext(
 	node: parser.LookupNode,
 	baseType: common.Type,
@@ -2846,9 +2773,7 @@ function memberAccessContext(
 	}
 
 	return {
-		// Everything between the base and the member, which is the `.` and
-		// whatever whitespace was written around it. The whole of it is what a fix
-		// overwrites, so `value . member` rewrites as cleanly as `value.member`.
+		// The `.` and any whitespace around it, which a fix overwrites whole.
 		separator: {
 			start: node.base.position.end,
 			end: node.member.position.start,
@@ -2881,13 +2806,9 @@ function memberAccessContext(
 	}
 }
 
-// A member of a Namespace nobody declared, with what its emission needs.
-// Two reach here. A Choice's derived `cases` is answered by the derive — named
-// by the base itself, or fabricated for a Namespace written over the Choice
-// that does not write one — and is emitted from the Case tags, a static having
-// no receiver to recover the Choice from. A bounded Type Parameter's member is
-// answered by its conformance, and is emitted against the hidden Parameter that
-// witness arrives in.
+// A member of a Namespace nobody declared, with what its emission needs. A
+// Choice's derived `cases` is emitted from the Case tags. A bounded Type
+// Parameter's member is emitted against the hidden witness Parameter.
 function fabricatedMember(
 	named: common.NamespaceType | null,
 	baseType: common.Type,
@@ -2923,10 +2844,8 @@ function fabricatedMember(
 		...(namespace.targetType.type === "GenericUse"
 			? { conformanceName: namespace.name }
 			: {}),
-		// And the third answer this rail has: a Namespace WRITING the
-		// Method the derive would have answered. Nothing about it is fabricated
-		// but the reach — the base spells the Choice, so the emission has to be
-		// told the name the Method is actually written in.
+		// A Namespace that writes the Method the derive would answer. The base
+		// spells the Choice, so the emission needs the Namespace's name.
 		...(namespace.name !== derivedEnumerableNamespaceName &&
 		namespace.targetType.type !== "GenericUse"
 			? { namespaceName: namespace.name }
@@ -2934,28 +2853,15 @@ function fabricatedMember(
 	}
 }
 
-// `.price`, `.address.city` — the Function the Compiler writes for the
-// position the path stands in. The desugar happens HERE, into typed Nodes, so
-// that nothing downstream of enrichment ever meets a shape of its own: the
-// Validator, the Optimiser's inliner, the source maps and the debugger all see
-// the Function literal the author could have written instead.
-//
-// INVARIANT: every synthesized Node takes a span the author WROTE — each
-// Lookup's member Identifier takes the span of the step that spelled it, and
-// the Parameter, the Return and the Function take the path's own. That one rule
-// is what earns rename, hover, semantic tokens and completion on a path without
-// a line of code in any of them, so a refactor that handed every Node the
-// path's span would break four features at once and no test of this file would
-// notice.
+// `.price` and `.address.city`: the Function the compiler writes for the
+// position the path stands in. See "Member paths" in DEVELOPMENT.md.
 function enrichMemberPath(
 	node: parser.MemberPathNode,
 	_scope: enricher.Scope,
 	expectedType: common.Type | null = null,
 ): common.typed.FunctionValueNode {
-	// An Argument is matched in one pass and enriched in another, and only
-	// the first has a position to read — so a path matched as an Argument reads
-	// back what that pass recorded, and a path anywhere else is handed its
-	// position outright. Exactly the split a prefixed Case construction lives by.
+	// An Argument is matched in one pass and enriched in another, so a path
+	// matched as an Argument reads back what the matching recorded.
 	let expected = expectedType ?? recordedMemberPathType(node)
 	let rootType = memberPathRootType(expected)
 
@@ -2976,11 +2882,8 @@ function enrichMemberPath(
 	)
 }
 
-// What a path reads its first member off — the one Parameter of the
-// Function the position expects, and nothing else. A Function of two Parameters
-// names no single Argument to read off, and a position that expects no Function
-// at all names nothing: a structural language can not invent a Root Type out of
-// a member name, which is the rule a bare `#Case` lives by for the same reason.
+// What a path reads its first member off: the one Parameter of the Function the
+// position expects, and nothing else.
 function memberPathRootType(expected: common.Type | null): common.Type | null {
 	if (
 		expected === null ||
@@ -2993,11 +2896,8 @@ function memberPathRootType(expected: common.Type | null): common.Type | null {
 	return expected.parameterTypes[0].type
 }
 
-// The Type each step reads, in written order, so the last is what the
-// synthesized Function returns. Members only: a step is read off a Record or a
-// Case — which is a Record with a nominal identity — and off nothing else. An
-// Optional, a Union, a Choice or a List is DECIDED before it is read, and the
-// deciding is a Match rather than a dot.
+// The Type each step reads, in written order, so the last is the Function's
+// return Type. A step reads off a Record or a Case only.
 function memberPathStepTypes(
 	node: parser.MemberPathNode,
 	rootType: common.Type,
@@ -3029,11 +2929,8 @@ function memberPathStepType(
 		})
 	}
 
-	// Silent. An Error is a Diagnostic somebody has already reported, and
-	// a Type Parameter nothing has bound yet is a position the call has not
-	// finished deciding — the Invocation reports that for itself, and a path
-	// saying the Root "is not a Record" would name a Type the author never
-	// wrote.
+	// Silent on an Error, and on an Unknown or an unbound Type Parameter, which
+	// the Invocation reports itself.
 	if (
 		baseType.type === "Error" ||
 		baseType.type === "Unknown" ||
@@ -3061,7 +2958,7 @@ function memberPathStepType(
 	return { type: "Error" }
 }
 
-// How a path is WRITTEN, for the Diagnostics that quote it back.
+// How a path is written, for Diagnostics that quote it.
 function memberPathSpelling(node: parser.MemberPathNode): string {
 	return `.${node.steps.map((step) => step.content).join(".")}`
 }
@@ -3085,24 +2982,9 @@ function reportPathWithoutContext(
 	)
 }
 
-// The edit a reader can make HERE, which depends on what the position
-// wants. A position naming no Function wants a VALUE, and no Function literal
-// fits it however its Types are written — so the offer there is to read the
-// members off something rather than to write a Function nothing accepts.
-//
-// Everywhere else the literal IS the edit, and it is spelled with BOTH its
-// Types. A Function literal only takes its Types from the surrounding context
-// where it stands as an Argument, which is the one position this Diagnostic is
-// never raised in — so a literal written from this report must write its
-// Parameter Type and its `-> Type` or meet `missing-return-type` on the next
-// run. So the Help writes both, each as the blank `<Type>`: a made-up name
-// would read as a Type to copy, and a blank reads as one to fill in.
-//
-// Where the position names nothing at all there is a cheaper edit than writing
-// either Type, and it comes first: move the path to a position that DOES name a
-// Function of one Parameter, which is what a path is for. It is offered only
-// there — a position wanting a value, or a Function of another arity, does not
-// take a '::map' any more than it takes the path.
+// The edit a reader can make here. A position wanting a value gets a member
+// read off a value. Otherwise the Help writes the literal with both Types as
+// `<Type>` blanks, since a literal outside an Argument must annotate them.
 function pathWithoutContextHelps(
 	node: parser.MemberPathNode,
 	expected: common.Type | null,
@@ -3115,11 +2997,8 @@ function pathWithoutContextHelps(
 		]
 	}
 
-	// And a literal of the arity the position asks for, where it asks for
-	// one a path can not have. A one-Parameter spelling offered there is refused
-	// for the very reason this report was raised — Note 2 has just finished
-	// saying the position takes two — so the count is named and the Parameters
-	// are left to the reader, whose own names they are.
+	// A position asking for a Function of another arity gets a literal of that
+	// arity, with the Parameters left to the reader.
 	if (expected !== null && expected.parameterTypes.length !== 1) {
 		return [
 			`Write the Function literal instead, with ${countOf(expected.parameterTypes.length, "Parameter")} and a return Type, reading '${spelling.slice(1)}' off the one you mean.`,
@@ -3132,10 +3011,8 @@ function pathWithoutContextHelps(
 	]
 }
 
-// What the position DOES ask for, which is the half of the refusal that
-// says what to change. A Function of the wrong arity is called out as such —
-// the Type is right, the number of Arguments it takes is what a path can not
-// answer — rather than printed in full twice over.
+// What the position asks for. A Function of the wrong arity is named by its
+// Parameter count rather than printed in full again.
 function pathContextNote(expected: common.Type | null): string {
 	if (expected === null) {
 		return "This position expects no particular Type."
@@ -3148,30 +3025,20 @@ function pathContextNote(expected: common.Type | null): string {
 	return `This position expects ${withArticle(describeType(expected))}.`
 }
 
-// The one Parameter the synthesized Function takes. `_` is a Symbol in
-// the grammar rather than the start of a word, so `_0` is a name no source can
-// spell and no binding of the author's can capture — and it is the name
-// `simplifyParameter` already gives a Parameter the source left unnamed, so the
-// emission is the one an author writing `(_ item: T) { <- item.price }` gets.
+// The one Parameter of the synthesized Function. No source can spell `_0`. See
+// "Member paths" in DEVELOPMENT.md.
 const memberPathParameterName = "_0"
 
-// `stepTypes[i]` is the Type of the Lookup that reads `steps[i]`, so its
-// last entry is the Function's return Type. A refused path passes Error the
-// whole way down rather than answering a Node of another shape: the Language
-// Server goes on renaming, colouring and completing inside a path the Compiler
-// has already refused, which is the state a file is in while it is being typed.
+// `stepTypes[i]` is the Type of the Lookup that reads `steps[i]`. A refused
+// path carries Error the whole way down but keeps its shape.
 function memberPathFunction(
 	node: parser.MemberPathNode,
 	rootType: common.Type,
 	stepTypes: Array<common.Type>,
 ): common.typed.FunctionValueNode {
 	let returnType = stepTypes[stepTypes.length - 1] ?? rootType
-	// The Parameter and the name the body reads it under stand at the
-	// FIRST STEP rather than at the path, which leaves the leading dot inside
-	// the Function's span and nothing else's — so that is where the path
-	// answers as the Function it stands for. Nothing the author can spell
-	// stands there, and `_0` is never the answer anywhere: the Language Server
-	// asks `synthesized` before it reads a name off this literal.
+	// The Parameter and the name the body reads it under stand at the first
+	// step, so the leading dot is inside the Function's span only.
 	let rootPosition = node.steps[0].position
 	let expression: common.typed.ExpressionNode = {
 		nodeType: "Identifier",
@@ -3214,10 +3081,8 @@ function memberPathFunction(
 					},
 					position: rootPosition,
 					type: rootType,
-					// Null although nothing here was written — an
-					// `inferredType` is what an Inlay Hint draws, and a path has
-					// no annotation slot to draw one into. The same goes for the
-					// return Type: a path is shorter than the hint would be.
+					// Null: an Inlay Hint draws an `inferredType`, and a path
+					// has no annotation slot to draw one into.
 					inferredType: null,
 					defaultValue: null,
 				},
@@ -3240,10 +3105,8 @@ function memberPathFunction(
 	}
 }
 
-// The Type of the Function a path stands for — one unlabelled Parameter
-// of the Root, answering whatever the last step reads. Built here rather than
-// off the synthesized Node, because the Argument match asks for it long before
-// there is a Node to build.
+// The Type of the Function a path stands for. The Argument match asks for it
+// before any Node is built.
 function memberPathSignature(
 	rootType: common.Type,
 	returnType: common.Type,
@@ -3271,16 +3134,14 @@ function enrichIdentifier(
 	}
 }
 
-// An Identifier in Expression position can stand for a member of `@`
-// instead of for a binding of its own — see `selfMemberAliases`. The alias is
-// read off the Scope that DECLARES the name, so an inner binding of the same
-// name shadows it exactly like any other declaration would.
+// An Identifier may stand for a member of `@`; see `selfMemberAliases`. The
+// alias is read off the Scope that declares the name, so an inner binding
+// shadows it.
 function enrichIdentifierExpression(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
-	// What the position the name stands in knows about it — see
-	// `NameContext`. It changes nothing about the lookup, and everything about
-	// what a name nothing declares is answered with.
+	// What the position knows about the name; see `NameContext`. It only
+	// changes what an undeclared name is answered with.
 	context: NameContext = {},
 ): common.typed.ExpressionNode {
 	let declaringScope = findDeclaringScope(node.content, scope)
@@ -3322,13 +3183,9 @@ function enrichSelf(
 	}
 }
 
-// A wildcard Handler stands for whatever the Handlers before it have not
-// already caught, so it resolves to the Union of the still-unhandled members.
-// That is what lets `@` inside `case _` keep the matched Union's own member
-// Type instead of degrading to Unknown — `case #Empty` followed by `case _`
-// types `@` as the Optional's other Case. A wildcard with nothing left to catch
-// falls back to Unknown, which matches anything, so a redundant `case _` stays
-// harmless rather than becoming un-typeable.
+// A wildcard Handler stands for what the earlier Handlers have not caught, so
+// `case _` after `case #Empty` types `@` as the other Case. With nothing left
+// it is Unknown, so a redundant `case _` stays harmless.
 function resolveWildcardMatcherType(
 	valueType: common.Type,
 	handledMatchers: Array<common.Type>,
@@ -3342,12 +3199,9 @@ function resolveWildcardMatcherType(
 		return isHandled(valueType) ? { type: "Unknown" } : valueType
 	}
 
-	// Handling is checked member by member for the same reason the
-	// Validator's exhaustiveness check flattens — but a named nested Union
-	// (`Number`, a Choice) whose members are all still unhandled stays whole,
-	// so `@` Hovers print its name. Once a Handler has taken some of its
-	// members, only the remaining ones survive, and those are necessarily
-	// spelled out.
+	// Handling is checked member by member, as the validator's exhaustiveness
+	// check does. A named nested Union with no member handled stays whole, so
+	// Hover prints its name.
 	let remainingTypes: Array<common.Type> = []
 
 	for (let memberType of unionMembersKeepingNames(valueType)) {
@@ -3376,15 +3230,9 @@ function resolveWildcardMatcherType(
 	return buildUnion(remainingTypes)
 }
 
-// A checked refinement can not stand where a runtime test is emitted — the
-// predicate is a check the runtime never hears of, so the test could only ask
-// about the base and the arm would run for values the predicate refuses, typed
-// as evidence nothing proved. Refused wherever a Matcher narrows by Type: the
-// Matcher itself, and the annotation on a Pattern's member. Refused however
-// DEEP the refinement stands, too — `List<NonZero>` spells no refinement at its
-// top level, but the emitted check could still only ask about `List<Integer>`,
-// and the arm would bind items the predicate refuses. The Error Type is the
-// usual poison, so the one Diagnostic does not cascade.
+// A checked refinement can not be tested at runtime, since its predicate
+// erases. A Matcher or a Pattern member annotation carrying one at any depth,
+// such as `List<NonZero>`, is refused and answers an Error.
 function refuseRefinementMatcher(
 	type: common.Type,
 	position: common.Position,
@@ -3417,31 +3265,23 @@ function refuseRefinementMatcher(
 	return { type: "Error" }
 }
 
-// Everything a Matcher establishes about the value it is written
-// against, worked out once. A `match` Handler and an assertion ask exactly the
-// same question of a Matcher — what does the value have to BE, and what can
-// still make this decline a value of that Type — so they ask it here, and an
-// assertion can never drift from the arm it is spelled like.
+// Everything a Matcher establishes about its value, worked out once. A `match`
+// Handler and an assertion share it, so an assertion never drifts from the arm
+// it is spelled like.
 type ResolvedMatcher = {
 	matcher: common.Type
 	literal: common.typed.ExpressionNode | null
 	memberLiterals: Record<string, common.typed.ExpressionNode> | null
 	memberTypes: Record<string, common.Type> | null
-	// What a Case Matcher's payload Pattern requires and proved, which is
-	// what its bindings are read at. Null for every other Matcher, and for a
-	// Case Matcher whose payload is a plain name.
+	// What a Case Matcher's payload Pattern requires and proved, which its
+	// bindings are read at. Null for other Matchers and for a plain-name
+	// payload.
 	payload: PayloadRequirements | null
 }
 
-// `handledMatchers` is what the arms ABOVE retired, which is what a
-// wildcard stands for. An assertion has no arms above it and hands an empty
-// list, so `is _` stands for the whole of what was asserted.
-//
-// `armIndex` is which arm this is, and it exists for ONE report: a Match
-// written on a Future has one mistake — the subject — and it used to be reported
-// once per arm, each saying the same sentence about a different Case name. It is
-// said on the first arm and nowhere else. An assertion has one Matcher and hands
-// 0, which is the arm it is.
+// `handledMatchers` is what earlier arms retired, which a wildcard stands for.
+// An assertion hands an empty list. `armIndex` lets a Match on a Future report
+// its subject on the first arm only.
 function resolveMatcher(
 	node: parser.MatcherNode,
 	valueType: common.Type,
@@ -3450,8 +3290,7 @@ function resolveMatcher(
 	armIndex = 0,
 ): ResolvedMatcher {
 	if (node.nodeType === "LiteralMatcher") {
-		// A literal Matcher binds `@` to the literal's own Type — inside
-		// `case 0` the value is known to be an Integer.
+		// A literal Matcher types `@` as the literal's Type.
 		let literal = enrichExpression(node.value, scope)
 
 		return {
@@ -3476,10 +3315,8 @@ function resolveMatcher(
 	if (node.nodeType === "CaseMatcher") {
 		let literals: Record<string, common.typed.ExpressionNode> = {}
 		let matcher = resolveCaseMatcherType(node, valueType, scope, armIndex)
-		// What the payload Pattern requires — beside the Matcher rather
-		// than inside it, so the Case stays the arm it is and only the Handler
-		// becomes conditional. It also says what the arm PROVED, which is what
-		// its bindings are read at.
+		// The payload Pattern's requirements stand beside the Matcher, so the
+		// Case stays the arm and only the Handler becomes conditional.
 		let payload = resolvePayloadRequirements(node, matcher, scope, literals)
 
 		return {
@@ -3521,20 +3358,9 @@ function resolveMatcher(
 	}
 }
 
-// What `start` and `complete` answer with, MEMBER BY MEMBER. A Union of
-// work is reachable from a `define`, a `match` or an `if` whose arms answer
-// different Future Types, and the runtime answers each member on its own: a
-// Future is run, a Started is waited for, and anything else is its own answer.
-// So the Type has to be read the same way, or an accepted Program has a value
-// the emission awaited and a Type that says it is still work.
-//
-// One level. `buildUnion` flattens anonymous Unions as it builds them, so
-// the members of a Union written down are the members there are — and a NAMED
-// Union stays whole for the same reason it does everywhere else: its name is
-// its spelling.
-//
-// Answers null where no member is work at all, which is what the two
-// `needless-*` Warnings are for.
+// What `start` and `complete` answer, member by member, as the runtime answers
+// each member of a Union of work. One level: anonymous Unions are already flat,
+// and a named Union stays whole. Null where no member is work.
 function unwrapWork(
 	type: common.Type,
 	unwrap: (member: common.Type) => common.Type | null,
@@ -3559,14 +3385,9 @@ function unwrapWork(
 	return unwrapped ? buildUnion(members) : null
 }
 
-// `start expr` — a `Future<Value>` becomes the `Started<Value>` that
-// stands for one run of it. Nothing about this waits, so it asks nothing of the
-// body it stands in and is legal wherever an Expression is.
-//
-// An operand that is not a Future is answered with ITSELF rather than with
-// an Error Type. The Warning below says what is wrong, and a Program that then
-// reads the value goes on reading exactly what it wrote down — an Error Type
-// here would cascade a second Diagnostic through everything the value reaches.
+// `start expr` turns a `Future<Value>` into the `Started<Value>` of one run. It
+// waits for nothing, so it is legal anywhere. An operand that is no Future
+// answers itself, so the Warning does not cascade.
 function enrichStart(
 	node: parser.StartNode,
 	scope: enricher.Scope,
@@ -3603,12 +3424,8 @@ function enrichStart(
 					),
 				],
 				tags: ["unnecessary"],
-				// The Note has to agree with the message above it. The
-				// one it always printed explains a value that is NOT work, and
-				// a `Started` is work — it was already started, which is the
-				// opposite complaint, and a reader told "a value that is not a
-				// Future describes no work to run" about one had been handed a
-				// contradiction to resolve on their own.
+				// A Started is already work, so its Note says it is in flight
+				// rather than that it is no work.
 				notes: [
 					type.type === "Started"
 						? "A Started is one run of a Future, and it belongs to whoever started it — there is no second run to ask for."
@@ -3627,14 +3444,9 @@ function enrichStart(
 	}
 }
 
-// `complete expr` — the `Value` a `Future<Value>` or a `Started<Value>`
-// answers with. It SUSPENDS, so where it may be written is a question about the
-// body around it, which `scope.completing` answers: a completing body's declared
-// `Future<T>`, a Program's top level, or a position that can not suspend at all.
-//
-// The operand is typed BEFORE the position is judged, so a `complete`
-// written in the wrong place still hands a Hover the Type it would have
-// answered with — and so the two Diagnostics below never both fire on one word.
+// `complete expr` answers the `Value` of a `Future<Value>` or `Started<Value>`.
+// It suspends, so `scope.completing` decides where it may stand. The operand is
+// typed first, so Hover works on a misplaced `complete`.
 function enrichComplete(
 	node: parser.CompleteNode,
 	scope: enricher.Scope,
@@ -3684,11 +3496,9 @@ function enrichComplete(
 	}
 }
 
-// The one place `complete-outside-future` is decided. Every `complete` in
-// a Function body is in a body the Parser has already marked as completing —
-// the mark IS "this body writes the word" — so what is left to be wrong is the
-// DECLARATION: a body that suspends answers a Future, and one that says it
-// answers anything else is the mistake this names.
+// Decides `complete-outside-future`. The Parser marks every body that writes
+// `complete` as completing. What is left to be wrong is a declared return Type
+// that is no Future.
 function reportMisplacedComplete(
 	node: parser.CompleteNode,
 	scope: enricher.Scope,
@@ -3699,17 +3509,14 @@ function reportMisplacedComplete(
 		return
 	}
 
-	// An Error Type here is a return annotation that has already been
-	// reported — a second Diagnostic would restate it in vaguer terms.
+	// An Error is a return annotation already reported.
 	if (context?.type === "Error") {
 		return
 	}
 
-	// Two shapes, and they are two different mistakes. A named Function
-	// that DECLARED something else has one word missing from its signature; a
-	// position that can not suspend at all — a Parameter's default, a test's
-	// name, a benchmark body, a property test's body — has nowhere to put the
-	// word, and the only advice is to move it.
+	// A named Function that declared another Type lacks a `Future`. A position
+	// that can not suspend, such as a default or a test's name, can only move
+	// the word.
 	let declared = context === null || context === undefined ? null : context
 	let barred = barredCompletion(completionBarrierIn(scope))
 
@@ -3738,9 +3545,8 @@ function reportMisplacedComplete(
 	})
 }
 
-// Local names for the walks, which live beside `modulePathOf` in
-// `scope.ts` — the Resolver asks the same questions about a bound it is about
-// to refuse, and the two must not answer them two ways.
+// The walks live beside `modulePathOf` in `scope.ts`, so the resolver answers
+// the same questions the same way.
 const completionContextOf = completionContextIn
 const findExpectedReturnType = expectedReturnTypeIn
 
@@ -3751,22 +3557,18 @@ function enrichMatch(
 	let value = enrichExpression(node.value, scope)
 	let returnType = resolveType(node.returnType, scope)
 	let handledMatchers: Array<common.Type> = []
-	// The values the Handlers above have NAMED, as the questions they asked
-	// — `case 0` asked `@::is(0)`, and every Handler below it is reached by a value
-	// that answered no. See `refinedSelfType`, which is what reads them.
+	// The values earlier Handlers named, as the questions they asked: after
+	// `case 0`, every Handler is reached by a value that is not `0`. See
+	// `refinedSelfType`.
 	let namedValues: Array<common.PredicateConjunct> = []
 
 	return {
 		nodeType: "Match",
 		value,
 		handlers: node.handlers.map((handler, index) => {
-			// `expectedReturnType` is what a Handler's `<-` yields — a
-			// bare Case there resolves against the Match's declared return
-			// Type first.
-			//
-			// `isMatchHandlerBody` says what the `@` bound below IS, for the
-			// one report that has to tell a Handler's `@` from a Method's —
-			// see `namespaceReach`.
+			// A bare Case after a Handler's `<-` resolves against the Match's
+			// return Type. `isMatchHandlerBody` tells a Handler's `@` from a
+			// Method's for `namespaceReach`.
 			let bodyScope = childScope(scope, {
 				expectedReturnType: returnType,
 				isMatchHandlerBody: true,
@@ -3781,11 +3583,8 @@ function enrichMatch(
 					index,
 				)
 
-			// Only an unconditional Handler retires a Type. A literal
-			// Matcher, a value-constrained Record member, a payload Pattern
-			// requiring something of a member, or a Guard can all decline a
-			// value whose Type they accepted, so a later wildcard still has to
-			// account for that Type.
+			// Only an unconditional Handler retires a Type for a later
+			// wildcard. See "Match Handlers and Guards" in DEVELOPMENT.md.
 			if (
 				literal === null &&
 				memberLiterals === null &&
@@ -3795,8 +3594,8 @@ function enrichMatch(
 				handledMatchers.push(matcher)
 			}
 
-			// Read from the values the Cases ABOVE this one named, which is
-			// why this Handler's own joins the list only afterwards.
+			// Read from the values earlier Handlers named, so this Handler's
+			// own joins the list afterwards.
 			declareVariableInScope(
 				"@",
 				refinedSelfType(matcher, namedValues, literal, scope),
@@ -3804,8 +3603,8 @@ function enrichMatch(
 				true,
 			)
 
-			// And what this Handler leaves to the ones below it — nothing at
-			// all where a Guard could decline the value it named.
+			// What this Handler leaves to later ones: nothing where a Guard
+			// could decline the value it named.
 			let namedValue =
 				literal === null || handler.guard !== null
 					? null
@@ -3815,29 +3614,22 @@ function enrichMatch(
 				namedValues.push(namedValue)
 			}
 
-			// Resolved before the Guard is enriched, so that the Guard
-			// can name them — and reported here, once, rather than once per
-			// place a name is lent to.
+			// Resolved before the Guard so it can name them, and reported once
+			// here.
 			let bindings = resolveMatcherBindings(
 				handler.matcher,
 				matcher,
 				payload,
 			)
 
-			// A Guard proves things about `@` the same way an `if`'s
-			// condition proves them about a Constant, and it runs before any
-			// Statement of the body — the Matcher's own check is ANDed in front
-			// of it — so whatever it establishes holds throughout. Which is why
-			// the two are worked out together: what a Guard proves is read in the
-			// very Scope it was enriched in.
+			// A Guard runs before the body, so what it proves holds throughout.
+			// It is read in the Scope it was enriched in.
 			let guard: common.typed.ExpressionNode | null = null
 			let guardNarrowings: Array<Narrowing> = []
 
 			if (handler.guard !== null) {
-				// The Guard is enriched in the body Scope so that it can
-				// use `@` — narrowing is what makes a Guard worth writing. A
-				// Matcher's bindings are lent to it through an alias Scope
-				// rather than through the Constants the body reads: see
+				// The Guard is enriched in the body Scope so it can use `@`. A
+				// Matcher's bindings are lent to it through an alias Scope; see
 				// `selfMemberAliases`.
 				let guardScope =
 					bindings.length === 0
@@ -3846,32 +3638,16 @@ function enrichMatch(
 
 				guard = enrichExpression(handler.guard, guardScope)
 
-				// That Scope is the only one where the value a Handler NAMED
-				// is a name at all — the body Scope has never heard of it, so a
-				// Guard about the payload binding proved nothing about anything.
+				// Only that Scope knows the names the Handler bound.
 				guardNarrowings = narrowingsFor(
 					conditionEvidence(guard, guardScope),
 					guardScope,
 				)
 			}
 
-			// What the Guard established for a Matcher's own bindings is
-			// not SHADOWED but DECLARED. A binding comes into being at the head
-			// of the body, so there is no earlier declaration for a shadow to
-			// stand in front of — and a shadow one Scope further out would be
-			// the wrong shape anyway: the Constant it stood in front of is a
-			// Statement of this very body, so a body re-declaring that name is
-			// declaring it twice, and a Scope between the two would quietly make
-			// that legal and emit one block holding two Constants of one name.
-			//
-			// Everything else the Guard established is shadowed as an `if`'s
-			// condition shadows it, and the body goes one Scope deeper only when
-			// something WAS established — so a Handler that narrows nothing
-			// keeps declaring its bindings in the Scope it always did.
-			//
-			// Every bound name is excluded, not just the first: a Pattern binds
-			// as many as it names, and one of them being narrowed must not leave
-			// the others shadowed.
+			// A Guard's proofs about a binding are declared with the binding,
+			// and its other proofs are shadowed. See "Match Handlers and
+			// Guards" in DEVELOPMENT.md.
 			let boundNames = new Set(
 				bindings.map((binding) => binding.name.content),
 			)
@@ -3888,12 +3664,9 @@ function enrichMatch(
 					? bodyScope
 					: childScope(scopeShadowing(shadowedNarrowings, bodyScope))
 
-			// `case #Value(item)` and `case { x, y }` alike — desugared
-			// here rather than carried through the typed tree, so the
-			// Simplifier, Rewriter and every walker downstream see the Constants
-			// an author could have written themselves. `@` is untouched and
-			// still means the narrowed scrutinee, so an arm can bind the parts
-			// AND hand the whole value onwards.
+			// Bindings desugar into Constants at the head of the body. `@`
+			// still means the narrowed value, so an arm can bind parts and pass
+			// the whole value on.
 			let bindingStatements = declareMatcherBindings(
 				bindings,
 				matcher,
@@ -3921,28 +3694,9 @@ function enrichMatch(
 	}
 }
 
-// An arm is reached only where every Condition ABOVE it answered `false`,
-// so the complements of those Conditions hold throughout it — and its own
-// Condition holds throughout its value. That is the `else if` chain's rule
-// exactly, asked of a chain that answers with values rather than with bodies,
-// and it is read through the very machinery an `if` narrows through.
-//
-// An arm still declares nothing and binds nothing. What it is read in is a
-// SHADOW Scope, which the Enricher declares and no author can spell — so the
-// one thing a child Scope buys an `if` body, a name of its own to re-declare,
-// is a thing an arm has no way to want.
-//
-// A Condition joined by `::and()` leaves the arms below it nothing:
-// `complementEvidence` refuses a conjunction outright, because a conjunction
-// answering `false` says that one of its questions failed and nothing about
-// which. Its own arm still narrows by both halves.
-//
-// The arrow beats the position beats the arms. `define -> Type` is a
-// claim about the `define` itself; the position around it — a Declaration's
-// annotation, a Record member, a `<-` — is a claim about what may stand there;
-// and only where neither says anything do the arms decide, through the Union of
-// what they answer with. Whichever of the two spoke is pushed INTO every arm as
-// its expected Type, which is what lets a bare `#Empty` arm resolve at all.
+// An arm narrows by the complements of the earlier conditions and by its own.
+// The answer Type comes from the arrow, the position or the arms. See "define
+// arms" in DEVELOPMENT.md.
 function enrichDefine(
 	node: parser.DefineNode,
 	scope: enricher.Scope,
@@ -3950,23 +3704,15 @@ function enrichDefine(
 ): common.typed.DefineNode {
 	let declaredType =
 		node.returnType === null ? null : resolveType(node.returnType, scope)
-	// The Type every arm is READ AGAINST, which is not what the `define`
-	// answers with — pushing a Type into the arms and answering with it are two
-	// different things. This is the pushing: it is what lets a bare Case arm
-	// resolve against the Choice the position named, and a position may push
-	// down a Type no value ever has, an offer of two spellings among them. What
-	// the `define` answers with is settled below, off the arms.
+	// The Type every arm is read against, which is not necessarily what the
+	// `define` answers. `settledAnswerType` settles that off the arms.
 	let answerType = declaredType ?? expectedType
-	// The Scope the NEXT arm is read in — the one it stands in plus every
-	// complement the arms above it left behind. A complement that established
-	// nothing leaves it untouched, so a `define` nobody narrows anything in is
-	// read in the one Scope it always was.
+	// The Scope the next arm is read in, with every complement earlier arms
+	// left.
 	let armScope = scope
 	let arms: Array<common.typed.DefineArm> = []
-	// The first arm that could not decide a Type with nothing to hand it
-	// one, which is what `define-without-answer-type` reports on. Held rather
-	// than reported on the spot, because the Diagnostic is about the `define`
-	// and belongs after the arm's own.
+	// The first arm that could not decide a Type. Reported after the arm's own
+	// Diagnostic, since it is about the `define`.
 	let undecided: common.typed.ExpressionNode | null = null
 
 	let enrichAnswer = (
@@ -3977,12 +3723,9 @@ function enrichDefine(
 			return enrichExpression(value, valueScope, answerType)
 		}
 
-		// Watched rather than inspected afterwards, because "this arm
-		// could not decide a Type" is not a question the typed Node answers: a
-		// Case whose name nobody declares is an Error too, and the fix for that
-		// one is to spell the Case, not to write an arrow. What separates them
-		// is which Diagnostic was reported, so that is what is read — and the
-		// Diagnostics are handed straight on, in the order they were raised.
+		// Watched through the Diagnostics, since an undeclared Case is an Error
+		// too and needs a different fix. The Diagnostics are passed on in
+		// order.
 		let answer = collectDiagnostics(() =>
 			enrichExpression(value, valueScope),
 		)
@@ -4004,13 +3747,9 @@ function enrichDefine(
 	}
 
 	for (let arm of node.arms) {
-		// The Condition is TYPED before the value, because what an arm
-		// narrows is read off the TYPED Condition — the same reason
-		// `enrichIfElseStatementNode` types its own before either branch Scope
-		// exists. It is WRITTEN after the value though, and a reader meets the
-		// two halves of `as VALUE if CONDITION` in the order they stand on the
-		// line, so its Diagnostics are held back and reported behind the
-		// value's. The two orderings disagree about nothing else.
+		// The condition is typed before the value, because narrowing reads the
+		// typed condition. Its Diagnostics follow the value's, in written
+		// order.
 		let asked = collectDiagnostics(() =>
 			enrichExpression(arm.condition, armScope),
 		)
@@ -4025,11 +3764,8 @@ function enrichDefine(
 			report(diagnostic)
 		}
 
-		// What this arm's Condition leaves the arms BELOW it, computed
-		// once and read twice — the Scope the next arm is enriched in, and the
-		// claim the Node carries that it established anything at all. The two
-		// were always one answer; only the second of them used to be thrown
-		// away.
+		// What this arm's condition leaves later arms: the next arm's Scope,
+		// and whether it established anything.
 		let complements = falseBranchNarrowings(condition, armScope)
 
 		arms.push({
@@ -4043,27 +3779,19 @@ function enrichDefine(
 		armScope = scopeShadowing(complements, armScope)
 	}
 
-	// The `otherwise` arm is reached by a value every Condition declined,
-	// so it holds every complement and no positive evidence of its own.
+	// The `otherwise` arm holds every complement and no evidence of its own.
 	let otherwise = {
 		value: enrichAnswer(node.otherwise.value, armScope),
 		position: node.otherwise.position,
 	}
 
-	// Every value this `define` answers with, the `otherwise` arm's among
-	// them: it is one of the answers, and everything below asks the same
-	// question of all of them.
+	// Every value the `define` answers with, the `otherwise` arm's included.
 	let answers = [...arms.map((arm) => arm.value), otherwise.value]
 
-	// The arrow first, because it is a CLAIM about this `define` and the
-	// position around it is only an OFFER — `settledAnswerType` is what reads
-	// the offer, and a claim is not read but taken. Then the Union of what the
-	// arms answer with, where neither said anything.
-	//
-	// `unionOfTypes` answers null only for an empty list of Types, which this
-	// can never be: a `define` without an `otherwise` arm is not a Node the
-	// Parser can build. The fallback is written out rather than asserted away
-	// all the same.
+	// The arrow is a claim and is taken. The position is an offer, read by
+	// `settledAnswerType`. Otherwise the arms' Union decides. `unionOfTypes`
+	// answers null only for an empty list, which a `define` with its
+	// `otherwise` never is.
 	let type =
 		declaredType ??
 		(expectedType === null
@@ -4085,29 +3813,8 @@ function enrichDefine(
 	}
 }
 
-// What a `define` answers with where the position around it spoke. A
-// position OFFERS rather than claims, and an anonymous Union offers each of its
-// members: a Case payload slot offers the one-member Record and the member's own
-// Type at once — two spellings of one payload, which is exactly what
-// `expectedPayloadType` hands down — and a Declaration annotated
-// `Integer | String` offers either of the two. What the `define` answers with is
-// the offers its arms TOOK.
-//
-// Pushing the offer into the arms and answering with it are two different
-// things, and this is the second of them. A ladder of Integers under a payload
-// slot is read against both spellings and answers Integer, which
-// `wrapSingleMemberShorthand` then wraps into the Record the Case carries; the
-// whole offer taken as the answer said `{ item: Integer } | Integer`, which is
-// neither spelling and fits no Case at all.
-//
-// A NAMED Union is one Type and not a list of offers — its name is its spelling,
-// the same reading `buildUnion` gives one — so it is taken whole, and so is
-// every Type that is no Union.
-//
-// The whole offer stands where an ARM took none of it: that arm disagrees with
-// the position, and the Validator holds every arm to this Type. Narrowing here
-// would hold the disagreeing arm to the offers the OTHER arms took and report it
-// against something the position never said.
+// What a `define` answers where the position offered a Type: the offers its
+// arms took. See "define arms" in DEVELOPMENT.md.
 function settledAnswerType(
 	expectedType: common.Type,
 	answers: Array<common.typed.ExpressionNode>,
@@ -4139,20 +3846,9 @@ function settledAnswerType(
 	return buildUnion(taken)
 }
 
-// An arm answered with something that decides no Type of its own — a bare
-// Case, whose Type Arguments are applied by the position around it and never
-// inferred — and the `define` had no Type to hand it. The arm's own Diagnostic
-// names the Case and the Type Parameters left over; this one names the
-// construct that could have answered them.
-//
-// The Argument position is a CAVEAT on the second help and not a claim
-// about where this `define` stands. Nothing here can tell the two apart — a
-// `define` in an Argument position and one declared with no annotation are
-// handed the same nothing, because a call picks its Overload BY the Arguments —
-// so it used to be stated as a Note, and read as an account of a plain
-// `constant x = define { … }` that no Argument list is anywhere near. The arrow
-// is what always works, so it leads; annotating the Declaration is the other
-// answer, and it comes with the one position that does not have it.
+// An arm decided no Type, as a bare Case does, and the `define` had none to
+// hand it. The arrow always works, so it leads the Helps. An Argument position
+// hands nothing down, since a call picks its Overload by the Arguments.
 function reportUndecidedAnswerType(
 	node: parser.DefineNode,
 	undecided: common.typed.ExpressionNode,
@@ -4180,9 +3876,8 @@ function reportUndecidedAnswerType(
 
 // #region Assertions
 
-// One builder for the two, because a Node whose `nodeType` is a UNION of
-// the two spellings fits neither of them — the two Statements have identical
-// fields and TypeScript still has to be told which one is being made.
+// The two Statements have identical fields, but a `nodeType` typed as their
+// Union fits neither, so TypeScript needs the branch.
 function assertionNode(
 	nodeType: "ExpectStatement" | "RequireStatement",
 	value: common.typed.ExpressionNode,
