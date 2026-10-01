@@ -1,45 +1,8 @@
 /*
  * Where every declaration of the standard library is published, and what each
- * library page holds as a result.
- *
- * ── Placement is by rule ─────────────────────────────────────────────────────
- *
- * There is no list of Types here to fall behind the sources. Every declaration
- * is placed by what it is for:
- *
- *   1. A Namespace with a `for` target goes to the page of its target's head
- *      Type: `GroupedList for List<ItemType>` and `IntegerList for
- *      List<Integer>` both go to List.
- *   2. A head that is a checked refinement stands for its base: `NonEmptyList`
- *      is a List, `NonZeroInteger` an Integer.
- *   3. A Choice, and any alias that is not a refinement, goes to the page of
- *      the first Type its file declares a page for: `Division` to Integer,
- *      `Stream` to Terminal, `Scalar` to Number. One that is itself that first
- *      Type heads its own page, as Optional, Result, Ordering and Number do.
- *   4. A Namespace with no target gets a page named after itself: Terminal.
- *   5. A free Function family gets a page named after itself (`loop`), and
- *      every Protocol goes to the Protocols page — Generatable too, though
- *      `Randomness.es` declares it.
- *   6. The overrides in `OVERRIDES`. `Step`'s file declares the Choice and
- *      nothing a page could hang from, so it goes to `loop`, because the
- *      callback of a `step` form of `loop` returns one. `Started` and the
- *      Namespaces about work go to Future.
- *
- * "The first Type a file declares a page for" is the first Namespace in the
- * file over a Type no file declares (`Integer`, `List`), over a refinement of
- * one, or over nothing at all; failing that, the first Choice or alias the file
- * both declares and writes a Namespace for.
- *
- * A declaration no rule places throws. So does a page the rules produce that
- * `libraryTable.ts` does not list, and a listed page nothing lands on.
- *
- * ── Grouping is by table ─────────────────────────────────────────────────────
- *
- * Inside a page the reader groups come from `libraryTable.ts`, keyed
- * `Namespace::member`. Every member placed on a page has to be in exactly one of
- * its groups, and every provided or derived member too, or this throws: a
- * Method the sources gain is a decision about where a reader will look for it,
- * and the generator stops until somebody makes it.
+ * library page holds as a result. Placement follows rules rather than a list,
+ * and grouping follows `libraryTable.ts`. See "Placing declarations on pages"
+ * in DEVELOPMENT.md.
  */
 
 import { builtinProtocolOrder } from "@essence-lang/compiler/enricher/builtins"
@@ -75,18 +38,13 @@ export const LIBRARY_ROOT = "/docs/library"
 const PROTOCOLS = "protocols"
 
 /*
- * Declarations placed by hand. `Step.es` declares the Choice and no Namespace,
- * so nothing names a page it belongs on, and a reader meets it where a
- * callback has to return one: the `step` forms of `loop`, and the
- * early-stopping form of `List::reduce`.
+ * Declarations placed by hand. `Step` has no Namespace to name its page, so it
+ * goes where a callback returns one: the `step` forms of `loop`.
  */
 const OVERRIDES: Record<string, string> = {
 	Step: "loop",
-	// One run of a Future has no page of its own — what a Started IS can
-	// not be said without saying what a Future is, and the two are met
-	// together. Nor has the Namespace that BUILDS one, for the same reason, nor
-	// the four narrower targets: each of them is a Method about work, and a
-	// reader looking for one is looking at the page about work.
+	// A Started, the Namespace building Futures and the Namespaces over
+	// collections of them are all about work, which the Future page explains.
 	Started: "Future",
 	Async: "Future",
 	ResultFuture: "Future",
@@ -96,20 +54,13 @@ const OVERRIDES: Record<string, string> = {
 }
 
 /*
- * The labels every `loop` entry of its kind shares: the seed, the start of a
- * count and the positional body. What is left tells the entry apart — `while`,
- * `through`, `through-step` — and is its heading.
+ * The labels all `loop` entries share: the seed, the start of a count and the
+ * positional body. The rest, such as `while`, tells an entry apart.
  */
 const SHARED_LOOP_LABELS = new Set(["_", "from", "startingWith"])
 
 /*
- * What a Protocol hands out without a line saying so, in prose. Each sentence
- * was checked against the Compiler before it went in: a payload Choice with no
- * Namespace answers `is` and `isNot`, and tells `#Circle(2)` from `#Circle(3)`;
- * an empty `namespace Light for Light is Printable {}` prints `Red`, and the
- * Choice without it has no `toString`; `Side.cases()` prints
- * `[Start, End, BothEnds]`; interpolating a Function is
- * `interpolation-not-printable`.
+ * What a Protocol gives without a line saying so, in prose for its page.
  */
 const PROTOCOL_NOTES: Record<string, string[]> = {
 	Equatable: [
@@ -149,9 +100,8 @@ export function loopLabel(entry: Entry): string {
 }
 
 /*
- * How a call names one entry — `List::append(_:)`, `Integer.parse(_:)`,
- * `Number.Pi`, `loop(from:through:startingWith:_:)` — so a list of entries from
- * all over the library reads as calls a reader could write.
+ * How a call names one entry, such as `List::append(_:)` or `Number.Pi`, so a
+ * list of entries reads as calls a reader could write.
  */
 function selector(
 	owner: string | null,
@@ -226,7 +176,7 @@ class Placement {
 			: null
 	}
 
-	/** The Type a file declares a page for — see the rules at the top. */
+	/** The Type a file declares a page for. See the file's opening comment. */
 	private primaryOf(fileName: string): string | null {
 		if (this.primaries.has(fileName)) {
 			return this.primaries.get(fileName)!
@@ -297,11 +247,8 @@ class Placement {
 	}
 
 	pageOfNamespace(namespace: Namespace): string {
-		// The Namespace's OWN name first, because a narrower target is
-		// not always where a reader looks for it. `FutureList` targets a List
-		// of Futures, whose head is `List`, and every Method it declares is
-		// about work rather than about Lists — so the page it belongs on is the
-		// one about work, which only an override can say.
+		// An override by the Namespace's own name comes first: `FutureList`
+		// targets a List, but its Methods are about work.
 		let override = OVERRIDES[namespace.name]
 
 		if (override !== undefined) {
@@ -312,10 +259,7 @@ class Placement {
 			return this.pageOfType(namespace.targetHead)
 		}
 
-		// A Namespace with no target is its own page — `Terminal`,
-		// `Randomness` — unless the override above said otherwise. `Async` is
-		// the one that does: what it builds is a Future, and a page about making
-		// one with no page about what one IS beside it teaches half the idea.
+		// A Namespace with no target is its own page, as `Terminal` is.
 		return namespace.name
 	}
 }
@@ -468,10 +412,9 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 	)
 
 	/*
-	 * The names a signature or a Parameter's Type links to where they are
-	 * documented: refinements, the Choices a page hosts, and Protocols. A Type
-	 * with a page of its own is not among them — `Integer` in every other
-	 * signature would be a page of underlines.
+	 * The names a signature links to their docs: refinements, hosted Choices and
+	 * Protocols. Types with their own page are left out, or `Integer` would be
+	 * underlined everywhere.
 	 */
 	let links: Record<string, string> = {}
 
@@ -624,8 +567,8 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 			}
 		}
 
-		// A mode's derived and provided Methods are said once, in the lede of
-		// the page's Modes section, not published per Choice.
+		// A mode's derived and provided Methods are described once, in the
+		// Modes section's lede.
 		let provided = new Map<string, ManifestMember[]>()
 
 		for (let member of surface.provided) {
@@ -876,8 +819,8 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 					: isModeNamespace(namespace)
 						? 3
 						: 2
-		// The head, its refinements in written order, its views in the order a
-		// reader meets their members, then the modes.
+		// The head, its refinements in written order, its views in the order
+		// their members appear, then the modes.
 		let namespaces = [...on.namespaces].sort(
 			(a, b) =>
 				rank(a) - rank(b) ||
@@ -927,9 +870,8 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 									})),
 							),
 							notes: PROTOCOL_NOTES[protocol.name] ?? [],
-							// A provided Method has its heading on every page that
-							// receives it. One nothing in the library receives would
-							// have no address at all, so it gets its heading here.
+							// A provided Method nothing receives would have no heading
+							// anywhere, so it gets one here.
 							headed: protocol.methods
 								.filter(
 									(method) =>
@@ -1058,10 +1000,9 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 	}
 
 	/*
-	 * The see-also rows are written as `library/<page>#<anchor>` in the table
-	 * and resolved here, against the pages as built — a row pointing at a
-	 * heading that no longer exists stops the generator rather than publishing
-	 * a link to nowhere.
+	 * See-also rows are written as `library/<page>#<anchor>` and resolved
+	 * against the built pages. A row naming a missing heading stops the
+	 * generator.
 	 */
 	for (let page of pages) {
 		page.manifest.seeAlso = (page.definition.seeAlso ?? []).map(

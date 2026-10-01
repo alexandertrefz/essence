@@ -44,3 +44,32 @@ generics out, so the start is pulled back to the `<` when there is one. The gene
 A signature spanning several lines carries the indentation of its nesting inside `declarations { namespace { … } }`
 on every line but the first, which the slice starts mid-line. `dedentContinuations` takes that nesting off, leaving
 the parameters' indentation relative to the declaration.
+
+### Placing declarations on pages
+
+`scripts/libraryPages.ts` keeps no list of Types that could fall behind the sources. Every declaration is placed by
+what it is for:
+
+1. A Namespace with a `for` target goes to the page of its target's head Type: `GroupedList for List<ItemType>` and
+   `IntegerList for List<Integer>` both go to List.
+2. A head that is a checked refinement stands for its base: `NonEmptyList` is a List, `NonZeroInteger` an Integer.
+3. A Choice, and any alias that is not a refinement, goes to the page of the first Type its file declares a page for.
+   So `Division` goes to Integer, `Stream` to Terminal and `Scalar` to Number. One that is itself that first Type heads
+   its own page, as Optional, Result, Ordering and Number do.
+4. A Namespace with no target gets a page named after itself, such as Terminal.
+5. A free Function family gets a page named after itself, such as `loop`. Every Protocol goes to the Protocols page,
+   Generatable too, though `Randomness.es` declares it.
+6. `OVERRIDES` places the rest by hand. `Step.es` declares the Choice and nothing a page could hang from, so `Step`
+   goes to `loop`, whose `step` forms take a callback returning one. `Started` and the Namespaces about work, such as
+   `Async` and `FutureList`, go to Future, since a Future and its run are learned together.
+
+The first Type a file declares a page for comes from its first Namespace over one of three targets. The target is a
+Type no file declares, such as `Integer` or `List`, a refinement of one, or nothing. Failing that, it is the first
+Choice or alias the file both declares and writes a Namespace for.
+
+A declaration no rule places throws. So does a page the rules produce that `scripts/libraryTable.ts` does not list, and
+a listed page nothing lands on.
+
+Inside a page, the reader groups come from `scripts/libraryTable.ts`, keyed `Namespace::member`. Every member placed
+on a page, provided and derived ones included, must sit in exactly one of its groups, or the generator throws. A
+Method the sources gain needs a decision about where a reader will look for it.

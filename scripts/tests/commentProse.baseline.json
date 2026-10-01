@@ -255,7 +255,6 @@
 	"packages/website/scripts/checkLinks.ts": {"sentence-length": 2, "em-dash": 1, "all-caps": 1},
 	"packages/website/scripts/generateStdlibDocs.ts": {"sentence-length": 6, "em-dash": 2},
 	"packages/website/scripts/libraryManifest.ts": {"sentence-length": 3, "em-dash": 4, "block-length": 1},
-	"packages/website/scripts/libraryPages.ts": {"sentence-length": 10, "em-dash": 8, "all-caps": 2, "position": 1, "block-length": 1},
 	"packages/website/scripts/libraryRender.ts": {"sentence-length": 8, "em-dash": 5, "all-caps": 1},
 	"packages/website/scripts/libraryTable.ts": {"sentence-length": 3, "em-dash": 3, "all-caps": 1},
 	"packages/website/src/components/docs/essenceLang.ts": {"sentence-length": 1, "em-dash": 1},
