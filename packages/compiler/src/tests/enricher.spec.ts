@@ -9396,12 +9396,8 @@ describe("Enricher", () => {
 				).toBe("NonEmptyList")
 			})
 
-			// The instantiation is remembered per receiver, and a NAME is
-			// the one thing a Program may spell twice — so the two `Even`s here
-			// print alike and prove different things. Remembered by their
-			// spelling, the second receiver was handed the first one's
-			// `NonEmptyList<Even>`, whose items answer another question
-			// altogether, and the branch then narrowed to nothing at all.
+			// The two `Even`s print alike but prove different things, so the
+			// instantiation is remembered per receiver, not by spelling.
 			it("should tell two shadowing refinements of one name apart", () => {
 				let source = `implementation {
 					type Even = Integer where @::isEven()
@@ -9434,22 +9430,13 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The one thing about a narrowing that DOES reach the typed tree
-		// — the two claims a Conditional carries about what its condition
-		// established, which nothing below the Enricher could work out for
-		// itself: a narrowing is read off the typed condition and checked
-		// refinements are erased before the Simplifier hands anything on.
-		// `instrument-coverage` marks each half of the branch with the claim
-		// about that half, and `--mutate` reads both before it will swap two
-		// bodies.
+		// A Conditional carries two claims about what its condition proved,
+		// since refinements are erased before later stages. `instrument-coverage`
+		// and `--mutate` read them.
 		describe("The claims a Conditional carries", () => {
-			// Two claims and not the same one twice, in both directions.
-			// `isEmpty` establishes nothing about a String where it holds and
-			// proves `NonEmptyString` where it does not, while
-			// `isGreaterThan(0)` proves `PositiveInteger` for the branch it
-			// opens and leaves the `else` nothing. Neither implies the other,
-			// which is why a reader that may not swap two bodies has to ask
-			// both.
+			// `isEmpty` proves `NonEmptyString` only for the `else`, and
+			// `isGreaterThan(0)` proves `PositiveInteger` only for its own branch,
+			// so both claims are kept.
 			it("should record what the condition proved for each branch", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					function pieces(_ text: String, on separator: String) -> NonEmptyList<String> {
@@ -9489,27 +9476,18 @@ describe("Enricher", () => {
 		})
 	})
 
-	// A `define` reads its arms in the Scope it stands in, and every arm
-	// carries a doorway of its own: the complements of the Conditions above it,
-	// which is what reaching it proves, and its own Condition on top. The same
-	// machinery an `if` narrows through, so what is asked here is what a `define`
-	// does with it and not whether the machinery works.
-	//
-	// The answer Type is the other half — the arrow, the position around the
-	// `define`, or the arms, in that order.
+	// Each arm is narrowed by the complements of earlier Conditions and its
+	// own. The answer Type comes from the arrow, the position, or the arms. See
+	// "define arms" in packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("Define Expressions", () => {
-		// A `define` standing where nothing hands a Type down, so the arms
-		// are what decide it. Written out per test because what the arms answer
-		// with is the point of most of them.
+		// The Type of a `define` where only the arms decide it.
 		function defineTypeOf(source: string): string {
 			return printType(lastConstantValue(source).type)
 		}
 
 		describe("Flow narrowing", () => {
-			// `divide` is what the narrowing is worth: the entry taking a
-			// NonZeroInteger answers the quotient itself, where the one taking a
-			// plain Integer answers an Optional it might be empty of. So the arm
-			// Types say which of the two the receiver reached.
+			// The `divide` entry taking a `NonZeroInteger` answers bare, the other
+			// an Optional, so the arm Types show which was reached.
 			it("should narrow an arm from the complement of the arm above it", () => {
 				let source = `implementation {
 					constant d = 3
@@ -9521,11 +9499,9 @@ describe("Enricher", () => {
 					}
 				}`
 
-				// Four uses, in the order a walk meets them: the
-				// Declaration's own name, the first arm's Condition — which
-				// stands above every complement and so narrows nothing — and
-				// then the second arm's value and its Condition, both of them
-				// read past the first arm's `false`.
+				// In walk order: the Declaration's name, the first Condition,
+				// which nothing narrows, then the second arm's value and
+				// Condition, read past the first arm's `false`.
 				expect(diagnosticsFor(source)).toEqual([])
 				expect(readTypesOf(source, "d")).toEqual([
 					"Integer",
@@ -9535,9 +9511,7 @@ describe("Enricher", () => {
 				])
 			})
 
-			// The value of the second arm is read in the Scope its own
-			// Condition opens, which stands on the complement above it — so the
-			// two doorways compose rather than replacing one another.
+			// The second arm's own Condition stacks on the earlier complement.
 			it("should narrow an arm by its own Condition as well", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9551,9 +9525,7 @@ describe("Enricher", () => {
 				).toBe("Rational")
 			})
 
-			// The `otherwise` arm is reached by a value every Condition
-			// declined, so it holds every complement — and no positive evidence,
-			// having asked nothing of its own.
+			// The `otherwise` arm holds every complement and nothing else.
 			it("should let the otherwise arm see every complement", () => {
 				let source = `implementation {
 					constant d = 3
@@ -9569,10 +9541,8 @@ describe("Enricher", () => {
 				expect(narrowedTypeOf(source, "d")).toBe("NonZeroInteger")
 			})
 
-			// A conjunction answering `false` says that ONE of its questions
-			// failed and nothing about which, so it leaves the arms below it
-			// nothing at all. Its own arm still narrows by both halves — this is a
-			// limitation of the complement, not of the evidence.
+			// A conjunction's `false` does not say which half failed, so later
+			// arms get nothing. Its own arm still narrows by both halves.
 			it("should leave no complement behind a conjunction", () => {
 				let source = `implementation {
 					constant d = 3
@@ -9587,9 +9557,8 @@ describe("Enricher", () => {
 				expect(narrowedTypeOf(source, "d")).toBe("Integer")
 			})
 
-			// Recorded per arm, because each arm asks a question of its own
-			// — and only the Enricher can say so, checked refinements being erased
-			// before anything downstream sees a Program.
+			// Recorded per arm, since refinements are erased before later
+			// stages.
 			it("should record which arms narrow", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					constant d = 3
@@ -9620,12 +9589,9 @@ describe("Enricher", () => {
 				}
 			})
 
-			// The SECOND claim, and the reason it is a second one:
-			// `isEmpty` establishes nothing about a String where it holds and
-			// proves `NonEmptyString` where it does not, while `isGreaterThan(0)`
-			// proves `PositiveInteger` for its own arm and leaves the arm below
-			// it nothing. Neither flag implies the other in either direction,
-			// which is why a reader that may not move an arm has to ask both.
+			// `isEmpty` proves `NonEmptyString` only for later arms, and
+			// `isGreaterThan(0)` proves `PositiveInteger` only for its own, so both
+			// flags are kept.
 			it("should record which arms narrow the arms BELOW them", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					function pieces(_ text: String, on separator: String) -> List<String> {
@@ -9668,10 +9634,9 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A bare `#Empty` decides no Type of its own — a Choice's Type
-		// Parameters are applied and never inferred — so a `define` whose arms
-		// answer with one compiles exactly where the position around it hands a
-		// Type down, and nowhere else. That is what every source here asks.
+		// A bare `#Empty` decides no Type, since a Choice's Type Parameters are
+		// never inferred, so these `define`s compile only where the position
+		// hands a Type down.
 		describe("The answer Type from context", () => {
 			const ARMS = `define {
 					as #Empty if flag
@@ -9780,10 +9745,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// The rows of a table test are read against what the row
-			// Parameter declared, which is the same hand-down every position
-			// above makes — asked with the tests section enriched, since that is
-			// the only mode that reads one at all.
+			// A table test's rows read the row Parameter's Type, so the tests
+			// section is enriched here.
 			it("should take it from a table test's row Parameter", () => {
 				expect(
 					enrich(
@@ -9803,10 +9766,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// An Argument is the one position that hands nothing down — a
-			// call picks its Overload BY the Arguments, so no Parameter Type is
-			// decided before they are read. The arrow is what a `define` standing
-			// in one has instead, and the Diagnostic is what says so.
+			// A call picks its Overload by the Arguments, so an Argument hands
+			// nothing down. The Diagnostic suggests the arrow.
 			it("should not reach an Argument, and say what to write instead", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					constant flag = true
@@ -9818,12 +9779,8 @@ describe("Enricher", () => {
 					constant total = count(${ARMS})
 				}`)
 
-				// All three, and in that order. The Case's own two
-				// Diagnostics name the Type Parameters left over and the two
-				// Choices declaring `#Value` — `Optional` and `Result` — and
-				// each offers to annotate the Declaration, which is a help
-				// there IS no Declaration for here. The `define`'s own is what
-				// supplies the one that works.
+				// The Case's two Diagnostics, then the `define`'s, which offers
+				// the arrow that works here.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual([
@@ -9844,12 +9801,9 @@ describe("Enricher", () => {
 				])
 			})
 
-			// The Argument position is a CAVEAT on the second help and not
-			// an account of where the `define` stands — nothing here can tell an
-			// Argument from a Declaration with no annotation, since both hand the
-			// same nothing down. Stated as a Note it read as a remark about the
-			// Declaration below, which no Argument list is anywhere near, and it
-			// withheld the help that annotating that Declaration is the fix.
+			// An Argument and an unannotated Declaration hand down the same
+			// nothing, so the Help offers the annotation and names the Argument
+			// case as a caveat.
 			it("should offer the Declaration the arrow is an alternative to", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					constant flag = true
@@ -9896,9 +9850,8 @@ describe("Enricher", () => {
 		})
 
 		describe("The answer Type from the arrow and the arms", () => {
-			// The arrow is a claim about the `define` itself and the
-			// position around it is a claim about what may stand there, so the
-			// arrow is the narrower of the two and wins.
+			// The arrow is a claim about the `define` itself, narrower than the
+			// position's.
 			it("should let the arrow beat the position", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9912,10 +9865,8 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// The position OFFERS where the arrow claims, and an
-			// anonymous Union offers each of its members — so what a `define`
-			// answers with is the offers its arms took. Both are taken here,
-			// which is the annotation over again.
+			// A position offers each member of a Union, and the `define` answers
+			// with the offers its arms took, here both.
 			it("should take the position's Type where there is no arrow", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9929,11 +9880,8 @@ describe("Enricher", () => {
 				).toBe("Integer | String")
 			})
 
-			// A ladder of Integers under `Integer | String` answers
-			// Integer, and nothing is lost by that: the position said either may
-			// stand there, and an Integer is one of them. Adopting the whole
-			// offer instead is what refused a `define` in a one-member Case
-			// payload, whose position offers two SPELLINGS of one payload.
+			// A ladder of Integers under `Integer | String` answers Integer, one
+			// of the offers.
 			it("should answer with only the offers its arms took", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9947,11 +9895,8 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// An arm that took none of the offers disagrees with the
-			// POSITION, and every arm is held to the Type the `define` answers
-			// with — so the whole offer stands, and the Validator reports the
-			// disagreement against what the position actually said rather than
-			// against the offers the other arms happened to take.
+			// An arm taking none of the offers keeps the whole offer, so the
+			// Validator reports against what the position said.
 			it("should keep the whole offer where an arm took none of it", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -9981,16 +9926,11 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A one-member Case's payload slot offers two spellings of one
-		// payload at once — the Record the Case carries and the member's own
-		// Type — and the value settles which of them it is. A `define` that
-		// answered with BOTH settled nothing: it fitted neither spelling, and
-		// every single-member Case in the language refused one.
+		// A one-member Case's payload slot offers the Record and the member's
+		// Type, and the `define` must settle on one spelling.
 		describe("The answer Type inside a Case payload", () => {
-			// The Type the payload reached the Case with. A one-member
-			// shorthand is wrapped into the Record the Case carries, so this is
-			// that Record either way — and `lastConstantValue` asks for a clean
-			// Program on the way past.
+			// The Type the payload reached the Case with, the carried Record
+			// either way, since a one-member shorthand is wrapped into it.
 			function payloadTypeOf(source: string): string {
 				let value = lastConstantValue(source)
 
@@ -10034,9 +9974,8 @@ describe("Enricher", () => {
 				).toBe("{ from: Integer, to: Integer }")
 			})
 
-			// The Record spelling written out, which the shorthand is only
-			// a shorter way of saying — the `define` stands in the member's own
-			// position there and never sees the two spellings at all.
+			// Written out in full, the `define` stands in the member's own
+			// position and sees one spelling.
 			it("should read the long form as it always did", () => {
 				expect(
 					payloadTypeOf(`implementation {
@@ -10065,12 +10004,8 @@ describe("Enricher", () => {
 				).toBe("{ item: Integer }")
 			})
 
-			// The other direction — a `define` whose arms are bare Cases
-			// answers with the Choice the position named, because a bare Case
-			// decides no Type Arguments of its own and the offer is what it is
-			// read against. Pushing the position's Type into the arms is what
-			// this needs, and it is untouched by what the `define` then answers
-			// with.
+			// Bare Case arms decide no Type Arguments, so they resolve against the
+			// position's Choice.
 			it("should let a bare Case arm resolve from the position", () => {
 				expect(
 					defineTypeOf(`implementation {
@@ -10086,12 +10021,9 @@ describe("Enricher", () => {
 		})
 	})
 
-	// The doorway nobody has to write — a Match on a bare Integer or String
-	// takes the VALUE apart, and its Cases are evidence in both directions:
-	// reaching the Case for the rest proves the value is none of the values named
-	// above it, and a Case that NAMES a value proves that. The Matcher itself is
-	// untouched throughout, which is what leaves the Rewriter the Match it always
-	// had.
+	// A Match on an Integer or String value: a Case naming a value proves it,
+	// and the Case for the rest proves the value is none of the named ones. The
+	// Matchers themselves are untouched.
 	describe("Refinement match narrowing", () => {
 		function handlersOf(
 			source: string,
@@ -10105,9 +10037,8 @@ describe("Enricher", () => {
 			return value.handlers
 		}
 
-		// The Type `@` has where the Handler ANSWERS, read off the value it
-		// returns rather than searched for — a Handler can hold more than one `@`,
-		// and a Guard's is not the body's.
+		// The Type of `@` in each Handler's returned value, since a Guard's `@`
+		// is not the body's.
 		function selfTypesOf(source: string): Array<string> {
 			return handlersOf(source).map((handler) => {
 				let returned = handler.body[0]
