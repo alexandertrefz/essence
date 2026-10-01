@@ -432,25 +432,18 @@ describe("Contract tests", () => {
 		// No remark: a Generatable conformance, the only help one could offer,
 		// never makes a generic Method eligible.
 		it("leaves a generic Method alone, and says nothing about it", () => {
-			expect(
-				namesOf(
-					moduleOf(`	namespace Counting for Integer {
+			let source = moduleOf(`	namespace Boxing for Integer {
 		up() -> Integer {
 			<- @::add(1)
 		}
-	}`),
-				),
-			).toEqual(["Counting::up()"])
 
-			expect(
-				codesOf(
-					moduleOf(`	namespace Boxing for Integer {
 		wrapped<Item>(_ item: Item) -> Integer {
 			<- @
 		}
-	}`),
-				),
-			).toEqual([])
+	}`)
+
+			expect(namesOf(source)).toEqual(["Boxing::up()"])
+			expect(codesOf(source)).toEqual([])
 		})
 
 		// A second declaration of one Namespace in a file is an error, but the
