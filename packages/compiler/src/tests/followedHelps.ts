@@ -5,32 +5,20 @@ import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
-// The three things a test about a Help does — report a probe, read the
-// Help off it, and COMPILE what it printed. They were written inside
-// `knownAnswers.spec.ts`, which is where the first reporters to earn them were
-// tested; the Help audit needs the same three from every spec it wrote, so they
-// moved here rather than being written a second way.
-//
-// A Help is a promise that what it prints works when it is followed, and a
-// report that breaks that promise is worse than one that says nothing — so the
-// spellings a Help spells are compiled here rather than compared as text.
-//
-// ONE file, because two of them is two answers to "does this compile?": the
-// audit briefly had a second harness whose `compiles` stopped after the
-// Enricher, and a Help followed into a Validator refusal read there as a
-// success. `compiles` runs every stage, through `analyseSource`, while
-// `firstOf` and `enrichedDiagnosticsFor` stop after the Enricher.
+// The shared harness for specs about Helps: report a probe, read the Help off
+// it, and compile what it printed. A Help promises that following it works, so
+// its spelling is compiled rather than compared as text. One harness gives one
+// answer to "does this compile?". `compiles` runs every stage through
+// `analyseSource`, while `firstOf` and `enrichedDiagnosticsFor` stop after the
+// Enricher.
 
-// Not exported: `firstOf` below is what a spec reaches for, and an export
-// nobody imports is a promise to keep a reader for.
+// Not exported, since specs reach for `firstOf`.
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
 }
 
-// Throws rather than answering null, and names every code that WAS
-// reported: a probe that stopped reporting what it was written for is a test
-// that has to say what it got instead, or the next reader spends the afternoon
-// finding out.
+// Throws rather than answering null, naming every code that was reported, so
+// a probe that stops reporting its code says what it got instead.
 export function firstOf(
 	source: string,
 	code: common.DiagnosticCode,
@@ -50,13 +38,9 @@ export function firstOf(
 	return found
 }
 
-// What a Help promises, checked by compiling it. A test passes here its
-// own probe with the Help's spelling written into it, so a Help that stops
-// compiling fails the test that prints it rather than a reader's afternoon.
-//
-// The whole pipeline, so that a Help followed into a Validator refusal fails
-// here rather than reading as a success — `analyseSource` is the one
-// description of what every stage has to say about one source.
+// A spec passes its probe with the Help's spelling written in, so a Help that
+// stops compiling fails the spec that prints it. Every stage runs, so a Help
+// followed into a Validator refusal fails too.
 export function compiles(
 	source: string,
 	options: AnalysisOptions = {},
@@ -64,10 +48,8 @@ export function compiles(
 	return !containsErrors(analysedDiagnosticsFor(source, options))
 }
 
-// The Parser and the Enricher, for the reports that never reach the
-// Validator: a probe whose point is a Type error stops there, and running the
-// Validator over a Program the Enricher gave up on only adds what it could not
-// judge.
+// The Parser and the Enricher alone, for a probe whose point is a Type error.
+// The Validator would only add what it could not judge in such a Program.
 export function enrichedDiagnosticsFor(
 	source: string,
 ): Array<common.Diagnostic> {
@@ -76,13 +58,9 @@ export function enrichedDiagnosticsFor(
 	return [...parsed.diagnostics, ...enrich(parsed.program).diagnostics]
 }
 
-// Every stage, for the Helps the VALIDATOR writes — a Match's Cases, a
-// bounded Function stored as a value. The Enricher reports none of them, so a
-// test that asked it alone would find nothing and say the reporter had stopped.
-//
-// `tests` is off unless a probe asks for it, the way `esc check` has it off: a
-// `tests { … }` section is walked only where something is going to run it, and a
-// spec about a report inside one has to say so or find an empty list.
+// Every stage, for the Helps the Validator writes, such as a Match's Cases or
+// a bounded Function stored as a value. The `tests` mode is off unless a probe
+// asks for it, so a report inside a `tests { … }` section needs that option.
 export function analysedDiagnosticsFor(
 	source: string,
 	options: AnalysisOptions = {},
@@ -90,8 +68,7 @@ export function analysedDiagnosticsFor(
 	return analyseSource(source, undefined, options).diagnostics
 }
 
-// `firstOf` over the whole pipeline, with the same insistence on naming
-// what WAS reported when the probe stops reporting what it was written for.
+// `firstOf` over every stage.
 export function firstAnalysed(
 	source: string,
 	code: common.DiagnosticCode,
@@ -110,10 +87,8 @@ export function firstAnalysed(
 	return found
 }
 
-// Every code one source is refused with, in the order a reader meets them
-// — the same list `esc` prints and the editor underlines. A cascade is tested by
-// writing the whole list down, so a report that comes back is a failure rather
-// than something the next reader finds.
+// Every code a source is refused with, in the order a reader meets them. A
+// spec of a cascade writes the whole list down, so a returning report fails it.
 export function codesOfSource(
 	source: string,
 	options: AnalysisOptions = {},
@@ -123,8 +98,7 @@ export function codesOfSource(
 	)
 }
 
-// The Helps of the first report carrying this code, which is `firstAnalysed`
-// with the one thing a spec about a Help wants off it.
+// The Helps of the first report carrying this code.
 export function helpsOfCode(
 	source: string,
 	code: common.DiagnosticCode,
@@ -132,17 +106,9 @@ export function helpsOfCode(
 	return firstAnalysed(source, code).helps ?? []
 }
 
-// The codes whose Helps are COMPILED somewhere — the registry the Help
-// specs maintain between them, and the one thing `helpCoverage.spec.ts` can not
-// work out for itself. A Help that spells an edit the reader is told to WRITE is
-// a promise, and the only way to keep it is to write that spelling into the
-// probe and compile the result; a Help nobody compiles is a Help that goes stale
-// the next time the spelling it names changes.
-//
-// Added to by the spec that starts compiling one. `helpCoverage.spec.ts` holds
-// it to the docs page both ways: an entry here that the page shows no "Write
-// '…'" Help for is an entry that has lost its subject, and the codes on the page
-// that are NOT here are printed as the list still to do.
+// The codes whose Helps some spec compiles through `compiles`. A spec that
+// starts compiling one adds it. `helpCoverage.spec.ts` holds this list to the
+// diagnostics reference page both ways and prints the codes still to do.
 export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 	[
 		"ambiguous-case",

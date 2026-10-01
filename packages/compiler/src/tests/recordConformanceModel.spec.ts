@@ -11,35 +11,22 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// A composite asks its members — checked against a MODEL of that sentence
-// rather than against the Compiler's own idea of it. The model below is written
-// from the rule and knows nothing about witnesses, slots, brands or pools: two
-// Records are equal when their member sets match and every member is equal by
-// its own Type's rule, where a Type's rule is the one its Namespace writes and
-// the structural one otherwise. Everything the Compiler does to arrive there is
-// invisible to it, which is the point — a test written from the implementation
-// agrees with the implementation.
+// A Record asks its members whether they are equal, checked against a model
+// written from the rule rather than from the Compiler. Two Records are equal
+// when their member sets match and each member is equal by its own Type's rule.
+// That is the one its Namespace writes, or the structural one. The model knows
+// nothing of witnesses, slots, brands or pools.
 //
-// SEVERAL Record Types per generated Program, which is the property the
-// hand-written tests did not have. Every one of them declares a single routed
-// Record, so no Program they compile can hold two witnesses that might be
-// confused for each other — and that is exactly the shape that found a witness
-// pool keyed without the routed member names, where `{ fig: Tag }` and
-// `{ zebra: Tag }` collapsed into one constant and the second Record was asked
-// about the first one's members. One Program here declares a dozen.
+// Each generated Program declares several Record Types, so two witnesses that
+// could be confused for each other share one Program. A witness pool keyed
+// without the routed member names would merge `{ fig: Tag }` and `{ zebra: Tag }`.
 //
-// Fixed seeds and a generator written out here, so a failure is a file a
-// reader can open rather than a run they have to reproduce. The two seeds were
-// picked because they generate different shapes, not because they were the ones
-// that passed: the reviewer's own harness ran four over 2,400 assertions, and
-// these two carry the same shapes in a size the suite can afford.
+// The seeds are fixed and the generator is written out, so a failing seed
+// names a Program a reader can regenerate. The seeds generate different shapes.
 
-// One Essence Type and the pairs that stand for it — each pair being two
-// spellings and what the MODEL says about them. `Tag` is case-insensitive by
-// its own `is`, so "News" and "NEWS" are one Tag and two Strings; `Money`
-// compares on `cents` and ignores `note`. Both pairs differ structurally, so a
-// Record that failed to route would answer the opposite of the model on every
-// one of them.
+// An Essence Type and pairs of its values, each with the model's answer. `Tag`
+// compares text without case and `Money` ignores `note`, so their pairs differ
+// structurally: a Record that failed to route would contradict the model.
 type Kind = {
 	spelling: string
 	pairs: Array<{ left: string; right: string; equal: boolean }>
@@ -144,9 +131,8 @@ const universe: Record<string, Kind> = {
 	},
 }
 
-// Out of alphabetical order on purpose. The witnesses are lined up with
-// the routed names BY POSITION, so a Record whose routed members are written
-// out of order is the shape that can tell the two lists apart.
+// Out of alphabetical order on purpose. The witnesses line up with the routed
+// names by position, and only unordered members tell the two lists apart.
 const memberNames = ["zebra", "apple", "mango", "kiwi", "pear", "fig"]
 
 const prelude = `type Tag = { text: String }
@@ -173,9 +159,8 @@ const prelude = `type Tag = { text: String }
 		<- x::is(y)
 	}`
 
-// Written out rather than reached for, so a seed means the same Program
-// on every machine and in every version of the runtime. Mulberry32: one
-// multiply-xor round over a 32-bit state, which is all that is wanted of it.
+// Mulberry32, written out so a seed means the same Program on every machine
+// and runtime version.
 function randomFrom(seed: number): () => number {
 	let state = seed >>> 0
 
@@ -190,11 +175,10 @@ function randomFrom(seed: number): () => number {
 	}
 }
 
-// The five questions, which are the five rails one answer has to travel:
-// the direct call, its complement, a bound solved at the call, a List's item
-// witness, and a Dictionary key — which is the one that also has to agree with
-// the key encoding. A Program batches all of them per pair, because what costs
-// seconds here is compiling and running a Program, not the questions in it.
+// Each pair is asked through every route an answer travels. The routes are the
+// direct call, its complement, a bound solved at the call, a List's item
+// witness, and a Dictionary key. The key must also agree with the key encoding.
+// One Program asks them all, since compiling and running it is the cost.
 function programFor(
 	seed: number,
 	typeCount: number,
@@ -228,8 +212,8 @@ function programFor(
 				name: member.name,
 				pair: pick(member.kind.pairs),
 			}))
-			// THE MODEL. Every member decides for itself, by its own
-			// Type's rule, and the Record is equal when all of them are.
+			// The model: the Record is equal when every member is equal by its
+			// own Type's rule.
 			let equal = chosen.every((member) => member.pair.equal)
 			let value = `${name}r${round}`
 			let write = (side: "left" | "right") =>
@@ -295,9 +279,8 @@ async function answersOf(source: string): Promise<Array<string>> {
 }
 
 describe("A generated Program agrees with the rule", () => {
-	// The two seeds are run as separate tests so a failure names which
-	// one, and the Program is regenerated from the seed in the report — the
-	// generator is deterministic, so printing the seed is printing the Program.
+	// One spec per seed, so a failure names the seed, and the deterministic
+	// generator rebuilds the Program from it.
 	for (let seed of [7, 23]) {
 		it(`answers every question the model's way (seed ${seed})`, async () => {
 			let { source, expected } = programFor(seed, 12)
@@ -306,9 +289,7 @@ describe("A generated Program agrees with the rule", () => {
 		})
 	}
 
-	// The generator itself, because a generator that quietly stopped
-	// generating would make every test above pass. Twelve Types, two pairs each,
-	// five questions per pair.
+	// A generator that stopped generating would let every seed's spec pass.
 	it("generates the Program it says it does", () => {
 		let { source, expected } = programFor(7, 12)
 
