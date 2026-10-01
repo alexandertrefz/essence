@@ -25,9 +25,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The names are what the failure message prints; the paths are what is
-// read. Keeping them apart means the message stays the short, greppable thing a
-// reader can act on rather than two absolute paths into a checkout.
+// The failure message prints the short names, and the paths are read.
 const harnessFile = "StdlibExhaustive.es"
 const goldenFile = "__golden__/stdlibExhaustive.txt"
 
@@ -36,25 +34,15 @@ const goldenPath = resolve(import.meta.dirname, goldenFile)
 
 type CompiledProgram = {
 	output: Array<string>
-	// The simplified Program the emitted JavaScript was made from —
-	// retained so the label↔call correspondence test can walk each `show(…)`
-	// call's second Argument without compiling the harness twice.
-	//
-	// Before the Optimiser, deliberately. That test asks which Method a
-	// call invokes, which is a question about the harness as written, and the
-	// Optimiser's whole business is replacing a call with the operation it
-	// performs — a comparison against a payload-less Case is a tag test by the
-	// time it is emitted, and invokes nothing. What RUNS below is the optimised
-	// Program, so the golden file goes on holding the standard library to
-	// account through every pass.
+	// The simplified Program before the Optimiser, which the label and call
+	// spec walks. The Optimiser replaces calls with operations, while the spec
+	// asks which Method the harness as written calls. The optimised Program is
+	// what runs.
 	program: common.typedSimple.Program
 }
 
-// The same stages the CLI runs, minus bundling — mirrored from
-// `codeGeneration.spec.ts` rather than shared with it, because that one folds
-// `expect` assertions into the pipeline and takes its source inline. This one
-// has a single caller, reads from disk, and has to say WHICH stage refused
-// before anything is compared to the golden file.
+// The CLI's stages without bundling. Unlike `codeGeneration.spec.ts`, it
+// reads from disk and says which stage refused before anything is compared.
 async function compileProgram(source: string): Promise<CompiledProgram> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -87,14 +75,9 @@ async function compileProgram(source: string): Promise<CompiledProgram> {
 	}
 
 	try {
-		// `import` rather than `require`, because the harness COMPLETES
-		// work at its top level and a Module that does is emitted with a
-		// top-level `await`. A `require` of one either refuses it or answers
-		// before the wait is over, which would record the description of a
-		// future where the golden file holds the value it answers with. It is
-		// what makes this whole file asynchronous, and the capture is installed
-		// across the wait for the same reason `fixtureSweep.spec.ts` installs
-		// its own across one.
+		// The harness completes work at its top level, so it is emitted with a
+		// top-level `await`. `import` waits for it where `require` would not, and
+		// the capture stays installed across the wait.
 		await import(file)
 	} finally {
 		console.log = originalLog
@@ -104,11 +87,8 @@ async function compileProgram(source: string): Promise<CompiledProgram> {
 	return { output, program: simplified }
 }
 
-// Each line of the harness output is `"Label => value"`, printed as a
-// String — which the runtime renders with its quotes. The separator is ` => `
-// and not ` -> ` because a label spells Function Parameters with the arrow of
-// their own signature: `List.everyItem<ItemType>(where: (_ ItemType) ->
-// Boolean)`.
+// Each harness line is the quoted String `"Label => value"`. The separator is
+// not ` -> `, which a label's Function Parameters use.
 function labelOf(line: string): string {
 	let text = line.startsWith('"') ? line.slice(1, -1) : line
 	let separator = text.indexOf(" => ")
@@ -116,12 +96,8 @@ function labelOf(line: string): string {
 	return unescaped(separator === -1 ? text : text.slice(0, separator))
 }
 
-// A label comes back through the quoted printer, so it arrives SPELLED —
-// `Record.is(_ {})` is printed `Record.is(_ \{\})`, because a bare brace in quoted
-// output would open an interpolation hole if the line were pasted back into a
-// Program. The signatures it is compared against are read off the Declarations
-// and hold the braces themselves, so the spelling is undone here: this reads a
-// printed String Literal and wants the text that was in it.
+// The quoted printer escapes a label's braces, as in `Record.is(_ \{\})`. The
+// declared signatures hold bare braces, so the escapes are undone.
 function unescaped(label: string): string {
 	let text = ""
 	let index = 0
@@ -141,33 +117,10 @@ function unescaped(label: string): string {
 	return text
 }
 
-// The one Namespace this harness can not cover, and the reason is the
-// harness itself: `show` works by CALLING `Terminal.inspect`, and every other
-// entry of that Namespace writes to a stream too. A `show("Terminal.print(…)",
-// …)` line would print twice — once for the call it is testing and once for the
-// label — and `Terminal.write` would put text on stdout with no newline in the
-// middle of a captured line, so the record below would stop being one value per
-// line. The Namespace that PRINTS can not be held to account by a record made of
-// printing; its behaviour is covered by `terminal.spec.ts`, which compiles small
-// Programs and reads back what each stream actually received.
-// And the one Namespace this harness can not CAPTURE. `Randomness.seeded`
-// builds a source a line here could draw from, and what the draw answers is one
-// of the generator's own words — so a capture of it would pin sfc32 rather than
-// the Namespace, and every change to the words would read as a broken body. So
-// there is no line `StdlibExhaustive.es` writes. The entries are covered by
-// `packages/runtime/src/tests/randomness.spec.ts`, which drives the natives
-// directly over a fixed seed and asserts the ranges, the exactness and the
-// replay, and by `packages/compiler/src/tests/randomness.spec.ts`, which runs
-// Programs that build a source and draw from it.
-// And the one Namespace this harness may not REACH. Every entry of
-// `Http` sends a request, and a line here would make the golden capture a
-// record of what some host answered on the day it was recaptured — which is
-// the opposite of what a golden file is for. The suite would also have to
-// stand up a server before it could be read at all. The entries are covered by
-// `packages/compiler/src/tests/http.spec.ts`, which runs Programs against a
-// `Bun.serve` started in the spec and asserts what each one sent and got back.
-// `Response` is NOT here: what it answers is read off a Record a line can
-// write down, and neither of its Methods sends anything.
+// The harness prints through `Terminal`, so `terminal.spec.ts` covers it. A
+// capture of `Randomness` would pin the generator's words, so the `randomness`
+// specs cover it. `Http` would record a host's answers, so `http.spec.ts`
+// covers it. `Response` sends nothing, so the harness covers it.
 const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness", "Http"])
 
 // Every Method a Program can call, spelled the way `StdlibExhaustive.es`
@@ -176,20 +129,14 @@ const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness", "Http"])
 function declaredSignatures(): Array<string> {
 	let signatures: Array<string> = []
 
-	// A Set, because a derived Method with no Parameter of its own prints
-	// the same signature for every Choice that derives it —
-	// `Choice_Printable.toString()` is one Method of one fabricated Namespace,
-	// however many Choices reach it, and listing it once is what keeps the
-	// uniqueness check below meaningful. The derived `is` and `isNot` take the
-	// Choice as a Parameter and are distinct already.
+	// A derived Method with no Parameter, such as `Choice_Printable.toString()`,
+	// prints one signature for every Choice. A Set lists it once, so the
+	// uniqueness check stays meaningful.
 	let derivedSignatures = new Set<string>()
 
-	// The names a derive answers for the Namespace being walked — filled
-	// as the derives are collected, and read by the provided-Method pass below.
-	// A derive answers AHEAD of a Protocol's provided Method of the same name
-	// (`namespacesDeclaringMethod` in the Enricher), so a Choice's `isNot` is
-	// `Choice_Equatable`'s and not `Equatable`'s, and listing both would ask the
-	// harness for a call nothing can make.
+	// The names a derive answers for the Namespace being walked. A derive
+	// answers ahead of a provided Method of the same name, as in
+	// `namespacesDeclaringMethod`, so the provided one is not listed.
 	let derivedNames = new Set<string>()
 
 	let collectDerived = (namespace: common.NamespaceType): void => {
@@ -232,12 +179,9 @@ function declaredSignatures(): Array<string> {
 			}
 		}
 
-		// A Choice's `is`, `isNot` and `toString` are DERIVED — no
-		// Namespace declares them, so the loop above never sees them, and
-		// without this the harness could quietly stop calling them. They are
-		// listed under the Namespace that answers at runtime, which is the one
-		// the labels name. The Scope only has to resolve the Choice's name back
-		// to the Choice, which the target Type already is.
+		// A Choice's derived `is`, `isNot` and `toString` are declared by no
+		// Namespace, so they are listed here under the Namespace that answers at
+		// run time. The Scope only resolves the Choice's name to its target.
 		if (member.targetType === null) {
 			continue
 		}
@@ -271,10 +215,8 @@ function declaredSignatures(): Array<string> {
 			collectDerived(printable)
 		}
 
-		// And the Case listing, which no Namespace declares and nobody
-		// declares the conformance for either — it is derived wherever the
-		// target is a Choice whose Cases carry no payload, and a Namespace
-		// writing `cases` replaces it.
+		// The Case listing is derived for a Choice whose Cases carry no payload,
+		// unless the Namespace writes `cases`.
 		let enumerable = loadStdlib().protocols[enumerableProtocolName]
 		let listing =
 			enumerable === undefined ||
@@ -289,26 +231,10 @@ function declaredSignatures(): Array<string> {
 			collectDerived(listing)
 		}
 
-		// A Protocol's PROVIDED Methods are Methods of every conformer,
-		// and no Namespace declares them either — so the loop above never sees
-		// them and the harness could quietly stop calling one.
-		//
-		// They are enumerated PER CONFORMER, with `Self` bound to that
-		// conformer's target Type: `Integer.isNot(_ Integer)` beside
-		// `String.isNot(_ String)`. That is the signature a call site reaches,
-		// and it is what keeps the coverage this feature INHERITED — each of
-		// these replaced a body that was called on its own Namespace. Listing
-		// the Protocol's `isNot(_ Self)` once instead would let a single call
-		// stand for every conformer.
-		//
-		// The label names the NAMESPACE, not the Protocol. A provided Method
-		// stands on the specificity ladder under the Namespace whose conformance
-		// put it in reach, and that Namespace is what the Invocation carries —
-		// so `7::isNot(8)` is `Integer.isNot` and `asNumber(2)::isNot(2/1)`,
-		// which Integer's rung rejects, is `Number.isNot`. The two ways a
-		// conformer can answer a name itself are mirrored from the Enricher: a
-		// Method it WRITES replaces the provided one on its own rung, and a
-		// DERIVE answers ahead of one.
+		// A Protocol's provided Methods are listed per conformer with `Self`
+		// bound, as `Integer.isNot(_ Integer)`, so one call cannot stand for every
+		// conformer. The label names the Namespace the Invocation carries. A
+		// written Method or a derive answers the name instead, as in the Enricher.
 		for (let protocol of Object.values(loadStdlib().protocols)) {
 			if (member.conformsTo?.includes(protocol.name) !== true) {
 				continue
@@ -320,9 +246,8 @@ function declaredSignatures(): Array<string> {
 				let method = protocol.methods[methodName]
 
 				if (
-					// Only the Methods this Protocol WROTE. An inherited
-					// one is listed under the Protocol that wrote it, which
-					// this same walk reaches.
+					// Only the Methods this Protocol wrote. The walk reaches an
+					// inherited one under the Protocol that wrote it.
 					writtenBy !== protocol.name ||
 					method === undefined ||
 					Object.hasOwn(member.methods, methodName) ||
@@ -352,11 +277,8 @@ function declaredSignatures(): Array<string> {
 
 	signatures.push(...derivedSignatures)
 
-	// The free Functions that belong to no Namespace — `loop` is the only
-	// one, and it has several entries. Only the OVERLOADED free Functions are
-	// enumerated here: each entry is a label of its own, exactly as an
-	// overloaded Method's entries are, but with no Namespace to prefix its
-	// name.
+	// Overloaded free Functions such as `loop`. Each entry is a label of its
+	// own, as an overloaded Method's are, with no Namespace prefix.
 	for (let [name, member] of Object.entries(loadStdlib().members)) {
 		if (member.type !== "OverloadedStaticMethod") {
 			continue
@@ -379,15 +301,10 @@ function demangle(name: string): string {
 	return name.replace(/__overload\$\d+$/, "")
 }
 
-// The `Namespace.method` a call resolves to, gathered from every
-// invocation Node anywhere inside an Expression — the same three spellings the
-// call graph walker recognises: an instance call is a `MethodInvocation` whose
-// `base` names the answering Namespace, a Union-receiver call is a
-// `UnionMethodInvocation` with a target per member, and a static call is a
-// `FunctionInvocation` off a Namespace `Lookup`. Searching the WHOLE subtree
-// rather than only its outermost call is deliberate: it means the check does
-// not depend on the tested Method being written outermost, so a later edit that
-// wraps a call (`x::foo()::toString()`) does not read as a mislabel.
+// Every `Namespace.method` a call anywhere in an Expression resolves to: a
+// `MethodInvocation`'s `base`, each target of a `UnionMethodInvocation`, and a
+// `FunctionInvocation` off a Namespace `Lookup`. The whole subtree is searched,
+// so a call wrapped as `x::foo()::toString()` still counts.
 function callTargetsIn(node: unknown): Set<string> {
 	let targets = new Set<string>()
 
@@ -435,10 +352,8 @@ function callTargetsIn(node: unknown): Set<string> {
 				callee.base.type.type === "Namespace" &&
 				callee.member.nodeType === "Identifier"
 			) {
-				// A derived `cases` is a member of no Namespace at all,
-				// and the Rewriter emits it under the derive's own name for
-				// that reason — so the target is what the label names rather
-				// than the Choice the base spells.
+				// A derived `cases` belongs to no Namespace, so its target is the
+				// derive's name, which the label names, not the Choice's.
 				targets.add(
 					`${
 						callee.derivedCases === undefined
@@ -447,10 +362,8 @@ function callTargetsIn(node: unknown): Set<string> {
 					}.${demangle(callee.member.name)}`,
 				)
 			} else if (callee.nodeType === "Identifier") {
-				// A bare free-Function call — `loop(…)` — whose callee is
-				// the Function's own (overload-mangled) name, with no Namespace
-				// to prefix it. This is how the harness's `loop` labels are
-				// checked against the call they sit beside.
+				// A bare free-Function call such as `loop(…)`, named by its
+				// demangled name with no Namespace prefix.
 				targets.add(demangle(callee.name))
 			}
 		}
@@ -465,10 +378,8 @@ function callTargetsIn(node: unknown): Set<string> {
 	return targets
 }
 
-// The `Namespace.member` a Property Lookup reads — a `Lookup` off a
-// Namespace base that is NOT a call. `Number.Pi` is the only shape this matches
-// in the harness, and it is how a Property label (no `(`) is checked against
-// its value.
+// The `Namespace.member` each Property `Lookup` reads, such as `Number.Pi`,
+// for checking a Property label against its value.
 function propertyReadsIn(node: unknown): Set<string> {
 	let reads = new Set<string>()
 
@@ -508,11 +419,9 @@ function propertyReadsIn(node: unknown): Set<string> {
 	return reads
 }
 
-// A label is a printed signature — `List.map<ItemType, Result>(_ …)` or
-// `Number.isBetween(_ Number, and: Number)` or the bare `Number.Pi` of a
-// Property. Its `Namespace.method` base is everything before the Type
-// Parameter clause or the Parameter list, with the ` [note]` suffix already
-// gone.
+// A label is a printed signature such as `List.map<ItemType, Result>(_ …)`, or
+// a Property's bare `Number.Pi`. Its base is what stands before the Type
+// Parameters or the Parameters, without the ` [note]` suffix.
 function baseOfLabel(label: string): string {
 	let withoutNote = label.replace(/ \[[^\]]*\]$/, "")
 	let boundary = withoutNote.search(/[<(]/)
@@ -520,10 +429,9 @@ function baseOfLabel(label: string): string {
 	return boundary === -1 ? withoutNote : withoutNote.slice(0, boundary)
 }
 
-// Every `show(…)` / `showMaybe(…)` call in the harness, paired with the
-// Expression Node it prints — walked out of the simplified Program. The
-// helper's OWN internal `show(label, match …)` call is skipped, because there
-// the first Argument is the `label` Identifier rather than a String literal.
+// Every `show(…)` and `showMaybe(…)` call with a String label, paired with the
+// Expression it prints. The helper's own `show(label, match …)` call is
+// skipped, since its label is an Identifier.
 function labelledCalls(
 	program: common.typedSimple.Program,
 ): Array<{ label: string; value: unknown }> {
@@ -618,9 +526,8 @@ function describeDifferences(
 	let shown = differences.filter((difference) => difference !== "")
 	let hidden = differences.length - shown.length
 
-	// The line count is stated even when it matches, because a harness
-	// that gained or lost a call shifts every line after it and the diff below
-	// reads as a wholesale change rather than the insertion it is.
+	// The line counts are always stated, since one added or lost call
+	// shifts every later line.
 	return [
 		`${differences.length} lines differ — ${golden.length} in the golden file, ${actual.length} printed`,
 		...shown,
@@ -631,9 +538,7 @@ function describeDifferences(
 }
 
 describe("Stdlib Golden", () => {
-	// Compiled and run ONCE, in a `beforeAll` rather than at this Scope,
-	// because running it is asynchronous now — see `compileProgram`. The three
-	// tests below read what it left behind.
+	// Compiled and run once in a `beforeAll`, since running is asynchronous.
 	let output: Array<string>
 	let program: common.typedSimple.Program
 
@@ -644,12 +549,9 @@ describe("Stdlib Golden", () => {
 		program = compiled.program
 	})
 
-	// The golden file was produced by RUNNING this harness against the
-	// TypeScript standard library, never written by hand. It is the record of
-	// what the standard library did before its Methods began moving into
-	// Essence, so a Method that comes out behaving differently says so by name
-	// — which is the whole reason this file exists. Re-capture it only when a
-	// change of behaviour is the intent, and never to make this test pass.
+	// The golden file is a captured run, never written by hand. A Method that
+	// behaves differently fails by name. Re-capture it only when a change of
+	// behaviour is intended.
 	it("prints what the golden file records", () => {
 		let golden = readFileSync(goldenPath, "utf8").split("\n")
 
@@ -667,10 +569,8 @@ describe("Stdlib Golden", () => {
 		}
 	})
 
-	// The gate that keeps the net exhaustive. A Method added to
-	// `packages/standard-library/sources` is not covered by anything until it is called here, and a
-	// Method that only LOOKS covered — a label that names an Overload the
-	// Declaration does not have — is just as wrong.
+	// A Method added to the standard library is uncovered until the harness
+	// calls it. A label naming an Overload that is not declared fails too.
 	it("calls every declared Method of every Namespace", () => {
 		let called = new Set(
 			output.map((line) => labelOf(line).replace(/ \[[^\]]*\]$/, "")),
@@ -686,24 +586,10 @@ describe("Stdlib Golden", () => {
 		expect(declared.length).toBe(new Set(declared).size)
 	})
 
-	// The coverage gate above compares label STRINGS to declared
-	// signatures, and a label is just text the author typed — nothing there
-	// forces the call beside it to invoke the Method it names. Without this
-	// test, `show("Boolean.or(…)", x::and(y))` would satisfy coverage for `or`
-	// while `or` went untested. This closes that hole for the Method NAME: it
-	// walks each `show(…)` call out of the simplified Program and asserts the
-	// label's `Namespace.method` is among the calls its value Argument actually
-	// makes.
-	//
-	// LIMITATION — this verifies the base `Namespace.method`, NOT the specific
-	// Overload the label spells. A label of `Integer.add(_ Rational)` beside a
-	// call to the Integer Overload of `add` still passes, because the
-	// simplified Node carries a mangled `add__overload$N` name and mapping that
-	// number back to a printed signature would duplicate the Simplifier's
-	// Overload-numbering — deep plumbing that would couple this test to an
-	// internal it should not know. So: a call mislabelled to a different METHOD
-	// is caught here; a call mislabelled to a different OVERLOAD of the right
-	// Method is not, and the labels' Overload precision rests on the author.
+	// A label is typed text, so `show("Boolean.or(…)", x::and(y))` would cover
+	// `or` untested. This checks each label's `Namespace.method` is among the
+	// calls its value makes. It cannot tell Overloads apart, since the call
+	// carries only a mangled `__overload$N` name.
 	it("labels each call with a Method the call actually invokes", () => {
 		let mismatches: Array<string> = []
 
