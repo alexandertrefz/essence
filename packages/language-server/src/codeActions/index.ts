@@ -441,8 +441,13 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(dropStaticAction(diagnostic, program, lines)),
 	"case-default-without-payload": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
+	// Before a value that is no work, the word goes rather than the Type.
 	"complete-outside-future": ({ diagnostic, program, lines }) =>
-		listed(declareFutureReturnAction(diagnostic, program, lines)),
+		listed(
+			diagnostic.data?.kind === "not-work"
+				? dropKeywordAction(diagnostic, program, lines)
+				: declareFutureReturnAction(diagnostic, program, lines),
+		),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
 		listed(constantToVariableAction(diagnostic, program, lines)),
 	"contradictory-modifiers": ({ diagnostic, lines }) =>

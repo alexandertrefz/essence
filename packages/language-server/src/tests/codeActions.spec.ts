@@ -8990,6 +8990,26 @@ describe("Quick Fixes for asynchrony", () => {
 				),
 			).toEqual([])
 		})
+
+		// Before a value that is no work the word is the mistake, so it goes and
+		// the declared Type stays.
+		it("drops a complete that waits for no work", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction twice(_ value: Integer) -> Integer {",
+				"\t\t<- complete value",
+				"\t}",
+				"}",
+			]
+			let fixes = quickFixes(lines).filter(
+				(entry) => entry.diagnosticCode === "complete-outside-future",
+			)
+			let result = applied(lines, fixes[0] as CodeActionEntry)
+
+			expect(titles(fixes)).toEqual(["Drop the 'complete'"])
+			expect(result[2]).toBe("\t\t<- value")
+			expect(codesOf(result)).toEqual([])
+		})
 	})
 
 	describe("a Keyword in front of a value that is neither", () => {

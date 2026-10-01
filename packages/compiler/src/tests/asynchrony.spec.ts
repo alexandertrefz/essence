@@ -668,6 +668,54 @@ ${deferredThree}
 			).toEqual(["complete-outside-future"])
 		})
 
+		// The word is the one mistake, so `needless-complete` stays quiet and the
+		// Help drops the word rather than declaring a Future.
+		it("reports a misplaced 'complete' before no work once", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+	function twice(x: Integer) -> Integer {
+		<- complete x
+	}
+}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"complete-outside-future",
+			])
+			expect(diagnostics[0]!.helps).toEqual(["Drop the 'complete'."])
+			expect(diagnostics[0]!.data).toEqual({ kind: "not-work" })
+			expect(
+				codesOf(`implementation {
+	function twice(_ value: Integer = complete 1) -> Integer {
+		<- value
+	}
+}`),
+			).toEqual(["complete-outside-future"])
+		})
+
+		// An operand already reported is no evidence that the word is needless,
+		// so the misplaced word keeps the Future Help and no Warning cascades.
+		it("judges no operand that is already an Error", () => {
+			let misplaced = diagnosticsOf(`implementation {
+	function g() -> Integer {
+		<- complete nope
+	}
+}`)
+
+			expect(misplaced.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+				"complete-outside-future",
+			])
+			expect(misplaced[1]!.helps).toEqual([
+				"Declare the return Type 'Future<Integer>'.",
+			])
+			expect(
+				codesOf(`implementation {
+	function g() -> Future<Integer> {
+		<- complete nope
+	}
+}`),
+			).toEqual(["unknown-name"])
+		})
+
 		it("refuses a Future nobody runs", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 	Async.deferred(() { <- 1 })

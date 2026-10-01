@@ -197,6 +197,9 @@ export type DiagnosticData =
 			kind: "asynchrony-mismatch"
 			mismatch: "unstarted" | "in-flight"
 	  }
+	// A `complete` before a value that is neither a Future nor a Started, which
+	// dropping the word fixes wherever it stands.
+	| { kind: "not-work" }
 	// The Namespace declaring a static Method called as `value::make(…)`, and
 	// which rewrite the signature accepts: `Namespace.make(value, …)`, or the
 	// call without `value`.

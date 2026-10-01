@@ -3457,14 +3457,14 @@ function enrichComplete(
 ): common.typed.CompleteNode {
 	let expression = enrichExpression(node.expression, scope)
 	let type = expression.type
-
-	reportMisplacedComplete(node, scope)
-
 	let answered = unwrapWork(type, (member) =>
 		member.type === "Future" || member.type === "Started"
 			? member.valueType
 			: null,
 	)
+	let notWork = answered === null && type.type !== "Error"
+	// A misplaced `complete` before no work is one mistake, reported once.
+	let misplaced = reportMisplacedComplete(node, scope, notWork)
 
 	if (answered !== null) {
 		return {
@@ -3475,7 +3475,7 @@ function enrichComplete(
 		}
 	}
 
-	if (type.type !== "Error") {
+	if (notWork && !misplaced) {
 		reportWarning("This is not work to wait for", node.position, {
 			code: "needless-complete",
 			labels: [
@@ -3485,9 +3485,7 @@ function enrichComplete(
 				),
 			],
 			tags: ["unnecessary"],
-			notes: [
-				"'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.",
-			],
+			notes: [notWorkNote],
 			helps: ["Drop the 'complete'."],
 		})
 	}
@@ -3500,22 +3498,28 @@ function enrichComplete(
 	}
 }
 
-// Decides `complete-outside-future`. The Parser marks every body that writes
-// `complete` as completing. What is left to be wrong is a declared return Type
-// that is no Future.
+const notWorkNote =
+	"'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer."
+
+// Decides `complete-outside-future`, and answers whether it reported. The Parser
+// marks every body that writes `complete` as completing. What is left to be
+// wrong is a declared return Type that is no Future. Before an operand that is
+// no work, the word itself is the mistake, so the Help drops it.
 function reportMisplacedComplete(
 	node: parser.CompleteNode,
 	scope: enricher.Scope,
-): void {
+	notWork: boolean,
+): boolean {
 	let context = completionContextOf(scope)
 
-	if (context === "top-level" || context?.type === "Future") {
-		return
-	}
-
-	// An Error is a return annotation already reported.
-	if (context?.type === "Error") {
-		return
+	// The top level and a Future body can wait. An Error is a return annotation
+	// already reported.
+	if (
+		context === "top-level" ||
+		context?.type === "Future" ||
+		context?.type === "Error"
+	) {
+		return false
 	}
 
 	// A named Function that declared another Type lacks a `Future`. A position
@@ -3534,19 +3538,24 @@ function reportMisplacedComplete(
 					: `this Function returns ${describeType(declared)}`,
 			),
 		],
-		notes:
-			declared === null
+		notes: notWork
+			? [notWorkNote]
+			: declared === null
 				? [barred.note]
 				: [
 						"A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.",
 					],
-		helps:
-			declared === null
+		helps: notWork
+			? ["Drop the 'complete'."]
+			: declared === null
 				? barred.helps
 				: [
 						`Declare the return Type 'Future<${describeType(declared)}>'.`,
 					],
+		...(notWork ? { data: { kind: "not-work" as const } } : {}),
 	})
+
+	return true
 }
 
 // The walks live beside `modulePathOf` in `scope.ts`, so the resolver answers

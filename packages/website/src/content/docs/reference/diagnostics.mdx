@@ -6556,7 +6556,9 @@ Error: 'complete' waits, and nothing here can wait
 
 Declare the return type a future of what the body answers with. The positions that can not suspend are a parameter's default, a test's name, a `benchmark` body and a property body, `test … for any (…)`; each reports the same code, under one label that says the position can not suspend, and the Note names all four. There the fix is to complete the work above the position, into a constant it reads.
 
-Quick Fix: **Declare the return Type 'Future\<String\>'**, wrapping the return type the body already declares. It is offered on a `complete` in a body, and not in a parameter's default, where wrapping that function's return type would leave the default exactly as wrong.
+Where the value after `complete` is no work at all, as in `<- complete x` with `x` an `Integer`, the word itself is the mistake. The help is then `Drop the 'complete'.`, in either shape, and [`needless-complete`](#needless-complete) is not reported as well.
+
+Quick Fix: **Declare the return Type 'Future\<String\>'**, wrapping the return type the body already declares. It is offered on a `complete` in a body, and not in a parameter's default, where wrapping that function's return type would leave the default exactly as wrong. Before a value that is no work, the Quick Fix is **Drop the 'complete'** instead, wherever the word stands.
 
 Taught on: [Asynchrony › A body that waits](/docs/language/asynchrony#a-body-that-waits)
 
@@ -6648,7 +6650,7 @@ Warning: This is not work to wait for
 
 </div>
 
-Drop the word.
+Drop the word. Where the `complete` also stands where nothing can wait, the one report is [`complete-outside-future`](#complete-outside-future), with the same help.
 
 Quick Fix: **Drop the 'complete'**.
 
