@@ -127,11 +127,9 @@ describe("LSP", () => {
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// The Compiler stops after the Parser, so what a habit written
-		// BEHIND a Statement costs is only ever visible here: a Declaration
-		// dropped with the refusal leaves its name undeclared, and the editor
-		// answers that at every line that reads it. The Parser reads past a ';'
-		// and a Comment for exactly this reason — see `swallowForeignTail`.
+		// A Declaration dropped with the refusal would leave its name undeclared
+		// at every line that reads it. See "Another language's syntax" in
+		// packages/compiler/src/parser/DEVELOPMENT.md.
 		it("should keep the Statement a ';' or a Comment was written behind", () => {
 			expect(
 				analyse(`implementation {
@@ -158,13 +156,9 @@ describe("LSP", () => {
 			).toEqual(["A Comment is written with '§'"])
 		})
 
-		// The same property for `primes[0]`, and visible in the same one
-		// place: an `essence check` stops after the Parser, so a cascade a
-		// refused index set off would be the editor's alone to show. Both
-		// halves are pinned — the name is still DECLARED, so nothing says
-		// `unknown-name` about it, and what it is bound to is an Error rather
-		// than the List in front of the brackets, so nothing offers `pad` for
-		// the `add` written on the line below.
+		// The same for `primes[0]`. The name stays declared, so nothing says
+		// `unknown-name`. It is bound to an Error rather than the List, so nothing
+		// offers `pad` for the `add` on the next line.
 		it("should keep the Declaration an index was written in, and type it Error", () => {
 			expect(
 				analyse(`implementation {
@@ -176,13 +170,9 @@ describe("LSP", () => {
 			).toEqual(["A value is not indexed with brackets"])
 		})
 
-		// And nothing the BASE of a refused index has to say is said
-		// either. What stands in front of the brackets is decided by where the
-		// Parser cut the Expression: a label written flush against a '[' is
-		// read as the value the brackets index, so `contentsOf[3, 4]` reported
-		// `'contentsOf' is not declared` about a name nobody wrote as a name. A
-		// base whose own report would have been true is silenced with it — one
-		// written mistake, one report.
+		// The base of a refused index reports nothing either. A label flush
+		// against a '[' is read as the base, so `contentsOf[3, 4]` would report a
+		// name nobody wrote. One written mistake gets one report.
 		it("should say nothing about the value a refused index stands behind", () => {
 			expect(
 				analyse(`implementation {
@@ -198,10 +188,8 @@ describe("LSP", () => {
 			).toEqual(["A value is not indexed with brackets"])
 		})
 
-		// The Validator runs whatever the Enricher found, so a Type error
-		// and a Validator error in one file are one run's worth of report. It
-		// used to take two: the Enricher's Diagnostic hid the Validator's, and
-		// the second only appeared once the first was fixed.
+		// The Validator runs whatever the Enricher found, so one run reports a
+		// Type error and a Validator error together.
 		it("should run the Validator when the Enricher reported errors", () => {
 			let diagnostics = analyse(`implementation {
 				constant a = undeclaredVariable
@@ -214,9 +202,8 @@ describe("LSP", () => {
 			])
 		})
 
-		// The order a report comes out in is the order the lines are
-		// written, whichever stage found each of them — a Validator Diagnostic
-		// above a syntax error where that is where they stand.
+		// A report comes out in the order the lines are written, whichever stage
+		// found each one.
 		it("should report every stage in file order", () => {
 			let diagnostics = analyse(`implementation {
 				constant a: String = true
@@ -269,8 +256,8 @@ describe("LSP", () => {
 			})
 		})
 
-		// An empty selection is what an Editor sends for a cursor sitting
-		// on a squiggle, which is how a Quick Fix is asked for in practice.
+		// An Editor sends an empty selection for a cursor on a squiggle, which
+		// is how a Quick Fix is usually asked for.
 		it("should carry an empty selection through as a zero-width Position", () => {
 			let cursor = { line: 5, character: 0 }
 
@@ -434,10 +421,8 @@ describe("LSP", () => {
 		})
 	})
 
-	// A capability is the only thing standing between a working feature
-	// and one no Editor ever asks for — every handler below keeps passing its
-	// own spec while the feature is dark. So the announcement is asserted as
-	// its own fact, feature by feature.
+	// Without its capability, no Editor asks for a feature while its handler's
+	// spec keeps passing. So the announcement is asserted on its own.
 	describe("capabilities", () => {
 		it("should announce every feature the Server implements", () => {
 			expect(serverCapabilities).toEqual({
@@ -521,9 +506,8 @@ describe("LSP", () => {
 			})
 		})
 
-		// The legend is handed over as two arrays of names and every
-		// Token is an index into them, so a client holding an older response
-		// recolours everything past an entry that moved.
+		// The legend is two arrays of names that every Token indexes, so a
+		// client holding an older one recolours everything past a moved entry.
 		it("should carry the semantic token legend in the order the encoder uses", () => {
 			expect(serverCapabilities.semanticTokensProvider).toEqual({
 				legend: {
@@ -606,10 +590,8 @@ describe("LSP", () => {
 			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
 		})
 
-		// `$` is an ordinary Identifier character, so the fallback is as
-		// able to spell a snippet variable by accident as the resolved snippet
-		// is — an unescaped `we$rd` inserts `we` followed by whatever the
-		// Editor holds in `$rd`, which is the wrong name silently.
+		// `$` is an ordinary Identifier character, so an unescaped `we$rd` would
+		// insert `we` followed by the Editor's `$rd` variable.
 		it("should escape a snippet metacharacter in the fallback insert text", () => {
 			let source = [
 				"implementation {",
@@ -647,10 +629,9 @@ describe("LSP", () => {
 			expect(item.sortText).toBe("1subject")
 		})
 
-		// The inserted call never types `(` or `,`, so the Editor is
-		// asked to open the parameter hints itself — for the resolved snippet
-		// and the bare-parentheses fallback alike, and for nothing that is
-		// referred to rather than called.
+		// The inserted call never types `(` or `,`, so the Editor is asked to
+		// open the parameter hints. That holds for both inserts, and not for a
+		// name only referred to.
 		it("should ask the Editor for parameter hints after inserting a call", () => {
 			let hints = {
 				title: "Trigger parameter hints",
@@ -746,8 +727,8 @@ describe("LSP", () => {
 			return { code, range, message: "", source: "essence" }
 		}
 
-		// Spelled out rather than found, for the shapes no fix produces
-		// yet — an entry reaching a second file, and one carrying a command.
+		// Spelled out for shapes no fix produces: an entry reaching a second
+		// file, and one carrying a command.
 		const span = {
 			start: { line: 2, column: 2 },
 			end: { line: 2, column: 6 },
@@ -785,9 +766,8 @@ describe("LSP", () => {
 			])
 		})
 
-		// Attribution only — the edits were computed on the buffer as it
-		// is now, while the Diagnostics the client echoes back belong to a
-		// buffer that is up to a debounce older.
+		// Attribution only. The edits were computed on the current buffer, while
+		// the client's Diagnostics may belong to one a debounce older.
 		it("should attach only the client Diagnostic the fix answers", () => {
 			let action = fixFor("missing-case")
 			let item = toLspCodeAction(
@@ -834,9 +814,8 @@ describe("LSP", () => {
 			expect(item.diagnostics).toBeUndefined()
 		})
 
-		// Every fix edits the document it was offered on, and a
-		// refactoring that moves something does not — which the protocol says
-		// as a second key of the one map.
+		// Every fix edits the document it was offered on, and a move edits
+		// another file too, as a second key of the one map.
 		it("should group the edits of an action by the file each belongs to", () => {
 			let other = "/Other.es"
 			let item = toLspCodeAction(
@@ -858,9 +837,8 @@ describe("LSP", () => {
 			])
 		})
 
-		// A path that spells the open document IS the open document. Two
-		// keys to the one file would have the Editor apply half the action to a
-		// buffer it is holding and half to the file under it.
+		// A path that spells the open document is the open document. Two keys
+		// would apply half the action to the buffer and half to the file under it.
 		it("should keep an edit naming the open file under the URI it came in under", () => {
 			let item = toLspCodeAction(
 				entryWith({
@@ -880,10 +858,9 @@ describe("LSP", () => {
 			expect(item.edit?.changes?.[uri]).toHaveLength(2)
 		})
 
-		// A text edit can not create the file it edits, so the one action
-		// that writes a Module hands its edits over as `documentChanges` with
-		// the creation in front of them — the shape the protocol says a
-		// resource operation in, and the only one an Editor will apply.
+		// A text edit cannot create the file it edits. An action that writes a
+		// Module sends `documentChanges` with the creation first, the protocol's
+		// shape for a resource operation.
 		it("should ask for a file that does not exist yet to be created", () => {
 			let written = "/Written.es"
 			let item = toLspCodeAction(
@@ -954,8 +931,8 @@ describe("LSP", () => {
 			expect(isRequestedKind("quickfix", [])).toBe(true)
 		})
 
-		// The Refactor menu is the request that asks for `refactor`, and
-		// a fix listed in it is a fix the reader went looking for a rewrite in.
+		// The Refactor menu asks for `refactor`, and a fix is not what the
+		// reader looks for there.
 		it("should keep the refactors and drop the fixes for a refactor request", () => {
 			expect(isRequestedKind("refactor.rewrite", ["refactor"])).toBe(true)
 			expect(isRequestedKind("quickfix", ["refactor"])).toBe(false)
@@ -968,9 +945,8 @@ describe("LSP", () => {
 			)
 		})
 
-		// A kind matches itself and everything under it, and nothing
-		// above it — an Editor asking for one branch of the menu must not be
-		// handed the whole of `refactor`.
+		// A kind matches itself and everything under it, and nothing above it.
+		// An Editor asking for one branch of the menu gets only that branch.
 		it("should read a requested kind as itself and what it holds", () => {
 			expect(
 				isRequestedKind("refactor.rewrite", ["refactor.rewrite"]),
@@ -1051,11 +1027,9 @@ describe("LSP", () => {
 		})
 	})
 
-	// The transport is not something this Server chooses — createConnection
-	// reads it off process.argv and throws when it finds none, so the invocation
-	// that breaks is the one nobody automated: a person running the Server by
-	// hand, and `essence lsp`, which forwards whatever the Editor passed and so
-	// forwards nothing when nobody passed anything.
+	// `createConnection` reads the transport off process.argv and throws when
+	// none is named. A person running the Server by hand, or `essence lsp`
+	// with no arguments, names none.
 	describe("transport", () => {
 		let originalArguments = process.argv
 
@@ -1119,10 +1093,8 @@ describe("LSP", () => {
 	})
 })
 
-// Read off the request as it arrives rather than only out of the pure
-// filter beside it: `context.only` is what an Editor sends, and a handler that
-// never looks at it passes every spec it has while the Refactor menu lists the
-// Quick Fixes.
+// Read off the request as it arrives, since `context.only` is what an Editor
+// sends. A handler that ignored it would list Quick Fixes as refactorings.
 describe("Code Actions asked for one kind", () => {
 	const source = [
 		"implementation {",
@@ -1173,11 +1145,8 @@ describe("Code Actions asked for one kind", () => {
 				CodeActionKind.Refactor,
 			])
 
-			// Every kind the menu lists is one of the refactorings and
-			// none of them is a fix — which is the whole of what `only` asks
-			// for. Spelled as a prefix rather than as one kind, because the
-			// Server offers more than one of them: a Type annotation written
-			// out is a rewrite, a Declaration sent to another Module is a move.
+			// Every kind the menu lists is a refactoring and none is a fix. It is
+			// matched by prefix, since the Server offers both rewrites and moves.
 			expect(refactors.length).toBeGreaterThan(0)
 			expect(
 				refactors.every((kind) =>
@@ -1197,12 +1166,9 @@ describe("Code Actions asked for one kind", () => {
 	})
 })
 
-// What a client can APPLY is not what the Server can compute, and the
-// protocol says both shapes of a Workspace Edit are the client's to allow: an
-// editor that never advertised `documentChanges` silently applies nothing when
-// it is sent one, and one whose `resourceOperations` omit `create` can not be
-// handed an action that writes a file. VS Code advertises both, so none of this
-// is about VS Code — it is about the editors on the roadmap.
+// An editor that never advertised `documentChanges` silently applies nothing
+// sent in that shape. One whose `resourceOperations` omit `create` cannot take
+// an action that writes a file.
 describe("Code Actions for a client that can apply less", () => {
 	const source = [
 		"implementation {",
@@ -1261,8 +1227,7 @@ describe("Code Actions for a client that can apply less", () => {
 		let full = await inSession(undefined)
 		let plain = await inSession({ workspaceFolders: true })
 
-		// The move to a NEW Module is the one action in this Server that
-		// writes a file that is not there yet.
+		// The move to a new Module writes a file that is not there yet.
 		expect(full.map((action) => action.title)).toContain(
 			"Move 'answer' to a new Module",
 		)
@@ -1270,8 +1235,8 @@ describe("Code Actions for a client that can apply less", () => {
 			"Move 'answer' to a new Module",
 		)
 
-		// And everything that is left reaches such a client in the shape
-		// it does take — a map of files, and no resource operation beside it.
+		// Everything else reaches such a client in the shape it takes: a map of
+		// files, with no resource operation.
 		expect(plain.length).toBeGreaterThan(0)
 		expect(
 			plain.every(
@@ -1317,11 +1282,9 @@ function applyLspEdits(text: string, edits: Array<TextEdit>): string {
 	)
 }
 
-// `essence.json` reaches this Server because the extension's document
-// selector names it, and every request over it is refused — a project file is
-// not a source. Code Actions are the one exception: a Diagnostic that names its
-// own answer and will not apply it is a squiggle that reads as the editor being
-// broken.
+// The extension's document selector sends `essence.json` here, and a project
+// file is not a source, so requests over it are refused. Code Actions are the
+// exception, so a Diagnostic that names its answer can apply it.
 describe("Code Actions on the project file", () => {
 	async function actionsFor(
 		session: LspSession,
@@ -1425,8 +1388,8 @@ describe("Code Actions on the project file", () => {
 		}
 	})
 
-	// Nothing else about a project file changed — the Server still has no
-	// Program to answer a Hover, a Completion or a rename over one.
+	// The Server has no Program to answer a Hover, a Completion or a rename
+	// over a project file.
 	it("should still refuse every other request over a project file", async () => {
 		let project = ["{", '\t"excludes": ["build"]', "}", ""].join("\n")
 		let files = makeSessionWorkspace({ "essence.json": project })
@@ -1452,11 +1415,9 @@ describe("Code Actions on the project file", () => {
 	})
 })
 
-// The two Keywords over the wire, on a document an editor opened: what the
-// Server publishes about it, what it says about the words themselves, and what
-// the lightbulb offers where the Compiler has something to say. Every layer
-// between the walks and the client is what this exercises — the analysis, the
-// Hover, the Code Action conversion.
+// `start` and `complete` over the wire: what the Server publishes, what Hover
+// says about the words, and what the lightbulb offers. This exercises every
+// layer between the walks and the client.
 describe("A document that starts and completes work", () => {
 	const source = [
 		"implementation {",
@@ -1486,8 +1447,8 @@ describe("A document that starts and completes work", () => {
 
 			expect(session.diagnosticsFor(files.pathOf("Async.es"))).toEqual([])
 
-			// The Hover positions are zero based over the wire — the
-			// `complete` of line 6 and the `start` of line 7.
+			// Hover positions are zero-based over the wire: the `complete` of line
+			// 6 and the `start` of line 7.
 			let hoverAt = async (line: number, character: number) => {
 				let { result } = await session.request<{
 					contents: { value: string }
@@ -1544,10 +1505,8 @@ describe("A document that starts and completes work", () => {
 	})
 })
 
-// A specifier is a path written in the source, so a file that moves takes
-// every entry naming it out of step — and takes its own entries out of step too,
-// since they were written from where it used to be. Both are answered before the
-// move happens, in one edit with it.
+// A specifier is a path written in the source. A moving file takes every entry
+// naming it out of step, and its own entries too. One edit answers both.
 describe("A file about to be renamed", () => {
 	const shared = [
 		"implementation {",
@@ -1645,9 +1604,8 @@ describe("A file about to be renamed", () => {
 		}
 	})
 
-	// A directory is ONE request about the directory rather than one per
-	// file under it, and the client sends it because the Server asked about
-	// folders as well. A folder holding no Essence answers with nothing.
+	// A directory is one request, not one per file under it, since the Server
+	// asked about folders too. A folder holding no Essence answers with nothing.
 	it("should answer for every source under a directory that moves", async () => {
 		let files = makeSessionWorkspace({
 			"Shared.es": shared,
@@ -1711,15 +1669,9 @@ describe("A file about to be renamed", () => {
 		}
 	})
 
-	// A source renamed OUT of the language is not a move to rewrite to.
-	// `"./Shared.txt"` is a specifier the Compiler refuses outright, so writing
-	// it into every dependent would be the Server volunteering text that can
-	// not compile and putting it in the reader's undo stack. The import was
-	// going to dangle either way; what is left is the Diagnostic that says so.
-	//
-	// A DIRECTORY rename is not one of these — its new path is a directory, and
-	// the sources beneath it keep their own names — which the test above, where
-	// `lib` becomes `deep/lib`, is what holds.
+	// A source renamed out of the language is not a move to rewrite to. The
+	// Compiler refuses `"./Shared.txt"`, so writing it into dependents would add
+	// text that cannot compile. A directory rename keeps its sources' names.
 	it("should answer nothing for a rename that leaves the language", async () => {
 		let files = makeSessionWorkspace({
 			"Shared.es": shared,
@@ -1755,9 +1707,8 @@ describe("A file about to be renamed", () => {
 	})
 })
 
-// The Server picks the rule a new name has to satisfy from the symbol the
-// workspace joined, so a Parameter whose name doubles as its label has to reach
-// it still marked as one.
+// The Server picks the rule a new name must satisfy from the joined symbol.
+// A Parameter whose name doubles as its label must reach it marked as one.
 describe("A rename asked of the Server", () => {
 	const source = [
 		"implementation {",
@@ -2045,14 +1996,9 @@ describe("A rename asked of the Server", () => {
 	})
 })
 
-// A standard library source is an ordinary `.es` file that two rules do
-// not apply to — it may open with `declarations { … }`, and its declarations
-// are already in the builtin tables because the loader read this very file to
-// put them there. Both are keyed off WHERE the document lives, so the Language
-// Server has to be told. Without it a stdlib file lights up with five errors,
-// one of them a bogus syntax error that wrecks the AST every other feature
-// runs on. String, Integer and Rational are hundreds of hand transcribed
-// Methods each; the editor has to work inside them.
+// A standard library source may open with `declarations { … }`, and its
+// declarations are already in the builtin tables the loader filled from it.
+// Both depend on where the document lives, so the Server is told its path.
 describe("LSP in a standard library source", () => {
 	const source = [
 		"declarations {",
@@ -2073,9 +2019,8 @@ describe("LSP in a standard library source", () => {
 		"}",
 	].join("\n")
 
-	// THE standard library — the one this compiler loads — not any
-	// directory that happens to be spelled `src/stdlib`. Essence is a language;
-	// a user's own project may well have one of those.
+	// The standard library this compiler loads, not any directory spelled
+	// `src/stdlib`, which a user's project may have.
 	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
 
 	it("should report no Diagnostics for a document in the standard library", () => {
@@ -2086,23 +2031,15 @@ describe("LSP in a standard library source", () => {
 		expect(analyse(source, `file://${stdlibPath}`)).toEqual([])
 	})
 
-	// The same file under the spelling the Editor happens to have opened
-	// the checkout with. A developer working through a symlink
-	// (`~/dev/essence` → the real directory) hands the Language Server a path
-	// that names this very file — compared lexically it matched nothing, and
-	// the standard library became uneditable for that whole session: the
-	// `declarations` header rejected, everything behind it mis-parsed, every
-	// declaration a redeclaration of itself.
+	// The same file through a symlinked checkout, as an Editor may open it. The
+	// path is resolved before it is compared, or the standard library could not
+	// be edited through the link.
 	it("should recognise the standard library through a symlinked checkout", () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-symlink-"))
 		let checkout = path.join(directory, "essence")
 
-		// The link and the path through it are derived from
-		// `STDLIB_DIRECTORY` rather than spelled out, so this stays a test
-		// about symlink resolution instead of a second, silent assertion about
-		// where the sources happen to sit. Written out, the two halves have to
-		// be kept agreeing by hand — and a mismatch does not fail loudly, it
-		// just stops reaching the standard library and passes anyway.
+		// The link and the path through it derive from `STDLIB_DIRECTORY`, so
+		// the spec tests symlink resolution and not where the sources sit.
 		symlinkSync(path.dirname(STDLIB_DIRECTORY), checkout, "dir")
 
 		try {
@@ -2115,20 +2052,16 @@ describe("LSP in a standard library source", () => {
 			expect(isStdlibDocument(linkedPath)).toBe(true)
 			expect(analyse(source, linkedPath)).toEqual([])
 		} finally {
-			// The link is unlinked FIRST and on its own. A recursive
-			// delete over a directory holding a link to the checkout is a
-			// sentence nobody should have to trust twice.
+			// The link is removed first and on its own, so the recursive delete
+			// never runs over a link to the checkout.
 			rmSync(checkout, { force: true })
 			rmSync(directory, { recursive: true, force: true })
 		}
 	})
 
-	// On a case-insensitive filesystem — macOS' default — `sources`
-	// and `SOURCES` are one directory and an Editor may hand over either
-	// spelling; on a case-sensitive one they are two, and the variant is
-	// genuinely not the standard library. Which of the two it is, is the
-	// filesystem's answer to give rather than this comparison's to guess, so
-	// the expectation is written as the filesystem's own.
+	// On a case-insensitive filesystem, macOS' default, `sources` and `SOURCES`
+	// are one directory, and on a case-sensitive one they are two. The
+	// expectation asks the filesystem which.
 	it("should recognise the standard library through a case-variant path", () => {
 		let variantPath = path.join(
 			path.dirname(STDLIB_DIRECTORY),
@@ -2139,22 +2072,18 @@ describe("LSP in a standard library source", () => {
 		expect(isStdlibDocument(variantPath)).toBe(existsSync(variantPath))
 	})
 
-	// A standard library source that has never been saved is still a
-	// standard library source — the Editor opens
-	// `packages/standard-library/sources/Ordering.es` as a new file and the
-	// `declarations` header has to be allowed while it is typed.
-	// Canonicalising must therefore not require the file to exist.
+	// A standard library source never saved is still one, and its
+	// `declarations` header must be allowed while it is typed. Canonicalising
+	// must not require the file to exist.
 	it("should recognise a standard library document that is not on disk yet", () => {
 		expect(
 			isStdlibDocument(path.join(STDLIB_DIRECTORY, "NotWrittenYet.es")),
 		).toBe(true)
 	})
 
-	// The other half of resolving paths for real: a user's own
-	// `src/stdlib/Boolean.es` exists on disk and canonicalises perfectly well,
-	// and is still not THIS compiler's standard library. Matching by shape
-	// would tell them in their Editor that a `declarations { … }` block is
-	// fine while `esc` rejects it.
+	// A user's own `src/stdlib/Boolean.es` canonicalises fine and is still not
+	// this compiler's standard library. Matching by shape would accept a
+	// `declarations { … }` block the Compiler rejects.
 	it("should still refuse a real src/stdlib in someone else's project", () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-project-"))
 		let ownPath = path.join(directory, "src", "stdlib", "Boolean.es")
@@ -2172,11 +2101,8 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// The permission is the standard library's alone. Lifting it for
-	// every document would retire `declarations-outside-stdlib` by accident —
-	// and a user's own `src/stdlib/Boolean.es` is a plausible thing to write,
-	// so the Editor must not tell them a `declarations` block is fine there
-	// while `esc` rejects it.
+	// The permission is the standard library's alone. Lifting it everywhere
+	// would retire `declarations-outside-stdlib`.
 	it("should still reject a 'declarations' header anywhere else", () => {
 		for (let documentPath of [
 			undefined,
@@ -2192,9 +2118,8 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// The self-collision. The loader put this file's `Boolean` into the
-	// builtin Scope; enriched against the untouched tables the document
-	// redeclares itself, and every Namespace it declares reports twice over.
+	// The loader put this file's `Boolean` into the builtin Scope. Against the
+	// untouched tables the document would redeclare itself.
 	it("should not report a Namespace as a redeclaration of itself", () => {
 		expect(
 			analyse(source, undefined).map((diagnostic) => diagnostic.code),
@@ -2231,19 +2156,15 @@ describe("LSP in a standard library source", () => {
 		).toContain("Integer")
 	})
 
-	// A rename inside a standard library source is silently destructive
-	// — the edit reaches this document only, while the name is the binding a
-	// runtime export answers to and a `is …` clause may depend on. Renaming
-	// `isPrime` to `prime` passes `essence check` and leaves a caller calling
-	// `undefined`; renaming `is` breaks the Equatable conformance and the
-	// loader throws for every Program compiled afterwards.
+	// A rename inside a standard library source is silently destructive. See
+	// "No renaming inside the standard library" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should refuse to rename anything in a standard library source", () => {
 		let { program } = parseDocument(source, stdlibPath)
 		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
 
-		// Every kind the document holds — the Namespace name (already
-		// protected, since it resolves to a builtin), a conformance Method, a
-		// plain native Method, and a Parameter.
+		// Every kind the document holds: the Namespace name, a conformance
+		// Method, a plain native Method and a Parameter.
 		for (let cursor of [
 			{ line: 3, column: 12 },
 			{ line: 8, column: 4 },
@@ -2261,8 +2182,8 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// The guard is keyed off the path and must not touch anything else —
-	// renaming in an ordinary document still works.
+	// The guard is keyed off the path, so renaming in an ordinary document
+	// still works.
 	it("should still rename in an ordinary document", () => {
 		let ordinary = [
 			"implementation {",
@@ -2285,11 +2206,9 @@ describe("LSP in a standard library source", () => {
 		expect(occurrence?.declaration.occurrences).toHaveLength(2)
 	})
 
-	// A standard library document declares the very Namespaces the
-	// builtin table holds, so both would match a receiver and every signature
-	// would be listed twice. Completion dedupes by Method name and hides it;
-	// Signature Help does not, and an Overload set would double entry for
-	// entry.
+	// A standard library document declares the Namespaces the builtin table
+	// holds, so both match a receiver. Signature Help would list every Overload
+	// twice.
 	it("should not list the document's own Namespace twice", () => {
 		expect(
 			matchingNamespaces(source, { type: "Boolean" }, null, stdlibPath)
@@ -2298,11 +2217,8 @@ describe("LSP in a standard library source", () => {
 		).toEqual(["Boolean"])
 	})
 
-	// A body-less native signature has NO typed Node — the Enricher
-	// drops it, since there is no body to emit — so Hover, which reads the
-	// typed tree, answered every question inside one of these files with the
-	// enclosing Namespace. The standard library is nothing but these
-	// signatures.
+	// A body-less native signature has no typed Node. See "What the typed tree
+	// lacks" in packages/language-server/DEVELOPMENT.md.
 	it("should describe a body-less signature, its Parameters and its annotations", () => {
 		let { program } = parseDocument(source, stdlibPath)
 		let { program: enrichedProgram, annotations } = enrichDocument(
@@ -2323,11 +2239,8 @@ describe("LSP in a standard library source", () => {
 		expect(hoverAt(14, 4)?.content).toBe("toString() -> String")
 	})
 
-	// What the pass above could never answer — it pairs a parsed
-	// annotation with the Type it resolved to as a WHOLE, so the cursor inside
-	// one got the whole thing back. The annotation index records each nested
-	// Type against its own span, so `Boolean` within `List<Boolean>` is its own
-	// answer.
+	// The annotation index records each nested Type against its own span, so
+	// `Boolean` within `List<Boolean>` answers on its own.
 	it("should describe the Type inside a native signature's compound annotation", () => {
 		let compoundSource = [
 			"declarations {",
@@ -2353,11 +2266,8 @@ describe("LSP in a standard library source", () => {
 		expect(hoverAt(4, 21)?.content).toBe("Boolean")
 	})
 
-	// Every real standard library source, analysed the way the editor
-	// analyses it, is clean. The loader already throws on a Diagnostic; this
-	// says the Language Server agrees with it, which it did not before — and
-	// since the standard library is where the language is now written, an
-	// editor that could not open it would be an editor nobody can extend it in.
+	// Every real standard library source, analysed as the editor analyses it,
+	// is clean, as the loader requires.
 	it("should report no Diagnostics for any real standard library source", () => {
 		let fileNames = readdirSync(STDLIB_DIRECTORY).filter((fileName) =>
 			fileName.endsWith(".es"),
@@ -2566,9 +2476,9 @@ describe("A Compiler throw while a request enriches a document", () => {
 		}
 	})
 
-	// The call's Arguments match no Overload yet, so Signature Help lists
-	// what every Namespace for the receiver offers, which reads the document's
-	// own Namespaces and Protocols.
+	// The call's Arguments match no Overload yet, so Signature Help lists what
+	// every Namespace for the receiver offers. That reads the document's own
+	// Namespaces and Protocols.
 	it("should log the throw once and still answer a Signature Help", async () => {
 		let text = [
 			"implementation {",
