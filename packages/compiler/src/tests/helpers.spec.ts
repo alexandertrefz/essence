@@ -1530,9 +1530,9 @@ describe("Helpers", () => {
 					rationalPrimitive,
 				),
 			).toBe(false)
-			// expect(
-			// 	matchesType(integerList, noArgumentOverloadedStaticMethodType),
-			// ).toBe(false)
+			expect(
+				matchesType(integerList, noArgumentOverloadedStaticMethodType),
+			).toBe(false)
 		})
 
 		describe("Opaque Generics", () => {
