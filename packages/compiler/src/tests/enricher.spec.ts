@@ -7700,12 +7700,8 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// A Rational narrows on the same rail, with the bound written as
-		// the fraction `Rational::isNot` takes. The receiver is a DIFFERENCE
-		// in all four of these, which is the one operation no refinement of
-		// Rational closes over — a sum of two written positives is a
-		// `PositiveRational` before the `if` is reached, and would prove the
-		// narrowing nothing.
+		// A Rational narrows the same way. The receiver is a difference, which no
+		// refinement of Rational closes over, so it is unproven before the `if`.
 		it("should narrow a Rational the condition proved the predicate of", () => {
 			expect(
 				narrowedTypeOf(
@@ -7721,11 +7717,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// And with the bound written as a bare Integer, which is the same
-		// number and so the same question. It used to be a different one: a
-		// bare `0` finds no same-kind entry and falls to the covering `Number`'s
-		// rung, so this branch narrowed to nothing at all while the fraction
-		// beside it reached `NonZeroRational`.
+		// A bare Integer bound is the same number, so the same question.
 		it("should narrow a Rational proved by an Integer bound", () => {
 			expect(
 				narrowedTypeOf(
@@ -7741,12 +7733,9 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// And the ELSE of the question turned round, which is the leaf
-		// read in the other polarity: `@::is(0/1)` failing IS `@::isNot(0/1)`
-		// holding, so the branch that did not find a zero holds a
-		// `NonZeroRational`. Nothing declares the contrary Type, so the `if`
-		// side stays the Rational it was — a complement narrows to a refinement
-		// somebody wrote down or to nothing at all.
+		// `@::is(0/1)` failing is `@::isNot(0/1)` holding, so the `else` holds a
+		// `NonZeroRational`. No Type declares the `if` side, so it stays a
+		// Rational.
 		it("should narrow a Rational in the else of the opposite question", () => {
 			expect(
 				narrowedTypeOf(
@@ -7764,13 +7753,9 @@ describe("Enricher", () => {
 			).toBe("NonZeroRational")
 		})
 
-		// A Rational bound is read by the same ordering law an Integer
-		// bound is. `isGreaterThan(0/1)` is what `PositiveRational` is written
-		// on, so the condition reaches that Alias exactly; a value above zero
-		// has also been proven not to BE zero, which is what the `reciprocal`
-		// inside spends. That call is what the narrowing is worth — the entry
-		// answering a bare Rational is the one a proven receiver reaches, and
-		// the annotation refuses the Optional the base answers.
+		// `isGreaterThan(0/1)` is what `PositiveRational` is written on, and a
+		// value above zero is not zero, which `reciprocal` spends. The
+		// annotation refuses the base's Optional.
 		it("should reach a Rational refinement an ordering proves", () => {
 			expect(
 				narrowedTypeOf(
@@ -7789,9 +7774,8 @@ describe("Enricher", () => {
 			).toBe("PositiveRational")
 		})
 
-		// The narrowing is worth exactly what it lets a Program write, which
-		// is the call a bare Integer is refused by — asserted end to end in
-		// `codeGeneration.spec.ts`, where the Validator that refuses it runs.
+		// The narrowed Constant reaches the call a bare Integer is refused.
+		// `codeGeneration.spec.ts` asserts it end to end.
 		it("should let a narrowed Constant reach a refined Parameter", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -7808,9 +7792,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// A Variable proven something about can be written to inside the very
-		// branch the narrowing would hold over, so the evidence would be about a
-		// value that is gone.
+		// A Variable can be written inside the branch, so evidence about it
+		// could outlive its value.
 		it("should not narrow a Variable", () => {
 			expect(
 				narrowedTypeOf(
@@ -7826,10 +7809,8 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// One question spelled two ways is one question. `PositiveInteger`
-		// is declared `@::isPositive()`, whose body is `@::isGreaterThan(0)`, so
-		// the condition below asks the very leaf the Alias is declared by and
-		// the branch has proven it. Which spelling was written decides nothing.
+		// `PositiveInteger` is `@::isPositive()`, whose body is
+		// `@::isGreaterThan(0)`, so either spelling proves the same leaf.
 		it("should narrow on a differently spelled predicate", () => {
 			expect(
 				narrowedTypeOf(
@@ -7845,9 +7826,8 @@ describe("Enricher", () => {
 			).toBe("PositiveInteger")
 		})
 
-		// And the one proving the MOST wins, counted through what a leaf
-		// implies. `@::isNot(0)` proves one question and reaches the one Alias
-		// declared by it; `PositiveInteger` would have to be proven above zero.
+		// `@::isNot(0)` reaches the Alias declared by it, not `PositiveInteger`,
+		// which needs a value above zero.
 		it("should narrow on the leaf the refinement is declared by", () => {
 			expect(
 				narrowedTypeOf(
@@ -7879,8 +7859,7 @@ describe("Enricher", () => {
 			).toBe("Integer")
 		})
 
-		// Set INCLUSION — a condition proving two things establishes a
-		// refinement asking for one of them.
+		// A condition proving two things establishes a refinement asking one.
 		it("should establish a refinement a conjunction includes", () => {
 			expect(
 				narrowedTypeOf(
@@ -7896,8 +7875,7 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// And where several qualify, the one proving the MOST wins — it is
-		// the one that forgets the least.
+		// Where several qualify, the one proving the most wins.
 		it("should prefer the refinement proving the most", () => {
 			expect(
 				narrowedTypeOf(
@@ -7915,14 +7893,9 @@ describe("Enricher", () => {
 			).toBe("SmallNonZero")
 		})
 
-		// And where several prove exactly as much as each other, the first
-		// candidate the walk reaches stands — nearest Scope first, and inside the
-		// one top-level table the builtins are declared ahead of a Program's own
-		// Aliases. Which of them wins is a spelling and nothing more (two
-		// refinements proving the same conjuncts over the same base are one Type to
-		// everything that reads conjuncts), but it is settled rather than
-		// incidental, and a Hover answering `Nonzero` here would be a change of
-		// behaviour nobody meant to make.
+		// Among equal candidates the first the walk reaches stands: nearest
+		// Scope first, and builtins before a Program's Aliases. Only the spelling
+		// differs, but it is settled.
 		it("should establish the builtin where a Program's Alias proves the same", () => {
 			expect(
 				narrowedTypeOf(
@@ -7957,10 +7930,8 @@ describe("Enricher", () => {
 			expect(narrowedTypeOf(source, "s")).toBe("NonEmptyString")
 		})
 
-		// An `else` proves the leaf its condition proved, asked the other
-		// way round. A leaf is stored RESOLVED and carries its polarity as a
-		// flag, so the opposite of one is that flag flipped and no pair of
-		// Methods has to be declared anywhere to be each other's contraries.
+		// An `else` proves its condition's leaf with the polarity flag flipped,
+		// so no Methods need to be declared contraries.
 		describe("the else branch", () => {
 			it("should narrow through isNot where the condition asked is", () => {
 				expect(
@@ -8053,10 +8024,8 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// Including one whose OTHER half proves nothing readable. The true
-			// branch may read a conjunction leaf by leaf and ignore the rest, because
-			// each leaf it reads really is proven; the false branch may not, and a
-			// count of the conjuncts that came back could not tell the two apart.
+			// The true branch may read a conjunction leaf by leaf, since each leaf
+			// is proven. The false branch may not, if any half is unreadable.
 			it("should not narrow through a conjunction it read half of", () => {
 				expect(
 					narrowedTypeOf(
@@ -8075,11 +8044,8 @@ describe("Enricher", () => {
 				).toBe("Integer")
 			})
 
-			// No Method is declared to be another's opposite any more.
-			// `isGreaterThanOrEqualTo` IS `isLessThan` negated — the standard
-			// library writes it that way — so the leaf the condition proves and
-			// the leaf its `else` proves are one leaf in two polarities, and the
-			// `else` proves exactly what `Small` is declared by.
+			// The standard library writes `isGreaterThanOrEqualTo` as `isLessThan`
+			// negated, so the `else` proves the leaf `Small` is declared by.
 			it("should narrow through a Method written as another's negation", () => {
 				expect(
 					narrowedTypeOf(
@@ -8099,9 +8065,8 @@ describe("Enricher", () => {
 				).toBe("Small")
 			})
 
-			// An `else if` needs nothing of its own — the nested If lives in
-			// the `falseBody` Array and is enriched in the Scope the complement was
-			// declared in, so every branch below it inherits the narrowing.
+			// The nested If is enriched in the Scope that holds the complement,
+			// so its branches inherit the narrowing.
 			it("should carry the narrowing into an else-if chain", () => {
 				let source = `implementation {
 					constant d = 3
@@ -8115,14 +8080,9 @@ describe("Enricher", () => {
 					}
 				}`
 
-				// The nested condition's own receiver, then both of its
-				// branches — the outer condition's receiver is the Integer before
-				// any of it, and is not among these three.
-				//
-				// The last of the three is the one both `else`s reached,
-				// and between them they have proven the value is neither zero
-				// nor below it — which is what `PositiveInteger` says, and more
-				// than the `NonZeroInteger` one `else` alone proves.
+				// The nested condition's receiver, then its branches. Both `else`s
+				// together prove neither zero nor below, which is
+				// `PositiveInteger`.
 				expect(readTypesOf(source, "d").slice(-3)).toEqual([
 					"NonZeroInteger",
 					"NonZeroInteger",
@@ -8150,10 +8110,8 @@ describe("Enricher", () => {
 				).toBe("NonZeroInteger")
 			})
 
-			// And `isNegative` is `<- @::isLessThan(0)`, whose contrary is
-			// the leaf `NonNegativeInteger` is declared by — written there as
-			// `@::isGreaterThanOrEqualTo(0)`, which is that same leaf negated.
-			// Three spellings, one question.
+			// `isNegative` is `@::isLessThan(0)`, whose contrary declares
+			// `NonNegativeInteger`. Three spellings, one question.
 			it("should narrow an else to a Type spelled three names away", () => {
 				expect(
 					narrowedTypeOf(
@@ -8172,14 +8130,11 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A Program's own Method of the shape is read exactly as the
-		// standard library's is — one call on `@`, Arguments written out — and
-		// what it forwards to is the leaf both branches are decided by.
+		// A Program's own one-call predicate is read as the standard library's,
+		// by the leaf it forwards to.
 		describe("a Program's own predicate alias", () => {
-			// The bound is 5 rather than 0, which the standard library
-			// declares `PositiveInteger` by — two refinements proving one leaf
-			// are one Type, and the tie above would hand the branch the builtin
-			// name.
+			// The bound is 5, since with 0 the builtin `PositiveInteger` would win
+			// the tie.
 			const STOCK = `namespace Stock for Integer {
 					isInStock() -> Boolean {
 						<- @::isGreaterThan(5)
@@ -8250,12 +8205,9 @@ describe("Enricher", () => {
 				).toBe("Unstocked")
 			})
 
-			// `negate` is a name until the Enricher says whose it is, and
-			// a Program may write one of its own over a Boolean. Only
-			// `Boolean::negate` is the answer the polarity flag stands for, so
-			// the peel is taken after the call resolves — `Same::negate` here
-			// answers the value it was handed, and reading it as a negation
-			// would prove `d` the opposite of what the branch tested.
+			// Only `Boolean::negate` flips the polarity, so the negation is read
+			// after the call resolves. `Same::negate` here answers its value
+			// unchanged.
 			it("should read no alias off a negate that is not Boolean's", () => {
 				expect(
 					narrowedTypeOf(
@@ -8286,10 +8238,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A Method that TAKES Arguments is read the same way, with the
-		// Arguments the body forwarded standing in for whatever a caller writes
-		// — `isLessThanOrEqualTo(_ other)` is `@::isGreaterThan(other)` negated,
-		// so a call passing 9 asks the leaf `@::isGreaterThan(9)`.
+		// A forwarding Method is read with the caller's Arguments in place.
+		// `isLessThanOrEqualTo(9)` asks `@::isGreaterThan(9)`, negated.
 		describe("an alias that forwards its Arguments", () => {
 			it("should narrow the else of a bound the standard library forwards", () => {
 				expect(
@@ -8310,11 +8260,8 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
-			// The standard library's own `doesNot…` Methods are of this
-			// shape, and String and List are two of the four bases a `where`
-			// clause may be written on. So the `else` of `contains` proves a
-			// refinement written on the contrary, over the very bound the
-			// condition asked about.
+			// The `doesNot…` Methods forward too, so the `else` of `contains`
+			// proves a refinement written on the contrary, with the same bound.
 			it("should narrow the else of a String the standard library forwards", () => {
 				expect(
 					narrowedTypeOf(
@@ -8353,8 +8300,8 @@ describe("Enricher", () => {
 				).toBe("Clean")
 			})
 
-			// The bound is the CALL's, not the body's — two calls of one
-			// alias with different Arguments are two questions.
+			// The bound is the call's, so different Arguments are different
+			// questions.
 			it("should not narrow where the bounds differ", () => {
 				expect(
 					narrowedTypeOf(
@@ -8432,11 +8379,9 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// A body writing the ordering BACKWARDS is read as its
-			// converse — `@ ≤ other` is what `other ≥ @` says, which is how
-			// `Integer::isLessThanOrEqualTo` answers a Rational bound. Read as
-			// written it would be a question of its own, and the `else` below
-			// would reach nothing.
+			// A body writing the ordering backwards, as
+			// `Integer::isLessThanOrEqualTo` does for a Rational bound, is read
+			// as its converse.
 			it("should narrow the else of a flipped call", () => {
 				expect(
 					narrowedTypeOf(
@@ -8456,12 +8401,8 @@ describe("Enricher", () => {
 				).toBe("Big")
 			})
 
-			// A slot is a POSITION, and a Parameter a caller may leave
-			// out makes the two sides count positions differently: `n` is
-			// declared second and written first, so the leaf would take its
-			// bound from `slack` and the branch would prove a bound nobody
-			// asked. Refused outright rather than read, so the question stays
-			// the Method's own.
+			// A defaulted Parameter makes the caller and the body count
+			// positions differently, so such a Method is read as no alias.
 			it("should read no alias off a Method with a defaulted Parameter", () => {
 				expect(
 					narrowedTypeOf(
@@ -8486,9 +8427,7 @@ describe("Enricher", () => {
 			})
 		})
 
-		// An alias naming an alias is the leaf both of them mean, and
-		// WHICH of the two was written first decides nothing — the readings are
-		// taken together and collapsed against each other.
+		// An alias naming an alias reads as the leaf both mean, in either order.
 		describe("a chain of aliases", () => {
 			it("should resolve a target written below", () => {
 				expect(
@@ -8544,12 +8483,9 @@ describe("Enricher", () => {
 				).toBe("Over")
 			})
 
-			// Three Namespaces, one chain, and every order of writing
-			// them down. A Namespace hoisting before what it names records the
-			// NAME, and one that hoists after records what the name had said by
-			// then, so a reading is finished where the leaf is read rather than
-			// where the body was. The middle Namespace is written first here,
-			// which is the order that leaves it recording a name.
+			// One chain written in every order. A Namespace hoisting before what
+			// it names records the name, so a reading is finished where the leaf
+			// is read.
 			const ASKS = {
 				A: `namespace Asker for Integer {
 						asks(_ n: Integer) -> Boolean {
@@ -8585,12 +8521,8 @@ describe("Enricher", () => {
 				)
 			}
 
-			// A refinement is read at the top of a round, and the reading
-			// of what it names may be a round or two behind — `Relay` waits on
-			// a Type written below it. The conjuncts are written ONCE, so a
-			// leaf put down before the reading landed would stay the name it
-			// was while the `if` beside it went on to the leaf. Held back to a
-			// later round instead.
+			// `Relay` waits on a later Type, so the reading lags. The conjuncts are
+			// written once, so the refinement waits a round for its leaf.
 			it("should hold a refinement back until its leaf is read", () => {
 				const LATE = `namespace Chain for Integer {
 						chains(_ n: Integer) -> Boolean {
@@ -8639,11 +8571,8 @@ describe("Enricher", () => {
 				]).toEqual(["Over", "Over", "Over", "Over", "Over", "Over"])
 			})
 
-			// A chain is no alias at all, however short. `@::absolute()`
-			// is an intermediate value whose evidence is nobody's to read here,
-			// so the `if` proves nothing about `d` and the refinement written
-			// on the comparison is out of reach. This is the rule that keeps
-			// the standard library's `isEmpty` a question of its own.
+			// A chain is no alias. `@::absolute()` is an intermediate value, so
+			// the `if` proves nothing about `d`.
 			it("should leave a chained body a question of its own", () => {
 				expect(
 					narrowedTypeOf(
@@ -8701,11 +8630,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A Protocol's PROVIDED body is read as it hoists, with no
-		// Namespace on the leaf — a provided Method belongs to whichever
-		// conformance reaches it — and the witness fills its own in. The
-		// standard library's `isNot` and the two `…OrEqualTo` are all of this
-		// shape, and a Program's own Protocol is read exactly alike.
+		// A provided body is read as it hoists, with no Namespace on the leaf,
+		// which the witness fills in. A Program's own Protocol is read alike.
 		describe("a Protocol's provided predicate", () => {
 			it("should narrow through a Protocol a Program declares", () => {
 				expect(
