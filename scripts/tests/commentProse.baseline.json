@@ -12,7 +12,6 @@
 	"packages/compiler/src/tests/enricherTermination.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 7, "position": 3},
 	"packages/compiler/src/tests/escapeSet.spec.ts": {"sentence-length": 9, "em-dash": 5, "all-caps": 6},
 	"packages/compiler/src/tests/followedHelps.ts": {"sentence-length": 12, "em-dash": 6, "all-caps": 8, "position": 1, "block-length": 3},
-	"packages/compiler/src/tests/foreignSyntax.spec.ts": {"sentence-length": 53, "em-dash": 33, "all-caps": 25, "history": 10, "position": 3, "block-length": 2, "counts": 2},
 	"packages/compiler/src/tests/genericWitnessArity.spec.ts": {"sentence-length": 15, "em-dash": 11, "all-caps": 11, "history": 5, "position": 2},
 	"packages/compiler/src/tests/helpCoverage.spec.ts": {"sentence-length": 12, "em-dash": 8, "all-caps": 6, "history": 1, "position": 1, "block-length": 2},
 	"packages/compiler/src/tests/helpers.spec.ts": {"sentence-length": 78, "em-dash": 64, "all-caps": 52, "history": 4, "position": 5, "block-length": 12},

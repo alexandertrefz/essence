@@ -8,11 +8,9 @@ import { operatorNote } from "../helpers/foreign"
 import { parseWithDiagnostics } from "../parser/index"
 import { compiles } from "./followedHelps"
 
-// What a reader arriving from another language writes, and what the
-// Compiler says about it. One spec for the whole family, because the family is
-// held together by the answer rather than by the stage: `a && b` is refused by
-// the Parser and `!a` by the Enricher, and a reader who wrote either is owed the
-// same sentence.
+// What a reader arriving from another language writes, and what the Compiler
+// says about it. `a && b` is refused by the Parser and `!a` by the Enricher,
+// but both owe the reader the same kind of answer.
 
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
@@ -54,9 +52,8 @@ function onlyDiagnostic(source: string): common.Diagnostic {
 	return diagnostics[0]
 }
 
-// The characters a Position covers — the only way to say that a fix
-// rewrites the `.` and not the member beside it without counting columns by
-// hand. Single line spans only; every payload asked this covers one.
+// The characters a single-line Position covers, so a test can say a fix
+// rewrites the `.` without counting columns.
 function spanOf(source: string, position: common.Position): string {
 	return source
 		.split("\n")
@@ -66,15 +63,13 @@ function spanOf(source: string, position: common.Position): string {
 		)
 }
 
-// The text the one Diagnostic a Program carries underlines. A Position is
-// nullable for the few Diagnostics that stand for a whole file rather than for
-// something written in one; every refusal asked here stands at a span.
+// The text the Program's one Diagnostic underlines. Every refusal asked here
+// has a Position.
 function refusedSpan(source: string): string {
 	return spanOf(source, onlyDiagnostic(source).position as common.Position)
 }
 
-// Written as one line per Statement with a real tab, so a span read back
-// out of the source is read out of the text a reader would have written.
+// One line per Statement, indented with a real tab, as a reader would write.
 function program(...lines: Array<string>): string {
 	return ["implementation {", ...lines.map((line) => `\t${line}`), "}"].join(
 		"\n",
@@ -114,9 +109,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// `add` takes an Argument, so the parentheses a fix would write
-		// answer a Method that needs one — the Help says so with its ellipsis and
-		// the payload leaves the call out.
+		// `add` takes an Argument, so the Help writes an ellipsis and the
+		// payload carries no call.
 		it("leaves the parentheses to the reader where the Method takes an Argument", () => {
 			let source = program("constant n = 1", "Terminal.print(n.add)")
 
@@ -171,9 +165,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["method-called-with-dot"])
 		})
 
-		// A Record HAS members, so the question is only asked for a name
-		// that is not one of them — and answered by the Namespace written over it,
-		// which is where `unknown-member` used to stop.
+		// A Record has members, so only a name that is none of them is looked
+		// up in the Namespace written over it.
 		it("answers for a Record whose Namespace declares the Method", () => {
 			let source = program(
 				"type Money = { euros: Integer }",
@@ -204,9 +197,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// The Method is not there, so nothing is offered as a fix — what is
-		// added is the sentence that gets the reader to `unknown-method`, which
-		// lists what the value does answer.
+		// No such Method exists, so no fix is offered. The sentence leads to
+		// `unknown-method`, which lists what the value answers.
 		it("keeps type-without-members where no Method of the name exists", () => {
 			let source = program(
 				'constant s = "ada"',
@@ -220,11 +212,8 @@ describe("Foreign syntax", () => {
 			expect(onlyDiagnostic(source).data).toBeUndefined()
 		})
 
-		// One mistake, one report. `w.length` inside a literal handed to
-		// `map` was answered three times — the `.` it is about, and then
-		// `uninferable-return-type` and `uninferable-type-parameter`, which
-		// restate it in vaguer words about a Type that could not be read off a
-		// body already refused. Both are gated at their source now.
+		// One mistake, one report: the refused body must not also report
+		// `uninferable-return-type` or `uninferable-type-parameter`.
 		it("reports a Method reached with '.' inside a literal once", () => {
 			let source = program(
 				'constant words = ["a", "bb"]',
@@ -242,12 +231,8 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// Said for a member READ too, where a value has no members at all.
-		// `n.toFixed` used to be answered with the rule and nothing to do about
-		// it: an Integer is not a Record, so whatever stands behind the `.` is
-		// not a member under any reading, and a Method is the only thing it can
-		// have been. The silence belongs to `unknown-member`, one test down,
-		// where the value HAS members and a `.` is how one of them is reached.
+		// A value with no members can only have meant a Method, so a member read
+		// gets the sentence too.
 		it("says it for a member read off a value with no members", () => {
 			let source = program(
 				'constant s = "ada"',
@@ -274,9 +259,8 @@ describe("Foreign syntax", () => {
 	})
 
 	describe("a binding declared in another language", () => {
-		// THE point of reading the Statement on rather than dropping it: a
-		// dropped declaration leaves the name undeclared, and one mistake becomes
-		// one Diagnostic per line that reads it.
+		// A dropped declaration would leave the name undeclared and report every
+		// line that reads it.
 		it("reports 'const' once and declares the Constant anyway", () => {
 			let source = program("const price = 12", "Terminal.print(price)")
 
@@ -302,9 +286,7 @@ describe("Foreign syntax", () => {
 				"foreign-syntax",
 				"foreign-syntax",
 			])
-			// Both Helps the table carries, not the first of them. A
-			// binding nothing reassigns is a `constant`, and a reader who wrote
-			// `let` out of habit has no way to know that from the fix alone.
+			// Both Helps, since a binding nothing reassigns is a `constant`.
 			expect(helpsOf(source)).toEqual([
 				"Write 'variable' in place of 'let'.",
 				"Or 'constant', where the value is never reassigned.",
@@ -313,11 +295,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// Rust writes two words where this language writes one, so the two
-		// are one habit here: reported over the span they cover, fixed by one
-		// edit, and read on as the Variable they declare. Answered word by word
-		// they were four Diagnostics, and the fix for the first of them left a
-		// `mut` standing between the Keyword and the name.
+		// `let mut` is one habit: reported over its span, fixed by one edit,
+		// and read on as the Variable it declares.
 		it("reads 'let mut' as the one word it stands for", () => {
 			let source = program(
 				"let mut total = 0",
@@ -386,7 +365,6 @@ describe("Foreign syntax", () => {
 			expect(spanOf(source, data.position)).toBe("const")
 		})
 
-		// The words are names, and a Program that declares one keeps it.
 		it("leaves the words alone where they are declared", () => {
 			expect(
 				codesOf(
@@ -476,18 +454,15 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// The shape is the whole of the test — two Identifiers and a brace —
-		// so a Program that declares one of the words keeps it.
+		// The test is the shape alone, two Identifiers and a brace, so a
+		// declared name is kept.
 		it("leaves a value named 'class' alone", () => {
 			expect(
 				codesOf(program("constant class = 1", "Terminal.print(class)")),
 			).toEqual([])
 		})
 
-		// The four shapes a block is opened in — see
-		// `foreignBlockBraceOffset`. Each of them used to end in `Expected
-		// 'with' but found '}'`, which is the Record Literal reading of the
-		// block, reported a screen below the word that opened it.
+		// The shapes a block is opened in. See `foreignBlockBraceOffset`.
 		it("refuses a block whatever stands between the word and its brace", () => {
 			let blocks: Array<[Array<string>, string]> = [
 				[
@@ -537,10 +512,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["'try' opens no block in Essence"])
 		})
 
-		// A block whose `}` never arrives is not read past — the Tokens
-		// stay where they are, so nothing a later reading needs is swallowed by
-		// a count that could never have balanced. It is still answered once, at
-		// the word, and nothing is said about what stands inside it.
+		// A block whose `}` never arrives is not read past, so no later reading
+		// loses its Tokens. It is answered once, at the word.
 		it("answers a block that never closes once, at the word", () => {
 			expect(
 				messagesOf(
@@ -553,9 +526,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["'try' opens no block in Essence"])
 		})
 
-		// The words the other four languages people arrive from write.
-		// Each is an ordinary name here, so each is answered exactly where an
-		// `unknown-name` would have been.
+		// Each word is an ordinary name here, answered where an `unknown-name`
+		// would have been.
 		it("answers the words Python, Rust, Go, Swift and Ruby write", () => {
 			let words: Array<[string, string]> = [
 				[
@@ -604,10 +576,8 @@ describe("Foreign syntax", () => {
 			}
 		})
 
-		// `println!` is keyed with its `!`, which is what a reader wrote
-		// and what the Lexer hands over — a `!` ends no name. Every rule under
-		// the table would have taken the `!` off the end and answered about
-		// that: the postfix habits first, and the operators behind them.
+		// `println!` is keyed with its `!`, as the reader wrote it, so the
+		// table answers before any rule reads the `!` alone.
 		it("answers a macro by the whole of what was written", () => {
 			let source = program('println!("hi")')
 
@@ -694,9 +664,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Did you mean 'total'?"])
 		})
 
-		// The three shapes where the guess is withheld — see
-		// `reportBareCaseName`. Each of them used to write an edit that the
-		// reader would have had to undo.
+		// The shapes where the guess is withheld. See `reportBareCaseName`.
 		it("says nothing where an APPLIED name matches a Case that takes nothing", () => {
 			let source = program(
 				"choice Light { Red, Green }",
@@ -740,10 +708,8 @@ describe("Foreign syntax", () => {
 			})
 		})
 
-		// `{ Red }` is a Record Literal's shorthand, where the name is the
-		// member AND its value — so the sigil written over the name alone leaves
-		// `{ #Red }`, which is not a Record Literal at all but `Expected 'with'`.
-		// The member is spelled out instead.
+		// In the shorthand `{ Red }` the name is the member and its value, and
+		// `{ #Red }` is no Record Literal, so the member is spelled out.
 		it("spells the member out where the name is a shorthand", () => {
 			let source = program(
 				"choice Light { Red, Green }",
@@ -825,13 +791,9 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// The whole family, in the four places one is written: between two
-		// Literals and between two names, as a whole Statement and inside a
-		// call. The call with NAMES in it is where six of the fourteen used to
-		// fall through to `Expected ')' but found 'tax'` — `total` read as an
-		// Argument's label and `+ tax` as its value — and it is the one column
-		// nothing covered, because a Literal can not be a label and so the
-		// Literal row always went the other way.
+		// Every operator between two Literals and between two names, in a
+		// declaration and inside a call. Inside a call, a name before an operator
+		// must not read as an Argument's label.
 		it("names the operator wherever one is written", () => {
 			let operators = [
 				"+",
@@ -885,10 +847,8 @@ describe("Foreign syntax", () => {
 			}
 		})
 
-		// The other half of the rule above: a name in front of an operator
-		// is no label, and a name in front of a VALUE still is. `-` is the one
-		// lexeme of the family that opens a value of this language, so a label
-		// stands in front of it and a negative Number follows.
+		// A name in front of a value is still a label. A `-` can open a negative
+		// Number, so a label may stand in front of it.
 		it("keeps a labelled Argument whose value opens with punctuation", () => {
 			expect(
 				codesOf(
@@ -919,10 +879,9 @@ describe("Foreign syntax", () => {
 			).toEqual([`Write '"hi"'.`])
 		})
 
-		// There are no grouping parentheses, so a `(` in Expression
-		// position opens a Function literal's Parameter list — which read `a` as
-		// a label and `+` as the name it labelled, and answered with
-		// `redundant-parameter-label` about a Parameter nobody wrote.
+		// A `(` in Expression position opens a Function literal's Parameter
+		// list, since there are no grouping parentheses. The operator inside is
+		// still what is reported.
 		it("names the operator inside parentheses a reader wrote to group", () => {
 			let source = program(
 				"constant a = 1",
@@ -950,10 +909,9 @@ describe("Foreign syntax", () => {
 			).toEqual(["operator-not-supported"])
 		})
 
-		// `!ready` is one Identifier — a `!` ends no name — so it is the
-		// Enricher that meets it, and the operand is in hand there. The table's
-		// own Help is the same sentence with a placeholder standing where the
-		// name goes, so it is REPLACED rather than printed under it.
+		// `!ready` is one Identifier, since a `!` ends no name, so the Enricher
+		// meets it with the operand in hand. Its Help replaces the table's
+		// placeholder sentence.
 		it("names the operand of a prefix '!'", () => {
 			let source = program(
 				"constant ready = true",
@@ -964,9 +922,8 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'ready::negate()'."])
 		})
 
-		// The name is offered as the thing to negate only where it IS the
-		// thing being negated. `- tree::hasItems()` negates the call, and
-		// `tree::negate()` is an edit about something else.
+		// `- tree::hasItems()` negates the call, so naming `tree` would suggest
+		// the wrong edit.
 		it("says the rule rather than the name where the '-' leads a call", () => {
 			let source = program(
 				"constant tree = [1, 2]",
@@ -986,9 +943,7 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'count = count::add(1)'."])
 		})
 
-		// The binding and the amount are the reader's own. `count` and `1`
-		// used to be printed whatever was written, so `tally += 5` was answered
-		// with two names nothing declares and an amount nobody asked for.
+		// The Help spells the binding and the amount the reader wrote.
 		it("spells a compound assignment with the operands that were written", () => {
 			let source = program("variable tally = 0", "tally += 5")
 
@@ -1001,9 +956,8 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// `count++` is one Identifier, so it is the Enricher that meets it
-		// and the binding is in hand there too. The amount is in the operator
-		// rather than in the text, which is why nothing is read behind it.
+		// `hits++` is one Identifier, so the Enricher meets it with the binding
+		// in hand. The amount is in the operator.
 		it("spells the binding a postfix increment counts", () => {
 			let source = program("variable hits = 0", "hits++")
 
@@ -1014,12 +968,8 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// And the same habit written on a MEMBER. `box.hits++` is a
-		// Lookup whose member is `hits++` — a `.` ends a name and a `+` does
-		// not — so it used to be answered "'{ hits: Integer }' has no member
-		// 'hits++'. Did you mean 'hits'?", which is a Help that drops what the
-		// line was written to do. The edit is a rebuild rather than an
-		// assignment, because a Record's member can not be assigned.
+		// `box.hits++` is a Lookup whose member is `hits++`, since a `+` ends no
+		// name. A Record's member can not be assigned, so the edit rebuilds it.
 		it("spells the member a postfix increment counts", () => {
 			let source = program("variable box = { hits = 0 }", "box.hits++")
 
@@ -1038,8 +988,7 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// A member name that merely ENDS in punctuation is not the
-		// habit — what says it is one is that the name without it IS a member.
+		// The habit needs the name without its `++` to be a member.
 		it("leaves a member nothing declares to the member report", () => {
 			let source = program(
 				"constant box = { hits = 0 }",
@@ -1049,10 +998,8 @@ describe("Foreign syntax", () => {
 			expect(codesOf(source)).toEqual(["unknown-member"])
 		})
 
-		// The right operand is spelled only where it is one Token and the
-		// whole of what is left of the Statement. Anything longer is an
-		// Expression of the reader's own, and half of one printed back is worse
-		// than the `…` that says theirs goes here.
+		// The right operand is spelled only where it is one Token ending the
+		// Statement. A longer Expression is the reader's, so `…` stands for it.
 		it("writes '…' where the amount is an Expression of its own", () => {
 			let source = program(
 				"variable tally = 0",
@@ -1064,9 +1011,8 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'tally = tally::add(…)'."])
 		})
 
-		// What is written here is a REASSIGNMENT, so the Help has to
-		// answer an Integer: `divide(by:)` answers a fraction, and the counter
-		// it would be written back into is not one.
+		// A reassignment must answer an Integer, and `divide(by:)` answers a
+		// fraction, so `quotient` leads.
 		it("offers a whole answer for a compound division", () => {
 			let source = program("variable count = 10", "count /= 2")
 
@@ -1085,8 +1031,8 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// There is no Method to offer for these four, and a Help that
-		// says so is a rule wearing an action's clothes. The rule is a Note.
+		// No Method stands in for a bitwise operator, so the rule is a Note
+		// rather than a Help.
 		it("answers a bitwise operator with a Note and no Help", () => {
 			let source = program("constant masked = 6 & 3")
 
@@ -1098,11 +1044,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// Built from the two operands the line already holds, like every
-		// other Help in this family. The table's own sentence spells `x` and
-		// `d` — a reader looking at `held ?? fallback` had to work out which of
-		// their two names each stood for, and the sentence is only reached now
-		// where one of them is not written plainly enough to print back.
+		// The Help is built from the operands written. The table's placeholder
+		// sentence is only for an operand too long to print back.
 		it("refuses the nullish operator with the Optional's own Method", () => {
 			let source = program(
 				"constant held: Optional<Integer> = #Value(1)",
@@ -1126,8 +1069,8 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// A Statement ends at the end of its Expression, so a `-` opening
-		// the next line is a negative Number and not a subtraction anybody wrote.
+		// A Statement ends with its Expression, so a `-` opening the next line
+		// is a negative Number.
 		it("leaves a Statement that opens on the next line alone", () => {
 			expect(
 				codesOf(
@@ -1184,10 +1127,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// A `;` ends no name, so `total;` is ONE Identifier and it is the
-		// Enricher that meets it, while `1;` is two Tokens and the Parser does.
-		// Both read one account — see `semicolonAccount` — because a reader who
-		// wrote both was being told two different things about them.
+		// `total;` is one Identifier, which the Enricher meets, and `1;` is two
+		// Tokens, which the Parser meets. Both read `semicolonAccount`.
 		it("answers a ';' in the same words from either stage", () => {
 			let afterNumber = program(
 				"constant total = 1;",
@@ -1207,10 +1148,8 @@ describe("Foreign syntax", () => {
 			expect(labelsOf(afterName)).toEqual(labelsOf(afterNumber))
 		})
 
-		// The Statement in front of the habit is whole, so it is kept —
-		// see `swallowForeignTail`. A file written with a ';' on every line is
-		// one report per line and not one per line plus one per reader of what
-		// each line declared.
+		// The Statement in front of the `;` is whole, so it is kept, and each
+		// line reports once. See `swallowForeignTail`.
 		it("reads past a ';' and keeps the Statement in front of it", () => {
 			expect(
 				messagesOf(
@@ -1256,9 +1195,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["A Comment is written with '§'"])
 		})
 
-		// A '*/' that never arrives is refused where the '/*' stands
-		// rather than read past: what a reading past it would swallow is the
-		// rest of the file.
+		// A '/*' whose '*/' never arrives is refused where it stands rather than
+		// swallowing the rest of the file.
 		it("refuses a block Comment that never closes", () => {
 			expect(
 				messagesOf(
@@ -1292,10 +1230,8 @@ describe("Foreign syntax", () => {
 			expect(messagesOf(source)).toEqual([
 				"A call writes no Type Arguments",
 			])
-			// ONE Help, and it is the edit: take the brackets out. Where
-			// the Arguments decide nothing a reader goes to the Declaration
-			// instead, and that is said as a Note — the Parser has not seen the
-			// signature and can not know which of the two a reader is in.
+			// The Help is the edit. The Parser has not seen the signature, so the
+			// case where the Arguments decide nothing is a Note.
 			expect(helpsOf(source)).toEqual([
 				"Write 'identity(…)' and let the Arguments decide.",
 			])
@@ -1321,10 +1257,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// A template literal is NOT one Token — a `{` ends a name, so the
-		// holes break the run into a name, a `$`, a Record Literal and a quote
-		// standing on its own, and each of the four was answered as a name
-		// nothing declares. One String, one report.
+		// A `{` ends a name, so a template literal's holes break it into several
+		// Tokens. It is still one String and one report.
 		it("refuses a template literal once, holes and all", () => {
 			let source = program(
 				'constant name = "Ada"',
@@ -1344,10 +1278,8 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// A run that closed on its own quote is ONE edit, so it keeps its
-		// fix; a run broken into pieces is a String the reader has to write out,
-		// and offering to rewrite the first piece of it would write a String
-		// holding a third of what they wrote.
+		// A run that closed on its own quote is one edit and keeps its fix. A run
+		// broken by holes is left for the reader to write out.
 		it("carries a fix only for a run that closed on its own quote", () => {
 			expect(
 				onlyDiagnostic(program("constant s = `hi`")).data,
@@ -1366,10 +1298,8 @@ describe("Foreign syntax", () => {
 			).toBeUndefined()
 		})
 
-		// `#Red` and `# Red` are both Essence, so what makes a `#` a
-		// Comment is the WORDS behind the Case: a Case carries its payload in
-		// brackets, and no Statement of this language stands behind another on
-		// one line.
+		// `#Red` and `# Red` are both Essence. Words standing behind the name
+		// make a Comment, since a Case carries its payload in brackets.
 		it("refuses a Comment written with a '#'", () => {
 			let source = program(
 				"# count the items",
@@ -1425,8 +1355,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["Essence has no '?' after a value"])
 		})
 
-		// The member is what the reader was reaching FOR, and the Lookup
-		// around the name is the only thing that has it — see `enrichLookupBase`.
+		// Only the Lookup around the name knows the member the reader was
+		// reaching for. See `enrichLookupBase`.
 		it("names the member a postfix habit was reaching for", () => {
 			expect(
 				helpsOf(
@@ -1440,10 +1370,7 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// And the `map` clause is WITHHELD where there is none. `.member`
-		// used to stand in for it, which is a path into a member of that name:
-		// on an `Optional<Integer>` following it reached `path-step-not-a-record`
-		// — a second report, about a word the Help itself had made up.
+		// With no member reached for, the `map` clause is withheld.
 		it("offers only the fallback where nothing was being reached for", () => {
 			expect(
 				helpsOf(
@@ -1458,11 +1385,8 @@ describe("Foreign syntax", () => {
 		})
 	})
 
-	// `primes[0]` — the one habit in the family that is a SHAPE rather
-	// than a lexeme: every character of it is Essence, and what is foreign is a
-	// value standing flush in front of a List. Written apart it is two
-	// Statements and compiles, which is why the mistake used to surface a line
-	// or two below with a near miss for a Method nobody was reaching for.
+	// `primes[0]` is a habit of shape rather than lexeme: a value flush in
+	// front of a List. Written apart, it is two Statements and compiles.
 	describe("a value indexed with brackets", () => {
 		it("refuses the brackets where they were written", () => {
 			let source = program(
@@ -1481,11 +1405,8 @@ describe("Foreign syntax", () => {
 			expect(refusedSpan(source)).toBe("[0]")
 		})
 
-		// The whole of the recovery, and the reason the refusal is
-		// reported rather than thrown. Dropping the Statement leaves `first`
-		// undeclared and answers one mistake at every line that reads the name;
-		// keeping `primes` as its value makes `first` a List and answers
-		// `first::add(1)` with a near miss for `pad`.
+		// Dropping the Statement would report every read of `first`, and keeping
+		// `primes` as its value would make `first` a List.
 		it("declares the name and says nothing further about it", () => {
 			let source = program(
 				"constant primes = [2, 3, 5]",
@@ -1513,10 +1434,8 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// A String key says the collection is a Dictionary and says it
-		// loudly — a List and a String are read by POSITION, and a position is
-		// an Integer and nothing else — so the Dictionary's Method leads and
-		// the two position Methods are never handed the String.
+		// A List and a String are read by an Integer position, so a String key
+		// means a Dictionary, whose Method leads.
 		it("leads with the Dictionary where a String was written as the key", () => {
 			let source = program(
 				'constant ages = ["ada" = 36]',
@@ -1547,11 +1466,9 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// The receiver is spelled back out where the Parser holds its
-		// text — a name, or a path of them. `collection` stands in where it does
-		// not, and it is not `value` on purpose: one of the three Methods offered
-		// is itself called `value`, and `'value::value(at 0)'` reads as a rule
-		// about a Keyword rather than as a name to substitute.
+		// The receiver is spelled back where it is a name or a path of them.
+		// Otherwise `collection` stands in, since `value::value(at 0)` would read
+		// oddly.
 		it("names the receiver where its spelling was written down", () => {
 			expect(
 				helpsOf(
@@ -1578,10 +1495,8 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// Anything but a single written value falls back to the schema.
-		// What stood between the brackets is never parsed — `items.length` is a
-		// member read and the `-` an operator, and each would be refused in its
-		// own right for a reader who has not written the call yet.
+		// Anything but a single written value falls back to the schema, and
+		// what stood between the brackets is never parsed.
 		it("answers a written Expression once, and with the schema", () => {
 			let source = program(
 				"constant items = [1, 2, 3]",
@@ -1595,9 +1510,8 @@ describe("Foreign syntax", () => {
 			)
 		})
 
-		// One habit written twice over. The second `[` stands flush
-		// against the first's `]`, which is the rule that made the first an
-		// index, so the whole run is read past and answered once.
+		// The second `[` stands flush against the first `]`, so the whole run
+		// is one index and one report.
 		it("answers a run of brackets once", () => {
 			let source = program(
 				"constant matrix = [[1, 2], [3, 4]]",
@@ -1640,12 +1554,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["foreign-syntax"])
 		})
 
-		// In Argument position the name in front of the brackets used to
-		// read as a LABEL and the brackets as the List it labelled, so the
-		// report was `argument-label-mismatch` about a label nobody wrote. The
-		// `[` joins `#` and `.` in `argumentIsLabelled`: written flush it
-		// carries the name on, and a label is what stands a space in front of
-		// its value.
+		// In `argumentIsLabelled`, a `[` written flush carries the name on, as
+		// `#` and `.` do. A label stands a space in front of its value.
 		it("refuses an index written as an Argument", () => {
 			let source = program(
 				"constant primes = [2, 3, 5]",
@@ -1744,11 +1654,8 @@ describe("Foreign syntax", () => {
 			).toEqual(["foreign-syntax"])
 		})
 
-		// The brackets with an `=` behind them, which is a WRITE and was
-		// answered as two reports — the refusal, and then `Expected an
-		// Expression but found '='` from the Statement loop reading what was
-		// left — with three Helps between them, every one of them about a
-		// Method that READS.
+		// Brackets with an `=` behind them are a write, answered once with
+		// Methods that rebuild the collection.
 		describe("and written into", () => {
 			let source = program(
 				"variable primes = [2, 3, 5]",
@@ -1793,10 +1700,8 @@ describe("Foreign syntax", () => {
 				])
 			})
 
-			// The value is read off the Token for the reason the key is,
-			// and only where it is the whole of what is left of the Statement.
-			// Anything longer is the reader's own Expression, and a Help that
-			// quoted half of it would print something nobody wrote.
+			// The value is spelled only where it is one Token ending the
+			// Statement.
 			it("writes a schema where the value is more than one Token", () => {
 				expect(
 					helpsOf(
@@ -1809,9 +1714,7 @@ describe("Foreign syntax", () => {
 				).toBe("Write 'primes = primes::replace(…, at 0)' for a List.")
 			})
 
-			// `==` is two Tokens and another habit entirely, so it is
-			// left to the operator table — the brackets are still read, and the
-			// comparison is answered on its own.
+			// `==` is another habit, left to the operator table.
 			it("leaves a comparison to the operator it is written with", () => {
 				expect(
 					codesOf(
@@ -1843,9 +1746,8 @@ describe("Foreign syntax", () => {
 			})
 		})
 
-		// A `[` whose `]` never arrives is left where it stands. Reading
-		// past it would swallow the rest of the file to answer a habit, and the
-		// List Literal that was never closed is what wants reporting there.
+		// A `[` whose `]` never arrives is left as an unclosed List Literal
+		// rather than swallowing the rest of the file.
 		it("leaves a bracket that never closes to the List Literal", () => {
 			expect(
 				codesOf(
@@ -1857,16 +1759,9 @@ describe("Foreign syntax", () => {
 			).toEqual(["syntax-error"])
 		})
 
-		// The one shape this rule takes away. `contentsOf[3, 4]` compiled
-		// before it and does not after, and that is the rule `#` and `.` have
-		// always been read by: a label stands a SPACE in front of its value,
-		// and written flush it carries the name on instead. `esfmt` writes the
-		// space, and nothing in the standard library, the fixtures, the
-		// examples or the documentation was ever written without it.
-		//
-		// The `unknown-name` for the label read as a receiver is the Enricher's
-		// and stands behind this one; `diagnosticsOf` stops at the Parser for a
-		// Program the Parser refused, which is what an `essence check` does too.
+		// A label stands a space in front of its value, so `contentsOf[3, 4]`
+		// is an index. The formatter writes the space. A refused Program stops at
+		// the Parser, so the Enricher's `unknown-name` is not reached.
 		it("reads a List written flush behind a label as an index", () => {
 			expect(
 				codesOf(
@@ -1880,9 +1775,8 @@ describe("Foreign syntax", () => {
 		})
 	})
 
-	// The other half of every rule above — the Essence that is written in
-	// the same characters, which none of them may touch. Each of these compiled
-	// before the family was written and has to compile after it.
+	// Essence written in the same characters, which no foreign-syntax rule
+	// may touch.
 	describe("the Essence written in the same characters", () => {
 		it("keeps the two arrows", () => {
 			expect(
@@ -1973,9 +1867,8 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// A Function literal is the shape the `=>` refusal stands next to,
-		// and it is written in the same characters as one — a Parameter list, an
-		// arrow and a block.
+		// A Function literal is a Parameter list, an arrow and a block, the
+		// characters the `=>` refusal stands next to.
 		it("keeps a Function literal in every position one is written", () => {
 			expect(
 				codesOf(
@@ -1989,8 +1882,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// A `-` signs a Number Literal, and every one of these is a place
-		// where a Number stands and nothing carries an Expression on.
+		// A `-` signs a Number Literal wherever a Number stands.
 		it("keeps a negative Number wherever one is written", () => {
 			expect(
 				codesOf(
@@ -2012,8 +1904,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// A Record Type is written inline wherever a Type is, and each of
-		// these is a `{ … : … }` that no Record Literal rule may claim.
+		// An inline Record Type is a `{ … : … }` no Record Literal rule may claim.
 		it("keeps an inline Record Type in every position one is written", () => {
 			expect(
 				codesOf(
@@ -2034,8 +1925,7 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// `~>` is written flush against neither side in the standard
-		// library and against both here, so the lexeme is read as one either way.
+		// `~>` is one lexeme whether written flush or spaced.
 		it("keeps a typed Record Literal written without its spaces", () => {
 			expect(
 				codesOf(
@@ -2048,11 +1938,8 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// Every place a `[` is written behind a value in this repository,
-		// swept over the standard library, the fixtures, the examples and every
-		// Essence sample in the documentation: a labelled Argument and the rows
-		// of a table test, each of them written with the space. Nothing there
-		// writes one flush, which is what the index rule is narrowed to.
+		// Where a `[` follows a value in Essence written here, a labelled
+		// Argument or a table test's rows, a space stands between them.
 		it("keeps a List written a space behind a label", () => {
 			expect(
 				codesOf(
@@ -2088,10 +1975,8 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// The three bracket forms that are not a List at all, and a List
-		// opening a Statement of its own on the line under a value — which is
-		// the reading the index rule leaves untouched, since nothing carries an
-		// Expression across a line break.
+		// Bracket forms that are no List, and a List opening a Statement on the
+		// line under a value. No Expression carries across a line break.
 		it("keeps a Dictionary, its update, the empty one and a List on its own line", () => {
 			expect(
 				codesOf(
@@ -2109,9 +1994,8 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 
-		// Every word in the foreign table is an ordinary name, and a
-		// Program that declares one keeps it — the table is consulted for a name
-		// that resolved to NOTHING and never for one that resolved.
+		// The foreign table is consulted only for a name that resolved to
+		// nothing.
 		it("keeps the foreign words a Program declares as names", () => {
 			expect(
 				codesOf(
