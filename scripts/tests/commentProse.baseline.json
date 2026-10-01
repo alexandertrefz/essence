@@ -14,7 +14,6 @@
 	"packages/ariadne/src/label.ts": {"sentence-length": 1},
 	"packages/ariadne/src/report.spec.ts": {"sentence-length": 3, "em-dash": 1},
 	"packages/ariadne/src/write.ts": {"sentence-length": 6, "em-dash": 3, "all-caps": 5},
-	"packages/cli/src/tests/cli.spec.ts": {"sentence-length": 66, "em-dash": 35, "all-caps": 15, "history": 1, "position": 5, "block-length": 7, "counts": 1},
 	"packages/cli/src/tests/harness.ts": {"sentence-length": 4, "em-dash": 2, "all-caps": 4},
 	"packages/cli/src/tests/mutation.spec.ts": {"sentence-length": 35, "em-dash": 23, "all-caps": 17, "history": 1, "position": 1, "block-length": 2},
 	"packages/cli/src/tests/oneAnalysis.spec.ts": {"sentence-length": 8, "em-dash": 4, "all-caps": 4, "history": 4},

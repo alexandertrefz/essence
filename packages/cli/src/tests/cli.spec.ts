@@ -91,14 +91,10 @@ import {
 } from "../theme"
 import { within, withFiles } from "./harness"
 
-// A directory of this run's own, so that a spec compiling a fixture
-// neither answers out of the user's bundle cache nor fills it. It is set before
-// anything below imports its way to a compile, because where the cache lives is
-// read off the environment every time it is asked for.
+// A bundle cache of this run's own, so specs neither read nor fill the user's.
+// It is set before anything compiles, since the cache path is read on every use.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-cli-cache-"))
-// And a result cache of its own beside it, for the same reason: a spec
-// driving `essence test` may neither answer out of the user's store nor leave a
-// fixture's answer in it.
+// A result cache of its own too, for the same reason.
 let resultCache = mkdtempSync(path.join(tmpdir(), "essence-cli-results-"))
 
 process.env.ESSENCE_CLI_CACHE = bundleCache
@@ -109,15 +105,9 @@ afterAll(() => {
 	rmSync(resultCache, { recursive: true, force: true })
 })
 
-// The three globals the helpers below hijack to read what a Program
-// wrote — `capture` holds both streams, `runBundle` holds `console.log` beside
-// stdout. Each puts back what it took in a `finally`, and a `finally` behind an
-// `await` never runs when the runtime abandons the promise: a test that hits
-// its timeout mid-compile leaves the hijack standing, and every later test in
-// the file then writes into a buffer nothing reads. These are the originals,
-// and the `afterEach` is what makes an abandoned hijack cost one test rather
-// than the file. It is registered here rather than inside a `describe` because
-// the four callers stand in three of them.
+// The originals of the globals `capture` and `runBundle` hijack. A test that
+// times out mid-await never reaches its `finally`. So the `afterEach` restores
+// them, and an abandoned hijack costs one test rather than the file.
 const originalLog = console.log
 const originalStandardOut = process.stdout.write
 const originalStandardError = process.stderr.write
@@ -134,9 +124,8 @@ const buildCommand = findCommand("build") as Command
 const runCommand = findCommand("run") as Command
 const formatCommand = findCommand("format") as Command
 
-// Everything the CLI writes goes through `process.stdout` and
-// `process.stderr`, including what a delegate writes for itself, so driving
-// `run` from a spec means holding both for the length of the call.
+// Everything the CLI writes, a delegate's output included, goes through
+// `process.stdout` and `process.stderr`, so a spec holds both for the call.
 async function capture(
 	invoke: () => Promise<number>,
 ): Promise<{ code: number; out: string; err: string }> {
@@ -183,13 +172,7 @@ function outcome(overrides: Partial<CompileOutcome> = {}): CompileOutcome {
 	}
 }
 
-// `esc --version` answered "unknown" for as long as it took to notice.
-// The version was read from a path counted out from `context.ts`, that module
-// moved one directory up when the CLI became its own package, and the `catch`
-// around the read turned a wrong path into a plausible-looking answer instead
-// of a failure. It is an import now, so the path can not be wrong — and this
-// says the value reaching `--version` is the manifest's, which is the part an
-// import alone does not promise.
+// `--version` must answer the manifest's version, not a fallback.
 describe("esc --version", () => {
 	it("reports the version the manifest declares", () => {
 		let manifest = JSON.parse(
@@ -241,8 +224,7 @@ describe("CLI", () => {
 			expect(invocation.files).toEqual(["a.es"])
 		})
 
-		// A path is never mistaken for a mistyped Command, however
-		// closely it happens to resemble one.
+		// A path is never mistaken for a mistyped Command, however close it looks.
 		it("treats a file name as a file rather than an unknown Command", () => {
 			let invocation = parseArguments(["build.es"])
 
@@ -299,9 +281,7 @@ describe("CLI", () => {
 			expect(invocation.files).toEqual(["a.es"])
 		})
 
-		// The one flag that changes what the OUTPUT IS rather than how it
-		// was made, so it is on the two Commands that write an artifact and on
-		// neither of the two that do not.
+		// `--embed` is on the two Commands that write an artifact, and on no other.
 		it("reads --embed on the Commands that write a bundle", () => {
 			expect(parseArguments(["build", "a.es"]).options.embed).toBe(false)
 			expect(
@@ -330,9 +310,7 @@ describe("CLI", () => {
 			})
 		})
 
-		// A pass name that names no pass is a mistake the user can only
-		// see if it is reported: silently, every pass would keep running and
-		// the flag would look like a pass that does nothing.
+		// An unknown pass name must be reported, or the flag would silently do nothing.
 		it("refuses an optimisation pass it does not have", () => {
 			try {
 				parseArguments([
@@ -441,9 +419,8 @@ describe("CLI", () => {
 			).toThrow("essence build does not pass arguments")
 		})
 
-		// The Formatter parses its own flags, so nothing after `format`
-		// may be read here — a flag esc has never heard of is not a mistake
-		// there, and a bare `--` is not a separator to fold away.
+		// The Formatter parses its own flags, so nothing after `format` is read here,
+		// not even a bare `--`.
 		it("captures a passthrough Command's arguments verbatim", () => {
 			let invocation = parseArguments([
 				"format",
@@ -480,10 +457,8 @@ describe("CLI", () => {
 			])
 		})
 
-		// --help is answered from the Command table rather than forwarded,
-		// so that `essence format --help` and `essence help format` are one
-		// screen — and so that `essence lsp --help` cannot start a Server that
-		// nobody is talking to.
+		// `--help` is answered from the Command table, so `essence format --help` matches
+		// `essence help format`, and `essence lsp --help` starts no Server.
 		it("answers --help itself for a passthrough Command", () => {
 			expect(parseArguments(["format", "--help"]).options.help).toBe(true)
 			expect(parseArguments(["lsp", "-h"]).options.help).toBe(true)
@@ -511,8 +486,8 @@ describe("CLI", () => {
 	})
 
 	describe("Command table", () => {
-		// Help is generated from the Command table, so an Option that is
-		// added without documentation would silently produce an empty entry.
+		// Help comes from the Command table, so an undocumented Option would render
+		// empty.
 		it("documents every Option", () => {
 			for (let command of commands) {
 				for (let option of [...command.options, ...globalOptions]) {
@@ -611,10 +586,8 @@ describe("CLI", () => {
 			expect(overview).toContain("Start the Essence Debug Adapter")
 		})
 
-		// The same table is rendered under whichever name the binary was
-		// invoked as. Every line of it has to name that one — help that says
-		// `esc` to somebody who typed `essence` cannot be pasted back into
-		// their shell.
+		// Help names the program as it was invoked, so its lines paste back into the
+		// user's shell.
 		it("renders the name the binary was invoked as", () => {
 			let asEssence = renderOverview({
 				...context,
@@ -661,9 +634,8 @@ describe("CLI", () => {
 			}
 		})
 
-		// A passthrough Command's arguments are read by the tool it
-		// delegates to, which has never heard of --json or --quiet, so listing
-		// them under its help would document flags that do nothing.
+		// A passthrough Command's delegate ignores `--json` and `--quiet`, so its help
+		// does not list them.
 		it("leaves the global Options out of a passthrough Command's help", () => {
 			let rendered = renderCommandHelp(formatCommand, {
 				...context,
@@ -719,9 +691,7 @@ describe("CLI", () => {
 			).rejects.toThrow(UsageError)
 		})
 
-		// An absolute pattern rather than one relative to the working
-		// directory, because `glob` resolves against the cwd and a spec must
-		// not care which directory `bun test` was started from.
+		// An absolute pattern, since `glob` resolves against the working directory.
 		it("expands a glob", async () => {
 			let files = await resolveInputFiles(
 				[fixturePath("*.es")],
@@ -763,9 +733,8 @@ describe("CLI", () => {
 			expect(outputs.get("a.es")).toBe("dist/a.js")
 		})
 
-		// Flattening several directories into one output directory can
-		// make two sources collide; that has to be an error rather than a
-		// silent overwrite.
+		// Flattening several directories into one can make two sources collide, which
+		// must be an error.
 		it("refuses inputs that would overwrite each other", async () => {
 			await expect(
 				resolveOutputFiles(
@@ -789,8 +758,7 @@ describe("CLI", () => {
 	})
 
 	describe("worker dispatch", () => {
-		// One entry is one graph and a graph is one worker's, so a second
-		// worker has nothing to take — however large the file is.
+		// One entry is one graph, which one worker compiles, however large.
 		it("stays on the main thread for one file", () => {
 			expect(
 				shouldUseWorkers({
@@ -829,8 +797,7 @@ describe("CLI", () => {
 			).toBe(true)
 		})
 
-		// Checking divides enrichment and nothing else, and there is not
-		// enough of it to divide until the batch is a quarter of a megabyte.
+		// A check only divides enrichment, which pays off only for a large batch.
 		it("keeps a check on the main thread until the sources are large", () => {
 			expect(
 				shouldUseWorkers({
@@ -875,9 +842,8 @@ describe("CLI", () => {
 			expect(defaultWorkerCount(1000)).toBeLessThanOrEqual(4)
 		})
 
-		// The worker is booted as whatever `pool.ts` itself is running
-		// as — in the published package the sources are compiled, and there is
-		// no `worker.ts` to boot.
+		// The worker file matches how `pool.ts` runs: the published package has no
+		// `worker.ts`.
 		it("boots the worker its own module could be", () => {
 			expect(workerFileName("file:///checkout/cli/src/pool.ts")).toBe(
 				"./worker.ts",
@@ -887,17 +853,9 @@ describe("CLI", () => {
 			)
 		})
 
-		// The two moments a worker can be told what run it is in, over
-		// one worker. A slot boots on the first job that lands on it rather
-		// than when the run is planned, so the FIRST `begin` of a run reaches
-		// no worker at all and the mode has to be waiting when the boot comes;
-		// the second reaches the worker that is now up. A run whose workers
-		// were opened as builds compiles every file without the section it
-		// exists to check, and reports a project with nothing to run.
-		//
-		// A file whose tests section does not compile is what says which
-		// mode the worker opened in — checking stops before anything is
-		// emitted, so this costs one boot and one enrichment.
+		// A worker learns its run's mode either way. A slot boots on its first
+		// job, after the first `begin`, and a later `begin` reaches the running
+		// worker. A file whose tests do not compile shows the mode it opened in.
 		it("opens a worker booted after begin in the run's mode", async () => {
 			let directory = mkdtempSync(path.join(tmpdir(), "essence-pool-"))
 			let entry = path.join(directory, "Mode.tests.es")
@@ -998,8 +956,7 @@ describe("CLI", () => {
 			expect(supportsColor("auto", tty, { TERM: "dumb" })).toBe(false)
 		})
 
-		// An explicit flag is the user's decision and outranks both the
-		// environment and the terminal.
+		// An explicit flag outranks both the environment and the terminal.
 		it("lets the flags override everything", () => {
 			expect(supportsColor("always", pipe, { NO_COLOR: "1" })).toBe(true)
 			expect(supportsColor("never", tty, { FORCE_COLOR: "1" })).toBe(
@@ -1062,8 +1019,8 @@ describe("CLI", () => {
 			expect(visibleLength(truncated)).toBeLessThanOrEqual(5)
 		})
 
-		// A terminal with no known width reports zero columns. Taking
-		// that literally would truncate every line down to an ellipsis.
+		// A terminal with no known width reports zero columns, which must not truncate
+		// every line.
 		it("does not truncate when the width is unknown", () => {
 			expect(truncate("hello", 0)).toBe("hello")
 		})
@@ -1140,11 +1097,9 @@ describe("CLI", () => {
 	})
 })
 
-// The CLI and the Language Server have to agree about the file in front
-// of them. `esc check packages/standard-library/sources/List.es` used to reject the `declarations { …
-// }` header of the very sources the compiler loads at startup — while the
-// Editor reported the same file clean — so a compiler developer could not
-// check their own transcription. Both now route through `documents.ts`.
+// The CLI and the Language Server agree about a file, since both route
+// through `documents.ts`. So `esc check` accepts a standard library source's
+// `declarations` header, as the Editor does.
 describe("CLI on a standard library source", () => {
 	it("checks a standard library source without Diagnostics", async () => {
 		let fileNames = readdirSync(STDLIB_DIRECTORY).filter((fileName) =>
@@ -1166,9 +1121,8 @@ describe("CLI on a standard library source", () => {
 		}
 	})
 
-	// The permission is the standard library's alone — an ordinary file
-	// that opens with `declarations { … }` is still rejected, by the CLI as
-	// much as by the Editor.
+	// Only the standard library may open with `declarations { … }`; the CLI rejects
+	// it elsewhere, as the Editor does.
 	it("still rejects a 'declarations' header outside the standard library", async () => {
 		let filePath = path.resolve(
 			tmpdir(),
@@ -1194,10 +1148,8 @@ describe("CLI on a standard library source", () => {
 	})
 })
 
-// One binary is installed under several names, and every name exposes
-// every Command — `esc` is `essence` under its old name. The name is not a
-// label on the help screen but the name of the program the user is talking to,
-// so it is threaded from the executable through every line either one prints.
+// One binary is installed as `essence` and `esc`, and every name exposes every
+// Command. The invoked name is threaded through every line printed.
 describe("the name the binary was invoked as", () => {
 	it("says essence when it was invoked as essence", async () => {
 		let { code, out } = await capture(() => run(["help"], "essence"))
@@ -1216,9 +1168,8 @@ describe("the name the binary was invoked as", () => {
 		expect(out).not.toMatch(/\bessence\b/)
 	})
 
-	// `esc` is what a caller who says nothing gets, so that the CLI can be
-	// driven directly — by a spec, or by a script older than the second name —
-	// without the name of the program changing under it.
+	// A caller that names no program gets `esc`, so specs and scripts can drive the
+	// CLI directly.
 	it("defaults to esc when nobody says", async () => {
 		let { code, out } = await capture(() => run(["help"]))
 
@@ -1239,9 +1190,8 @@ describe("the name the binary was invoked as", () => {
 		expect(err).not.toMatch(/\besc\b/)
 	})
 
-	// A usage error that belongs to no Command still has to say who could
-	// not read the arguments, and a caller who asked for JSON gets the failure
-	// in JSON too.
+	// A usage error outside any Command still names the program, and comes as JSON
+	// when asked.
 	it("names the invoked program in a JSON usage error", async () => {
 		let { code, out } = await capture(() =>
 			run(["buld", "--json"], "essence"),
@@ -1253,9 +1203,8 @@ describe("the name the binary was invoked as", () => {
 })
 
 describe("essence format", () => {
-	// Both forms are one screen, rendered from esc's own Command table:
-	// the Formatter's flags are documented there, and `essence lsp --help` must
-	// not start a Server that nobody is talking to.
+	// Both forms are one screen from esc's own Command table, and
+	// `essence lsp --help` must not start a Server.
 	it("answers help the same way through help format and format --help", async () => {
 		let viaHelp = await capture(() => run(["help", "format"], "essence"))
 		let viaFlag = await capture(() => run(["format", "--help"], "essence"))
@@ -1276,9 +1225,7 @@ describe("essence format", () => {
 		expect(code).toBe(0)
 	})
 
-	// --check is the Formatter's flag, not esc's. Reaching the Formatter
-	// verbatim is the whole point of a passthrough Command: read here, it would
-	// have been an unknown option and never have arrived.
+	// `--check` is the Formatter's flag, which only a passthrough delivers intact.
 	it("reports an unformatted source without reading --check itself", async () => {
 		let filePath = path.resolve(
 			tmpdir(),
@@ -1328,10 +1275,8 @@ describe("essence format", () => {
 	})
 })
 
-// There is deliberately no spec that starts the Server: it holds stdio
-// open until the other end closes it, which in a test runner is forever. What
-// can be said here is that asking about it does not start it — which is why
-// `--help` is answered from the Command table rather than forwarded.
+// No spec starts the Server, which holds stdio open until the other end closes.
+// This only checks that asking about it does not start it.
 describe("essence lsp", () => {
 	it("documents itself without starting a Server", async () => {
 		let { code, out } = await capture(() => run(["help", "lsp"], "essence"))
@@ -1343,7 +1288,7 @@ describe("essence lsp", () => {
 	})
 })
 
-// The same holds for the Debug Adapter, for the same reason.
+// The same holds for the Debug Adapter.
 describe("essence dap", () => {
 	it("documents itself without starting an Adapter", async () => {
 		let { code, out } = await capture(() => run(["help", "dap"], "essence"))
@@ -1355,12 +1300,8 @@ describe("essence dap", () => {
 	})
 })
 
-// What an abandoned hijack leaves behind, without abandoning one: a test
-// that times out inside `capture` or `runBundle` never reaches the `finally`
-// that puts the globals back, and a spec that timed one out on purpose would
-// itself be a failing test. This installs the same state directly, and the test
-// after it is the assertion — the `afterEach` at the top of the file is what
-// stands between the two.
+// Installs what an abandoned hijack leaves, without timing a test out. The next
+// test asserts that the `afterEach` restored the globals.
 describe("an abandoned output hijack", () => {
 	it("leaves the globals held, as a timed-out test would", () => {
 		console.log = (() => {}) as typeof console.log
@@ -1377,11 +1318,8 @@ describe("an abandoned output hijack", () => {
 	})
 })
 
-// `essence check` must not pay for tools it never calls. The Formatter,
-// the Language Server and the Debug Adapter are reached through `import(…)` at
-// the point of use, and a static import anywhere in the package would load all
-// of them — with everything they import — before the first argument had been
-// read.
+// `essence check` must not load tools it never calls, so the Formatter, the
+// Language Server and the Debug Adapter are imported at their point of use.
 describe("delegation stays lazy", () => {
 	let sourceDirectory = path.resolve(
 		path.dirname(fileURLToPath(import.meta.url)),
@@ -1424,9 +1362,8 @@ describe("delegation stays lazy", () => {
 	})
 })
 
-// A Module graph belongs to a directory rather than to a file — a
-// specifier is a path from one Module to another — so a test that needs one
-// writes it outside the repository and takes it down again afterwards.
+// A Module graph belongs to a directory, so a test that needs one writes it
+// outside the repository and removes it afterwards.
 async function withModules<Value>(
 	files: Record<string, string>,
 	body: (directory: string) => Promise<Value>,
@@ -1465,8 +1402,7 @@ function captureTerminal(): { terminal: Terminal; lines: Array<string> } {
 	}
 }
 
-// One job, so that a test compiles in this process: a worker would
-// answer the same and boot a second copy of the Compiler to do it.
+// One job, so a test compiles in this process without booting a worker.
 function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 	return {
 		help: false,
@@ -1534,15 +1470,10 @@ function plainReport() {
 	}
 }
 
-// The bundle is imported rather than started as a program, which is what
-// `esc run` does with this very file: a child process inherits the test
-// runner's streams, so what it printed could not be read back here.
-// Both doors a Program writes through, into one buffer in writing order:
-// `Terminal.inspect` ends its line through `console.log`, while
-// `Terminal.print` and `Terminal.write` go to the stream, there being no way to
-// spell "no newline" through the console. A harness holding only `console.log`
-// would read a printing Program as silent, and silence is what every comparison
-// below would then be making.
+// The bundle is imported rather than spawned, since a child would write to the
+// test runner's streams. Both of a Program's outputs go to one buffer in order:
+// `Terminal.inspect` writes through `console.log`, and `Terminal.print` and
+// `Terminal.write` through the stream.
 async function runBundle(fileName: string): Promise<Array<string>> {
 	let written = ""
 	let log = console.log
@@ -1623,10 +1554,8 @@ const sharedDependency = {
 }
 
 describe("CLI on a Module graph", () => {
-	// The whole graph as one bundle, run. Five files, a cycle among them
-	// and a Namespace reached only through implicit dispatch — and three lines
-	// of output, which is what says every Module body ran exactly once: a
-	// Module the bundle carries two copies of prints six.
+	// The whole graph as one bundle, run: five files, a cycle and a Namespace reached
+	// only by implicit dispatch. Three lines of output show each Module body ran once.
 	it("compiles the Module fixtures into one standalone file and runs it", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "esc-bundle-"))
 
@@ -1650,15 +1579,12 @@ describe("CLI on a Module graph", () => {
 
 			let emitted = readFileSync(outputFileName, "utf8")
 
-			// Standalone: the runtime is inlined and nothing is left to
-			// resolve at run time.
+			// Standalone: the runtime is inlined, and nothing resolves at run time.
 			expect(emitted).not.toMatch(/^import\s/m)
 			expect(emitted).not.toContain("require(")
 
-			// The Bundler labels each Module it inlines with the
-			// specifier it came in under, so the labels are the bundle's own
-			// account of what it carries: five Modules and one prelude, one
-			// copy each.
+			// The Bundler labels each inlined Module with its specifier, so the labels show
+			// five Modules and one prelude, one copy each.
 			expect(
 				[...emitted.matchAll(/^\/\/ (essence:\S+)$/gm)].map(
 					(match) => match[1],
@@ -1682,10 +1608,8 @@ describe("CLI on a Module graph", () => {
 		}
 	})
 
-	// A Diagnostic is rendered against the source it was reported in.
-	// The importer's text at the dependency's line numbers would underline
-	// whatever happens to be written there, which is why every Module carries
-	// its own source through the outcome.
+	// A Diagnostic renders against the source it was reported in, so every Module
+	// carries its own source through the outcome.
 	it("reports a dependency's Diagnostics under the dependency's own name", async () => {
 		await withModules(brokenDependency, async (directory) => {
 			let outcome = await compileFile({
@@ -1705,10 +1629,8 @@ describe("CLI on a Module graph", () => {
 			expect(
 				dependency?.diagnostics.map((diagnostic) => diagnostic.code),
 			).toEqual(["return-type-mismatch"])
-			// The entry's own Diagnostic says why IT did not compile,
-			// which is a thing about the entry rather than a second telling of
-			// the dependency's mistake. It is what the Editor shows over the
-			// import, and `esc` and the Editor answer about a file alike.
+			// The entry's own Diagnostic says why it did not compile, over the import, as
+			// the Editor shows it.
 			expect(
 				entry?.diagnostics.map((diagnostic) => diagnostic.code),
 			).toEqual(["dependency-has-errors"])
@@ -1724,10 +1646,8 @@ describe("CLI on a Module graph", () => {
 		})
 	})
 
-	// `esc check Dep.es Main.es`, where the second imports the first.
-	// Both are entries, so both are compiled — but the graph is one graph, and
-	// the file they share is reported by the outcome that owns it. Counted per
-	// entry instead, a batch says two errors where the reader finds one.
+	// `esc check Dep.es Main.es`, where the second imports the first. Both compile,
+	// but the shared file is reported once, by the outcome that owns it.
 	it("reports a file that is both an entry and a dependency exactly once", async () => {
 		await withModules(brokenDependency, async (directory) => {
 			let report = await checkAsJSON([
@@ -1740,8 +1660,7 @@ describe("CLI on a Module graph", () => {
 
 			let diagnostics = report.files.flatMap((file) => file.diagnostics)
 
-			// Dep.es's own mistake, reported once however many entries
-			// reach it, and Main.es's own answer for why it did not compile.
+			// Dep.es's mistake once, and Main.es's own answer for why it did not compile.
 			expect(
 				diagnostics.map((diagnostic) => [
 					path.basename(diagnostic.file),
@@ -1756,8 +1675,8 @@ describe("CLI on a Module graph", () => {
 		})
 	})
 
-	// The file a Diagnostic belongs to is the file it was written in,
-	// which with Modules is regularly not the file that was compiled.
+	// A Diagnostic belongs to the file it was written in, often not the compiled
+	// one.
 	it("names the file each Diagnostic was written in under --json", async () => {
 		await withModules(brokenDependency, async (directory) => {
 			let report = await checkAsJSON([path.join(directory, "Main.es")])
@@ -1776,8 +1695,8 @@ describe("CLI on a Module graph", () => {
 		})
 	})
 
-	// The entry reaches the broken file only through a facade, and still
-	// answers for itself on the import that leads there.
+	// The entry reaches the broken file only through a facade, and still reports on
+	// the import leading there.
 	it("reports a dependency broken behind a re-export on the entry", async () => {
 		await withModules(
 			{
@@ -1828,9 +1747,8 @@ describe("CLI on a Module graph", () => {
 		)
 	})
 
-	// Both files built in one invocation, so the dependency's typed
-	// Program is the one the entry's graph holds: it is emitted from twice, and
-	// the session simplifies it once.
+	// Both files built in one invocation share the dependency's typed Program, which
+	// is emitted twice and simplified once.
 	it("emits a Module twice over without simplifying it twice", async () => {
 		await withModules(sharedDependency, async (directory) => {
 			let session = createCompileSession([
@@ -1862,9 +1780,8 @@ describe("CLI on a Module graph", () => {
 		})
 	})
 
-	// Which entries a worker is handed together. Workers share nothing,
-	// so an entry that imports another entry belongs in one of them, while an
-	// unrelated file is free to go anywhere.
+	// Which entries a worker gets together: an entry importing another shares its
+	// worker, and an unrelated file may go anywhere.
 	it("gathers the entries whose graphs overlap", async () => {
 		await withModules(
 			{
@@ -1888,10 +1805,8 @@ describe("CLI on a Module graph", () => {
 	})
 })
 
-// The flags are only worth having if they reach the Compiler, so this
-// drives them through the same `compileFile` the commands run and reads the
-// file that comes out. A fixture, rather than a snippet: what the Options have
-// to hold for is a real build.
+// The optimisation flags must reach the Compiler, so this builds a real fixture
+// through `compileFile` and reads the output.
 describe("the optimisation Options", () => {
 	async function build(
 		optimisation: CompileRequest["optimisation"],
@@ -1920,14 +1835,9 @@ describe("the optimisation Options", () => {
 		}
 	}
 
-	// An absence is only the Program's to answer for inside the Program's
-	// own emission. What is read back is the whole BUNDLE — the runtime esbuild
-	// inlined ahead of it — and a runtime Method that builds a List goes on
-	// calling `createList` however the Program was compiled, so a bundle-wide
-	// absence is a claim about which runtime Methods this fixture happens to
-	// reach rather than about the Optimiser. esbuild labels each inlined module
-	// with its path and emits the entry last, so the Essence source's own
-	// emission is everything past the final label.
+	// Only the Program's own emission is checked, since the inlined runtime
+	// calls `createList` however the Program compiled. The bundler labels each
+	// inlined module and emits the entry last, after the final label.
 	function userModuleOf(emitted: string): string {
 		let start = emitted.lastIndexOf("// essence:")
 
@@ -1966,16 +1876,14 @@ describe("the optimisation Options", () => {
 		})
 
 		expect(partial.emitted).toContain("createRecord(")
-		// The pass that was NOT named still ran — read off the Program's
-		// own emission for the same reason as above.
+		// The pass not named still ran, read off the Program's own emission.
 		expect(userModuleOf(partial.emitted)).not.toContain("Object.assign(")
 		expect(partial.printed).toEqual(optimised.printed)
 	})
 })
 
-// What a debug session builds. The Adapter is handed what compiling
-// MEANS, and this is the function that means it — driven here rather than
-// through a spawned adapter, so the claim is about the compile itself.
+// What a debug session builds, driven directly rather than through a spawned
+// adapter.
 describe("the Debug Adapter's compile", () => {
 	it("emits the Program as written", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "esc-dap-"))
@@ -1993,17 +1901,14 @@ describe("the Debug Adapter's compile", () => {
 
 			let emitted = readFileSync(outputFileName, "utf8")
 
-			// The shapes the registry takes away, all still standing —
-			// a debugger steps through Statements, stops on bindings and reads
-			// their values back, and half of the passes exist to drop exactly
-			// those.
+			// The shapes the passes would remove all remain, since a debugger steps through
+			// Statements and reads bindings.
 			expect(emitted).toContain("createRecord(")
 			expect(emitted).toContain("createList(")
 			expect(emitted).toContain("Object.assign(")
 			expect(emitted).not.toContain("$pool_")
 			expect(emitted).not.toContain("$loop_")
-			// And it still runs, and prints what an optimised build of
-			// the same file prints.
+			// It still runs and prints what an optimised build prints.
 			expect(await runBundle(outputFileName)).toEqual([
 				"55",
 				"321",
@@ -2019,11 +1924,9 @@ describe("the Debug Adapter's compile", () => {
 	})
 })
 
-// The two homes a map can have, driven through the same `compileFile`
-// the commands run: `build` writes it beside the output, while `run`'s
-// scratch directory is deleted the moment the program exits — so `run` rides
-// the map inside the bundle, where a stack trace can still be read through
-// it. Either way the map holds Essence sources alone.
+// `build` writes the map beside the output, and `run` inlines it, since its
+// scratch output is deleted when the program exits. Either way the map holds
+// only Essence sources.
 describe("source maps", () => {
 	it("adds --enable-source-maps exactly for Node with a map", () => {
 		expect(runtimeArguments(true, false)).toEqual(["--enable-source-maps"])
@@ -2086,15 +1989,11 @@ describe("source maps", () => {
 	})
 })
 
-// `--embed` builds a Module for a JavaScript host to LOAD rather than a
-// program to run: the runtime bridge goes into the bundle, and the boundary
-// between the two languages is written down beside it. `@essence-lang/client`'s
-// `loadPrebuilt` reads the pair, and its own spec loads what this writes —
-// what is asked here is only that `esc` leaves both halves behind.
+// `--embed` builds a Module for a JavaScript host to load, with the runtime
+// bridge inside and a Descriptor beside it. `loadPrebuilt`'s own spec loads the
+// pair; this only checks `esc` writes both.
 describe("essence build --embed", () => {
-	// A Module of its own rather than a fixture, because every fixture is
-	// a program: importing one to read its bridge off would run it, and print
-	// into the middle of this run's output.
+	// A Module of its own, since importing a fixture program would run it and print.
 	const embeddable = {
 		"Doubling.es": [
 			"implementation {",
@@ -2111,9 +2010,8 @@ describe("essence build --embed", () => {
 		].join("\n"),
 	}
 
-	// The rule stated on this side. `descriptorPath` states it in the
-	// client, and its spec is where the two are held together — it asks `esc`
-	// for a pair and then finds the sidecar with the other spelling.
+	// The rule on this side. `descriptorPath` states it in the client, whose spec
+	// holds the two together.
 	it("names the Descriptor after the bundle", () => {
 		expect(descriptorFileName("dist/app.js")).toBe(
 			"dist/app.descriptor.json",
@@ -2121,8 +2019,8 @@ describe("essence build --embed", () => {
 		expect(descriptorFileName("/build/app.mjs")).toBe(
 			"/build/app.descriptor.json",
 		)
-		// A dot in a directory is not an extension, and a name that is
-		// nothing but one has nothing to replace.
+		// A dot in a directory is no extension, and a name that is only an extension has
+		// nothing to replace.
 		expect(descriptorFileName("/opt/v1.2/app")).toBe(
 			"/opt/v1.2/app.descriptor.json",
 		)
@@ -2154,9 +2052,8 @@ describe("essence build --embed", () => {
 
 			expect(descriptor.exports.doubled?.kind).toBe("function")
 
-			// The bundle itself, imported — the bridge is its DEFAULT
-			// export, and what makes it one is a Type key no other kind of
-			// default export would carry.
+			// The bundle itself, imported: the bridge is its default export, recognised by
+			// its Type key.
 			let bundle = (await import(
 				pathToFileURL(outputFileName).href
 			)) as Record<string, { typeKey?: symbol }>
@@ -2169,11 +2066,8 @@ describe("essence build --embed", () => {
 		})
 	})
 
-	// A graph, so that the Descriptor is written for the ENTRY rather than
-	// for whichever Module the linked list happens to end with. A dependency's
-	// boundary would be a Module a host binds nothing of, and both files export
-	// a name here so that picking the wrong one is a passing compile with a
-	// wrong answer.
+	// A graph, so the Descriptor must describe the entry rather than the last linked
+	// Module. Both files export a name, so picking the wrong one would still compile.
 	it("describes the entry rather than something it imports", async () => {
 		await withModules(
 			{
@@ -2229,9 +2123,7 @@ describe("essence build --embed", () => {
 		)
 	})
 
-	// Off by default, and off means nothing extra written and nothing
-	// extra in the bundle — `esc build` builds a program until it is asked to
-	// build something else.
+	// Off by default: nothing extra is written or bundled.
 	it("leaves a build that did not ask for it alone", async () => {
 		await withModules(embeddable, async (directory) => {
 			let outputFileName = path.join(directory, "out", "Doubling.mjs")
@@ -2257,9 +2149,8 @@ describe("essence build --embed", () => {
 })
 
 describe("essence run", () => {
-	// `--out` may name a directory. What runs has to be the bundle the
-	// compiler actually wrote into it — resolved per file inside the plan —
-	// never the directory path the option was given as.
+	// `--out` may name a directory, so what runs is the bundle the Compiler wrote
+	// into it.
 	it("executes the bundle it wrote into an --out directory", async () => {
 		await withModules(
 			{ "Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n' },
@@ -2292,18 +2183,10 @@ describe("essence run", () => {
 		)
 	})
 
-	// --json changes how the compilation is reported, not what `run`
-	// does — the command documents itself as exiting with the program's own
-	// exit code, with no --json qualification. The program here overflows the
-	// stack at run time, something no Diagnostic can see, so a non-zero exit
-	// can only mean it actually ran.
-	//
-	// Driven as a child process with its streams CAPTURED, like the test
-	// below, rather than through the in-process harness. `run` hands the
-	// program the CLI's own streams, so in-process the overflow's stack trace
-	// landed in this suite's output — eleven lines of `RangeError` in a green
-	// run, which more than one reader has taken for a failing test. Captured,
-	// the trace is evidence the program ran, and it is asserted on.
+	// `--json` changes only how the compile is reported: the exit code is still the
+	// program's. The program overflows the stack at run time, so a non-zero exit
+	// means it ran. It runs as a child with captured streams, so the stack trace is
+	// asserted rather than printed into this suite's output.
 	it("still executes the program and answers its exit code under --json", async () => {
 		await withModules(
 			{
@@ -2350,11 +2233,8 @@ describe("essence run", () => {
 		)
 	})
 
-	// A Module whose TOP LEVEL waits, and an entry that reads what it
-	// waited for. The emitted Modules are ESM, so a top-level `await` in one of
-	// them is awaited by whatever imported it — which is what makes a Constant
-	// a Module completes readable from another Module at all, rather than a
-	// promise the reader would have to know about.
+	// A Module whose top level waits, and an entry reading what it waited for.
+	// Emitted Modules are ESM, so the importer awaits the top-level `await`.
 	it("waits for a Module whose top level completes before the entry runs", async () => {
 		await withModules(
 			{
@@ -2404,8 +2284,7 @@ describe("essence run", () => {
 				)
 
 				expect(result.code).toBe(EXIT_SUCCESS)
-				// The Program's own three lines, after whatever the
-				// command wrote about what it compiled.
+				// The Program's three lines, after what the command wrote about compiling.
 				expect(
 					result.stdout
 						.split("\n")
@@ -2415,11 +2294,8 @@ describe("essence run", () => {
 		)
 	})
 
-	// The one assertion the in-process harness can not make — the
-	// program's streams are inherited, so only a real child process shows
-	// where its printing lands. --json promises stdout carries the report as
-	// a single JSON document and nothing else, so the program's own output is
-	// routed to stderr, and a printing program must not break `… --json | jq`.
+	// Only a real child shows where a program's output lands. Under `--json` it goes
+	// to stderr, so `… --json | jq` still works.
 	it("keeps stdout a single JSON document while the program prints under --json", async () => {
 		await withModules(
 			{
@@ -2434,10 +2310,8 @@ describe("essence run", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
-				// The environment is handed over rather than inherited:
-				// Bun does not carry a `process.env` a spec assigned into a
-				// child, and the bundle cache this suite compiles against is
-				// named by exactly such an assignment.
+				// The environment is passed explicitly, since Bun does not pass a child the
+				// `process.env` assignments that name this suite's bundle cache.
 				let result = await spawnAndWait(
 					[
 						process.execPath,
@@ -2460,9 +2334,8 @@ describe("essence run", () => {
 	})
 })
 
-// What the project file itself reads is the Compiler's own spec. What is
-// here is the half the command line owns: where a setting meets the flag that
-// says the same thing, and what a run does when both were written.
+// The project file's reading is the Compiler's spec. This covers where a setting
+// meets its flag.
 describe("the project's settings against the flags", () => {
 	function withSettings(
 		overrides: (configuration: ProjectConfiguration) => void = () => {},
@@ -2489,9 +2362,7 @@ describe("the project's settings against the flags", () => {
 		)
 	}
 
-	// And which commands ask at all. `check` is about the files it was
-	// handed; the Formatter reads only `exclude`, itself; the two servers are
-	// handed a workspace by the editor, which reads the file itself.
+	// Which commands read the file: not `check`, the Formatter or the servers.
 	it("reads the project file for the commands it speaks to", () => {
 		expect(
 			commands
@@ -2523,10 +2394,8 @@ describe("the project's settings against the flags", () => {
 		).toBe("here")
 	})
 
-	// Collecting coverage compiles the whole project a second way, which
-	// is a choice about a RUN. The format and the directory are facts about the
-	// project, and a project that named one is not a project asking for a
-	// coverage run every time.
+	// Collecting coverage is a choice about one run. A configured format or
+	// directory does not turn it on.
 	it("does not turn coverage on because a format was configured", () => {
 		let configuration = withSettings((settings) => {
 			settings.test.coverage.report = "lcov"
@@ -2591,8 +2460,7 @@ describe("the project's settings against the flags", () => {
 		}
 	})
 
-	// `--no-embed` is offered where `--embed` is, which `run` is not:
-	// what it spawns is a program, and a bundle for a host to import is not one.
+	// `--no-embed` is offered where `--embed` is, which excludes `run`.
 	it("offers each way out beside the flag it undoes", () => {
 		let named = (name: string) =>
 			(findCommand(name) as CommandSpec).options.map(
@@ -2646,10 +2514,8 @@ describe("the project's settings against the flags", () => {
 		).toEqual(["fold-constants", "inline-loops", "pool-constants"])
 	})
 
-	// A configured `out` is a directory, always — a project can not name
-	// one output file for every source it builds — so it arrives spelled the
-	// way `--out` spells a directory. Without the separator a single source and
-	// no `dist` yet would have its bundle written AS `dist`.
+	// A configured `out` is always a directory, so it arrives with a trailing
+	// separator, and a single bundle is never written as `dist`.
 	it("writes bundles where the project says, as a directory", () => {
 		let configuration = withSettings((settings) => {
 			settings.build.out = path.resolve("/project/dist")
@@ -2665,17 +2531,12 @@ describe("the project's settings against the flags", () => {
 	})
 })
 
-// End to end, because the whole point of the settings is that a bare
-// `essence build` in a project obeys them — the file is found by walking up
-// from the working directory, and what it says reaches the compile.
+// End to end: a bare `essence build` finds the project file by walking up from
+// the working directory and obeys it.
 describe("a project's build settings, end to end", () => {
-	// Spawned rather than driven in this process, and pointed at the
-	// directory the build should START in. `process.chdir` would say the same
-	// thing and leave a trap behind: the bundler's own child process is started
-	// once per process and keeps the working directory it was started in, so a
-	// compile driven from inside a directory this spec then removes leaves
-	// every later build in this process resolving against a directory that is
-	// no longer there.
+	// Spawned in the directory the build starts in, not via `process.chdir`.
+	// The bundler's child process keeps the working directory it started in,
+	// so later builds would resolve against a removed directory.
 	async function build(
 		directory: string,
 		essenceArguments: Array<string>,
@@ -2712,8 +2573,7 @@ describe("a project's build settings, end to end", () => {
 		)
 	})
 
-	// And the way out of each of them is a flag on the run, which is why
-	// the negative twins exist at all.
+	// Each setting can be overridden by its negative flag.
 	it("lets one run out of what the project configured", async () => {
 		await withModules(
 			{
@@ -2756,25 +2616,20 @@ describe("a project's build settings, end to end", () => {
 })
 
 describe("essence init", () => {
-	// The Help names the file, and the reader finds it. Two spellings of
-	// one name is a command that documents a file nothing reads.
+	// The Help names the file that is read.
 	it("spells the project file the way the reader does", () => {
 		expect(PROJECT_FILE).toBe(PROJECT_FILE_NAME)
 	})
 
-	// The file marks the project, so what this asserts is where it lands
-	// and that it reads: an `essence.json` the reader could not read would be a
-	// project whose every setting is at its default from the first minute.
+	// The written file lands in the working directory and reads cleanly.
 	it("writes a project file the reader reads back", async () => {
 		await withModules({ "keep.txt": "" }, async (directory) =>
 			within(directory, async () => {
 				let { code, out } = await capture(() =>
 					run(["init", "--no-color"], "essence"),
 				)
-				// Read back through `process.cwd()` rather than through
-				// the directory `withModules` made, which on macOS is the same
-				// place under a different name: /var is a link to /private/var,
-				// and the reader answers with the path it was asked about.
+				// Compared through `process.cwd()`: on macOS `/var` links to `/private/var`, and
+				// the reader answers with the path it was given.
 				let root = process.cwd()
 				let written = path.join(root, "essence.json")
 
@@ -2797,7 +2652,7 @@ describe("essence init", () => {
 		)
 	})
 
-	// What is in the file is a project's own decisions, comments and all.
+	// An existing file holds a project's own decisions, so it is never overwritten.
 	it("refuses a directory that already holds one, and writes nothing", async () => {
 		await withModules(
 			{ "essence.json": `{ "test": { "skipTags": ["slow"] } }` },
@@ -2819,9 +2674,8 @@ describe("essence init", () => {
 		)
 	})
 
-	// A project inside a project is allowed — a package of a monorepo
-	// that runs its own tests is one — and it is also the shape of a mistake,
-	// so it is written AND said.
+	// A project inside a project is allowed, as for a monorepo package, but may be a
+	// mistake, so it is written and reported.
 	it("writes under a project that already governs, and says so", async () => {
 		await withModules(
 			{
@@ -2847,10 +2701,8 @@ describe("essence init", () => {
 	})
 })
 
-// The three reports about a path on the command line. Each of them had
-// the answer in hand and printed none: the directory listing is a `readdirSync`
-// away, the advice about a directory was written into the MESSAGE rather than
-// into a Help, and a permissions refusal said nothing at all.
+// The reports about a path on the command line, each with its Help: a near
+// miss for a missing file, a directory's files, and permissions.
 describe("a path that can not be read", () => {
 	it("should answer a near miss against the files beside it", () =>
 		withFiles(
@@ -2896,9 +2748,7 @@ describe("a path that can not be read", () => {
 			},
 		))
 
-	// The advice moved out of the message, which is the one line a report
-	// repeats everywhere, and into the Help every other Diagnostic here puts it
-	// in.
+	// The advice is a Help, not part of the message.
 	it("should offer the glob for a directory as a Help", () =>
 		withFiles(
 			{ "src/Main.es": "implementation {}\n" },
