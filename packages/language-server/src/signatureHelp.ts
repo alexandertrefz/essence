@@ -1,21 +1,18 @@
-import {
-	caseDefaults,
-	parameterDefaults,
-	requiredParameterCount,
-} from "@essence-lang/compiler/helpers"
+import { requiredParameterCount } from "@essence-lang/compiler/helpers"
 import {
 	describeSignature,
 	type ParameterRange,
 	signaturesOf,
 	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
+import {
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
-import { typedAssertionExpressions } from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { documentAnalysisOf, enrichProbe } from "./moduleLink"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
@@ -433,232 +430,43 @@ type Invocation =
 	| common.typed.FunctionInvocationNode
 	| common.typed.MethodInvocationNode
 
+// The search for the smallest Invocation containing the cursor.
+type Search = {
+	cursor: common.Position
+	best: Invocation | null
+}
+
 function findEnclosingInvocation(
 	nodes: Array<common.typed.ImplementationNode>,
 	cursor: common.Position,
 ): Invocation | null {
-	let best: Invocation | null = null
-	let bestPosition: common.Position | null = null
+	let search: Search = { cursor, best: null }
 
-	function visitBody(body: Array<common.typed.ImplementationNode>) {
-		for (let node of body) {
-			visitNode(node)
-		}
+	for (let node of nodes) {
+		visitNode(node, search)
 	}
 
-	function consider(node: common.typed.ImplementationNode) {
-		if (
-			node.nodeType !== "FunctionInvocation" &&
-			node.nodeType !== "MethodInvocation"
-		) {
-			return
-		}
+	return search.best
+}
 
-		if (!contains(node.position, cursor.start)) {
-			return
-		}
-
-		// A cursor exactly at an Invocation's end has just closed it, so the call
-		// around it is the one being written, unlike what `contains` says.
-		if (isAtOrBefore(node.position.end, cursor.start)) {
-			return
-		}
-
-		if (bestPosition === null || isSmaller(node.position, bestPosition)) {
-			best = node
-			bestPosition = node.position
-		}
+function visitNode(node: TypedNode, search: Search) {
+	if (
+		(node.nodeType === "FunctionInvocation" ||
+			node.nodeType === "MethodInvocation") &&
+		encloses(node.position, search.cursor) &&
+		(search.best === null || isSmaller(node.position, search.best.position))
+	) {
+		search.best = node
 	}
 
-	// A call in a Parameter's default gets help as one in a body does.
-	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
-		for (let defaultValue of parameterDefaults(parameters)) {
-			visitNode(defaultValue)
-		}
-	}
+	forEachTypedChild(node, visitNode, search)
+}
 
-	function visitPresent(node: common.typed.ImplementationNode | null) {
-		if (node !== null) {
-			visitNode(node)
-		}
-	}
-
-	function visitNode(node: common.typed.ImplementationNode) {
-		consider(node)
-
-		switch (node.nodeType) {
-			case "ConstantDeclarationStatement":
-			case "VariableDeclarationStatement":
-			case "VariableAssignmentStatement":
-				visitNode(node.value)
-				return
-			case "FunctionStatement":
-				visitDefaults(node.value.parameters)
-				visitBody(node.value.body)
-				return
-			case "NamespaceDefinitionStatement":
-				for (let property of Object.values(node.properties)) {
-					visitNode(property.value)
-				}
-
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitDefaults(method.value.parameters)
-						visitBody(method.value.body)
-					}
-				}
-
-				for (let shim of node.nativeShims) {
-					visitDefaults(shim.parameters)
-				}
-
-				return
-			case "ProtocolDeclarationStatement":
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitDefaults(method.value.parameters)
-						visitBody(method.value.body)
-					}
-				}
-
-				return
-			case "IfStatement":
-				visitNode(node.condition)
-				visitBody(node.body)
-				return
-			case "IfElseStatement":
-				visitNode(node.condition)
-				visitBody(node.trueBody)
-				visitBody(node.falseBody)
-				return
-			case "ReturnStatement":
-				visitNode(node.expression)
-				return
-			// A call in an assertion gets help too.
-			case "ExpectStatement":
-			case "RequireStatement":
-				for (let expression of typedAssertionExpressions(node)) {
-					visitNode(expression)
-				}
-
-				return
-			case "MethodInvocation":
-				visitNode(node.base)
-
-				for (let argument of node.arguments) {
-					visitNode(argument.value)
-				}
-
-				return
-			case "FunctionInvocation":
-				visitNode(node.name)
-
-				for (let argument of node.arguments) {
-					visitNode(argument.value)
-				}
-
-				return
-			case "Lookup":
-				visitNode(node.base)
-				return
-			case "Combination":
-				visitNode(node.lhs)
-				visitNode(node.rhs)
-				return
-			case "Start":
-			case "Complete":
-				visitNode(node.expression)
-				return
-			case "Match":
-				visitNode(node.value)
-
-				for (let handler of node.handlers) {
-					for (let expression of typedHandlerExpressions(handler)) {
-						visitNode(expression)
-					}
-
-					visitBody(handler.body)
-				}
-
-				return
-			// A call in a `define` arm gets help too.
-			case "Define":
-				for (let expression of defineExpressions(node)) {
-					visitNode(expression)
-				}
-
-				return
-			case "RecordValue":
-				for (let member of Object.values(node.members)) {
-					visitNode(member)
-				}
-
-				return
-			case "ListValue":
-				for (let value of node.values) {
-					visitNode(value)
-				}
-
-				return
-			case "DictionaryValue":
-				for (let entry of node.entries) {
-					visitNode(entry.key)
-					visitNode(entry.value)
-				}
-
-				return
-			case "InterpolatedStringValue":
-				for (let segment of node.segments) {
-					if (segment.kind === "expression") {
-						visitNode(segment.expression)
-					}
-				}
-
-				return
-			case "FunctionValue":
-				visitDefaults(node.value.parameters)
-				visitBody(node.value.body)
-				return
-			case "CaseValue":
-				if (node.value !== null) {
-					visitNode(node.value)
-				}
-
-				return
-			case "ChoiceDeclarationStatement":
-				// A call in a Case payload's default gets help too.
-				for (let defaultValue of caseDefaults(node.cases)) {
-					visitNode(defaultValue)
-				}
-
-				return
-			// A call in a refinement predicate gets help too.
-			case "TypeAliasStatement":
-				visitPresent(node.predicate)
-				return
-			case "Identifier":
-			case "Self":
-			case "StringValue":
-			case "IntegerValue":
-			case "RationalValue":
-			case "BooleanValue":
-				return
-		}
-	}
-
-	visitBody(nodes)
-
-	return best
+// A cursor exactly at an Invocation's end has just closed it, so the call
+// around it is the one being written, unlike what `contains` says.
+function encloses(position: common.Position, cursor: common.Position) {
+	return (
+		contains(position, cursor.start) &&
+		!isAtOrBefore(position.end, cursor.start)
+	)
 }
