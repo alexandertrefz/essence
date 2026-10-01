@@ -3197,17 +3197,28 @@ describe("Parser", () => {
 		})
 
 		// A declaration name is an ordinary Identifier, so no name a Program
-		// could not spell back can be declared.
+		// could not spell back can be declared. Spelled `native`, this block
+		// parses clean.
 		it("should refuse a double underscore in a native free Function's name", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`declarations {
 					§§ Prints a value.
-					function __native <infer Item>(_ value: Item) -> Item
+					overload function __native {
+						(_ value: Integer) -> Integer
+						(_ value: String) -> String
+					}
 				}`,
 				{ allowDeclarationsHeader: true },
 			)
 
-			expect(containsErrors(diagnostics)).toBe(true)
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+				]),
+			).toEqual([
+				["syntax-error", "Expected an Identifier but found '_'."],
+			])
 		})
 
 		it("should still parse a bodied free Function in declarations mode", () => {
