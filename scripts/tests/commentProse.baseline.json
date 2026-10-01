@@ -53,7 +53,6 @@
 	"packages/compiler/src/tests/recordConformance.spec.ts": {"sentence-length": 68, "em-dash": 44, "all-caps": 77, "history": 1, "position": 3, "block-length": 12},
 	"packages/compiler/src/tests/recordConformanceModel.spec.ts": {"sentence-length": 7, "em-dash": 6, "all-caps": 6, "position": 2},
 	"packages/compiler/src/tests/recovery.spec.ts": {"sentence-length": 22, "em-dash": 14, "all-caps": 19, "history": 1, "position": 3, "block-length": 2},
-	"packages/compiler/src/tests/resolvers.spec.ts": {"sentence-length": 36, "em-dash": 30, "all-caps": 24, "history": 6, "position": 4, "block-length": 5},
 	"packages/compiler/src/tests/result.spec.ts": {"sentence-length": 17, "em-dash": 8, "all-caps": 9, "block-length": 2},
 	"packages/compiler/src/tests/returnSynthesis.spec.ts": {"sentence-length": 4, "em-dash": 5, "all-caps": 1, "block-length": 1},
 	"packages/compiler/src/tests/rewriter.spec.ts": {"sentence-length": 41, "em-dash": 39, "all-caps": 18, "history": 5, "position": 1, "block-length": 7},

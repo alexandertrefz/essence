@@ -15,11 +15,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// What the Enricher's name resolution answers — the Scope walks in
-// `resolvers.ts`. Several of the faults below were invisible to every stage
-// before the emitted Program RAN (a specifier resolved to a Namespace the
-// emitted code can not reach, a payload compared without its witness), so those
-// are pinned by running one rather than by asserting on Types.
+// What the Enricher's name resolution answers: the Scope walks in
+// `resolvers.ts`. Some answers show only when the emitted Program runs, so
+// those specs run one.
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
@@ -29,10 +27,8 @@ function codesFor(source: string): Array<string> {
 	return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// The JavaScript a clean Program compiles to. Read directly where the
-// question is what the emitted call SAYS — a witness that never reaches a
-// hidden conformance Parameter is a missing Argument, and the text is where an
-// Argument is either there or not.
+// The JavaScript a clean Program compiles to, read where the question is
+// whether the emitted call passes a witness.
 function emitted(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -46,9 +42,8 @@ function emitted(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `Terminal.inspect` calls run — the same harness `codeGeneration.spec.ts`
-// uses, because the same faults only show up in what the Program prints.
+// Emits the Program, writes it to a throwaway module and imports it, so its
+// top-level `Terminal.inspect` calls run.
 async function run(source: string): Promise<Array<string>> {
 	let javascript = emitted(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-resolvers-"))
@@ -73,10 +68,8 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// The names a JavaScript object carries whether anyone declared them or
-// not. A Scope map indexed plainly answers with `Object.prototype`'s function
-// for every one of them, so each has to be checked rather than `toString`
-// standing in for the family.
+// The names every JavaScript object carries. A Scope map indexed plainly
+// answers each with `Object.prototype`'s function, so each is checked.
 const INHERITED_NAMES = [
 	"toString",
 	"valueOf",
@@ -166,13 +159,8 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// A Namespace's own name is in Scope inside every body it holds, which
-	// is what the emitted `class` says too — its binding is in scope in its own
-	// static initialisers, and its Methods are installed before any of them run.
-	// A static Property's value was the one body that could not see it: it is
-	// enriched while the Namespace Type is still being built, so `Reader.base`
-	// inside `namespace Reader` reported `unknown-name` where the identical
-	// spelling outside resolved.
+	// A Namespace's own name is in Scope inside every body it holds, a static
+	// Property's value included, as in the emitted `class`.
 	describe("A Namespace naming itself", () => {
 		it("reads a static Property written above it", async () => {
 			expect(
@@ -232,10 +220,8 @@ describe("Resolvers", () => {
 	})
 
 	describe("Namespace Specifiers", () => {
-		// The shadow is the whole point — the specifier used to walk past
-		// the Constant to the Namespace outside, so the call type-checked
-		// against a Namespace the emitted `Greeter.greet(…)` could not reach and
-		// crashed at runtime with `5.greet is not a function`.
+		// The Constant shadows the Namespace, so the specifier must not walk
+		// past it to a Namespace the emitted call can not reach.
 		it("should report a specifier shadowed by a Constant", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Greeter for String {
@@ -295,8 +281,7 @@ describe("Resolvers", () => {
 		})
 
 		it("should keep the specifier out of an unqualified call's way", () => {
-			// The control the fault was measured against — the same call
-			// WITHOUT the specifier was always rejected, and stays rejected.
+			// The control: the same call without the specifier is rejected.
 			expect(
 				codesFor(`implementation {
 					namespace Greeter for String {
@@ -338,8 +323,8 @@ describe("Resolvers", () => {
 			Terminal.inspect(ambiguously())
 		}`
 
-		// The control — one solve, below a second conforming Namespace
-		// declared into the same body, is ambiguous.
+		// The control: one solve, below a second conforming Namespace declared
+		// in the same body, is ambiguous.
 		it("should report the ambiguity a body-local Namespace creates", () => {
 			expect(
 				codesFor(
@@ -354,9 +339,8 @@ describe("Resolvers", () => {
 			).toEqual(["ambiguous-conformance"])
 		})
 
-		// And the fault: an EARLIER solve in the same Scope used to leave
-		// a memoised witness behind that the later one reused, so the Namespace
-		// declared in between was silently ignored and the Program compiled.
+		// An earlier solve in the same Scope must not leave a memoised witness
+		// that hides the Namespace declared in between.
 		it("should report it again after an earlier solve in the same Scope", () => {
 			expect(
 				codesFor(
@@ -387,11 +371,9 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// A conditional conformance bounds the Methods that fulfil it, and
-	// hoisting is what puts the Namespace Type into Scope. Until the bounds were
-	// woven while it hoisted, WHERE a use site sat decided which Type it solved
-	// against: one above the Namespace's Statement saw unbounded Methods and
-	// emitted calls that curried no witness, one below saw the bounded ones.
+	// A conditional conformance bounds the Methods that fulfil it, and the
+	// bounds are woven while the Namespace hoists. Use sites before and after the
+	// Namespace solve against the same Type.
 	describe("Conditional Conformance and Declaration Order", () => {
 		let boxes = (order: "above" | "below") => {
 			let use = `function rankBoxes(
@@ -424,10 +406,8 @@ describe("Resolvers", () => {
 			}`
 		}
 
-		// `compare` can not fulfil `Rankable` unconditionally AND carry
-		// the `Comparable` clause's bound — the Method the Protocol promises
-		// takes no witness. Both orders have to say so; the "above" one used to
-		// compile clean and die with `Item__conformance` undefined.
+		// `compare` can not fulfil `Rankable` unconditionally and carry the
+		// `Comparable` clause's bound, since the promised Method takes no witness.
 		it("should reject an unconditional clause the bound Method can not fulfil", () => {
 			expect(codesFor(boxes("above"))).toEqual([
 				"nonconforming-namespace",
@@ -466,10 +446,8 @@ describe("Resolvers", () => {
 			}`
 		}
 
-		// The Protocol is declared BELOW the Namespace here, so the
-		// Namespace can not be checked in the hoist round that reaches it first
-		// — it defers to the next one rather than hoisting a Type whose Methods
-		// have lost their bound.
+		// The Protocol is declared after the Namespace, so the Namespace defers
+		// to the next hoist round rather than losing its bound.
 		it("should weave the bound when the Protocol hoists after the Namespace", async () => {
 			expect(await run(sortable(true))).toEqual(['"Less"', '"Greater"'])
 		})
@@ -479,10 +457,8 @@ describe("Resolvers", () => {
 		})
 
 		it("should curry the Item witness onto the call above the Namespace", () => {
-			// The witness is a constant — a map of Method references, the
-			// same one at every site — so `pool-constants` declares it once and
-			// the call reads it by name. What it is a witness FOR is the
-			// question here, so the map itself is read out of the band.
+			// `pool-constants` declares the witness once and the call reads it
+			// by name, so the pooled map is asserted separately.
 			let generated = emitted(sortable(false))
 
 			expect(generated).toMatch(/Boxes\.rank\(a, b, \$pool_\d+\)/)
@@ -492,22 +468,13 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// An empty List Literal's item Type is Unknown, and `List<ItemType>`
-	// accepts a `List<Unknown>` receiver without binding `ItemType` to anything.
-	// The `where ItemType is Comparable` condition then had no Type to solve, and
-	// was silently dropped: the emitted call handed the fulfilling Method a plain
-	// method map where it expects a curried one. Programs that got away with it
-	// are rejected now — there is no witness to emit for a Type nothing has
-	// pinned down yet.
+	// An empty List Literal's item Type is Unknown, which binds no `ItemType`.
+	// A `where ItemType is Comparable` condition then has no witness to emit,
+	// so the call is refused.
 	describe("Witness conditions over an unpinned item Type", () => {
-		// The witness condition is not what refuses this one any more.
-		// A written List proves it holds items, so the receiver is a
-		// `NonEmptyList<List<Unknown>>` and both `List` and `NonEmptyList`
-		// declare `sort` — and a receiver carrying an Unknown is refused
-		// before the specificity order is asked anything. The mistake and the
-		// fix are the same either way, and the Help names the annotation that
-		// pins the item Type. The witness condition itself is covered by the
-		// sibling below, whose Method only `List` declares.
+		// The receiver is a `NonEmptyList<List<Unknown>>`, and both `List` and
+		// `NonEmptyList` declare `sort`, so the undecided receiver is refused
+		// first. The next spec reaches the witness condition.
 		it("should report sorting a List of empty Lists", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				Terminal.inspect([[], []]::sort())
@@ -528,12 +495,8 @@ describe("Resolvers", () => {
 			).toEqual(["unsatisfied-conformance-condition"])
 		})
 
-		// This one used to compile clean and die reading `compare` off
-		// `undefined` — the items the Program actually sorted were Lists of
-		// Integers whose witness was never curried. The assignment now DECIDES
-		// the Variable's item Type, so the receiver is a List of Lists of
-		// Integers by the time the witness is solved and there is nothing left
-		// unpinned to report.
+		// The assignment decides the Variable's item Type, so the witness is
+		// solved for Lists of Integers.
 		it("should sort a Variable that was only assigned later", async () => {
 			expect(
 				await run(`implementation {
@@ -565,11 +528,8 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// An application is the only place a Generic Alias' bound can be
-	// checked — the body is substituted and gone by the time anything else looks
-	// at it, so `Ranked<Function>` used to hand a Type with no ordering to a
-	// member declared Comparable and be found out at the call that reached for
-	// the witness, if at all.
+	// A Generic Alias' bound is checked where the Alias is applied, since its
+	// body is substituted away afterwards.
 	describe("Type Argument Bounds", () => {
 		let ranked = `protocol Rankable {
 			rank() -> Integer
@@ -623,9 +583,8 @@ describe("Resolvers", () => {
 			).toEqual(["7"])
 		})
 
-		// Every Alias the standard library declares is unbounded, and the
-		// bound check has to cost them nothing — `resolveConformances` answers
-		// before it looks at a single Argument when no Generic carries a bound.
+		// When no Generic carries a bound, `resolveConformances` answers before
+		// it looks at any Argument.
 		it("should leave an unbounded Alias applying to anything", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -647,11 +606,9 @@ describe("Resolvers", () => {
 			Second { b: B }
 		}`
 
-		// `is` reads the same inside a `case #First` as outside it — the
-		// receiver's Type Arguments pin the Parameters its narrowed Type no
-		// longer mentions, instead of being reported as uninferable. Both sides
-		// are the narrowed `@` on purpose: a whole-Choice Argument would mention
-		// every Parameter and bind them by itself, which is what hid this.
+		// The receiver's Type Arguments pin the Parameters its narrowed Type no
+		// longer mentions. Both sides are the narrowed `@`, since a whole-Choice
+		// Argument would bind every Parameter by itself.
 		it("should compare a receiver narrowed to one Case", async () => {
 			expect(
 				await run(`implementation {
@@ -720,9 +677,8 @@ describe("Resolvers", () => {
 			).toEqual(["false"])
 		})
 
-		// The pinned Parameter is a Type Parameter of the enclosing
-		// Function here, not a Type — pinning it hands the enclosing bound's own
-		// witness down, exactly as inferring it did.
+		// The pinned Parameter is the enclosing Function's Type Parameter, so
+		// pinning it hands down that bound's witness.
 		it("should compare a narrowed receiver inside a bounded Function", async () => {
 			expect(
 				await run(`implementation {
@@ -779,10 +735,8 @@ describe("Resolvers", () => {
 				Val { v: T | { code: Integer } }
 			}`
 
-		// Every Record value carries the runtime tag "Record", so the
-		// concrete `{ code: Integer }` arm used to claim the Parameter's values
-		// too and compare them structurally — the custom witness the conformance
-		// solve selected was silently skipped.
+		// Every Record value carries the runtime tag "Record", so the concrete
+		// `{ code: Integer }` arm must not claim the Parameter's values.
 		it("should compare a Parameter's values through their witness", async () => {
 			expect(
 				await run(`implementation {
@@ -800,8 +754,7 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true"])
 		})
 
-		// "List" is the other tag a whole family of Types shares — the same
-		// collision, and the same answer.
+		// "List" is the other tag a whole family of Types shares.
 		it("should compare a Parameter bound to a List through its witness", async () => {
 			expect(
 				await run(`implementation {
@@ -833,9 +786,8 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true"])
 		})
 
-		// A Parameter bound to a Type of another KIND leaves the concrete
-		// arm claiming, so a Record payload still compares structurally and a
-		// String one still goes through the witness.
+		// A Parameter bound to a Type of another kind leaves the concrete arm
+		// claiming its Records.
 		it("should keep a concrete arm that no Parameter collides with", async () => {
 			expect(
 				await run(`implementation {
@@ -857,11 +809,8 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true", "false", "false"])
 		})
 
-		// The other half of the collision, and the one a dropped arm gets
-		// wrong: a `{ code = 3 }` is a value of the arm as DECLARED, and sending
-		// it to the Parameter's witness — written for a Named — read a `name` off
-		// a Record that has none and died in `lowercase`. Both arms have to
-		// keep claiming, each the values whose SHAPE fits it.
+		// A `{ code = 3 }` is a value of the declared arm, not of the
+		// Parameter's witness. Each arm claims the values whose shape fits it.
 		it("should compare the colliding arm's own values structurally", async () => {
 			expect(
 				await run(`implementation {
@@ -883,9 +832,7 @@ describe("Resolvers", () => {
 			).toEqual(["true", "false", "false", "true", "false"])
 		})
 
-		// The same two directions for the "List" tag — a shape is not a
-		// Record's members, it is whatever `isValueOfType` checks, and for a
-		// List that is the items it holds.
+		// For a List the shape `isValueOfType` checks is the items it holds.
 		it("should tell a colliding List arm apart by its items", async () => {
 			expect(
 				await run(`implementation {
@@ -917,9 +864,8 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true", "false"])
 		})
 
-		// Two concrete arms sharing the tag with the Parameter — each is
-		// told apart by its own shape, and a value of one is never a value of
-		// the other.
+		// Two concrete arms sharing the tag with the Parameter are each told
+		// apart by their shape.
 		it("should tell several colliding arms apart by their shapes", async () => {
 			expect(
 				await run(`implementation {
@@ -953,8 +899,7 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true", "false", "false"])
 		})
 
-		// A shape only tells arms apart when the shapes differ — the
-		// member NAMES are not the whole of it, the member Types decide too.
+		// Member Types tell shapes apart as well as member names.
 		it("should tell a colliding arm apart by its member Types", async () => {
 			expect(
 				await run(`implementation {
@@ -986,9 +931,8 @@ describe("Resolvers", () => {
 			).toEqual(["true", "true", "false"])
 		})
 
-		// The genuinely ambiguous Union — the Argument IS the arm, so no
-		// runtime check can tell the two apart. The witness wins, and this
-		// Namespace calls every Code equal to prove which of the two answered.
+		// Where the Argument is the arm, no runtime check tells them apart and
+		// the witness wins. This one calls every Code equal, to show it answered.
 		it("should give an exactly overlapping arm to the witness", async () => {
 			expect(
 				await run(`implementation {
@@ -1016,10 +960,8 @@ describe("Resolvers", () => {
 			).toEqual(["true"])
 		})
 
-		// Record shapes are OPEN — a `{ code: Integer }` arm accepts a
-		// `{ code = 1, name = "A" }` too — so an Argument that REFINES the arm
-		// takes a shape of its own and is ordered ahead of it. Written with the
-		// concrete arm FIRST, so declaration order can not be what saves it.
+		// Record shapes are open, so an Argument that refines the arm is
+		// ordered ahead of it. The concrete arm is written first on purpose.
 		it("should let a refining Type Argument claim before the arm it refines", async () => {
 			expect(
 				await run(`implementation {
@@ -1054,25 +996,14 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// The receiver is built directly and asked of the standard library's
-	// own Namespaces, which is what makes these about resolution rather than
-	// about a Declaration.
-	//
-	// There are two halves and both are load-bearing. A refined receiver
-	// has to keep every Method its base had, or refining a Type would take its
-	// Methods away; and a Namespace written FOR the refinement has to be found,
-	// or refining one would buy nothing. The index buckets Namespaces by the kind
-	// they target, so a refinement that pulled only its own bucket would be a
-	// value with no Methods at all.
+	// A receiver built by hand, asked of the standard library's Namespaces. A
+	// refined receiver keeps every Method its base had and also finds the
+	// Namespaces written for the refinement.
 	describe("Refined receivers", () => {
 		const integer: common.Type = { type: "Integer" }
 
-		// The conjunct names `Integer`, because that is what
-		// `Integer.es`'s own `NonZeroInteger` carries: `isNot` is a Protocol's
-		// PROVIDED Method, and a provided Method stands on the ladder under the
-		// Namespace whose conformance put it in reach. A conjunct spelled any
-		// other way is a different refinement, and the Namespace written for
-		// this one would not be found for it.
+		// The conjunct is spelled as `Integer.es` spells `NonZeroInteger`'s. A
+		// conjunct spelled any other way is a different refinement.
 		const nonZeroInteger: common.Type = {
 			type: "Refinement",
 			name: "NonZeroInteger",
@@ -1110,16 +1041,12 @@ describe("Resolvers", () => {
 			]
 			let base = [...namespacesTargeting(namespaces, integer).keys()]
 
-			// `Integer` out of the kind bucket the base is filed under,
-			// and `Scalar` and `Number` out of the blanket one every lookup
-			// pays for — each target is a Union an Integer is a member of,
-			// which takes a refined Integer through the same widening rule.
+			// `Integer` from the base's kind bucket, and `Scalar` and `Number`
+			// from the blanket one, as Unions an Integer is a member of.
 			expect(base).toEqual(["Integer", "Scalar", "Number"])
 
-			// Evidence ADDS and never takes away, so every Namespace the
-			// base is answered by answers here too — asserted as inclusion
-			// rather than as equality, because the standard library declares one
-			// FOR this refinement and that one is the difference.
+			// Evidence only adds, so every Namespace of the base answers here
+			// too, plus the one declared for the refinement.
 			expect(base.every((name) => refined.includes(name))).toBe(true)
 			expect(refined).toEqual([
 				"Integer",
@@ -1145,20 +1072,16 @@ describe("Resolvers", () => {
 				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
 			]).toContain("NonZeroInteger")
 
-			// And not the other way round — a bare Integer has proven
-			// nothing, so the Namespace that promises more than Integer can does
-			// not answer for it.
+			// A bare Integer has proven nothing, so the refinement's Namespace
+			// does not answer for it.
 			expect([
 				...namespacesTargeting(namespaces, integer).keys(),
 			]).not.toContain("NonZeroInteger")
 		})
 
-		// The same two halves over a GENERIC refinement, and this one needs
-		// no receiver built by hand: `NonEmptyList<String>` is a Type the standard
-		// library declares and a Namespace it declares a Namespace for. The
-		// asymmetry is the whole of what the refinement buys — a List someone
-		// PROVED has something in it reaches the total `firstItem`, and a List
-		// nothing proved anything about reaches only the one answering an Optional.
+		// The same over a generic refinement the standard library declares. A
+		// proven non-empty List reaches the total `firstItem`, and a plain List
+		// only the one answering an Optional.
 		it("should offer a refined List its own Namespace and the base's", () => {
 			let namespaces = stdlibNamespaces()
 			let strings: common.Type = {
@@ -1185,16 +1108,9 @@ describe("Resolvers", () => {
 			]
 			let base = [...namespacesTargeting(namespaces, strings).keys()]
 
-			// `KeyedNumberList` targets `List<ItemType>` too, so every
-			// List reaches it — what makes its aggregates keyed is the
-			// Function they take, not the items. It is offered on both halves
-			// for that reason, and says nothing about the refinement either
-			// way. `GroupedList` is the same shape a second time: the bridge
-			// to a Dictionary is about what a List BECOMES rather than about
-			// what it holds, so its target is the widest one there is.
-			// `NonEmptyKeyedNumberList` and `GroupedNonEmptyList` are that
-			// rule one rung up: each targets any PROVEN List, so both join the
-			// refined half and neither joins the base one.
+			// `KeyedNumberList` and `GroupedList` target every List.
+			// `NonEmptyKeyedNumberList` and `GroupedNonEmptyList` target every
+			// proven List, so they join only the refined half.
 			expect(base).toEqual(["List", "KeyedNumberList", "GroupedList"])
 			expect(refined).toEqual([
 				"List",
@@ -1206,10 +1122,8 @@ describe("Resolvers", () => {
 			])
 		})
 
-		// Conformance is found through the same widening rule, which is why
-		// nothing was written for it: `Integer is Comparable` covers every value a
-		// `NonZeroInteger` can hold, so the witness the base declares is the
-		// witness a refined value passes.
+		// Conformance is found through the same widening rule, so a refined
+		// value passes the witness its base declares.
 		it("should solve a Protocol conformance through the base's Namespace", () => {
 			let solved = solveConformance(
 				nonZeroInteger,
