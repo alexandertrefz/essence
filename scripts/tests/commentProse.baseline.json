@@ -67,7 +67,7 @@
 	"packages/compiler/src/embed/emit.ts": {"sentence-length": 10, "em-dash": 8, "all-caps": 2, "position": 2, "counts": 1},
 	"packages/compiler/src/embed/hash.ts": {"sentence-length": 12, "em-dash": 9, "all-caps": 6, "block-length": 2},
 	"packages/compiler/src/embed/index.ts": {"sentence-length": 30, "em-dash": 28, "all-caps": 19, "history": 1, "block-length": 6, "stacked": 1},
-	"packages/compiler/src/enricher/resolvers.ts": {"sentence-length": 459, "em-dash": 325, "all-caps": 273, "history": 6, "position": 40, "block-length": 108, "counts": 3},
+	"packages/compiler/src/enricher/resolvers.ts": {"sentence-length": 400, "em-dash": 283, "all-caps": 242, "history": 6, "position": 35, "block-length": 96, "counts": 3},
 	"packages/compiler/src/helpers/bounds.ts": {"sentence-length": 2, "em-dash": 1, "all-caps": 2, "position": 1},
 	"packages/compiler/src/helpers/conformance.ts": {"sentence-length": 49, "em-dash": 29, "all-caps": 35, "history": 1, "position": 9, "block-length": 13},
 	"packages/compiler/src/helpers/defaults.ts": {"sentence-length": 17, "em-dash": 12, "all-caps": 10, "block-length": 3},
