@@ -1003,3 +1003,77 @@ division by the same twelve settles a small composite before any modular power i
 
 `compare` stays native rather than going through `Number.compare`. That Method decides every pairing of the numeric
 tower, and would bring the whole tower into any Program that compares two Integers.
+
+## The key encoding
+
+`keyEncoding.ts` reduces a key to a value a JavaScript `Map` or `Set` can find in one step. A Dictionary finds its
+slots by it, and so do the set-shaped List natives and `mode`. It is a module of its own. A Program that asks a
+List for its distinct items then carries none of the Dictionary's store, versions or printing.
+
+Everything rests on one claim: for two keys that both encode, the encodings are `===` exactly when the kind's own
+`is` calls the keys equal. A kind that can not keep the claim answers `null` and takes the scan path, where each
+candidate is asked through the witness. The scan is correct for every key Type, and slower.
+
+- A String encodes as its NFC form, read from `normalisedFormOf`. `stringEquals` decides `String::is` by the same
+  answer, so the encoding and the equality are one function.
+- An Integer encodes as the value it holds, since one Integer has one representation.
+- A Rational encodes by its reduced parts, so `1/2` and `2/4` are one key. A whole Rational encodes as the Integer it
+  equals, so `3` and `3/1` are one key under a `Number` key Type.
+- A Boolean encodes as its value.
+- A Record, a Case or a List encodes as a text when every part of it encodes.
+- Every other kind answers `null`: a Dictionary, an Algebraic, a Transcendental, a Function, and a composite holding
+  one of those.
+
+A text could also be some String's NFC form. So a text travels in a box, `TextKey`, and a store keeps texts in an
+index of their own. One `typeof` routes an encoding to the right index, and a String key, the common one, goes
+straight to the primitive index. Within the text index the kinds differ by their first character. A fraction opens
+with a digit or a sign, a Case with `c`, a Record with `R` and a List with `l`.
+
+### Composite key texts
+
+The text of a composite is injective. Every part is length-prefixed or terminated, so two values spell one text
+exactly when all their parts do. A Record's members are written in sorted order, since `Record::is` ignores order. A
+List's text starts with its item count. Without it `[[], []]` and `[[[]]]` would spell the same text.
+
+A composite is only encoded under a branded witness, which compares these kinds structurally. A List is compared by
+`List::is` as a key, and by `anyIs` inside a Record or a Case payload. The two agree, since a branded item witness is
+`anyIs` for its kind. A composite whose member or item is compared through an unbranded witness, such as an `is` a
+Program writes, takes the scan path.
+
+Three texts are remembered, because a lookup would otherwise spell its key again every time. A payload-free Case
+keeps its text on the shared instance under a Symbol. The head of a Case with a payload, `c<length>:<tag>`, is
+remembered per tag in `caseHeads`. A List keeps its text on the box under a Symbol. A Symbol key is invisible to
+`Object.keys`, which is all the structural comparison and the encoding read.
+
+A List's text can not go stale, because a box's logical items never change. A run may grow, be trimmed or be
+combined, and none of that moves an item the box answers for. A write in place changes a cell an older box views.
+`runsOf` repairs that box to its own items before anyone reads a run of it. `listText` reads through `runsOf`
+rather than `viewOf`, so encoding a key never trims the List it was asked about.
+
+### The structural brand
+
+`encodeKey` encodes only under a witness branded `structural`. The Compiler brands a witness whose equality is the
+standard library's own for the kind. Those are `String`, `Integer`, `Rational`, `Boolean`, `Number`, `Record` and the
+equality derived for a Choice. `List`, `Optional`, `Result` and the derived equality of a generic Choice are branded
+when the witnesses for what they hold are. The lists live in `helpers/conformance.ts` in the Compiler, and a Namespace
+a Program writes is never branded.
+
+That keeps a written `is` from being ignored. A Namespace may call two Strings equal when they differ only in case.
+The canonical encoding would put `"Ada"` and `"ada"` in two slots, and a lookup the witness says holds would miss. An
+unbranded witness answers `null` instead, so the Dictionary is written and read by the scan. A Namespace that writes
+an `is` for a Choice replaces the derived one, and is unbranded by the same rule. The empty literal `[=]` is built
+with a `null` witness, which is never asked, since the Dictionary holds no key.
+
+### Key sets and counts
+
+A `KeySet` is what the set-shaped List natives need of a container: whether a key has been met. It holds the two
+indexes a store holds, `primitives` and `texts`, and `unencoded`, the keys with no encoding. `addKey` answers
+whether the key was new, so a test and an insertion are one lookup.
+
+`keys` holds every key, encoded or not, for a probe with no encoding of its own. One branded witness can cover kinds
+that encode and kinds that do not, as `Number`'s covers Integers and Algebraics. So such a probe is compared against
+every key, not only the unencoded ones, as a Dictionary does in "Finding a Dictionary key".
+
+A `KeyCount` counts each key for `mode`, keeping keys in the order each was first met. It takes no witness. The
+Namespaces that count hold Integers, Rationals or both, whose equality is the standard library's own, and every one
+of those encodes. A key with no encoding there is a mistake in a declaration, and `countKey` throws.

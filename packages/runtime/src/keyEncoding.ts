@@ -9,210 +9,73 @@ import type { StringType } from "./String"
 import { normalisedFormOf } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// THE CANONICAL KEY ENCODING, and the brand that says when a call may
-// use it. It is a module of its own because two containers rest on it and only
-// one of them is a container: `Dictionary.ts` finds a slot by it, and the
-// set-shaped List natives — `removeDuplicates`, `hasDuplicates`,
-// `everyItem(alsoIn:)`, `removeEvery(contentsOf:)` and
-// `contains(everyItemOf:)` — hold their seen keys in plain Sets keyed by it.
-// A List Program that asks one of those questions carries this file and
-// nothing else of the second container: no store, no version stamps, no kind
-// registry and no written form. Measured on the Program
-// `["ada", "bob", "ada", "cy"]::removeDuplicates()::join(with ", ")`, whose
-// answer once came back through a Dictionary: 18,607 bytes then, 12,753 now,
-// against 5,083 for the same Program without the call.
-
-// What a key is reduced to for the Map that finds it in one step. Every
-// kind that has one is encoded into a JavaScript primitive whose `===` — the
-// equality a `Map` decides its keys by — agrees exactly with what that kind's
-// own `is` says. A kind with no such encoding answers `null` and is found by
-// the scan path instead; see `encodeKey`.
+// The canonical key encoding, which Dictionaries and the set-shaped List
+// natives find keys by. See "The key encoding" in DEVELOPMENT.md.
 //
-// Three kinds encode to a TEXT no primitive spells — a non-whole
-// Rational's reduced parts, a Case's tag and payload, a Record's members. Any
-// such text would also be a String key's encoding — every String is a possible
-// one — so it is carried in a box of its own, which a store keeps in an index of
-// its own, keyed by that text. The box is what says which of the two indexes
-// answers for an encoding; it is read with one `typeof`, and a String key,
-// which is the hot one, fails that test in a step and goes straight to a
-// raw-string `Map.get`. Within the text index the three kinds are told apart by
-// their first character: a fraction opens with a digit or a sign, a Case with
-// `c` and a Record with `R` — see `compositeText`.
+// A text travels in a box, so it never meets a String key's encoding.
 export type TextKey = { text: string }
 
 export type EncodedKey = string | number | bigint | boolean | TextKey
 
-// What a bounded Method is handed after its declared Parameters — the
-// conforming Namespace's method map. Only the member each native reads is
-// named, which is what `List.is` and `List.join` name of theirs.
-//
-// `structural` is the one thing a Dictionary asks of a witness that no
-// other native asks: whether the equality it carries is the standard library's
-// own for a kind whose keys encode. The Compiler brands it, and it brands
-// nothing else — see `encodeKey`.
+// The conforming Namespace's method map a bounded Method is handed.
+// `structural` says its equality is the standard library's own. See "The
+// structural brand" in DEVELOPMENT.md.
 export type EquatableWitness<Value extends AnyType> = {
 	is: (first: Value, second: Value) => BooleanType
-	// Named so that a witness may be written down whole, as the generated
-	// conformance and the property-test generators write theirs. Nothing here
-	// reads it: a Dictionary asks whether two keys are one key and never
-	// whether they are not.
+	// Unread here, and named so that a whole witness fits the Type.
 	isNot?: (first: Value, second: Value) => BooleanType
 	structural?: true
 }
 
-// THE CANONICAL KEY ENCODING. The whole of the fast path rests on one
-// claim: for two keys that both encode, the encodings are `===` exactly when
-// the standard library's `is` for that kind says the keys are equal. Every arm
-// below is written to keep that claim, and a kind that can not keep it answers
-// `null` rather than weaken it.
+// INVARIANT: two encodings are `===` exactly when the kind's `is` calls the
+// keys equal. A kind that can not keep that answers `null`.
 export function canonicalEncoding(key: AnyType): EncodedKey | null {
-	// A Function carries no Type key at all — it is emitted as a bare
-	// JavaScript function — so reading the tag off one answers `undefined` and
-	// falls to the scan path below, which is where a value with no equality of
-	// its own belongs.
+	// A Function has no tag, so it falls through to the scan path.
 	let tag = key[typeKeySymbol]
 
 	if (tag === "String") {
-		// The NFC-normalised text, not the raw one. `String.is` is
-		// `compare(to other)::is(#Equal)` in Essence, and `String.compare` is
-		// lexicographic by code point over the NFC-normalised String — so an
-		// accent written as one code point and the same accent written as a
-		// base and a combining mark are one String to the language. Encoding
-		// the raw `.value` would put those two in two slots, and a Dictionary
-		// would then hold a key twice that its own `hasKey` says it holds once.
-		//
-		// `normalisedFormOf` is asked rather than computed: it remembers
-		// the answer on the String value under a Symbol key, and it is the same
-		// answer `stringEquals` — the shortcut the Compiler emits for
-		// `a::is(b)` on two Strings — is decided by. So the encoding and the
-		// equality are literally one function's answer rather than two that
-		// have to agree.
+		// The NFC form, the same answer `stringEquals` decides by.
 		return normalisedFormOf(key as StringType)
 	} else if (tag === "Integer") {
-		// What the Integer holds, untouched. `createInteger`
-		// canonicalises — a number inside ±(2⁵³ − 1), a bigint beyond — so one
-		// mathematical Integer has exactly one representation and `===` on it
-		// is the whole of `Integer.is`. Numbers and bigints are distinct Map
-		// key spaces, which is exactly right: two values spelled in different
-		// representations have different magnitudes and are not equal.
+		// One Integer has one representation, so the value itself is the key.
 		return (key as IntegerType).value
 	} else if (tag === "Rational") {
 		let rational = key as RationalType
 
-		// A Rational holds the parts it was built with — `4/2` holds 4
-		// and 2 — and its `is` cross-multiplies those raw parts, so the
-		// encoding has to be of the reduced form or `1/2` and `2/4` would land
-		// in two slots. A denominator that is already `1n` needs no reduction,
-		// which is the shape a widened Integer arrives in.
+		// The reduced parts, so `1/2` and `2/4` are one key.
 		let parts =
 			rational.denominator === 1n
 				? rational
 				: reduced(rational.numerator, rational.denominator)
 
 		if (parts.denominator === 1n) {
-			// A whole Rational encodes as the Integer it equals, and that
-			// is what makes `3` and `3/1` one key under a covering `Number` key
-			// Type: `Number.is` answers by value across the two kinds, so the
-			// two spellings have to reach one slot. `canonical` is the same
-			// narrowing `createInteger` applies, so the two arms land on the
-			// same primitive for the same value.
+			// The Integer it equals, so `3` and `3/1` are one key.
 			return canonical(parts.numerator)
 		}
 
-		// The reduced parts as text, in the box that sends it to the
-		// store's own text index. The sign is on the numerator, which
-		// `reduced` guarantees, so the text is one per value.
-		//
-		// It was `Symbol.for` — the global Symbol registry answers the
-		// same Symbol for the same text, which is exactly the interning a Map
-		// key wants. What it never does is forget one: every distinct fraction
-		// a Program ever looked a key up by held about 265 bytes for the life
-		// of the process, whether a Dictionary still held it or not. A Map on
-		// the store is interning of the same shape with the same lifetime as
-		// the entries it is about.
+		// The sign is on the numerator, so the text is one per value.
 		return { text: `${parts.numerator}/${parts.denominator}` }
 	} else if (tag === "Boolean") {
 		return (key as BooleanType).value
 	}
 
-	// A Case, a Record or a List encodes as the text `compositeText`
-	// spells, where every part of it encodes, and takes the scan path where one
-	// does not. The rule the whole of this rests on is stated there.
+	// A composite encodes as text when every part of it encodes.
 	let text = compositeText(key, tag)
 
 	if (text !== null) {
 		return { text }
 	}
 
-	// THE SCAN PATH — Dictionaries, Algebraics, Transcendentals,
-	// Functions, a Case, a Record or a List holding one of those, and anything
-	// else. Such a key is found by walking the slots and asking the Equatable
-	// witness, which is correct for every key Type the language has and costs
-	// O(n) for the Types that take it. It is invisible from Essence: the same
-	// Methods answer the same things, only slower.
+	// The scan path, which asks the witness of every candidate.
 	return null
 }
 
-// The text a Case, a Record or a List encodes to, or `null` for a value
-// that is none of those or that holds a part with no encoding. It is only asked
-// under a branded witness, and a branded witness compares these kinds as the
-// text reads: a Record's members and a Case's payload structurally once the tag
-// has decided the Case, and a List's items through a branded item witness. A
-// Record, Case or List that compares a member or item through a witness with no
-// brand, such as an `is` a Program writes (see `Record.es`), has none either,
-// so its keys scan.
-//
-// One text serves two comparisons, which is what makes a List safe to
-// spell in both positions. As a KEY a List is compared by `List::is` through
-// the item witness the Compiler branded; INSIDE a Record or a Case payload it
-// is compared by `anyIs`, the universal structural walk, which asks no witness
-// at all. The two agree wherever the item witness is branded, because a branded
-// witness IS `anyIs` restricted to its kind — that is what the brand means —
-// and where it is not branded no List reaches here in the first place.
-//
-// The text is INJECTIVE over the values that have one: every part is
-// length-prefixed or terminated, so a reader could take it apart again, and two
-// values spell the same text exactly when every part of them does. The members
-// are written in sorted name order, because `Record::is` is order-insensitive
-// and the same two members can arrive in either order. A whole Rational spells
-// the Integer it equals, because the structural comparison calls those equal;
-// a String spells its NFC form, because that comparison does too.
-//
-// A payload-free Case is one interned instance per tag, so its text is
-// remembered on it after the first encoding rather than spelled again on every
-// lookup — a Dictionary keyed by such a Choice is the one most Programs hold,
-// and its lookups are the ones this saves the work on. Measured over 100,000
-// lookups, best of three: on a three-Case Choice the memo answers in 2.93 ms
-// and spelling the text afresh takes 7.26 ms, against 2.54 ms for the scan the
-// encoding replaces; on a twelve-Case one the memo answers in 2.97 ms, the
-// spelling in 6.92 ms and the scan in 8.20 ms. So the encoded path is FLAT in
-// how many Cases the Choice has and the scan is not: at three Cases the two
-// are a wash, and by twelve the encoding is 2.8× ahead. Spelling the text
-// afresh on every lookup costs nearly three times the scan at the narrow
-// width, which is what the memo is for.
-//
-// The memo is bounded by how many unit Case tags the Program constructs,
-// exactly as the instances themselves are, and it sits under a Symbol so that
-// `Object.keys` — which is what the structural comparison and this encoding
-// read the members by — never sees it.
+// A payload-free Case's text, remembered on its shared instance. See
+// "Composite key texts" in DEVELOPMENT.md.
 const unitCaseTextKey: unique symbol = Symbol("unitCaseText")
 
-// The HEAD of a Case's text — `c<length>:<tag>` — remembered per tag. The
-// memo above answers a payload-free Case before this is reached, so what this
-// serves is the Case that CARRIES a payload, whose text has to be spelled
-// afresh on every lookup because the payload is a different value every time.
-// The head is the part of it that never is.
-//
-// It is what makes a SMALL Dictionary keyed by a generic Choice worth
-// encoding at all. Measured over 200,000 lookups of a table of one entry: 44 ms
-// scanning it, 56 ms spelling the head every time, 50 ms reading it here — so
-// the width at which the encoding starts to pay moves from four entries down to
-// three, and every table wider than that is flat where the scan is not.
-//
-// Bounded by how many Case tags the Program encodes a key of, which is
-// the bound the memo above carries too and is fixed when the Program is
-// written. A Map rather than a key on the Case, because the Cases that reach
-// here are fresh values and what is remembered is about their TYPE.
+// The head of a Case's text, `c<length>:<tag>`, remembered per tag for the
+// Cases that carry a payload.
 const caseHeads = new Map<string, string>()
 
 function compositeText(value: AnyType, tag: unknown): string | null {
@@ -278,60 +141,9 @@ function membersText(
 	return `${text}};`
 }
 
-// The text a List encodes to — how many items, then each item's own part
-// text — which is the shape `List::is` decides equality by read out in order:
-// the lengths first, then the items pairwise. A List holding one item with no
-// part text has no text itself and takes the scan path with it, which is what
-// a `List<Number>` holding an Algebraic does.
-//
-// The COUNT is what makes the text injective against its own NESTING. A
-// part is self-delimiting, so a reader could take a text apart again — but
-// with the head alone `[[], []]` and `[[[]]]` both spell three heads and
-// nothing else, and a Dictionary would then hold one slot for two keys its own
-// `hasKey` calls distinct. `l` joins the letters already spoken for by the
-// parts below (`s i r t f`) and by the composites above (`R c`).
-//
-// `runsOf` rather than `viewOf`, for two reasons on top of the one
-// `GroupedList` gives. Encoding a key is a READ that happens on every lookup,
-// and `viewOf` would trim and store back the run Arrays of a List the Program
-// merely asked a question about. And it is the cheaper import: `viewOf` calls
-// `runsOf`, so asking for it would put both functions into every Program
-// holding a Dictionary of ANY key Type — this file is reached by all of them —
-// where `runsOf` alone costs 671 bytes. The two runs are walked directly, as
-// every other native that visits each item once walks them.
-//
-// THE TEXT IS REMEMBERED ON THE BOX, which is the unit-Case memo one kind
-// along and the one place this file holds anything per value. Spelling a key
-// costs O(items) and a lookup spells it afresh, so a key held in a variable and
-// asked about in a loop paid for its whole length at every turn. Measured, best
-// of three alternated passes: one List of 10,000 Integers looked up 10,000
-// times took 3,804 ms and now takes 1; 200,000 lookups over 2,000 two-item keys
-// took 27.0 ms and now take 9.5, which is 4.7× ahead of the Record-keyed twin's
-// 47.4 rather than 1.8× behind it; and a Dictionary of one to eight List keys,
-// where the SCAN it replaces is at its best, went from 16.4 ms to 5.9 against
-// the scan's 12.8 — so the encoded path is ahead at every width instead of
-// behind up to three. A table of 100,000 keys is unmoved (46 ms built, 46 ms
-// read, either way): every key there is spelled twice and the memo answers once.
-//
-// What it costs is a property per box that is ever used as a key —
-// measured at about 3 MB per 100,000 of them — and the text itself is the very
-// String the store's index already holds, not a second copy of it.
-//
-// It can not go stale, and it rests on exactly the invariant the whole
-// two-run representation rests on: a box's LOGICAL ITEMS never change. A run
-// Array may grow, be trimmed, or be replaced by the two runs combined, and none
-// of those moves an item a box has already answered for, which is what THE
-// REENTRANCY RULE in `List.ts` rests on too.
-//
-// That invariant is about the ITEMS rather than about the array, which is what
-// carries it through the in-place positional writes of `listWrites.ts`.
-// `replace` really does write over a cell an older box views, and `runsOf` is
-// what keeps the promise: a box left behind by a write is repaired to its own
-// items — the array copied and the writes made since undone — before any reader
-// is handed a run of it, and the spelling below reads through `runsOf` exactly
-// as every other reader does. So a box keyed before a write and the same box
-// keyed afterwards spell one text, because they hold one set of items; the
-// written box is a DIFFERENT box, and carries a memo of its own.
+// A List's text, its item count and then each item's part, remembered on the
+// box. It can not go stale, since a box's items never change. See "Composite
+// key texts" in DEVELOPMENT.md.
 const listTextKey: unique symbol = Symbol("listText")
 
 function listText(value: ListType<AnyType>): string | null {
@@ -370,16 +182,10 @@ function listText(value: ListType<AnyType>): string | null {
 	return text
 }
 
-// One part of a composite key, spelled so that the parts of one text can
-// not run into each other. The cross-kind rule is the one `anyIs` keeps: an
-// Integer and the whole Rational it equals spell the same text. Collapsing a
-// bigint and a number to one text can not merge two Integers the comparison
-// calls unequal, because `createInteger` gives one mathematical Integer
-// exactly one representation — the same invariant the whole-Integer arm of
-// `canonicalEncoding` rests on.
+// One self-delimiting part of a composite text. A whole Rational spells the
+// Integer it equals, as `anyIs` compares them.
 function partText(value: AnyType): string | null {
-	// A Function carries no Type key — see `canonicalEncoding` — and a
-	// Record that holds one is compared by identity, which no text can spell.
+	// A Function compares by identity, which no text can spell.
 	if (typeof value === "function") {
 		return null
 	}
@@ -409,28 +215,8 @@ function partText(value: AnyType): string | null {
 	return compositeText(value, tag)
 }
 
-// What a call may encode a key by, which is the canonical encoding only
-// where the witness the call was handed is the standard library's own equality
-// for the key's kind. The Compiler brands such a witness `structural` — the
-// conformance resolved to `String`, `Integer`, `Rational`, `Boolean`, the
-// covering `Number` or `Record`, to a refinement of one of those that inherits
-// its `is`, or to the equality the language DERIVES for a Choice — and brands
-// nothing that a Namespace wrote.
-//
-// This is the whole of what keeps a user-written `is` from being ignored.
-// A `namespace Loose for NonEmptyString is Equatable` that calls two Strings
-// equal when they differ only in case is accepted by the Compiler and handed to
-// every Dictionary native as the key witness; encoding by the canonical rule
-// would have put "Ada" and "ada" in two slots and answered nothing for a lookup
-// the witness says holds. An unbranded witness answers `null` here, which is
-// the scan path — every live slot compared through the witness itself — and
-// the scan is what a Dictionary is then both written and read by. A Namespace
-// that writes an `is` for a Choice replaces the derived one and is unbranded
-// by the same rule, so a Case that counts as equal to a sibling is found the
-// way its Namespace says rather than by its tag.
-//
-// A `null` witness is what the empty literal `[=]` is built with. It
-// holds no key, so it never reaches an arm that would compare one.
+// The canonical encoding under a branded witness, and `null` otherwise, so a
+// written `is` is never bypassed. See "The structural brand" in DEVELOPMENT.md.
 export function encodeKey<Key extends AnyType>(
 	key: Key,
 	conformance: EquatableWitness<Key> | null,
@@ -440,22 +226,8 @@ export function encodeKey<Key extends AnyType>(
 		: null
 }
 
-// A COUNT PER KEY over the same encoding, and the second thing a List
-// Method asks of this file: `mode` counts how often each item stands and
-// answers the earliest of the items counted highest. It is the set above with
-// a tally beside each key rather than only the key — `keys` holds one entry per
-// distinct key in the order each was first met, `counts` holds that key's count
-// at the same position, and the two indexes answer WHICH position rather than
-// whether there is one.
-//
-// No witness, because the Namespaces that count are `NonEmptyIntegerList`,
-// `NonEmptyRationalList` and `NonEmptyNumberList` — three concrete Types whose
-// equality is the standard library's own, which is the equality the canonical
-// encoding is written to agree with. Every one of those kinds encodes, so the
-// scan path a `KeySet` keeps for the kinds that do not is a case that can not
-// arise: an unencodable key here is a Namespace declaring `mode` over a kind
-// this file has no encoding for, which is a mistake in the declaration rather
-// than a slower answer.
+// A count per key for `mode`, keys in the order first met. It takes no
+// witness. See "Key sets and counts" in DEVELOPMENT.md.
 export type KeyCount<Key extends AnyType> = {
 	primitives: Map<string | number | bigint | boolean, number>
 	texts: Map<string, number>
@@ -507,24 +279,8 @@ export function countKey<Key extends AnyType>(
 	}
 }
 
-// A SET OF KEYS over the encoding above, and the whole of the second
-// container the set-shaped List natives need. It holds no versions, no
-// insertion order and no values, because none of those questions is asked of
-// it: `removeDuplicates` keeps the ORDER in the answer it is building, and the
-// rest only ever ask whether a key has been met.
-//
-// The three fields mirror a store's three. `primitives` and `texts` are
-// the two indexes an encoding is routed between by one `typeof`, apart for the
-// reason `TextKey` gives — a fraction, a Case and a Record spell texts that a
-// String key could also spell. `unencoded` holds the keys of the kinds that
-// answer no encoding, which are compared through the witness instead.
-//
-// `keys` holds EVERY key, encoded or not, and it is read only by a probe
-// that has no encoding of its own. Such a probe can equal an encoded key —
-// `Number.is` calls the Integer `3` and an Algebraic that reduces to 3 equal,
-// and only one of the two encodes — so a scan that looked at `unencoded` alone
-// would answer `false` for a key the witness holds. It is the same rule
-// `slotHolding` reads its two arms by.
+// The keys a set-shaped List native has met. `keys` holds every key, for a
+// probe with no encoding. See "Key sets and counts" in DEVELOPMENT.md.
 export type KeySet<Key extends AnyType> = {
 	primitives: Set<string | number | bigint | boolean>
 	texts: Set<string>
@@ -545,11 +301,7 @@ export function freshKeySet<Key extends AnyType>(
 	}
 }
 
-// Whether one of the candidates is the key, asked through the witness
-// itself. This is THE SCAN PATH, and it costs the same O(n) a hand-rolled
-// `hasItems(where …)` costs — which is what a key of a kind with no encoding
-// was always going to cost, and is invisible from Essence: the same Methods
-// answer the same things, only slower.
+// The scan path: each candidate asked through the witness.
 function anyMatches<Key extends AnyType>(
 	set: KeySet<Key>,
 	candidates: Array<Key>,
@@ -593,9 +345,7 @@ export function hasKey<Key extends AnyType>(
 	return holds(set, key, encodeKey(key, set.conformance))
 }
 
-// The key put in, and whether it was NEW — which is the whole of what
-// `removeDuplicates` and `hasDuplicates` ask, in one lookup rather than in a
-// membership test followed by an insertion.
+// Adds the key and answers whether it was new, in one lookup.
 export function addKey<Key extends AnyType>(
 	set: KeySet<Key>,
 	key: Key,

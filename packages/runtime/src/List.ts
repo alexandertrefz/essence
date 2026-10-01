@@ -1519,7 +1519,7 @@ export function repeat__overload$2<ItemType extends AnyType>(
 }
 
 // The set-shaped natives walk once with one `KeySet` lookup per item, where a
-// fold on `contains` would be quadratic. See "Finding a Dictionary key" in
+// fold on `contains` would be quadratic. See "Key sets and counts" in
 // DEVELOPMENT.md.
 //
 // The item as its own key, so the bare entries share the `on:` entries' walk.
