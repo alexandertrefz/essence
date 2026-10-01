@@ -1141,8 +1141,8 @@ function validateFunctionDefinition(
 	waitingBodies.push(node.returnType.type === "Future" ? true : "plain-body")
 
 	try {
-		// A default runs in the body's frame when the Function is called, so it
-		// is held to the body's rules, except that it may not wait.
+		// A default runs in the body's frame when the Function is called. It is
+		// held to the body's rules, except that it may not wait.
 		insideBody("parameter-default", () => {
 			for (let defaultValue of parameterDefaults(node.parameters)) {
 				validateExpression(defaultValue)
@@ -3445,9 +3445,9 @@ function matchableArgumentsFromTypedNodes(
 	}))
 }
 
-// Matches the Arguments against the committed Signature, and once more with
-// the bindings read off the call's recorded Type where an undecided slot
-// failed the first match. See "Re-matching a committed call" in DEVELOPMENT.md.
+// Matches the Arguments against the committed Signature. Where an undecided
+// slot failed that, it matches again with bindings read off the recorded Type.
+// See "Re-matching a committed call" in DEVELOPMENT.md.
 function matchCommittedArguments(
 	signature: common.BaseFunction,
 	argumentNodes: Array<common.typed.ArgumentNode>,
@@ -3625,32 +3625,20 @@ function reportIncompleteRecordArgument(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this Record.`],
-			// In the Parameter's declaration order, which is the order
-			// the label and the Help name them in — a scaffold that wrote them
-			// in any other reads as though the Compiler shuffled the Record.
+			// In declaration order, as the Label and the Help name them.
 			data: { kind: "missing-members", names: missing },
 		},
 	)
 }
 
-// "'host', 'retries'" — the spelling every Diagnostic that lists names
-// uses, so a reader meets one shape wherever a set of members is named.
+// "'host', 'retries'", the spelling every Diagnostic uses for a list of names.
 function quotedNames(names: ReadonlyArray<string>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
-// A path key in a Literal that is merged into a default reaches into a
-// member the merge REBUILDS — the callee writes that member out one level down,
-// taking each of ITS members from the Argument or from the default. A member the
-// merge does not rebuild is one the Argument replaces whole, and a path key into
-// one would quietly drop every member it did not write. That is the hole this
-// refuses, and it refuses it by name: the Argument does not fit its position
-// either way, and `argument-type-mismatch` would name the whole Type under the
-// one step that is wrong.
-//
-// The first refusal is the one reported. A path is walked from its root, and a
-// step that reaches nowhere makes every step after it a question about a value
-// that is not there.
+// A path key must reach into a member the default merge rebuilds. Into any
+// other member it would drop every member it did not write. Reports the first
+// failing step by name and answers whether it reported.
 function reportUnmergedPathKey(
 	into: common.Type | common.GenericUse,
 	filled: ReadonlyArray<string> | undefined,
@@ -3669,9 +3657,7 @@ function reportUnmergedPathKey(
 
 		let position = value.memberPositions?.[name] ?? member.position
 
-		// A step the position does not declare at all is a member nobody
-		// has, which `argument-type-mismatch` and `payload-type-mismatch` name
-		// as they name every other one. This is about a member that IS there.
+		// An undeclared member is the business of the Type mismatch reports.
 		if (!Object.hasOwn(into.members, name)) {
 			continue
 		}
@@ -3736,9 +3722,8 @@ function reportUnmergedPathKey(
 			return true
 		}
 
-		// One level down, where every member of the default's Literal is
-		// written out — so a step is refused there for the same reasons and
-		// under the same names.
+		// One level down, every member of the default's Literal is written
+		// out, and the same rules apply.
 		if (
 			reportUnmergedPathKey(
 				declaredType,
@@ -3755,8 +3740,7 @@ function reportUnmergedPathKey(
 	return false
 }
 
-// The same question about a Case's payload, which is merged into its
-// payload default exactly as an Argument is merged into a Parameter's.
+// The same question about a Case's payload and its payload default.
 function reportUnmergedPayloadPathKey(
 	payloadType: common.RecordType,
 	caseType: common.CaseType,
@@ -3792,10 +3776,7 @@ function reportArgumentMismatch(
 	let name = describeParameter(parameter, index)
 
 	if (parameter !== undefined) {
-		// Before the missing-member reading and before the Type is named:
-		// a path key the default does not reach into is the ONE thing wrong
-		// with this Argument, and the whole Type is what every other reading
-		// names.
+		// A path key the default does not reach is reported first, by name.
 		if (
 			reportUnmergedPathKey(
 				parameter.type,
@@ -3824,10 +3805,7 @@ function reportArgumentMismatch(
 
 	let evidence = refinementEvidence(parameter?.type, argumentNode.value)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
-	// The members a partial default fills in are not missing from this
-	// Argument, however little it writes — the merge supplies them. Which is
-	// the same list `missingMembersOf` read a moment ago, asked here of the
-	// Argument that got PAST that reading and is refused for what it wrote.
+	// The members the default fills in are not missing from the Argument.
 	let record =
 		parameter === undefined
 			? null
@@ -3888,10 +3866,8 @@ function reportArgumentMismatch(
 	)
 }
 
-// An Argument the default's members WOULD have covered, refused only for
-// being written as something other than a Record literal. Its Type reads like a
-// perfectly good partial, so nothing the Diagnostic says about Types can explain
-// the refusal — the rule has to be named.
+// Names the rule for an Argument the default would have completed, refused
+// only for not being written as a Record literal.
 function partialSpellingEvidence(
 	parameter: common.Parameter | undefined,
 	argumentNode: common.typed.ArgumentNode,
