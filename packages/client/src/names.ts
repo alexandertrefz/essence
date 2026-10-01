@@ -1,20 +1,15 @@
-// What JavaScript will let a name be — the rules a GENERATED file has to
-// obey, wherever one is generated. A declaration file names an export and a
-// wrapper Module binds one, and both meet the same Essence: `ok?` is an export
-// nothing can be spelled after, `default` is a word nothing can be named.
+// The names JavaScript allows in a generated file. A declaration file names an
+// export and a wrapper Module binds one, and an Essence name such as `ok?` or
+// `default` can be neither.
 //
-// The Rewriter's `escapeName` answers a related question and not this one.
-// It decides what the BUNDLE binds a name as, and a generated file has to spell
-// the name a host actually imports — so a wrapper reads `$module["ok?"]` and
-// exports it under the string, rather than renaming the Module's exports to
-// whatever JavaScript found easier.
+// The Rewriter's `escapeName` picks the name the bundle binds. A generated file
+// spells the name a host imports, so a wrapper exports `$module["ok?"]` under
+// the string.
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 
-// The words a declaration can not be named after. Deliberately the whole
-// reserved set rather than the subset that happens to be illegal in each
-// position — a generated file is read at least as often as it is compiled, and
-// `let let` is not worth the two names it saves.
+// The words no generated name may be. The whole reserved set applies in every
+// position, rather than the subset each position forbids, so the rule stays one.
 const RESERVED_WORDS = new Set([
 	"arguments",
 	"await",
@@ -66,9 +61,8 @@ const RESERVED_WORDS = new Set([
 	"yield",
 ])
 
-// TypeScript's own Type names on top of those. `type string = …` declares
-// a name nothing can refer to afterwards, so a Module exporting one is left
-// undeclared rather than declared unreachably.
+// TypeScript's own Type names. `type string = …` declares a name nothing can
+// refer to, so an exported Type of that name is left undeclared.
 const TYPE_KEYWORDS = new Set([
 	"any",
 	"bigint",
@@ -90,16 +84,14 @@ export function isTypeName(name: string): boolean {
 	return isValueName(name) && !TYPE_KEYWORDS.has(name)
 }
 
-// A member of an object — written plainly where it can be, quoted where
-// it can not. `toString` is an ordinary member name and `ok?` is a string.
+// A member of an object, quoted unless it is a value name.
 export function memberName(name: string): string {
 	return isValueName(name) ? name : JSON.stringify(name)
 }
 
-// A local binding for a name JavaScript can not spell — `ok?` becomes
-// `ok_3f_`, which is a name, and the export it hangs off carries the real one as
-// a string. Every character JavaScript refuses is spelled as its code point, so
-// two names can not mangle to one.
+// A local binding for a name JavaScript can not spell: `ok?` becomes `ok_3f_`.
+// Each refused character is spelled as its code point between underscores. An
+// Essence name holds no underscore, so no two names mangle to one.
 export function mangled(name: string): string {
 	return [...name]
 		.map((character) =>

@@ -1,15 +1,9 @@
 import type { RuntimeBridge } from "@essence-lang/compiler/embed/bridge"
 
-// The bridge read back off an imported bundle — the half of it that needs
-// no Compiler, and so the half that may be imported by a path that must not have
-// one. Putting a bridge INTO a bundle is emit-time work and lives in the
-// Compiler, at `@essence-lang/compiler/embed/bridge`, which says why a bundle
-// carries one at all.
-//
-// One name to read, because the bridge is the bundle's DEFAULT export.
-// That is what keeps this side free of the table the other side is written out
-// of: a second copy of which Function is bound under which name is the only way
-// the two could ever come apart, and there is no second copy of one name.
+// Reads the runtime bridge back off an imported bundle, which needs no
+// compiler. The compiler writes the bridge in `@essence-lang/compiler/embed/bridge`.
+// It is the bundle's default export, so this side keeps no table of names that
+// could disagree with the one the bundle was written from.
 export type {
 	EssenceValue,
 	FutureContext,
@@ -21,11 +15,8 @@ export function runtimeBridgeOf(
 ): RuntimeBridge {
 	let bridge = namespace.default
 
-	// The Type key is what is checked, rather than every member in turn: it
-	// is the one member no other kind of default export would carry, and a
-	// missing member past it would be a Compiler bug rather than a bundle built
-	// some other way. Saying so out loud beats a `TypeError` about `undefined`
-	// from whichever constructor a caller happened to reach for first.
+	// Only the Type key is checked. No other kind of default export carries
+	// one, and a bridge missing a later member would be a compiler bug.
 	if (
 		bridge === null ||
 		typeof bridge !== "object" ||
