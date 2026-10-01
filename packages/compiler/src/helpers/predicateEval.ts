@@ -10,50 +10,9 @@ import {
 	provenConjuncts,
 } from "./types"
 
-// Whether a value is admitted into a refinement by DECIDING its predicate
-// here, while compiling. A refinement normally needs a branch in front of it —
-// something has to have asked the question — but a value written DOWN needs
-// nobody to ask: `constant d: NonZeroInteger = 3` is a NonZeroInteger because 3
-// is not zero, and the Compiler can see that as plainly as a reader can. The
-// same question is asked of an Argument, of a returned value, and of a declared
-// Property.
-//
-// Nothing here reports. A value that is not admitted is a value the ordinary
-// mismatch belongs to, and that Diagnostic is written where the value stands,
-// with `describePredicate` below naming what went unanswered.
-//
-// Only a written LITERAL is admitted. Anything else would have to be
-// evaluated, and evaluating Essence while compiling means an interpreter, a fuel
-// budget and a second implementation of every native — so what is here instead
-// is an ALLOWLIST: a table of predicates whose meaning is written out over
-// JavaScript scalars, keyed by the Namespace that answered and the Method. A
-// conjunct the table does not name is not admitted, and that is the whole of the
-// failure mode: the Program says what it always said, and the value goes through
-// a branch.
-//
-// The key can be trusted because the Namespaces it names are the standard
-// library's and a Program can not redeclare one — `namespace Integer for
-// Integer` is refused for the name alone, which is already declared. So an
-// `Integer::isNot` conjunct is the standard library's `isNot` and no other, and
-// the meanings below are its meanings, read off its bodies.
-//
-// The Overload is no part of a conjunct at all. An Overload is told apart by the
-// Arguments it takes, and an entry that can not decode the Arguments it was
-// given refuses — which is how `@::isLessThan(1/2)`, Integer's Rational
-// Overload, falls out here rather than being compared as though the bound were
-// an Integer.
-//
-// The table is over the PRIMITIVES alone, because a conjunct is stored
-// resolved: `isZero` arrives as `is`, `hasCharacters` as a negated `isEmpty`,
-// `isGreaterThanOrEqualTo` as a negated `isLessThan` over the bound the call
-// wrote. Every Method the standard library writes on another one is gone by the
-// time a value is asked about it, and what is left is the handful of questions
-// that read a value directly.
-//
-// Which Methods those are is read off their BODIES rather than named anywhere,
-// so the list is not a promise this file may keep on its own: the census in
-// `stdlibLoader.spec.ts` is the whole of it, and a body rewritten to stop
-// forwarding puts a question here that nothing can decide.
+// Whether a written value is admitted into a refinement by deciding its
+// predicate while compiling, through a table of the standard library's
+// primitives. See "Deciding a written value" in DEVELOPMENT.md.
 function admittedByEvaluation(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
@@ -61,22 +20,9 @@ function admittedByEvaluation(
 	return admissionOfWrittenValue(value)?.(refinement) ?? false
 }
 
-// The Type a written value is admitted AT, given the Type its position
-// asks for — which is the question every site below really has, since a position
-// naming a refinement wants the refinement back to match its Parameter by.
-// `null` is "nothing here was decided": the position asks for no evidence, or
-// the value did not answer what it asked.
-//
-// A written LIST is asked item by item. The two List predicates read the
-// count and nothing else, so `[[1], [2, 3]]` is a `List<NonEmptyList<Integer>>`
-// for the same reason `[1]` is a `NonEmptyList<Integer>` — the brackets are
-// right there, one pair per item. What comes back is a List of what the ITEMS
-// decided rather than of what the position asked, so a position whose item Type
-// is still binding Type Parameters gets the instantiation the values made.
-//
-// An item that decides nothing has to fit as it stands, which is what refuses
-// an empty one and refuses an opaque one BY TYPE: `[[1], made()]` is admitted
-// exactly when `made()` already answers a `NonEmptyList`.
+// The Type a written value is admitted at, given the Type its position asks
+// for, or null where nothing was decided. Lists and Dictionaries are asked part
+// by part. See "Containers" in DEVELOPMENT.md.
 export function admittedTypeOf(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -116,22 +62,13 @@ export function admittedTypeOf(
 		itemTypes.push(decided ?? item.type)
 	}
 
-	// The empty written List decides nothing and needs to: its item Type
-	// is Unknown, which every List Type already accepts.
+	// An empty written List decides nothing, and its `Unknown` item fits anyway.
 	return itemTypes.length === 0
 		? null
 		: { type: "List", itemType: buildUnion(itemTypes) }
 }
 
-// The written Dictionary asked the same question the written List is
-// asked, once per SLOT: `["a" = [1]]` is a `Dictionary<String,
-// NonEmptyList<Integer>>` because the brackets around the `1` are right there,
-// one pair per entry. Both slots are walked rather than only the values,
-// because a key is a written Expression in exactly the way a value is and
-// nothing about the shape says otherwise.
-//
-// The empty Dictionary decides nothing, exactly as the empty List does — both
-// slots are Unknown, which every Dictionary Type already accepts.
+// A written Dictionary, asked as a written List is, key and value per entry.
 function admittedDictionaryTypeOf(
 	expected: common.DictionaryType,
 	value: common.typed.DictionaryValueNode,
@@ -172,9 +109,8 @@ function admittedDictionaryTypeOf(
 	}
 }
 
-// Whether a written value fits where it stands — assignability, plus the
-// evidence a written value carries of its own. Every position that measures a
-// value against a Type it did not resolve asks this rather than `matchesType`.
+// Whether a written value fits where it stands: assignable, or admitted. A
+// position measuring a value against a Type it did not resolve asks this.
 export function fitsWritten(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -185,11 +121,8 @@ export function fitsWritten(
 	)
 }
 
-// Whether a position asks a written value for evidence at all — the one
-// cheap question every Argument is asked before anything is read or memoised.
-// Down the List spine only: an item is a position a written List has a Node
-// for, and a Record's or a Case's member is one this would have to learn to
-// read before it could ask.
+// Whether a position asks a written value for evidence at all, checked before
+// anything is read. Only List items and Dictionary slots are looked down.
 export function refinementInside(type: common.Type): boolean {
 	return (
 		type.type === "Refinement" ||
@@ -200,31 +133,23 @@ export function refinementInside(type: common.Type): boolean {
 	)
 }
 
-// What a written part that did not fit is reported as — the part, the
-// question it left unanswered, and WHAT it is inside the value it was written
-// in. `part` is what a Diagnostic calls it: a List holds items, a Dictionary
-// holds keys and values, and calling a key an item is calling it the wrong
-// thing in a message whose whole job is to say which one it is.
+// A written part that did not fit, the question it left unanswered, and what
+// it is in its container, so a Diagnostic calls a key a key.
 type UnadmittedWrittenPart = {
 	value: common.typed.ExpressionNode
 	refinement: common.RefinementType
 	part: "item" | "key" | "value"
 }
 
-// The first written part that did not answer the question its position
-// asks, and that question — what a Diagnostic points at when a written
-// container is refused for something inside it. `null` where the refusal is
-// about the container itself, which is what every site already reports.
+// The first written part that did not answer its position's question, or null
+// where the refusal is about the container itself.
 export function unadmittedWrittenItem(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
 ): UnadmittedWrittenPart | null {
 	let container = expected.type === "Refinement" ? expected.base : expected
 
-	// A Dictionary's entries are walked in written order and each entry
-	// KEY before its value, so the report points at the first thing a reader
-	// would have written — the same rule as a List's items, over two slots
-	// instead of one.
+	// Entries in written order, each key before its value.
 	if (
 		container.type === "Dictionary" &&
 		value.nodeType === "DictionaryValue"
@@ -269,13 +194,8 @@ export function unadmittedWrittenItem(
 	return null
 }
 
-// The deepest thing inside a part that did not fit, or the part itself
-// where the slot named a refinement. `null` where the slot named none, which is
-// the refusal every site already reports about the whole value.
-//
-// A part deeper in carries ITS own word — the offending value of a Dictionary
-// inside a List is a value and not an item — so the name travels with whatever
-// the walk finally points at rather than with where the walk started.
+// The deepest thing inside a part that did not fit, named by its own word, or
+// the part where the slot named a refinement. Null where the slot named none.
 function unadmittedWrittenPart(
 	expected: common.Type,
 	part: common.typed.ExpressionNode,
@@ -289,15 +209,8 @@ function unadmittedWrittenPart(
 	)
 }
 
-// The same question asked of MANY refinements at once, with the value read
-// only once. A Method receiver is the one position nothing hands an expected
-// Type — it is typed bottom-up and Namespace lookup runs from whatever that came
-// to — so it asks every refinement in scope instead of one, and reading a written
-// List's items again per candidate is work the answer does not depend on.
-//
-// `null` is "not a value the Compiler can see written", which is the receiver's
-// first question and the cheapest: a receiver the table can not read costs one
-// switch and no candidate walk at all.
+// The admission question for many refinements, reading the value once, for a
+// Method receiver. Null where the value is no Literal the table can read.
 export function admissionOfWrittenValue(
 	value: common.typed.ExpressionNode,
 ): ((refinement: common.RefinementType) => boolean) | null {
@@ -307,15 +220,8 @@ export function admissionOfWrittenValue(
 		return null
 	}
 
-	// The base is asked as well as the predicate. `["a"]::hasItems()` is
-	// true of a List of Strings and says nothing whatever about the
-	// `List<Integer>` a refinement of that base demands — the conjuncts alone
-	// would admit it.
-	//
-	// Asked as a WRITTEN value, so a base that names a refinement of its
-	// own reaches the items — `NonEmptyList<NonEmptyList<Integer>>` proves its
-	// own count here and asks the base for each item's. A base naming no
-	// refinement costs the one `matchesType` it always cost.
+	// The base is asked too, as a written value: `["a"]::hasItems()` says nothing
+	// about a `List<Integer>` base.
 	return (refinement) =>
 		fitsWritten(refinement.base, value) &&
 		provenConjuncts(refinement).every(
@@ -323,47 +229,16 @@ export function admissionOfWrittenValue(
 		)
 }
 
-// The refinement a written value is asked ABOUT, where the position it
-// stands at has not finished saying what it is. A Parameter written
-// `NonEmptyList<Item>` in a signature that infers `Item` is not a Type until
-// something decides that Parameter, and while an Argument is being matched
-// nothing has: the base is `List<Item>`, which no written List is ever of, so the
-// question above could not be asked at all and every literal was refused.
-//
-// So it is asked of the refinement the value itself DECIDES — the declared base
-// unified against the value's own Type, substituted through. `["a"]` decides
-// `Item` as String and answers `hasItems` about a `List<String>`, which is the
-// same question a `NonEmptyList<String>` Parameter would have asked outright.
-//
-// A unification that leaves one Parameter undecided is no question to ask: an
-// empty List's `List<Unknown>` is accepted by `List<Item>` without saying what
-// `Item` is — the Unknown is a slot nothing has filled — and a refinement over a
-// base nobody decided would hand the call a Type nobody wrote. The same rule
-// `instantiatedRefinementFor` establishes a narrowing by, for the same reason.
-//
-// The Parameters asked about are the ones the BASE names, which is what a value
-// can decide anything about. An Alias' Parameter the base does not mention is
-// nothing this value was ever going to answer for — it stays open, and the call
-// reports it uninferable exactly as it does for an unrefined signature. A
-// narrowing demands all of them because there is no call behind it to report
-// anything: the branch either establishes a whole Type or none.
-//
-// This is what the value is asked about and NOT what it may answer with.
-// The bindings are worked out in a Map of this call's own, so a losing Overload
-// probe leaves nothing behind; and the instantiation is handed back to
-// `matchTypes` against the Parameter as DECLARED, which binds an `infer`
-// Parameter through the base — never to the refinement, the v1 rule — and refuses
-// an opaque one outright. A `Filled<Item>` whose `Item` belongs to the enclosing
-// Declaration accepts no `Filled<String>`, so a written value proves nothing
-// there, exactly as it should not.
+// The refinement a written value is asked about where the position's own Type
+// Parameters are not decided yet, or null where the value leaves one open. See
+// "Generic refinements" in DEVELOPMENT.md.
 export function refinementDecidedBy(
 	refinement: common.RefinementType,
 	valueType: common.Type,
 ): common.RefinementType | null {
 	let parameters = genericNamesMentioned(refinement.base)
 
-	// Every non-generic refinement, which comes back as ITSELF — the
-	// question a `NonZeroInteger` Parameter asks is the one it was written as.
+	// A non-generic refinement comes back as itself.
 	if (parameters.size === 0) {
 		return refinement
 	}
@@ -385,32 +260,10 @@ export function refinementDecidedBy(
 	return instantiated.type === "Refinement" ? instantiated : null
 }
 
-// The predicate spelled back out of the conjuncts, for the Diagnostic that
-// has to name the question a value did not answer. The typed predicate
-// Expression lives on the Type Alias Statement it was written on, and nothing
-// reporting about a refinement has that Node in hand, so what is printed is the
-// CANONICAL form: the conjuncts in the order they are compared, joined the way a
-// chain is written.
-//
-// An Argument LABEL is no part of what makes two conjuncts the same question,
-// so the KEY does not keep it — but the spelling does, and the text reads
-// `@::isBetween(0, and 9)` exactly as the clause was written. A `match` guard is
-// spelled `case Integer where @::isBetween(0, and 9)`, `@` and all, so a Help
-// that dropped the label offered something no Overload answers.
-//
-// A leaf is stored RESOLVED — `@::hasCharacters()` is `String::isEmpty`
-// negated — and what is printed is the name it was WRITTEN as, which the leaf
-// carries for this one purpose. A reader is told the predicate they wrote and
-// not the Method the standard library wrote it on top of. A leaf nobody wrote
-// carries no spelling, and those are exactly the synthesized ones — a
-// complement, a Matcher's `case 0` — which no Diagnostic ever names.
-// Folded from the FIRST conjunct rather than from a seed, because a
-// refinement proving nothing does not exist: a predicate spells one leaf or a
-// conjunction of leaves, so the set is never empty, and the unresolved case is
-// refused by `provenConjuncts` before it gets here. A seeded fold would have to
-// name a `first` that the Type system, with no index checking, calls a String
-// whether one is there or not — and would answer the Diagnostic the text
-// "undefined" for a refinement nobody can write.
+// The predicate spelled back out of its conjuncts for a Diagnostic, as each was
+// written, joined as a chain. See "The literal table" in DEVELOPMENT.md.
+// INVARIANT: a refinement holds at least one conjunct, so the `reduce` needs no
+// seed.
 export function describePredicate(refinement: common.RefinementType): string {
 	return provenConjuncts(refinement)
 		.map(spellConjunct)
@@ -423,18 +276,14 @@ function spellConjunct(conjunct: common.PredicateConjunct): string {
 		.map(spellArgument)
 		.join(", ")})`
 
-	// A spelling is written the way it was asked, so the flag is already
-	// in the name and adding anything would be saying it twice. Only a leaf
-	// nobody wrote can reach the negation here, and it prints as the Essence a
-	// reader would have to write for it.
+	// A spelling already carries its negation in its name. Only a conjunct nobody
+	// wrote prints `::negate()`.
 	return conjunct.negated && conjunct.spelling === undefined
 		? `${call}::negate()`
 		: call
 }
 
-// An Argument as it was written — the scalar under the label the call put
-// in front of it, and the scalar alone where it wrote none. A leaf nobody wrote
-// carries its bare scalars here, which is what a synthesized conjunct has.
+// An Argument as written: its scalar, after its label where it has one.
 function spellArgument(
 	argument: common.PredicateSpellingArgument | string | boolean,
 ): string {
@@ -443,53 +292,14 @@ function spellArgument(
 		: spellScalar(argument)
 }
 
-// A String Argument arrives already quoted — that is what tells `1` from
-// `"1"` in the key — and every other scalar is bare digits, a fraction or a
-// Boolean. So the scalar IS its own spelling, and the only one that has to be
-// made into text is the Boolean.
+// A String Argument arrives quoted, so only a Boolean needs making into text.
 function spellScalar(scalar: string | boolean): string {
 	return typeof scalar === "boolean" ? String(scalar) : scalar
 }
 
-// A written value as the JavaScript the table below compares — a bigint
-// for an Integer, because that is what an Integer is at run time and what its
-// digits mean, and a PAIR of them for a Rational, kept in lowest terms with the
-// sign on the numerator, because that is what a Rational is at run time and
-// what `1/2` and `2/4` both mean.
-//
-// A List is admitted by its LENGTH. `[x, y]` holds exactly two items whatever
-// `x` and `y` turn out to be: a List literal is a bracketed list of
-// Expressions, the grammar has no spread, and so nothing a Program can write
-// makes a written List's length depend on what stands inside it. The two List
-// predicates are `isEmpty` and `hasItems`, which read that count and nothing
-// else. So an item is KEPT where it is written out and stands OPAQUE where it
-// is not, and the List around it counts the same either way.
-//
-// This was once "a List counts as written when its items are written too",
-// which refused `[{ x = 1 }]` for holding a Record — a value written down as
-// plainly as any other, in a position where nothing was ever going to ask what
-// was in it. What that rule was really guarding is still guarded, and by the
-// Type rather than by care: `Opaque` is a kind of its own, every reader below
-// asks for the kind it wants, and so a predicate that ever reads an ITEM
-// answers `null` for an opaque one and refuses — exactly as it does for a value
-// of the wrong shape.
-//
-// Only an ITEM is ever opaque. `literalValueOf` answers `null` for an
-// Expression it can not read, and `admittedByEvaluation` refuses on that before
-// a single conjunct is asked: a value the Compiler can not see at all is not a
-// value it may decide anything about, and a List is the one shape it can see
-// something about without seeing the whole of it.
-//
-// `whole` is what tells a written Dictionary from an UPDATE of one. A
-// literal names every entry it holds; an update names the entries it sets and
-// stands on a base whose own entries the Compiler can not see. So an update's
-// brackets are a LOWER BOUND — at least these entries, and whatever the base
-// holds besides — and the flag is what keeps every reader of one from mistaking
-// it for the other. Only a question the bound alone decides may be asked of a
-// value that is not whole, which is what `isEmpty` checks before it answers: a
-// Dictionary with an entry written into it is not empty however many the base
-// held, and a Dictionary with none written into it is a question about the
-// base, which is not here.
+// A written value as the scalars the predicate table compares. A List's or a
+// Dictionary's unreadable part is `Opaque`, and `whole` tells a Literal from an
+// update. See "The literal table" in DEVELOPMENT.md.
 type LiteralValue =
 	| { kind: "Integer"; value: bigint }
 	| { kind: "Rational"; numerator: bigint; denominator: bigint }
@@ -500,39 +310,25 @@ type LiteralValue =
 
 type LiteralItem = LiteralValue | { kind: "Opaque" }
 
-// One written entry, both halves read as items — a key or a value the
-// Compiler can not see is opaque exactly as a List's item is, and for the same
-// reason: what the brackets say is how many entries there are, whatever stands
-// inside them.
+// One written entry, each half read as a List item is.
 type LiteralEntry = { key: LiteralItem; value: LiteralItem }
 
 const OPAQUE_ITEM: LiteralItem = { kind: "Opaque" }
 
-// `null` is "not a shape this entry can decide" — the wrong kind of value,
-// or Arguments it can not read — and is what makes the table refusable entry by
-// entry rather than by a second list of shapes each entry accepts.
+// Null where the entry can not decide this value or read these Arguments.
 type PredicateEvaluator = (
 	value: LiteralValue,
 	args: Array<string | boolean>,
 ) => boolean | null
 
-// The comparisons are declared once by `Comparable`, which provides them
-// for every numeric kind, and AGAIN on Integer, where the same-kind entry is
-// written on the same-kind native — a performance stratification the standard
-// library explains at length. Either way the conjunct names the NAMESPACE whose
-// conformance answered: an Integer receiver's `isLessThan` is Integer's own
-// entry and its `isBetween` is the one Orderable provides through Integer's
-// conformance, and both are `Integer::…` here. Both spellings are the same
-// question about the same two integers.
+// The comparisons over Integers, keyed by the Namespace whose conformance
+// answered, whether Integer wrote the entry or `Orderable` provides it.
 const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	is: integerComparison((value, other) => value === other),
 	isLessThan: integerComparison((value, other) => value < other),
 	isGreaterThan: integerComparison((value, other) => value > other),
 
-	// Both bounds included, and the two naming the same range in either
-	// order — which is what the standard library's own body says, so a pair
-	// written the other way round is read with the two exchanged rather than as
-	// a range that encloses nothing.
+	// Both bounds included, in either order, as the standard library's body reads.
 	isBetween: (value, args) => {
 		let integer = integerLiteral(value)
 
@@ -554,49 +350,28 @@ const NUMERIC_COMPARISONS: Record<string, PredicateEvaluator> = {
 	},
 }
 
-// Integer's alone — `Number` declares none of these over the tower.
-// `isZero`, `isPositive` and `isNegative` are not here: each is written on a
-// comparison above and arrives as that comparison, so the table would be asked
-// a question nothing can spell any more.
+// Integer's own questions. `isZero` and its kin arrive as comparisons.
 const INTEGER_QUESTIONS: Record<string, PredicateEvaluator> = {
-	// A negative remainder is still a remainder — `-3 % 2` is `-1` in
-	// JavaScript — so evenness is asked as "the remainder is zero", which is
-	// also how Integer writes it. Oddness is the same leaf negated and is
-	// decided by the flag rather than by a row of its own.
+	// `-3 % 2` is `-1` in JavaScript, so evenness asks for a zero remainder, as
+	// Integer writes it. Oddness is this leaf negated.
 	isEven: integerQuestion((value) => value % 2n === 0n),
 }
 
-// Essence's String equality is canonical equivalence: `String.is` is
-// `compare(to other)::is(#Equal)` and `compare` orders the NFC-normalised
-// Strings, so a composed accent and a decomposed one are the same String. Both
-// sides are normalised here for that reason, and `isNot` is why it MUST be —
-// comparing the code units as written would admit `isNot` for a pair the Program
-// considers equal, which is a proof of something false rather than a missed
-// admission.
+// String equality compares NFC forms, as the runtime's `is` does. An `isNot`
+// over raw code units would prove something false.
 const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	is: stringComparison((value, other) => value === other),
 
-	// `isEmpty` is `@::length()::is(0)`, and `length` counts grapheme
-	// clusters — a String has no clusters exactly when it has no code units, so
-	// the JavaScript length answers the emptiness question, and only that one.
-	// It is a leaf of its own for that reason: the body reads a chain rather
-	// than asking one Method of `@`. `hasCharacters` is this one negated.
+	// No grapheme clusters means no code units, so the JavaScript length decides
+	// emptiness. `hasCharacters` is this leaf negated.
 	isEmpty: stringQuestion((value) => value.length === 0),
 
-	// `isOneCharacter` is `@::length()::is(1)`, and `length` counts
-	// grapheme clusters — so this one has to segment where `isEmpty` could
-	// read the code units. It is the same segmentation the runtime performs
-	// (`clustersIn` in `String.ts`): the NFC form, cut by `Intl.Segmenter`.
-	// A written `"a"` is what proves `Character` at a call, so a table that
-	// declined to decide it would leave every Character Argument to be
-	// narrowed by hand.
+	// One grapheme cluster must be counted, as the runtime's `clustersIn` does.
 	isOneCharacter: stringQuestion((value) => isOneGrapheme(value)),
 }
 
-// Whether the text is ONE grapheme cluster, counted the way the runtime
-// counts. The Segmenter is built on first use and remembered, for the reason
-// `String.ts` gives: constructing one costs about a millisecond of table
-// loading, and a compile that never asks this question should not pay it.
+// Whether the text is one grapheme cluster. The Segmenter is built on first use,
+// since building one is slow.
 let graphemeSegmenter: Intl.Segmenter | null = null
 
 function isOneGrapheme(value: string): boolean {
@@ -624,16 +399,12 @@ function isOneGrapheme(value: string): boolean {
 }
 
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {
-	// `hasItems` is this one negated, exactly as on a String.
+	// `hasItems` is this leaf negated.
 	isEmpty: listQuestion((items) => items.length === 0),
 }
 
-// And the Dictionary's one question, on the same terms: `hasEntries` is
-// `@::isEmpty()::negate()`, so it arrives here as this row with the flag turned
-// over and is no row of its own. What the brackets say is how many entries were
-// written, which is the whole of what either predicate reads — and for an
-// UPDATE that is a lower bound rather than a count, which is what `whole` says
-// and what leaves an update naming no entry undecided.
+// `hasEntries` is this leaf negated. An update writing no entry leaves it
+// undecided, since its entries are only a lower bound.
 const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
 	isEmpty: (value, args) => {
 		if (value.kind !== "Dictionary" || args.length !== 0) {
@@ -650,25 +421,12 @@ const DICTIONARY_PREDICATES: Record<string, PredicateEvaluator> = {
 
 // #region Rational literals
 
-// A Rational as the pair the entries below compare — the lowest-terms
-// form with the sign on the numerator, which is the one form `1/2` and `2/4`
-// share. The runtime canonicalises the same way (`createRational` moves a
-// negative sign off the denominator, `reduced` divides both parts out), so a
-// written Rational is read here as exactly the value it will be.
+// A Rational in lowest terms with the sign on the numerator, as the runtime
+// canonicalises one, so `1/2` and `2/4` read alike.
 type ExactValue = { numerator: bigint; denominator: bigint }
 
-// The Rational rung of the comparisons, and the PRIMITIVES of it alone:
-// `Rational` declares them on its own `compare` and `Orderable` provides
-// `isBetween` through its conformance, each keyed as `Rational::…` since a
-// conjunct names the Namespace that ANSWERED. `isNot`, `isLessThanOrEqualTo`
-// and `isGreaterThanOrEqualTo` are no rows here for the reason no Integer rung
-// holds them either — a conjunct arrives resolved, so each of the three is one
-// of these three with the flag turned over.
-//
-// Each takes a Rational OR an Integer bound, because that is what the entries
-// take: `Rational::isLessThan` has an Overload for each, and both are the same
-// question about the same two exact numbers. An Integer bound is read as `n/1`,
-// which is what widening one to a Rational does.
+// The comparisons over Rationals, keyed `Rational::…`. Each takes a Rational or
+// an Integer bound, read as `n/1`.
 const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 	is: rationalComparison((value, other) => compareExact(value, other) === 0),
 	isLessThan: rationalComparison(
@@ -678,9 +436,7 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 		(value, other) => compareExact(value, other) > 0,
 	),
 
-	// Both bounds included, and the two naming the same range in either
-	// order — the Integer entry's rule, and for the same reason: this is what
-	// `Orderable::isBetween` says, whichever kind it was provided for.
+	// Both bounds included, in either order, as in the Integer entry.
 	isBetween: (value, args) => {
 		let rational = rationalLiteral(value)
 

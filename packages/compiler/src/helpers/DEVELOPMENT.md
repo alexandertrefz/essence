@@ -168,3 +168,86 @@ differences from that one shape.
 The evidence is empty for a mismatch that is not between two Records, so a site can spread it without asking. A
 partial position, such as an update or a payload default, leaves no member missing. Nor does a member a default
 fills in, by the rule `missingRecordMembers` applies to an Argument.
+
+## Deciding a written value
+
+A refinement usually needs a branch in front of it, something that asked its question. A value written down needs
+nobody to ask: `constant d: NonZeroInteger = 3` is a `NonZeroInteger` because 3 is not zero. `predicateEval.ts`
+decides such predicates while compiling, for a declared Constant, an Argument, a returned value and a Property.
+It reports nothing. A value it does not admit gets the ordinary mismatch where it stands, and `describePredicate`
+names the question it left unanswered.
+
+Only a written Literal is admitted. Deciding anything else would need an interpreter and a second implementation
+of every native. So the evaluator is an allowlist: a table of predicates over JavaScript scalars, keyed by the
+Namespace that answered and the Method. A conjunct the table does not name is not admitted, and the value then
+needs a branch, as any other value does.
+
+The key can be trusted because a Program can not redeclare a standard library Namespace: `namespace Integer for
+Integer` is refused as a duplicate name. So an `Integer::isNot` conjunct is the standard library's `isNot`. The key
+holds no Overload. An entry that can not decode the Arguments it is given refuses, so `@::isLessThan(1/2)` on an
+Integer is not decided.
+
+The table holds only primitives, since a conjunct is stored resolved: `isGreaterThanOrEqualTo` arrives as a negated
+`isLessThan`. Which Methods resolve to which is read off the standard library's bodies. The census in
+`stdlibLoader.spec.ts` lists the primitives, so a body rewritten to stop forwarding shows up there.
+
+### Containers
+
+`admittedTypeOf` asks a written List item by item. The List predicates read only the count, so `[[1], [2, 3]]` is
+a `List<NonEmptyList<Integer>>` for the reason `[1]` is a `NonEmptyList<Integer>`. It answers a List of what the
+items decided, so an item Type that still binds Type Parameters gets the instantiation the values made. An item
+that decides nothing must fit as it stands. A written Dictionary is asked the same way, key and value per entry.
+An empty Literal decides nothing, and needs to decide nothing, since its `Unknown` slots fit every container.
+
+`refinementInside` gates all of this. It looks down List items and Dictionary slots only, since a Record or a Case
+member is a position the evaluator can not read.
+
+`admissionOfWrittenValue` asks many refinements of one value, for a Method receiver. A receiver is typed bottom-up
+and has no expected Type, so it asks every refinement in scope. It checks the refinement's base as well as the
+conjuncts: `["a"]::hasItems()` is true, but says nothing about the `List<Integer>` a refinement may demand.
+
+### Generic refinements
+
+A Parameter written `NonEmptyList<Item>` in a signature that infers `Item` is no Type until something decides
+`Item`. Its base `List<Item>` matches no written List, so `refinementDecidedBy` asks the refinement the value
+decides instead. It unifies the base against the value's Type in a Map of its own and substitutes the bindings.
+`["a"]` decides `Item` as `String` and is asked about a `List<String>`.
+
+Every Parameter the base names must be decided. An empty List's `List<Unknown>` fits `List<Item>` without saying
+what `Item` is. A refinement over an undecided base would hand the call a Type nobody wrote. A Parameter the
+base does not name stays open, and the call reports it as for an unrefined signature.
+
+The answer is what the value is asked about, not the Type it may answer with. `matchTypes` then matches the
+instantiation against the Parameter as declared. It binds an `infer` Parameter through the base and refuses an
+opaque one, so a written value proves nothing about the enclosing Declaration's own Parameter.
+
+### The literal table
+
+`literalValueOf` reads a written value as the scalars the runtime holds. An Integer is a bigint. A Rational is a
+pair of bigints in lowest terms with the sign on the numerator, as the runtime keeps one. So `1/2` and `2/4` read
+as one value.
+
+A List is admitted by its length. A List Literal is a bracketed list of Expressions with no spread, so its length
+never depends on what its items are. An item the evaluator can not read stands as `Opaque`, and the List around it
+counts the same. A predicate that reads an item answers null for an opaque one and refuses. Only an item is ever
+opaque: a whole value the evaluator can not read is no Literal, and nothing is decided about it.
+
+A Dictionary's entries are read as items the same way. `whole` tells a Literal from an update. An update names the
+entries it sets over a base the evaluator can not see, so its entries are a lower bound. `isEmpty` answers false
+for an update that writes an entry, and nothing for one that writes none.
+
+A conjunct names the Namespace whose conformance answered. An Integer receiver's `isLessThan` is Integer's own
+entry, and its `isBetween` is the one `Orderable` provides, and both are keyed `Integer::…`. Negated forms such as
+`isNot` and `isGreaterThanOrEqualTo` have no rows, since a conjunct arrives resolved with its flag turned over.
+`isBetween` includes both bounds and reads them in either order, as the standard library's body does. A Rational
+entry takes an Integer bound too, read as `n/1`.
+
+String equality compares NFC forms, as the runtime's `is` does, so a composed and a decomposed accent are one
+String. An `isNot` over the raw code units would prove something false. `isEmpty` reads the code units, since a
+String has no grapheme clusters exactly when it has no code units. `isOneCharacter` must count clusters, so it
+segments the NFC form with `Intl.Segmenter`, as `clustersIn` does in the runtime.
+
+`describePredicate` spells a refinement's conjuncts back for a Diagnostic, joined as a chain. A conjunct stores
+the name and labels it was written with, so a reader is told `@::isBetween(0, and 9)` as written, not the Method
+it resolves to. A conjunct nobody wrote, such as a complement, carries no spelling and prints as its resolved
+Method with `::negate()` where negated.
