@@ -25,7 +25,6 @@
 	"packages/compiler/src/tests/printType.spec.ts": {"sentence-length": 9, "em-dash": 6, "all-caps": 6, "block-length": 1},
 	"packages/compiler/src/tests/protocolProvidedMethods.spec.ts": {"sentence-length": 56, "em-dash": 40, "all-caps": 27, "history": 1, "position": 1, "block-length": 6},
 	"packages/compiler/src/tests/ranges.spec.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 3, "history": 1},
-	"packages/compiler/src/tests/rationals.spec.ts": {"sentence-length": 30, "em-dash": 16, "all-caps": 13, "position": 4, "block-length": 3},
 	"packages/compiler/src/tests/recordConformanceModel.spec.ts": {"sentence-length": 7, "em-dash": 6, "all-caps": 6, "position": 2},
 	"packages/compiler/src/tests/recovery.spec.ts": {"sentence-length": 22, "em-dash": 14, "all-caps": 19, "history": 1, "position": 3, "block-length": 2},
 	"packages/compiler/src/tests/snapshotCache.spec.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 2},

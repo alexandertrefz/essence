@@ -33,17 +33,11 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The two invariants a Rational is built on — the sign lives on the
-// numerator, and zero is `0/1` — plus the two places they historically leaked:
-// an Integer-operand `divide` that handed the sign to the DENOMINATOR, which
-// every ordering primitive then read backwards, and a `reduce` that bailed on
-// a zero operand, so a cancelled `0/4` could never reduce itself. Every
-// Rational is built through `createRational`: the Essence bodies of
-// `packages/standard-library/sources/Rational.es` that build one reach it
-// through `Rational.of`, and the same-kind arithmetic natives reach it
-// directly. So the direct half of these tests checks that gateway, and the
-// compiled Programs check the same behaviour through the Essence bodies written
-// on top of the invariants, such as `round(toward:)` and `isWholeNumber()`.
+// The invariants a Rational is built on: the sign lives on the numerator, and
+// zero is `0/1`. See "Rational numbers" in packages/runtime/DEVELOPMENT.md.
+// The direct tests check the `createRational` gateway. The compiled Programs
+// check the Essence bodies written on the invariants, such as `round(toward:)`
+// and `isWholeNumber()`.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -87,13 +81,9 @@ const partsOf = (value: rational.RationalType) => ({
 	denominator: value.denominator,
 })
 
-// Every fallible native answers an `Optional<…>` — `Rational.of` has no
-// answer for a zero denominator, `squareRoot` none for a negative radicand —
-// so the direct tests below have to step through the `#Value` Case before they
-// reach the value the invariants live on. The tag is asserted on the way past
-// rather than cast away: an accidental `#Empty` would otherwise hand the checks
-// an `undefined` payload, and `undefined` compares equal to nothing they ask
-// about, which reads as a failure somewhere else entirely.
+// A fallible native answers an `Optional<…>`. The tag is asserted rather than
+// cast away, since an `#Empty` would hand the checks an `undefined` payload
+// and fail somewhere else.
 function valueOf<Item extends AnyType>(
 	built: optional.OptionalType<Item>,
 ): Item {
@@ -143,10 +133,7 @@ describe("Rationals", () => {
 	})
 
 	describe("Canonical zero", () => {
-		// `1/2 − 1/2` builds `(1·2 + −1·2)/4` in the Essence `add` — a
-		// zero that reaches the gateway with a denominator of 4 and must leave
-		// it as `0/1`. The gateway is checked with that same shape here, and
-		// the Essence route to it in the compiled Programs below.
+		// A cancelled zero such as `0/4` must leave the gateway as `0/1`.
 		const cancelled = () => rational.createRational(0n, 4n)
 
 		it("reduces a cancelled zero to 0/1", () => {
@@ -163,10 +150,9 @@ describe("Rationals", () => {
 			).toBe(1)
 		})
 
-		// The structural form and the form a caller asks for differ on a
-		// whole value. `formatAsRational` is what `Terminal.inspect` shows, so
-		// it says what a Rational IS; `toString(as #Fraction)` prints the
-		// numerator alone, exactly as the no-Argument `toString` does.
+		// `formatAsRational` is what `Terminal.inspect` shows, so it prints the
+		// structure. `toString(as #Fraction)` prints a whole value's numerator
+		// alone.
 		it("prints every zero as 0/1 structurally, and as 0 to a caller", () => {
 			expect(rational.formatAsRational(cancelled())).toBe("0/1")
 			expect(
@@ -221,10 +207,9 @@ describe("Rationals", () => {
 			).toBe("-0.75")
 		})
 
-		// The cap and the rounding are deliberate: a non-terminating
-		// expansion is cut at 80 fractional digits, and the cut digit rounds
-		// halves away from zero, like `round` does. `2/3` ending in `…667`
-		// is what separates rounding from the truncation it replaced.
+		// A non-terminating expansion is cut at 80 fractional digits, and the
+		// cut digit rounds halves away from zero. `2/3` ending in 7 shows the
+		// rounding.
 		it("cuts a non-terminating expansion at 80 digits and rounds the last one", () => {
 			expect(
 				rational.toString__overload$2(
@@ -246,9 +231,8 @@ describe("Rationals", () => {
 			).toBe(`-0.${"6".repeat(79)}7`)
 		})
 
-		// `1 − 5·10⁻⁸¹` expands to eighty 9s with an exactly-half tail, so
-		// the round-up has to carry through every kept digit into the whole part
-		// — and the zeroes it leaves behind are artifacts, not expansion digits.
+		// One minus half a unit past the cap expands to eighty 9s and a half.
+		// The round-up carries into the whole part, and no zeroes remain.
 		it("carries a round-up through the kept digits into the whole part", () => {
 			const scale = 2n * 10n ** 80n
 
@@ -308,11 +292,8 @@ describe("Rationals", () => {
 			})
 		})
 
-		// `extractSquarePart(0)` leaves 0 whole — its trial division
-		// starts above it — so the collapse test has to name the radicand 0
-		// itself. Without this an Algebraic escaped with `radicand: 0` and a
-		// non-zero radical coefficient, which every sign routine read as
-		// strictly positive: `√0` compared GREATER than zero.
+		// `extractSquarePart(0)` leaves 0 whole, so the gateway must collapse a
+		// zero radicand itself, or every sign routine would read it as positive.
 		it("collapses a zero radicand at the createAlgebraic gateway", () => {
 			const value = algebraic.createAlgebraic(
 				{ numerator: 3n, denominator: 4n },
@@ -345,11 +326,9 @@ describe("Rationals", () => {
 		})
 	})
 
-	// The two formats that rewrite the value before they render it. A
-	// percentage is one hundred times the receiver, and the scientific form is
-	// the receiver over the largest power of ten at or below it — so both are
-	// held to the same 80-digit cap and the same fixed widths the decimal form
-	// is, and both are checked here against a value whose expansion never ends.
+	// A percentage renders one hundred times the receiver, and the scientific
+	// form the receiver over the largest power of ten at or below it. Both keep
+	// the decimal form's cap and fixed widths.
 	describe("The percent and scientific forms", () => {
 		const plain = (
 			numerator: bigint,
@@ -399,10 +378,8 @@ describe("Rationals", () => {
 			expect(fixed(0n, 1n, scientific, 2)).toBe("0.00e0")
 		})
 
-		// A mantissa is below ten before it is rounded and can reach ten
-		// after — `9.99` at one place is `10.0` — so the exponent has to take
-		// the carry. Ten is the only value a carry can reach, so one step of
-		// renormalisation is the whole of it.
+		// Rounding can lift a mantissa to ten, as `9.99` at one place, so the
+		// exponent takes the carry.
 		it("carries a rounded mantissa into the exponent", () => {
 			expect(fixed(999n, 100n, scientific, 1)).toBe("1.0e1")
 			expect(fixed(9999n, 1000n, scientific, 2)).toBe("1.00e1")
@@ -424,11 +401,9 @@ describe("Rationals", () => {
 		})
 	})
 
-	// The fixed-width formatter rounds the one digit it cuts, and the
-	// direction is what decides which way. It works on the MAGNITUDE with the
-	// sign prefixed afterwards, so `#Down` and `#Up` have to read the sign back
-	// — a negative value rounded down is rounded AWAY from zero — and these
-	// tests are what hold that pairing.
+	// The fixed-width formatter rounds the magnitude and prefixes the sign, so
+	// `#Down` and `#Up` read the sign back. A negative value rounded down moves
+	// away from zero.
 	describe("The rounded width", () => {
 		const fixed = (
 			numerator: bigint,
@@ -471,11 +446,8 @@ describe("Rationals", () => {
 			expect(fixed(-1n, 2n, 2, up)).toBe("-0.50")
 		})
 
-		// The count has no ceiling, where the entry beside it stops at 80
-		// digits — measured at 15 ms for 200 000 places. This asks for more
-		// digits than that cap and checks the expansion is what long division
-		// gives, so a cap added later fails here rather than silently
-		// shortening an answer a caller asked the width of.
+		// The width has no ceiling, unlike the capped entry, so a cap added
+		// later fails here rather than silently shortening the answer.
 		it("writes every place it is asked for, past the 80 the capped entry stops at", () => {
 			let text = fixed(2n, 3n, 200, nearest)
 
@@ -495,11 +467,8 @@ describe("Rationals", () => {
 		})
 	})
 
-	// `#NearestEven` is the one Rounding Case whose answer depends on the
-	// step below rather than only on the distance to it, so every test here
-	// pairs a tie with the parity of its floor. `round` is written in Essence,
-	// so all of them go through a compiled Program: there is no native to
-	// drive.
+	// `#NearestEven` reads the parity of the step below a tie, so every test
+	// pairs a tie with the parity of its floor.
 	describe("Banker's rounding", () => {
 		it("sends a tie to the even step on either side of zero", async () => {
 			expect(
@@ -543,12 +512,9 @@ describe("Rationals", () => {
 			).toEqual(['"3/25"', '"19/50"', '"13/100"'])
 		})
 
-		// The bias the Case exists for, measured rather than argued. The
-		// hundred halves `1/2` through `199/2` sum to exactly 5000; rounding
-		// each away from zero first totals 5050, and rounding each to its even
-		// neighbour totals 5000. Exhaustive over the run rather than a `for
-		// any` draw, because the halves ARE the whole of what separates the two
-		// Cases and a draw would mostly miss them.
+		// The halves `1/2` through `199/2` sum to 5000. Rounding them away from
+		// zero totals 5050, and to even totals 5000. A `for any` draw would
+		// mostly miss the halves.
 		it("keeps a run of halves on its exact total", async () => {
 			expect(
 				await run(`implementation {
@@ -578,11 +544,8 @@ describe("Rationals", () => {
 		})
 	})
 
-	// The Integer rungs of the formatting family. What they are FOR is a
-	// receiver of `Integer | Rational` — the Type a mixed List sums to — which
-	// dispatches per member and needs both Namespaces to declare the name. So
-	// every test here runs the call twice: once on an Integer, and once on a
-	// Scalar the Compiler can not narrow.
+	// A receiver of `Integer | Rational`, which a mixed List sums to, dispatches
+	// per member, so both Namespaces declare the formatting Methods.
 	describe("Integer's rung of the formatting family", () => {
 		it("writes an Integer in every format", async () => {
 			expect(
@@ -616,11 +579,8 @@ describe("Rationals", () => {
 			).toEqual(["5", "-5", "5"])
 		})
 
-		// The Type is written out rather than inferred, so the receiver
-		// is the Union both rungs answer for and neither the Integer nor the
-		// Rational entry can be reached on its own. Without Integer's rungs
-		// these three calls are `no-matching-overload`, which is the hole this
-		// package was written to close.
+		// The written Type makes the receiver the Union, so neither the
+		// Integer nor the Rational entry can be reached on its own.
 		it("dispatches a Scalar receiver over both rungs", async () => {
 			expect(
 				await run(`implementation {
@@ -642,11 +602,9 @@ describe("Rationals", () => {
 		})
 	})
 
-	// `approximate` is one name across the whole tower, and its two exact
-	// rungs are what let a `Number` receiver reach it at all. `Terminal.inspect`
-	// shows the STRUCTURAL form of a Rational — `5/1` rather than `5` — which is
-	// what makes the answer's Type visible here: Integer's rung answers a
-	// Rational, not the receiver.
+	// `approximate` is one name across the tower. `Terminal.inspect` shows a
+	// Rational's structure, `5/1` rather than `5`, which shows that Integer's
+	// rung answers a Rational.
 	describe("The exact rungs of approximate", () => {
 		it("answers an Integer receiver as a Rational", async () => {
 			expect(
@@ -670,8 +628,8 @@ describe("Rationals", () => {
 			).toEqual(["167/100", "83/50", "2/1", "3/25"])
 		})
 
-		// The grid is what it promises: the answer is within a step of
-		// the receiver, and the step is a tenth to the power of the width.
+		// The answer is within one step of the receiver, a tenth to the power
+		// of the width.
 		it("stays within one step of the receiver", async () => {
 			expect(
 				await run(`implementation {
@@ -689,11 +647,9 @@ describe("Rationals", () => {
 		})
 	})
 
-	// Grouping is written into the digits of an answer the formatter has
-	// already produced, so what it has to get right is WHICH digits: a run
-	// before a point, and one on each side of a fraction's slash. The two
-	// entries are on `Rational` and on `Integer` alike, so a `Scalar` receiver
-	// reaches them, and the last test here is what says so.
+	// Grouping is written into the formatted digits: the run before a point,
+	// and each side of a fraction's slash. `Rational` and `Integer` both
+	// declare it, so a `Scalar` receiver reaches it.
 	describe("Grouped digits", () => {
 		it("writes the separator between every three digits from the right", async () => {
 			expect(
@@ -765,29 +721,11 @@ describe("Rationals", () => {
 			).toEqual(['"6,172,839/5,000"', '"1.235e6"', '"123 456 700%"'])
 		})
 
-		// The one claim here a stopwatch has to make. Writing a
-		// separator between the groups is a walk over the groups, so it has to
-		// cost what the formatting it is written on top of costs, give or take
-		// — an Array each group is unshifted onto instead moves every group
-		// already in it, and 100,000 whole digits measured 92 ms that way
-		// against 6.2 ms this way, best of three, where the same value
-		// formatted without a separator is 5.1 ms. The ceiling is a RATIO
-		// against that same unseparated formatting rather than a time, so a
-		// slow machine moves both figures together: it was 17× before this and
-		// is 1.2× now.
-		//
-		// How the two are timed is what keeps this from being a flake,
-		// and all three parts of it are load-bearing. They are run once before
-		// the clock starts, because whichever went first otherwise paid for
-		// warming up the digit conversion they share — measured cold against
-		// warm, the ratio read 1.8× rather than 1.2×. They are timed
-		// INTERLEAVED, one attempt of each, so a collection or a descheduled
-		// window falls on both of them rather than on whichever was being
-		// measured at the time. And the fastest of FIFTEEN attempts is what
-		// each of them is judged on, because the fastest of three is a stall
-		// away from a wrong answer: with the whole machine busy, best of three
-		// crossed the ceiling on one round in five and best of fifteen on none
-		// in a hundred and eighty, where the ratio it read never passed 1.4×.
+		// Grouping must cost about what plain formatting costs, held as a ratio
+		// so a slow machine moves both figures. Both run once before timing, so
+		// neither pays for warm-up. They are timed interleaved, so a stall falls
+		// on both. Each is judged on its fastest of fifteen attempts, since the
+		// fastest of three can cross the ceiling under load.
 		it("writes the separator in one pass over the groups", () => {
 			let value = rational.createRational(BigInt("9".repeat(100_000)), 1n)
 			let comma = createString(",")
@@ -812,9 +750,8 @@ describe("Rationals", () => {
 						performance.now() - start,
 					)
 
-					// Read here so that no engine can drop the call as a
-					// value nothing looks at, and so a formatter that answered
-					// nothing is not the fastest run of all.
+					// Reading the answer keeps an engine from dropping the call,
+					// and keeps an empty answer from being the fastest.
 					expect(answer.length).toBeGreaterThanOrEqual(100_000)
 				}
 			}
@@ -844,11 +781,8 @@ describe("Rationals", () => {
 		})
 	})
 
-	// The sign style is over the plain form, and its whole content is
-	// what a value that is NOT negative is written as. So every test pairs the
-	// two Cases over the same value, and zero is the one that has to be said
-	// outright: it is written `+0`, because the rule is the sign a value that
-	// is not negative gets rather than a claim about its sign.
+	// The sign style decides how a value that is not negative is written, so
+	// zero is written `+0` under `#Always`.
 	describe("The written sign", () => {
 		it("writes a plus in front of what is not negative", async () => {
 			expect(
@@ -887,10 +821,8 @@ describe("Rationals", () => {
 		})
 	})
 
-	// The scaled rendering money needs: minor units held as an Integer,
-	// written as a major-unit decimal. What it has to get right is a receiver
-	// SMALLER than the scale — five cents is `0.05`, not `5.00` — and the sign
-	// standing in front of every digit rather than in front of the last two.
+	// Minor units held as an Integer, written as a major-unit decimal. Five
+	// cents is `0.05`, and the sign stands in front of every digit.
 	describe("An Integer scaled by decimal places", () => {
 		it("reads the receiver as a count of the last place", async () => {
 			expect(
@@ -1009,10 +941,8 @@ describe("Rationals", () => {
 			).toEqual(['"-1/6"', '"-1/6"'])
 		})
 
-		// The List is bound to a `List` Type on purpose. A written List is
-		// its own proof of having an item, so a literal Argument would reach
-		// `Number.lowest(_ NonEmptyList<Integer | Rational>)` and answer bare —
-		// and the fold under test here is the one answering an Optional.
+		// A written List proves it has an item and would reach the bare
+		// `NonEmptyList` entry, so the List is bound to a `List` Type.
 		it("finds the lowest of a mixed List through the Essence fold", async () => {
 			expect(
 				await run(`implementation {
@@ -1093,17 +1023,10 @@ describe("Rationals", () => {
 			).toEqual(['"0"', '"0"', '"0"'])
 		})
 
-		// `Rational::isPositive` is `@::isGreaterThan(0/1)` and
-		// `isNegative` is `@::isLessThan(0/1)` — one call on `@` each, so a
-		// refinement written on either name is the comparison's own Type, and
-		// the guard that asks the comparison proves it. Written as chains over
-		// the numerator, both were questions of their own, and every line here
-		// that hands `r` on was `argument-type-mismatch`: the guard proved
-		// nothing a `PositiveRational` asks for, and a written `3/4` proved it
-		// neither. The `else` of `isPositive` narrows too, to the negation the
-		// alias records, which is what `isLessThanOrEqualTo(0/1)` reads.
-		// `PositiveRational` is the Prelude's own Type now, so the Program
-		// declares only the half the library has no name for.
+		// `Rational::isPositive` is `@::isGreaterThan(0/1)` and `isNegative` is
+		// `@::isLessThan(0/1)`, so a refinement on either name is the
+		// comparison's Type, and a guard asking the comparison proves it. The
+		// `else` of `isPositive` narrows to the recorded negation.
 		it("narrows a Rational by its sign through the comparison it is written on", async () => {
 			expect(
 				await run(`implementation {
