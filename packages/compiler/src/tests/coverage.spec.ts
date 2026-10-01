@@ -212,6 +212,27 @@ describe("The coverage instrumentation pass", () => {
 		])
 	})
 
+	it("names a provided Method's branch after its Protocol", () => {
+		let program = instrumented(`implementation {
+	protocol Sized {
+		size() -> Integer
+
+		describeSize() -> String {
+			if @::size()::isZero() {
+				<- "empty"
+			} else {
+				<- "full"
+			}
+		}
+	}
+}`)
+
+		expect(labelsOf(program, "branch")).toEqual([
+			"Sized::describeSize › if",
+			"Sized::describeSize › else",
+		])
+	})
+
 	it("marks a branch whose condition established something", () => {
 		let branches = pointsOf(instrumented(fixtures)).filter(
 			(point) => point.kind === "branch",

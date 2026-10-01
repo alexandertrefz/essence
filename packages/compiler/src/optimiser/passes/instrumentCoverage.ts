@@ -369,7 +369,11 @@ function scopesOf(program: common.typedSimple.Program): Array<CoverageScope> {
 					})
 				}
 
-				if (node.nodeType === "NamespaceDefinitionStatement") {
+				// A Protocol's provided Methods are named like a Namespace's.
+				if (
+					node.nodeType === "NamespaceDefinitionStatement" ||
+					node.nodeType === "ProtocolDeclarationStatement"
+				) {
 					for (let [member, method] of Object.entries(node.methods)) {
 						let position = method.method.position
 
