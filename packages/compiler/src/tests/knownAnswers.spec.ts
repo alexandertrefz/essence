@@ -6,16 +6,14 @@ import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
 import { compiles, firstOf } from "./followedHelps"
 
-// Three reporters that knew the answer and said something else. A Method
-// the receiver has not got may be a Method of what it HOLDS, a Case no Choice in
-// scope declares was written where a Choice is expected, and a bare name that is
-// not declared may be a static of the Namespace it was written inside. Each of
-// them used to end in a guess by edit distance.
+// Reports that know the answer rather than guessing by edit distance. A Method
+// the receiver lacks may be a Method of what it holds. A Case no Choice in scope
+// declares may be written where a Choice is expected. An undeclared bare name
+// may be a static of the Namespace it is written inside.
 //
-// Every Help printed here is compiled, in `compiles`. A Help is a promise that
-// what it prints works when it is followed, and a report that breaks that
-// promise is worse than one that says nothing. The three helpers live in
-// `./followedHelps` since the Help audit's own spec came to need the same three.
+// Every Help printed here is compiled, in `compiles`, since a Help promises
+// that what it prints works when followed. The helpers live in
+// `./followedHelps`, which other specs share.
 
 const future = [
 	"	function fetched() -> Future<Integer> {",
@@ -46,7 +44,6 @@ describe("A Method of what the value holds", () => {
 			])
 		})
 
-		// `pad` is what this used to offer, with a Quick Fix behind it.
 		it("should offer no near miss and no Quick Fix payload", () => {
 			let diagnostic = firstOf(source, "unknown-method")
 
@@ -70,10 +67,9 @@ describe("A Method of what the value holds", () => {
 			).toBe(true)
 		})
 
-		// The proof changes which reading Method answers the item outright
-		// — `List::firstItem()` answers an Optional and would trade one refusal
-		// for the same one — so the Help is read off the receiver rather than
-		// written once for every List.
+		// The proof changes which Method reads an item outright, since
+		// `List::firstItem()` answers an Optional. So the Help is read off the
+		// receiver.
 		it("should offer the proven List its own reading Method", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -90,7 +86,6 @@ describe("A Method of what the value holds", () => {
 		})
 
 		// A List of Lists holds a List, and `add` is a Method of neither.
-		// Nothing is claimed where nothing was found.
 		it("should say nothing where the item Type has not got the Method", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -122,9 +117,8 @@ describe("A Method of what the value holds", () => {
 			expect(diagnostic.notes[0]).toBe(
 				"'add' is a Method of Integer, which is what a Dictionary<String, Integer> holds — a Method of its values rather than of the Dictionary itself.",
 			)
-			// And no `::map` Help. `Dictionary::map` hands its transform a
-			// whole `{ key, value }` entry and never the value on its own, so
-			// the Help that would have bound one is not offered here.
+			// No `::map` Help, since `Dictionary::map` hands its transform a
+			// whole `{ key, value }` entry rather than the value.
 			expect(diagnostic.helps).toEqual([
 				"Read one out with '::value(at …, defaultingTo …)' and call '::add(…)' on it.",
 			])
@@ -175,9 +169,8 @@ describe("A Method of what the value holds", () => {
 			)
 		})
 
-		// A Choice a Program declares has no reading Method and no `map`,
-		// so the `match` is the only Help there — and a Help that stands first
-		// does not open on "Or".
+		// A Program's Choice has no reading Method and no `map`, so the `match`
+		// Help stands first and does not open on "Or".
 		it("should open the match Help on 'Or' only where one precedes it", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -273,8 +266,7 @@ ${future}
 			).toBe(true)
 		})
 
-		// A body that answers something other than a Future can not write
-		// the word at all, so naming it would be advice that does not compile.
+		// Only a body that answers a Future can write `complete`.
 		it("should withhold the wait where nothing here can wait", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -319,10 +311,8 @@ ${future}
 		})
 	})
 
-	// And the same forgotten word met in a String's hole, which said the
-	// Future was not Printable and left the reader to work out why something
-	// Integer-shaped is not. One voice: the state sentence and the word are the
-	// ones every other report about a missing `complete` prints.
+	// A forgotten `complete` in a String's hole gets the sentences every other
+	// report about a missing `complete` prints.
 	describe("a Future in a String's hole", () => {
 		it("should name the word and what the work answers with", () => {
 			let diagnostic = firstOf(
@@ -364,8 +354,6 @@ ${future}
 			])
 		})
 
-		// The word is only named where it may stand, which is the rule
-		// every Help about `complete` is held to.
 		it("should withhold the word where nothing here can wait", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -383,17 +371,14 @@ ${future}
 			expect(diagnostic.notes[2]).toBe(
 				"'complete' only stands in a body that answers a Future, and this position is not one.",
 			)
-			// And the declaration alone is not the whole edit — a body
-			// declared `-> Future<…>` still holds an uncompleted hole, which
-			// reports exactly as before. The Help says both halves for that
-			// reason.
+			// A body declared `-> Future<…>` still holds an uncompleted hole,
+			// so the Help names both edits.
 			expect(diagnostic.helps).toEqual([
 				"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, and add 'complete' where the value is read.",
 			])
 			expect(diagnostic.data).toBeUndefined()
 		})
 
-		// A hole that holds neither is answered exactly as it always was.
 		it("should leave an unprintable hole that waits for nothing alone", () => {
 			let diagnostic = firstOf(
 				`implementation {
@@ -428,9 +413,8 @@ ${future}
 		})
 	})
 
-	// The evidence is looked up with the lookup a call is decided by, so a
-	// Namespace the Program writes itself counts exactly as the standard
-	// library's does — and one it has not got counts for neither.
+	// The evidence comes from the lookup that decides a call, so a Program's
+	// own Namespace counts as the standard library's does.
 	describe("a Namespace the Program wrote", () => {
 		it("should find a Method a user Namespace declares for the item", () => {
 			let diagnostic = firstOf(
@@ -454,10 +438,8 @@ ${future}
 })
 
 describe("A near miss that could not have been this call", () => {
-	// `index` really is one edit from `indx`, and it takes a label this
-	// call did not write. A Method that could not have been called this way is
-	// not the Method that was meant, and the Quick Fix behind the suggestion
-	// would have traded one refusal for another.
+	// `index` is one edit from `indx` but takes a label this call did not
+	// write. So it can not be the Method meant, and its Quick Fix would fail.
 	it("should prefer a candidate the written Arguments could pair with", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -472,8 +454,7 @@ describe("A near miss that could not have been this call", () => {
 		expect(diagnostic.data).toBeUndefined()
 	})
 
-	// And the other half of the rule: a name the call's own shape fits is
-	// still offered, which is what `index` was measured against.
+	// A name the call's own shape fits is still offered.
 	it("should keep a candidate the written Arguments do pair with", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -487,10 +468,8 @@ describe("A near miss that could not have been this call", () => {
 		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
 	})
 
-	// A misspelled name with a LABEL behind it lost its suggestion to that
-	// rule: nothing fitting `(of …)` is near `lenght`, so the pool that was
-	// asked came back with nothing to say. The label is a second mistake, not a
-	// reason to go quiet about the first.
+	// Nothing fitting `(of …)` is near `lenght`. A call that wrote a label
+	// then hears of any declared name one edit away.
 	it("should name the Method where the label is wrong as well", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -517,9 +496,8 @@ describe("A near miss that could not have been this call", () => {
 		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
 	})
 
-	// And the name this door may not let back in. `indexOf` labels
-	// nothing and is two edits from `index(on:)`, so neither the fitting names
-	// nor the second pool answers it.
+	// `indexOf` writes no label and is two edits from `index(on:)`, so no
+	// name answers it.
 	it("should stay silent for a name that is two edits from a Method", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -536,9 +514,8 @@ describe("A near miss that could not have been this call", () => {
 })
 
 describe("An Argument that describes work", () => {
-	// The Validator has said this on `argument-type-mismatch` since
-	// asynchrony landed. A call that picked no Overload never reached the
-	// Validator at all, so the same sentence is said here.
+	// The Validator says this on `argument-type-mismatch`. A call that picked
+	// no Overload never reaches the Validator, so it is said here too.
 	it("should name the missing word on a refused Overload", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -567,9 +544,8 @@ ${future}
 })
 
 describe("A Case the position decides", () => {
-	// Every flag in the standard library is a bare Case passed at a
-	// Parameter, so this report is how a reader discovers what `round(toward:)`
-	// takes. It used to say that no Choice in scope declared the name and stop.
+	// The standard library's flags are bare Cases passed at a Parameter, so
+	// this report is how a reader discovers what `round(toward:)` takes.
 	it("should name the Choice the Parameter takes and list its Cases", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -599,11 +575,9 @@ describe("A Case the position decides", () => {
 		})
 	})
 
-	// One parse tree enriched over and over, which is what an editor does
-	// with the buffer under the cursor. The expectation is recorded against the
-	// NAME Node, and that Node outlives every pass — so the recording is
-	// deduped where it is written, and the report says the same thing each time
-	// rather than growing a Type per pass behind it.
+	// An editor enriches one parse tree over and over. The expectation is
+	// recorded on the name Node, which outlives every pass, so the recording
+	// is deduplicated and the report does not grow.
 	it("should answer the same way on every enrichment of one parse tree", () => {
 		let parsed = parse(`implementation {
 			Terminal.print(7/2::round(toward #Floor)::toString())
@@ -652,9 +626,7 @@ describe("A Case the position decides", () => {
 		])
 	})
 
-	// A Case that carries something is spelled with what it carries, so
-	// the list is one a reader can write from. `#Value` beside `#Empty` with
-	// nothing to tell them apart is a list nobody can act on.
+	// A Case is listed with what it carries, so a reader can write it out.
 	it("should spell a Case with the payload it carries", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -670,10 +642,9 @@ describe("A Case the position decides", () => {
 		])
 	})
 
-	// And a payload of SEVERAL members is spelled as the Record it is. The
-	// pattern form this printed — '#Rect(width, height)' — is
-	// `case-payload-is-one-value` the moment it is copied into the position the
-	// list stands in, which is one refusal traded for the next.
+	// The pattern form '#Rect(width, height)' is refused as
+	// `case-payload-is-one-value` when copied into the position, so a payload
+	// of several members is listed as a Record.
 	it("should spell a payload of several members as a Record", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -717,9 +688,8 @@ describe("A Case the position decides", () => {
 		).toBe(true)
 	})
 
-	// An Overload whose candidates take different Choices is the one shape
-	// this can not decide, so every Choice is named and none of them is the
-	// message's subject.
+	// Overload candidates that take different Choices leave the position
+	// undecided, so every Choice is named and none is the message's subject.
 	it("should name every Choice where the candidates disagree", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -747,8 +717,8 @@ describe("A Case the position decides", () => {
 		])
 	})
 
-	// Nothing decides a Record Literal's member, so nothing here can name
-	// a Choice — and the one thing worth saying is how to get a report that can.
+	// Nothing decides a Record Literal's member, so the Help says how to get
+	// a report that can name a Choice.
 	it("should say how to get a Choice where the position decides nothing", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -767,9 +737,8 @@ describe("A Case the position decides", () => {
 		])
 	})
 
-	// And where the scan DID find a near miss, which Choice declares it —
-	// the half a reader has nowhere to look up. The Cases themselves are still
-	// not listed: the scan reaches the whole prelude.
+	// A near miss names the Choice that declares it. The Cases are not
+	// listed, since the scan reaches the whole prelude.
 	it("should name the Choice that declares the near miss", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -784,9 +753,7 @@ describe("A Case the position decides", () => {
 		expect(diagnostic.helps[0]).toBe("Did you mean '#Truncating'?")
 	})
 
-	// A `match` written one level out. The subject declares no Case at
-	// all, so the list of what it does declare was empty and the report said
-	// nothing whatsoever.
+	// A `match` written one level out, on a subject that declares no Case.
 	it("should say a matched subject holds the Choice", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -822,8 +789,6 @@ describe("A name the Namespace around it reaches", () => {
 		"",
 	].join("\n")
 
-	// This is what was answered with "Did you mean 'loop'?" — a word from
-	// the prelude two edits away, with a Quick Fix behind it.
 	it("should name a static of the enclosing Namespace", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -862,8 +827,7 @@ ${clock}
 		expect(diagnostic.helps).toEqual(["Write 'Clock.make'."])
 	})
 
-	// An instance Method is reached through the value it works on, and
-	// inside a Method body that value is `@`.
+	// Inside a Method body the value an instance Method works on is `@`.
 	it("should name an instance Method of the enclosing Namespace", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -934,8 +898,7 @@ ${clock}
 		])
 	})
 
-	// Which of them was meant is not something this can decide, so they
-	// are listed and nothing writes one of them into the reader's file.
+	// Which one was meant can not be decided, so no fix writes one in.
 	it("should list every Namespace and offer no fix where several declare it", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -954,8 +917,7 @@ ${clock}
 		expect(diagnostic.data).toBeUndefined()
 	})
 
-	// The standard library's own statics answer the same way, which is
-	// what a reader arriving from a language with free functions writes.
+	// A reader who knows free functions writes a standard library static bare.
 	it("should reach the standard library's statics too", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -967,10 +929,8 @@ ${clock}
 		expect(diagnostic.helps).toEqual(["Write 'Number.Pi'."])
 	})
 
-	// A Record Literal's shorthand is the member AND its value, so the
-	// reach written over the name alone — `{ Clock.noon }` — is refused as
-	// `shorthand-on-path-key`, one refusal traded for the next. The member is
-	// spelled out instead.
+	// A shorthand is the member and its value, and `{ Clock.noon }` is
+	// refused as `shorthand-on-path-key`. So the member is spelled out.
 	it("should spell the member out where the name is a shorthand", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -991,11 +951,9 @@ ${clock}
 		})
 	})
 
-	// Sixteen plain lowercase names are statics of the prelude — `head`,
-	// `write`, `get`, `send` — and a `head` written one line under a Constant
-	// called `heads` is a misspelling far more often than it is `Http.head`
-	// without its Namespace. The reach took the first Help and the fix, and
-	// wrote a Namespace over a name that was one edit from the reader's own.
+	// Plain lowercase names such as `head` and `write` are prelude statics. A
+	// `head` under a Constant called `heads` is far more likely a misspelling
+	// than `Http.head` without its Namespace.
 	it("should let a near miss lead a Namespace that is merely in scope", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1032,8 +990,7 @@ ${clock}
 		])
 	})
 
-	// And the other way where there is nothing to lead with: the reach
-	// stands alone and keeps its fix.
+	// With no near miss to lead, the reach stands alone and keeps its fix.
 	it("should keep the reach and its fix where nothing is a near miss", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1050,9 +1007,8 @@ ${clock}
 		})
 	})
 
-	// The Namespace the name stands INSIDE is evidence from the site
-	// rather than a guess, so it keeps the first Help and the fix however close
-	// something else in scope is spelled.
+	// The Namespace the name stands inside is evidence rather than a guess,
+	// so it keeps the first Help and the fix over any near miss.
 	it("should keep the enclosing Namespace ahead of a near miss", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1118,8 +1074,6 @@ ${clock}
 		).toBe(true)
 	})
 
-	// The near miss is what the Namespace reach replaces, so a name no
-	// Namespace declares still gets one.
 	it("should keep the near miss where no Namespace reaches the name", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1134,11 +1088,9 @@ ${clock}
 	})
 })
 
-// The `@` half of that reach, which is the half that can be wrong about
-// the value it names: a Method body binds `@` to the receiver, a Match Handler
-// binds it to the value matched, and a reach is only ever true of one of them.
-// Every Help here is asked of the Method lookup a `::` call is decided by, so
-// what it prints is a call that resolves.
+// A Method body binds `@` to the receiver, and a Match Handler binds it to the
+// value matched. Every Help here asks the lookup that decides a `::` call, so
+// what it prints resolves.
 describe("A Method reached through the '@' that is in hand", () => {
 	const route = [
 		"			choice Route {",
@@ -1148,8 +1100,7 @@ describe("A Method reached through the '@' that is in hand", () => {
 		"",
 	].join("\n")
 
-	// This is what was answered `Write '@::area()'` — a spelling that
-	// resolves nothing at all, because the `@` it wrote is the matched Route.
+	// The `@` here is the matched Route, so `@::area()` would resolve nothing.
 	it("should not offer '@' for a Method the matched value has not got", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1179,9 +1130,8 @@ ${route}
 		expect(diagnostic.data).toBeUndefined()
 	})
 
-	// And the same Handler where the value matched DOES answer the name,
-	// which is the case the enclosing Namespace's own table could not tell from
-	// the one above.
+	// Here the matched value does answer the name, which the enclosing
+	// Namespace's own table could not tell apart.
 	it("should offer '@' for a Method the matched value has", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1207,8 +1157,7 @@ ${route}
 		})
 	})
 
-	// A Function literal binds no `@` of its own, so the receiver of the
-	// Method around it is still the one in hand — and the reach still holds.
+	// A Function literal binds no `@` of its own, so the reach still holds.
 	it("should reach the receiver from inside a Function literal", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1230,8 +1179,8 @@ ${route}
 		expect(diagnostic.helps).toEqual(["Write '@::area'."])
 	})
 
-	// A static Method's body has no `@` to write, and a reach that named
-	// one would be refused by `at-in-static-method` — so nothing is offered.
+	// A static Method's body has no `@`, and writing one is refused as
+	// `at-in-static-method`.
 	it("should offer nothing in a static Method's body", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1250,8 +1199,7 @@ ${route}
 		expect(diagnostic.notes).toEqual([])
 	})
 
-	// A Protocol's PROVIDED Method is reached through the value exactly as
-	// a written one is, and the Namespace's own table never held it.
+	// The Namespace's own table never holds a Protocol's provided Method.
 	it("should reach a Protocol's provided Method", () => {
 		let diagnostic = firstOf(
 			`implementation {
@@ -1275,9 +1223,7 @@ ${route}
 		expect(diagnostic.helps).toEqual(["Write '@::greetTwice'."])
 	})
 
-	// And a Method another Namespace declares for the same Type, which is
-	// the same lookup answering from somewhere the enclosing Namespace's table
-	// can not see.
+	// The enclosing Namespace's table can not see another Namespace's Method.
 	it("should reach a Method another Namespace declares for the Type", () => {
 		let diagnostic = firstOf(
 			`implementation {
