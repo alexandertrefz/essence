@@ -7354,8 +7354,8 @@ function bakeNamedCaseDefaultValue(
 	let declaring = findDeclaringScope(name, scope)
 	let value = declaring?.constantValues?.[name]
 
-	// The enrichment order rules out a cycle today, but the guard keeps the
-	// walk terminating regardless.
+	// A Constant can only name Constants declared before it, so no cycle
+	// arises, but the guard keeps the walk terminating regardless.
 	if (value === undefined || through.includes(name)) {
 		if (through.length === 0 && !alreadyReportedAbout(node)) {
 			reportCaseDefaultNameNotAConstant(node, declaring)
@@ -13923,10 +13923,10 @@ function probeAcceptedOverload(
 	)
 	let probed = result.result
 
-	// None of these rejections can arise today: a payload-free Case's Type
-	// never matches a sibling Case's payload. They restate `selectOverload`'s
-	// contract, so an entry whose bounds refuse the call is never a second
-	// reading.
+	// None of these rejections can arise from the shapes that reach here: a
+	// payload-free Case's Type never matches a sibling Case's payload. They
+	// restate `selectOverload`'s contract, so an entry whose bounds refuse the
+	// call is never a second reading.
 	if (
 		probed === undefined ||
 		probed.sawErrorArgument ||
@@ -14685,8 +14685,8 @@ function memberTypeOf(type: common.Type, name: string): common.Type {
 	return found.length === 0 ? { type: "Unknown" } : buildUnion(found)
 }
 
-// The Type at the end of a Pattern binding's spine — `["state", "total"]`
-// walked from the value the Pattern took apart.
+// The Type at the end of a Pattern binding's path, such as
+// `["state", "total"]`, walked from the value the Pattern took apart.
 function typeAtPath(type: common.Type, path: Array<string>): common.Type {
 	return path.reduce(memberTypeOf, type)
 }
@@ -17264,23 +17264,10 @@ function conversedStep(
 
 // #endregion
 
-// A literal Argument as the stable scalar a conjunct key is built from.
-// The Integer's digits rather than its value, because a value is a number or a
-// bigint at run time and neither spells every Integer in JSON; the Rational's
-// two halves under a slash, which no Integer's digits can spell.
-//
-// The Rational's halves are the LOWEST-TERMS ones rather than the two
-// runs of digits that were typed. A conjunct is a key, and two refinements are
-// compared by their conjunct sets — `@::isNot(0/1)` and `@::isNot(0/2)` ask one
-// question about one number, so the number is what is kept. An Integer needs no
-// such step: its digits are already the one spelling of its value.
-//
-// A String keeps the QUOTES `JSON.stringify` gives it, and that is the
-// half of the scalar that says which kind it is. A conjunct names no Overload —
-// the Method a body forwards to is read long before anything resolves an
-// Overload of it — so the Arguments are the whole of what tells two entries of
-// one name apart, and `@::check(1)` and `@::check("1")` have to stay two
-// questions. Digits, a fraction and a Boolean each spell only themselves.
+// A literal Argument as the stable scalar a conjunct key is built from. An
+// Integer keeps its digits, and a Rational its lowest terms, so `0/1` and `0/2`
+// are one key. A String keeps its JSON quotes, so `@::check(1)` and
+// `@::check("1")` differ.
 function literalPredicateArgument(
 	value: common.typed.ExpressionNode,
 ): string | boolean | null {
@@ -17298,13 +17285,9 @@ function literalPredicateArgument(
 	}
 }
 
-// A Namespace's own name, bound to the Namespace itself — what makes
-// `Reader.readsBase` inside `namespace Reader` read exactly like the same
-// spelling written outside it. Every body a Namespace holds gets it: a Method's
-// signature and body, and a static Property's value.
-//
-// The Namespace is injected as a MEMBER only — injecting it as a Type would
-// shadow a same-named Type Alias (`namespace Event for Event`).
+// A Namespace's own name bound to the Namespace, so `Reader.readsBase` reads
+// the same inside `namespace Reader` as outside. It is a member only, so a
+// same-named Type Alias is not shadowed.
 function scopeWithNamespaceSelf(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
@@ -17314,7 +17297,7 @@ function scopeWithNamespaceSelf(
 		members: { [node.name.content]: type },
 		declarations: { [node.name.content]: node.name.position },
 		constants: new Set([node.name.content]),
-		// Read by `unknown-name` alone — see `Scope.namespace`.
+		// Read only by `unknown-name`; see `Scope.namespace`.
 		namespace: { name: node.name.content, type },
 	})
 }
@@ -17322,27 +17305,21 @@ function scopeWithNamespaceSelf(
 export function resolveNamespaceDefinitionStatementType(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
-	// Set by hoisting alone, to the Protocol names that have not hoisted
-	// yet. It turns on the speculative bound weave — the Type this pass registers
-	// is what every use site ABOVE the Namespace's Statement solves against, so
-	// it has to carry the conditional conformances' bounds already — and lets a
-	// clause naming a Protocol still on its way throw, which the hoist loop reads
-	// as "not this round".
+	// Set only by hoisting, to the Protocols not hoisted yet. It turns on the
+	// silent bound weave, so earlier use sites see the bounds. A clause naming
+	// a pending Protocol throws, for a later round.
 	options: { deferOnPendingConformance?: ReadonlySet<string> } = {},
 ): common.NamespaceType {
-	// Namespace Generics are visible in the target Type and in every
-	// Method signature — `namespace Boxes<infer Item> for List<Item>` — and
-	// carry whatever bound the target Type itself demands of them; see
+	// Namespace Type Parameters are visible in the target Type and every
+	// signature, with any bound the target Type implies; see
 	// `impliedTargetBounds`.
 	let impliedBounds = impliedTargetBounds(node, scope)
 	let genericScope = scopeWithGenerics(node.generics, scope, impliedBounds)
 
 	let clauses = resolveConformanceClauses(node, scope)
 
-	// The maps the Type is built from are the ones it CARRIES, filled in
-	// place as they resolve, so the Namespace injected into its own body sees
-	// every member resolved so far — a Property naming one above it reads the
-	// Type that one resolved to.
+	// The maps the Type carries are filled in place, so the Namespace seen
+	// inside its own body has every member resolved so far.
 	let properties: Record<string, common.Type> = {}
 	let methods: Record<string, common.MethodType> = {}
 
@@ -17371,29 +17348,21 @@ export function resolveNamespaceDefinitionStatementType(
 		unsettledNamespaces.add(resultType)
 	}
 
-	// The natives first, and in one pass of their own: a value-LESS
-	// Property is answered by the runtime rather than by an initialiser, so it
-	// has a value wherever it is written, and a Property above it may read it.
+	// Native Properties first: the runtime answers them, so any Property may
+	// read one.
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
 		if (memberValue.value !== null) {
-			// A bodied Property has no Type until its value is enriched,
-			// and the Property BELOW is the one whose read is too early, so it
-			// is seeded as Error rather than left out — the read resolves, and
-			// the Validator, which is the pass that knows the order the
-			// initialisers run in, is the one that refuses it.
+			// A bodied Property is seeded as Error until its value is enriched.
+			// The validator, which knows the initialiser order, refuses a read
+			// that comes too early.
 			properties[memberKey] = { type: "Error" }
 
 			continue
 		}
 
-		// A native static Property declares its Type instead of carrying
-		// a value — `static Pi: Transcendental` — so the annotation IS the
-		// Type. Resolved in the outer Scope, like the bodied form's value.
-		//
-		// With neither a value nor an annotation there is nothing left to say
-		// what the Property is. Silently resolving to Error would let a
-		// Namespace ship a Property of no Type at all, and the standard
-		// library's zero-Diagnostic gate would wave it through.
+		// A native static Property's annotation is its Type, as in
+		// `static Pi: Transcendental`. One with neither a value nor an
+		// annotation is reported, rather than shipping a Property of no Type.
 		if (memberValue.type === null) {
 			reportError(
 				`Native Property '${memberKey}' declares no Type`,
@@ -17414,9 +17383,8 @@ export function resolveNamespaceDefinitionStatementType(
 		properties[memberKey] = resolveDeclaredType(memberValue.type, scope)
 	}
 
-	// Before the Property values, so that one of them may CALL a Method of
-	// its own Namespace: a Method is installed with the class, ahead of every
-	// static initialiser, so it answers whatever order the two are written in.
+	// Methods resolve before the Property values, since a Method is installed
+	// ahead of every static initialiser and a value may call one.
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
 		methods[methodName] = resolveMethodType(
 			methodValue,
@@ -17433,10 +17401,8 @@ export function resolveNamespaceDefinitionStatementType(
 			continue
 		}
 
-		// A property's Type is its value's, read off the enriched
-		// Expression — the same walk the Node build uses, so the two agree.
-		// Enriching an Expression declares nothing, so this is safe under the
-		// speculative resolution hoisting runs.
+		// A Property's Type is its value's. Enriching an Expression declares
+		// nothing, so this is safe while hoisting.
 		properties[memberKey] = enrichExpression(
 			memberValue.value,
 			selfScope,
@@ -17461,9 +17427,8 @@ export function resolveNamespaceDefinitionStatementType(
 	return resultType
 }
 
-// The Namespace Types hoisted while a clause or a `where` condition
-// named nothing yet, which a Protocol imported from a cycle partner does until
-// the import is seeded. `settleConformanceClauses` reads them again.
+// The Namespace Types hoisted while a clause or a `where` condition named
+// nothing yet. `settleConformanceClauses` reads them again.
 let unsettledNamespaces = new WeakSet<common.NamespaceType>()
 
 // A Namespace's `is` clauses as identities, each expanded through every
@@ -17484,12 +17449,11 @@ function resolveConformanceClauses(
 		string,
 		Array<{ generic: string; protocol: string }>
 	> = {}
-	// Every Protocol a clause names and each one it extends, kept flat
-	// so asking about a conformance stays a lookup. A clause's conditions ride
-	// along to each Protocol it grants, since they hold the ancestor's as well.
+	// Every Protocol a clause names and each one it extends, kept flat. A
+	// clause's conditions apply to each Protocol it grants.
 	let conformsTo: Array<string> = []
-	// The Protocols some clause grants outright, so a later conditional
-	// clause reaching the same one can not put conditions back on it.
+	// The Protocols some clause grants outright, which a later conditional
+	// clause can not put conditions back on.
 	let unconditional = new Set<string>()
 	let unsettled = false
 
@@ -17533,9 +17497,9 @@ function resolveConformanceClauses(
 				conformsTo.push(identity)
 			}
 
-			// The weakest grant wins: in `is Ordered where Item is
-			// Ordered, is Ranked`, both extending `Named`, the second grants it
-			// outright.
+			// The weakest grant wins: in
+			// `is Ordered where Item is Ordered, is Ranked`, both extending
+			// `Named`, the second grants `Named` outright.
 			if (conditions === null) {
 				unconditional.add(identity)
 				delete conformanceConditions[identity]
@@ -17551,9 +17515,9 @@ function resolveConformanceClauses(
 	return { conformsTo, conformanceConditions, unsettled }
 }
 
-// Reads a hoisted Namespace's clauses again once every import is bound,
-// and writes the answer into the list and record every copy of the Type shares.
-// Answers false where the Type has nothing to settle.
+// Reads a hoisted Namespace's clauses again once every import is bound, writing
+// into the list and record every copy of the Type shares. False where nothing
+// is unsettled.
 export function settleConformanceClauses(
 	type: common.NamespaceType,
 	node: parser.NamespaceDefinitionStatementNode,
@@ -17580,25 +17544,10 @@ export function settleConformanceClauses(
 	return true
 }
 
-// The qualified spelling is shown rather than described — "prefix it
-// with its Choice's name" leaves the reader to work out what that looks like,
-// and the whole point of the Diagnostic is that they can not tell the two
-// Choices apart.
-//
-// A GENERIC Choice's name alone is not a spelling that compiles. The bare
-// `Optional#Value` a reader would write from the Help resolves the ambiguity and
-// then meets `undecided-type-arguments`, because a Choice's Type Parameters are
-// applied and never inferred — so the Help says the Type Arguments belong there
-// too, and shows the ellipsis rather than the Parameter names: those are the
-// declaration's own names and are not in scope at the call, and writing one back
-// is `unknown-type`. Only the ambiguity is this Diagnostic's to answer, which is
-// why the Help names the shape and leaves the Arguments to the reader.
-//
-// Handed the candidate CASES, since every caller has Cases rather than
-// written names in hand, and spelling them out is this function's business: what
-// a reader has to write to pick one is the Choice's name, never the Module path
-// its identity carries in front of it — plus whether that Choice is generic,
-// which only the Case knows.
+// Shows the qualified spelling for each candidate. A generic Choice also needs
+// its Type Arguments, written as `<…>`, since its Type Parameter names are not
+// in scope at the call. Takes Cases, which know the Choice's display name and
+// whether it is generic.
 function reportAmbiguousCase(
 	caseName: parser.IdentifierNode,
 	candidates: Array<common.CaseType>,
@@ -17623,12 +17572,9 @@ function reportAmbiguousCase(
 				(choiceName) =>
 					`'${choiceName}' declares '#${caseName.content}'.`,
 			),
-			// One Help per candidate, not just the first. WHICH Choice was
-			// meant is exactly what this Diagnostic can not decide, so naming
-			// only one quietly recommends it — and since `Optional` became a
-			// builtin Choice, `#Empty` and `#Value` collide with names a
-			// Program is likely to declare, where the builtin is the one it
-			// almost certainly did NOT mean.
+			// One Help per candidate, since which Choice was meant is what this
+			// can not decide. The builtin `Optional`'s `#Empty` and `#Value`
+			// collide with names a Program likely declares.
 			helps: candidates.map((candidate) => {
 				let choiceName = displayChoiceName(candidate.choice)
 
@@ -17636,23 +17582,16 @@ function reportAmbiguousCase(
 					? `Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`
 					: `Write '${choiceName}<…>#${caseName.content}' with its Type Arguments to pick '${choiceName}'.`
 			}),
-			// The names alone, one Help each and one action each, in the
-			// same order. A generic Choice's `<…>` is not part of its name and
-			// is not carried: an ellipsis is not a Type Argument list, so what
-			// a fix can write is the prefix, and `undecided-type-arguments`
-			// then points at where the Arguments go.
+			// The names alone, one action each in the same order. A fix writes
+			// the prefix, and `undecided-type-arguments` then asks for any Type
+			// Arguments.
 			data: { kind: "choice-candidates", names: choiceNames },
 		},
 	)
 }
 
-// An unknown Case is reported from three places — a named Choice, the
-// matched value's Union, and the scan of every Choice in scope — which differ
-// in what they can say about where the Case was looked for, but not in what
-// they offer instead. Computing the near miss once is what keeps the terminal
-// and the editor in step: the Help is the Quick Fix's title, and a site that
-// wrote only one of them would show a suggestion nothing applies, or apply one
-// nothing announced.
+// The near miss for an unknown Case, computed once for every reporting site, so
+// the Help and the Quick Fix title agree.
 function caseSuggestion(
 	name: string,
 	candidateNames: Array<string>,
@@ -17661,9 +17600,7 @@ function caseSuggestion(
 
 	return {
 		helps: suggestion === null ? [] : [`Did you mean '#${suggestion}'?`],
-		// The bare name, without the `#` the Help renders it with —
-		// a Quick Fix replaces the Case's name, and the `#` beside it is
-		// not part of what the Diagnostic underlines.
+		// The bare name, since the Quick Fix replaces only the underlined name.
 		...suggestionData(suggestion),
 	}
 }
