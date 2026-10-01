@@ -35,10 +35,8 @@ import {
 	writeResult,
 } from "../resultCache"
 
-// Every spec here works in a directory of its own and never asks
-// `resultCacheDirectory` where the store is unless that is what it is about —
-// the one place the environment is read is the pair of tests that prove the
-// override works, and both of them put it back.
+// Every spec here works in its own directory. Only the two tests about the
+// override make `resultCacheDirectory` read the environment, and both restore it.
 function withDirectory<Value>(body: (directory: string) => Value): Value {
 	let directory = mkdtempSync(path.join(tmpdir(), "essence-results-"))
 
@@ -119,10 +117,8 @@ describe("the result cache's key", () => {
 		expect(keyWith({})).toBe(keyWith({}))
 	})
 
-	// The bundle key is the whole of what the key says about CODE — it
-	// already digests every Module of the graph, the Compiler, the standard
-	// library and the Optimiser Options — so a change to a source or to a
-	// dependency's source reaches this key through that one string.
+	// The bundle key covers everything about the code, so a change to any source in
+	// the graph reaches this key through it.
 	it("changes when the bundle it stands for changes", () => {
 		expect(keyWith({ bundleHash: "fedcba9876543210" })).not.toBe(
 			keyWith({}),
@@ -161,9 +157,8 @@ describe("the result cache's key", () => {
 		expect(new Set([...keys, keyWith({})]).size).toBe(keys.length + 1)
 	})
 
-	// A tag named twice and a tag named in another order are the same run,
-	// because `resolveFilters` has already made them one — so the key must not
-	// pretend they are two and lose the entry.
+	// Repeated or reordered tags are one run, as `resolveFilters` already made them,
+	// so they share a key.
 	it("reads a tag set as a set", () => {
 		expect(
 			keyWith({
@@ -172,8 +167,8 @@ describe("the result cache's key", () => {
 		).toBe(keyWith({ filters: { ...plainFilters, tags: ["a", "b"] } }))
 	})
 
-	// The counted lists are what makes this true. Without them one tag and
-	// one skipped tag would mix the same bytes as two tags and none.
+	// Counting each list keeps one tag and one skipped tag from mixing like two tags
+	// and none.
 	it("does not confuse a tag with a skipped one", () => {
 		expect(
 			keyWith({ filters: { ...plainFilters, tags: ["a", "b"] } }),
@@ -219,8 +214,7 @@ describe("the companion stores a key reads", () => {
 		})
 	})
 
-	// The order is the Modules' sorted, so two entries reaching one set of
-	// Modules mix the same bytes whichever order their graphs reported them in.
+	// Modules are sorted, so one set of Modules mixes the same bytes in any order.
 	it("sorts the Modules it was handed", async () => {
 		await withDirectoryAsync(async (directory) => {
 			let read = createStoreReader()
@@ -250,10 +244,8 @@ describe("the companion stores a key reads", () => {
 				"written after the first read\n",
 			)
 
-			// One run reads a companion once. What lands beside a Module
-			// while the run is deciding its keys is the NEXT run's business —
-			// which is also what keeps every entry of one run keyed against one
-			// picture of the disk.
+			// One run reads a companion once, so every entry is keyed against one picture
+			// of the disk.
 			expect((await read([module]))[0]!.text).toBe("")
 		})
 	})
@@ -290,9 +282,8 @@ describe("a stored record", () => {
 		}
 	})
 
-	// The stream is versioned apart from the payload, so a record holding a
-	// kind this build has never heard of is a record it may still replay — the
-	// same tolerance every consumer of the stream is asked for.
+	// A record holding an unknown event kind may still be replayed, since the stream
+	// is versioned apart from its payloads.
 	it("keeps an event kind it does not know", () => {
 		let unknown = readRecord(
 			JSON.stringify({
@@ -328,8 +319,7 @@ describe("the result store", () => {
 		})
 	})
 
-	// The name is the hash of everything the answer depends on, so a file
-	// already there answers the same question — whichever run wrote it first.
+	// A file under the same key answers the same question, so the first write stays.
 	it("does not rewrite a name it already holds", async () => {
 		await withDirectoryAsync(async (directory) => {
 			await writeResult(directory, "key-four", record)
@@ -421,10 +411,8 @@ describe("where the result store lives", () => {
 	})
 })
 
-// The one thing a remembered answer can not be remembered THROUGH. Every
-// module named here is checked by the label esbuild writes above the code it
-// inlines, so these fixtures are bundles as far as this question is concerned:
-// what a real one holds between the labels is code, and nothing here reads it.
+// A bundle linking the effectful runtime is never recorded. The check reads only
+// esbuild's labels, so these fixtures need only labels.
 describe("a bundle that reaches the world", () => {
 	const linked = [
 		"// type.ts",
@@ -443,9 +431,8 @@ describe("a bundle that reaches the world", () => {
 		"",
 	].join("\n")
 
-	// One Program taken through the stages the CLI runs, to the bytes
-	// esbuild writes. The labels are what the rule reads, so nothing short of
-	// the real bundle answers the question these two tests ask.
+	// One Program taken through the CLI's stages to esbuild's bytes, since only a
+	// real bundle has real labels.
 	async function bundled(source: string): Promise<string> {
 		let parsed = parseWithDiagnostics(source)
 		let enriched = enrich(parsed.program)
@@ -485,9 +472,8 @@ describe("a bundle that reaches the world", () => {
 		})
 	})
 
-	// A name inside a STRING or a comment of the Program's own is not a
-	// label, which is the whole reason the check is written against the labels
-	// rather than against the text.
+	// A name inside a String or comment of the Program is no label, which is why the
+	// check reads labels rather than text.
 	it("reads the label rather than the text around it", async () => {
 		await withBundle(
 			[
@@ -516,13 +502,8 @@ describe("a bundle that reaches the world", () => {
 		})
 	})
 
-	// The other half of the claim, and the half the hand-written bundles
-	// above can not make: that a REAL Program reaching the world produces a
-	// bundle carrying that label. The rule is written against a string esbuild
-	// emits, so nothing but a compile and a bundle can say the string is still
-	// the one esbuild emits — a renamed runtime module or a changed label
-	// convention would leave every test above passing and every run of an
-	// effectful test suite quietly remembered.
+	// A real Program reaching the world yields a bundle carrying the label. Only a
+	// real compile catches a renamed runtime module or a changed label convention.
 	it("refuses the store for a bundle a Program reaching the world produced", async () => {
 		await withBundle(
 			await bundled(`implementation {

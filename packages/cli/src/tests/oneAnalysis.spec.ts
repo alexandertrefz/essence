@@ -9,17 +9,10 @@ import { analyse } from "@essence-lang/language-server/analyse"
 
 import { compileFile } from "../pipeline"
 
-// `essence check X.es` and the Editor's Problems for X.es are ONE list.
-// They run the same analysis — see `@essence-lang/compiler/analysis` — and this
-// is what says so over every deliberately broken file in the corpus rather than
-// over one example somebody remembered to write down.
-//
-// It is a CLI spec because the CLI is the only package that can reach both: it
-// depends on the Language Server, and nothing depends on it.
-//
-// Compared by code, Position and message. What is deliberately NOT
-// compared is presentation: `esc` renders a report and the Editor publishes
-// LSP Diagnostics, and the two will never be the same bytes.
+// `essence check X.es` and the Editor's Problems for X.es are one list, from one
+// analysis in `@essence-lang/compiler/analysis`. This checks it over every broken
+// file in the corpus. Only the CLI depends on the Language Server, so only it can
+// reach both. Code, Position and message are compared, never presentation.
 function fingerprint(diagnostic: common.Diagnostic): string {
 	let position = diagnostic.position
 
@@ -50,12 +43,9 @@ function editorFingerprints(filePath: string): Array<string> {
 	return analyse(readFileSync(filePath, "utf8"), filePath).map(fingerprint)
 }
 
-// The THIRD reader of the same list — the seam a host embeds the Compiler
-// through, which is where the Vite, Bun and esbuild plugins get a build's
-// mistakes from. It used to stop at whichever stage reported first and call the
-// Validator bare underneath, so a plugin's Problems panel showed one mistake
-// where `essence check` over the very same file showed three, and a reader had
-// no way to tell which of the two was telling them the truth about their file.
+// The third reader of the list: the seam a host embeds the Compiler through,
+// which the Vite, Bun and esbuild plugins report from. It must report every
+// mistake `essence check` does.
 async function embedFingerprints(filePath: string): Promise<Array<string>> {
 	let result = await compileToMemory(filePath)
 
@@ -85,11 +75,8 @@ describe("one analysis", () => {
 		})
 	}
 
-	// A Module graph is the case the two used to be furthest apart on —
-	// the Editor answered a dependency's mistake AND said so over the import,
-	// while `esc` said only the first. The entry's own list is what is compared:
-	// each of the graph's other files is reported under its own name on both
-	// sides, and `Main.es` is where they used to disagree.
+	// In a Module graph, the entry's own list is compared. Each other file
+	// reports under its own name, and `Main.es` reports over the import.
 	it("answers alike for a Module whose dependency is broken", async () => {
 		let filePath = fixturePath("diagnostics", "modules", "Main.es")
 		let fromCheck = await checkFingerprints(filePath)
@@ -99,9 +86,9 @@ describe("one analysis", () => {
 	})
 })
 
-// Three mistakes in one file, from two stages: the Validator reports
-// `return-type-mismatch` and `missing-return`, the Enricher `unknown-name`, and
-// one run reports all three.
+// Three mistakes in one file from two stages: the Validator's
+// `return-type-mismatch` and `missing-return`, and the Enricher's
+// `unknown-name`. One run reports all three.
 describe("every stage in one run", () => {
 	let filePath = path.join(SHOWCASE_DIRECTORY, "Staged.es")
 
@@ -124,8 +111,7 @@ describe("every stage in one run", () => {
 			["unknown-name", 21],
 		])
 		expect(outcome.ok).toBe(false)
-		// And no stage refused, so nothing is said about one. A `check`
-		// writes no file, so there is nothing it stopped short of either.
+		// No stage refused, and a `check` writes no file, so nothing says it stopped.
 		expect(outcome.failedStage).toBeNull()
 	})
 
@@ -144,9 +130,8 @@ describe("every stage in one run", () => {
 		])
 	})
 
-	// And through the embedding seam, which is the one that used to stop
-	// at the first stage that reported — a host building this file was handed
-	// the `unknown-name` and nothing else.
+	// Through the embedding seam too, which must report more than the first stage's
+	// mistake.
 	it("reports all three mistakes to an embedding host, in file order", async () => {
 		let result = await compileToMemory(filePath)
 
