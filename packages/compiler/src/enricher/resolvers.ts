@@ -7458,9 +7458,8 @@ export function silentCheckedConformances(
 			namespaceType.targetType,
 			assumptions,
 			conformanceGrantsIn(scope),
-			// The providers of every clause: a Method this clause's
-			// Protocol only requires may be provided by another's, and then the
-			// Namespace owes nothing for it.
+			// A Method this clause's Protocol requires may be provided by
+			// another clause's, and then nothing is owed.
 			clauseProvidersIn(node, protocol, namespaceType.targetType, scope),
 		)
 
@@ -7476,13 +7475,9 @@ export function silentCheckedConformances(
 	return checked
 }
 
-// The reporting check, called from the Enricher and never from
-// speculative hoisting — a Namespace with a broken conformance clause is still a
-// perfectly usable Namespace and must hoist, so hoisting reads the silent twin
-// above and leaves every Diagnostic to this pass. The Namespace Type checked
-// here is the one the hoist already wove its bounds into, which is what makes an
-// unconditional clause fulfilled by a Method a conditional clause bounds the
-// error it always was, wherever the use sites happen to sit.
+// The reporting check, never run by the hoist, which reads
+// `silentCheckedConformances` so a Namespace with a broken clause still
+// hoists. It checks the Namespace Type with its bounds already woven in.
 export function checkProtocolConformance(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
@@ -7517,9 +7512,7 @@ export function checkProtocolConformance(
 					notes: [
 						"A conformance says what a Type can do, so there has to be a Type.",
 					],
-					// The head is the edit, and which Type goes in it is
-					// the reader's — every Method here is written for one, so
-					// the name is in front of them and not in front of this.
+					// The edit is the head, with a Type only the reader knows.
 					helps: [
 						`Give this Namespace a target Type: 'namespace ${namespaceType.name} for … is ${identifier.content}'.`,
 					],
@@ -7529,10 +7522,8 @@ export function checkProtocolConformance(
 			continue
 		}
 
-		// Validate each `where` condition before it becomes an
-		// assumption — the LHS has to name one of this Namespace's own Type
-		// Parameters, the RHS a real Protocol, and no Generic may be bound
-		// twice in one clause.
+		// Each `where` condition must name one of this Namespace's Type
+		// Parameters and a real Protocol, binding no Type Parameter twice.
 		let conditions: Array<{ generic: string; protocol: string }> = []
 		let assumptions = new Map<string, string>()
 
@@ -7561,9 +7552,7 @@ export function checkProtocolConformance(
 							helps: [
 								`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
 							],
-							// The name as the condition wrote it — what a
-							// fix inserts into the Generic list is the very name
-							// the condition reads, or the two go on disagreeing.
+							// The name as the condition wrote it.
 							data: {
 								kind: "undeclared-parameter",
 								name: condition.generic.content,
@@ -7593,14 +7582,8 @@ export function checkProtocolConformance(
 				} else if (rejection.kind === "unknown-protocol") {
 					reportUnknownProtocol(condition.protocol, scope)
 				} else {
-					// One bound per Type Parameter per conformance,
-					// because a conformance threads ONE hidden witness per
-					// Parameter into the Methods that fulfil it and one witness
-					// can not be two Protocols. So the second bound is not an
-					// edit to this clause at all — it belongs to a conformance
-					// of its own, which is a Namespace of its own. The same
-					// answer `nonconforming-namespace` gives when adding the
-					// condition it asks for would land here.
+					// One witness per Type Parameter per conformance, so a second
+					// bound belongs to a conformance, and a Namespace, of its own.
 					reportError(
 						`'${condition.generic.content}' is bound twice in this conformance`,
 						condition.generic.position,
@@ -7638,9 +7621,7 @@ export function checkProtocolConformance(
 			})
 		}
 
-		// As in the silent twin, a name this clause's Protocol requires may
-		// be provided by another clause's, and the Namespace owes nothing for it
-		// then.
+		// As in `silentCheckedConformances`.
 		let providers = clauseProvidersIn(
 			node,
 			protocol,
@@ -7656,12 +7637,8 @@ export function checkProtocolConformance(
 			providers,
 		)
 
-		// `namespace Colour for Colour is Equatable { }` writes no `is`
-		// and is still right — the Choice derives one. Accepted here rather
-		// than diagnosed, with the same all-or-nothing rule the use site
-		// applies, so declaring the conformance a Choice already has is a way
-		// of SAYING so rather than an error to work around by deleting the
-		// clause.
+		// `namespace Colour for Colour is Equatable { }` writes no `is`, and
+		// the Choice derives it, by the rule the use site applies.
 		if (
 			result.kind !== "conforms" &&
 			derivedConformanceSource(
@@ -7693,12 +7670,9 @@ export function checkProtocolConformance(
 		let spelled = describeProtocol(protocol.identity, scope)
 
 		if (result.kind === "needs-condition") {
-			// The condition this clause already carries for the same Type
-			// Parameter, which is what decides whether "add it here" is an edit
-			// at all: a second bound on one Parameter is refused by
-			// `conflicting-where-condition`, so writing it leaves this report
-			// standing and adds one. Where the Parameter is already spoken for,
-			// the conformance is what moves — onto a Namespace of its own.
+			// A condition this clause has for the same Type Parameter already.
+			// Then the conformance moves to a Namespace of its own rather than
+			// take a second bound.
 			let existing = assumptions.get(result.genericName)
 
 			reportError(
@@ -7757,10 +7731,7 @@ export function checkProtocolConformance(
 								]),
 						...echo.notes,
 					],
-					// The whole list, named rather than left to the Quick
-					// Fix alone — a reader reading the report in a terminal has
-					// no fix to apply, and what a conformance OWES is the one
-					// thing this report knows and never said.
+					// Every requirement owed, named for a reader without the fix.
 					helps: [
 						refusing === null
 							? `Write ${declared(owed)}, or drop the 'is ${spelled}'.`
@@ -7774,14 +7745,8 @@ export function checkProtocolConformance(
 									),
 								)}, or drop the 'is ${spelled}'.`,
 					],
-					// The whole list, where the Label names the one the
-					// check stopped at — a fix that writes the stubs writes
-					// them all at once, and a Namespace that declares a
-					// conformance and writes nothing owes every requirement.
-					// The two clauses that report this code beside it carry
-					// none: a signature that does not MATCH is a Method to
-					// correct rather than one to write, and a missing `where`
-					// is a clause to add to the conformance itself.
+					// The fix writes stubs for every requirement owed. A
+					// mismatched signature or a missing `where` gets none.
 					...(refusing === null
 						? {
 								data: {
@@ -7806,11 +7771,7 @@ export function checkProtocolConformance(
 						),
 					],
 					notes: echo.notes,
-					// A Method to CORRECT rather than one to write, so no
-					// stub is offered and the Help says where the shape it has
-					// to take is written down. Which part of the signature
-					// differs is a comparison this site does not make — it knows
-					// only that they do not match.
+					// A Method to correct, so no stub is offered.
 					helps: [
 						`Write '${result.methodName}' with the signature '${spelled}' declares for it.`,
 					],
@@ -7831,28 +7792,16 @@ export function checkProtocolConformance(
 	return checked
 }
 
-// The Protocols a Choice answers WITHOUT anybody declaring them.
-// `Printable` is deliberately not among them: its derive answers only where a
-// Namespace has said `is Printable`, so writing `toString` without the clause
-// leaves nothing to disagree with.
+// The Protocols a Choice answers without a declaration. `Printable` derives
+// only where declared, so it is not one.
 const undeclaredDerivedProtocolNames: ReadonlyArray<string> = [
 	"Equatable",
 	enumerableProtocolName,
 ]
 
-// A Namespace over a Choice that WRITES one of a derived Protocol's
-// Methods and does not DECLARE the conformance is refused, because the two
-// rails would answer one question two ways: a call naming the Namespace reads
-// the written Method, while a call through a bound reaches the derive — which
-// is built from the Choice and never consults a Namespace nobody declared the
-// clause on. Which of the two a Program got even depended on whether the
-// Namespace happened to share the Choice's name.
-//
-// Asked of the derive itself rather than of the target's shape, so this
-// and `derivedConformanceSource` can not drift apart: where the derive answers
-// null nothing is replaced and nothing is reported. Collected, because solving
-// a generic Choice's conformance reports about its payloads, and this question
-// is nobody's but this one's.
+// Refuses a Namespace over a Choice that writes a derived Protocol's Method
+// without declaring it, since a bounded call would still reach the derive.
+// It asks the derive itself, silently, so the two agree.
 function reportUndeclaredDerivedConformance(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
@@ -7885,14 +7834,8 @@ function reportUndeclaredDerivedConformance(
 		let spelling = protocolSpelling(protocolName, scope)
 		let spelled = spelling ?? displayProtocolName(protocolName)
 
-		// The Protocol's REQUIREMENTS, and not the Methods it PROVIDES.
-		// A requirement is what the derive answers, so a Namespace writing that
-		// name takes the derive's place on the direct rail while the bound rail
-		// goes on reaching it — the split. A provided Method is answered by the
-		// Protocol's own const, which a Namespace writing that name does not
-		// take away: `namespace Extras for Colour { isNot(_ tag: String) }`
-		// stands beside `Equatable::isNot` on the ladder rather than instead of
-		// it, and shadowing a name that way is a documented thing to do.
+		// Only requirements count. A written `isNot` stands beside the
+		// provided `Equatable::isNot` rather than replacing it.
 		let written = Object.keys(protocol.methods).filter(
 			(methodName) =>
 				providedMethodProtocol(protocol, methodName) === null &&
@@ -7943,8 +7886,7 @@ function reportUndeclaredDerivedConformance(
 				helps: [
 					`Declare the conformance: 'is ${spelled}' on this Namespace.`,
 				],
-				// No Parameter — what carries a conformance here is the
-				// Namespace's own head, which is the Node the fix writes into.
+				// No Parameter: the fix writes into the Namespace's head.
 				...(spelling === null
 					? {}
 					: {
@@ -7959,19 +7901,15 @@ function reportUndeclaredDerivedConformance(
 	}
 }
 
-// What a Type Alias means WITHOUT its `where` clause — the Type its body
-// resolves to, which is also the base a checked refinement refines. A refined
-// Alias needs Expressions enriched, and enrichment imports the Resolver rather
-// than the other way round, so the clause is read by
-// `resolveTypeAliasStatementType` over in `enrichers.ts` and this is the half
-// that stayed here.
+// What a Type Alias means without its `where` clause, the base a refinement
+// refines. `resolveTypeAliasStatementType` in `enrichers.ts` reads the
+// clause, which needs Expressions enriched.
 export function resolveAliasedType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 ): common.Type {
-	// Checked here as well as in declareTypeInScope — hoisting resolves
-	// speculatively and would otherwise register the reserved name without
-	// ever reaching the declaration check.
+	// Checked here as well as in `declareTypeInScope`, which the hoist never
+	// reaches.
 	if (node.name.content === "Self") {
 		reportReservedTypeName(node.name.position)
 	}
@@ -7979,18 +7917,9 @@ export function resolveAliasedType(
 	if (node.generics.length === 0) {
 		let resolvedType = resolveType(node.type, scope)
 
-		// An anonymous Union takes the Alias's name, so Hovers and
-		// Diagnostics print `Coordinate` rather than spelling the members out.
-		// A copy, not a mutation — the resolved Type may be a shared Scope
-		// object. An already named or aliased Union (a Choice, `Number`,
-		// `Optional<Integer>`, another Alias) keeps its original spelling.
-		//
-		// And an anonymous RECORD takes it for the same reason and under
-		// the same rule — `Standing` rather than nine members spelled out at
-		// every mention of it. `type Score = Standing` keeps printing
-		// `Standing`, the way `type Sure = Number` keeps printing `Number`:
-		// what a second name for one Type buys a reader is nothing, and the
-		// name their Declarations agree on is the one they wrote first.
+		// An anonymous Union or Record takes the Alias's name for display, on
+		// a copy. A named one keeps its name, so `type Sure = Number` prints
+		// `Number`.
 		if (
 			(resolvedType.type === "UnionType" ||
 				resolvedType.type === "Record") &&
@@ -8003,9 +7932,8 @@ export function resolveAliasedType(
 		return resolvedType
 	}
 
-	// Generic Type Aliases keep their body unapplied — the Generics
-	// stay GenericUses until a use site applies Type Arguments, which
-	// substitutes them into the body.
+	// A generic Alias keeps its body unapplied until a use site substitutes
+	// its Type Arguments.
 	let genericScope = scopeWithGenerics(node.generics, scope)
 
 	return {
@@ -8016,9 +7944,8 @@ export function resolveAliasedType(
 	}
 }
 
-// Applies Type Arguments to a Generic Type Alias by substituting them
-// into the alias body — missing Arguments fall back to the Generic's default
-// Type, and to an Error Type (after a Diagnostic) without one.
+// Substitutes Type Arguments into a Generic Alias's body. A missing Argument
+// takes its default, or is reported and becomes an Error.
 function applyGenericAlias(
 	aliasType: common.GenericAliasType,
 	typeArguments: Array<common.Type>,
@@ -8048,10 +7975,7 @@ function applyGenericAlias(
 				notes: [
 					`'${aliasType.name}' takes ${countOf(aliasType.generics.length, "Type Parameter")}.`,
 				],
-				// The shape to write, with a blank per Parameter. The Note
-				// says how MANY there are and leaves the reader to work out what
-				// that looks like — which is the whole of the edit for the bare
-				// spelling, where no brackets were written to correct.
+				// The shape to write, with a blank per Type Parameter.
 				helps: [typeApplicationHelp(aliasType.name, generics.length)],
 			},
 		)
@@ -8069,25 +7993,15 @@ function applyGenericAlias(
 		bindings.set(generic.name, argument)
 	}
 
-	// A bound is a promise the APPLICATION has to keep — nothing below
-	// this point ever asks again, so `Box<Function>` used to substitute a Type
-	// with no equality into a payload declared Equatable and only fall over when
-	// something reached for the witness. Solved for the Diagnostic alone: the
-	// witnesses a call needs are solved at the call, against the Types the
-	// arguments actually have. An Alias whose Generics carry no bound at all —
-	// every one the standard library declares — pays nothing for this, because
-	// `resolveConformances` returns before it looks at any of them.
+	// The application must keep the bounds, so `Box<Function>` is refused
+	// here. Solved for the Diagnostic alone; a call solves its own witnesses.
 	resolveConformances(aliasType.generics, bindings, scope, position)
 
 	let appliedType = applyGenericBindings(aliasType.aliasedType, bindings)
 
-	// An applied alias whose body is an anonymous Union or Record carries
-	// the applied spelling as its display alias, so `Optional<Integer>` and
-	// `Pair<Integer>` print as written rather than as their targets' members.
-	// The Type Arguments are kept as Types — a later substitution rewrites them
-	// alongside the members, so the spelling never goes stale. Display-only,
-	// like every Union name. A body that is already named or aliased keeps its
-	// own spelling, the way `type Sure = Number` keeps printing `Number`.
+	// An applied anonymous Union or Record displays as written, such as
+	// `Optional<Integer>`. Its Type Arguments stay Types, so a later
+	// substitution keeps the spelling current.
 	if (
 		(appliedType.type === "UnionType" || appliedType.type === "Record") &&
 		appliedType.name === undefined &&
