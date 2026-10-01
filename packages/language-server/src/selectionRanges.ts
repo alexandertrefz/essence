@@ -119,6 +119,17 @@ function collectFromDefaults(
 	return false
 }
 
+// A default comes before the body, and the cursor is in at most one.
+function collectFromDefinition(
+	definition: parser.FunctionDefinitionNode,
+	cursor: common.Cursor,
+	chain: Array<common.Position>,
+) {
+	if (!collectFromDefaults(definition.parameters, cursor, chain)) {
+		collectFromBody(definition.body, cursor, chain)
+	}
+}
+
 function collectFromNode(
 	node: parser.ImplementationNode,
 	cursor: common.Cursor,
@@ -131,11 +142,7 @@ function collectFromNode(
 			descend(node.value, cursor, chain)
 			return
 		case "FunctionStatement":
-			if (collectFromDefaults(node.value.parameters, cursor, chain)) {
-				return
-			}
-
-			collectFromBody(node.value.body, cursor, chain)
+			collectFromDefinition(node.value, cursor, chain)
 			return
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
@@ -218,6 +225,9 @@ function collectFromNode(
 			}
 
 			return
+		case "OverloadedFunctionStatement":
+			collectFromOverloads(node.methods, cursor, chain)
+			return
 		case "TypeAliasStatement":
 			descend(node.predicate, cursor, chain)
 			return
@@ -287,11 +297,7 @@ function collectFromNode(
 
 			return
 		case "FunctionValue":
-			if (collectFromDefaults(node.value.parameters, cursor, chain)) {
-				return
-			}
-
-			collectFromBody(node.value.body, cursor, chain)
+			collectFromDefinition(node.value, cursor, chain)
 			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
@@ -371,6 +377,22 @@ function collectFromNode(
 		case "RationalValue":
 		case "BooleanValue":
 			return
+	}
+}
+
+// An `overload` block, which only the standard library writes, may mix bodied
+// Functions with native signatures, whose defaults are spans inside no body.
+function collectFromOverloads(
+	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
+	cursor: common.Cursor,
+	chain: Array<common.Position>,
+) {
+	for (let method of methods) {
+		if (method.nodeType === "FunctionValue") {
+			descend(method, cursor, chain)
+		} else {
+			collectFromDefaults(method.parameters, cursor, chain)
+		}
 	}
 }
 

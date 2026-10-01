@@ -362,3 +362,32 @@ describe("Selection Ranges inside a refinement predicate", () => {
 		])
 	})
 })
+
+// Only the standard library may write an `overload function` block, but the
+// Parser keeps the block it refuses.
+describe("Selection Ranges inside an overload function block", () => {
+	it("should widen from a name in a body out through its Function", () => {
+		let source = [
+			"implementation {",
+			"\toverload function describe {",
+			"\t\t(_ value: Integer) -> String {",
+			'\t\t\t<- "integer"',
+			"\t\t}",
+			"",
+			"\t\t(_ value: String) -> String {",
+			"\t\t\t<- value::append(value)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 8, column: 8 })).toEqual([
+			{ start: { line: 8, column: 7 }, end: { line: 8, column: 12 } },
+			{ start: { line: 8, column: 7 }, end: { line: 8, column: 27 } },
+			{ start: { line: 8, column: 4 }, end: { line: 8, column: 27 } },
+			{ start: { line: 7, column: 3 }, end: { line: 9, column: 4 } },
+			{ start: { line: 2, column: 2 }, end: { line: 10, column: 3 } },
+			{ start: { line: 1, column: 1 }, end: { line: 11, column: 2 } },
+		])
+	})
+})
