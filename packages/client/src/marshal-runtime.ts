@@ -2545,7 +2545,7 @@ function sameNames(
 const OMITTED: unique symbol = Symbol("omitted")
 
 // How many Arguments a call must write, where the range in `callShape` starts.
-export function requiredCount(signature: FunctionDescriptor): number {
+function requiredCount(signature: FunctionDescriptor): number {
 	return signature.parameters.filter(
 		(parameter) => parameter.optional !== true,
 	).length
