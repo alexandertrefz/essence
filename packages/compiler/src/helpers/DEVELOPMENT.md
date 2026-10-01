@@ -331,3 +331,63 @@ alike. A target wins where the other covers it as a pattern and not the other wa
 cover fails both ways for, such as `List<ItemType>` against `List<Integer> | String`. `filterMostSpecificByTarget`
 keeps the candidates nothing beats. A cyclic order would leave none, so it then hands back every candidate, and the
 caller reports the ambiguity.
+
+## Pending refinement copies
+
+The Enricher hoists declarations in rounds. A declaration that reads something not hoisted yet throws
+`NotHoistedYet`, the one throw the rounds retry. `refusePendingPredicate` throws it for a refinement whose predicate
+is still unread, so the reader runs again once the predicate is filled. Outside a hoist nothing is left to fill it,
+so the same read is an internal error.
+
+A generic refinement is copied whenever `applyGenericBindings` substitutes its base, and
+`refinementWithTypeArguments` copies it again to stamp the applied spelling, such as `NonEmptyList<String>`. The
+conjuncts travel by reference, unsubstituted. A predicate that typechecks against an opaque item Type can not
+mention it, so the Type Arguments live only in the base.
+
+A copy may be taken while the predicate is still unread. `namespace List` answers `hasItems`, the predicate of
+`NonEmptyList`, and also promises `append(_ item) -> NonEmptyList<ItemType>`. Refusing that copy would send the
+Namespace back into the rounds, and the fill would then look for `hasItems` on a Namespace that never hoisted. Each
+would wait for the other. So `trackedRefinementCopy` takes the copy and registers it in `pendingRefinementCopies`
+against the object it was copied from. The fill hands the Alias and every copy one conjuncts array, so nothing
+downstream can tell them apart. A copy of a resolved refinement needs no registration.
+
+The registry is keyed by the source object, not the Alias, since a pending copy may be copied again. A
+signature's `NonEmptyList<Item>` is copied once more when a call instantiates it. Every registered copy is a fresh object, so the entries
+form a tree from the Alias' object, and `pendingRefinementCopiesOf` walks it without a visited set.
+
+The registry lives only while a hoist is open. Hoists nest. A name resolved in a Program's rounds may be the first
+to touch the standard library. Its lazy load then hoists every library file inside that round. So
+`openPendingRefinementCopies` counts, and only the outermost close clears the map. Entries are never removed one
+by one. A copy from a round that failed to hoist costs a field write when the fill reaches it. That is cheaper
+than tracking what a discarded round left behind.
+
+`applyGenericBindings` hands back a refinement whose base holds no Type Parameter as itself, before any copy. So a
+non-generic refinement such as `NonZeroInteger` in a generic Namespace's signature is never copied or registered.
+
+## Predicate conjuncts
+
+A refinement's predicate is stored as conjuncts, each a leaf already resolved to the Method that reads the value.
+`@::isZero()` and `@::is(0)` are one leaf, and `@::isNot(0)` is that leaf negated. Assignability between two
+refinements is set inclusion over `predicateConjunctKey`, so no two questions may share a key. The key joins the
+Namespace, the Method, the negation flag and the Arguments as JSON with `:` separators. No written name holds a
+`:`, and a String Argument arrives quoted. The leaf's `spelling` is left out of the key, since it names the
+question for a reader and does not decide it. `negatedPredicateConjunct` drops the spelling, since the contrary of
+`@::hasCharacters()` is not called `hasCharacters`.
+
+`impliedConjunctKeys` adds what a set of leaves proves beyond itself, by the law of an ordering. `Comparable`
+promises that less than, equal to and greater than one bound exclude each other and cover everything. So a leaf excludes the other
+two comparisons over its Argument, and two excluded comparisons leave the third. A receiver an `if` proved
+`@::isGreaterThan(0)` of thus reaches `NonZeroInteger`. `isBetween` excludes less than its lower bound and greater
+than its higher one, in either order. Only the same Argument is related, so the closure is what a set
+carries on its own and can not grow with the Program.
+
+The law is read only where the base's own Namespace answered the leaf. The covering `Number` counts too, where a
+bound of the other numeric kind falls to it. A Program may declare `isLessThan` on a Namespace for `String` and mean something
+else by it. `answersForBase` and `namespaceAnswersForBase` ask this, and the Enricher's `narrowedBy` applies the
+same guard. `refinableBaseTag` names the base, walking through nested refinements and generic Aliases.
+
+The answer is memoised against the conjuncts array, the object the fill writes into every copy of an Alias. So a
+declared `NonEmptyList<Item>` and each instantiation share it. The base's tag is part of the key.
+
+`boundArgument` reads a bound as an exact pair without dividing, the sign on the numerator, since bounds are only
+compared. It repeats `predicateEval.ts`'s reader, because that module imports this one.

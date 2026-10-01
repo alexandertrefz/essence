@@ -661,30 +661,16 @@ export function filterMostSpecificByTarget<Candidate>(
 	return mostSpecific.length > 0 ? mostSpecific : candidates
 }
 
-// The copies taken of a refinement whose predicate is still unread, kept
-// from the source object to the copies made of it. It exists ONLY while a hoist
-// is open — outside one there is no fill left to complete a pending copy, so
-// taking one is a Compiler bug and stays a throw.
-//
-// Keyed by the object copied FROM rather than by the Alias, because a pending
-// copy is itself pending and may be copied again — `NonEmptyList<Item>` in a
-// signature, instantiated once more at a call site — and the fill has to reach
-// those too. Walking the map from the Alias' own object finds every generation.
-//
-// Entries are never removed one at a time. A copy taken during a round that then
-// failed to hoist is speculative garbage the fill writes into for nothing, which
-// costs a field write and is far cheaper than working out which copies a
-// discarded speculation left behind.
+// The copies taken of a refinement whose predicate is unread, by the object
+// each was copied from. It lives only while a hoist is open. See "Pending
+// refinement copies" in DEVELOPMENT.md.
 let pendingRefinementCopies = new Map<
 	common.RefinementType,
 	Array<common.RefinementType>
 >()
 
-// Hoists NEST — a name resolved during a Program's rounds may be the
-// first to touch the standard library, whose lazy load hoists every library
-// file inside that round. So the registry is opened by counting rather than by
-// replacing: the inner hoist registers into the same map, the outer's fill still
-// finds its own entries, and only the outermost close clears it.
+// Hoists nest, so the registry is opened by counting, and only the outermost
+// close clears it.
 let openHoists = 0
 
 export function openPendingRefinementCopies(): void {
@@ -699,9 +685,8 @@ export function closePendingRefinementCopies(): void {
 	}
 }
 
-// What a declaration throws when it reads something the hoist has not
-// reached yet, and the only throw the rounds retry. Like the parser's
-// `ParseError` it is not an `Error`, so `toString` gives crash reports its text.
+// What a declaration throws when it reads something not hoisted yet, the only
+// throw the rounds retry. Not an `Error`, so `toString` gives crash reports text.
 export class NotHoistedYet {
 	name = "NotHoistedYet"
 	message: string
@@ -735,15 +720,8 @@ export function refusePendingPredicate(
 		: new NotHoistedYet(message, refinement)
 }
 
-// THE door every copy of a refinement goes through, and the reason there
-// are only two callers rather than a spread at each site: a copy taken while the
-// predicate is still unread is a promise to finish it, and the promise is kept by
-// registering the copy against the object it came from. The fill then hands the
-// Alias and every copy of it the very same conjuncts array, so nothing
-// downstream can tell one from the other.
-//
-// A copy of a RESOLVED refinement needs none of this — its conjuncts already
-// travel by reference — so it passes straight through.
+// Every copy of a refinement goes through here. A copy of a pending one is
+// registered against its source, so the fill completes it with the Alias.
 function trackedRefinementCopy(
 	source: common.RefinementType,
 	copy: common.RefinementType,
@@ -769,13 +747,8 @@ function trackedRefinementCopy(
 	return copy
 }
 
-// The applied spelling stamped onto an instantiation, which is the second
-// place a refinement is copied — `NonEmptyList<String>` prints as written rather
-// than as the bare Alias name every instantiation would otherwise share. It goes
-// through the same door as the substitution above, because a copy taken here of a
-// still-pending predicate has to be registered exactly as one taken there does:
-// the stamp is what the signature ends up holding, and an unregistered stamp
-// would keep the null after the fill wrote the conjuncts into everything else.
+// The applied spelling stamped onto an instantiation, such as
+// `NonEmptyList<String>`. A pending copy taken here is registered too.
 export function refinementWithTypeArguments(
 	refinement: common.RefinementType,
 	typeArguments: Array<common.Type>,
@@ -783,11 +756,8 @@ export function refinementWithTypeArguments(
 	return trackedRefinementCopy(refinement, { ...refinement, typeArguments })
 }
 
-// Every copy taken of this refinement, copies of those copies included —
-// what the fill hands the conjuncts to, and what the poison path turns into its
-// own base. The walk terminates without a visited set because every registration
-// is a FRESH object: a copy is never its own source, and no object is ever
-// registered twice, so the entries form a tree rooted at the Alias' object.
+// Every copy taken of this refinement, copies of copies included. Each
+// registered copy is a fresh object, so the walk needs no visited set.
 export function pendingRefinementCopiesOf(
 	refinement: common.RefinementType,
 ): Array<common.RefinementType> {
@@ -822,10 +792,8 @@ export function applyGenericBindings(
 				? type
 				: { type: "List", itemType }
 		}
-		// The one slot a Future has, substituted exactly as a List's item
-		// Type is — `Future<Value>` is what a `namespace Future<infer Value>`
-		// reads its Parameter off, so a Method of one is resolved by the same
-		// machinery every other container's is.
+		// A Future's slot, so a `namespace Future<infer Value>` resolves its Methods as
+		// any container does.
 		case "Future": {
 			let valueType = applyGenericBindings(type.valueType, bindings)
 
@@ -840,10 +808,7 @@ export function applyGenericBindings(
 				? type
 				: { type: "Started", valueType }
 		}
-		// Both slots substituted, and the identity check asks about both:
-		// a `Dictionary<String, T>` comes back as itself while `T` is unbound,
-		// which is what keeps a Type nothing changed comparing by reference for
-		// every reader downstream.
+		// Both slots, and an unchanged Dictionary comes back as itself.
 		case "Dictionary": {
 			let keyType = applyGenericBindings(type.keyType, bindings)
 			let valueType = applyGenericBindings(type.valueType, bindings)
@@ -852,18 +817,8 @@ export function applyGenericBindings(
 				? type
 				: { type: "Dictionary", keyType, valueType }
 		}
-		// A refinement's conjuncts are keys rather than Types, so only the
-		// base can hold a Generic — `NonEmptyList<Item>`'s `List<Item>` is where one
-		// does. The conjuncts travel along BY REFERENCE and unsubstituted, which is
-		// the whole reason a generic refinement costs so little: a predicate that
-		// could mention the item Type would not typecheck against an opaque one, so
-		// what survives is item-agnostic and the Type Arguments live in the base,
-		// where `matchTypes` already compares them.
-		//
-		// An applied spelling substitutes right along with the base, so
-		// `NonEmptyList<Item>` heals into `NonEmptyList<String>` rather than going stale —
-		// the same healing an applied Union's `alias` gets below, and just as
-		// display-only.
+		// Only the base can hold a Generic. The conjuncts travel by reference, and the
+		// applied spelling is substituted with the base.
 		case "Refinement": {
 			let base = applyGenericBindings(type.base, bindings)
 			let typeArguments = type.typeArguments?.map((typeArgument) =>
@@ -881,21 +836,9 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// Copying a PENDING predicate is what lets the Namespace that
-			// ANSWERS a generic Alias' predicate apply that Alias in its own
-			// signatures — `namespace List` answering `hasItems` while promising
-			// `append(_ item) -> NonEmptyList<ItemType>`. Refusing the copy would send
-			// the Namespace back into the rounds, and the fill would then look for
-			// `hasItems` on a Namespace that never hoisted: a deadlock no ordering can
-			// undo, because each side is the other's precondition. So the copy is
-			// taken and REGISTERED, and the fill finishes it along with the Alias.
-			//
-			// Which is why the identity check sits AHEAD of this. A refinement whose
-			// base holds no Type Parameter — every non-generic one, `NonZeroInteger`
-			// among them — comes back AS ITSELF whatever bindings it is handed, so a
-			// generic Namespace with a refined signature (`divide(by NonZeroInteger)`)
-			// is never copied and never registered, exactly as it was before generic
-			// refinements existed.
+			// A pending predicate is copied and registered, so a Namespace answering a
+			// generic Alias' predicate can use the Alias in its signatures. See "Pending
+			// refinement copies" in DEVELOPMENT.md.
 			return trackedRefinementCopy(type, {
 				...type,
 				base,
@@ -923,13 +866,9 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// A plain `name` cannot follow a substitution — it might
-			// spell out the very Type Parameters being replaced — so it is
-			// dropped rather than kept stale. Parameter-free named Unions
-			// (`Number`, a Choice) come back untouched member by member and
-			// survive through the identity check above. An `alias` carries
-			// its Type Arguments as Types, so it substitutes right along and
-			// `Optional<ItemType>` heals into `Optional<Integer>`.
+			// A `name` may spell the Type Parameters being replaced, so it is dropped. An
+			// unchanged named Union returns as itself. An `alias` substitutes along, so
+			// `Optional<ItemType>` becomes `Optional<Integer>`.
 			let substituted: common.UnionType = { type: "UnionType", types }
 
 			if (type.alias !== undefined && aliasArguments !== undefined) {
@@ -963,15 +902,8 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// The two display fields follow the rule they follow on a
-			// Union, one branch up, and for the same reasons: a plain `name`
-			// may well spell out the very Type Parameters being replaced, so
-			// it is dropped rather than kept stale, while an `alias` carries
-			// its Type Arguments as Types and substitutes right along —
-			// `Pair<Item>` heals into `Pair<Integer>`. A Parameter-free named
-			// Record comes back member by member unchanged and survives
-			// through the identity check above, which is what keeps `Standing`
-			// spelled `Standing` everywhere a substitution passes it by.
+			// The display fields follow the Union rule: `name` is dropped, `alias`
+			// substitutes, and an unchanged named Record returns as itself.
 			let substituted: common.RecordType = {
 				type: "Record",
 				members: Object.fromEntries(entries),
@@ -1005,13 +937,9 @@ export function applyGenericBindings(
 						typeArgument === type.typeArguments?.[index],
 				)
 
-			// A DECLARED Case of a generic Choice (`choiceGenerics` set,
-			// no `typeArguments` yet) is being instantiated — force a fresh
-			// object so the applied spelling can be stamped, mirroring the Union
-			// alias healing above. Everything else (a plain Case, an already
-			// instantiated one whose members and Arguments are untouched) comes
-			// back identical, the identity that keeps matchTypes' `lhs === rhs`
-			// fast path O(1) for every non-generic Choice.
+			// A declared Case of a generic Choice is copied so its applied spelling can be
+			// stamped. Any other unchanged Case returns as itself, which keeps the `===`
+			// fast path in `matchTypes` cheap.
 			let isDeclaredCase =
 				type.choiceGenerics !== undefined &&
 				type.typeArguments === undefined
@@ -1025,11 +953,8 @@ export function applyGenericBindings(
 				: Object.fromEntries(entries)
 
 			if (isDeclaredCase) {
-				// The applied spelling, in declaration order — an unbound
-				// Generic stays a GenericUse so a later substitution can still
-				// bind it (a never-`#Done` callback keeps `Result` open). The
-				// declared-only `choiceGenerics` is dropped; what survives is an
-				// instantiated Case carrying its `typeArguments`.
+				// The applied spelling, in declaration order. An unbound Generic stays a
+				// `GenericUse`, so a later substitution can still bind it.
 				return {
 					type: "Case",
 					choice: type.choice,
@@ -1042,12 +967,7 @@ export function applyGenericBindings(
 								name: generic.name,
 							},
 					),
-					// Carried, because it is a fact about the
-					// DECLARATION rather than about the instantiation — a
-					// generic Choice with no payloads has none whichever
-					// Arguments are bound into it. Every other branch of this
-					// case spreads the Case whole and keeps it for free; this
-					// is the one that rebuilds.
+					// A fact about the declaration, kept whatever is bound.
 					...(type.unitChoice === true
 						? { unitChoice: true as const }
 						: {}),
@@ -1065,8 +985,7 @@ export function applyGenericBindings(
 		case "StaticMethod":
 			return {
 				...type,
-				// Spread rather than rebuilt — a Parameter carries what
-				// documents it, and binding a Generic must not lose that.
+				// Spread, so a Parameter keeps what documents it.
 				parameterTypes: type.parameterTypes.map((parameter) => ({
 					...parameter,
 					type: applyGenericBindings(parameter.type, bindings),
@@ -1099,9 +1018,8 @@ export function applyGenericBindings(
 	}
 }
 
-// Handles an expected or actual GenericUse — the first occurrence of a
-// bindable Generic binds the Type on the other side, every later occurrence
-// substitutes the binding and re-checks with the normal assignability rules.
+// Matches a `GenericUse` on either side. A bindable Generic's first occurrence
+// binds the other side, and later ones check against that binding.
 function matchGenericUse(
 	generic: common.GenericUse,
 	otherType: common.Type,
@@ -1112,14 +1030,8 @@ function matchGenericUse(
 		let binding = context.bindings.get(generic.name)
 
 		if (binding !== undefined) {
-			// A Generic already bound to exactly this opaque Generic is
-			// consistent by identity — short-circuit. Without this, verifying
-			// the binding recurses forever when the bound value is a Generic use
-			// of the same name: a Method forwarding a same-named Generic to
-			// another binds `ItemType := ItemType` off the receiver, then
-			// re-matches that binding against the argument's identical
-			// `ItemType`, which matches the binding, which re-matches… A concrete
-			// binding never hits this and still checks through `checkAgainstBinding`.
+			// A Generic bound to this same-named opaque Generic is consistent. Checking
+			// the binding instead would match it against itself without end.
 			if (
 				binding.type === "GenericUse" &&
 				otherType.type === "GenericUse" &&
@@ -1136,31 +1048,21 @@ function matchGenericUse(
 		return true
 	}
 
-	// A Generic that is not bindable here is an opaque symbol of an
-	// enclosing definition — it only matches itself, which the caller has
-	// already checked.
+	// A Generic not bindable here is opaque and matches only itself, which the
+	// caller has checked.
 	return false
 }
 
-// A mark in a context's bindings, taken before a match attempt — the
-// number of bindings it starts from. Everything the attempt binds is added
-// AFTER the mark, so `restoreBindings` can undo a failed attempt by dropping
-// the tail, which beats copying the whole Map for every attempt of every Union
-// member the Enricher meets. What makes the tail exactly the attempt's own work
-// is that bindings only ever GROW while a Type is matched: `matchGenericUse`
-// binds a Generic on its FIRST occurrence and only ever CHECKS it afterwards,
-// so no earlier binding can be overwritten out from under the mark, and a Map
-// iterates in insertion order.
+// A mark taken before a match attempt: the number of bindings so far.
+// INVARIANT: bindings only grow during a match, and a Map iterates in insertion
+// order, so an attempt's own bindings are exactly those after the mark.
 function markBindings(context: GenericInferenceContext | null): number {
 	return context === null ? 0 : context.bindings.size
 }
 
-// Rolls a context back to a mark — the state before a match attempt that
-// has since failed. A failed attempt may well have bound Generics on its way
-// down, and those bindings are worth no more than the attempt that made them:
-// left behind, they decide the attempts that follow. The bindings are dropped
-// in place rather than the Map replaced, so every holder of the context keeps
-// looking at the same object.
+// Rolls a context back to a mark after a failed attempt, whose bindings would
+// otherwise decide the attempts after it. Drops them in place, so every holder
+// keeps the same Map.
 function restoreBindings(
 	context: GenericInferenceContext | null,
 	mark: number,
@@ -1185,10 +1087,8 @@ function restoreBindings(
 	}
 }
 
-// Members that would bind a still-unbound Generic are tried last, so
-// that a Union member with a concrete counterpart does not get eaten by a
-// greedy first-occurrence binding (`String` must match the `String` member
-// of `Value | String`, not bind `Value`).
+// Members that would bind an unbound Generic are tried last, so `String` matches
+// the `String` member of `Value | String` rather than binding `Value`.
 function orderUnionMembersForMatching(
 	types: Array<common.Type>,
 	context: GenericInferenceContext | null,
@@ -1217,10 +1117,8 @@ function orderUnionMembersForMatching(
 
 // #endregion
 
-// Whether every member `promised` says a call may leave out is one
-// `supplied` fills in. Both lists are sorted, so this is a merge rather than a
-// lookup per name — and the overwhelmingly common answer, two Parameters that
-// carry no Record default at all, costs one comparison.
+// Whether `supplied` fills in every member `promised` lets a call leave out.
+// Both lists are sorted, so this is a merge.
 function defaultMembersCover(
 	supplied: ReadonlyArray<string> | undefined,
 	promised: ReadonlyArray<string> | undefined,
@@ -1250,13 +1148,8 @@ function defaultMembersCover(
 	return true
 }
 
-// A signature is substitutable when the actual signature accepts at
-// least what the expected signature promises to feed it (contravariant
-// parameter types) and returns no more than the expected signature promises
-// to yield (covariant return type).
-// This accepts an actual `(_ a: A | B) -> X` where `(_ a: A) -> X` is
-// expected, and rejects the unsafe reverse direction.
-// External parameter names are part of the call syntax and must match exactly.
+// Whether `actual` can stand where `expected` is wanted: Parameter Types are
+// contravariant, the return Type covariant, and labels must match exactly.
 function signatureMatches(
 	expected: common.BaseFunction,
 	actual: common.BaseFunction,
@@ -1271,13 +1164,8 @@ function signatureMatches(
 			return false
 		}
 
-		// A Parameter the expected signature says may be left out has to
-		// be one the actual signature can answer without — a call written
-		// against the expected Type omits the Argument, and the emitted call
-		// passes `undefined` in its place, which only a Parameter that carries
-		// a default of its own consumes. The other direction is safe and is
-		// allowed: a call through a Type that promises nothing writes every
-		// Argument, and a Function that would have filled one in never has to.
+		// A Parameter the expected signature lets a call leave out must have a default
+		// in the actual one, since the call passes `undefined` there.
 		if (
 			expected.parameterTypes[i].hasDefault === true &&
 			actual.parameterTypes[i].hasDefault !== true
@@ -1285,12 +1173,7 @@ function signatureMatches(
 			return false
 		}
 
-		// The same rule one level down. A call written against the
-		// expected Type may leave the members the expected Parameter names out
-		// of its Record Argument, and only a Parameter whose own default fills
-		// those members in can answer it — so every member the expected side
-		// promises has to be one the actual side supplies. The other direction
-		// is safe and is allowed, exactly as it is for `hasDefault`.
+		// The same rule for the members a Record Parameter's default fills in.
 		if (
 			!defaultMembersCover(
 				actual.parameterTypes[i].defaultMembers,
@@ -1317,11 +1200,8 @@ function signatureMatches(
 
 // #region Type Walks, Proofs and Slots
 
-// Whether a Type mentions a Generic anywhere in its tree. Types are
-// plain data, so a structural walk covers every shape — including ones added
-// later — without enumerating them. Used to reject `where` conditions on a
-// Type Parameter the target Type never carries: unification could never bind
-// such a Generic, so no use site could ever produce its witness.
+// Whether a Type mentions a Generic anywhere. A `where` condition on a Type
+// Parameter the target never mentions is refused, since nothing could bind it.
 export function typeMentionsGeneric(
 	type: common.Type,
 	genericName: string,
@@ -1329,18 +1209,14 @@ export function typeMentionsGeneric(
 	return typeMentionsAnyGeneric(type, new Set([genericName]))
 }
 
-// The same walk where the NAMES are what is wanted rather than a yes or
-// no. Asked of a refinement's base, whose Type Parameters are exactly the ones a
-// value standing at that position may decide: `NonEmptyList<Item>` is a Type only
-// once something says what `Item` is, and unifying the base against the value's
-// own Type is how that is worked out.
+// The Generic names a Type mentions, as a refinement's base names the
+// Parameters a value at its position may decide.
 export function genericNamesMentioned(
 	type: common.Type,
 ): Set<common.GenericName> {
 	let names = new Set<common.GenericName>()
 
-	// A search that never finds anything, so the whole Type is walked —
-	// collecting is what it is here for, and answering would stop it early.
+	// A search that never succeeds, so the whole Type is walked.
 	typeWalkFinds(type, (record) => {
 		if (record.type === "GenericUse" && typeof record.name === "string") {
 			names.add(record.name)
@@ -1352,9 +1228,7 @@ export function genericNamesMentioned(
 	return names
 }
 
-// The same walk over a whole SET of Generic names, which is what
-// Argument ordering asks (`does this Parameter wait on anything still
-// unbound?`) — one pass instead of one per name.
+// Whether a Type mentions any of a set of Generic names, in one pass.
 function typeMentionsAnyGeneric(
 	type: common.Type,
 	genericNames: ReadonlySet<common.GenericName>,
@@ -1368,39 +1242,20 @@ function typeMentionsAnyGeneric(
 	)
 }
 
-// Whether an Error Type sits anywhere in this one — the same structural
-// walk, for the same reason it does not enumerate shapes. An Error was already
-// reported where it came from, so a Type carrying one buried in a List's items
-// or a Record's members must not be diagnosed a second time for whatever it
-// then fails to do.
+// Whether an Error Type sits anywhere in this one. It was reported where it
+// came from, so a Type holding one must not be reported again.
 export function typeContainsError(type: common.Type): boolean {
 	return typeWalkFinds(type, (record) => record.type === "Error")
 }
 
-// Whether a checked refinement sits anywhere in this Type — the same
-// structural walk again, and for one purpose: refinements erase before
-// emission, so a Type still carrying one where the Rewriter is about to
-// SERIALIZE it names a Compiler bug rather than a Program's mistake. The walk
-// reads every field so that a refinement buried in a List's items or a Record's
-// member is found too, which is exactly where a hand written eraser would miss
-// one.
+// Whether a checked refinement sits anywhere in this Type. The Rewriter treats
+// one it is about to serialise as an internal error, since refinements erase.
 export function typeContainsRefinement(type: common.Type): boolean {
 	return typeWalkFinds(type, (record) => record.type === "Refinement")
 }
 
-// What makes two predicate leaves the SAME question — the Namespace that
-// answers it, the Method, whether the answer is negated, and the Arguments.
-// Assignability between two refinements is set inclusion over these keys, so
-// nothing may spell two questions alike. Which is why the separator is a COLON
-// and the Arguments are JSON: the Lexer reads `:` as a Symbol, so no name a
-// Program can write holds one, and a String Argument — which arrives quoted —
-// may hold whatever a joined list's separator would have been.
-//
-// The leaf is already RESOLVED where it is built, so this compares questions
-// rather than spellings: `@::isZero()` and `@::is(0)` key alike, and
-// `@::isNot(0)` is the second of those with the flag on. `spelling` is how the
-// leaf was written and is deliberately absent — it names the question for a
-// reader, it does not decide it.
+// The key that makes two leaves one question: Namespace, Method, negation and
+// Arguments, without the spelling. See "Predicate conjuncts" in DEVELOPMENT.md.
 export function predicateConjunctKey(
 	conjunct: common.PredicateConjunct,
 ): string {
@@ -1409,10 +1264,7 @@ export function predicateConjunctKey(
 	}${JSON.stringify(conjunct.args)}`
 }
 
-// The same leaf asked the other way round. A resolved leaf carries its
-// polarity as a flag, so the opposite of one is one field flipped — and the
-// spelling goes with the polarity it belonged to: `hasCharacters` is not what
-// the contrary of `@::hasCharacters()` is called.
+// The leaf negated, without its spelling, which named the other polarity.
 export function negatedPredicateConjunct(
 	conjunct: common.PredicateConjunct,
 ): common.PredicateConjunct {
@@ -1421,43 +1273,9 @@ export function negatedPredicateConjunct(
 	return { ...leaf, negated: !conjunct.negated }
 }
 
-// What a set of leaves proves BESIDES the leaves themselves, as keys. A
-// value proven above zero has been proven not to be zero — so a receiver the
-// `if` proved `@::isPositive()` of reaches `NonZeroInteger`, which is what a
-// reader expects of the two and what comparing the spelled leaves alone does
-// not give.
-//
-// This is the ordering's own law and nothing more, which is what `Comparable`
-// promises of its conformers: below, above and equal to one bound exclude each
-// other and cover everything. So a leaf excludes the other two, and any two
-// exclusions leave the third — the `else` of `@::is(0)` and the `else` of
-// `@::isLessThan(0)` between them say the value is above zero. `isBetween` is
-// the same statement about two bounds at once, and says nothing at all when the
-// bounds enclose nothing.
-//
-// It is the SAME Argument throughout. `@::is(5)` says plenty about zero as
-// well, and every one of those would have to be worked out against every
-// literal any refinement in scope mentions — so what is here is the closure a
-// set carries on its own, which can not grow with the Program.
-//
-// The Methods are named, but only where the base itself answers them.
-// `is`, `isLessThan` and `isGreaterThan` are `Equatable`'s and `Comparable`'s
-// vocabulary, and `isBetween` is `Orderable`'s, and the ordering's law is a
-// promise the BASE makes — so a leaf is read for it only when the Namespace
-// that answered is the base's own, or the covering `Number` an Integer bound on
-// a Rational falls to. A Program may declare
-// `namespace Tally for String { isLessThan(_ n: Integer) … }` and mean
-// something else entirely by the word, and reading the law off that would rule
-// out comparisons nobody made. It is `narrowedBy`'s guard, spelled once more,
-// and it costs the standard library nothing: every conjunct there is
-// `Integer::`, `Rational::`, `String::`, `List::` or `Number::`.
-//
-// Remembered against the conjuncts ARRAY rather than the refinement, because
-// that array is the object the two-stage fill writes into every copy of an
-// Alias — so the declared `NonEmptyList<Item>` and every instantiation of it
-// share one answer, which is exactly what a memo wants. Assignability asks this
-// on a hot path and used to build a fresh Set at every call. The BASE is in the
-// key as well, because the answer is now a question about the two together.
+// The keys a set of leaves proves, its own and those an ordering's law implies
+// for the same Argument, where the base answered the leaf. See "Predicate
+// conjuncts" in DEVELOPMENT.md.
 let impliedKeyMemos = new WeakMap<
 	Array<common.PredicateConjunct>,
 	Map<string, ReadonlySet<string>>
@@ -1509,10 +1327,8 @@ export function impliedConjunctKeys(
 	return keys
 }
 
-// Whether the Namespace that answered a leaf is one the base's own
-// ordering speaks through — the base's Namespace, or the covering `Number` a
-// bound of the other numeric kind falls to. Anything else is a Program's own
-// word for something, and says nothing about below, above and equal.
+// Whether the base's own ordering answered a leaf: the base's Namespace, or the
+// covering `Number`.
 export function answersForBase(
 	conjunct: common.PredicateConjunct,
 	tag: string,
@@ -1520,9 +1336,8 @@ export function answersForBase(
 	return namespaceAnswersForBase(conjunct.namespaceName, tag)
 }
 
-// The same question asked of a NAME alone, which is what reading a body
-// has instead of a leaf: the Enricher decides whether a flipped call may be
-// read as the ordering's converse before it has a conjunct to ask about.
+// The same question of a Namespace name, for the Enricher reading a body before
+// it has a conjunct.
 export function namespaceAnswersForBase(
 	namespaceName: string,
 	tag: string,
@@ -1530,11 +1345,8 @@ export function namespaceAnswersForBase(
 	return namespaceName === tag || namespaceName === "Number"
 }
 
-// The tag of the Type a refinement is written ON. A refinement of a
-// refinement carries its own base one level in, and a generic Alias carries the
-// refinement one level in — so both are walked through to the Integer, Rational,
-// String or List underneath. Anything else answers as itself, which no conjunct's
-// Namespace is ever named after, and so trusts nothing.
+// The tag of the Type a refinement is written on, through nested refinements
+// and generic Aliases.
 export function refinableBaseTag(type: common.Type): string {
 	let current = type
 
@@ -1577,10 +1389,7 @@ function excludedByConjunct(
 			return []
 		}
 
-		// The two bounds name the same range in either order, which is
-		// what the standard library's own body says — so a pair written the
-		// other way round is read with the two exchanged, rather than as a
-		// contradiction nothing may be read off.
+		// The bounds name one range in either order, as the standard library reads them.
 		let exchanged =
 			first.numerator * second.denominator >
 			second.numerator * first.denominator
@@ -1596,10 +1405,8 @@ function excludedByConjunct(
 	return []
 }
 
-// The comparison two EXCLUSIONS over one bound leave standing. The three
-// cover everything between them, so ruling out two proves the third: the `else`
-// of `@::is(0)` and the `else` of `@::isLessThan(0)` say nothing apiece and say
-// "above zero" together.
+// The comparison two exclusions over one bound leave standing: not equal to
+// and not less than zero prove greater than zero.
 function leftByExclusions(
 	conjunct: common.PredicateConjunct,
 	conjuncts: Array<common.PredicateConjunct>,
@@ -1630,9 +1437,7 @@ function leftByExclusions(
 		: []
 }
 
-// The three comparisons over one bound, each mapped to the other two. Read
-// in one direction it is what a leaf rules out, and in the other what two ruled
-// out leave standing.
+// The three comparisons over one bound, each mapped to the other two.
 const COMPARISON_TRIO: Record<string, Array<string>> = {
 	is: ["isLessThan", "isGreaterThan"],
 	isLessThan: ["is", "isGreaterThan"],
@@ -1653,16 +1458,8 @@ function comparisonLeaf(
 	}
 }
 
-// A bound as the exact number it is — a run of digits, or two of them
-// with a slash between, which is what a Rational receiver's conjunct keeps. The
-// two are only ever COMPARED here, so the pair is kept rather than divided, and
-// a negative denominator is moved onto the numerator so the cross-multiplication
-// keeps the order.
-//
-// The reader is written out again rather than borrowed from `predicateEval`,
-// which reads the same two forms: that module is the one that DECIDES a
-// predicate and it imports this one, so the borrowing would have to run the
-// other way round.
+// A bound as an exact pair with the sign on the numerator, for comparing.
+// `predicateEval.ts` imports this module, so its reader can not be borrowed.
 function boundArgument(
 	scalar: string | boolean,
 ): { numerator: bigint; denominator: bigint } | null {
