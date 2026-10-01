@@ -159,7 +159,7 @@
 	"packages/compiler/src/optimiser/reads.ts": {"sentence-length": 3, "em-dash": 3, "all-caps": 2},
 	"packages/compiler/src/optimiser/residual.ts": {"sentence-length": 77, "em-dash": 51, "all-caps": 63, "position": 7, "block-length": 13},
 	"packages/compiler/src/optimiser/walk.ts": {"sentence-length": 55, "em-dash": 46, "all-caps": 29, "position": 6, "block-length": 9},
-	"packages/compiler/src/parser/descent/parse.ts": {"sentence-length": 82, "em-dash": 69, "all-caps": 42, "history": 4, "position": 5, "block-length": 21, "counts": 1},
+	"packages/compiler/src/parser/descent/parse.ts": {"sentence-length": 67, "em-dash": 49, "all-caps": 38, "history": 4, "position": 3, "block-length": 17, "counts": 1},
 	"packages/compiler/src/printType.ts": {"sentence-length": 19, "em-dash": 20, "all-caps": 10, "position": 2, "block-length": 4},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},

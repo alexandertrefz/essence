@@ -6452,12 +6452,8 @@ class DescentParser {
 			)
 		}
 
-		// `[d with a, b]` — a comma-separated list of bare names, which is
-		// the shorthand this form does not have and is never going to. Reported
-		// here rather than left as "expected ']'" for the reason the braced
-		// half reports `shorthand-in-combination`: the comma says the author
-		// meant a key list, and what they have to be told is that a key is a
-		// value and there is nothing for a name to be short for.
+		// `[d with a, b]`: bare names as keys. The comma says a key list was
+		// meant, so the report explains that a key is a value.
 		if (this.tokens.peek()?.type === TokenType.SymbolComma) {
 			throw new ParseError(
 				"A bare name is not a key in an update",
@@ -6493,15 +6489,9 @@ class DescentParser {
 		)
 	}
 
-	// `ownsDocumentation` is false for a literal in EXPRESSION position.
-	// Such a literal is anonymous: it declares nothing, so no `§§` block is
-	// written about it, and the block above it belongs to whatever Declaration
-	// the expression sits inside. `documentationHere` is keyed by line alone,
-	// so a literal sharing that Declaration's line would otherwise claim it —
-	// which is how a Parameter's default `(_ item: ItemType) -> Boolean { … }`
-	// took the Method's block, and had the Method's `@param` lines checked
-	// against the literal's own Parameters. `parseParameterHead` keeps the same
-	// rule off a Parameter, through `startsLine`.
+	// `ownsDocumentation` is false for a literal in Expression position, which
+	// declares nothing. `documentationHere` is keyed by line, so such a literal
+	// would claim the block of the Declaration on its line.
 	protected parseFunctionLiteral(
 		allowsInferredTypes = false,
 		ownsDocumentation = true,
@@ -6558,10 +6548,8 @@ class DescentParser {
 		)
 	}
 
-	// Named Functions and Methods take an optional Generic list before
-	// their parameter list — anonymous Function literals in expression
-	// position are dispatched by their first Token instead (see
-	// `parsePrimaryExpression`).
+	// Named Functions and Methods take an optional Generic list before their
+	// Parameter list.
 	protected parseOptionallyGenericFunctionLiteral(): parser.FunctionValueNode {
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
 			return this.parseGenericFunctionLiteral()
@@ -6578,10 +6566,8 @@ class DescentParser {
 		return this.parseOptionalGenericListWithPosition().generics
 	}
 
-	// The same list, with the span of the `<…>` the entries were written
-	// in — null where none was. Only a Method keeps it (see
-	// `FunctionDefinitionNode.genericListPosition`); the readers that take the
-	// entries alone go through `parseOptionalGenericList` above.
+	// The same list with the span of its `<…>`, or null where none was
+	// written. See `FunctionDefinitionNode.genericListPosition`.
 	protected parseOptionalGenericListWithPosition(): {
 		generics: Array<parser.GenericDeclarationNode>
 		position: common.Position | null
@@ -6628,9 +6614,8 @@ class DescentParser {
 	}
 
 	protected parseGenericDeclaration(): parser.GenericDeclarationNode {
-		// `infer` is a valid Identifier, so it only acts as the modifier
-		// when it is followed by the actual Generic name — `<infer>` declares
-		// a Generic named `infer`.
+		// `infer` is the modifier only where a name follows, so `<infer>`
+		// declares a Generic named `infer`.
 		let inferred = false
 		let inferKeyword: Token | null = null
 
@@ -6645,8 +6630,8 @@ class DescentParser {
 		let name = this.parseIdentifier()
 		let start = inferKeyword?.position.start ?? name.position.start
 
-		// `is` is contextual — `<infer Item is Comparable>` bounds the
-		// Type Parameter by a Protocol.
+		// A contextual `is` bounds the Type Parameter by a Protocol, as in
+		// `<infer Item is Comparable>`.
 		let constraint: parser.IdentifierNode | null = null
 		let peeked = this.tokens.peek()
 		if (
@@ -6728,9 +6713,7 @@ class DescentParser {
 		}
 	}
 
-	// The `§§` block above whatever is about to be parsed. Every
-	// Declaration sits on the line of its own first Token, so no Declaration
-	// needs to hand its Documentation down to the signature it owns.
+	// The `§§` block on the lines just before the next Token.
 	protected documentationHere(): common.Documentation | null {
 		let token = this.tokens.peek()
 
@@ -6741,20 +6724,9 @@ class DescentParser {
 		return this.tokens.documentationAbove(token.position.start.line)
 	}
 
-	// `allowsInferredTypes` is set only for a Function literal in
-	// expression position, where an omitted annotation has an expected
-	// signature to be read off. Every Declaration parses its annotations, so a
-	// null Type can not reach a named Function or a Method.
-	// The `= expression` a caller may leave out, read after everything
-	// else the Parameter writes. There is nothing to disambiguate here:
-	// Essence has no infix operators at all, so nothing continues an
-	// expression past a top-level `,` or `)`, and any comma inside the default
-	// sits within a `(…)`, `[…]`, `{…}` or `<…>` the sub-parser already
-	// balances.
-	//
-	// It is attached to the finished Parameter rather than threaded through
-	// the nine places one is built, and it deliberately leaves `position`
-	// alone — see the NOTE on `ParameterNode`.
+	// `allowsInferredTypes` is set only for a Function literal in Expression
+	// position, where an expected signature supplies omitted annotations. A
+	// default value, `= expression`, is attached last and leaves `position` alone.
 	protected parseParameter(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
@@ -6769,17 +6741,9 @@ class DescentParser {
 		return parameter
 	}
 
-	// `start` and `complete` can not be a Parameter's LABEL. A label
-	// stands exactly where the two words open their prefix Expression, so
-	// `compute(start 1)` is a `start` of `1` and never an Argument labelled
-	// `start` — a Parameter asking for one could not be written at a call at
-	// all, and every call would report a label the caller had already written.
-	// Refused here, where the signature is read, so the Declaration is what
-	// answers for it.
-	//
-	// The label is dropped and the Parameter keeps its name, the way a
-	// `redundant-parameter-label` does: one reserved word is no reason to
-	// refuse the whole Declaration and cascade through its body.
+	// `start` and `complete` can not be a Parameter's label, since no call
+	// could pass one. See "Asynchrony keywords" in DEVELOPMENT.md. The label is
+	// dropped and the Parameter keeps its name.
 	protected parameterLabel(
 		name: parser.IdentifierNode,
 	): parser.IdentifierNode | null {
@@ -6811,9 +6775,8 @@ class DescentParser {
 	protected parseParameterHead(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
-		// Only a Parameter written on a line of its own can carry a
-		// block — otherwise the first Parameter of `function greet (…)` would
-		// claim the Function's own Documentation.
+		// Only a Parameter on a line of its own carries Documentation, so the
+		// first Parameter of `function greet (…)` leaves the Function's alone.
 		let documentation = this.tokens.startsLine()
 			? this.documentationHere()
 			: null
@@ -6821,22 +6784,16 @@ class DescentParser {
 		let annotationFollows = () =>
 			this.tokens.peek()?.type === TokenType.SymbolColon
 
-		// `(a + b) * c` — the parentheses a reader wrote to GROUP, read
-		// here as the Parameter list of a Function literal, `a` as a label and
-		// `+` as the name it labels. What came of that was
-		// `redundant-parameter-label` about a Parameter nobody wrote, and then
-		// a `syntax-error` at the `b` behind it. The `+` is refused instead,
-		// where it stands, with the note that says there are no grouping
-		// parentheses either — see `operatorNote`.
+		// `(a + b) * c`: grouping parentheses read as a Parameter list. The `+`
+		// is refused where it stands. See `operatorNote`.
 		let following = this.foreignTextFollowing()
 
 		if (following !== null) {
 			this.refuseForeignText(following)
 		}
 
-		// A leading `{` — a Pattern standing where the internal name goes,
-		// with no label written. Like a bare `item`, it takes both its Type and
-		// its label from the expected signature.
+		// A Pattern with no label, which takes its Type and label from the
+		// expected signature.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
 			return this.parsePatternParameter(null, null, documentation)
 		}
@@ -6844,9 +6801,7 @@ class DescentParser {
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
 
-			// `_ { … }` — the labelless Pattern Parameter written out,
-			// which is what a named Function needs, since it parses its
-			// annotations rather than reading them off a signature.
+			// `_ { … }`: the unlabelled Pattern Parameter written out.
 			if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
 				return this.parsePatternParameter(
 					null,
@@ -6855,8 +6810,8 @@ class DescentParser {
 				)
 			}
 
-			// A bare `_` — binds no name and takes its Type from the
-			// expected signature, the contextual counterpart of `_: Type`.
+			// A bare `_` binds no name and takes its Type from the expected
+			// signature.
 			if (allowsInferredTypes && !isIdentifierToken(this.tokens.peek())) {
 				return generators.parameter(
 					null,
@@ -6867,9 +6822,8 @@ class DescentParser {
 				)
 			}
 
-			// `_: Type` stops at the `_` — it drops the label *and* the
-			// name, leaving a Parameter the body has no way to refer to. `_
-			// name: Type` only drops the label.
+			// `_: Type` has neither label nor name, while `_ name: Type` has no
+			// label.
 			if (this.tokens.peek()?.type === TokenType.SymbolColon) {
 				this.tokens.next()
 
@@ -6889,8 +6843,7 @@ class DescentParser {
 
 			let internalName = this.parseIdentifier()
 
-			// `_ name` — the same Parameter `_ name: Type` declares,
-			// with the Type left to the expected signature.
+			// `_ name`, with the Type left to the expected signature.
 			if (allowsInferredTypes && !annotationFollows()) {
 				return generators.parameter(
 					null,
@@ -6919,9 +6872,8 @@ class DescentParser {
 
 		let name = this.parseIdentifier()
 
-		// `of { width, height }: Rectangle` — a label, then a Pattern where
-		// the internal name goes. The label is what the caller writes, so the
-		// call site is untouched by anything the Pattern says.
+		// `of { width, height }: Rectangle`: a label, then a Pattern where the
+		// internal name goes.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
 			return this.parsePatternParameter(
 				this.parameterLabel(name),
@@ -6933,12 +6885,8 @@ class DescentParser {
 		if (isIdentifierToken(this.tokens.peek())) {
 			let internalName = this.parseIdentifier()
 
-			// A written label is only meaningful next to a written Type
-			// — an unannotated Parameter takes its label from the expected
-			// signature, so there would be nothing for this one to agree with.
-			// The label is dropped and parsing continues, so that one mistaken
-			// label does not cascade into a parse failure for the whole
-			// literal.
+			// An unannotated Parameter takes its label from the expected
+			// signature, so a written label is reported and dropped.
 			if (allowsInferredTypes && !annotationFollows()) {
 				let labelPosition = {
 					start: name.position.start,
@@ -6983,11 +6931,8 @@ class DescentParser {
 			)
 		}
 
-		// A bare `item` — both the Type and the label come from the
-		// expected signature, which is why no external name is recorded. This
-		// is the one place a lone Identifier does not mean `name: Type`'s
-		// label-and-name, and it is why the annotated and unannotated forms of
-		// a lambda can not be mixed within one Parameter.
+		// A bare `item` takes its Type and label from the expected signature,
+		// so no label is recorded.
 		if (allowsInferredTypes && !annotationFollows()) {
 			return generators.parameter(
 				null,
@@ -7011,10 +6956,8 @@ class DescentParser {
 		)
 	}
 
-	// The tail of every Pattern Parameter, shared by its three spellings —
-	// `({ … })`, `(_ { … }: Type)` and `(label { … }: Type)`. The annotation is
-	// optional for the same reason a bare `item`'s is: a Function literal in
-	// Argument position has an expected signature to read it off.
+	// The tail of a Pattern Parameter: `({ … })`, `(_ { … }: Type)` or
+	// `(label { … }: Type)`. The annotation is optional where inferred Types are.
 	protected parsePatternParameter(
 		externalName: parser.IdentifierNode | null,
 		underscorePosition: common.Position | null,
