@@ -895,13 +895,40 @@ describe("composite keys", () => {
 	// The text is remembered under a Symbol on the interned instance, invisible
 	// to `Record::is` and the derived equality.
 	test("a unit Case remembers its text on the interned instance", () => {
-		let red = asValue(createCase("Colour#Red"))
-		let first = encodeKey(red, equality) as { text: string }
-		let second = encodeKey(red, equality) as { text: string }
+		let lit = asValue(createCase("Lamp#Lit"))
+		let memos = lit as unknown as Record<symbol, string>
+		let remembered = () =>
+			Object.getOwnPropertySymbols(lit).filter(
+				(symbol) => symbol !== typeKeySymbol,
+			)
 
-		expect(first.text).toBe(second.text)
-		expect(Object.keys(red)).toEqual([])
-		expect(anyIs(red, asValue(createCase("Colour#Red")))).toBeTrue()
+		// The instance lives as long as the process, so an earlier run of this
+		// test may have left its text there.
+		for (let symbol of remembered()) {
+			delete memos[symbol]
+		}
+
+		expect(remembered()).toEqual([])
+
+		let first = encodeKey(lit, equality) as { text: string }
+
+		expect(remembered()).toHaveLength(1)
+
+		let memo = remembered()[0]
+
+		expect(memos[memo]).toBe(first.text)
+
+		// Every later instance of the tag is that object. A planted text comes
+		// back, so encoding reads the instance rather than spelling the Case again.
+		let again = asValue(createCase("Lamp#Lit"))
+
+		expect(again).toBe(lit)
+		memos[memo] = "planted"
+		expect(encodeKey(again, equality)).toEqual({ text: "planted" })
+		memos[memo] = first.text
+
+		expect(Object.keys(lit)).toEqual([])
+		expect(anyIs(lit, again)).toBeTrue()
 	})
 })
 
