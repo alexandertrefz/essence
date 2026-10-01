@@ -1935,16 +1935,9 @@ export function createInterpreter(
 		)
 	}
 
-	// Work met where the bundle carries no door for it. Unlike the
-	// Dictionary's, this one is not reachable from a boundary the Compiler
-	// described: work at an undeclared position is refused by
-	// `asynchronyInsideValue` before any door is asked for, so a Descriptor that
-	// names a Future while the bundle carries none is a Descriptor and a bundle
-	// that did not come from one compile.
-	//
-	// Said out loud for the reason `runtimeBridgeOf` says its own: a
-	// `TypeError` about `undefined` from inside a walk names nothing a reader
-	// can act on.
+	// Work where the bundle carries no door for it. Undeclared work meets
+	// `asynchronyInsideValue` first, so here the Descriptor and the bundle come
+	// from two compiles.
 	function noFutureDoor(at: Path | null, step: Step): EssenceMarshalError {
 		let where = spell(at, step)
 
@@ -1996,10 +1989,8 @@ export function createInterpreter(
 		)
 	}
 
-	// What the value IS, in one clause, for the second half of an Error.
-	// Never the value itself past a bounded length: what is being described is a
-	// value a host got wrong, which is exactly the sort that turns out to be a
-	// megabyte of JSON.
+	// What the value is, in one clause, for an Error. Never the whole value,
+	// which may be huge.
 	function describe(value: unknown): string {
 		if (value === undefined) {
 			return "nothing"
@@ -2021,18 +2012,12 @@ export function createInterpreter(
 					}`
 		}
 
-		// A Promise, named as one. It has no own keys either, so the clause
-		// at the bottom would call it an empty object — and of every value a
-		// host is likely to hand the wrong door, this is the one whose mistake is
-		// worth naming: it is an answer that has not arrived, and the Module has
-		// somewhere to put one only where it declared work.
+		// A Promise has no own keys, and would read as an empty object.
 		if (value instanceof Promise) {
 			return "a Promise, which crosses only where the Module declared a Future"
 		}
 
-		// Named as the Map it is rather than read for members it has none
-		// of — `Object.keys` answers nothing at all for one, so the clause below
-		// would call a Map of a thousand entries an empty object.
+		// A Map has no own keys either.
 		if (value instanceof Map) {
 			return value.size === 0
 				? "an empty Map"
@@ -2053,25 +2038,15 @@ export function createInterpreter(
 				return "a function"
 		}
 
-		// An Essence value, named by its own tag — read through the bridge's
-		// key like every other tag, so a value from ANOTHER bundle is described as
-		// the plain object it is from here rather than misreported as one of this
-		// Module's.
+		// An Essence value of this bundle, named by its tag.
 		let tag = (value as Record<symbol, unknown>)[typeKey]
 
 		if (typeof tag === "string") {
-			// A Case is named the way a host reads it — `Shape#Circle`,
-			// with the Module the tag carries taken back off, which is the
-			// spelling `caseName` below hands out everywhere else on this
-			// boundary. A refusal that named the compiling machine's path told
-			// its reader nothing they could act on.
+			// A Case as a host reads it, `Shape#Circle`, without the Module.
 			return `an Essence ${tag.includes("#") ? caseName(tag) : tag} value`
 		}
 
-		// Tagged, but by another copy of the runtime — see
-		// `mintedTypeKeys`. Named as the Essence value it is, and as one this
-		// Module can not accept, because "an object with 'value'" is true and
-		// sends the host looking in the wrong place entirely.
+		// Tagged by another copy of the runtime (`mintedTypeKeys`).
 		let foreign = foreignTag(value, typeKey)
 
 		if (foreign !== null) {
@@ -2088,11 +2063,7 @@ export function createInterpreter(
 	// #endregion
 
 	return {
-		// A NULLISH Descriptor rather than an absent one, because a host
-		// that has none to pass reaches for either spelling — `undefined` from a
-		// caller that left the Argument off, `null` from one that had a variable
-		// holding no Descriptor — and both say the same thing: nothing was
-		// declared here, so read the value by what it says it is.
+		// `undefined` and `null` both mean nothing was declared.
 		toJS: (value, path = "value", expected) =>
 			expected === undefined || expected === null
 				? toJS(value, null, path, null)
@@ -2113,13 +2084,8 @@ export function createInterpreter(
 	}
 }
 
-// The keys of a value that the shape it is crossing as does not name, or
-// `null` where there are none — the Array is built on the first of them, because
-// a value that fits declares nothing extra and should leave nothing behind.
-//
-// Reached for a Record only where its keys were not the members
-// themselves — see the two lists compared where the members are read, which is
-// what answers this without a walk at all for a value written as its Type reads.
+// The keys the shape does not name, or `null`. The Array is built on the first,
+// so a fitting value allocates nothing.
 function undeclaredOf(
 	given: Record<string, unknown>,
 	declared: Set<string>,
@@ -2144,27 +2110,19 @@ function undeclaredOf(
 
 // #region Binding
 
-// The Module's exports as things a host can USE — a Function it can call, a
-// Namespace it can reach a Method on — rather than the tagged values the bundle
-// binds. Marshalling says what a value crossing the boundary becomes; this says
-// which name is bound to what.
+// The Module's exports for a host to use, and the bundle's own bindings.
 export type ModuleBindings = {
-	// JavaScript all the way down: values marshalled, Functions callable
-	// with JavaScript Arguments, Namespaces plain objects of the same.
+	// Marshalled values, callable Functions, and Namespaces as plain objects.
 	exports: Readonly<Record<string, unknown>>
-	// The bundle's own bindings under the names their author wrote, and
-	// nothing else done to them.
+	// The bundle's own bindings under the names their author wrote.
 	raw: Readonly<Record<string, unknown>>
 }
 
 export type BindOptions = {
-	// THIS bundle's own Type key and value constructors. Not optional and
-	// not discoverable: every Essence value carries its Type on a Symbol minted
-	// when a bundle was evaluated, so a bridge belongs to one bundle and binding
-	// against another's would build values the Module can not read.
+	// This bundle's Type key and value constructors. Another bundle's bridge
+	// would build values this Module can not read.
 	bridge: RuntimeBridge
-	// The host's own stop, which becomes the ROOT of every run this
-	// binding starts — see `InterpreterOptions`.
+	// The host's stop, the root of every run this binding starts.
 	signal?: AbortSignal
 }
 
@@ -2182,18 +2140,15 @@ export function bind(
 	let exports: Record<string, unknown> = {}
 
 	for (let [name, entry] of Object.entries(descriptor.exports)) {
-		// An Overload set binds nothing under its own name, so it is the
-		// one export whose binding is not read off `raw` — it is bound to the
-		// refusal that says why, and where its Overloads are instead.
+		// An Overload set binds no name, so it is bound to a refusal that
+		// says where its Overloads are.
 		if (entry.kind === "overloaded") {
 			exports[name] = overloadedCall(entry.overloads, name)
 
 			continue
 		}
 
-		// And a Choice binds nothing at all — its Cases are Types, which
-		// are erased before a byte is emitted. What goes under the name is
-		// built here instead of read off the bundle.
+		// A Choice binds nothing either, so its constructors are built here.
 		if (entry.kind === "choice") {
 			exports[name] = caseConstructors(entry.cases)
 
@@ -2232,14 +2187,9 @@ export function bind(
 	return { exports: Object.freeze(exports), raw }
 }
 
-// The Module's exports under the names they were WRITTEN under. The
-// Rewriter escapes a name JavaScript can not spell — `ok?` is bound as
-// `$user_ok_3f_` — and a Descriptor carries what it emitted, so the two spellings
-// can not drift apart.
-//
-// A name the Descriptor lists that the bundle does not bind would be a
-// Compiler bug, and is left out rather than bound to `undefined` — reading it
-// then says "no such export" instead of handing back nothing.
+// The bundle's bindings under their written names, read through the emitted
+// names the Descriptor carries. A name the bundle does not bind is left out
+// rather than bound to `undefined`.
 function bindRaw(
 	bundle: Record<string, unknown>,
 	descriptor: ModuleDescriptor,
@@ -2247,13 +2197,8 @@ function bindRaw(
 	let raw: Record<string, unknown> = {}
 
 	for (let [name, entry] of Object.entries(descriptor.exports)) {
-		// An Overload set binds no name of its own — each Overload is its
-		// own `name__overload$N` — so the whole set is put on `raw` under those
-		// names, which are the only ones a host can actually call. (No user Module
-		// reaches this today: `overload function` is the standard library's alone,
-		// and the `declarations` files that may write it may not export. It is
-		// here because `raw` promises the bundle's bindings, and a promise with a
-		// hole in it is worse than a branch that waits.)
+		// Each Overload is bound under a name of its own, and so is each put
+		// on `raw`.
 		if (entry.kind === "overloaded") {
 			for (let overload of entry.overloads) {
 				if (overload.emitted in bundle) {
@@ -2264,9 +2209,7 @@ function bindRaw(
 			continue
 		}
 
-		// A Choice is not on `raw` under any name, because the bundle
-		// binds none: its constructors are this side's answer to a Type that was
-		// erased, and `raw` promises the bundle's own bindings and nothing else.
+		// A Choice binds nothing in the bundle, so `raw` has nothing for it.
 		if (entry.kind === "choice") {
 			continue
 		}
@@ -2279,24 +2222,9 @@ function bindRaw(
 	return Object.freeze(raw)
 }
 
-// One way to spell each Case of a Choice, under the Case's own name. A
-// Case with a payload is a Function of it — `Shape.Circle({ radius: 3n })` — and
-// one without is the value itself: there is nothing to pass, and `Shape.Blank()`
-// would be a call whose only purpose is to look like the others.
-//
-// And a Case of a unit Choice is the STRING it crosses as, so
-// `Direction.Up` and `"Up"` are the same value rather than two spellings of
-// one. A host that writes the constructor gets what it would have written by
-// hand, which is what makes the name worth offering at all: it is a place to
-// read the Cases off and to have a typo caught, not a wrapper around the
-// value.
-//
-// Nothing here marshals or checks. What comes back is the plain object the
-// boundary already accepts, so a constructor is a SPELLING and the deciding
-// stays where every other decision is — at the crossing, once, with the path and
-// the Type to say it in. The tag is written last for the reason `toJS` writes it
-// last: which Case a value is is part of the value, and a payload member of that
-// name is refused where the value crosses rather than silently taking it over.
+// Each Case of a Choice under its own name: a Function of its payload, the
+// value itself, or for a unit Choice the string it crosses as. Nothing is
+// checked here, since the crossing checks. The tag is written last.
 function caseConstructors(
 	cases: Array<CaseDescriptor>,
 ): Readonly<Record<string, unknown>> {
@@ -2318,24 +2246,9 @@ function caseConstructors(
 	return Object.freeze(constructors)
 }
 
-// A constant is marshalled ON READ rather than at bind time, for two
-// reasons that happen to have one answer.
-//
-// A value the boundary has no mapping for — the numeric tower above Rational,
-// today — would otherwise take the whole Module down: one `constant root =
-// 2::squareRoot()` and `exports`, `raw`, `bridge` and `marshaller` are all
-// unreachable over an export nobody asked for. Bound this way, the refusal lands
-// on the export that caused it, where it can be read and worked around.
-//
-// And what a read hands back is a fresh value every time, exactly as
-// `marshaller.toJS(raw.…)` is. A single marshalled Array shared by every reader
-// is one a host can push onto, which changes what every other holder of the same
-// Module sees — while `Object.freeze(exports)` says, wrongly, that it cannot.
-//
-// What was declared rides along for the one value a tag does not describe —
-// a Function inside the constant, which the way out wraps against it. The
-// Descriptor is walked once HERE, where the export is bound, so that reading the
-// name a hundred times walks it none.
+// A constant is marshalled on each read. An unmappable one then refuses only
+// itself, and each read hands back a fresh value a host may change freely. The
+// Descriptor is compiled once, here.
 function defineConstant(
 	target: Record<string, unknown>,
 	key: string,
@@ -2352,11 +2265,8 @@ function defineConstant(
 	})
 }
 
-// WHICH Overload a call means is a question only the Compiler answers — it
-// reads the Argument Types, and a JavaScript value has none to read. So the name
-// is bound to the refusal rather than left off: reaching it says what is wrong
-// and where the Overloads are, where a missing name would only say that something
-// the Module exports is not there.
+// Only the compiler can pick an Overload, from the Argument Types. The name is
+// bound to a refusal that lists the Overloads.
 function overloadedCall(
 	overloads: Array<OverloadDescriptor>,
 	name: string,
@@ -2372,19 +2282,9 @@ function overloadedCall(
 	}
 }
 
-// A Namespace is emitted as a class of static Methods, so it comes back as
-// a plain object of the same names — a host writes `Rectangle.of(…)` either way.
-// An INSTANCE Method keeps the receiver it is emitted with as its first Argument,
-// `Point.shifted(point, 4n)`, because there is no `::` on this side to put it
-// before the name.
-//
-// OWN members, because a Namespace is emitted as a class and a class
-// inherits `name`, `length`, `call` and `bind` from `Function` — an `in` would
-// answer for a Method the bundle does not bind and hand back JavaScript's own.
-//
-// A static constant is bound ON READ for the reasons `defineConstant`
-// states — a constant is a constant wherever it sits, and one the boundary has no
-// mapping for would otherwise take the whole Namespace with it.
+// A Namespace, emitted as a class, as a plain object of its statics. An
+// instance Method takes its receiver first, as in `Point.shifted(point, 4n)`.
+// Own members only, since a class inherits `name` and `call` from `Function`.
 function bindNamespace(
 	value: unknown,
 	descriptor: NamespaceDescriptor,
@@ -2393,10 +2293,8 @@ function bindNamespace(
 	let namespace = value as Record<string, unknown>
 	let bound: Record<string, unknown> = {}
 
-	// The constructors of the Choice this Namespace shares its name with,
-	// where there is one. They are written FIRST so that a Method or a static
-	// constant of the same name — which the bundle really does bind — wins:
-	// what a Module declares outranks what this side offers.
+	// The constructors of a Choice of the same name, first, so a member the
+	// Module declares replaces one.
 	for (let [name, constructor] of Object.entries(
 		caseConstructors(descriptor.cases ?? []),
 	)) {
@@ -2444,21 +2342,9 @@ function bindNamespace(
 
 // #region Calls
 
-// The Arguments in the order the emitted Function takes them, whichever way
-// the caller wrote the call.
-//
-// A Function whose every Parameter carries a label may be called with one object
-// instead — `Rectangle.of({ width: 3n, height: 4n })` — because that is the call
-// Essence itself writes, and dropping to positional Arguments at the boundary
-// would lose the one thing the Declaration insisted on. The keys have to be
-// EXACTLY the labels: a labelled call with a missing or a misspelled one is a
-// mistake, not a positional call that happens to pass an object.
-//
-// The answer is the Array the call is made from, and WHICH Array it is says
-// how the call was written: a labelled call is read into one of its own, so
-// `ordered !== args` is that an Argument has a label to be named by in an Error.
-// One object less per call than a field saying the same thing, and there was
-// never anything else the field meant.
+// The Arguments in the emitted Function's order. A Function with every
+// Parameter labelled also takes one object keyed by exactly the labels. A
+// labelled call answers a new Array, so `ordered !== args` marks it.
 function readCall(
 	args: Array<unknown>,
 	signature: FunctionDescriptor,
@@ -2481,12 +2367,8 @@ function readCall(
 					let optional =
 						signature.parameters[position]?.optional === true
 
-					// A key that is absent and a key written as
-					// `undefined` are the same call. The `.d.ts` this generator
-					// writes types an omittable label as `label?: T`, and
-					// TypeScript's `?` admits an explicit `undefined` — so
-					// refusing one here would refuse a call the declaration it
-					// was given says is legal.
+					// An absent key and one written `undefined` are the same
+					// call, as TypeScript's `label?: T` allows.
 					ordered[position] =
 						Object.hasOwn(given, label) &&
 						!(optional && given[label] === undefined)
