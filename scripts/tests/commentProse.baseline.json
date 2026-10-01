@@ -57,7 +57,6 @@
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
 	"packages/compiler/src/testing/coverageReports.ts": {"sentence-length": 6, "em-dash": 4, "all-caps": 5, "position": 1, "block-length": 1},
-	"packages/compiler/src/testing/snapshots.ts": {"sentence-length": 11, "em-dash": 10, "all-caps": 9, "block-length": 3},
 	"packages/compiler/src/testing/staging.ts": {"sentence-length": 1},
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
 	"packages/compiler/src/tests/asynchrony.spec.ts": {"sentence-length": 25, "em-dash": 20, "all-caps": 13, "block-length": 1, "counts": 1},

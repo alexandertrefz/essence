@@ -59,3 +59,29 @@ build, has no line coverage. `isReported` leaves it out of the table, and its co
 
 `percentageOf` answers null where there is nothing to measure, which a report draws as a dash. It rounds down, so
 100% means every point: 199 of 200 is 99, and a gate reading it does not pass a missed branch.
+
+## Snapshots
+
+`snapshots.ts` keeps the stored half of `matches snapshot from "name"`. The runtime never touches a file, since a
+bundle may run in a browser. Whoever starts a run reads the entries, hands them over, and writes back what the run
+recorded. The CLI and the language server both do, so a snapshot accepted through a Code Lens lands where
+`essence test --update` puts it.
+
+A `.snap` file lives in `__snapshots__` beside its source, so it travels with its file. Its format:
+
+- Lines before the first entry are a comment, written afresh each time.
+- An entry opens with `snapshot "name"` at the left margin. The name is escaped as a String Literal's would be.
+- Each line of the entry's text follows with one leading tab, an empty line as a lone tab. A line starting with a
+  tab belongs to the entry and gives up one tab. Anything else ends it, so the round trip is exact.
+- Entries are written in name order, so recording one twice writes the same bytes.
+
+It is not an `.es` file because the text is whatever a value printed. Escaping it into a Literal would make it
+harder to read. A file whose every newline is a CRLF had its line endings rewritten by a tool, so those `\r`s are
+dropped. A file mixing the two keeps them, since the format writes only `\n`, so a `\r` there is the value's. A
+value holding a CRLF inside a fully rewritten file can not be told apart, and `essence test --update` repairs it.
+
+`writeSnapshots` writes only `written` snapshots. A companion file is written straight to disk, since nobody edits
+one by hand. An inline snapshot rewrites a source through the formatter, which the caller hands in lazily so a
+run without inline snapshots never loads it. The language server asks for the new text instead of a write, since
+the buffer it compiled may be unsaved. An entry no test names is kept, since a run narrowed by `--filter` or a tag
+has not visited every test.
