@@ -2,30 +2,15 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { modulePathOf } from "./scope"
 
-// The Types written down in a source, paired with what each one resolved
-// to. Module state, exactly as the Diagnostic list is — `resolveType` would
-// otherwise have to thread a collector through itself and its ~35 callers, for
-// something no stage of the Compiler reads.
-//
-// NULL rather than an empty Map when nobody is collecting: only the Language
-// Server ever asks for this, and a compile must not pay a Map write per
-// annotation for a Hover it will never render.
-//
-// Keyed by the parser NODE, not by its Position, so that `Map.set` IS the
-// last-write-wins rule. The same annotation is resolved more than once —
-// hoisting resolves declarations speculatively in rounds and the in-order
-// enrichment re-resolves most of them afterwards — and the LAST resolution is
-// always the authoritative one, because the Scope those rounds resolve against
-// is one object that only ever grows. Keying by Position would say the same
-// thing less exactly; keying by node also collapses the repeats, so the index
-// stays one entry per annotation rather than one per round.
+// The Types written in a source, paired with what each resolved to. Only the
+// language server reads them, so this is `null` while nobody collects. Hoisting
+// resolves an annotation once per round and enrichment again; keyed by the
+// parser Node, the last resolution wins and the repeats collapse.
 let activeAnnotations: Map<
 	parser.TypeDeclarationNode,
 	{ type: common.Type; modulePath: string | null }
 > | null = null
 
-// The Scope is only consulted when a collector is open — the walk to its
-// Module path is not free, and a compile records nothing.
 export function recordAnnotation(
 	node: parser.TypeDeclarationNode,
 	type: common.Type,
@@ -38,18 +23,11 @@ export function recordAnnotation(
 	activeAnnotations.set(node, { type, modulePath: modulePathOf(scope) })
 }
 
-// Opened ONCE, around a whole enrichment — NOT per speculative round the
-// way `collectDiagnostics` is, and that is not a matter of taste. A hoisted
-// Type Alias, Choice, Protocol or Namespace target is never re-resolved
-// afterwards (`enrichStatement` reuses the hoisted Type), so its annotations
-// exist ONLY inside a speculation. Scoping the collector to a round would
-// discard precisely those, and the index would answer for almost nothing.
-// `modulePath` filters the collection to the annotations recorded while
-// enriching ONE Module — a group of Modules hoists every file's declarations
-// interleaved, so a collector spanning the group holds every file's
-// annotations, at Positions that mean nothing outside their own file. The
-// standard library's lazy load records under no Module path at all and is
-// filtered away by the same comparison.
+// Opened around a whole enrichment, not per hoisting round. A hoisted Type
+// Alias, Choice, Protocol or Namespace target is not resolved again, so its
+// annotations exist only inside a round. `modulePath` keeps one Module's
+// annotations, since a group hoists its files interleaved. The standard
+// library records under no Module path.
 export function collectAnnotations<T>(
 	work: () => T,
 	options: { modulePath?: string | null } = {},

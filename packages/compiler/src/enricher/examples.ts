@@ -4,31 +4,19 @@ import { report } from "../diagnostics/index"
 import { parseTestBody } from "../parser/descent/parse"
 import { documentationPrefix } from "../parser/documentation"
 
-// `@example` blocks, turned into the tests they are. What is written
-// under the tag is Essence compiled in the FILE's own scope and reported under
-// a synthetic suite called `examples`, named after the Method or the Function
-// the block documents — so an example that drifts from the code it documents
-// fails a run instead of quietly lying in hover text.
-//
-// The example is parsed out of a text this file builds: every line of the file
-// blank except the example's, and each of those standing at the column it
-// stands at in the source. So every Position the parse produces is the Position
-// it has in the file, without a single offset threaded anywhere — a Diagnostic
-// about an example underlines the `§§` line it was written on, and a failed
-// `expect` inside one is reported there.
+// `@example` blocks become tests in a synthetic `examples` suite, compiled in
+// the file's own scope. An example that drifts from its code fails a run.
+// Each is parsed at its own line and column, so its Diagnostics need no offset.
 
-// A found example, and what to call the test it becomes. The name is the
-// Method's full spelling — `Standings::pointsPerGame` — because that is what a
-// reader searching a report will look for, and because two Namespaces may
-// perfectly well declare a Method of one name.
+// A found example, named by the Method's full spelling, such as
+// `Standings::pointsPerGame`, since two Namespaces may declare one name.
 type FoundExample = {
 	name: string
 	example: common.DocumentationExample
 }
 
-// Whether a file's documentation promises anything a run has to keep.
-// It is asked before a compile — by `essence test`'s own discovery, which has to
-// decide whether a file with no `tests { … }` block is a file with tests.
+// Asked before a compile by `essence test`'s discovery, so a file with no
+// `tests { … }` block can still be a file with tests.
 export function hasDocumentationExamples(program: parser.Program): boolean {
 	return findExamples(program).length > 0
 }
@@ -51,10 +39,8 @@ export function exampleTestsOf(
 	let counts = new Map<string, number>()
 
 	return found.flatMap((entry) => {
-		// A Method documenting itself twice gets two tests, numbered.
-		// Their identities differ by the name, which is what everything durable
-		// is keyed by — so the second example of a Method may not silently be
-		// the first one's twin.
+		// A second example of one Method gets a numbered name, since tests
+		// are keyed by name.
 		let seen = (counts.get(entry.name) ?? 0) + 1
 
 		counts.set(entry.name, seen)
@@ -71,10 +57,8 @@ export function exampleTestsOf(
 	})
 }
 
-// The synthetic `suite "examples" { … }` the tests are reported under. It
-// is written here rather than in the Parser because no source wrote it: a
-// reader who asks for a file's tests is shown the ones they wrote and, beside
-// them, the ones their documentation promises.
+// The synthetic `suite "examples" { … }` the tests are reported under. No
+// source wrote it, so the parser does not build it.
 export function exampleSuite(
 	tests: Array<parser.TestNode>,
 	position: common.Position,
@@ -96,10 +80,8 @@ function exampleTest(
 ): parser.TestNode | null {
 	let { body, diagnostics } = parseTestBody(sourceOf(entry.example, lines))
 
-	// A Diagnostic the example's own parse produced is reported into
-	// whatever collection this compile opened — the parse ran in one of its
-	// own, because a collection is module state and the enrichment is already
-	// inside one.
+	// The parse collected its Diagnostics apart, so they are reported into
+	// the collection this compile opened.
 	for (let diagnostic of diagnostics) {
 		report(diagnostic)
 	}
@@ -123,10 +105,8 @@ function exampleTest(
 	}
 }
 
-// The text the example is parsed out of: the file, with every line the
-// example does not stand on replaced by an empty one, and every line it does
-// stand on holding its own content at its own column. Nothing is offset
-// afterwards, because nothing moved.
+// The file with every line but the example's blanked, and each example line
+// at its own column, so every parsed Position is the file's own.
 function sourceOf(
 	example: common.DocumentationExample,
 	lines: Array<string>,
@@ -144,10 +124,8 @@ function sourceOf(
 	return padded.join("\n")
 }
 
-// The same rule `parseDocumentation` reads a line by — the sigil, and one
-// space after it if there is one. It is spelled again rather than shared
-// because what this needs is the LENGTH it removed, which is what says at which
-// column the code begins.
+// The rule `parseDocumentation` reads a line by: the sigil, then one optional
+// space. It is repeated here because the length removed gives the column.
 function stripPrefix(line: string): string {
 	let body = line.startsWith(documentationPrefix)
 		? line.slice(documentationPrefix.length)
@@ -156,10 +134,8 @@ function stripPrefix(line: string): string {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// Every `@example` a Program's own declarations carry, in written order,
-// paired with what to call it. A Namespace's Methods are spelled
-// `Namespace::member` whether they are static or not: that is the Method's own
-// spelling, it is unambiguous, and it is what the coverage report already says.
+// Every `@example` a Program's own declarations carry, in written order. A
+// Namespace's Methods are named `Namespace::member`, static or not.
 function findExamples(program: parser.Program): Array<FoundExample> {
 	let found: Array<FoundExample> = []
 
@@ -214,8 +190,8 @@ function findExamples(program: parser.Program): Array<FoundExample> {
 					add(name, method.signature.documentation)
 					break
 				default:
-					// An `overload` block documents itself once, above
-					// the block, and each entry may document itself as well.
+					// An `overload` block may document itself, and each entry
+					// may too.
 					add(name, method.documentation)
 
 					for (let entry of method.methods) {

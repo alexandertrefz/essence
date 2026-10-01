@@ -1,18 +1,9 @@
 import type { common } from "@essence-lang/interfaces"
 
-// The bare Type tags — the handful of Types that have no declaration
-// anywhere, because they ARE what a declaration bottoms out in. A standard
-// library file writes `Boolean`, `String`, `Integer` in its signatures; these
-// are what those names resolve to, and there is nowhere else they could come
-// from: `packages/standard-library/sources/Boolean.es` declares the Boolean
-// NAMESPACE, and writes `Boolean` in its own signatures.
-//
-// This is the ONLY TypeScript left that describes a Type of the language.
-// A Type belongs here if and only if no `type`, `choice` or `protocol`
-// declaration could produce it — `Number` and `Irrational` are Unions and live
-// in `packages/standard-library/sources/Number.es`, `Optional` and `Ordering`
-// in files of their own. Nothing compares these by identity; a consumer that
-// needs "is this an Integer?" reads the `type` tag.
+// The Types that have no declaration, because declarations bottom out in them.
+// A Type belongs here only if no `type`, `choice` or `protocol` declaration
+// could produce it; `Number` is a Union in the standard library's `Number.es`.
+// Nothing compares these by identity: a consumer reads the `type` tag.
 
 export const booleanType: common.BooleanType = { type: "Boolean" }
 export const stringType: common.StringType = { type: "String" }
@@ -22,29 +13,13 @@ const algebraicType: common.AlgebraicType = { type: "Algebraic" }
 const transcendentalType: common.TranscendentalType = {
 	type: "Transcendental",
 }
-// The source a property test generates its values from. It has no
-// declaration anywhere for the reason the tags above have none: nothing a
-// `type`, `choice` or `protocol` could say produces a value that carries state
-// only the runtime can read.
+// The source a property test generates its values from. Its state is
+// readable only by the runtime.
 const randomnessType: common.RandomnessType = { type: "Randomness" }
-// The two asynchronous containers, and the one pair of tags that holds
-// another Type. A `Future` describes work that will answer with its `valueType`
-// and a `Started` is one execution of such a description already in flight;
-// neither has a declaration anywhere, for the reason the source above has none
-// — nothing a `type`, `choice` or `protocol` could say produces a value the
-// runtime alone can build, run and wait for.
-//
-// What the NAME resolves to is the applied shape with its slot left
-// Unknown, rather than a second Type the way `GenericList` is a second Type
-// beside `List`. What `GenericList` exists for is the empty List Literal, which
-// has to be assignable to every List; no Expression builds a Future out of
-// nothing, so there is no such literal here and nothing for a second tag to say.
-//
-// An author can not write that shape down: `resolveIdentifierTypeDeclarationType`
-// refuses a bare `Future` or `Started` the way a bare `Optional` is refused, so
-// the slot is open only between the name being looked up and the Type Arguments
-// being applied to it. It has to be, and that is the whole of why it is Unknown
-// rather than an Error: the entry here is what `Future<Integer>` APPLIES.
+// A `Future` describes work that answers with its `valueType`, and a `Started`
+// is one run of it in flight. The name resolves to the applied shape with an
+// Unknown slot, which `Future<Integer>` fills. A bare `Future` is refused by
+// `resolveIdentifierTypeDeclarationType`, so the slot never stays open.
 const futureType: common.FutureType = {
 	type: "Future",
 	valueType: { type: "Unknown" },
@@ -54,22 +29,20 @@ const startedType: common.StartedType = {
 	valueType: { type: "Unknown" },
 }
 
-// The open Record Type — `{}` members, which every Record is assignable
-// to. It is the receiver Type the Record Namespace targets, and it is also the
-// UNIT Type: a Function that answers nothing useful promises a Record with no
-// members, and there is nothing to read off one. See `isUnitType`.
+// The open Record Type, with no members, which every Record is assignable to.
+// The Record Namespace targets it, and it is the unit Type a Function answering
+// nothing useful promises. See `isUnitType`.
 export const recordType: common.RecordType = { type: "Record", members: {} }
 
-// `List` names the unapplied List Type — `List<Item>` applies it. The
+// `List` names the unapplied List Type, which `List<Item>` applies. The
 // default keeps a bare `List` annotation meaningful.
 const genericListType: common.GenericListType = {
 	type: "GenericList",
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 }
 
-// The same for `Dictionary`, which `Dictionary<Key, Value>` applies. Both
-// defaults are Unknown and are decided SEPARATELY — a bare `Dictionary` has
-// decided neither slot, and nothing may read one from the other.
+// The same for `Dictionary`, which `Dictionary<Key, Value>` applies. A bare
+// `Dictionary` has decided neither slot, and each is decided on its own.
 const genericDictionaryType: common.GenericDictionaryType = {
 	type: "GenericDictionary",
 	generics: [
@@ -78,8 +51,7 @@ const genericDictionaryType: common.GenericDictionaryType = {
 	],
 }
 
-// The Type Scope a standard library file starts from, before a single
-// line of it has been read.
+// The Type Scope a standard library file starts from.
 export const primitiveTypes: Record<string, common.Type> = {
 	Boolean: booleanType,
 	String: stringType,
