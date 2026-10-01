@@ -38,6 +38,106 @@ describe("The typed Expression at a span", () => {
 	})
 })
 
+// A name is no Expression of its own, so a span holding only a name answers
+// nothing. A Function Invocation's callee is the one name that is.
+describe("The typed Expression at a name's span", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tchoice Shape {",
+		"\t\tDot { at: Point },",
+		"\t\tBlank,",
+		"\t}",
+		"",
+		"\tnamespace Points for Point {",
+		"\t\tsum() -> Integer {",
+		"\t\t\t<- @.x::add(@.y)",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tfunction shift (by amount: Integer) -> Integer {",
+		"\t\t<- amount",
+		"\t}",
+		"",
+		"\tconstant origin: Point = { x = 0, y = 0 }",
+		"\tconstant across = origin.x",
+		"\tconstant blank = Shape#Blank",
+		"\tconstant moved = shift(by 1)",
+		"}",
+	].join("\n")
+	let { program } = enrich(parseWithDiagnostics(source).program)
+
+	function statement<Kind extends common.typed.StatementNode["nodeType"]>(
+		nodeType: Kind,
+		name: string,
+	): Extract<common.typed.StatementNode, { nodeType: Kind }> {
+		return program.implementation.nodes.find(
+			(node) =>
+				node.nodeType === nodeType &&
+				"name" in node &&
+				node.name.content === name,
+		) as Extract<common.typed.StatementNode, { nodeType: Kind }>
+	}
+
+	function valueOf(name: string) {
+		return statement("ConstantDeclarationStatement", name).value
+	}
+
+	it("should answer nothing at a Lookup's member", () => {
+		let lookup = valueOf("across") as common.typed.LookupNode
+
+		expect(typedExpressionAt(program, lookup.position)).toBe(lookup)
+		expect(typedExpressionAt(program, lookup.member.position)).toBeNull()
+	})
+
+	it("should answer nothing at a Case reference's Choice or Case name", () => {
+		let caseValue = valueOf("blank") as common.typed.CaseValueNode
+
+		expect(
+			typedExpressionAt(program, caseValue.choice!.position),
+		).toBeNull()
+		expect(
+			typedExpressionAt(program, caseValue.caseName.position),
+		).toBeNull()
+	})
+
+	it("should answer nothing at a Parameter's label or name", () => {
+		let parameter = statement("FunctionStatement", "shift").value
+			.parameters[0]!
+
+		expect(
+			typedExpressionAt(program, parameter.externalName!.position),
+		).toBeNull()
+		expect(
+			typedExpressionAt(program, parameter.internalName!.position),
+		).toBeNull()
+	})
+
+	it("should answer nothing at a declaration's name", () => {
+		let constant = statement("ConstantDeclarationStatement", "origin")
+		let declaration = statement("FunctionStatement", "shift")
+
+		expect(typedExpressionAt(program, constant.name.position)).toBeNull()
+		expect(typedExpressionAt(program, declaration.name.position)).toBeNull()
+	})
+
+	it("should answer nothing at a Method's own Function", () => {
+		let namespace = statement("NamespaceDefinitionStatement", "Points")
+		let method = namespace.methods["sum"] as common.typed.SimpleMethod
+
+		expect(typedExpressionAt(program, method.method.position)).toBeNull()
+	})
+
+	it("should answer a Function Invocation's callee", () => {
+		let invocation = valueOf("moved") as common.typed.FunctionInvocationNode
+
+		expect(typedExpressionAt(program, invocation.name.position)).toBe(
+			invocation.name,
+		)
+	})
+})
+
 function nativeDefaults(): Array<{
 	program: common.typed.Program
 	defaultValue: common.typed.ExpressionNode

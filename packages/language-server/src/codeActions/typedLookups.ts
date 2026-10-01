@@ -1,9 +1,6 @@
-import { caseDefaults } from "@essence-lang/compiler/helpers"
+import { findTypedChild, type TypedNode } from "@essence-lang/compiler/visitor"
 import type { common } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "../assertionChildren"
-import { defineExpressions } from "../defineArmChildren"
-import { typedHandlerExpressions } from "../matchHandlerChildren"
 import { isSamePosition } from "../positions"
 import { typedProgramBodies } from "../sections"
 
@@ -15,230 +12,96 @@ export function typedExpressionAt(
 	program: common.typed.Program,
 	position: common.Position,
 ): common.typed.ExpressionNode | null {
-	let found: common.typed.ExpressionNode | null = null
-
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body, (node) => {
-			// The first match is the outermost Node of a span. A call without
-			// a written receiver shares its Position with its base Identifier.
-			if (found === null && isSamePosition(node.position, position)) {
-				found = node
+		for (let node of body) {
+			let found = findExpression(node, position)
+
+			if (found !== undefined) {
+				return found
 			}
-		})
-	}
-
-	return found
-}
-
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	for (let node of nodes) {
-		visitNode(node, visit)
-	}
-}
-
-// The walk `findInlayHints` makes, which reaches every Expression of a typed
-// Program.
-function visitNode(
-	node: common.typed.ImplementationNode,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			visitNode(node.value, visit)
-			return
-		case "FunctionStatement":
-			visitFunctionDefinition(node.value, visit)
-			return
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				visitNode(property.value, visit)
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, visit)
-				}
-			}
-
-			visitNativeShims(node.nativeShims, visit)
-			return
-		case "IfStatement":
-			visitNode(node.condition, visit)
-			visitBody(node.body, visit)
-			return
-		case "IfElseStatement":
-			visitNode(node.condition, visit)
-			visitBody(node.trueBody, visit)
-			visitBody(node.falseBody, visit)
-			return
-		case "ReturnStatement":
-			visitNode(node.expression, visit)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, visit)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			for (let defaultValue of caseDefaults(node.cases)) {
-				visitNode(defaultValue, visit)
-			}
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, visit)
-				}
-			}
-
-			return
-		case "TypeAliasStatement":
-			if (node.predicate !== null) {
-				visitNode(node.predicate, visit)
-			}
-
-			return
-	}
-
-	visit(node)
-
-	switch (node.nodeType) {
-		case "FunctionInvocation":
-			visitNode(node.name, visit)
-			visitArguments(node.arguments, visit)
-			return
-		case "MethodInvocation":
-			visitNode(node.base, visit)
-			visitArguments(node.arguments, visit)
-			return
-		case "Lookup":
-			visitNode(node.base, visit)
-			return
-		case "Start":
-		case "Complete":
-			visitNode(node.expression, visit)
-			return
-		case "RefusedValue":
-			visitNode(node.base, visit)
-			return
-		case "Combination":
-			visitNode(node.lhs, visit)
-			visitNode(node.rhs, visit)
-			return
-		case "Match":
-			visitNode(node.value, visit)
-
-			for (let handler of node.handlers) {
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, visit)
-				}
-
-				visitBody(handler.body, visit)
-			}
-
-			return
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				visitNode(expression, visit)
-			}
-
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				visitNode(member, visit)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				visitNode(value, visit)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				visitNode(entry.key, visit)
-				visitNode(entry.value, visit)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, visit)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			visitFunctionDefinition(node.value, visit)
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				visitNode(node.value, visit)
-			}
-
-			return
-		default:
-			return
-	}
-}
-
-function visitFunctionDefinition(
-	definition: common.typed.FunctionDefinitionNode,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	visitDefaults(definition.parameters, visit)
-	visitBody(definition.body, visit)
-}
-
-// A native Method's defaults stand in the shim the Compiler synthesizes for
-// it.
-function visitNativeShims(
-	shims: Array<common.typed.NativeShimNode>,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	for (let shim of shims) {
-		visitDefaults(shim.parameters, visit)
-	}
-}
-
-function visitDefaults(
-	parameters: Array<common.typed.ParameterNode>,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	for (let parameter of parameters) {
-		if (parameter.defaultValue !== null) {
-			visitNode(parameter.defaultValue, visit)
 		}
 	}
+
+	return null
 }
 
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	visit: (node: common.typed.ExpressionNode) => void,
-) {
-	for (let argument of nodeArguments) {
-		visitNode(argument.value, visit)
+// The first match is the outermost Node of a span. A call without a written
+// receiver shares its Position with its base Identifier.
+function findExpression(
+	node: TypedNode,
+	position: common.Position,
+): common.typed.ExpressionNode | undefined {
+	if (isExpression(node) && isSamePosition(node.position, position)) {
+		return node
 	}
+
+	return findInside(node, position)
+}
+
+function findInside(
+	node: TypedNode,
+	position: common.Position,
+): common.typed.ExpressionNode | undefined {
+	return findTypedChild(
+		node,
+		node.nodeType === "FunctionInvocation" ? findExpression : findInValue,
+		position,
+	)
+}
+
+// A name a node declares or looks up is no Expression of its own, so it has
+// no Type to spell. Only a Function Invocation's `name` is its callee. A
+// Method's Function is the declaration itself, searched for its body.
+function findInValue(
+	child: TypedNode,
+	position: common.Position,
+	field: string,
+): common.typed.ExpressionNode | undefined {
+	if (namingFields.has(field)) {
+		return undefined
+	}
+
+	if (field === "method" || field === "methods") {
+		return findInside(child, position)
+	}
+
+	return findExpression(child, position)
+}
+
+const namingFields = new Set([
+	"name",
+	"member",
+	"choice",
+	"caseName",
+	"externalName",
+	"internalName",
+])
+
+function isExpression(node: TypedNode): node is common.typed.ExpressionNode {
+	return Object.hasOwn(expressionKinds, node.nodeType)
+}
+
+// Keyed by every Expression kind, so the type checker names a new one.
+const expressionKinds: Record<common.typed.ExpressionNode["nodeType"], true> = {
+	MethodInvocation: true,
+	FunctionInvocation: true,
+	RecordValue: true,
+	StringValue: true,
+	InterpolatedStringValue: true,
+	IntegerValue: true,
+	RationalValue: true,
+	BooleanValue: true,
+	FunctionValue: true,
+	ListValue: true,
+	DictionaryValue: true,
+	Lookup: true,
+	Identifier: true,
+	Self: true,
+	Combination: true,
+	Match: true,
+	Define: true,
+	CaseValue: true,
+	Start: true,
+	Complete: true,
+	RefusedValue: true,
 }
