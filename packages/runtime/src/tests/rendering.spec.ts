@@ -4,7 +4,12 @@ import { createDictionary } from "../Dictionary"
 import { createInteger } from "../Integer"
 import { anyIs, boundRecordToString } from "../internalHelpers"
 import { createList } from "../List"
-import { formatAsFraction } from "../Rational"
+import {
+	createRational,
+	formatAsFraction,
+	formatAsRational,
+	type RationalType,
+} from "../Rational"
 import { createRecord } from "../Record"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
@@ -296,11 +301,13 @@ describe("rendering a Record whose member is named like Object.prototype", () =>
 // The walk renders each child once at indent zero and re-indents it. See "The
 // structural rendering" in packages/runtime/DEVELOPMENT.md.
 describe("rendering a deeply nested value", () => {
+	const longLeaf = createString(
+		"a leaf String long enough that every level of this chain wraps",
+	)
+
 	// One member per level, and a leaf long enough that every level wraps.
-	function chain(depth: number): AnyType {
-		let value: AnyType = createString(
-			"a leaf String long enough that every level of this chain wraps",
-		)
+	function chain(depth: number, leaf: AnyType = longLeaf): AnyType {
+		let value = leaf
 
 		for (let level = 0; level < depth; level++) {
 			value = createRecord({ member: value })
@@ -320,12 +327,27 @@ describe("rendering a deeply nested value", () => {
 		}
 	})
 
-	test("a chain twenty-two deep renders at once", () => {
-		let value = chain(22)
-		let start = performance.now()
-		let rendered = getStringRepresentation(value)
+	// Every child is handed the Rational form, so its calls count the leaf's
+	// renderings. Rendering children again at their own depth would double them
+	// per level, so the second call throws rather than run on.
+	test("a chain twenty-two deep renders its leaf once", () => {
+		let renderings = 0
+		let countedForm = (rational: RationalType) => {
+			renderings++
 
-		expect(performance.now() - start).toBeLessThan(50)
-		expect(rendered.split("\n").length).toBe(45)
+			if (renderings > 1) {
+				throw new Error("the leaf was rendered again")
+			}
+
+			return formatAsRational(rational)
+		}
+		let value = chain(
+			22,
+			createRecord({ text: longLeaf, ratio: createRational(1n, 3n) }),
+		)
+		let rendered = getStringRepresentation(value, 0, countedForm)
+
+		expect(renderings).toBe(1)
+		expect(rendered.split("\n").length).toBe(48)
 	})
 })
