@@ -128,7 +128,6 @@
 	"packages/compiler/src/helpers/suggest.ts": {"sentence-length": 6, "em-dash": 5, "all-caps": 3, "block-length": 1},
 	"packages/compiler/src/helpers/terminalText.ts": {"sentence-length": 9, "em-dash": 5, "all-caps": 10, "history": 2, "block-length": 1},
 	"packages/compiler/src/helpers/types.ts": {"sentence-length": 268, "em-dash": 199, "all-caps": 168, "history": 3, "position": 32, "block-length": 69, "counts": 1},
-	"packages/compiler/src/lexer/index.ts": {"sentence-length": 83, "em-dash": 64, "all-caps": 41, "history": 3, "position": 8, "block-length": 15},
 	"packages/compiler/src/modules/graph.ts": {"sentence-length": 22, "em-dash": 17, "all-caps": 8, "block-length": 5},
 	"packages/compiler/src/modules/host.ts": {"sentence-length": 2, "em-dash": 1},
 	"packages/compiler/src/modules/index.ts": {"sentence-length": 1, "em-dash": 1},

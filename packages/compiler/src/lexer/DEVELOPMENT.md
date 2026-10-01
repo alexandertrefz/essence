@@ -38,3 +38,84 @@ reads the String's start off that Label and writes the missing quote at the end 
 A String whose `{` opened a hole holding a backslash, such as JSON with escaped quotes, is reported as a hole
 problem instead. Adding a quote there leaves the same refusal standing, so the Quick Fix withholds itself too.
 `holeHoldsAnEscape` answers the question for both.
+
+## Unicode escapes
+
+`\u{1F600}` names one Unicode scalar value in one to six hexadecimal digits. `readUnicodeEscape` reads it by hand
+rather than through `stringEscapes`, because its spelling runs past two characters and each part can be wrong on
+its own. The braces can be missing, empty, hold a character that is not a hexadecimal digit, or hold too many
+digits. The number can be above U+10FFFF, or a surrogate.
+
+### Recovery
+
+A refused escape contributes no character to the String. It named none. Keeping the digits as text would put
+`1B` into a value whose author wrote an escape. A replacement character would put in one that nothing asked for.
+
+Where the scan stops is the whole recovery. Looking for the closing brace, it stops at the characters that end the
+literal's reading. Those are the closing quote, a backslash, a line break and the `{` that opens a hole. It does not
+consume them. So an unclosed escape takes nothing with it: the quote still closes the String, and the `{` still
+opens its hole. `refuseEscape` reports the escape as far as it was read and resumes there.
+
+### Reports and Helps
+
+A `LexingError` for a `\u{…}` carries its whole report in `report`, because each Help spells the reader's own
+digits back. Which mistake it was is known only where the escape was read. Every malformed escape shares the Note
+`unicodeEscapeRule`. A surrogate gets `surrogateRule` instead, since its digits are a well-formed escape and the
+number is the mistake. A String holds characters, not the UTF-16 units they are stored in.
+
+The Helps that rewrite the escape begin with a fixed phrase and quote the new spelling. `unicodeEscapeActions` in
+the language server's `literalFixes.ts` reads that spelling back out of the Help, so the phrase is the contract
+between the two. `pairedCharacterHelp` writes the surrogate pair's Help in one place for that reason.
+
+- `\u{U+1B}` writes a code point as it is named rather than spelled. `namedCodePointHelps` offers the digits
+  alone.
+- Seven digits or more are leading zeros in every case a reader meant, such as `\u{000001B}`. `trimmedDigitHelps`
+  drops them where what is left names a character, and offers nothing otherwise.
+- A code point spelled by `bracedEscape` is upper case, as Unicode names one and as the runtime's quoted printer
+  writes it. A Help that only re-brackets the reader's own digits keeps their case.
+
+### Decimal digits
+
+`\u{128512}` is a code point read off a chart in decimal and written into an escape that reads hexadecimal. Every
+decimal digit is a hexadecimal digit too, so nothing looks wrong, and the number is simply too large.
+`decimalReadingHelps` offers the decimal reading on a condition written into the sentence: "where the character
+numbered 128512 was meant". It does so only for digits that are all decimal. Only the reader knows which base they
+meant, so no Quick Fix applies this Help.
+
+The Help is withheld up to `firstPlaneAboveTheTop`, U+11FFFF. The smallest escape this refusal sees is
+`\u{110000}`, the top missed by one, written by someone who knows where it is. An escape in the first plane past
+the last real one reads as someone counting planes, not copying a decimal.
+
+`decimalReadingHelps` still checks the decimal reading with `isScalarValue`, though no six-digit input can fail it. The decimal reading of `110000` is past every surrogate and below U+10FFFF. The check keeps a Help from ever
+spelling an escape the next run refuses, should the digit limit change.
+
+### Unbraced escapes
+
+`\u001B` and `\u1B` are the JavaScript and JSON habit, which writes the digits without braces. `readUnbracedEscape`
+answers with the Essence spelling of the character the reader wrote, so it has to choose the digits carefully.
+JavaScript's `\u` takes exactly four, so `\uABCD1` is `\uABCD` followed by `1` there. Four digits are taken where
+four or more are written, and all of them where fewer are. Where a `}` stands right after one to six digits, only
+the `{` was lost, and the whole of `\u1B}` is rewritten.
+
+A surrogate pair, `\uD83D\uDE00`, is how JavaScript writes an astral character. Neither half names a character, so
+neither has a rewrite of its own. `lowSurrogateBehind` finds the second half after the first, in either spelling,
+so `\uD83D\u{DE00}` counts too. The whole pair is refused under one Diagnostic, the reading resumes past both
+halves, and the Help rewrites the whole span as one escape. A braced high surrogate followed by its low half is
+refused the same way. The unbraced form of a low half takes exactly four digits; the braced form takes one to six
+and its closing brace.
+
+## Number Literals
+
+A Number Literal is digits and nothing else. Essence has no hexadecimal, binary or exponent form, so `0xFF`,
+`0b101` and `1e5` are all wrong. `lexNumber` reads the letters into the Literal anyway and reports one
+`invalid-number`. Stopping at the first letter would leave `FF` behind as an Identifier Statement, which the author
+did not write and could not act on. The Token keeps only its leading digits, so later stages see
+a well-formed Number.
+
+The `.` of a decimal is a Token of its own. The Parser joins `0`, `.` and `75` into one Rational Literal where the
+three are written flush, as it joins `3`, `/` and `4`.
+
+A Number ends at a character another language writes an operator with, the members of `foreignPunctuation`. `1+2`
+is two Numbers and a habit, not one malformed Number, and `total = 1;` is a Number with a `;` after it. Neither
+character ends a word for the Lexer, so each lexes as the start of an Identifier. The Parser answers it where it
+stands, because it knows whether it is reading an operator or a Statement terminator.
