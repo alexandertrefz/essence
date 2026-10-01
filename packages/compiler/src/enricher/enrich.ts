@@ -274,7 +274,7 @@ function reportStrayValueComments(
 }
 
 // The one place the mode flag is read. Null for a compile that did not ask
-// for tests, or a file with none, so only the parser's Program says whether a
+// for tests, or for a file with none. Only the parser's Program says whether a
 // file has tests.
 function testsSectionOf(
 	program: parser.Program,
@@ -1718,9 +1718,9 @@ type TestsContext = {
 	modulePath: string | null
 }
 
-// The `tests { … }` block, enriched only where the compile asked for it. It
-// opens a child Scope of the top level, so it sees every declaration, its
-// helpers stay out of the implementation's reach, and a reused name shadows.
+// The `tests { … }` block, enriched only where the compile asked for it. In
+// a child Scope of the top level it sees every declaration. Its helpers stay
+// out of the implementation's reach, and a reused name shadows.
 export const enrichTestsSection = (
 	section: parser.TestsSectionNode,
 	scope: enricher.Scope,
@@ -1729,12 +1729,8 @@ export const enrichTestsSection = (
 ): common.typed.TestsSectionNode => {
 	return {
 		nodeType: "TestsSection",
-		// No barrier here. The runner waits for what it called — one test
-		// at a time, each awaited before the next — so a `complete` written in
-		// the setup or in a test body is an `await` in a Function that is
-		// awaited, and the Scope chain reaches the Program's own "top-level"
-		// standing. The two forms that can NOT wait carry the barrier
-		// themselves, at `enrichTest`.
+		// No barrier: the runner awaits each test, so the setup and a plain
+		// test may `complete`. `enrichTest` bars the forms that can not wait.
 		nodes: enrichTestsNodes(section.nodes, childScope(scope), {
 			suitePath: [],
 			covering: noModifiers,
@@ -1751,9 +1747,8 @@ const enrichTestsNodes = (
 ): Array<common.typed.TestsNode> => {
 	refuseDuplicateNames(nodes)
 
-	// Only the ordinary Statements hoist. A test and a suite declare no
-	// name — what they are called is a String, not an Identifier — so there is
-	// nothing about either one for a Statement above it to resolve against.
+	// Only the ordinary Statements hoist, since a test or a suite declares no
+	// name.
 	let hoistedTypes = hoistDeclarations([
 		{
 			nodes: nodes.filter(isStatementOfTests),
@@ -1790,13 +1785,8 @@ function isStatementOfTests(
 	return node.nodeType !== "Test" && node.nodeType !== "Suite"
 }
 
-// Whether the test's NAME reads the row the table binds. A table test's
-// name is what tells forty tests apart, so it usually does — and that is what
-// makes widening the row Parameter's Type a decision rather than a free edit:
-// the name prints the row, so the widened Type has to stay Printable.
-//
-// The row's name is the Parameter's internal name; a Pattern Parameter binds
-// several, and any of them being read is the row being read.
+// Whether the test's name reads the row the table binds, through any name a
+// Pattern Parameter binds. If so, a widened row Type must stay Printable.
 function nameReadsTheRow(
 	name: parser.StringValueNode | parser.InterpolatedStringValueNode,
 	table: parser.TestTableNode,
@@ -1830,16 +1820,9 @@ const enrichTest = (
 		resolveTestModifiers(node.modifiers, "test"),
 		context.covering,
 	)
-	// A body of its own, so that what one test declares is gone by the
-	// next one — the Scope is what says two tests share nothing but the setup
-	// above them.
-	//
-	// And the one place asynchrony is barred from a `tests { … }` block.
-	// A plain test is run once and awaited, so it may `complete` whatever it
-	// likes; the other two forms run their body many times under machinery that
-	// is measured or replayed, and neither can wait for a run without changing
-	// what it is measuring or what it drew. `complete` the work into a Constant
-	// above the test instead — the setup is awaited like everything else.
+	// A Scope per test, so tests share only the setup. A benchmark or a
+	// property test runs its body many times, measured or replayed, so it can
+	// not `complete`; the setup above it can.
 	let bodyScope = childScope(scope)
 
 	if (node.form === "benchmark" || node.properties !== null) {
@@ -1847,9 +1830,7 @@ const enrichTest = (
 		bodyScope.completingBarrier =
 			node.form === "benchmark" ? "benchmark-body" : "property-body"
 	}
-	// Before the name and before the body: a table test binds its row in
-	// the body's Scope, and both of them read it — the name because it says
-	// which row it ran for, which is the whole point of interpolating one.
+	// Before the name and the body, which both read the row.
 	let table =
 		node.table === null
 			? null
@@ -1860,9 +1841,7 @@ const enrichTest = (
 					modifiers.skipped !== null,
 					nameReadsTheRow(node.name, node.table),
 				)
-	// Beside the table for the same reason, and never with one: a table
-	// runs a row a reader wrote and a property runs a value the runner made up,
-	// so a test asking for both is asking for two runs of one body.
+	// Never together with a table.
 	let properties =
 		node.properties === null
 			? null
@@ -1890,19 +1869,14 @@ const enrichTest = (
 
 	return {
 		nodeType: "Test",
-		// Carried rather than decided: what the Keyword said is what the
-		// runner is told, and everything between here and the run — the
-		// identity, the Modifiers, the rows — answers for one shape.
 		form: node.form,
 		identity: {
 			modulePath: context.modulePath,
 			suitePath: context.suitePath,
 			name: nameTemplate(node.name),
 		},
-		// A property test's name is read in the OUTER Scope: what a
-		// property generates is a different value every case, so a name saying
-		// which one it ran for could not be worked out once and could not name
-		// the test at all.
+		// Only a table test's name reads the body's Scope. A property differs
+		// every case, so its name can not read it.
 		name: enrichTestName(
 			node.name,
 			nameScope(table === null ? scope : bodyScope),
@@ -1919,12 +1893,8 @@ const enrichTest = (
 	}
 }
 
-// A name is worked out BEFORE the run — the whole section is walked once
-// with no test selected to render every interpolated one, so that a `--filter`
-// matches what a reader sees — and a rendered name is a String the manifest
-// carries. So it is the one Expression of a `tests { … }` block that can not
-// wait for anything, and the barrier says so where a Diagnostic can point at
-// the hole in the name.
+// A test name is rendered before the run, so `--filter` matches what a reader
+// sees. So it can not `complete` anything.
 const nameScope = (scope: enricher.Scope): enricher.Scope =>
 	childScope(scope, {
 		completing: null,
@@ -1941,8 +1911,7 @@ const enrichSuite = (
 		context.covering,
 	)
 	let name = nameTemplate(node.name)
-	// A suite is a group AND a Scope: what it declares is the setup its
-	// own tests share, and is gone outside it.
+	// A suite is a Scope too: what it declares is setup for its own tests.
 	let bodyScope = childScope(scope)
 
 	return {
@@ -1966,9 +1935,8 @@ const enrichSuite = (
 	}
 }
 
-// `across` and `for any` are two answers to one question — what the body
-// runs for. A test writing both would run every row for every generated value,
-// which is a third thing nobody asked for.
+// `across` and `for any` each say what the body runs for, so a test may
+// write only one.
 const refuseBothTestForms = (node: parser.TestNode): void => {
 	if (node.table === null || node.properties === null) {
 		return
@@ -1996,14 +1964,9 @@ const refuseBothTestForms = (node: parser.TestNode): void => {
 	)
 }
 
-// A benchmark is a MEASUREMENT, and a measurement is comparable only
-// where every run does the same work. A generated value is a different value
-// every case, so the body would be timed doing something else each time and the
-// baseline it is held to would be a number about nothing.
-//
-// The properties are enriched all the same — the Error above has already
-// stopped anything from running, and error recovery keeps the tree whole so
-// that everything an Editor draws off it is still there.
+// A benchmark compares runs that do the same work, which generated values do
+// not. The properties are still enriched, so the tree stays whole for an
+// editor.
 const refuseGeneratedBenchmark = (node: parser.TestNode): void => {
 	if (node.properties === null) {
 		return
@@ -2031,11 +1994,9 @@ const refuseGeneratedBenchmark = (node: parser.TestNode): void => {
 	)
 }
 
-// An inline snapshot inside a table test has nowhere to be written: every
-// row runs the same body, so N rows produce N values for the one slot the source
-// holds. A named one has a place per row — see `snapshotted` in the runtime,
-// which numbers a stored entry by the row that recorded it — so what this asks
-// for is a name.
+// Every row of a table test runs one body, so an inline snapshot there would
+// have one slot for many values. A named one is stored per row
+// (`snapshotted`). A property test may record no snapshot at all.
 const refuseSnapshots = (
 	nodes: Array<common.typed.ImplementationNode>,
 	form: "table" | "property",
@@ -2109,9 +2070,8 @@ const refuseSnapshots = (
 	visit(nodes)
 }
 
-// The cast holds because the Parser puts nothing else there — a name is a
-// String Literal or an interpolated one — and enriching either answers with the
-// Node of the same kind.
+// The cast holds: a name is a String Literal or an interpolated one, and
+// enriching either answers a Node of the same kind.
 const enrichTestName = (
 	node: parser.StringValueNode | parser.InterpolatedStringValueNode,
 	scope: enricher.Scope,
