@@ -19,23 +19,13 @@ import { readSurface } from "../scripts/stdlibSurface.ts"
 
 /*
  * The standard library reference, held to the standard library page by page.
+ * A new member fails this until `scripts/libraryTable.ts` groups it and
+ * `bun run docs:stdlib:sync` writes it. A manifest listing a member the library
+ * lacks fails too, as after a rename.
  *
- * "Every member has a place" is a completion gate, not an aspiration — the
- * bargain `diagnosticCodes.spec.ts` strikes for Diagnostic codes, for the same
- * reason. A reference with holes in it teaches a reader that a Method missing
- * from the documentation means nothing, and from then on they read the
- * sources anyway. So a member the library gains fails this until
- * `scripts/libraryTable.ts` gives it a group and `bun run docs:stdlib:sync`
- * writes it. It runs the other way too: a manifest listing a member the
- * library no longer declares documents something nobody can call — the
- * failure mode of a rename, and invisible without a check like this.
- *
- * Each library page has a manifest beside it, `library/<slug>.json`, written
- * by the same run as the page. The checks read the manifests, and the anchor
- * checks read the pages the way Astro does.
- *
- * The pages are read as files rather than through `astro:content`,
- * which only resolves inside an Astro build; this has to run under `bun test`.
+ * The checks read each page's `library/<slug>.json` manifest, and the anchor
+ * checks read the pages as Astro does. Pages are read as files, since
+ * `astro:content` only resolves inside an Astro build.
  */
 
 const SYNC = "Run `bun run docs:stdlib:sync` in packages/website."
@@ -112,11 +102,10 @@ for (let protocol of surface.protocols) {
 }
 
 /*
- * The ids a page's HTML will carry, found the way Astro finds them: the text
- * of each Markdown heading, with the JSX around it dropped, through
- * github-slugger in page order — and every explicit `id` written in the page.
- * The generator simulates the slugger to write its manifests; this uses the
- * real one, so the two are checked against each other.
+ * The ids a page's HTML will carry, found as Astro finds them. Each Markdown
+ * heading's text, without its JSX, goes through github-slugger in page order,
+ * and every explicit `id` counts. This is the real slugger the generator
+ * simulates.
  */
 function idsOf(mdx: string): string[] {
 	let slugger = new GithubSlugger()
@@ -260,10 +249,8 @@ describe("the standard library reference", () => {
 	})
 
 	it("hands MDX no quoted prop with an escape in it", () => {
-		// A quoted MDX attribute is taken literally, escapes and all. A
-		// declaration that spans lines once rendered its `\n` and `\t` as text on
-		// three pages, and the pages still matched the generator above — so the
-		// shape is held here, where the output is.
+		// A quoted MDX attribute is taken literally, so an escape such as `\n`
+		// in one would render as text.
 		let escaped = [...pages]
 			.filter(([, mdx]) => /\s\w+="(?:[^"\\]|\\.)*\\[nt]/.test(mdx))
 			.map(([slug]) => slug)
@@ -388,20 +375,9 @@ describe("the library's addresses", () => {
 })
 
 /*
- * The signatures the OVERVIEW quotes, held to the ones the library pages were
- * generated with.
- *
- * "How to read a signature" shows five entries of `List` and says they are
- * written as the sources write them — inside a `§ fragment` block, which
- * `docsExamples.spec.ts` never compiles, because a signature without a body is
- * not a Program. So nothing held that promise, and the page went on teaching
- * `contains<infer ItemType is Equatable>` after the sources had stopped
- * spelling it that way and the compiler had begun refusing it.
- *
- * What CAN be checked mechanically is the one thing that matters: each line the
- * fragment quotes is a signature `list.json` carries. The manifest is generated
- * from the sources by the same run that writes the pages, so a spelling that
- * drifts here is a spelling the library never had.
+ * The signatures the overview quotes, held to the library pages'. They sit in
+ * a `§ fragment` block, which `docsExamples.spec.ts` never compiles. So each
+ * quoted line must be a signature `list.json` carries, as the sources spell it.
  */
 describe("The overview's quoted signatures", () => {
 	it("quotes List signatures the library page carries", () => {
@@ -413,10 +389,9 @@ describe("The overview's quoted signatures", () => {
 
 		expect(fragment).not.toBeNull()
 
-		// An entry may be broken across lines, exactly as the sources
-		// have it — a continuation is indented or is the `)` that closes the
-		// Parameter list, so the entries are gathered rather than read one line
-		// at a time.
+		// An entry may span lines as the sources have it: a continuation is
+		// indented or is the closing `)`. So entries are gathered, not read by
+		// line.
 		let quoted: Array<string> = []
 
 		for (let line of (fragment![1] as string).split("\n")) {

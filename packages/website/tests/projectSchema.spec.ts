@@ -10,14 +10,10 @@ import {
 } from "@essence-lang/compiler/configuration"
 import GithubSlugger from "github-slugger"
 
-// The site serves the JSON Schema for `essence.json` at the URL the
-// file's `$schema` names, so an editor anywhere can validate a project file
-// against what the toolchain actually reads. The copy is generated from the
-// reader's catalogue; this spec re-renders and compares, and NEVER writes — a
-// drifted copy is fixed by `bun run generate:schema`.
-//
-// Beside the file it holds to account, in the package that ships it,
-// rather than in the compiler's tests counting `../`s towards it.
+// The site serves the JSON Schema for `essence.json` at the URL its `$schema`
+// names, so editors validate against what the toolchain reads. This spec
+// re-renders the copy and compares, never writing; `bun run generate:schema`
+// fixes a drifted copy.
 const SERVED_COPY = path.resolve(
 	import.meta.dirname,
 	"../public/schemas/essence.schema.json",
@@ -47,15 +43,9 @@ describe("the served project-file Schema", () => {
 	})
 })
 
-// The same catalogue, held against the page that documents it. A setting
-// the reader gains has no address on the site until the page gives it an entry,
-// and an entry for a setting the reader dropped documents a key that is now a
-// Warning — so both directions fail here.
-//
-// The catalogue's keys the page gives no entry of its own. `test.contracts`
-// switches an experimental test mode, which the site documents nowhere.
-// `$schema` is not a setting — Essence reads nothing from it — and the page
-// says so under "The file format" rather than beside the settings.
+// The catalogue's keys the settings page has no entry for: `test.contracts`
+// switches an undocumented experimental mode, and `$schema` is no setting. Every
+// other key needs an entry, and every entry a key.
 const UNDOCUMENTED_KEYS = new Set(["$schema", "test.contracts"])
 
 /** Every setting a project file can hold, by its dotted path. A table is not a setting; its members are. */
@@ -69,10 +59,9 @@ function settingKeys(setting: Setting, prefix = ""): Array<string> {
 	)
 }
 
-// The address a `###` is reached by. A dotted key cannot be its own
-// heading's slug — the slugger drops the dots — so the page writes the address
-// in a `<span id>` inside the heading. A key without a dot is the heading's own
-// text, and its slug is the address.
+// The address a `###` is reached by. The slugger drops dots, so a dotted key's
+// address is a `<span id>` inside its heading. Otherwise the slug is the
+// address.
 function entryIds(page: string): Array<string> {
 	let slugger = new GithubSlugger()
 
@@ -113,8 +102,8 @@ describe("the project-file reference", () => {
 	})
 
 	it("leaves out only keys the catalogue still has", () => {
-		// A named exception outlives the key it excused otherwise, and
-		// then silently excuses whatever is next given that name.
+		// An exception must name a real key, or it would silently excuse the
+		// next key given that name.
 		let keys = new Set(settingKeys(projectSettings))
 
 		expect([...UNDOCUMENTED_KEYS].filter((key) => !keys.has(key))).toEqual(
