@@ -988,6 +988,38 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 4, column: 18 })).toBe("Result")
 	})
 
+	// Each declaration pairs with the one written where it starts, so two
+	// Choices of one name in two bodies keep their own payloads.
+	it("should describe requirements and payload members declared in a body", () => {
+		let source = [
+			"implementation {",
+			"\tfunction circles() -> Integer {",
+			"\t\tprotocol Sized {",
+			"\t\t\tsize() -> Integer",
+			"\t\t}",
+			"",
+			"\t\tchoice Shape {",
+			"\t\t\tCircle { radius: Integer },",
+			"\t\t}",
+			"",
+			"\t\t<- 1",
+			"\t}",
+			"",
+			"\tfunction labels() -> Integer {",
+			"\t\tchoice Shape {",
+			"\t\t\tCircle { radius: String },",
+			"\t\t}",
+			"",
+			"\t\t<- 2",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 4 })).toBe("size() -> Integer")
+		expect(hover(source, { line: 8, column: 13 })).toBe("radius: Integer")
+		expect(hover(source, { line: 16, column: 13 })).toBe("radius: String")
+	})
+
 	it("should describe a Type Alias's Type Parameter", () => {
 		let source = [
 			"implementation {",

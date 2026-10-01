@@ -431,7 +431,10 @@ between two tokens belongs to whatever spans them, such as `a + b`, and answers 
 
 ### What the typed tree lacks
 
-Some parts of a declaration have no typed node with a Position, so the passes pair the typed tree with the parsed one:
+Some parts of a declaration have no typed node with a Position, so the walk pairs the typed tree with the parsed one. A
+typed Namespace, Protocol or Choice pairs with the parsed declaration that starts where it does, at any depth. So one
+declared in a Function body answers as one at the top level does, and two of one name in two bodies keep their own
+parts. Each parsed Program's declarations are indexed once, the first time the cursor is inside one.
 
 - A native Method signature has no typed node at all: the Enricher drops it, since there is no body to emit. Its
   Types are on the typed Namespace, and its Positions only in the parsed source. `visitNativeSignatures` pairs each
@@ -439,7 +442,7 @@ Some parts of a declaration have no typed node with a Position, so the passes pa
   Parameter names and a native static property. It finds nothing in an ordinary Program, since native signatures
   occur only in a declarations file.
 - A Protocol's requirements and a Choice's payload members survive enrichment only as plain Records of Types.
-  `visitProtocolBodies` and `visitChoicePayloads` pair them with the parsed declaration by name.
+  `visitProtocolBodies` and `visitChoicePayloads` pair them by name with the parsed declaration's.
 - The typed tree erases annotations. `visitAnnotations` offers the Enricher's resolved annotations as a flat list,
   each paired with what it resolved to. No annotation spans exactly what its parent annotation spans, so the smallest
   candidate rule handles nesting. They are offered last, so an exact tie goes to the annotation.

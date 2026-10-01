@@ -17,6 +17,10 @@ import {
 	withoutSelf,
 	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
+import {
+	forEachParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "./assertionChildren"
@@ -25,11 +29,7 @@ import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { protocolSpellings } from "./protocolSpellings"
-import {
-	programNodes,
-	typedProgramNodes,
-	typedProgramSections,
-} from "./sections"
+import { typedProgramNodes, typedProgramSections } from "./sections"
 
 // Hovers over the enriched Program: the smallest typed node containing the
 // cursor wins. See "Hover" in DEVELOPMENT.md.
@@ -46,7 +46,13 @@ type State = {
 	// Every Protocol in Scope, built once per request, so a conformance clause
 	// reads back as the Protocol it names.
 	protocols: Record<string, common.ProtocolType>
+	parserProgram: parser.Program | null
 }
+
+type ParsedDeclaration =
+	| parser.NamespaceDefinitionStatementNode
+	| parser.ProtocolDeclarationStatementNode
+	| parser.ChoiceDeclarationStatementNode
 
 // The document's own Protocols over inherited ones: a standard library source
 // redeclares Protocols the builtin tables hold, with its own Positions.
@@ -98,6 +104,7 @@ function hoverAt(
 		cursor,
 		best: null,
 		protocols: protocolsOf(program),
+		parserProgram,
 	}
 
 	// Every body the Program holds, test bodies included.
@@ -112,9 +119,6 @@ function hoverAt(
 	}
 
 	if (parserProgram !== null) {
-		visitNativeSignatures(parserProgram, program, state)
-		visitProtocolBodies(parserProgram, program, state)
-		visitChoicePayloads(parserProgram, program, state)
 		visitModuleSections(parserProgram, program, state)
 	}
 
@@ -523,6 +527,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
+			visitNativeSignatures(node, state)
 			return
 		case "TypeAliasStatement":
 			visitTypeAlias(node, state)
@@ -554,6 +559,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
+			visitProtocolBodies(node, state)
 			return
 		}
 		case "IfStatement":
@@ -848,6 +854,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				visitNode(defaultValue, state)
 			}
 
+			visitChoicePayloads(node, state)
 			return
 		}
 		case "StringValue":
@@ -1159,27 +1166,63 @@ function invokedSignatures(
 	return signatures
 }
 
+// Each parsed Program's declarations, indexed once, since every Hover over one
+// version of a workspace document reads the same parsed Program.
+const declarationIndexes = new WeakMap<
+	parser.Program,
+	Map<string, ParsedDeclaration>
+>()
+
+// The parsed declaration a typed one was enriched from, which starts where it
+// does, at any depth. Null when the cursor is outside it, since then nothing
+// it pairs can win.
+function parsedDeclaration(
+	state: State,
+	position: common.Position,
+): ParsedDeclaration | null {
+	if (state.parserProgram === null || !contains(position, state.cursor)) {
+		return null
+	}
+
+	let declarations = declarationIndexes.get(state.parserProgram)
+
+	if (declarations === undefined) {
+		declarations = declarationsOf(state.parserProgram)
+		declarationIndexes.set(state.parserProgram, declarations)
+	}
+
+	return declarations.get(startKey(position)) ?? null
+}
+
+function declarationsOf(
+	program: parser.Program,
+): Map<string, ParsedDeclaration> {
+	let declarations = new Map<string, ParsedDeclaration>()
+
+	let visit = (node: ParserNode) => {
+		if (
+			node.nodeType === "NamespaceDefinitionStatement" ||
+			node.nodeType === "ProtocolDeclarationStatement" ||
+			node.nodeType === "ChoiceDeclarationStatement"
+		) {
+			declarations.set(startKey(node.position), node)
+		}
+
+		forEachParserChild(node, visit)
+	}
+
+	visit(program)
+
+	return declarations
+}
+
+function startKey(position: common.Position): string {
+	return `${position.start.line}:${position.start.column}`
+}
+
 /**********************************/
 /* Body-less native declarations  */
 /**********************************/
-
-// Answers for a native Method's name, its signature, its Parameters' names as
-// resolved, and a native static property's name. The annotations are
-// `visitAnnotations`'s. See "What the typed tree lacks" in DEVELOPMENT.md.
-
-function namespaceTypesOf(
-	program: common.typed.Program,
-): Map<string, common.NamespaceType> {
-	let types = new Map<string, common.NamespaceType>()
-
-	for (let node of typedProgramNodes(program)) {
-		if (node.nodeType === "NamespaceDefinitionStatement") {
-			types.set(node.name.content, node.type)
-		}
-	}
-
-	return types
-}
 
 // The signature entries of one parsed Method node, paired by index with the
 // resolved Overloads. A bodied entry has a typed node and is skipped.
@@ -1229,97 +1272,93 @@ function nativeSignatureEntries(
 	return entries
 }
 
+// Answers for a native Method's name, its signature, its Parameters' names as
+// resolved, and a native static property's name. The annotations are
+// `visitAnnotations`'s. See "What the typed tree lacks" in DEVELOPMENT.md.
 function visitNativeSignatures(
-	parserProgram: parser.Program,
-	program: common.typed.Program,
+	namespace: common.typed.NamespaceDefinitionStatementNode,
 	state: State,
 ) {
-	let namespaceTypes = namespaceTypesOf(program)
+	let node = parsedDeclaration(state, namespace.position)
 
-	for (let node of programNodes(parserProgram)) {
-		if (node.nodeType !== "NamespaceDefinitionStatement") {
+	if (node?.nodeType !== "NamespaceDefinitionStatement") {
+		return
+	}
+
+	let namespaceType = namespace.type
+
+	for (let [name, property] of Object.entries(node.properties)) {
+		// Only those without a value, which have no typed node.
+		if (property.value !== null) {
 			continue
 		}
 
-		let namespaceType = namespaceTypes.get(node.name.content)
+		let type = namespaceType.properties[name]
 
-		if (namespaceType === undefined) {
+		consider(
+			state,
+			property.name.position,
+			(type ?? { type: "Unknown" }) as common.Type,
+			`static ${name}`,
+			property.documentation,
+		)
+	}
+
+	for (let [name, member] of Object.entries(node.methods)) {
+		let methodType = namespaceType.methods[name]
+
+		if (methodType === undefined) {
 			continue
 		}
 
-		for (let [name, property] of Object.entries(node.properties)) {
-			// Only those without a value, which have no typed node.
-			if (property.value !== null) {
-				continue
-			}
+		let entries = nativeSignatureEntries(member, methodType)
 
-			let type = namespaceType.properties[name]
+		if (entries.length === 0) {
+			continue
+		}
 
-			consider(
+		let isStatic =
+			methodType.type === "StaticMethod" ||
+			methodType.type === "OverloadedStaticMethod"
+		let label = isStatic ? `static ${name}` : name
+
+		// The name is typed as the Method itself, so it describes every Overload.
+		consider(state, member.name.position, methodType, label)
+
+		for (let { signature, resolved } of entries) {
+			considerSignatures(
 				state,
-				property.name.position,
-				(type ?? { type: "Unknown" }) as common.Type,
-				`static ${name}`,
-				property.documentation,
+				signature.position,
+				[isStatic ? resolved : withoutSelf(resolved)],
+				label,
+				signature.documentation,
 			)
-		}
 
-		for (let [name, member] of Object.entries(node.methods)) {
-			let methodType = namespaceType.methods[name]
+			// A non-static signature has the receiver injected first, so the resolved
+			// list is one longer.
+			let offset = isStatic ? 0 : 1
 
-			if (methodType === undefined) {
-				continue
-			}
+			signature.parameters.forEach((parameter, index) => {
+				let parameterType = resolved.parameterTypes[index + offset]
 
-			let entries = nativeSignatureEntries(member, methodType)
+				if (parameterType === undefined) {
+					return
+				}
 
-			if (entries.length === 0) {
-				continue
-			}
-
-			let isStatic =
-				methodType.type === "StaticMethod" ||
-				methodType.type === "OverloadedStaticMethod"
-			let label = isStatic ? `static ${name}` : name
-
-			// The name is typed as the Method itself, so it describes every Overload.
-			consider(state, member.name.position, methodType, label)
-
-			for (let { signature, resolved } of entries) {
-				considerSignatures(
-					state,
-					signature.position,
-					[isStatic ? resolved : withoutSelf(resolved)],
-					label,
-					signature.documentation,
-				)
-
-				// A non-static signature has the receiver injected first, so the resolved
-				// list is one longer.
-				let offset = isStatic ? 0 : 1
-
-				signature.parameters.forEach((parameter, index) => {
-					let parameterType = resolved.parameterTypes[index + offset]
-
-					if (parameterType === undefined) {
-						return
+				for (let identifier of [
+					parameter.externalName,
+					parameterInternalName(parameter),
+				]) {
+					if (identifier !== null) {
+						consider(
+							state,
+							identifier.position,
+							parameterType.type as common.Type,
+							identifier.content,
+						)
 					}
-
-					for (let identifier of [
-						parameter.externalName,
-						parameterInternalName(parameter),
-					]) {
-						if (identifier !== null) {
-							consider(
-								state,
-								identifier.position,
-								parameterType.type as common.Type,
-								identifier.content,
-							)
-						}
-					}
-				})
-			}
+				}
+			})
 		}
 	}
 }
@@ -1330,7 +1369,7 @@ function visitNativeSignatures(
 
 // A Protocol's requirements and a Choice's payload members are typed as plain
 // Records without Positions, so they are paired by name with the parsed
-// declaration. See "What the typed tree lacks" in DEVELOPMENT.md.
+// declaration's. See "What the typed tree lacks" in DEVELOPMENT.md.
 
 function protocolSignatureEntries(
 	member: parser.ProtocolMethods[string],
@@ -1368,136 +1407,107 @@ function protocolSignatureEntries(
 }
 
 function visitProtocolBodies(
-	parserProgram: parser.Program,
-	program: common.typed.Program,
+	protocol: common.typed.ProtocolDeclarationStatementNode,
 	state: State,
 ) {
-	let protocolTypes = new Map<string, common.ProtocolType>()
+	let node = parsedDeclaration(state, protocol.position)
 
-	for (let node of typedProgramNodes(program)) {
-		if (node.nodeType === "ProtocolDeclarationStatement") {
-			protocolTypes.set(node.name.content, node.protocolType)
-		}
+	if (node?.nodeType !== "ProtocolDeclarationStatement") {
+		return
 	}
 
-	for (let node of programNodes(parserProgram)) {
-		if (node.nodeType !== "ProtocolDeclarationStatement") {
+	let protocolType = protocol.protocolType
+
+	for (let [name, member] of Object.entries(node.methods)) {
+		let methodType = protocolType.methods[name]
+
+		if (methodType === undefined) {
 			continue
 		}
 
-		let protocolType = protocolTypes.get(node.name.content)
+		let isStatic =
+			methodType.type === "StaticMethod" ||
+			methodType.type === "OverloadedStaticMethod"
+		let label = isStatic ? `static ${name}` : name
 
-		if (protocolType === undefined) {
-			continue
-		}
+		// The name is the requirement itself, so it describes every Overload.
+		consider(state, member.name.position, methodType, label)
 
-		for (let [name, member] of Object.entries(node.methods)) {
-			let methodType = protocolType.methods[name]
+		for (let { signature, resolved } of protocolSignatureEntries(
+			member,
+			methodType,
+		)) {
+			considerSignatures(
+				state,
+				signature.position,
+				[isStatic ? resolved : withoutSelf(resolved)],
+				label,
+				signature.documentation,
+			)
 
-			if (methodType === undefined) {
-				continue
-			}
+			// A non-static requirement has the receiver injected first, as a
+			// native signature does.
+			let offset = isStatic ? 0 : 1
 
-			let isStatic =
-				methodType.type === "StaticMethod" ||
-				methodType.type === "OverloadedStaticMethod"
-			let label = isStatic ? `static ${name}` : name
+			signature.parameters.forEach((parameter, index) => {
+				let parameterType = resolved.parameterTypes[index + offset]
 
-			// The name is the requirement itself, so it describes every Overload.
-			consider(state, member.name.position, methodType, label)
+				if (parameterType === undefined) {
+					return
+				}
 
-			for (let { signature, resolved } of protocolSignatureEntries(
-				member,
-				methodType,
-			)) {
-				considerSignatures(
-					state,
-					signature.position,
-					[isStatic ? resolved : withoutSelf(resolved)],
-					label,
-					signature.documentation,
-				)
-
-				// A non-static requirement has the receiver injected first, as a
-				// native signature does.
-				let offset = isStatic ? 0 : 1
-
-				signature.parameters.forEach((parameter, index) => {
-					let parameterType = resolved.parameterTypes[index + offset]
-
-					if (parameterType === undefined) {
-						return
+				for (let identifier of [
+					parameter.externalName,
+					parameterInternalName(parameter),
+				]) {
+					if (identifier !== null) {
+						consider(
+							state,
+							identifier.position,
+							parameterType.type,
+							identifier.content,
+						)
 					}
-
-					for (let identifier of [
-						parameter.externalName,
-						parameterInternalName(parameter),
-					]) {
-						if (identifier !== null) {
-							consider(
-								state,
-								identifier.position,
-								parameterType.type,
-								identifier.content,
-							)
-						}
-					}
-				})
-			}
+				}
+			})
 		}
 	}
 }
 
 function visitChoicePayloads(
-	parserProgram: parser.Program,
-	program: common.typed.Program,
+	choice: common.typed.ChoiceDeclarationStatementNode,
 	state: State,
 ) {
-	let choiceCases = new Map<string, Map<string, common.CaseType>>()
+	let node = parsedDeclaration(state, choice.position)
 
-	for (let node of typedProgramNodes(program)) {
-		if (node.nodeType === "ChoiceDeclarationStatement") {
-			choiceCases.set(
-				node.name.content,
-				new Map(
-					node.cases.map((choiceCase) => [
-						choiceCase.name.content,
-						choiceCase.type,
-					]),
-				),
-			)
-		}
+	if (node?.nodeType !== "ChoiceDeclarationStatement") {
+		return
 	}
 
-	for (let node of programNodes(parserProgram)) {
-		if (node.nodeType !== "ChoiceDeclarationStatement") {
+	let cases = new Map(
+		choice.cases.map((choiceCase) => [
+			choiceCase.name.content,
+			choiceCase.type,
+		]),
+	)
+
+	for (let choiceCase of node.cases) {
+		let caseType = cases.get(choiceCase.name.content)
+
+		if (caseType === undefined || choiceCase.type === null) {
 			continue
 		}
 
-		let cases = choiceCases.get(node.name.content)
+		for (let [memberName, member] of Object.entries(
+			choiceCase.type.members,
+		)) {
+			let memberType = caseType.members[memberName]
 
-		if (cases === undefined) {
-			continue
-		}
-
-		for (let choiceCase of node.cases) {
-			let caseType = cases.get(choiceCase.name.content)
-
-			if (caseType === undefined || choiceCase.type === null) {
+			if (memberType === undefined) {
 				continue
 			}
 
-			for (let [memberName, member] of Object.entries(
-				choiceCase.type.members,
-			)) {
-				let memberType = caseType.members[memberName]
-
-				if (memberType === undefined) {
-					continue
-				}
-
-				consider(state, member.name.position, memberType, memberName)
-			}
+			consider(state, member.name.position, memberType, memberName)
 		}
 	}
 }
