@@ -2820,8 +2820,8 @@ function allOf(tests: Array<estree.Expression>): estree.Expression {
 	}))
 }
 
-// Whether an emitted Expression may be written more than once: a literal, a
-// name, or plain member reads over one, since emitted values have no accessors.
+// Whether an emitted Expression may be written more than once. Emitted values
+// have no accessors, so a literal, a name or member reads over one may.
 function isRepeatable(node: estree.Expression): boolean {
 	switch (node.type) {
 		case "Identifier":
@@ -3001,8 +3001,8 @@ function rewriteConformanceValue(
 	}
 }
 
-// A conformer's witnesses, built in one call so each provided body can
-// name the one it is curried with, and each condition is built once:
+// A conformer's witnesses, built in one call so each provided body names the
+// witness it is curried with. Each condition is built once:
 // `$type.providedConformances(methods, provided, conditions, curried, shared)`.
 function rewriteWitnessGroup(
 	node: common.typedSimple.ConformanceValueNode,
@@ -4315,15 +4315,15 @@ function protocolPreludeNamespaces(
 	return found
 }
 
-// Each provided Method's const, by Protocol identity and Method name:
-// `$es_<Name>__<member>` for the first Protocol of a name to claim it, and
-// `$es_<Name>_<n>__<member>` for the n-th, which no Name can spell.
+// Each provided Method's const name, by Protocol identity and Method name.
+// See "Const names" in DEVELOPMENT.md.
 export type ProvidedMemberIdentifiers = ReadonlyMap<
 	string,
 	ReadonlyMap<string, string>
 >
 
-// See "Const names" in DEVELOPMENT.md.
+// Names every provided Method's const, claiming in an order every entry of a
+// graph agrees on. See "Const names" in DEVELOPMENT.md.
 function providedMemberIdentifiers(
 	prelude: Array<PreludeNamespace>,
 ): ProvidedMemberIdentifiers {
@@ -7383,11 +7383,8 @@ function testGenerator(
 					"generate",
 					generatorClosure(generator.binding, generator.call),
 				),
-				// The other half of the conformance: what a value it drew
-				// is reported as instead, where the Namespace wrote a `shrink`.
-				// It is emitted even where the Namespace wrote none, because
-				// the Protocol's provided body is a call like any other — one
-				// that answers an empty List.
+				// Always emitted: without a written `shrink`, the Protocol's
+				// provided one answers an empty List.
 				property(
 					"shrink",
 					generatorClosure(generator.shrinkBinding, generator.shrink),
@@ -7454,10 +7451,8 @@ function generatorClosure(
 	}
 }
 
-// What a table test's rows share: one Function of the row, for the name
-// and one for the body. Both are Functions rather than values because a row
-// that is not the one running must cost nothing — a table of a hundred rows
-// interpolates one name and runs one body, not a hundred of each.
+// A Function of the row, for a table test's name or body, so only the
+// running row is evaluated.
 function rowClosure(
 	binding: string,
 	body: Array<estree.Statement>,
@@ -7578,9 +7573,8 @@ function awaitedRegistration(
 	return { type: "AwaitExpression", argument: call }
 }
 
-// The span table, indexed by point id. Emitted whole rather than per
-// point so that a reader with an event in hand can resolve it without the
-// Compiler — see `TestsSectionNode.spans`.
+// The span table, indexed by point id, so a reader of an event needs no
+// compiler.
 function testSpans(
 	spans: Array<common.typedSimple.TestSpan>,
 ): estree.ArrayExpression {
@@ -7680,11 +7674,8 @@ function property(name: string, value: estree.Expression): estree.Property {
 	}
 }
 
-// What a bundle publishes when anything in it declared a test. It is on
-// the ENTRY Module, because what a bundle exports is what its entry exports,
-// and it is emitted whether or not the entry itself wrote a `tests` block: a
-// graph whose tests all live in its dependencies is the ordinary shape of a
-// `Foo.tests.es`.
+// The test entry points the entry Module exports whenever any Module of the
+// graph declared a test.
 function testEntryPointsExport(): estree.ExportNamedDeclaration {
 	return {
 		type: "ExportNamedDeclaration",
@@ -7704,22 +7695,16 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 	}
 }
 
-// The name a Module's coverage counter is bound to, and the head that
-// binds it: one call registering this Module's table with the test runtime,
-// answering with the Function every counter in the body calls. It is a closure
-// over the Module's own counts rather than a lookup by Module name, so a
-// counter costs one call and one increment.
+// The name of a Module's coverage counter, a closure over the Module's own
+// counts that every counter in the body calls.
 const COVERAGE_COUNTER = "$cover"
 
 function coverageCounter(): estree.Identifier {
 	return { type: "Identifier", name: COVERAGE_COUNTER }
 }
 
-// The head is emitted BEFORE anything else the Module says, because a
-// top-level Statement is instrumented too and would otherwise call a name that
-// is not bound yet. The table goes with it: what a counter MEANT — where it
-// stands, what kind of thing it counts, what to call it — can not be read back
-// off the emitted JavaScript, so it travels beside the counters it indexes.
+// Binds the counter by registering the Module's table of points, which says
+// what each counter means. It stands above every instrumented Statement.
 function coverageHead(
 	section: common.typedSimple.CoverageSectionNode,
 	modulePath: string | null,
@@ -7798,12 +7783,8 @@ function coverageChoices(
 	}
 }
 
-// One counter, in the three shapes a point can need. Standing on its own
-// it counts and answers with nothing; around a Case construction it counts and
-// answers with the very value; in front of a `define` arm's answer it is a
-// sequence, which counts and then answers with the value beside it. The last two
-// leave what the Expression evaluates to unchanged, and differ only in whether
-// the count lands before the value is built — see `CoverageCounterNode.leads`.
+// One counter: alone, around a value it passes through, or, where it `leads`,
+// counting before the value is built.
 function rewriteCoverageCounter(
 	node: common.typedSimple.CoverageCounterNode,
 ): estree.Expression {
@@ -7828,13 +7809,8 @@ function rewriteCoverageCounter(
 		: count([point, value])
 }
 
-// An instrumented point, which answers with the very value it recorded —
-// so wrapping an Expression in one changes nothing about what that Expression
-// evaluates to, and the Position it carries is the Position of what it wraps.
-//
-// A `probe` is the same recording into a different buffer: what a `§?`
-// line asks about belongs to the test rather than to the next assertion, which
-// drains what it was built from.
+// An instrumented point, answering the value it recorded. A `probe` records
+// into the test's buffer rather than the next assertion's.
 function rewriteTestTrace(
 	node: common.typedSimple.TestTraceNode,
 ): estree.Expression {
@@ -7845,20 +7821,13 @@ function rewriteTestTrace(
 	])
 }
 
-// Both forms are one call. `expect` records and the test carries on;
-// `required` records and, where it did not hold, unwinds the test from where it
-// stands — so the Constants a Matcher binds below it are simply never reached.
-// The unwinding is the runtime's rather than an early `return` emitted here
-// because an assertion may stand inside a Handler of a `match` that is used as
-// an Expression, and that Handler is emitted as the body of an arrow Function:
-// a `return` would end the arrow and leave the test running.
+// One call for either form. A failed `require` unwinds the test through the
+// runtime, since a `return` inside a Match's wrapper would only end the wrapper.
 function rewriteTestAssertion(
 	node: common.typedSimple.TestAssertionStatementNode,
 ): estree.Statement {
-	// A snapshot is recorded rather than tested: what it hands over is
-	// the rendered text, which slot of the source a recorded value stands in,
-	// and what stands there now. Whether that holds is the runtime's question,
-	// because only the run knows what a stored snapshot says.
+	// A snapshot hands the runtime the rendered text, its slot and what the
+	// slot holds now; only the run knows the stored snapshot.
 	if (node.snapshot !== null) {
 		return {
 			type: "ExpressionStatement",
@@ -7896,10 +7865,8 @@ function rewriteTestAssertion(
 	}
 }
 
-// What has to hold, as a RAW JavaScript boolean. A Matcher's test already
-// is one — it is the same chain of `&&`s a `match` Handler is tested by, read
-// off the Constant the Statement in front of this one holds the value under —
-// and a Boolean Expression is unwrapped, exactly as an `if`'s condition is.
+// What has to hold, as a raw JavaScript boolean: a Matcher's Handler test, or
+// a Boolean's `value`.
 function assertionTest(
 	node: common.typedSimple.TestAssertionStatementNode,
 ): estree.Expression {
@@ -7909,18 +7876,9 @@ function assertionTest(
 		return valueRead(value)
 	}
 
-	// A Matcher's test reads the value as many times as the Matcher has
-	// parts, so it has to be a name. The Enricher's desugar guarantees one — a
-	// `require MATCHER = EXPR` is always preceded by the Constant holding what
-	// it asserts
-	// — and the arrow below is the answer for a Program that somehow arrives
-	// without it, rather than a wrong test emitted quietly.
-	//
-	// It is also the answer for a Matcher `compile-type-tests` reached.
-	// That pass writes a compiled test against `_self` — the name a Match binds
-	// its value to — because it runs first and can not know what the value will
-	// be spelled as by the time it is emitted. So a compiled Matcher binds the
-	// value to that name, and one the Optimiser never saw is read as itself.
+	// The test reads the value more than once, so it must be a name. A
+	// compiled Matcher reads `_self`, so it, or a value that is no name, is
+	// bound by an arrow.
 	if (value.type === "Identifier" && !isCompiledHandler(node.matcher)) {
 		return handlerTest(node.matcher, value, null)
 	}
@@ -7936,9 +7894,8 @@ function assertionTest(
 	)
 }
 
-// Whether `compile-type-tests` decided this Handler's checks. Both fields
-// are the Optimiser's own — the Simplifier leaves them null — and either one of
-// them is written against `_self`.
+// Whether `compile-type-tests` wrote this Handler's checks, which read
+// `_self`.
 function isCompiledHandler(handler: common.typedSimple.MatchHandler): boolean {
 	return handler.typeTest !== null || handler.memberTests !== null
 }
