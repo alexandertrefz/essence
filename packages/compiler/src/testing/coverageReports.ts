@@ -1,11 +1,9 @@
 import type { CoverageSummary, FileCoverage } from "./coverage"
 import { isReported, percentageOf } from "./coverage"
 
-// The two shapes a coverage run can be WRITTEN as, produced as text and
-// written to disk by whoever asked. They live beside the fold rather than in
-// the command line because what they mean is a property of the run and not of
-// the terminal: a CI job reads `lcov.info`, and the Compiler is the thing that
-// knows what a branch point was.
+// The two file formats a coverage run is written as, produced as text for the
+// caller to write. A CI job reads `lcov.info`, and only the compiler knows what
+// a branch point was.
 
 export type CoverageReportFormat = "lcov" | "json"
 
@@ -20,25 +18,14 @@ export function isCoverageReportFormat(
 	return (coverageReportFormats as ReadonlyArray<string>).includes(name)
 }
 
-// What the written file is CALLED, per format — so a caller asking for a
-// directory does not have to know either.
+// The file name per format, so a caller naming a directory need not know it.
 export function coverageReportFileName(format: CoverageReportFormat): string {
 	return format === "lcov" ? "lcov.info" : "coverage.json"
 }
 
-// `lcov`'s tracefile format, which is what every coverage viewer reads.
-// Only the records that mean something here are written:
-//
-//   SF   the source file
-//   DA   a line and how often it ran
-//   LF/LH lines found / lines hit
-//   BRDA a branch: line, block, branch number, taken count
-//   BRF/BRH branches found / branches hit
-//
-// A Match arm is written as a BRANCH, because lcov has no notion of an
-// exhaustive Case and a viewer that draws arms as branches is telling the
-// reader the truth about them. Each point gets a block of its own and is named
-// by its label, so a viewer shows `case #Postponed` rather than `1`.
+// The `lcov` tracefile that coverage viewers read: `SF`, `DA`, `LF` and `LH` for
+// lines, and `BRDA`, `BRF` and `BRH` for branches. A Match arm is written as a
+// branch, in a block of its own, named by its label.
 export function toLcov(summary: CoverageSummary): string {
 	let lines: Array<string> = []
 
@@ -80,9 +67,8 @@ export function toLcov(summary: CoverageSummary): string {
 	return lines.length === 0 ? "" : `${lines.join("\n")}\n`
 }
 
-// The same answer as data, for a consumer that would rather read the
-// Compiler's own vocabulary than lcov's — the Cases, the doorways and the
-// scopes are all here, and none of them survive the translation above.
+// The same answer as JSON in the compiler's own terms: Cases, refinement
+// branches and scopes, which `lcov` can not carry.
 export function toCoverageJson(summary: CoverageSummary): string {
 	return `${JSON.stringify(
 		{
@@ -106,18 +92,13 @@ export function toCoverageJson(summary: CoverageSummary): string {
 	)}\n`
 }
 
-// A `BRDA` record is four COMMA-separated fields, so a label holding a
-// comma — `case { x: Integer, y: Integer }` is one an ordinary Record Matcher
-// produces — would move the count into the name and leave the record
-// unreadable. The commas go; the label with them intact is in the JSON report,
-// which has no such trouble.
+// A `BRDA` record is four comma-separated fields, so a label's commas become
+// semicolons. The JSON report keeps them.
 function branchName(label: string): string {
 	return label.replaceAll(",", ";")
 }
 
-// How often each line ran, which is the one thing lcov asks for that the
-// point table does not hold directly: a line may carry several Statements, and
-// what a viewer draws is the greatest of their counts — the line ran that often.
+// How often each line ran: the greatest count of the points on it.
 function lineCounts(file: FileCoverage): Array<[number, number]> {
 	let counts = new Map<number, number>()
 

@@ -3,9 +3,9 @@ import { rmSync } from "node:fs"
 import { readdir, rm } from "node:fs/promises"
 import * as path from "node:path"
 
-// Where a test run stages the bundles it imports: a directory named for
-// the process that made it, under a prefix of the tool's own, so that a later
-// run can tell the directory of one that has stopped from one still in use.
+// Where a test run stages the bundles it imports: a directory under the tool's
+// prefix, named for the process that made it. A later run can then tell a
+// stopped process's directory from one still in use.
 export function stagingDirectoryIn(root: string, prefix: string): string {
 	return path.join(root, `${prefix}${process.pid}-${randomUUID()}`)
 }
