@@ -10633,14 +10633,9 @@ describe("Enricher", () => {
 			).toBe("NonZeroInteger")
 		})
 
-		// The proofs the library MINTS. A count is never negative, a count
-		// of something proven non-empty is above zero, a distance from zero is
-		// never negative and a denominator in lowest terms is always positive
-		// — and each of those answers says so, so that the next call can spend
-		// it: `2::raise(to items::length())` reaches the entry taking a
-		// `NonNegativeInteger` exponent and answers a whole number rather than
-		// the Union, and `absolute()::squareRoot()` answers the root itself
-		// rather than an Optional.
+		// Counts, distances from zero and lowest-terms denominators carry sign
+		// proofs, so `2::raise(to items::length())` answers a whole number and
+		// `absolute()::squareRoot()` a bare root.
 		it("should mint the count and sign proofs a native answer carries", () => {
 			expect(
 				answerOf(`constant items: List<Integer> = [1, 2, 3]
@@ -10698,9 +10693,8 @@ describe("Enricher", () => {
 			).toBe("PositiveInteger")
 		})
 
-		// A Program's own Alias is a candidate beside the builtins, and a
-		// Namespace over it is reached by a written receiver exactly as the
-		// standard library's are.
+		// A written receiver reaches a Program's own refined Namespace as it
+		// reaches the standard library's.
 		it("should reach a Program's own refined Namespace", () => {
 			expect(
 				answerOf(`type Even = Integer where @::isEven()
@@ -10716,18 +10710,10 @@ describe("Enricher", () => {
 		})
 	})
 
-	// The other half of what a proof buys. A refinement ADDS Methods and
-	// takes none away, so `namespace NonEmptyList` can answer `firstItem()` bare
-	// and still not hide `List::firstItem(defaultingTo:)` — the call compiles,
-	// and the fallback beside it is text that can never run. Only a Diagnostic
-	// can say so.
-	//
-	// The rule is written about the LABEL and about nothing else: an Invocation
-	// carrying an Argument labelled `defaultingTo` is resolved a second time with
-	// that Argument struck out, and the Warning is reported when the second
-	// resolution answers a Type that is not an Optional. No Method name and no
-	// Namespace name is named anywhere in it, which is what makes a Program's own
-	// Namespace following the same convention read the same way.
+	// A refinement adds Methods and hides none, so a `defaultingTo` fallback
+	// can be dead. A call is resolved again without that Argument, and a
+	// non-Optional answer is a Warning. See "Dead fallbacks" in
+	// packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("Dead 'defaultingTo' fallbacks", () => {
 		function programWith(body: string): string {
 			return `implementation {
@@ -10762,12 +10748,9 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// A written RECEIVER is proof of the same kind, and the probe that
-		// erases the caller's proof erases it too — the receiver is widened past
-		// its refinement and no written value is admitted to one, so the
-		// question asked is what a caller holding nothing would have reached.
-		// Without that, `[1, 2]::firstItem(defaultingTo 0)` would look like an
-		// entry swap rather than the dead fallback it is.
+		// The probe widens a written receiver past its refinement, so
+		// `[1, 2]::firstItem(defaultingTo 0)` is a dead fallback, not an entry
+		// swap.
 		it("should warn where a written receiver answers bare", () => {
 			expect(
 				codesFor(
@@ -10778,10 +10761,8 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// A written `2` is proof enough for `divide`'s NonZeroInteger
-		// entry, so the quotient exists and the fallback is as dead as the
-		// receiver-side ones — the evidence is on the ARGUMENT here, which is
-		// the same rule from the other side.
+		// A written `2` proves `divide`'s `NonZeroInteger` entry, so the
+		// fallback is dead, with the evidence on the Argument.
 		it("should warn where a written Argument proves the answer exists", () => {
 			expect(
 				codesFor(
@@ -10792,8 +10773,7 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// The Warning has to name the Type the call already answers, or a
-		// reader is told to delete an Argument without being told what is left.
+		// The Warning names the Type the call answers without the fallback.
 		it("should name the Type the call answers without the fallback", () => {
 			let source = programWith(
 				"constant first = proven::firstItem(defaultingTo 0)",
@@ -10826,10 +10806,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// The one entry the whole rule is built around — and the reason it
-		// re-probes rather than reading a Parameter list. `Optional::value`
-		// declares no bare `value()` at all, so the second resolution finds no
-		// winner and there is nothing to say.
+		// `Optional::value` declares no bare `value()`, so the second resolution
+		// finds no winner. This is why the rule re-probes.
 		it("should stay silent on 'Optional::value(defaultingTo:)'", () => {
 			expect(
 				codesFor(
@@ -10913,11 +10891,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// A `defaultingTo` Parameter carrying a default value is filled in
-		// by the callee where no Argument is written, so striking the Argument
-		// reaches the very entry the call already selected. Nothing was proven —
-		// it is one entry asked twice — and the Argument that WAS written is read
-		// at run time, so the Help would change what the Program answers.
+		// A defaulted `defaultingTo` Parameter means the re-probe reaches the
+		// same entry, whose written Argument is read at run time.
 		it("should stay silent where the Parameter was defaulted, not dropped", () => {
 			expect(
 				codesFor(`implementation {
@@ -10954,11 +10929,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// Striking the Argument can let an ENTIRELY different entry win, and
-		// an entry that answers bare for reasons of its own proves nothing. A
-		// plain List reaches this one holding no proof at all, the written call
-		// really does read its fallback — no item is greater than 100 — and the
-		// Help would silently swap which entry runs.
+		// A different entry answering bare for reasons of its own proves
+		// nothing. This call does read its fallback.
 		it("should stay silent where the bare entry needed no proof", () => {
 			expect(
 				codesFor(`implementation {
@@ -10980,10 +10952,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// A call that resolved to nothing has no entry to have written the
-		// fallback for, so it is told nothing about it — the Validator is
-		// already reporting the Argument it could not place, and "drop the
-		// fallback" on top of that reads as a second, unrelated fault.
+		// A call that resolved to nothing gets no Warning, since the Validator
+		// already reports its Argument.
 		it("should stay silent where the written call resolved to nothing", () => {
 			expect(
 				codesFor(`implementation {
@@ -10996,11 +10966,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// A re-probe enriches the Arguments it keeps, and one of those may
-		// write a `defaultingTo` of its own — so the re-probe is not re-entered.
-		// The inner call still reports for itself, from the enrichment the
-		// Program commits, and the outer one stays silent because a plain List
-		// can still be empty.
+		// A re-probe is not re-entered for a kept Argument's own `defaultingTo`.
+		// The inner call reports once, and the outer stays silent.
 		it("should report a nested call once, from its own enrichment", () => {
 			expect(
 				codesFor(
@@ -11011,11 +10978,8 @@ describe("Enricher", () => {
 			).toEqual(["fallback-never-used"])
 		})
 
-		// The Warning is a Warning: the call is well typed, nothing is
-		// refused, and what the Program does is unchanged. A reader who leaves it
-		// alone gets the same answer — which `lastConstantValue` can not be asked
-		// for, since it requires a Program that enriches silently and this one is
-		// the whole point.
+		// The call keeps its entry. `lastConstantValue` is not used, since it
+		// requires a silent Program.
 		it("should leave the call resolving to the entry it was written for", () => {
 			let { program } = enrichSource(
 				programWith(
@@ -11032,18 +10996,10 @@ describe("Enricher", () => {
 		})
 	})
 
-	// A carrier and what it holds are two levels, and `Optional::is` has an
-	// entry for each — so a written `#Empty` against an
-	// `Optional<Optional<Integer>>` fits both, the whole-carrier entry is reached
-	// because it is written first, and the call answers a question about the
-	// RECEIVER that reads like a question about its payload. `Result` has the
-	// same trap one Case over. Only a Diagnostic can say which of the two was
-	// asked.
-	//
-	// The rule names no Method and no Namespace: the entry the call selected
-	// takes the receiver's own Type, another entry takes what one of that Type's
-	// Cases holds, and the value the call built reads at both. A Program's own
-	// carrier is read the same way.
+	// `Optional::is` has an entry for the carrier and one for its payload. A
+	// written `#Empty` against `Optional<Optional<Integer>>` fits both, and the
+	// first entry wins, so a Warning says which question was asked. A Program's
+	// own carrier is read the same way.
 	describe("Two-level carrier comparisons", () => {
 		function programWith(body: string): string {
 			return `implementation {
@@ -11061,10 +11017,7 @@ describe("Enricher", () => {
 			return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
 		}
 
-		// `lastConstantMethodInvocation` holds the Program to enriching
-		// cleanly, and half the Programs here are the ones that warn — so the
-		// Overload slot is read from a Program that is allowed to have something
-		// to say.
+		// The selected Overload slot, read from a Program that may warn.
 		function selectedEntryOf(source: string): number | null {
 			let { program } = enrichSource(source)
 			let constants = program.implementation.nodes.filter(
@@ -11093,10 +11046,8 @@ describe("Enricher", () => {
 			).toEqual(["ambiguous-nesting-level"])
 		})
 
-		// A `Result` of `Result`s fails with one Type at both levels, so a
-		// written `#Failure(reason)` is the Optional trap's twin: it fits the
-		// whole Result and the Result it holds, and the reader is asking about
-		// the outer failure without saying so.
+		// A `Result` of `Result`s fails with one Type at both levels, so
+		// `#Failure(reason)` fits both, as `#Empty` does for Optionals.
 		it("should warn where a Result of Results is compared to a failure", () => {
 			expect(
 				codesFor(
@@ -11107,9 +11058,7 @@ describe("Enricher", () => {
 			).toEqual(["ambiguous-nesting-level"])
 		})
 
-		// The Warning has to name both levels and both spellings, or a
-		// reader is told the call is ambiguous without being told what either
-		// reading is written as.
+		// The Warning names both levels and how to spell each.
 		it("should name both levels and both spellings", () => {
 			let source = programWith("constant answer = nested::is(#Empty)")
 			let diagnostic = diagnosticsFor(source)[0]
@@ -11133,8 +11082,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The Argument alone, since the Argument is what both Helps rewrite
-		// — the Method name carries the secondary Label instead.
+		// The Argument alone, which both Helps rewrite. The Method name carries
+		// the secondary Label.
 		it("should underline the Argument", () => {
 			let source = programWith("constant answer = nested::is(#Empty)")
 
@@ -11154,9 +11103,8 @@ describe("Enricher", () => {
 			).toBe(0)
 		})
 
-		// The other side of the same fact. An Argument annotated at the
-		// item's level reaches the bare-item entry, which is slot 1 — the inner
-		// question, asked unambiguously, and nothing to warn about.
+		// An Argument annotated at the item's level reaches the bare-item
+		// entry, slot 1, unambiguously.
 		it("should stay silent where an annotated Constant asks about the item", () => {
 			let source = programWith("constant answer = nested::is(inner)")
 
@@ -11164,19 +11112,16 @@ describe("Enricher", () => {
 			expect(selectedEntryOf(source)).toBe(1)
 		})
 
-		// And an Argument annotated at the carrier's level fits the
-		// whole-carrier entry only — a `#Value` holding an Optional is no
-		// Optional of Integers — so the receiver's question is asked with nothing
-		// left to read the other way.
+		// An Argument annotated at the carrier's level fits only the
+		// whole-carrier entry.
 		it("should stay silent where an annotated Constant asks about the receiver", () => {
 			expect(
 				codesFor(programWith("constant answer = nested::is(outer)")),
 			).toEqual([])
 		})
 
-		// The spelling Help 1 asks for. Wrapping the Argument in the Case
-		// that holds decides the level: the payload of an `Optional<Integer>`'s
-		// `#Value` is an Integer, and an `#Empty` is not one.
+		// The first Help's spelling: wrapping the Argument in the holding Case
+		// decides the level.
 		it("should stay silent on the wrapped spelling it recommends", () => {
 			expect(
 				codesFor(
@@ -11185,10 +11130,9 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// Why Help 2 asks for a Constant rather than for the Choice written
-		// in front. A Case carries its Type Arguments for display and `matchTypes`
-		// compares its MEMBERS, so a payload-free Case is one Type at every level
-		// and writing `Optional<Optional<Integer>>#Empty` decides nothing.
+		// `matchTypes` compares a Case's members, not its Type Arguments, so
+		// `Optional<Optional<Integer>>#Empty` decides nothing. The second Help
+		// asks for a Constant.
 		it("should go on warning where the Case names its Choice", () => {
 			expect(
 				codesFor(
@@ -11211,22 +11155,17 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// `Integer::is` takes its receiver's own Type too, and an Integer
-		// holds nothing — there is no second level for an Argument to be read at,
-		// which is the filter that keeps this off every numeric comparison in
-		// every Program.
+		// An Integer holds nothing, so there is no second level and no
+		// Warning.
 		it("should stay silent where the receiver holds nothing", () => {
 			expect(codesFor(programWith("constant answer = 3::is(4)"))).toEqual(
 				[],
 			)
 		})
 
-		// `or` and `value(defaultingTo:)` are the pair this Warning is NOT
-		// about. Each is one entry, and their Parameter Types say which level
-		// they read at — `or` takes what it answers, `value(defaultingTo:)` takes
-		// the item — so the reader picks the level by picking the Method and the
-		// Compiler picks nothing at all. See Optional.es, where the same fact
-		// keeps an `orElse` out of the Namespace.
+		// `or` and `value(defaultingTo:)` are single entries whose Parameter
+		// Types pick the level, so the Method name decides. The same fact keeps
+		// an `orElse` out of `Optional.es`.
 		it("should stay silent where the Method's own name picks the level", () => {
 			expect(
 				codesFor(`implementation {
@@ -11238,10 +11177,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// Nothing in the rule is about the standard library. A Choice a
-		// Program declares, with a Namespace whose Overload takes the carrier and
-		// what it holds, is read exactly the same way — down to the Case its Help
-		// asks the reader to wrap in.
+		// A Program's own carrier and Overload are read the same way, down to
+		// the Case the Help wraps in.
 		it("should read a Program's own carrier by the same shape", () => {
 			let source = `implementation {
 				choice Box<ItemType> {
@@ -11276,12 +11213,9 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A carrier holding one Type in TWO Cases. Both `#Labelled` and
-		// `#Full` would fit the payload entry, and each of them asks a different
-		// question — `#Labelled` is not even the same Type here, which is what
-		// keeps the two apart — so the Warning names every Case that qualifies
-		// rather than the first with a payload. Naming one would present one of
-		// several readings as the fix, and the Rewrite would commit to it.
+		// `#Labelled` and `#Full` both fit the payload entry and ask different
+		// questions, so the Warning names every qualifying Case rather than
+		// choosing one.
 		it("should name every Case of a carrier whose payload fits", () => {
 			let source = `implementation {
 				choice Twin<ItemType> {
@@ -11322,11 +11256,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// And the Case that fits is not the first with a payload —
-		// `#Labelled` holds a String and the receiver holds a `Box<Integer>` —
-		// so this is what tells "the Case whose payload matches" from "the first
-		// Case with a payload". The mutant that takes the first names
-		// `#Labelled`, which does not compile.
+		// `#Labelled` holds a String, so it is the first Case with a payload but
+		// not the one that fits.
 		it("should name the Case whose payload fits rather than the first", () => {
 			let source = `implementation {
 				choice Box<ItemType> {
@@ -11362,19 +11293,9 @@ describe("Enricher", () => {
 			})
 		})
 
-		// What the check COSTS, guarded by a count rather than by a clock.
-		// It runs on every call to an Overload whose selected entry takes the
-		// receiver's own Type — every `Optional::is` and `Optional::isNot` in
-		// the language — and probing an entry is a full match-and-solve, so a
-		// probe per entry on the call that never warns was 2.8x the enrich cost
-		// of the whole Invocation. The written value is asked for first, and it
-		// needs no probe: a value that is no Case's payload can not be a second
-		// reading of anything.
-		//
-		// A clock is no guard for this. `stdlibLoader.spec.ts` says so outright
-		// — five idle runs of an enrich spread 66% — and a ceiling tight enough
-		// to see 16 µs a call is the flake that rule refuses. The count is
-		// exact, and the second half is what keeps it from passing vacuously.
+		// The check runs on every `Optional::is`, and a probe is a full match,
+		// so a value that is no Case's payload must need no probe. Probes are
+		// counted, since a timing ceiling this tight would flake.
 		function probesFor(source: string): number {
 			nestingLevelProbes.count = 0
 			enrichSource(source)
