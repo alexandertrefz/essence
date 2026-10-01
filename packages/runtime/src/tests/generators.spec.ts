@@ -23,13 +23,9 @@ import { createRecord } from "../Record"
 import { createString } from "../String"
 import { type AnyType, createCase, liveEntriesOf, typeKeySymbol } from "../type"
 
-// The generator interpreter as a unit — what it BUILDS and what it makes
-// smaller — driven directly rather than through a compile. What the Compiler
-// derives from a Type is `testingProperties.spec.ts`; what the descriptions it
-// derives MEAN is here.
-//
-// Every draw is over a fixed seed, so every assertion below is about a
-// sequence that is the same on every machine and in every run.
+// The generator interpreter, driven directly over fixed seeds.
+// `testingProperties.spec.ts` covers what the Compiler derives from a Type. See
+// "Property-test generators" in packages/runtime/DEVELOPMENT.md.
 
 function sourceOf(seed = "beef"): RandomnessType {
 	return createRandomness(seedOf(seed))
@@ -58,8 +54,7 @@ function textOf(value: AnyType): string {
 	return (value as unknown as { value: string }).value
 }
 
-// What `Generatable` provides as `shrink`, which is what the Compiler
-// emits for a conformance whose Namespace writes none of its own.
+// The `shrink` that `Generatable` provides, for a Namespace that writes none.
 function noCandidates(): AnyType {
 	return createList([])
 }
@@ -83,9 +78,8 @@ function tagOf(value: AnyType): string {
 	return (value as unknown as Record<symbol, string>)[typeKeySymbol]!
 }
 
-// The witness a Dictionary built here is handed. `Generators.ts` builds
-// its own drawn Dictionaries through the same universal comparison, so this is
-// what a drawn one was keyed by and what a hand-built one has to agree with.
+// The universal comparison, which `drawnKeyEquatable` also keys a drawn
+// Dictionary by.
 const anyEquatable = {
 	is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
 }
@@ -103,9 +97,8 @@ const strings: Generator = { kind: "string" }
 const booleans: Generator = { kind: "boolean" }
 const rationals: Generator = { kind: "rational" }
 
-// What a checked refinement's description looks like once the Compiler
-// has lowered it: a base, whatever the narrowing holds by construction, and the
-// predicate as a check over the value.
+// A checked refinement as the Compiler lowers it: a base, the narrowing it holds
+// by construction, and the predicate as checks.
 function refined(
 	name: string,
 	base: Generator,
@@ -134,10 +127,8 @@ describe("Generators", () => {
 			expect(drawn.some((value) => value === 0n)).toBe(true)
 		})
 
-		// One draw in eight is taken from a far wider window, which is
-		// what meets an assumption a small number never breaks. The window has a
-		// ceiling as well, a hundred spans, because what a draw is fed to can
-		// grow far faster than the draw — a power's digits, a range's items.
+		// One draw in eight comes from a window a hundred times wider, which is
+		// still bounded.
 		test("draws an Integer past what a small window holds", () => {
 			let drawn = draw(integers, 200).map(wholeOf)
 
@@ -237,10 +228,8 @@ describe("Generators", () => {
 			)
 		})
 
-		// The two slots drawn apart, and the one thing collapsing a
-		// repeated key does to a draw: what comes out may hold FEWER entries
-		// than were drawn for it, so the count is never asserted — only that
-		// every entry is a key and a value of the Types the slots named.
+		// A repeated key collapses, so a draw may hold fewer entries than were
+		// drawn, and the count is never asserted.
 		test("draws a Dictionary of the two slots it was given", () => {
 			let generator: Generator = {
 				kind: "dictionary",
@@ -289,7 +278,6 @@ describe("Generators", () => {
 	})
 
 	describe("what a refinement holds", () => {
-		// THE claim a property test over `NonEmptyList<…>` rests on.
 		test("never draws an empty List for a non-empty one", () => {
 			let generator = refined(
 				"NonEmptyList",
@@ -332,8 +320,8 @@ describe("Generators", () => {
 			}
 		})
 
-		// A predicate the narrowing does not hold is the FILTER: values
-		// are drawn and refused until one is admitted.
+		// A check the narrowing does not hold filters: values are drawn and
+		// refused until one is admitted.
 		test("draws only what every check admits", () => {
 			let generator = refined("EvenInteger", integers, {}, [
 				(value) => ({ value: wholeOf(value) % 2n === 0n }),
@@ -344,9 +332,8 @@ describe("Generators", () => {
 			}
 		})
 
-		// A narrowing that holds the whole predicate leaves no check to
-		// run, so nothing else would notice a draw or a shrink answering a bound
-		// it could not honour.
+		// Where the narrowing holds the whole predicate there is no check to run,
+		// so the narrowing itself is checked.
 		test("refuses a value the narrowing itself forbids", () => {
 			let generator = refined("Nothing", integers, {
 				atLeast: "5",
@@ -503,9 +490,8 @@ describe("Generators", () => {
 			expect(shrink(booleans, createBoolean(false))).toEqual([])
 		})
 
-		// A Namespace that writes no `shrink` keeps the one `Generatable`
-		// provides, which answers no candidates at all — so a value its
-		// generator drew is reported as it was drawn.
+		// The `shrink` `Generatable` provides answers no candidates, so the value
+		// is reported as drawn.
 		test("answers no candidate where the conformance answers none", () => {
 			let generator: Generator = {
 				kind: "generated",
@@ -517,10 +503,8 @@ describe("Generators", () => {
 			expect(shrink(generator, createString("Lions"))).toEqual([])
 		})
 
-		// And a Namespace that writes one is asked, with the failing
-		// value in hand. The candidates are answered in the body's own order,
-		// which is the order the runner tries them in, so a body that writes
-		// its smallest first is shrunk to it first.
+		// The candidates keep the body's order, which is the order the runner
+		// tries them in.
 		test("answers what the conformance's own shrink answers, in order", () => {
 			let asked: Array<string> = []
 			let generator: Generator = {
@@ -543,9 +527,8 @@ describe("Generators", () => {
 			expect(asked).toEqual(["Lions"])
 		})
 
-		// A body answering the value it was handed is answering that it
-		// can go no smaller. Trying it would re-run the property on the value
-		// the shrink already has, once for every attempt the budget allows.
+		// Trying the failing value again would spend an attempt of the budget on
+		// every copy of it.
 		test("drops a candidate that is the failing value itself", () => {
 			let generator: Generator = {
 				kind: "generated",
@@ -560,10 +543,8 @@ describe("Generators", () => {
 			).toEqual(["Li"])
 		})
 
-		// A refinement of a Type a Namespace generates is the one place
-		// the two kinds of shrink meet: the conformance says what the smaller
-		// values are, and the predicate says which of them the refined Type
-		// admits at all.
+		// The conformance offers the smaller values, and the predicate says which
+		// of them the refined Type admits.
 		test("holds a conformance's candidates to the refinement over it", () => {
 			let generator = refined(
 				"LongName",
@@ -617,10 +598,8 @@ describe("Generators", () => {
 			).toBe(true)
 		})
 
-		// THE claim a shrunk Dictionary rests on. Two keys shrinking
-		// towards one key would collapse into a single entry, so a candidate
-		// would be a Dictionary of another LENGTH than the shrink meant to
-		// answer — a report about a value the property never saw.
+		// Two keys shrinking to one would collapse into one entry, leaving a
+		// Dictionary of another length than the shrink meant.
 		test("never rewrites a key", () => {
 			let value = dictionaryOf([
 				[createString("alex"), createInteger(39n)],
@@ -639,17 +618,11 @@ describe("Generators", () => {
 		})
 	})
 
-	// WHICH KEYS ARE ONE KEY is not a question a generator can answer out
-	// of the shape it was told to draw: a Namespace may write an `is` for the
-	// key Type, and two keys it calls equal are one entry however they are
-	// spelled. So the plan carries the key Type's own Equatable witness, and
-	// everything here that builds a Dictionary builds through it.
+	// A Namespace may write an `is` for the key Type. So the plan carries the key
+	// Type's Equatable witness, and every Dictionary is built through it.
 	describe("the witness a drawn Dictionary is built by", () => {
-		// A key generator that answers the two spellings of one name in
-		// turn, and a witness that calls them equal — the shape a user
-		// Namespace `for NonEmptyString is Equatable` leaves behind. It counts
-		// rather than draws so that the two spellings are what a draw of two
-		// keys meets, whatever the source answers.
+		// Answers two spellings of one name in turn, which `looseText` calls
+		// equal. It counts rather than draws, so a draw of two keys meets both.
 		let spelling = 0
 
 		const spellings: Generator = {
@@ -740,9 +713,8 @@ describe("Generators", () => {
 			)
 		})
 
-		// An empty Dictionary needs no key at all, which is why the
-		// smallest one can always be built while the smallest NON-empty one
-		// needs both slots to have a smallest value of their own.
+		// An empty Dictionary needs no key, so the smallest one can always be
+		// built.
 		test("answers the empty Dictionary", () => {
 			expect(
 				entriesOf(
@@ -755,10 +727,8 @@ describe("Generators", () => {
 			).toEqual([])
 		})
 
-		// A length above one is a length in DISTINCT keys, which is what
-		// a `NonEmptyDictionary` of more than one entry asks for. The smallest
-		// key is one of them and the rest are drawn, because "smaller" is an
-		// ordering the language owns for numbers and not for keys.
+		// A length counts distinct keys. The smallest key is one of them and the
+		// rest are drawn, since keys have no order of size.
 		test("answers as many distinct keys as a minimum length asks for", () => {
 			for (let length of [1, 2, 5]) {
 				let smallest = minimal(
@@ -780,9 +750,8 @@ describe("Generators", () => {
 			}
 		})
 
-		// And where the key Type has too few values to make that many, it
-		// answers nothing rather than a Dictionary shorter than it promised. A
-		// Boolean has two.
+		// Where the key Type has too few values it answers nothing rather than a
+		// shorter Dictionary. A Boolean has two.
 		test("answers nothing where the key Type has too few values", () => {
 			expect(
 				minimal(
@@ -848,10 +817,9 @@ describe("Generators", () => {
 		})
 	})
 
-	// What the coverage-guided search moves with. A neighbour is ONE step
-	// from a value rather than a fresh case, so what is asserted below is
-	// STRUCTURAL — which part moved and which parts did not — and every count is
-	// over a pinned seed, so the sequence is the same on every machine.
+	// A neighbour is one step from a value, so the assertions are structural:
+	// which part moved and which did not. See "Neighbouring generated values" in
+	// packages/runtime/DEVELOPMENT.md.
 	describe("what a neighbour of a value is", () => {
 		function neighbours(
 			generator: Generator,
@@ -890,9 +858,8 @@ describe("Generators", () => {
 			).toEqual(createBoolean(true))
 		})
 
-		// A leaf is redrawn rather than nudged — see the NOTE on
-		// `mutate`. What is asserted is that the redraw HAPPENS and stays a
-		// value of the Type, not which number came out.
+		// A leaf is redrawn rather than nudged, so the test asks only that the
+		// redraw happens and stays a value of the Type.
 		test("redraws an Integer, a Rational and a String", () => {
 			let whole = neighbours(integers, createInteger(0n), 40)
 			let text = neighbours(strings, createString(""), 40)
@@ -909,8 +876,6 @@ describe("Generators", () => {
 			)
 		})
 
-		// The three moves a List has, and the bounds a narrowing puts on
-		// which of them are available at all.
 		test("moves a List's length by one, and never past a bound", () => {
 			let generator: Generator = { kind: "list", item: integers }
 			let value = createList([
@@ -943,8 +908,8 @@ describe("Generators", () => {
 			expect(lengths).toContain(3)
 		})
 
-		// A narrowing that admits exactly one length leaves an empty List
-		// with no neighbour at all, and the function still has to answer.
+		// A narrowing that admits only length zero leaves an empty List no move,
+		// and `mutate` still answers.
 		test("answers the value itself where no move is available", () => {
 			let generator: Generator = { kind: "list", item: integers }
 			let moved = mutate(generator, createList([]), sourceOf(), 4, {
@@ -955,10 +920,8 @@ describe("Generators", () => {
 			expect(itemsOf(moved)).toEqual([])
 		})
 
-		// THE property a Record's neighbour rests on: everything the case
-		// already reached is kept, one member excepted. The members that did not
-		// move are the very objects the value held — values are immutable, so
-		// sharing them is what "did not move" MEANS.
+		// The members that did not move are the very objects the value held, which
+		// immutability makes safe.
 		test("moves exactly one member of a Record", () => {
 			let generator: Generator = {
 				kind: "record",
@@ -987,8 +950,7 @@ describe("Generators", () => {
 				}
 			}
 
-			// Every member is the moved one sometimes, so the choice is a
-			// choice rather than a fixed member the search never leaves.
+			// Every member is the moved one sometimes.
 			expect(untouched).toEqual(new Set(names))
 		})
 
@@ -1017,15 +979,9 @@ describe("Generators", () => {
 			}
 		})
 
-		// A step that ADDS has to draw a key the Dictionary does not
-		// already hold. A key it holds is an overwrite, which leaves the length
-		// where it was — so the move would have been the redraw move under
-		// another name, and the search would grow a Dictionary half as often as
-		// it means to. A Boolean key has two values, so a one-entry Dictionary
-		// collides on every second draw; over ninety neighbours at this seed
-		// twenty-three grow, where taking the first draw whatever it was grew
-		// eleven and turned the other twenty into a second way of redrawing a
-		// value.
+		// Adding a key the Dictionary holds would only overwrite and keep the
+		// length. A Boolean key collides with a one-entry Dictionary on every second
+		// draw.
 		test("a step that adds an entry draws a key the Dictionary lacks", () => {
 			let generator: Generator = {
 				kind: "dictionary",
@@ -1048,11 +1004,8 @@ describe("Generators", () => {
 			).toBeGreaterThan(0)
 		})
 
-		// And where the key Type has no value left to draw, the step
-		// falls back to a move that is available rather than answering the
-		// value it was handed. Both Booleans are held here and the length is
-		// pinned from below, so every neighbour is a redrawn value under a key
-		// that was already there.
+		// Both Booleans are held and the length may not drop, so every neighbour
+		// falls back to redrawing a value under a held key.
 		test("a step falls back where every key its Type has is held", () => {
 			let generator: Generator = {
 				kind: "dictionary",
@@ -1077,8 +1030,8 @@ describe("Generators", () => {
 			).toBeTrue()
 		})
 
-		// A payload-free Case is the only value of its own shape, so its
-		// neighbour is itself — built afresh rather than handed back.
+		// A payload-free Case is the only value of its shape, so its neighbour is
+		// itself.
 		test("answers a payload-free Case with its own tag", () => {
 			let generator: Generator = {
 				kind: "case",
@@ -1096,10 +1049,8 @@ describe("Generators", () => {
 			).toEqual(createCase("Ordering#Equal") as unknown as AnyType)
 		})
 
-		// One time in four, which at this seed is what the counts below
-		// say. A neighbour that never left its arm would leave the search unable
-		// to cross a Union at all; one that left it half the time would not be a
-		// neighbour.
+		// A neighbour leaves its arm one time in four. Never leaving would stop the
+		// search crossing a Union, and leaving half the time is no neighbour.
 		test("usually stays in the arm the value inhabits", () => {
 			let generator: Generator = {
 				kind: "union",
@@ -1122,10 +1073,9 @@ describe("Generators", () => {
 			expect(crossed).toBeLessThan(tags.length / 2)
 		})
 
-		// The claims question, sharpened: the runtime key alone reads
-		// every Record as the FIRST Record arm, and a neighbour rebuilt under
-		// the wrong arm drops the very members the kept case held. The member
-		// names are what tell two Record arms apart.
+		// Both Record arms share a runtime key, so their member names tell them
+		// apart. Rebuilt under the first arm, a neighbour would drop the member
+		// the value held.
 		test("holds a value inside its own Record arm of a Union", () => {
 			let generator: Generator = {
 				kind: "union",
@@ -1147,16 +1097,13 @@ describe("Generators", () => {
 				Object.keys(moved as unknown as object).includes("count"),
 			)
 
-			// Most neighbours stay in the value's own arm — the cross-arm
-			// coin is one in four — and every one that stayed still holds the
-			// arm's own member rather than the first arm's.
+			// The cross-arm coin is one in four, so most neighbours stay in the
+			// value's own arm.
 			expect(kept.length).toBeGreaterThan(30)
 		})
 
-		// Two refinements of one base share a key too, and there the
-		// predicate is what claims — a positive Integer mutated under the
-		// negative arm's generator would answer values the kept case's arm
-		// refuses.
+		// Two refinements of one base also share a key, so their predicates
+		// claim. Mutating under the other arm would answer values this arm refuses.
 		test("tells two refined arms of one base apart by their predicates", () => {
 			let positive: Generator = {
 				kind: "refined",
@@ -1188,16 +1135,15 @@ describe("Generators", () => {
 				wholeOf,
 			)
 
-			// The cross-arm coin still crosses — what may never happen is
-			// a "stay" that lands in the other arm because the first one
-			// claimed a value its own predicate refuses.
+			// The coin still crosses sometimes, but a stay must never land in the
+			// other arm.
 			expect(moved.filter((value) => value < 0n).length).toBeGreaterThan(
 				30,
 			)
 		})
 
-		// A value no arm claims is a value the Union never built, and a
-		// draw is the only honest answer to it.
+		// A value no arm claims was never built by the Union, so a fresh draw
+		// answers it.
 		test("draws afresh for a value no arm of a Union claims", () => {
 			let generator: Generator = {
 				kind: "union",
@@ -1213,9 +1159,7 @@ describe("Generators", () => {
 			expect(tags).toEqual(new Set(["Shade#Light", "Shade#Dark"]))
 		})
 
-		// THE law a refinement's neighbour rests on: the answer is always
-		// one the refinement ADMITS, whether the mutation found it or the fresh
-		// draw behind it did. The checks are run again here rather than trusted.
+		// The checks run again here rather than being trusted.
 		test("answers only what a refinement admits", () => {
 			let generator = refined("EvenInteger", integers, {}, [
 				(value) => ({ value: wholeOf(value) % 2n === 0n }),
@@ -1240,10 +1184,8 @@ describe("Generators", () => {
 			}
 		})
 
-		// A refinement no neighbour of this value satisfies. The draw
-		// behind the attempts is what still answers an admitted value, and it
-		// raises the run's own failure where nothing satisfies the predicate at
-		// all — the same answer `generate` gives.
+		// Where nothing satisfies the predicate, the fresh draw behind the
+		// attempts raises the run's failure, as `generate` does.
 		test("refuses a predicate nothing satisfies rather than answering", () => {
 			let generator = refined("Impossible", integers, {}, [
 				() => ({ value: false }),
@@ -1254,9 +1196,8 @@ describe("Generators", () => {
 			).toThrow(GenerationFailure)
 		})
 
-		// A Namespace's own generator says how to BUILD a value and
-		// nothing about what one is made of, so a neighbour of one is another
-		// value it built.
+		// A Namespace's generator says how to build a value, not what it is made
+		// of, so a neighbour is a fresh value.
 		test("asks a Namespace's own generator afresh", () => {
 			let asked = 0
 			let generator: Generator = {
@@ -1276,8 +1217,8 @@ describe("Generators", () => {
 			expect(asked).toBe(3)
 		})
 
-		// Everything above draws from the source and from nothing else,
-		// which is what makes the whole guided search replay under one seed.
+		// Every move draws from the source alone, so the guided search replays
+		// under one seed.
 		test("answers the same sequence for the same seed", () => {
 			let generator: Generator = {
 				kind: "record",
@@ -1299,10 +1240,9 @@ describe("Generators", () => {
 		})
 	})
 
-	// THE law every stored counterexample rests on — what is written down
-	// reads back as the very value that was written. A kind that round-trips for
-	// nothing is a corpus entry that quietly stops replaying, so every kind but
-	// a Namespace's own is asked here.
+	// A value written down must read back as the very value written, or its
+	// corpus entry stops replaying. See "Writing a counterexample down" in
+	// packages/runtime/DEVELOPMENT.md.
 	describe("what a value written down reads back as", () => {
 		const optionals: Generator = {
 			kind: "union",
@@ -1412,9 +1352,7 @@ describe("Generators", () => {
 		]
 
 		for (let [what, generator, value] of written) {
-			// Through JSON rather than straight back, because a corpus is
-			// a file: a value that only survives while it stays an object
-			// survives nothing at all.
+			// Through JSON, since a corpus is a file.
 			test(`reads ${what} back as the very value`, () => {
 				let data = encode(generator, value)
 
@@ -1471,8 +1409,8 @@ describe("Generators", () => {
 			).toBeNull()
 		})
 
-		// One Parameter is enough to cost the whole test its corpus, so a
-		// generator holding one anywhere inside it has to say so from the top.
+		// A Namespace's own generator nested anywhere means nothing is written
+		// down.
 		test("writes nothing down where one is nested inside a Record", () => {
 			let generator: Generator = {
 				kind: "record",
@@ -1605,9 +1543,8 @@ describe("Generators", () => {
 			).toBeNull()
 		})
 
-		// A refinement that has NARROWED since a counterexample was stored
-		// no longer admits it, and a value the Type says is impossible is not a
-		// counterexample — it is an entry to drop.
+		// A refinement narrowed since the value was stored no longer admits it,
+		// so the entry is dropped.
 		test("refuses a value the narrowing no longer admits", () => {
 			let generator = refined("BigEnough", integers, { atLeast: "10" })
 			let small: EncodedValue = {
