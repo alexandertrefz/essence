@@ -252,7 +252,6 @@
 	"packages/runtime/src/Future.ts": {"sentence-length": 38, "em-dash": 29, "all-caps": 30, "position": 2, "block-length": 10},
 	"packages/runtime/src/Http.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 19, "position": 2, "block-length": 3},
 	"packages/runtime/src/Integer.ts": {"sentence-length": 46, "em-dash": 31, "all-caps": 22, "position": 5, "block-length": 10},
-	"packages/runtime/src/NonEmptyList.ts": {"sentence-length": 18, "em-dash": 11, "all-caps": 10, "position": 2, "block-length": 3, "counts": 1},
 	"packages/runtime/src/Randomness.ts": {"sentence-length": 33, "em-dash": 12, "all-caps": 15, "position": 13, "block-length": 3},
 	"packages/runtime/src/Testing.ts": {"sentence-length": 190, "em-dash": 128, "all-caps": 119, "position": 5, "block-length": 21},
 	"packages/runtime/src/internalHelpers.ts": {"sentence-length": 58, "em-dash": 46, "all-caps": 44, "history": 2, "position": 6, "block-length": 20, "stacked": 1},
