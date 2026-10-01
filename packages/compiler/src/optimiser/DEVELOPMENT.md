@@ -41,6 +41,18 @@ answer is handed in.
 
 Only `instrument-coverage` reads the options. Every other pass is right whenever it applies.
 
+### Namespaces named after builtins
+
+A Program can not declare a top-level Namespace named after a builtin, such as `Integer`: the enricher reports
+`duplicate-variable`. A nested one is accepted, and it replaces the builtin for the rest of its block, in Method
+resolution and in conformance solving. So a Namespace named after a builtin is always nested. The standard
+library's own Namespaces reach the optimiser in the prelude's Programs, and they are always top-level. A tests
+section is a Scope inside the Program, so whatever it declares is nested too.
+
+`declaredNamespaces` answers both sets. A pass that reads a Namespace name as the standard library's checks
+`nested` first. Lowering a Program's own `Integer` Method to a bigint operation would answer for code nobody
+wrote. `pool-constants` reads `all`, since a declared Namespace is emitted as a class, and a class is not hoisted.
+
 ### Options
 
 `OptimiserOptions.enabled` set to false is `--no-optimise`. `essence dap` compiles a debug session with
