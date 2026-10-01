@@ -19,11 +19,8 @@ export function createRecord(record: Record<string, AnyType>): RecordType {
 	return { [typeKeySymbol]: "Record", ...record }
 }
 
-// `keys` is declared on the Namespace; `entries` and `values` are
-// runtime-only for now — their honest return Types need an `Anything` Type
-// (a Record's values have no common Type), which arrives with the JSON
-// design. They stay implemented and tested so the Dictionary work can pick
-// them up.
+// Only `keys` is declared in `Record.es`. `entries` and `values` would answer
+// a value of any Type, which no Type can be written for yet.
 export function entries(recordInstance: RecordType): ListType<RecordType> {
 	return createList(
 		Object.entries(recordInstance).map(([key, value]) => {
@@ -48,17 +45,9 @@ export function values(recordInstance: RecordType): ListType<AnyType> {
 	)
 }
 
-// Records are structurally equal when they hold the same keys with
-// equal values — the order in which the keys were defined does not matter.
-//
-// The second `Object.keys` looks like an Array built only to be counted,
-// and counting the second Record's members with a `for…in` instead is the
-// obvious way to do without it. It is nearly FOUR TIMES SLOWER: measured on a
-// three-member Record, a million comparisons of an equal pair and a differing
-// one take 33.6ms through two key Arrays and 126.4ms through one Array and a
-// `for…in`. A Record carries a Symbol key, which is enough to keep it off the
-// engine's fast enumeration path, while `Object.keys` on a Record of a shape
-// the engine has seen before is nearly free. The Array stays.
+// The same keys with equal values, in any order. The second key Array is only
+// counted, but a `for…in` is slower: the Symbol key keeps a Record off the
+// engine's fast enumeration path.
 export function is(
 	firstRecordInstance: RecordType,
 	secondRecordInstance: RecordType,
@@ -83,16 +72,7 @@ export function is(
 	return createBoolean(true)
 }
 
-// The PRINTABLE rendering rather than the structural one
-// `Terminal.inspect` shows: a Record conforms to `Printable`, so a whole
-// Rational member prints its numerator alone, exactly as it does everywhere
-// else a value is rendered for a reader. `formatAsFraction` is what says so,
-// and it is handed in rather than named inside the walk, so a Program that
-// prints no Record does not carry it. The empty padding beside it is the same
-// promise about a List member: `List.toString` answers `[1, 2]`, and a Record
-// holding that List has to say the same thing about it. The layout is still the
-// structural one — members as `name = value`, a String member quoted — which is
-// what `Record.es` promises.
+// The printable rendering. See "The structural rendering" in DEVELOPMENT.md.
 export function toString(recordInstance: RecordType): StringType {
 	return createString(
 		getStringRepresentation(recordInstance, 0, formatAsFraction, ""),

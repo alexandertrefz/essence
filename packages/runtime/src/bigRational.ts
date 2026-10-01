@@ -2,34 +2,14 @@ import type { IntegerType } from "./Integer"
 import type { RationalType } from "./Rational"
 import { typeKeySymbol } from "./type"
 
-// The exact bigint-rational core the numeric tower is built on: a plain
-// `{ numerator, denominator }` pair, treated as immutable everywhere. The
-// module is side-effect-free and its one value import is the Type key from
-// `type.ts`, which every Program carries anyway, so a Program only carries the
-// helpers it reaches. `reduced` establishes the two invariants every consumer
-// relies on — the sign lives on the numerator, never on the denominator, and
-// zero has exactly one lowest-terms form, `0/1`.
+// The exact rational core the numeric tower is built on, a pair of bigints
+// never changed once built. `reduced` puts the sign on the numerator and writes
+// zero as `0/1`, and every consumer relies on both.
 export type BigRational = { numerator: bigint; denominator: bigint }
 
-// Euclid's, through a temporary rather than a destructured swap: the
-// swap allocated an Array per turn, and this loop is what every reduction runs
-// — several turns for every arithmetic operation on a Rational.
-//
-// `b > 0n` rather than `b !== 0n`, which is the same question of the
-// bigints this is written for — `b` is an absolute value and a remainder of
-// one, so it is never negative — and the same single comparison to make. What
-// the two are not the same about is a pair that is no pair of bigints at all.
-// Nothing in the language can hand one over: the Enricher is what says these
-// are Rational parts. But a hole in it used to reach here, and `NaN % 2` is
-// `NaN` forever, so `!==` spun until the process was killed while `>` — false
-// against `NaN`, as every relational comparison is — falls out and answers.
-// The next hole of that kind is a wrong answer somebody can read rather than a
-// run that stops responding.
-//
-// Exported because `Integer::greatestCommonDivisor` and
-// `leastCommonMultiple` are this Function under those names. The reduction
-// every Rational already runs is the algorithm both of them want, and a second
-// copy in `Integer.ts` would be one more thing to keep in step.
+// Euclid's algorithm, swapping through a temporary so that no turn allocates.
+// `b > 0n` rather than `b !== 0n`: a part that is not a bigint, such as `NaN`,
+// then ends the loop rather than spinning forever.
 export function greatestCommonDivisor(first: bigint, second: bigint): bigint {
 	let a = first < 0n ? -first : first
 	let b = second < 0n ? -second : second
@@ -112,11 +92,8 @@ export function rationalSign(rational: BigRational): -1n | 0n | 1n {
 }
 
 export function bigRationalOf(value: IntegerType | RationalType): BigRational {
-	// THE boundary between the hybrid Integer and the numeric tower.
-	// Everything past here — Rational, Algebraic, Transcendental — is written
-	// on pairs of bigints, and an Integer that may be holding a number is
-	// normalised into one here, so the arithmetic past it needs to know
-	// nothing about the two representations.
+	// The boundary between the hybrid Integer and the numeric tower, which is
+	// written on bigint pairs alone.
 	if (value[typeKeySymbol] === "Integer") {
 		return { numerator: BigInt(value.value), denominator: 1n }
 	}

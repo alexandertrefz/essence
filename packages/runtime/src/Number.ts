@@ -31,14 +31,10 @@ export const GoldenRatio = createAlgebraic(
 
 // #endregion
 
-// `lowest`, `highest`, `sum`, `product` and `average` are
-// written in Essence now — `packages/standard-library/sources/Number.es`. The pairwise
-// `lowest`/`highest` entries were already there; the List entries
-// fold them over the items, and the aggregates fold the members' own
-// arithmetic, collapsing a whole mixed total back to an Integer. The widest
-// pairwise entry folds none of this: it reads the `compare` below.
-
 // #region Union-level Methods
+
+// Every other Method of `Number` is written in Essence in `Number.es`, on
+// `compare`.
 
 export type NumberType =
 	| IntegerType
@@ -48,12 +44,8 @@ export type NumberType =
 
 type RationalKind = IntegerType | RationalType
 
-// The cross-member semantics of `Number`: two Numbers are compared by
-// numeric value, so the Integer `1` and the Rational `1/1` are the same
-// Number even though the member Namespaces treat them as different values.
-// Cross-multiplication keeps everything in bigint arithmetic; equality is
-// sign-safe, and the ordering comparisons assume positive denominators like
-// the rest of the runtime does.
+// The parts `compare` cross-multiplies. Every denominator is positive, so the
+// products order as the values do.
 function numeratorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
 		return BigInt(number.value)
@@ -70,18 +62,9 @@ function denominatorOf(number: RationalKind): bigint {
 	}
 }
 
-// `is`, `isNot` and `toString` are written in Essence now —
-// `packages/standard-library/sources/Number.es`. `is` reads the covering `compare` against
-// `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
-// and defers to that member's own `toString`. `compare` below is the one
-// ordering primitive they all fall out of, and it stays native.
-
-// Wiring B — the covering Namespace hand-writes all sixteen cells.
-// Every cell involving a single-base Transcendental is total and exact,
-// because equality across kinds is impossible by definition. Only a
-// Transcendental carrying several bases — π and e, today — meets the one
-// conjectural spot in the tower: its comparisons refine enclosures to a deep
-// documented precision cutoff — see `Transcendental.ts`.
+// Compares by value across the members, so the Integer `1` and the Rational
+// `1/1` are one Number. Only a Transcendental over several bases can reach the
+// precision cutoff. See "Deciding a Transcendental's sign" in DEVELOPMENT.md.
 export function compare(number: NumberType, other: NumberType): OrderingType {
 	const numberKind = number[typeKeySymbol]
 	const otherKind = other[typeKeySymbol]
@@ -148,24 +131,5 @@ export function compare(number: NumberType, other: NumberType): OrderingType {
 		return greater
 	}
 }
-
-// #endregion
-
-// #region Comparisons
-
-// The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
-// `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
-// `packages/standard-library/sources/Number.es`. Each reads the covering `compare` above against the
-// matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
-// on), and the `…OrEqualTo` pair negates the strict opposite. `compare` is
-// the one ordering primitive they all fall out of, and it stays native.
-
-// `isBetween` is written in Essence now — `Orderable` provides it, in
-// `packages/standard-library/sources/Orderable.es` — as
-// `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
-// is the same two comparisons this function made, read off the same covering
-// order. Both bounds stay included, and the two name the same range in either
-// order: a pair written the other way round runs that chain with the two
-// exchanged, which is the reading `clamp` gives the same pair.
 
 // #endregion
