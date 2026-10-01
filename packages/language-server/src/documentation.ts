@@ -1,10 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
-// Documentation reaches an Editor as Markdown. The tagged sections were
-// lifted out of the prose when the `§§` block was parsed, so they are put back
-// here — but only where there is room for them. Signature Help shows a
-// Parameter's own text next to that Parameter, so it asks for the description
-// alone; a Hover has no such place and renders everything.
+// Documentation as Markdown, with the tagged sections put back. Signature Help
+// shows a Parameter's text beside it, so it asks for the description alone.
 
 export function documentationOf(
 	type: common.Type | undefined,
@@ -34,11 +31,8 @@ export function renderDocumentation(
 
 	let sections = [documentation.description]
 
-	// In the order the Parameters stand in, which is the order the
-	// `@param` lines were written in. The name is the one the signature shows —
-	// a Documentation attached to a resolved signature carries the internal
-	// name where the line wrote `_`, so a positional Parameter is named here
-	// rather than underlined.
+	// In Parameter order. The name is the one the signature shows, which names a
+	// positional Parameter written `_`.
 	for (let parameter of documentation.parameters) {
 		sections.push(`**${parameter.name}** — ${parameter.text}`)
 	}

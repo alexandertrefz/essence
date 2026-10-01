@@ -11,15 +11,13 @@ export function toCursor(position: Position): common.Cursor {
 	return { line: position.line + 1, column: position.character + 1 }
 }
 
-// A whole Range rather than the two Cursors separately — a request that
-// carries a selection (Code Actions) reads it as one span, and `toLspRange`
-// below is already the way back.
+// A whole Range, as a selection is read.
 export function toRange(range: Range): common.Position {
 	return { start: toCursor(range.start), end: toCursor(range.end) }
 }
 
-// Compiler Positions are 1-based, LSP Ranges are 0-based. Diagnostics
-// without a Position are mapped to the very start of the document.
+// Compiler Positions are 1-based, LSP Ranges 0-based. A Diagnostic without a
+// Position maps to the document's start.
 export function toLspRange(position: common.Position | null): Range {
 	if (position === null) {
 		return {
@@ -40,12 +38,8 @@ export function toLspRange(position: common.Position | null): Range {
 	}
 }
 
-// The terminal renderer gives Labels their own arrows, Notes and Helps
-// their own footers. The Language Server protocol has neither: a Diagnostic
-// is one message plus related locations. So the primary Label's message is
-// folded into the message — it is the sentence the arrow would have carried —
-// and the Notes and Helps follow it as lines. Dropping them would make the
-// Editor strictly worse informed than the terminal.
+// LSP has no Labels, Notes or Helps, so the primary Label's message joins the
+// message, and the Notes and Helps follow as lines.
 function toLspMessage(diagnostic: common.Diagnostic): string {
 	let lines = [diagnostic.message]
 	let primaryLabel = diagnostic.labels?.find(
@@ -71,9 +65,8 @@ export function toLspDiagnostic(
 	diagnostic: common.Diagnostic,
 	uri: string,
 ): Diagnostic {
-	// Secondary Labels are what `relatedInformation` is for — an Editor
-	// renders each as a link the reader can jump to, which is the closest
-	// thing it has to the terminal renderer's second arrow.
+	// Secondary Labels become `relatedInformation`, which an Editor shows as
+	// links.
 	let relatedInformation = (diagnostic.labels ?? [])
 		.filter((label) => label.kind === "secondary")
 		.map((label) => ({

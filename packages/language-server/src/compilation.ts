@@ -8,33 +8,19 @@ import {
 	loadModuleGraph as loadModuleGraphUncounted,
 } from "@essence-lang/compiler/modules"
 
-// Every Compiler entry point this Server runs goes through here, and
-// nowhere else imports them directly. The point is the counters: "how many
-// times did answering this request compile something" is the only question
-// that tells a cache that works from a cache that merely exists, and it can
-// not be asked from outside the process. A test asserts the exact number for a
-// typing burst followed by a Hover — that assertion is what stops a future
-// request from quietly re-parsing the document it was handed.
-//
-// The counters are four integer increments on paths that each cost
-// milliseconds, so they are not conditional on anything: a counter that is
-// only kept in a test build is a counter the shipped Server can not be
-// measured by.
+// Every Compiler entry point the Server runs goes through here, counted. A
+// spec asserts how many compiles a typing burst and a Hover cost, proving the
+// cache works. The counters are always on, so the shipped Server is measurable.
 export const compilationCounts = {
-	// Text to a Parser AST. The graph parses through its own code path
-	// inside the Compiler, so a `loadModuleGraph` covers as many parses as the
-	// graph has Modules and none of them are counted here.
+	// Text to a Parser AST. A graph's parses happen inside the Compiler and are
+	// not counted.
 	parses: 0,
-	// A Parser AST to a typed Program, for ONE document — a file that
-	// writes neither Module section, or a probe. A probe of a Module is linked
-	// against dependencies that were linked already rather than enriched alone,
-	// and counts here too: what it types is one Program, and the graph behind it
-	// is read back rather than compiled.
+	// A Parser AST to a typed Program, for one document: a file writing neither
+	// Module section, or a probe, which links against dependencies already linked.
 	enrichments: 0,
 	// A Module graph read and parsed, entry included.
 	graphs: 0,
-	// One graph-wide enrichment. This is the expensive one: it enriches
-	// and Type-checks every Module the entry reaches.
+	// One graph-wide enrichment, which type-checks every Module the entry reaches.
 	links: 0,
 }
 

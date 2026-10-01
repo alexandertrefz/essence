@@ -1,7 +1,7 @@
 import { format } from "@essence-lang/formatter"
 
-// The shape the LSP wants back, kept structural so this module needs
-// nothing from `vscode-languageserver` and can be tested on its own.
+// The shape LSP wants, kept structural so this module needs nothing from
+// `vscode-languageserver`.
 type FormattingEdit = {
 	range: {
 		start: { line: number; character: number }
@@ -10,19 +10,14 @@ type FormattingEdit = {
 	newText: string
 }
 
-// `warning` carries an `unsafe` refusal's message — the formatter found
-// its own output wanting and kept the file as it was, which is a formatter bug
-// and worth saying out loud. A syntax refusal stays silent: it is most
-// keystrokes and every format-on-save of a file caught mid-edit, and the
-// Diagnostics already say what is wrong.
+// The message of an `unsafe` refusal, a formatter bug worth reporting. A
+// syntax refusal stays silent: the Diagnostics already say what is wrong.
 type FormattingResult = {
 	edits: Array<FormattingEdit> | null
 	warning: string | null
 }
 
-// In the 0-based line/character the protocol counts in — which is not
-// the compiler's 1-based Cursor, and not a byte offset either, since neither
-// the protocol nor the compiler has one.
+// In the protocol's 0-based line and character.
 function positionAt(
 	source: string,
 	offset: number,
@@ -40,11 +35,8 @@ function positionAt(
 	return { line, character: offset - lineStart }
 }
 
-// One edit covering the changed middle of the document — the untouched
-// lead and tail are pared off by common prefix and suffix, so a format-on-save
-// that fixes one line does not replace the whole buffer under the cursor. Any
-// finer diff would be invented after the fact rather than produced by the
-// work, so a single contiguous span is as honest as it gets.
+// One edit over the changed middle of the document, trimming the common
+// prefix and suffix, so a one-line fix does not replace the whole buffer.
 function narrowedEdit(source: string, formatted: string): FormattingEdit {
 	let limit = Math.min(source.length, formatted.length)
 	let prefix = 0
@@ -53,9 +45,7 @@ function narrowedEdit(source: string, formatted: string): FormattingEdit {
 		prefix++
 	}
 
-	// The suffix must not reach back into the prefix — when one text is
-	// a substring of the other, the same characters would otherwise be counted
-	// from both ends.
+	// The suffix must not overlap the prefix when one text contains the other.
 	let suffix = 0
 
 	while (
@@ -75,12 +65,9 @@ function narrowedEdit(source: string, formatted: string): FormattingEdit {
 	}
 }
 
-// `edits` is `null` both while the document does not parse and when it
-// is already formatted, so that an editor's format-on-save neither reports a
-// failed request nor marks a clean buffer dirty.
-//
-// `formatter` is a test seam: an `unsafe` refusal is by definition a formatter
-// bug, so no real source can produce one on demand.
+// `edits` is null while the document does not parse and when it is formatted
+// already, so format-on-save neither fails nor dirties a clean buffer.
+// `formatter` lets a spec produce an `unsafe` refusal.
 export function findFormattingEdits(
 	source: string,
 	documentPath?: string,
