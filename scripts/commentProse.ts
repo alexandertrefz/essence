@@ -140,6 +140,8 @@ type Comment = {
 type Scanned = {
 	comments: Array<Comment>
 	names: Array<string>
+	// The string after each `from`: the Module an `import` or `export` reads.
+	modules: Array<string>
 	// Where the first token that is not part of an `import` stands.
 	codeStart: number
 }
@@ -212,6 +214,7 @@ export function scanScript(text: string): Scanned {
 	scanner.resetTokenState(getShebang(text)?.length ?? 0)
 	let comments: Array<Comment> = []
 	let names: Array<string> = []
+	let modules: Array<string> = []
 	let braces: Array<"brace" | "hole"> = []
 	let previous: SyntaxKind | null = null
 	let codeStart = -1
@@ -297,6 +300,13 @@ export function scanScript(text: string): Scanned {
 			names.push(scanner.getTokenText())
 		}
 
+		if (
+			kind === SyntaxKind.StringLiteral &&
+			previous === SyntaxKind.FromKeyword
+		) {
+			modules.push(scanner.getTokenValue())
+		}
+
 		previous = kind
 		lineBreak = false
 	}
@@ -304,6 +314,7 @@ export function scanScript(text: string): Scanned {
 	return {
 		comments,
 		names,
+		modules,
 		codeStart: codeStart === -1 ? text.length : codeStart,
 	}
 }
