@@ -685,3 +685,57 @@ becomes text. Adjacent text pieces are joined, and an interpolation of text alon
 
 Each answer keeps the Type and Position of the Node it replaces, so a debugger still stops where the author wrote
 the operation.
+
+### compile-union-dispatch
+
+A Method called on a Union-typed receiver is answered by one of several Methods, chosen by the receiver. Without
+this pass the rewriter emits `$type.dispatchMethod(value, [args…], [cases…])`, which builds an array per call, a
+tuple and a descriptor per case, and then searches with `isValueOfType`. The pass writes the decision out as a
+chain instead:
+
+```
+value[$type.typeKeySymbol] === "Shape#Circle"
+  ? Shapes.area(value, (item) => { … })
+  : Shapes.area(value)
+```
+
+The cases keep the order the enricher chose, most specific first, and the first that accepts runs, as the search
+did. The receiver and the shared Arguments are evaluated once, in order, before any test.
+
+What changes is when a branch's own Arguments are built: only in the taken branch, rather than every case's
+before the search. That is observable only through an effect, and those Arguments are conformance witnesses and
+Function literals, which have none. `caseArgumentsArePure` proves it per case, and the call stays where it can not.
+
+`planBranches` asks each case's check of `matcherResidualOverMembers` against the cases, one per member of the
+receiver's Union. So `List<Alpha>` beside `List<Beta>` keeps the full check, as a Match Handler would. A branch
+whose residual is `always` ends the chain, and the cases after it are dropped, as the search would have stopped
+there.
+
+The last case becomes the `else`, on the argument `elide-final-match-test` makes. The enricher gives every member of
+the Union a case, so a value reaching the last case has nowhere else to go. The elision is taken only where that check
+is a tag comparison. That bounds what is lost to a receiver whose tag disagrees with its Type. Otherwise the test
+stays and the chain ends in `$type.noDispatchCaseMatched`, the throw `dispatchMethod` ends with. A Record case follows
+the same rule, and `compile-record-members` may later write over a kept test.
+
+`collapsedIfUniform` writes a chain whose branches all make the same call as that call alone. The tests only pick
+which Method sees the receiver, which is passed unchanged, so when every branch names one Method they decide
+nothing. Branches are the same call only with the same Namespace, Method, provider and omitted Parameters. None may
+carry Arguments, a derived descriptor or routed members of its own.
+
+### Held operands
+
+`holdPlan` decides which operands the chain binds to `$dispatch_` names, evaluated once and in order before any
+test. The others are written where the branches use them:
+
+- With one untested branch, every read operand is written in place, since each has one place and one order already.
+- A literal or a name is written in place. A literal is the same value however often it is built, and `pool-constants`
+  declares it once. A name reads the same binding later, unless a held operand after it could assign it. In
+  `either::tagged(with flip())`, where `flip` assigns `either`, the receiver has to be read before the Argument runs.
+  So a name before a held operand is held too. The plan therefore walks the operands back to front.
+- Anything else is held, so no branch carries a copy.
+- A shared Argument that every branch overrides is read by none. The enricher overrides exactly where the Program
+  wrote a Function literal, which observes nothing, so it can be dropped. An unread operand that can not be shown
+  to observe nothing is held anyway, evaluated where the Argument array would have been.
+
+A chain nested in another's branch numbers its names from zero again and shadows the outer ones. That is
+harmless, since a chain reads only its own names, and only a Function literal stands inside one.
