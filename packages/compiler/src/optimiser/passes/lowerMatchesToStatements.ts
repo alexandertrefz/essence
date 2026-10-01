@@ -4,64 +4,16 @@ import type { OptimiserPass } from "../index"
 import { isPureExpression } from "../purity"
 import { rewriteStatements } from "../walk"
 
-// A Match is an Expression in Essence and its Handlers are Statements, so
-// the Rewriter had one way of saying it: wrap the chain in a Function and call
-// it, which is the only Expression JavaScript lets hold Statements.
-//
-//   (function (_self) {
-//     if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
-//     return …
-//   })(value)
-//
-// That is a closure built and called on every evaluation, of every Match, of
-// every turn of whatever loop reaches one — and it is built to hold Statements
-// in a place where Statements were never allowed. Where the Match itself stands
-// in a Statement position, they are: the chain is simply written.
-//
-//   const _self = value;
-//   if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
-//   return …
-//
-// THREE positions, which are the three places an Expression's answer has
-// somewhere a Statement can name: a Return Statement's Expression, a Variable
-// Declaration's initialiser (or an assignment's right-hand side), and a
-// Statement written for its effects. A Match anywhere ELSE — an Argument, a
-// Record member, an interpolation hole — keeps its wrapper, because there is
-// nothing there to write Statements into.
-//
-// What a Handler's Return Statement MEANS is the whole of the difference
-// between the three. Under the wrapper it was a JavaScript Return and answered
-// the wrapper; in Return position it answers the enclosing Function, which is
-// what a Return already does, so those Handlers are emitted exactly as written
-// and nothing is held at all. Everywhere else the answer is written where it
-// goes and the chain is left through a labelled `break` — which is emitted only
-// where a Handler answers somewhere other than its last Statement, because a
-// Handler that answers last has nothing after it to skip.
-//
-// `_self` is the name every Handler reads the matched value under, and
-// binding it is the one thing the wrapper did that a block has to do
-// differently. A Parameter is bound from OUTSIDE the Scope it declares, and a
-// `const` is not: `const _self = _self` reads the name being declared and is a
-// `ReferenceError`, not the enclosing receiver. So `match @ -> …` binds nothing
-// at all — the value is already `_self` — and a scrutinee that merely MENTIONS
-// `_self` reads it in a Scope of its own first. See `MatchedValueBinding`.
-//
-// This pass also lifts a compiled Union dispatch that HOLDS operands. Such
-// a chain stands in an Expression position too, and `compile-union-dispatch`
-// binds its names as the Parameters of an arrow it calls at once — for the same
-// reason, and with the same answer where the dispatch is what a Statement
-// computes: the names become the `const`s of a block and the arrow is gone.
+// Writes a Match that stands in a Statement position as a chain of Statements,
+// in place of the Function the rewriter would wrap it in. It lifts a compiled
+// dispatch that holds operands the same way. See "lower-matches-to-statements"
+// in DEVELOPMENT.md.
 
 export const lowerMatchesToStatements: OptimiserPass = {
 	name: "lower-matches-to-statements",
 	run: (program, namespaces) => {
-		// Asked for the one thing this pass drops rather than moves: a
-		// Handler answering a value nobody reads, in a Match written for its
-		// effects. Whether answering it can be observed is the same question
-		// `lower-scalar-operations` asks of an `and`'s Argument, and it is asked
-		// the same way — of the Program's own Namespaces, because a Namespace a
-		// Program declares can answer under a builtin's name and do anything at
-		// all.
+		// For the one thing this pass drops: a discarded Handler answer, which a
+		// Program's own Namespace could make observable.
 		let shadowed = namespaces.nested
 		let lowering = new Lowering(shadowed)
 
@@ -69,11 +21,8 @@ export const lowerMatchesToStatements: OptimiserPass = {
 	},
 }
 
-// Unspellable in Essence, like every other name the Compiler binds for
-// itself: the Lexer reads `_` as a Symbol, so no user identifier holds one, and
-// the `$` keeps it clear of `_self`. Numbered across the whole Program rather
-// than per Match, so that a label a nested Match breaks out of can not be the
-// one its own chain declares.
+// Unspellable in Essence, since the lexer reads `_` as a Symbol. Numbered
+// across the Program, so a nested Match never breaks to its own label.
 const labelPrefix = "$match_"
 const heldScrutineePrefix = "$matched_"
 
@@ -82,9 +31,7 @@ class Lowering {
 
 	constructor(private readonly shadowed: ReadonlySet<string>) {}
 
-	// Every Statement kind by name, so that a kind added to `typedSimple`
-	// is a compile error here rather than an Expression this reads for a value —
-	// exactly as the walk itself is written.
+	// Every Statement kind by name, so a new kind fails to compile here.
 	lower(
 		node: common.typedSimple.ImplementationNode,
 	): common.typedSimple.ImplementationNode {
@@ -110,38 +57,27 @@ class Lowering {
 						node,
 					) ?? node
 				)
-			// A declaration, and nothing this pass reads. A lowered
-			// Statement is one this pass already wrote.
-			//
-			// A Conditional Statement holds a body this walk has already
-			// reached and a condition that is another pass's business —
-			// `unbox-conditions` is what reads a question asked in JavaScript's
-			// own terms out of the Boolean built around it.
+			// Declarations, and Statements whose Expressions have nowhere to write an
+			// answer. `unbox-conditions` reads a Conditional's condition.
 			case "ConditionalStatement":
 			case "NamespaceDefinitionStatement":
 			case "ProtocolDeclarationStatement":
 			case "TypeAliasStatement":
 			case "FunctionStatement":
-			// An assertion holds an Expression that has to be tested
-			// where it stands, and a Match inside one is written out by the
-			// walk rather than lifted above it.
+			// An assertion's Expression is tested where it stands.
 			case "TestAssertionStatement":
-			// And a turn of a looped Function, whose Expressions are the
-			// Arguments it evaluates and the values it assigns — neither of them
-			// an answer this pass could write anywhere.
+			// A loop turn's Expressions answer nothing this pass could write.
 			case "TailCallStatement":
 			case "IntrinsicStatement":
 				return node
 			default:
-				// An Expression written for its effects — the Node stands
-				// in a Statement position and is its own value, so what it
-				// answers goes nowhere.
+				// An Expression written for its effects, whose answer goes nowhere.
 				return this.statement(node, { kind: "discard" }, node) ?? node
 		}
 	}
 
-	// One Expression standing in one Statement position, and null where
-	// there is nothing here this pass knows how to write.
+	// One Expression in one Statement position, or null where there is nothing to
+	// write.
 	private statement(
 		value: common.typedSimple.ExpressionNode,
 		result: common.typedSimple.StatementResult,
@@ -151,9 +87,7 @@ class Lowering {
 			return this.statementMatch(value, result, source)
 		}
 
-		// A chain holding nothing has no wrapper to take away — it is the
-		// conditional Expression itself, which stands in a Statement position as
-		// happily as in any other.
+		// A chain holding nothing is a plain conditional Expression with no wrapper.
 		if (
 			value.nodeType === "Intrinsic" &&
 			value.kind === "dispatch-chain" &&
@@ -197,15 +131,8 @@ class Lowering {
 		}
 	}
 
-	// A Handler whose answer nobody reads and whose last Statement answers
-	// something that observes nothing has nothing left to do. The Simplifier
-	// gives every Handler body a Return — appending `<- {}` where the body has
-	// none — so without this every Handler of a Match written for its effects
-	// would end in an empty Record built and dropped.
-	//
-	// The LAST Statement only. A Return anywhere else is control flow as
-	// well as an answer: it says the rest of the body does not run, and taking
-	// it away would run it.
+	// Drops a discarded Handler's final Return of a pure value, which the
+	// simplifier adds to every body. A Return elsewhere is control flow and stays.
 	private withoutDiscardedAnswer(
 		handler: common.typedSimple.MatchHandler,
 	): common.typedSimple.MatchHandler {
@@ -223,9 +150,8 @@ class Lowering {
 	}
 }
 
-// How the matched value reaches `_self`. The wrapper bound it as a
-// Parameter, which is evaluated OUTSIDE the Scope the name is declared in; a
-// `const` is not, and that is the whole of what these three answer.
+// How the matched value reaches `_self`, since `const _self = _self` would be
+// a `ReferenceError`.
 function bindingOf(
 	value: common.typedSimple.ExpressionNode,
 	heldName: string,
@@ -239,17 +165,11 @@ function bindingOf(
 		: { kind: "block" }
 }
 
-// The name `@` lowers to — the receiver Parameter of every Method, and
-// the value a Match binds for its Handlers. One name for both is what lets a
-// Handler write `@` and mean the value that matched.
+// The name `@` lowers to, both a Method's receiver and a Match's value.
 const selfName = "_self"
 
-// Whether this Expression can READ `_self`, asked of the whole subtree and
-// answered yes wherever the name occurs at all. It over-answers on purpose: an
-// occurrence under a nested Match's own `_self` is not the enclosing one, and
-// telling the two apart is a Scope analysis where the cost of not doing it is
-// one extra block. Structural, so a position added to `typedSimple` later is
-// searched without this having to hear about it.
+// Whether `_self` occurs anywhere in the subtree. It over-answers for a nested
+// Match's own `_self`, at the cost of one extra block.
 function mentionsSelf(value: unknown): boolean {
 	if (Array.isArray(value)) {
 		return value.some((entry) => mentionsSelf(entry))

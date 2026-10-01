@@ -377,3 +377,45 @@ written out at every site.
 The pass does not claim that a tag decides the Matcher. `elide-final-match-test` and the last-case elision of
 `compile-union-dispatch` still decline a Handler whose check this pass compiled, so the throw that names a
 compiler bug stays.
+
+### lower-matches-to-statements
+
+A Match is an Expression and its Handlers are Statements. Without this pass the rewriter wraps the chain in a
+Function and calls it, the only JavaScript Expression that holds Statements:
+
+```
+(function (_self) {
+  if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
+  return …
+})(value)
+```
+
+That builds and calls a closure on every evaluation. Where the Match stands in a Statement position, the chain is
+written out instead:
+
+```
+const _self = value;
+if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
+return …
+```
+
+There are three such positions: a Return's Expression, a declaration's or assignment's value, and an Expression
+written for its effects. A Match anywhere else, such as an Argument or a Record member, keeps its wrapper.
+
+In Return position, a Handler's Return already answers the enclosing Function, so the Handlers are emitted as written.
+Elsewhere, the answer is written where it goes, and a Handler that answers before its last Statement leaves the chain
+through a labelled `break`. The labels are numbered across the whole Program, so a nested Match never breaks to its
+own chain's label. Where the answer is discarded, a Handler's final Return of a pure value is dropped. The simplifier
+gives every body one, `<- {}` where none was written. A Return anywhere else is control flow and stays.
+
+Every Handler reads the matched value as `_self`. A wrapper's Parameter is bound outside the Scope it declares,
+but a `const` is not, so `const _self = _self` would be a `ReferenceError`. `bindingOf` therefore answers one of
+three `MatchedValueBinding`s:
+
+- `self`, for `match @`, binds nothing, since the value is already `_self`.
+- `held` reads a scrutinee that mentions `_self` into a fresh name first. `mentionsSelf` over-answers, since a
+  nested Match's own `_self` would need Scope analysis to tell apart, and the cost is one extra block.
+- `block` binds `_self` directly.
+
+The pass also lifts a compiled Union dispatch that holds operands. `compile-union-dispatch` binds those as the
+Parameters of an arrow it calls at once, and in a Statement position they become the `const`s of a block.
