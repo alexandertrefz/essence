@@ -38,7 +38,6 @@
 	"packages/compiler/src/tests/mutation.spec.ts": {"sentence-length": 21, "em-dash": 13, "all-caps": 15, "block-length": 2, "counts": 1},
 	"packages/compiler/src/tests/natives.spec.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 2},
 	"packages/compiler/src/tests/numericAdditions.spec.ts": {"sentence-length": 11, "em-dash": 6, "all-caps": 1, "position": 1},
-	"packages/compiler/src/tests/optimiser.spec.ts": {"sentence-length": 289, "em-dash": 227, "all-caps": 155, "history": 4, "position": 17, "block-length": 41, "counts": 2},
 	"packages/compiler/src/tests/parser.spec.ts": {"sentence-length": 38, "em-dash": 37, "all-caps": 17, "history": 2, "position": 1, "block-length": 2},
 	"packages/compiler/src/tests/parserDiagnostics.spec.ts": {"sentence-length": 55, "em-dash": 46, "all-caps": 27, "history": 5, "position": 2, "block-length": 5},
 	"packages/compiler/src/tests/printType.spec.ts": {"sentence-length": 9, "em-dash": 6, "all-caps": 6, "block-length": 1},
