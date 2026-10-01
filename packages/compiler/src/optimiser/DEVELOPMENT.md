@@ -284,3 +284,29 @@ anything.
 `planRecordTests` refuses a Matcher it is already planning. A Type graph may hold a back edge, where the runtime walks
 a finite value. `checkIsImplied`, which every level asks first, walks the same Type graph with no guard of its own.
 The enricher refuses the recursive Type declaration such a Record would need, so this guard is insurance.
+
+## Passes
+
+Each pass file opens with what the pass does. The reasoning that needs more room is here, under the pass's
+name.
+
+### collapse-combinations
+
+Without the pass, `{ base with x = 1 }` is emitted as
+`Object.assign({}, base, createRecord({ x: createInteger(1) }))`. The pass writes it as one object
+literal, `{ ...base, x: 1 }`.
+
+The two forms copy the same members. `Object.assign` copies own enumerable properties, Symbol keys included, in their
+own order, a later source overwriting an earlier one. Object spread copies the same set in the same order. Neither
+reads through a source's prototype. `Object.assign` sets where spread defines. The target is a fresh literal in both
+forms and no runtime value has a setter, so nothing can tell them apart.
+
+The right-hand side is copied only by the members its Type declares, never whole. Record assignability is width
+subtyping, so a value admitted as `{ port: Integer }` may carry more members. Copying those could put a value of the
+wrong Type into a member the Program reads at its declared Type. The declared names ride on the Node, and the rewriter
+reads exactly those.
+
+The forms differ in where the hidden Type key comes from. `Object.assign` takes it from the right-hand Record,
+while a spread inherits the left-hand side's. That is the same answer only while the left-hand side is a Record,
+which the enricher guarantees by refusing other Combinations as `uncombinable-types`. The pass checks it anyway,
+so that a broken guarantee costs an optimisation rather than a mis-branded value.
