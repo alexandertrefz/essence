@@ -845,7 +845,7 @@ describe("Randomness", () => {
 		})
 
 		// Four items have 24 orders, and 200 seeded draws reach them all.
-		test("reaches more than one order", () => {
+		test("reaches every order of four items", () => {
 			let source = sourceOf()
 			let seen = new Set<string>()
 
