@@ -33,7 +33,6 @@
 	"packages/cli/src/session.ts": {"sentence-length": 20, "em-dash": 11, "all-caps": 4},
 	"packages/cli/src/spinner.ts": {"sentence-length": 2, "em-dash": 2},
 	"packages/cli/src/terminal.ts": {"sentence-length": 2, "em-dash": 5},
-	"packages/cli/src/testWatch.ts": {"sentence-length": 23, "em-dash": 14, "all-caps": 10, "position": 3},
 	"packages/cli/src/tests/cli.spec.ts": {"sentence-length": 66, "em-dash": 35, "all-caps": 15, "history": 1, "position": 5, "block-length": 7, "counts": 1},
 	"packages/cli/src/tests/harness.ts": {"sentence-length": 4, "em-dash": 2, "all-caps": 4},
 	"packages/cli/src/tests/mutation.spec.ts": {"sentence-length": 35, "em-dash": 23, "all-caps": 17, "history": 1, "position": 1, "block-length": 2},
