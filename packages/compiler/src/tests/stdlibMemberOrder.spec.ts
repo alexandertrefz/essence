@@ -7,20 +7,12 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { loadStdlib, parseStdlibSource } from "../enricher/stdlib"
 
-// One member order for every Namespace in the standard library, written
-// down in `packages/standard-library/DEVELOPMENT.md` under "Member order" and
-// enforced here. A reader who has found their way around `String` has found
-// their way around `List`: the statics open the Namespace, the Protocol
-// witnesses come next, and what a Method ANSWERS decides the rest.
+// One member order for every Namespace in the standard library. See "Member
+// order" in packages/standard-library/DEVELOPMENT.md.
 //
-// The check is that the group index never DECREASES down a declaration. It is
-// deliberately not an exact order: inside a group the sources keep the order
-// they already had, so adding a Method costs a decision about which group it
-// joins and nothing else. Groups 2 and 3 are the exception — each is a short
-// fixed set where the reader can be given the same order every time.
-//
-// Only Namespaces are held to this. `Loop.es` declares free Functions, which
-// belong to no Namespace and have no order to keep.
+// The group index never decreases down a declaration. Inside a group the
+// sources keep their own order, except for the short fixed sets of groups 2
+// and 3. Free Functions, as in `Loop.es`, have no order to keep.
 
 const GROUP_NAMES: Record<number, string> = {
 	1: "static creators and constants",
@@ -31,17 +23,12 @@ const GROUP_NAMES: Record<number, string> = {
 	6: "transforms and everything else",
 }
 
-// The Methods a Protocol asks for, in the order a reader meets the
-// Protocols themselves: equality, then ordering, then printing.
-//
-// A Method a Protocol PROVIDES never reaches this file, and can not: the
-// order checked here is the order of the DECLARATIONS a Namespace body holds,
-// and a conformer declares nothing for a provided Method. `isNot` is still
-// listed because a Namespace may override one, and `Optional` does.
+// Equality, then ordering, then printing. A provided Method has no declaration
+// to order, but `Optional` overrides `isNot`, so it is listed.
 const WITNESS_ORDER = ["is", "isNot", "compare", "toString"]
 
-// The four operations in the order arithmetic is taught, then the four
-// that build on them.
+// The basic operations in the order arithmetic is taught, then the ones that
+// build on them.
 const ARITHMETIC_ORDER = [
 	"add",
 	"subtract",
@@ -53,12 +40,8 @@ const ARITHMETIC_ORDER = [
 	"squareRoot",
 ]
 
-// Spelled out rather than derived, because an accessor is named for the
-// part it answers and no signature says that. `reciprocal` is deliberately
-// absent: it BUILDS a Rational out of the receiver rather than reading a part
-// of it, which is a transform. `enumerate` is absent for the same reason: the
-// Records it answers are built out of the List rather than held by it, and it
-// is the one member here named with a verb.
+// Spelled out, because no signature says an accessor answers a named part.
+// `reciprocal` and `enumerate` build their answers, so they are transforms.
 const ACCESSORS = new Set([
 	"length",
 	"numerator",
@@ -70,43 +53,29 @@ const ACCESSORS = new Set([
 	"firstIndex",
 	"lastIndex",
 	"indices",
-	// The middle of `firstItem` and `lastItem`: the item of a List that
-	// holds exactly one. It reads a part of the receiver the way they do, and
-	// it stands where `List.es` declares it.
+	// The item of a List that holds exactly one.
 	"onlyItem",
-	// The plural of `firstIndex` and `lastIndex`, which names every
-	// position an item stands at rather than one of them. `indices(where:)` is
-	// an entry on `indices` instead, because that Method already answers
-	// positions.
+	// Every position an item stands at.
 	"everyIndex",
 	"keys",
-	// A Dictionary's two other halves, beside the keys it shares
-	// with `Record`. An entry is the pair a Dictionary is written in terms
-	// of rather than a Record built out of one, which is what separates
-	// `entries` from `enumerate`.
+	// A Dictionary's other halves. An entry is the pair a Dictionary is
+	// written in terms of, unlike the Records `enumerate` builds.
 	"values",
 	"entries",
-	// The first of them, read under the name a Dictionary gives the pair
-	// it is made of — what `firstItem` is to a List and `firstCharacter` to a
-	// String.
+	// What `firstItem` is to a List.
 	"firstEntry",
 	"characters",
-	// The level below a character, read off the same String — a part of
-	// the value under the name Unicode gives it, beside the characters it is
-	// grouped into.
+	// The level below a character, under the name Unicode gives it.
 	"codePoints",
 	"words",
 	"lines",
 	"character",
-	// A String's two ends, which `List` names `firstItem` and `lastItem`
-	// — the same part of a value read under the name its own Type gives it.
+	// A String's two ends, which `List` names `firstItem` and `lastItem`.
 	"firstCharacter",
 	"lastCharacter",
 	"value",
-	// A Result's two Cases read apart, and the List-side reading of the
-	// second. `reason` stands beside `value`, and each pluralises to the
-	// List-side name — `values` and `reasons` — the way `character` pluralises
-	// to `characters`.
+	// A Result's failure read apart, and its List-side plural, as `value`
+	// pluralises to `values`.
 	"reason",
 	"reasons",
 ])
@@ -119,12 +88,9 @@ type Member = {
 	line: number
 }
 
-// Every Namespace the sources declare, keyed by name — including any
-// `Prelude.es` does not forward. `loadStdlib().members` holds the PUBLIC
-// surface, so an internal helper would quietly go unchecked; the typed
-// Programs carry each declaration's own complete Namespace Type instead. There
-// is no such helper today — `Scalar` was the last one, and preluding it under
-// its own name is what took the level's only occupant away.
+// Every Namespace the sources declare, keyed by name, including any
+// `Prelude.es` does not forward. `loadStdlib().members` holds only the public
+// surface, so the typed Programs are read instead.
 function declaredNamespaces(): Map<string, common.NamespaceType> {
 	let namespaces = new Map<string, common.NamespaceType>()
 
@@ -146,9 +112,7 @@ function isStatic(method: common.MethodType): boolean {
 	)
 }
 
-// EVERY entry, so that an Overload counts as a predicate only when the
-// whole family answers a Boolean. `Optional::is` is one either way; a family
-// with one Boolean entry and one that answers a value is not a predicate.
+// An Overload counts as a predicate only when every entry answers a Boolean.
 function answersBoolean(method: common.MethodType): boolean {
 	let returnTypes =
 		method.type === "SimpleMethod" || method.type === "StaticMethod"
@@ -178,11 +142,8 @@ function groupOf(name: string, method: common.MethodType | null): number {
 	return ACCESSORS.has(name) ? 5 : 6
 }
 
-// Read off the sources rather than off the loaded tables, because the
-// rule is about the order the `.es` file WRITES its members in and a Namespace
-// Type keeps its Properties and its Methods in two records. A Property and a
-// Method are ordered against each other by the Position of the name each was
-// declared under.
+// Read off the sources, since a Namespace Type keeps Properties and Methods
+// apart. A Property and a Method are ordered by the Position of their names.
 function declaredMembers(): Array<Member> {
 	let namespaces = declaredNamespaces()
 	let members: Array<Member> = []
@@ -206,8 +167,7 @@ function declaredMembers(): Array<Member> {
 
 			let declared: Array<Member> = []
 
-			// A Namespace Property is always static — there is no
-			// per-value Property — so each one opens the Namespace with the
+			// A Namespace Property is always static, so it belongs with the
 			// static Methods.
 			for (let property of Object.values(node.properties)) {
 				declared.push({
@@ -244,8 +204,8 @@ function describeGroup(group: number): string {
 	return `group ${group} (${GROUP_NAMES[group]})`
 }
 
-// One line per member that stands too late, naming the member it stands
-// after — which is the one an editor has to move it above.
+// One line per member that stands too late, naming the member it must move
+// before.
 function outOfOrderMembers(): Array<string> {
 	let problems: Array<string> = []
 	let highest: Member | null = null
@@ -271,9 +231,8 @@ function outOfOrderMembers(): Array<string> {
 	return problems
 }
 
-// The order INSIDE one group, for the two groups that state one. Read off
-// the members the group actually has, so a Namespace declaring three of the
-// four witnesses is held to the order of the three it declares.
+// The order inside a group that states one, over the members the Namespace
+// declares.
 function outOfOrderWithin(group: number, order: Array<string>): Array<string> {
 	let problems: Array<string> = []
 	let previous: Member | null = null
@@ -306,12 +265,9 @@ function outOfOrderWithin(group: number, order: Array<string>): Array<string> {
 
 describe("Standard Library Member Order", () => {
 	it("should find Namespaces to hold to the order", () => {
-		// A guard on the reading above. Every check below passes on an
-		// empty list, so a collector that found no Namespace, or that found no
-		// member in the ones it found, would make this file a no-op nobody
-		// notices. Seven of the Namespaces declare no member at all — a Choice
-		// of payload-free Cases derives everything it answers — so the two
-		// counts do not match and neither stands in for the other.
+		// A guard on `declaredMembers`, since every other check passes on an
+		// empty list. A Choice of payload-free Cases declares no member, so the
+		// two counts differ.
 		let members = declaredMembers()
 
 		expect(declaredNamespaces().size).toBeGreaterThan(20)
@@ -325,11 +281,8 @@ describe("Standard Library Member Order", () => {
 		expect(outOfOrderMembers().join("\n")).toBe("")
 	})
 
-	// The rulebook a next editor reads and the set this file classifies
-	// by are two spellings of one list, and only one of them fails a test when
-	// it goes stale. So the rulebook is held to the set: an accessor added here
-	// has to be written there too, or the next reader is given a list that has
-	// quietly stopped being the list.
+	// The written rule and `ACCESSORS` are one list, so the written rule is
+	// held to the set.
 	it("should name every accessor in DEVELOPMENT.md", () => {
 		let development = readFileSync(
 			path.resolve(
@@ -357,9 +310,8 @@ describe("Standard Library Member Order", () => {
 		expect(outOfOrderWithin(3, ARITHMETIC_ORDER).join("\n")).toBe("")
 	})
 
-	// The classifier is what the two checks above rest on, so the shapes
-	// it has to tell apart are pinned here rather than left to the sources
-	// happening to hold one of each.
+	// The order checks rest on `groupOf`, so the shapes it tells apart are
+	// pinned here.
 	describe("the classifier", () => {
 		let namespaces = declaredNamespaces()
 
@@ -387,8 +339,8 @@ describe("Standard Library Member Order", () => {
 		it("should read a Method answering a Boolean as a predicate", () => {
 			expect(group("List", "contains")).toBe(4)
 			expect(group("String", "starts")).toBe(4)
-			// An Overload counts only when every entry answers a
-			// Boolean. All three `hasItems` entries do.
+			// An Overload counts only when every entry answers a Boolean. Both
+			// `hasItems` entries do.
 			expect(group("List", "hasItems")).toBe(4)
 		})
 
@@ -401,8 +353,7 @@ describe("Standard Library Member Order", () => {
 		it("should read everything else as a transform", () => {
 			expect(group("List", "sort")).toBe(6)
 			expect(group("Integer", "negate")).toBe(6)
-			// `reciprocal` builds a Rational rather than reading a part
-			// of one, so it is not an accessor.
+			// `reciprocal` builds a Rational, so it is not an accessor.
 			expect(group("Rational", "reciprocal")).toBe(6)
 		})
 	})

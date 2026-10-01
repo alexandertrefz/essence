@@ -11,12 +11,8 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The full pipeline minus bundling, mirroring loop.spec — the searching
-// Methods below are only proven once the emitted JavaScript RUNS, because what
-// went wrong in them was never a Type error: a List that STORES an empty
-// Optional, a `List<Optional<Integer>>` walked by `hasItems(where:)` and
-// `"aaa"::lastIndex(of "aa")` all compiled without a single Diagnostic and
-// answered the wrong value.
+// The full pipeline minus bundling, and the emitted JavaScript runs. A wrong
+// search answer is never a Type error, so only running shows it.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -54,16 +50,11 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// An `Integer | String` conformance spelled by hand — the hand-written
-// counterpart to the equality a Choice DERIVES for `Optional<Integer>`, on the
-// other kind of item Type a List can hold. A Union derives nothing, so without
-// this Namespace `List<Integer | String>` does not conform to `Equatable` at
-// all and the searching Methods below can not be called on it.
+// A Union derives no equality, so `List<Integer | String>` needs this
+// hand-written conformance to be searched.
 //
-// Each arm narrows BOTH sides before it compares, and only a narrowed side can
-// be asked for its own `is`: at the Union Type that call resolves back to this
-// very Method — which is exactly what `isNot` is written on, and would never
-// return if `is` asked it of itself.
+// Each arm narrows both sides before it compares. At the Union Type, `is`
+// would resolve back to this Method and never return.
 const integersOrStrings = `namespace IntegersOrStrings for Integer | String is Equatable {
 	is(_ other: Integer | String) -> Boolean {
 		<- match @ -> Boolean {
@@ -93,20 +84,8 @@ const integersOrStrings = `namespace IntegersOrStrings for Integer | String is E
 }`
 
 describe("Stdlib searching Methods", () => {
-	// The whole point of this block: an EMPTY Optional stored in a List
-	// is an item like any other, and the Methods that search by value have to
-	// compare it rather than read it as "no item here".
-	//
-	// This used to be a claim about `item(at:)` as much as about the search:
-	// while `Optional<ItemType>` collapsed when nested, its answer for a
-	// stored empty item and its answer for a position past the end were the
-	// SAME value, so no amount of reading could tell them apart and
-	// `firstIndex`/`lastIndex` had to count their way through the ITEMS
-	// instead. A nominal Choice nests, so `#Value(#Empty)` and `#Empty` are
-	// now different values and the distinction is finally observable — the
-	// test below pins it. The counting stays, but for the smaller reason the
-	// Stdlib gives it: `reduce` hands each item as it stands, where walking
-	// the positions would build and take apart a wrapper per item.
+	// An empty Optional stored in a List is an item like any other. The
+	// searches by value compare it rather than read it as no item.
 	describe("a stored empty Optional is an item like any other", () => {
 		it("finds the positions of an empty Optional in a List of them", async () => {
 			expect(
@@ -131,10 +110,8 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"true"', '"false"', '"2"'])
 		})
 
-		// `removeDuplicates` is `tally`'s keys, and a tally finds an
-		// item's entry through the item's own `is` — so it inherits the
-		// answer the same way `contains` does, and an `is` blind to a stored
-		// empty Optional would have kept every one of them.
+		// `removeDuplicates` decides by the item's own `is`, as `contains`
+		// does.
 		it("keeps one empty Optional when duplicates are removed", async () => {
 			expect(
 				await run(`implementation {
@@ -145,12 +122,8 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"1"'])
 		})
 
-		// The sharper half of the block, and the one that could not be
-		// written at all while `Optional` was a Type Alias: reading a stored
-		// empty item now answers `Value(Empty)` — a value that IS there and
-		// happens to be empty — where reading past the end answers `Empty`.
-		// Two levels, two different answers, from the same `Optional<Integer>`
-		// item Type.
+		// Reading a stored empty item answers `Value(Empty)`, and reading past
+		// the end answers `Empty`.
 		it("tells a stored empty Optional apart from a position past the end", async () => {
 			expect(
 				await run(`implementation {
@@ -170,10 +143,8 @@ describe("Stdlib searching Methods", () => {
 			])
 		})
 
-		// The searches run on the equality a Choice DERIVES from its
-		// tags and its payloads, so `#Empty` matches only the empty items and
-		// `#Value(1)` only the one holding a 1 — no Namespace is written for
-		// `Optional<Integer>` anywhere in this Program.
+		// The searches run on the equality the Choice derives from its tags
+		// and payloads. The Program writes no Namespace for `Optional<Integer>`.
 		it("finds the empty Optionals among the values beside them", async () => {
 			expect(
 				await run(`implementation {
@@ -203,12 +174,8 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// The same searching Methods over the other kind of item Type that
-	// carries more than one shape: a Union, whose equality nothing derives.
-	// `Optional<Integer>` above hands the search the equality its Choice built
-	// from tags and payloads; here the search has to find and run a conformance
-	// a Program WROTE, and hand it on through the same bound — `count` through
-	// the `firstIndex` fold, `lastIndex` through the reversal.
+	// Over a Union the searches run a conformance the Program wrote, handed on
+	// through the same bound.
 	describe("a hand-written conformance over a Union item Type", () => {
 		it("finds every item of one member of the Union", async () => {
 			expect(
@@ -240,16 +207,8 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// The quantified `hasItems` entries used to be
-	// `firstItem(where:)::hasValue()`,
-	// which reads the matching item back out — and while `Optional` collapsed
-	// when nested, a matching item that was itself empty came back as the very
-	// value the Method answers when nothing matched at all. That is no longer
-	// so: `#Value(#Empty)` is not `#Empty`, so the reading formulation would
-	// answer these correctly today, and the test below holds it to that. The
-	// Boolean fold stays for the remaining reason — it carries the ANSWER
-	// through `reduce` and builds nothing, where reading builds an Optional
-	// per call only to throw it away.
+	// The quantified `hasItems` entries fold a Boolean, so a matching item that
+	// is itself empty still counts as a match.
 	describe("the quantified hasItems entries decide on the check", () => {
 		it("answers true when the matching item is itself empty", async () => {
 			expect(
@@ -281,13 +240,9 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"false"'])
 		})
 
-		// The claim the NOTE above makes, pinned: the Optional the
-		// reading formulation builds is `Value(Empty)` for the empty item it
-		// FOUND and `Empty` for the List that holds no empty item at all, so
-		// `hasValue` agrees with `hasItems(where:)` on both. Nothing depends on
-		// this —
-		// it is the evidence that the fold is now a cost decision rather than
-		// a correctness one.
+		// Reading the match back with `firstItem(where:)` answers `Value(Empty)`
+		// for an empty item found and `Empty` for none, so it agrees with
+		// `hasItems(where:)`.
 		it("agrees with the reading formulation now that Optionals nest", async () => {
 			expect(
 				await run(`implementation {
@@ -350,10 +305,9 @@ describe("Stdlib searching Methods", () => {
 			])
 		})
 
-		// `Terminal.inspect` answers with the value it prints, so a check that
-		// wraps its item leaves a record of every item the walk reached. This is
-		// what proves the Boolean fold still LEAVES the walk: both stop at the
-		// item that decided the answer and never see the fourth.
+		// `Terminal.inspect` answers with the value it prints, so wrapping the
+		// item records every item the walk reached. Both walks stop at the item
+		// that decided.
 		it("still stops at the item that decides the answer", async () => {
 			expect(
 				await run(`implementation {
@@ -371,14 +325,12 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// A `lastIndex` derived from `split(on:)`, which scans left to right
-	// and CONSUMES each match it finds, answers the last non-overlapping match
-	// rather than the last occurrence. The native walks the grapheme view from
-	// the end, so the first match it meets is the last occurrence.
+	// The native walks the grapheme view from the end, so it answers the last
+	// occurrence even where occurrences overlap.
 	describe("String.lastIndex(of:)", () => {
 		it("finds the last occurrence when occurrences overlap", async () => {
-			// The positions JavaScript's own `lastIndexOf` answers, which
-			// is what "the last occurrence" means: "aaa" has "aa" at 0 AND at 1.
+			// The positions JavaScript's own `lastIndexOf` answers: "aaa" has
+			// "aa" at 0 and at 1.
 			expect(
 				await run(`implementation {
 					Terminal.inspect("aaa"::lastIndex(of "aa")::toString())
@@ -418,9 +370,8 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"Value(5)"', '"Value(0)"', '"Empty"', '"Value(0)"'])
 		})
 
-		// Positions are by GRAPHEME everywhere in the Namespace, and the
-		// searches read the same view `split` reads, which never splits one —
-		// so a String of emoji counts the same from either end.
+		// Positions are by grapheme everywhere in the Namespace, so a String of
+		// emoji counts the same from either end.
 		it("counts the positions by grapheme", async () => {
 			expect(
 				await run(`implementation {
@@ -431,10 +382,8 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// The List Methods that were already right, kept right — the reversal
-	// `lastIndex` is written on has to leave an ordinary List's positions where
-	// they were, and the fold `firstIndex` counts with has to keep answering an
-	// EMPTY Optional for an absent item rather than the length it settles on.
+	// `firstIndex` answers an empty Optional for an absent item rather than the
+	// length its fold settles on.
 	describe("List.firstIndex and List.lastIndex on ordinary items", () => {
 		it("answers the first and last position of a repeated item", async () => {
 			expect(
@@ -463,10 +412,8 @@ describe("Stdlib searching Methods", () => {
 			).toEqual(['"Empty"', '"Empty"', '"Empty"', '"Empty"'])
 		})
 
-		// The bound is what carries equality down: a `List<List<Integer>>`
-		// searches through `List.is` curried with the Integers' own, and both
-		// Methods have to hand that witness on — `lastIndex` through the
-		// `firstIndex` call it is written on.
+		// The bound carries equality down: a `List<List<Integer>>` searches
+		// through `List.is` with the Integers' own `is` handed on.
 		it("searches through the items' own conformance", async () => {
 			expect(
 				await run(`implementation {
