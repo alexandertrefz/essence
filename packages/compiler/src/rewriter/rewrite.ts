@@ -4758,24 +4758,9 @@ function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
 
 // #region Lowered Statements
 
-// The Statement half of the intrinsic family: a Match, a compiled Union
-// dispatch and an inlined loop written where they stand, with no Function
-// around their Statements. `lower-matches-to-statements` writes a Match's and a
-// dispatch's, and `inline-loops` a loop's.
-//
-// Two Statements come out of exactly one shape: a Variable Declaration.
-// Its name has to outlive the block that computes its value, so the declaration
-// stands before the block and is a `let` — assigned once, by the block, and
-// never again.
-//
-// And the answer is written from INSIDE that block, which is a Scope the
-// Program writes Statements into: a Handler that binds the very name being
-// written to stands in front of it, and the assignment then lands on the
-// Handler's own binding rather than on the declaration. Where that is so, the
-// answer is written to a name of the Compiler's own first and the Program's
-// name is assigned from it once the block has closed — one block deeper than
-// the chain, so nothing a Handler binds can reach it and nothing it binds can
-// collide with a sibling's.
+// A Match, compiled dispatch or inlined loop written as Statements. A
+// declaration's `let` stands before the block. See "Lowered Statements" in
+// DEVELOPMENT.md.
 function rewriteIntrinsicStatement(
 	node: common.typedSimple.IntrinsicStatementNode,
 ): Array<estree.Statement> {
@@ -4815,30 +4800,20 @@ function rewriteIntrinsicStatement(
 			body: [
 				loopDeclaration("let", heldAnswerName, null),
 				intrinsicStatementBody(node, null, held),
-				// After the chain and after the label a Handler leaves
-				// through, which both end here — so every way out of the chain
-				// passes through this one assignment.
+				// Every way out of the chain passes this assignment.
 				resultStatement(result, loopIdentifier(heldAnswerName)),
 			],
 		},
 	]
 }
 
-// Unspellable in Essence for the reason every Compiler-bound name is: the
-// Lexer reads `_` as a Symbol, so no user identifier holds one. It needs no
-// number — the block it is declared in holds exactly one of them, and the only
-// blocks nested inside it that declare it again are lowered Statements of their
-// own, which write their own answers and never this one's.
+// No Essence name contains `_`. One per block is enough, since a nested
+// lowered Statement writes only its own.
 const heldAnswerName = "$held_answer"
 
-// Whether the name a lowered Statement writes its answer to is a name the
-// Statements it holds BIND. Only the Scopes an answer can actually be written
-// into are asked, which is the same descent `redirectedStatements` makes: a
-// Handler body, a Conditional branch inside one, and a lowered Statement in
-// Return position, whose own Handlers answer THIS Statement's question. A
-// compiled dispatch holds `const`s of the Compiler's own and an inlined loop
-// writes its answer beside them, so neither of those can hold a Program's
-// binding where the answer is written.
+// Whether a Handler binds the name the answer is written to, in the Scopes
+// `redirectedStatements` writes answers into. See "The held answer" in
+// DEVELOPMENT.md.
 function bindsAnswerName(
 	node: common.typedSimple.IntrinsicStatementNode,
 	name: string,
@@ -4856,10 +4831,8 @@ function bodyBindsName(
 ): boolean {
 	return nodes.some((node) => {
 		switch (node.nodeType) {
-			// The four Statements that bind a name in the block they stand
-			// in — a `let`, a `function`, a `class`, and the `let` a lowered
-			// Statement in declaration position is emitted as. A Type Alias and a
-			// Protocol bind nothing at all: they are emitted as nothing.
+			// The Statements that bind a name in their block. A Type Alias and
+			// a Protocol are emitted as nothing.
 			case "VariableDeclarationStatement":
 			case "FunctionStatement":
 			case "NamespaceDefinitionStatement":
@@ -4900,32 +4873,22 @@ function resultStatement(
 					right: answer,
 				},
 			}
-		// A name the Compiler binds for itself — an inlined loop's State,
-		// its answer, the Boolean a predicate settled on. It is emitted verbatim
-		// rather than through `rewriteIdentifier`, because it is not a name any
-		// Essence Program could have written.
+		// A name the compiler binds, emitted as it is.
 		case "temporary":
 			return loopAssignment(result.name, answer)
-		// Evaluated and dropped — through the same rule every discarded
-		// Expression is emitted by, because a Handler may answer with a value as
-		// well as with a call. Where evaluating it observes nothing the pass has
-		// already taken the Return Statement away.
+		// A Handler may answer with a value as well as a call.
 		case "discard":
 			return discardedExpressionStatement(answer)
 	}
 }
 
-// Where an answer GOES, for the answers that go somewhere: a Statement
-// position's own result, or a name the Rewriter itself binds.
+// Where an answer goes: a Statement position's result, or a compiler name.
 type PlacedTarget =
 	| common.typedSimple.StatementResult
 	| { kind: "temporary"; name: string }
 
-// And the whole of what an answer may be written as, which is wider by one
-// — an inlined loop's callback does not merely PUT its answer somewhere: a
-// predicate's answer decides whether the walk goes round again, and a `Step`
-// decides both where the answer goes and whether the walk is over. So the target
-// may be a writer of its own, handed the answer and the redirect it stands in.
+// A target may also be a writer, for an inlined loop's callback whose answer
+// decides whether the walk goes on.
 type RedirectTarget =
 	| PlacedTarget
 	| {
@@ -4936,19 +4899,15 @@ type RedirectTarget =
 			) => Array<estree.Statement>
 	  }
 
-// One answer, as the two things a writer can need of it: the Node it was
-// written as — which is what lets `#Done(…)` be recognised where it is BUILT,
-// and the Case never built at all — and the JavaScript it emits, asked for only
-// where the Node was not enough. `node` is null where no Node stands behind the
-// answer: a nested inlined loop's own answer is read out of the name that walk
-// settled in, and the writer falls back to reading the tag.
+// One answer: the node it was written as, so `#Done(…)` is recognised where
+// it is built, and its JavaScript. `node` is null for a nested loop's answer.
 type LoopAnswer = {
 	node: common.typedSimple.ExpressionNode | null
 	value: () => estree.Expression
 }
 
-// One answer, written where its target says — and the way OUT of the body
-// it was written in, where the answer was not the last thing in it.
+// One answer written to its target, then a `break` unless it is in tail
+// position.
 function answerStatements(
 	result: RedirectTarget,
 	answer: LoopAnswer,
@@ -4961,18 +4920,13 @@ function answerStatements(
 	return [resultStatement(result, answer.value()), ...breakOut(redirect)]
 }
 
-// What a lowered Statement standing inside a Handler body or an inlined
-// callback's is emitted against, when that body's Return Statements are being
-// written somewhere other than a JavaScript Return. A Match in Statement
-// position holds a Match in Return position holds another, and each of them
-// answers the OUTERMOST one's question — so the redirect travels down and the
-// label is the outermost one's.
+// Where a body's Returns are written instead of a JavaScript Return. It
+// travels down nested lowered Statements with the outermost label. See
+// "Redirected Returns" in DEVELOPMENT.md.
 type ReturnRedirect = {
 	result: RedirectTarget
 	label: string
-	// True only for the last Statement of the body being redirected, a
-	// Handler's or an inlined callback's, where nothing follows the answer and
-	// there is nothing to break out of.
+	// True where nothing follows the answer, so no `break` is needed.
 	isTail: boolean
 	broke: () => void
 }
@@ -4992,10 +4946,8 @@ function intrinsicStatementBody(
 	}
 }
 
-// Where a lowered Statement's answer goes: the name the Statement
-// position it stood in decides, the outer question it is answering where it
-// stands inside one, or a name of the Compiler's own where the Program binds
-// the first of those itself.
+// Where a lowered Statement's answer goes: the held name, else the outer
+// redirect's target, else its own result.
 function placedResult(
 	node: common.typedSimple.IntrinsicStatementNode,
 	redirect: ReturnRedirect | null,
@@ -5008,10 +4960,8 @@ function placedResult(
 	return redirect === null ? node.result : redirect.result
 }
 
-// `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
-// dispatch holds, as the `const`s of a block. The block is what keeps one
-// chain's names its own: they are numbered from zero per chain, so two chains
-// lifted into one Scope would otherwise declare one name twice.
+// `{ const $dispatch_0 = …; return <the chain>; }`. The block keeps each
+// chain's numbered names its own.
 function heldExpression(
 	node: common.typedSimple.HeldExpressionNode,
 	redirect: ReturnRedirect | null,
@@ -5047,10 +4997,8 @@ function heldExpression(
 	}
 }
 
-// A Match written as the Statements it always was. What the three
-// bindings mean is stated where they are declared; what is common to them is
-// that `_self` names the matched value for the length of the chain and for
-// nothing else.
+// A Match written as Statements, with `_self` naming the matched value for
+// the length of the chain.
 function statementMatch(
 	node: common.typedSimple.StatementMatchNode,
 	redirect: ReturnRedirect | null,
@@ -5059,9 +5007,8 @@ function statementMatch(
 	let result = placedResult(node, redirect, held)
 	let label = redirect === null ? node.label : redirect.label
 	let broke = false
-	// A redirected Match breaks out of the label its redirect names, which
-	// is the OUTER Match's — so it is the outer Match that has to hear about it,
-	// and the flag below stays false.
+	// A redirected Match breaks out of the outer Match's label, so the outer
+	// Match hears of it.
 	let markBroke =
 		redirect === null
 			? (): void => {
@@ -5080,12 +5027,8 @@ function statementMatch(
 						redirectedStatements(handler.body, {
 							result,
 							label,
-							// A Handler's last Statement is the end of its
-							// branch, and the `if` chain is the end of the block
-							// — so its answer needs nothing after it. Unless this
-							// Match is itself inside a Handler being redirected
-							// somewhere that is NOT the end of ITS body, where
-							// the rest of that body follows the chain.
+							// A Handler's last Statement ends the chain, unless
+							// this Match stands before the end of a redirected body.
 							isTail: redirect === null || redirect.isTail,
 							broke: markBroke,
 						}),
@@ -5100,10 +5043,8 @@ function statementMatch(
 	)
 	let body = boundChain(node, chain, value)
 
-	// The label is emitted only where something breaks out of it, which is
-	// where a Handler answered somewhere other than its last Statement. A
-	// redirected Match breaks out of the label its redirect names, and that one
-	// is the outer Match's to declare.
+	// The label is emitted only where something breaks out of it, and only by
+	// the outermost Match.
 	if (!broke || redirect !== null) {
 		return body
 	}
@@ -5115,12 +5056,8 @@ function statementMatch(
 	}
 }
 
-// The chain with the matched value bound in front of it, in as few blocks
-// as the binding needs. `chain` is a run of Statements because a chain may bind
-// the matched value's tag ahead of itself, and where a block is being built for
-// the value anyway the two bindings stand side by side in it. Where none is —
-// `match @`, whose value is already `_self` — a chain that bound nothing is
-// still the one Statement it always was.
+// The chain with the matched value bound as `_self` in front of it, in as
+// few blocks as needed. See "Binding the matched value" in DEVELOPMENT.md.
 function boundChain(
 	node: common.typedSimple.StatementMatchNode,
 	chain: Array<estree.Statement>,
@@ -5180,13 +5117,9 @@ function breakOut(redirect: ReturnRedirect | null): Array<estree.Statement> {
 	]
 }
 
-// A Handler's body or an inlined callback's, with every Return Statement
-// in it written where the redirect's target says instead. Only three kinds of
-// Statement can hold one: a Return itself, a Conditional's bodies, and a
-// lowered Statement that answers with a Return of its own. Everything else is
-// emitted exactly as it always is — a Function declared inside a Handler has
-// Returns of its own and they are ITS Returns, which is why this descends by
-// name rather than by searching.
+// A body with each of its own Returns written to the redirect's target. A
+// nested Function's Returns are its own. See "Redirected Returns" in
+// DEVELOPMENT.md.
 function redirectedStatements(
 	nodes: Array<common.typedSimple.ImplementationNode>,
 	redirect: ReturnRedirect,
@@ -5222,10 +5155,8 @@ function redirectedStatement(
 				node.position,
 			)
 		case "IntrinsicStatement":
-			// A lowered Statement answering with a Return of its own is
-			// answering THIS Match — it stood in the Return position of a Handler
-			// body. One that answers a name of its own is answering that name,
-			// and is emitted as it stands.
+			// One answering with a Return answers this Match; one answering a
+			// name of its own stands as it is.
 			if (node.result.kind === "return") {
 				return withStatementLocation(
 					[intrinsicStatementBody(node, redirect, null)],
@@ -5242,9 +5173,7 @@ function redirectedStatement(
 }
 
 // A branch of a Conditional is in tail position exactly where the
-// Conditional is: an answer written at the end of a branch of a Conditional that
-// ends the Handler body has nothing after it either, in the branch or after the
-// `if`.
+// Conditional is.
 function redirectedConditional(
 	node: common.typedSimple.ConditionalStatementNode,
 	redirect: ReturnRedirect,

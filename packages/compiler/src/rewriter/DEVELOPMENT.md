@@ -527,3 +527,58 @@ is tested first. Every part of an arm is an Expression, so no Function is needed
 the chain, so it is total and has no fall-through. Each Condition is read through `.value` unless
 `conditionIsRaw` says `unbox-conditions` left a raw JavaScript boolean. Reading `.value` off a raw boolean
 would answer `undefined`, and every arm would decline.
+
+## Lowered Statements
+
+An `IntrinsicStatement` is a Match, a compiled dispatch or an inlined loop written as Statements where it
+stands, with no wrapper Function. `lower-matches-to-statements` writes a Match's and a dispatch's, and
+`inline-loops` writes a loop's. `rewriteIntrinsicStatement` emits them.
+
+### Where the answer goes
+
+The node's `result` says where its answer goes: a `return`, a `declaration`, an `assignment` or a `discard`.
+A declaration's name must outlive the block that computes it, so a `let` is emitted before the block and
+the block assigns it once. A discarded answer goes through `discardedExpressionStatement`, since a Handler
+may answer with a value as well as a call.
+
+The Rewriter adds two targets of its own. A `temporary` is a name the compiler binds, such as an inlined
+loop's state, and is emitted as it is. An `answer` target is a writer, for an inlined loop's callback whose
+answer decides more than where a value goes. A predicate's answer decides whether the walk continues, and a
+`Step` decides that and where the value goes. A `LoopAnswer` carries the node an answer was written as, so a
+writer can recognise `#Done(…)` where it is built. It also carries a way to emit the answer's JavaScript.
+
+### Redirected Returns
+
+A Handler's Return means "this is the Match's answer". `redirectedStatements` writes every such Return to
+the target instead. Only a Return, the branches of a Conditional, and a lowered Statement whose own result is
+a `return` can hold one. A Function declared inside a Handler has Returns of its own, so the descent goes by
+node kind rather than by search.
+
+A lowered Statement in a Handler's Return position answers the outer one's question. So the redirect, with
+the outer target and label, travels down into it.
+
+An answer written before the end of its body needs a way out of the chain. `breakOut` emits a `break` to the
+redirect's label, and the label is emitted only when something broke out of it. An answer is in tail
+position, needing no `break`, when it is the last Statement of a Handler body that ends the chain. A branch
+of a Conditional is in tail position exactly where the Conditional is.
+
+### The held answer
+
+The answer is written from inside the chain, which is a Scope the Program writes into. If a Handler binds the
+very name the answer goes to, the assignment would land on the Handler's binding. `bindsAnswerName` checks
+for this in the Scopes an answer can be written into. Where it happens, the answer goes to `$held_answer`
+in a block one level deeper, and the Program's name is assigned from it after the chain. Every way out of
+the chain passes that one assignment. A compiled dispatch binds only the compiler's names, and an inlined
+loop writes its answer outside its callbacks, so only a Match needs this.
+
+### Binding the matched value
+
+`boundChain` binds the matched value as `_self` in one of three ways, from the node's `binding`:
+
+- `self`: the value is already `_self`, as in `match @`, so nothing is bound.
+- `block`: `{ const _self = <value>; … }`, which shadows an enclosing `_self` for the chain.
+- `held`: `{ const <name> = <value>; { const _self = <name>; … } }`. The value reads the enclosing `_self`,
+  as in `match @.item`, and a `const _self` in the same block would shadow it before it is initialised.
+
+A compiled dispatch, `held-expression`, declares its numbered `$dispatch_<N>` consts in a block of its own.
+Two chains in one Scope then never declare one name twice.
