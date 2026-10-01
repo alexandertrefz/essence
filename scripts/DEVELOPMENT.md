@@ -7,17 +7,31 @@ root is the release checklist.
 ## The test budget
 
 `testBudget.ts` gives every spec in the repository one timeout, preloaded by `bunfig.toml` into each test process,
-the parallel runner's workers included. Most of this suite compiles a Program and often runs it, and how long that
-takes depends on the host more than on the code. Bun's default of five seconds is ample on an idle machine, but with
-several suites sharing a loaded machine, fast tests time out at random.
+the parallel runner's workers included. Bun reads `bunfig.toml` only from the directory a run starts in, so a run
+started inside a package keeps Bun's default. Most of this suite compiles a Program and often runs it, and how long
+that takes depends on the host more than on the code. Bun's default of five seconds is ample on an idle machine, but
+with several suites sharing a loaded machine, fast tests time out at random.
 
 A timeout that fires while the thing it guards still holds is a flake. So the budget is a minute, and a test that
 truly hangs still fails, a minute later. A spec that claims a speed says so with a growth ratio or a count of the
 work done, never with this number.
 
-The budget is a preload rather than `[test] timeout` in `bunfig.toml`, which Bun reads but does not apply. It is not
-`--timeout` on the `test` script either, which would leave `bun test <one spec>` on the default.
-`setDefaultTimeout` covers `beforeAll` hooks as well as tests.
+The budget is a preload rather than `[test] timeout` in `bunfig.toml`, which Bun ignores. It is not `--timeout` on
+the `test` script either, which would leave `bun test <one spec>` on the default.
+
+A test takes its timeout from its file's default when it registers, and `setDefaultTimeout` sets only the default of
+the file it runs in. A plain `bun test` runs the preload once, inside its first file, so a call there leaves every
+later file on five seconds. `--isolate`, which `--parallel` implies, runs the preload again for each file. In a plain
+run nothing in the preload runs again before a later file registers its tests. So the preload registers a plugin
+that puts the call at the start of every `*.spec.ts` file Bun loads. The call shares the first line, or replaces a
+`#!` line there. Line numbers in a failure stay true, and only columns on the first line shift. The call reaches
+`bun:test` through `import.meta.require`, so it declares no name that a spec's own names could shadow. It covers
+`beforeAll` hooks as well as tests.
+
+`ESSENCE_TEST_BUDGET` sets the budget in milliseconds. Anything but a positive number keeps the minute, since a
+timeout of zero turns timeouts off. `tests/testBudget.spec.ts` sets a short budget this way. It runs files that
+outlast it after another file: plainly, under `--isolate` and under `--parallel`. A later file left on Bun's default
+passes there, which fails the spec. It also refuses a test file whose name the plugin's filter misses.
 
 ## Publishing packages
 
