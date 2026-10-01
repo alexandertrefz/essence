@@ -2244,9 +2244,8 @@ function membersOverlapAtRuntime(
 	)
 }
 
-// The two Types the runtime answers its List check for — a `List<X>` and
-// the bare `List` a Generic List annotation resolves to, which names no item
-// Type of its own.
+// The Types the runtime's List check answers: `List<X>` and the bare `List`,
+// which names no item Type.
 function isRuntimeList(type: common.Type): boolean {
 	return type.type === "List" || type.type === "GenericList"
 }
@@ -2255,9 +2254,8 @@ function runtimeItemType(type: common.Type): common.Type {
 	return type.type === "List" ? type.itemType : { type: "Unknown" }
 }
 
-// The same pair for the Dictionary, whose bare spelling names neither of
-// its slots — so both read as Unknown, which is what the checks above ask for
-// when they mean "this says nothing about that half".
+// The same for the Dictionary, whose bare spelling reads both slots as
+// Unknown.
 function isRuntimeDictionary(type: common.Type): boolean {
 	return type.type === "Dictionary" || type.type === "GenericDictionary"
 }
@@ -2270,12 +2268,8 @@ function runtimeValueType(type: common.Type): common.Type {
 	return type.type === "Dictionary" ? type.valueType : { type: "Unknown" }
 }
 
-// One slot of a Dictionary, asked exactly as `acceptsAllAtRuntime` asks a
-// List's items — the Matcher naming nothing there takes every value, and a
-// member whose own slot is undecided could hold anything, so it is not all of
-// anything. The two slots are asked SEPARATELY and both have to answer, which is
-// what keeps `Dictionary<String, Unknown>` from passing for `Dictionary<String,
-// Integer>` on the strength of its keys.
+// One slot of a Dictionary, asked as a List's items are. Both slots must
+// answer, so the keys alone never decide.
 function slotAcceptsAllAtRuntime(
 	matcherSlot: common.Type,
 	memberSlot: common.Type,
@@ -2290,10 +2284,8 @@ function slotAcceptsAllAtRuntime(
 	)
 }
 
-// Whether the payload is present and matches is checked here rather
-// than in the Enricher — the Case's Type resolves either way, so a wrong
-// payload stays a single Diagnostic instead of poisoning the whole
-// Expression.
+// The payload is checked here rather than in the enricher, since the Case's
+// Type resolves either way and a wrong payload stays one Diagnostic.
 function validateCaseValue(
 	node: common.typed.CaseValueNode,
 ): common.typed.CaseValueNode {
@@ -2306,11 +2298,7 @@ function validateCaseValue(
 		return node
 	}
 
-	// A payload judged against a Case whose own members the Enricher could
-	// not establish — or a payload VALUE it could not — is judged against a hole,
-	// and every answer that comes back names Types the reader never wrote. The
-	// two shape checks above it stand down with it: which of them applies is
-	// decided by the very members that are missing.
+	// A hole in the Case's members or the payload stands every check down.
 	if (
 		typeContainsError(node.type) ||
 		(node.value !== null && typeContainsError(node.value.type))
@@ -2345,17 +2333,8 @@ function validateCaseValue(
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
 				],
-				// A bare `#Case` is a UNIT Case's spelling and stays one,
-				// however much of a payload is defaulted — which is what keeps
-				// a bare Case name meaning exactly one thing on both sides of
-				// the JavaScript boundary. So a fully defaulted Case has an
-				// empty payload to write, and this is where to say so.
-				//
-				// Every other one gets the SHAPE, spelled with the member
-				// names the Note has just named the Types of — the two halves of
-				// one answer, and a reader holding both writes the payload
-				// without looking the Case up. The values are the reader's, so
-				// they stand as the `…` this says it is.
+				// A bare `#Case` always spells a unit Case, so a fully defaulted
+				// payload is written `({})`. Otherwise the Help spells the shape.
 				helps:
 					node.type.payloadDefault?.members.length ===
 					Object.keys(node.type.members).length
@@ -2374,9 +2353,7 @@ function validateCaseValue(
 	} else if (
 		reportUnmergedPayloadPathKey(payloadType, node.type, node.value)
 	) {
-		// Reported already — a path key the payload's default does not
-		// reach into is what made the payload not fit, and naming the whole Type
-		// under it would name everything but the mistake.
+		// Reported already, at the path key the default does not reach.
 	} else if (casePayloadIsPartial(node.type, node.value)) {
 		let missing = missingRecordMembers(
 			payloadType,
@@ -2390,18 +2367,13 @@ function validateCaseValue(
 	} else if (
 		!matchesType(payloadType, casePayloadType(node.type, node.value))
 	) {
-		// A generic Choice applied to a blank carries one: a `step` body
-		// over a seed nothing decided constructs `#Continue` out of a
-		// `{ state: List<Unknown> }`, and what refuses the payload is the blank
-		// rather than anything the payload holds.
+		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
 			payloadType,
 			casePayloadType(node.type, node.value),
 			null,
 		)
-		// A payload shape is a Record nobody declared under a name, so
-		// the sentences call it what the rest of this report calls it — the
-		// Case whose payload it is.
+		// The payload shape is named after its Case.
 		let record = recordMismatchEvidence(
 			payloadType,
 			casePayloadType(node.type, node.value),
@@ -2429,16 +2401,8 @@ function validateCaseValue(
 				],
 				helps: [
 					...record.helps,
-					// A single-member Case would have accepted the value
-					// through the shorthand, so the hint only helps where it can
-					// not: a multi-member Case needs the whole Record spelled out.
-					// And only where the payload was not ALREADY written
-					// as that Record. `#Rectangle({ width = "wide", height = 2 })`
-					// spells every member the Case declares and got one value
-					// wrong; telling its author that the shorthand does not apply
-					// answers a question nobody asked. The guard counted members
-					// and looked at nothing else, so the sentence came out for
-					// every multi-member mismatch there is.
+					// The shorthand hint, only for a multi-member Case whose
+					// payload does not already spell its members.
 					...(Object.keys(node.type.members).length > 1 &&
 					!payloadSpellsTheCasesMembers(node.type, node.value)
 						? [
@@ -2455,11 +2419,8 @@ function validateCaseValue(
 	return node
 }
 
-// Whether the payload names the Case's own members — which is what tells a
-// payload that tried the one-member shorthand from one that wrote the Record out
-// and got a value wrong. Names only: the Types are exactly what disagreed, and a
-// payload that spells `width` and `height` at a Case declaring `width` and
-// `height` is a payload nobody took a shortcut with.
+// Whether the payload names exactly the Case's members, which tells a written
+// Record from a tried shorthand. Names only, since the Types disagreed.
 function payloadSpellsTheCasesMembers(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
@@ -2477,13 +2438,9 @@ function payloadSpellsTheCasesMembers(
 	)
 }
 
-// A payload written as a Record Literal for a Case that defaults its
-// payload is measured as a PARTIAL — every member it writes is one the payload
-// declares, carrying a value that member's Type admits — and what is left is
-// only ever the question of which members it should have written. A payload that
-// is not a Literal carries whatever its value holds, which width subtyping lets
-// be more than its Type names, so it is held to the payload whole: the same
-// split, for the same reason, that a Record Argument is held to.
+// A Record Literal payload for a Case with a payload default is measured as a
+// partial. Any other payload may carry more than its Type names, so it is held
+// to the whole payload, as a Record Argument is.
 function casePayloadIsPartial(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
@@ -2499,10 +2456,8 @@ function casePayloadIsPartial(
 	)
 }
 
-// What the payload comes to once the default has filled it in — the Type
-// a path key's member stands for, rather than the partial it wrote. The
-// payload's own Type wherever no path key was written, which is every payload
-// but one.
+// The payload's Type once the default fills in what a path key reaches, or
+// its own Type where it wrote no path key.
 function casePayloadType(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
@@ -2541,8 +2496,7 @@ function reportIncompleteCasePayload(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this payload.`],
-			// As for an Argument — a payload is a Record Literal measured
-			// against a default, and the same scaffold answers both.
+			// The data an incomplete Record Argument carries.
 			data: { kind: "missing-members", names: missing },
 		},
 	)
@@ -2573,10 +2527,8 @@ function validateRationalValue(
 	return node
 }
 
-// A member is an Expression like any other — a Match, an Invocation, a
-// Function literal — so it is walked rather than only checked for the values
-// that can not travel. The Record's own shape is the Enricher's business; what
-// is checked here is what the members are made of.
+// Each member is walked as an Expression. The Record's shape is the
+// enricher's business.
 function validateRecordValue(
 	node: common.typed.RecordValueNode,
 ): common.typed.RecordValueNode {
@@ -2599,10 +2551,7 @@ function validateListValue(
 	return node
 }
 
-// Both halves of every entry, on the same terms a List's items are held
-// to: a value whose Type carries hidden conformance Parameters can not be
-// stored, because storing it is what makes it travel away from the call that
-// filled them.
+// Both halves of every entry, held to what a List's items are.
 function validateDictionaryValue(
 	node: common.typed.DictionaryValueNode,
 ): common.typed.DictionaryValueNode {
@@ -2616,10 +2565,8 @@ function validateDictionaryValue(
 	return node
 }
 
-// Each hole is an Expression of its own — `"total: {price::add(tax)}"`
-// holds an Invocation — so each is walked. A hole can not itself be a bound
-// Function value (the Enricher already refused it as not Printable), so unlike
-// a List there is no `validateNoBoundFunctionValue` guard to add.
+// Each hole is walked as an Expression. A Function value in a hole is
+// refused by the enricher as not Printable.
 function validateInterpolatedStringValue(
 	node: common.typed.InterpolatedStringValueNode,
 ): common.typed.InterpolatedStringValueNode {
@@ -2632,10 +2579,8 @@ function validateInterpolatedStringValue(
 	return node
 }
 
-// Both sides are Expressions of their own — `{ makeBase(1) with x =
-// compute("2") }` holds two Invocations — so both are walked. Whether the two
-// shapes combine at all is the Enricher's business
-// (`partial-type-mismatch`); what is checked here is what they are made of.
+// Both sides are walked as Expressions. Whether the shapes combine is the
+// enricher's business.
 function validateCombination(
 	node: common.typed.CombinationNode,
 ): common.typed.CombinationNode {
@@ -2649,11 +2594,8 @@ function validateCombination(
 
 // #region Statements
 
-// The two assertions are NOT among these — nothing about them depends on
-// the Function they stand in, so `validateImplementationNode` answers for them
-// before they get here. Excluding them from the parameter Type rather than
-// leaving unreachable cases in the switch is what keeps that routing a fact
-// TypeScript checks.
+// The assertions are excluded from the parameter Type, since
+// `validateImplementationNode` routes them to `validateAssertion`.
 function validateStatement(
 	node: Exclude<
 		common.typed.StatementNode,
@@ -2729,13 +2671,9 @@ function validateVariableDeclarationStatement(
 	return node
 }
 
-// A Declaration's Type Annotation carries no Position of its own, so
-// the Type it demands is stated as a note rather than pointed at. The value
-// is what gets the arrow — it is the part that can be changed.
-// `name` is null for the Constant a Pattern Declaration holds its value
-// in. That Constant is real and its annotation is the author's, but its NAME is
-// the Compiler's — unspellable on purpose — so the report names the Pattern
-// instead of a `$pattern_2_11` no reader has ever seen.
+// A Type Annotation has no Position, so the declared Type is a Note and the
+// value gets the arrow. `name` is null for the hidden Constant of a Pattern
+// Declaration, and the report names the Pattern.
 function reportDeclarationMismatch(
 	kind: "Constant" | "Variable" | "Property",
 	name: string | null,
