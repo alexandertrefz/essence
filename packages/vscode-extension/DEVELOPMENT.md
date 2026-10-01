@@ -86,7 +86,8 @@ while the setting is fixed.
 
 `resolveCli` picks the CLI the debug adapter runs through. The setting comes
 first, then a checkout open in the workspace, whose `bin/essence` runs on Bun,
-then an installed `essence`.
+then an installed `essence`. `resolveRuntime` finds that one without a setting
+of its own, since `essence.cli.path` is the setting that names a CLI.
 
 ## Restarting the server
 

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test"
+import { readFileSync } from "node:fs"
+import * as path from "node:path"
 
 import manifest from "../package.json"
 
@@ -61,17 +63,40 @@ describe("the debugger contribution", () => {
 		])
 	})
 
-	it("documents every path setting it reads", () => {
-		let properties = manifest.contributes.configuration.properties
+	// The settings are read off `extension.js`, where a runtime's setting is
+	// named after the runtime, so each `findRuntime` call has to name one.
+	it("declares every setting `extension.js` reads", () => {
+		let properties: Record<string, unknown> =
+			manifest.contributes.configuration.properties
+		let source = readFileSync(
+			path.join(import.meta.dirname, "..", "extension.js"),
+			"utf8",
+		)
+		let named = (argument: string) =>
+			/^"[^"]+"$/.test(argument) ? argument.slice(1, -1) : `<${argument}>`
+		let read = [
+			...new Set([
+				...[...source.matchAll(/settings\(\)\.get\("([^"]+)"\)/g)].map(
+					(match) => `essence.${match[1]}`,
+				),
+				...[
+					...source.matchAll(/(?<!function )findRuntime\(([^)]*)\)/g),
+				].map((match) => `essence.${named(match[1]!)}.path`),
+			]),
+		]
 
-		for (let setting of [
-			"essence.server.path",
-			"essence.cli.path",
-			"essence.bun.path",
-			"essence.node.path",
-		]) {
-			expect(properties[setting as keyof typeof properties]).toBeDefined()
-		}
+		// Finding the path settings shows the reading reaches the reads.
+		expect(read).toEqual(
+			expect.arrayContaining([
+				"essence.bun.path",
+				"essence.cli.path",
+				"essence.node.path",
+				"essence.server.path",
+			]),
+		)
+		expect(
+			read.filter((setting) => properties[setting] === undefined),
+		).toEqual([])
 	})
 })
 

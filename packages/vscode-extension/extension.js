@@ -466,7 +466,12 @@ async function createDebugAdapter() {
 	}
 
 	let runtimeName = cli.kind === "bun" ? "bun" : "essence"
-	let runtime = await findRuntime(runtimeName)
+	// An installed `essence` is only searched for, since `essence.cli.path`
+	// is the setting that names a CLI.
+	let runtime =
+		cli.kind === "bun"
+			? await findRuntime("bun")
+			: await resolveRuntime("essence", undefined, runtimeContext())
 
 	reportRuntimeLookup(runtimeName, runtime)
 
