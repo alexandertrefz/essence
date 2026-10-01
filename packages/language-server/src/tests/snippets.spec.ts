@@ -598,6 +598,24 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
+	it("offers nothing inside the Parameter list of a bodied overload function entry", () => {
+		let offered = snippetsAt(
+			[
+				"declarations {",
+				"\toverload function combine {",
+				"\t\t(first value: Integer) -> Integer {",
+				"\t\t\t<- value",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 3, column: 10 },
+			path.join(STDLIB_DIRECTORY, "Scratch.es"),
+		)
+
+		expect(offered).toEqual([])
+	})
+
 	// The bodies reach the Editor as snippet text, or a tab stop would be
 	// literal characters.
 	it("hands the body over as snippet text, and says what it writes", () => {

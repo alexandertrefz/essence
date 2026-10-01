@@ -796,6 +796,25 @@ function walkDefaults(parameters: Array<parser.ParameterNode>, visit: Visitor) {
 	return true
 }
 
+// A bodied entry is a Function value, and a native one may carry a default.
+function walkOverloadEntries(
+	methods: parser.OverloadedFunctionStatementNode["methods"],
+	visit: Visitor,
+) {
+	for (let method of methods) {
+		let walked =
+			method.nodeType === "FunctionValue"
+				? walkNode(method, visit)
+				: walkDefaults(method.parameters, visit)
+
+		if (!walked) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // True to go on, false to stop the whole walk.
 export function walkNode(
 	node: parser.ImplementationNode,
@@ -815,6 +834,8 @@ export function walkNode(
 				walkDefaults(node.value.parameters, visit) &&
 				walkBody(node.value.body, visit)
 			)
+		case "OverloadedFunctionStatement":
+			return walkOverloadEntries(node.methods, visit)
 		case "ChoiceDeclarationStatement":
 			// A Case payload's default holds Expressions too.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -981,9 +1002,7 @@ export function walkNode(
 			return walkNode(node.base, visit)
 		case "CaseValue":
 			return node.value === null ? true : walkNode(node.value, visit)
-		// A path's steps are member names, not Expressions.
-		case "MemberPath":
-			return true
+		// A MemberPath's steps are member names, not Expressions.
 		default:
 			return true
 	}

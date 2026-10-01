@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test"
+import * as path from "node:path"
 
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 import { format } from "@essence-lang/formatter"
 import type { common, parser } from "@essence-lang/interfaces"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import { analyse, analyseDocument } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
@@ -7605,6 +7607,37 @@ describe("Extract to a Constant", () => {
 			"\tconstant scores = [1, 2, 3]",
 			"\tconstant highestItem = scores::highestItem(defaultingTo 0)",
 			"\tconstant highest = highestItem",
+			"}",
+		])
+	})
+
+	// Only a standard library file may write `overload function`, and each
+	// entry's body is a body like any other.
+	it("lifts an Expression inside an entry of an overload function", () => {
+		let lines = [
+			"declarations {",
+			"\toverload function combine {",
+			"\t\t(first value: Integer) -> Integer {",
+			"\t\t\t<- value::add(1)",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [action] = findCodeActions(
+			lines.join("\n"),
+			rangeOf(lines, "value::add(1)"),
+			path.join(STDLIB_DIRECTORY, "Combine.es"),
+		).filter((entry) => entry.title === "Extract to a Constant")
+
+		expect(applied(lines, action)).toEqual([
+			"declarations {",
+			"\toverload function combine {",
+			"\t\t(first value: Integer) -> Integer {",
+			"\t\t\tconstant add = value::add(1)",
+			"\t\t\t<- add",
+			"\t\t}",
+			"\t}",
 			"}",
 		])
 	})
