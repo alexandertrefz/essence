@@ -3570,10 +3570,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// Two of the four sites report at a Handler's Matcher, and the
-		// primary Label is the whole of what tells them apart — a Guard's fix
-		// applied to a Case whose problem is that it names no value would take
-		// a Guard off something else entirely.
+		// Several sites report at a Handler's Matcher, and only the primary
+		// Label tells them apart. A Case that names no value gets no Guard fix.
 		it("should offer nothing for a Case that names no value", () => {
 			let lines = [
 				"implementation {",
@@ -3605,11 +3603,8 @@ describe("Code Actions", () => {
 			let [fix] = quickFixes(lines)
 			let result = applied(lines, fix)
 
-			// EVERY Case that names a List, and the `case _` the Guards
-			// make necessary. Guarding one Case reported the same Warning one
-			// Case further down, and guarding them all without the arm turned a
-			// WARNING into an ERROR — `missing-case`, whose own first Help was
-			// to write back the Cases the Guards had just stopped claiming.
+			// Every Case that names a List is guarded, and the `case _` the
+			// Guards make necessary is added, so no `missing-case` follows.
 			expect(fix.title).toBe(
 				"Guard the Cases with 'where @::hasItems()' and add a 'case _'",
 			)
@@ -3622,17 +3617,15 @@ describe("Code Actions", () => {
 			)
 			expect(result[5]).toBe("\t\tcase _ {}")
 
-			// The Warning is gone and no ERROR stands in its place. What
-			// is left is the empty arm's own hole, which is the reader's to fill
-			// and is what every scaffolding fix here leaves.
+			// The Warning is gone and no Error replaces it. The empty arm's hole
+			// is left for the reader.
 			expect(codesOf(result)).not.toContain("empty-list-overlap")
 			expect(codesOf(result)).not.toContain("missing-case")
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// A Match that already ends in a wildcard has somewhere for the
-		// empty List to land, so the arm is not written a second time — a
-		// `case _` under a `case _` is an unreachable Case.
+		// A Match already ending in a wildcard gets no second `case _`, which
+		// would be unreachable.
 		it("should write no arm where the Match already ends in one", () => {
 			let lines = [
 				"implementation {",
@@ -3652,10 +3645,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The dispatch branches of a Method Invocation report the same
-		// Warning, and its secondary Label points at the receiver rather than
-		// at a Matcher. There is no arm to edit, and the lookup answering
-		// nothing is what says so.
+		// A Method Invocation's dispatch branches report the same Warning, with
+		// the secondary Label at the receiver. There is no arm to edit.
 		it("should offer nothing where the branches are a dispatch", () => {
 			let lines = [
 				"implementation {",
@@ -3725,8 +3716,8 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).toEqual([])
 		})
 
-		// A literal always belongs to the Modifier in front of it, so the
-		// word deleted on its own would leave a `3` that opens nothing.
+		// A literal belongs to the Modifier in front of it, so it goes with the
+		// word.
 		it("should take the arguments the Modifier was read with", () => {
 			let lines = [
 				"implementation {",
@@ -3745,9 +3736,8 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).toEqual([])
 		})
 
-		// The Formatter puts a Modifier on a line of its own under a
-		// `test "…"` head, and a word removed from in front of nothing leaves
-		// nothing but the indentation it stood behind. So the line goes with it.
+		// The Formatter puts a Modifier on its own line under a `test "…"` head,
+		// so the line goes with it.
 		it("should take the line a Modifier stood alone on", () => {
 			let lines = [
 				"implementation {",
@@ -3777,12 +3767,9 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).toEqual([])
 		})
 
-		// The Enricher regroups what the Parser read before it reports —
-		// `tagged slow focussed` is read as `tagged` and `slow(focussed)`, and
-		// the typo it reports about is an ARGUMENT in the tree. So the fix finds
-		// no Modifier and takes the word alone, which is what `tagged slow`
-		// needs. The near miss also puts a spelling above the removal, and the
-		// removal stops being the preferred answer.
+		// `tagged slow focussed` reads as `tagged` and `slow(focussed)`, so the
+		// typo is an Argument and the fix takes the word alone. The spelling is
+		// offered first, and the removal is not preferred.
 		it("should offer the spelling above the removal for a near miss", () => {
 			let lines = [
 				"implementation {",
@@ -3807,10 +3794,7 @@ describe("Code Actions", () => {
 	})
 
 	describe("contradictory-modifiers", () => {
-		// Neither is preferred, which is the whole of what the Diagnostic
-		// has to say: which of the two was meant is not something the source
-		// says, and an Editor applying one unasked would be the guess it refuses
-		// to make.
+		// Neither is preferred, since the source does not say which was meant.
 		it("should offer both Modifiers, and neither as the answer", () => {
 			let lines = [
 				"implementation {",
@@ -3875,8 +3859,8 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).toEqual([])
 		})
 
-		// Every other Modifier says ONE thing, so there is nothing to
-		// merge. The Enricher already keeps the first, and the edit says so.
+		// Every other Modifier says one thing, so nothing merges. The Enricher
+		// keeps the first, and the edit removes the second.
 		it("should remove the second of a Modifier that carries nothing", () => {
 			let lines = [
 				"implementation {",
@@ -3896,9 +3880,8 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).toEqual([])
 		})
 
-		// Two spans that slid by the SAME column still read as the same
-		// word, so the agreement between them says nothing — the line lost its
-		// indentation since the analysis and both spans now cover `ocused`.
+		// Two spans that slid by the same column still agree, so agreement
+		// proves nothing. Both now cover `ocused`.
 		it("should stay silent where both spans have slid off their words", () => {
 			let was = [
 				"implementation {",
@@ -3949,11 +3932,8 @@ describe("Code Actions", () => {
 			"\tconstant boxed: Box = { v = 1 }",
 		]
 
-		// A static whose Parameters the written Arguments already fill has
-		// nowhere to put the receiver, so only the one shape is offered — and
-		// being the only one, it is preferred. Both used to be offered whatever
-		// the arity, and "passing the value" answered this very call with
-		// `argument-count-mismatch`: a fix that trades one refusal for another.
+		// A static whose Parameters the Arguments already fill has nowhere for
+		// the receiver, so only the other shape is offered, and preferred.
 		it("should offer only the call the signature accepts", () => {
 			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
 
@@ -3965,9 +3945,8 @@ describe("Code Actions", () => {
 			expect(fixes.map((entry) => entry.isPreferred)).toEqual([true])
 		})
 
-		// And the other way round — a static with a Parameter left over
-		// takes the receiver into it, and the shape that drops the value is the
-		// one withheld.
+		// A static with a Parameter left over takes the receiver into it, and the
+		// shape that drops the value is withheld.
 		it("should pass the value as the first Argument", () => {
 			let lines = [
 				"implementation {",
@@ -4004,8 +3983,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A call passing nothing needs no comma written after the value —
-		// the closing bracket the call already carries is what closes it.
+		// A call passing nothing needs no comma after the value.
 		it("should write no comma for a call with no Arguments", () => {
 			let lines = [
 				"implementation {",
@@ -4029,8 +4007,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The receiver's own text is never retyped — it is the one thing
-		// the two edits are written around.
+		// The receiver's own text is never retyped. The two edits are written
+		// around it.
 		it("should carry a written receiver across untouched", () => {
 			let lines = [
 				"implementation {",
@@ -4053,9 +4031,8 @@ describe("Code Actions", () => {
 	})
 
 	describe("a Namespace's own Type Parameter", () => {
-		// The bound goes on the METHOD the call stands in, not on a
-		// declaration — the Parameter is the Namespace's and its declaration is
-		// the one place a bound is refused.
+		// The bound goes on the Method the call stands in, since a bound on the
+		// Namespace's declaration is refused.
 		it("should bound the Method the call is written in", () => {
 			let lines = [
 				"implementation {",
@@ -4148,9 +4125,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A restated `infer` with no bound has nothing to keep, so the
-		// edit is the removal rather than the loss of the word — the `data`
-		// names the edit, and this is the fix it names.
+		// A restated `infer` with no bound has nothing to keep, so the edit
+		// removes it.
 		it("should drop a restated 'infer' that carries no bound", () => {
 			let lines = [
 				"implementation {",
@@ -4174,11 +4150,9 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A list the Formatter broke across lines puts the `<` on the
-		// line ABOVE the entry, so an edit that starts one column before the
-		// entry eats the indentation and leaves the `<` standing — a buffer
-		// that no longer parses. Every layout below asks for the same edit, and
-		// the assertion that matters in each is `codesOf`: the buffer compiles.
+		// A list broken across lines puts the `<` on the line before the entry.
+		// Every layout asks for the same edit, and `codesOf` checks the buffer
+		// compiles.
 		it("should drop a lone re-declaration written across lines", () => {
 			let lines = [
 				"implementation {",
@@ -4299,10 +4273,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A Comment inside the `<…>` is the reader's own text, and the
-		// span this edit removes would take it along. Nothing is offered rather
-		// than something that deletes a sentence nobody asked about — the
-		// Diagnostic's Help still says what to write by hand.
+		// The span this edit removes would take a Comment inside the `<…>`
+		// along, so nothing is offered. The Help still says what to write.
 		it("should withhold the drop where a Comment sits in the list", () => {
 			let lines = [
 				"implementation {",
@@ -4336,8 +4308,8 @@ describe("Code Actions", () => {
 			"",
 		]
 
-		// The Diagnostic is reported at the CALL and the edit lands on the
-		// declaration around it, found by the name the Compiler carried.
+		// The Diagnostic is reported at the call, and the edit lands on the
+		// declaration found by the name the Compiler carried.
 		it("should bound the Type Parameter the call passes", () => {
 			let lines = [
 				...SIZED,
@@ -4359,8 +4331,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A Method's own list is a head like any other, and the walk
-		// answers with the innermost that declares the name.
+		// A Method's own list is a head like any other, and the innermost one
+		// declaring the name answers.
 		it("should bound a Method's own Type Parameter", () => {
 			let lines = [
 				...SIZED,
@@ -4381,9 +4353,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// `<infer T is A is P>` is not a spelling, and which of the two
-		// bounds a reader meant to keep is not a question a Diagnostic about one
-		// of them can answer.
+		// `<infer T is A is P>` is not a spelling, and the Diagnostic cannot say
+		// which bound to keep.
 		it("should offer nothing where the Parameter is bound already", () => {
 			let lines = [
 				"implementation {",
@@ -4418,8 +4389,8 @@ describe("Code Actions", () => {
 	})
 
 	describe("undeclared-conformance", () => {
-		// The Diagnostic is reported against the METHOD that gave the
-		// Namespace away, and the edit lands on the head above it.
+		// The Diagnostic is reported at the Method, and the edit lands on the
+		// Namespace head.
 		it("should declare the conformance on the Namespace head", () => {
 			let lines = [
 				"implementation {",
@@ -4445,8 +4416,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A conformance list is comma separated, so a head that already
-		// declares one takes the new clause after it rather than beside it.
+		// A conformance list is comma separated, so the new clause goes after
+		// one already declared.
 		it("should write it after a conformance already declared", () => {
 			let lines = [
 				"implementation {",
@@ -4479,9 +4450,8 @@ describe("Code Actions", () => {
 	})
 
 	describe("unknown-where-generic", () => {
-		// A Type Parameter a Namespace never declared is `unknown-type`
-		// in its target Type as well, so the fix under test is picked out by
-		// its code rather than taken as the first offered.
+		// An undeclared Type Parameter is also `unknown-type` in the target
+		// Type, so the fix is picked out by its code.
 		function parameterFixes(lines: Array<string>): Array<CodeActionEntry> {
 			return quickFixes(lines).filter(
 				(entry) => entry.diagnosticCode === "unknown-where-generic",
@@ -4498,10 +4468,8 @@ describe("Code Actions", () => {
 			"",
 		]
 
-		// The shape this is nearly always written by hand — a target Type
-		// naming a Parameter the Generic list forgot — where declaring it
-		// answers the `unknown-type` beside it as well and the Namespace
-		// compiles.
+		// A target Type naming a Parameter the Generic list forgot. Declaring it
+		// answers the `unknown-type` too, and the Namespace compiles.
 		it("should declare the Parameter after the Namespace's name", () => {
 			let lines = [
 				...BOXES,
@@ -4525,11 +4493,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A list that already holds Parameters takes the new one after
-		// them — `infer` and all, since a Namespace's Type Parameters are every
-		// one of them inferred. What is left is the condition speaking about a
-		// Parameter the target Type never mentions, which is the reader's to
-		// answer and says so in its own words.
+		// A list that holds Parameters takes the new one after them, with
+		// `infer`, since a Namespace's Type Parameters are all inferred.
 		it("should write it into a Generic list already there", () => {
 			let lines = [
 				...BOXES,
@@ -4568,8 +4533,8 @@ describe("Code Actions", () => {
 
 			expect(fix.title).toBe("Add a '@param right' line")
 			expect(fix.diagnosticCode).toBe("undocumented-parameter")
-			// The description is left empty, so the reader still has
-			// something to write — which is why the fix is not preferred.
+			// The description is left empty for the reader, so the fix is not
+			// preferred.
 			expect(fix.isPreferred).toBe(false)
 
 			expect(result).toEqual([
@@ -4586,9 +4551,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("undocumented-parameter")
 		})
 
-		// A tag's description runs until the next tag opens, so the line
-		// goes under everything the tag above it wrote — and above the tag
-		// below it, whatever that tag is.
+		// A tag's description runs until the next tag, so the line goes after
+		// the previous tag's text and before the next tag.
 		it("should write it below the lines that continue the tag above", () => {
 			let lines = [
 				"implementation {",
@@ -4645,8 +4609,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The whole line and the lines under it, since a description left
-		// behind would read as prose about whatever tag stands above it.
+		// The line and its description, which would otherwise read as prose of
+		// the tag before it.
 		it("should remove a tag past the last Parameter, description and all", () => {
 			let lines = [
 				"implementation {",
@@ -4675,9 +4639,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// An `overload` block's tags are read by NAME, so a near miss is
-		// tellable there — and the fix that keeps the description stands above
-		// the one that throws it away.
+		// An `overload` block's tags are read by name, so a near miss is offered
+		// before the removal.
 		it("should offer a near miss above the removal", () => {
 			let lines = [
 				"implementation {",
@@ -4705,9 +4668,7 @@ describe("Code Actions", () => {
 			expect(codesOf(applied(lines, fixes[0]))).toEqual([])
 		})
 
-		// An empty `§§` is the blank line of a block — it holds the prose
-		// apart from the tags. Taking the last tag out stranded it, and the
-		// block was left ending on a separator with nothing behind it.
+		// An empty `§§` separates prose from tags, so it goes with the last tag.
 		it("should take the stranded separator with the last tag", () => {
 			let lines = [
 				"implementation {",
@@ -4735,8 +4696,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// And it is KEPT where a tag still stands above the removal: that
-		// block has two halves left to hold apart.
+		// It is kept where a tag still stands before the removal.
 		it("should keep a separator that still separates something", () => {
 			let lines = [
 				"implementation {",
@@ -4799,8 +4759,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The snapshot is moved WHOLE — a stored one names an entry of
-		// the snapshot file, and the name goes with it.
+		// A stored snapshot names an entry of the snapshot file, so the name
+		// moves with it.
 		it("should take a stored snapshot's name along", () => {
 			let lines = [
 				"implementation {",
@@ -4821,9 +4781,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// One action per name, and none of them preferred: which member
-		// of the Pattern the snapshot meant is not something the Diagnostic
-		// can say.
+		// One action per name, none preferred, since the Diagnostic cannot say
+		// which member the snapshot meant.
 		it("should offer one line per name a Pattern introduced", () => {
 			let lines = [
 				"implementation {",
@@ -4866,9 +4825,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// A moved block keeps its text byte for byte — what is adjusted is
-	// the blank line in front of it and the one behind it, so a file spaced the
-	// way its author spaced it stays that way.
+	// A moved block keeps its text byte for byte. Only the blank lines around
+	// it are adjusted.
 	describe("misplaced sections", () => {
 		it("should move a tests block below the implementation", () => {
 			let lines = [
@@ -4901,8 +4859,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The block goes to the END, which is below whatever the Module
-		// hands out rather than directly below the implementation.
+		// The block goes to the end, after the exports.
 		it("should move a tests block below the exports", () => {
 			let lines = [
 				"implementation {",
@@ -4969,14 +4926,12 @@ describe("Code Actions", () => {
 				"}",
 			])
 
-			// The specifier names no file here, so the graph is what is
-			// left to complain about rather than the shape of the Program.
+			// The specifier names no file, so only the graph complains.
 			expect(codesOf(result)).not.toContain("misplaced-module-section")
 		})
 
-		// A Comment held off from the block below it is about the FILE,
-		// so an import written back above the implementation goes under it
-		// rather than over it.
+		// A Comment set apart from the block after it is about the file, so the
+		// import block goes after it.
 		it("should leave a file's own header above the import block", () => {
 			let lines = [
 				"§ A file about things",
@@ -5044,9 +4999,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A file that separates nothing with blank lines gets none
-		// invented for it — the move adjusts the spacing the block had, and it
-		// had none.
+		// A file with no blank lines gets none, since the move keeps the
+		// spacing the block had.
 		it("should invent no blank line for a file that writes none", () => {
 			let lines = [
 				"export {",
@@ -5087,8 +5041,8 @@ describe("Code Actions", () => {
 
 			expect(fix.title).toBe("Move this Statement below 'Maths'")
 			expect(fix.diagnosticCode).toBe("use-before-declaration")
-			// Moving a Statement changes what it can see and what can see
-			// it, so the reader decides rather than the Editor.
+			// Moving a Statement changes what it sees and what sees it, so it is
+			// not preferred.
 			expect(fix.isPreferred).toBe(false)
 
 			expect(result).toEqual([
@@ -5104,9 +5058,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A `§§` block is a run of Comments directly above what it
-		// documents, so it travels with the Statement the way any Comment
-		// glued to a block does.
+		// A `§§` block travels with the Statement it documents.
 		it("should take the Statement's documentation along", () => {
 			let lines = [
 				"implementation {",
@@ -5140,9 +5092,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The same code covers a Property read from another Property's
-		// initialiser. What would move there is a member of a Namespace, and
-		// the Parser records no span for one.
+		// The same code covers a Property read from another's initialiser. The
+		// Parser records no span for a Namespace member to move.
 		it("should offer nothing for a Property read too early", () => {
 			let lines = [
 				"implementation {",
@@ -5158,10 +5109,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The stubs a Namespace owes, carrying the Protocol's own signatures
-	// and nothing in their bodies. Applying one leaves a `missing-return` under
-	// each stub, which is the visible hole this trades a conformance nobody can
-	// see the shape of for.
+	// The stubs a Namespace owes, with the Protocol's signatures and empty
+	// bodies. Each leaves a `missing-return` for the reader.
 	describe("nonconforming-namespace", () => {
 		it("should write a stub for the one requirement a Namespace owes", () => {
 			let lines = [
