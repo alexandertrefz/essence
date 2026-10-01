@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
+import { enrich } from "../enricher/index"
+import { unnameableTargetNote } from "../helpers/describe"
+import { parse } from "../parser/index"
 import { compiles, firstAnalysed, firstOf } from "./followedHelps"
 
 // The Helps about conformance, each followed literally and compiled. A Help
@@ -666,15 +669,20 @@ describe("A Type in want of a conformance", () => {
 		).toEqual([])
 	})
 
+	// An overloaded Function is refused as a value before any bound is asked
+	// of it. So the helper is asked directly, with the Type of `Integer.add`.
+	// `snapshot-not-printable` words its Help with the same `unnameableTarget`.
 	it("should call an Overload set an overloaded Function", () => {
-		let diagnostic = firstOf(
-			`implementation {
-				Terminal.print(Integer.add)
-			}`,
-			"unsatisfied-bound",
+		let { program } = enrich(
+			parse(`implementation { constant adding = Integer.add }`),
 		)
+		let [statement] = program.implementation.nodes
 
-		expect(diagnostic.notes).toContain(
+		if (statement?.nodeType !== "ConstantDeclarationStatement") {
+			throw new Error("The Program declares no Constant.")
+		}
+
+		expect(unnameableTargetNote(statement.value.type)).toBe(
 			"No Namespace can be declared for an overloaded Function — no Type Annotation can spell it, so no 'for' clause can name it.",
 		)
 	})

@@ -72,6 +72,7 @@ import {
 	disagreeingTypeArguments,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
+	holdsFunctionRefusedAsValue,
 	isPartialOf,
 	matchesType,
 	NotHoistedYet,
@@ -289,7 +290,11 @@ export function combinationTypeOf(
 	let resolved = resolveUnknownSlots(lhsType, rhsType)
 	let combined = resolved.type === "Record" ? resolved : lhsType
 
-	if (isPartialOf(combined, rhsType)) {
+	// A Function refused as a value is reported as that, by the validator.
+	if (
+		isPartialOf(combined, rhsType) ||
+		holdsFunctionRefusedAsValue(rhsType)
+	) {
 		return combined
 	}
 
@@ -6779,10 +6784,11 @@ export function resolveConformances(
 		let bound = bindings.get(generic.name)
 
 		// An unbound Type Parameter, a binding naming one, or an Error was
-		// reported already.
+		// reported already. The validator reports a Function refused as a value.
 		if (
 			bound === undefined ||
 			bound.type === "Error" ||
+			holdsFunctionRefusedAsValue(bound) ||
 			unbound.some((name) => typeMentionsGeneric(bound, name))
 		) {
 			continue

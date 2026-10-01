@@ -77,7 +77,9 @@ invariant shows up as a Diagnostic naming the call, not as a `ReferenceError` or
   a conditional conformance are walked too, since each forwards a witness of its own.
 
 Each rail is skipped where the call involves an Error Type, since a Type Parameter bound to an Error is skipped on
-purpose. All of them stand down, through `railsStandDown`, on a Program that already has an Error. Nothing is
+purpose. `checkConformanceArity` is skipped too for an Argument that is or holds a Function refused as a value,
+overloaded or Protocol-bounded (`holdsFunctionRefusedAsValue`). The enricher solves no bound for it, since `validate`
+reports it once. All of them stand down, through `railsStandDown`, on a Program that already has an Error. Nothing is
 emitted from such a Program, and what the rails would meet there is recovery rather than a bug. A Namespace that
 failed to conform resolves no witness, for example. On a broken Program only `analysisFuzz.spec.ts` watches the
 walk: it breaks real sources at many sites and holds the walk to never throwing.
@@ -120,6 +122,12 @@ questions. An Error anywhere in the expected Type means the annotation did not r
 the value to. On the value's side only a Type that is an Error counts. An Error nested inside a value's Type can be
 a slot nothing bound. `Result::flatten` leaves one in a Program the enricher accepted, and a mismatch around it is
 real.
+
+A value that is or holds a Function refused as a value fits as well, and an Argument holding one is no
+`argument-type-mismatch`. Nor is a Case payload holding one a `payload-type-mismatch`, an update writing one a
+`partial-type-mismatch`, or a call whose receiver or Argument holds one a `no-matching-overload` in the enricher.
+`validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
+is not reported itself, since its arms carry the value.
 
 ## Match
 

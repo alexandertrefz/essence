@@ -484,7 +484,8 @@ describe("Type matching", () => {
 		})
 
 		// An overloaded Method is a set of signatures, which the Validator
-		// refuses in every value position.
+		// refuses in every value position. That refusal is the one report, so
+		// the declared Type does not add a mismatch.
 		it("should still refuse an overloaded Method as a value", () => {
 			let errors = errorsFor(`implementation {
 				namespace Reader {
@@ -500,10 +501,104 @@ describe("Type matching", () => {
 				}
 
 				constant read: (_ x: Integer) -> Integer = Reader.readsBase
+				variable kept = (_ x: Integer) -> Integer { <- x }
+
+				kept = Reader.readsBase
 			}`)
 
 			expect(errors.map((error) => error.code)).toEqual([
-				"assignment-type-mismatch",
+				"overloaded-function-value",
+				"overloaded-function-value",
+			])
+		})
+
+		// The bound `Terminal.print` puts on its Argument is no second mistake,
+		// and the call's missing witness is no compiler bug.
+		it("should refuse a Function value passed to a bounded Parameter once", () => {
+			let errors = errorsFor(`implementation {
+				function shown<infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				Terminal.print(Integer.add)
+				Terminal.print(shown)
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+			])
+		})
+
+		// The refusal is the one report wherever the value stands: an Argument,
+		// a `<-`, a `define` arm, a Case payload, an update or a receiver. The
+		// same holds inside a List or a Record.
+		it("should refuse a Function value once in every value position", () => {
+			let errors = errorsFor(`implementation {
+				function shown<infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				function take(_ rule: (_: Integer, _: Integer) -> Integer) -> Integer {
+					<- rule(1, 2)
+				}
+
+				function pick() -> (_: Integer, _: Integer) -> Integer {
+					<- Integer.add
+				}
+
+				constant choose = () -> (_: Integer, _: Integer) -> Integer {
+					<- Integer.add
+				}
+
+				constant flag = true
+
+				constant chosen: (_: Integer, _: Integer) -> Integer = define {
+					as Integer.add if flag
+					as Integer.add otherwise
+				}
+
+				constant rules: List<(_: Integer, _: Integer) -> Integer> = [
+					Integer.add,
+				]
+
+				choice Holder {
+					Has { rule: (_: Integer, _: Integer) -> Integer },
+					Empty,
+				}
+
+				constant maybe: Optional<(_: Integer, _: Integer) -> Integer> =
+					#Value(Integer.add)
+				constant held: Holder = #Has({ rule = Integer.add })
+				constant base = { rule = (_ a: Integer, _ b: Integer) -> Integer { <- a } }
+				constant updated = { base with rule = Integer.add }
+				constant book: Dictionary<String, (_: Integer, _: Integer) -> Integer> = [=]
+				constant written = [book with "add" = Integer.add]
+				constant table = ["add" = Integer.add]
+
+				Terminal.print(take(Integer.add))
+				Terminal.print(take(shown))
+				Terminal.print([Integer.add])
+				Terminal.print({ a = shown })
+				Terminal.inspect([[3, 1]]::map(List.sort))
+				Terminal.inspect(table::count())
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+				"overloaded-function-value",
+				"protocol-bound-function-value",
 				"overloaded-function-value",
 			])
 		})

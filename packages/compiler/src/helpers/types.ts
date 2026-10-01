@@ -1279,6 +1279,71 @@ function typeMentionsAnyGeneric(
 	)
 }
 
+// A Function whose Protocol-bounded Type Parameters take conformance
+// Parameters that only a direct call passes, so it can not be a value.
+export function isBoundFunctionType(type: common.Type): boolean {
+	if (
+		type.type === "Function" ||
+		type.type === "SimpleMethod" ||
+		type.type === "StaticMethod"
+	) {
+		return type.generics.some((generic) => generic.constraint != null)
+	}
+
+	if (
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+	) {
+		return type.overloads.some((overload) =>
+			overload.generics.some((generic) => generic.constraint != null),
+		)
+	}
+
+	return false
+}
+
+// A Function the validator refuses wherever a value is written. An
+// overloaded one names every overload at once, and a bounded one needs the
+// witnesses only a direct call passes.
+export function isFunctionRefusedAsValue(type: common.Type): boolean {
+	return (
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod" ||
+		isBoundFunctionType(type)
+	)
+}
+
+// Whether a value of this Type is or holds such a Function, in a List, a
+// Dictionary, a Record, a Case or a Union. A Namespace's Methods and a
+// Function's signature are no values it holds, so the walk stops there.
+export function holdsFunctionRefusedAsValue(
+	type: common.Type,
+	visited: Set<common.Type> = new Set(),
+): boolean {
+	if (visited.has(type)) {
+		return false
+	}
+
+	visited.add(type)
+
+	let holds = (inner: common.Type) =>
+		holdsFunctionRefusedAsValue(inner, visited)
+
+	switch (type.type) {
+		case "List":
+			return holds(type.itemType)
+		case "Dictionary":
+			return holds(type.keyType) || holds(type.valueType)
+		case "Record":
+		case "Case":
+			return Object.values(type.members).some(holds)
+		case "UnionType":
+			return type.types.some(holds)
+		default:
+			return isFunctionRefusedAsValue(type)
+	}
+}
+
 // Whether an Error Type sits anywhere in this one. It was reported where it
 // came from, so a Type holding one must not be reported again.
 export function typeContainsError(type: common.Type): boolean {

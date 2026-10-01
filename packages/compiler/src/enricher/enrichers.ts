@@ -69,6 +69,7 @@ import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	genericNamesMentioned,
+	holdsFunctionRefusedAsValue,
 	type GenericInferenceContext,
 	impliedConjunctKeys,
 	isPartialOf,
@@ -1213,7 +1214,11 @@ function reportUnsettableEntries(
 			)
 		}
 
-		if (valueType !== null && !fitsWritten(valueType, entry.value)) {
+		if (
+			valueType !== null &&
+			!fitsWritten(valueType, entry.value) &&
+			!holdsFunctionRefusedAsValue(entry.value.type)
+		) {
 			// The labels name the entry and the Dictionary. A Record value's
 			// refusing member goes into the notes rather than a third label.
 			let record = recordMismatchEvidence(
@@ -10769,6 +10774,22 @@ function writtenArgumentTypes(
 	)
 }
 
+// Whether an Argument holds a Function refused as a value, which the validator
+// reports, so no call is refused over it again. A Function literal is left
+// untyped, since typing one away from its Parameter would report it.
+function argumentHoldsRefusedFunction(
+	args: Array<parser.ArgumentNode>,
+	typer: ArgumentTyper,
+): boolean {
+	return args.some(
+		(argument) =>
+			argument.value.nodeType !== "FunctionValue" &&
+			holdsFunctionRefusedAsValue(
+				typer.enrichedArgumentValue(argument.value).type,
+			),
+	)
+}
+
 function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
 	resolvedNamespace: common.NamespaceType,
@@ -12307,6 +12328,14 @@ function reportNoMatchingOverload(
 	memberType: common.Type | null = null,
 ): void {
 	let receiverType = memberType ?? baseType
+
+	if (
+		holdsFunctionRefusedAsValue(receiverType) ||
+		argumentHoldsRefusedFunction(node.arguments, typer)
+	) {
+		return
+	}
+
 	let matchableArguments = methodMatchableArguments(
 		node,
 		baseType,
@@ -13386,6 +13415,18 @@ function resolveFunctionInvocation(
 			}
 		}
 
+		let failed = {
+			type: { type: "Error" } as const,
+			conformances: [],
+			overloadedMethodIndex: null,
+			omittedParameterIndices: [],
+			selected: false,
+		}
+
+		if (argumentHoldsRefusedFunction(node.arguments, typer)) {
+			return failed
+		}
+
 		// Candidates are listed as this call writes them. A Method reached
 		// through its Namespace passes its receiver as an ordinary Argument, so
 		// nothing is dropped.
@@ -13420,13 +13461,7 @@ function resolveFunctionInvocation(
 			...(data === undefined ? {} : { data }),
 		})
 
-		return {
-			type: { type: "Error" },
-			conformances: [],
-			overloadedMethodIndex: null,
-			omittedParameterIndices: [],
-			selected: false,
-		}
+		return failed
 	} else {
 		if (type.type !== "Error") {
 			reportError(

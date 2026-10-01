@@ -34,6 +34,8 @@ import {
 	applyGenericBindings,
 	createFreshenedInference,
 	flattenUnionMembers,
+	isBoundFunctionType,
+	holdsFunctionRefusedAsValue,
 	isMergedLevel,
 	isPartialOf,
 	isUnitType,
@@ -516,6 +518,12 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 // A Function with Protocol-bounded Type Parameters can not be a value: its
 // hidden conformance Parameters exist only at a direct call.
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
+	// A `define` or a `match` answers with what its arms answer, and each arm's
+	// value is checked where it stands.
+	if (node.nodeType === "Define" || node.nodeType === "Match") {
+		return
+	}
+
 	// An overloaded Function names every overload at once, and only a direct
 	// call picks one.
 	if (
@@ -569,27 +577,6 @@ function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 	}
 }
 
-function isBoundFunctionType(type: common.Type): boolean {
-	if (
-		type.type === "Function" ||
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod"
-	) {
-		return type.generics.some((generic) => generic.constraint != null)
-	}
-
-	if (
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	) {
-		return type.overloads.some((overload) =>
-			overload.generics.some((generic) => generic.constraint != null),
-		)
-	}
-
-	return false
-}
-
 // Whether the invariant rails stand down. See "Compiler invariant rails" in
 // DEVELOPMENT.md.
 function railsStandDown(): boolean {
@@ -641,8 +628,10 @@ function checkConformanceArity(
 
 	if (
 		typeContainsError(node.type) ||
-		node.arguments.some((argumentNode) =>
-			typeContainsError(argumentNode.type),
+		node.arguments.some(
+			(argumentNode) =>
+				typeContainsError(argumentNode.type) ||
+				holdsFunctionRefusedAsValue(argumentNode.type),
 		) ||
 		(node.nodeType === "MethodInvocation" &&
 			typeContainsError(node.base.type))
@@ -1634,11 +1623,14 @@ function reportCaselessDefine(node: common.typed.DefineNode): void {
 }
 
 // Every arm is held to the `define`'s answer Type, and reported at its value
-// with the code a `<-` gets.
+// with the code a `<-` gets. An arm is a value, so a Function refused as one
+// is reported here.
 function checkDefineAnswer(
 	node: common.typed.DefineNode,
 	value: common.typed.ExpressionNode,
 ): void {
+	validateNoBoundFunctionValue(value)
+
 	if (fitsExpectedType(node.type, value)) {
 		return
 	}
@@ -2360,7 +2352,9 @@ function validateCaseValue(
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
 	} else if (
-		!matchesType(payloadType, casePayloadType(node.type, node.value))
+		!matchesType(payloadType, casePayloadType(node.type, node.value)) &&
+		// Reported as a value that can not be one.
+		!holdsFunctionRefusedAsValue(node.value.type)
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
@@ -3376,12 +3370,17 @@ function validateDefiniteReturn(
 
 // Whether a value fits where it was written. A written literal carries its
 // own evidence for a refinement, so `constant d: NonZeroInteger = 3` fits. A
-// hole fits. See "Holes" in DEVELOPMENT.md.
+// hole fits, and so does a Function refused as a value. See "Holes" in
+// DEVELOPMENT.md.
 function fitsExpectedType(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
 ): boolean {
-	if (typeContainsError(expected) || value.type.type === "Error") {
+	if (
+		typeContainsError(expected) ||
+		value.type.type === "Error" ||
+		holdsFunctionRefusedAsValue(value.type)
+	) {
 		return true
 	}
 
@@ -3733,6 +3732,11 @@ function reportArgumentMismatch(
 			argumentNode,
 		)
 
+		return
+	}
+
+	// Reported as a value that can not be one, by `validateNoBoundFunctionValue`.
+	if (holdsFunctionRefusedAsValue(argumentNode.value.type)) {
 		return
 	}
 
