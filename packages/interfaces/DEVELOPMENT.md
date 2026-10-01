@@ -418,8 +418,8 @@ call whose driver it can see and whose callbacks are Function literals. It write
 since it is whatever was bound to it.
 
 `InlineLoopDriver` names the driver, and each kind mirrors its Essence driver exactly, evaluating the call's
-Arguments in the order the call did. The `counted` driver is a `for` over the bigints the Integers hold, with
-no Record threaded through it.
+Arguments in the order the call did. The `counted` driver is a `for` over the raw values the bounds hold,
+numbers where both fit and a bigint otherwise, with no Record threaded through it.
 
 `name` is the prefix of every name the loop binds, such as `$loop_0_state`, and of the label `$loop_0` it
 leaves through. It is numbered across the whole Program, so a loop inlined in another loop's body can not
@@ -488,6 +488,7 @@ Pattern's bindings and a Record default's merge run on every fresh call, so ever
 
 A tail call evaluates its `bindings` first, in the order the Arguments were written, then makes its
 `assignments`. That makes the rebinding simultaneous, so `<- swap(b, a)` swaps rather than writing `a` over
-`b`. Only an Argument that could read a Parameter assigned later is bound first. A tail call names its label
+`b`. All changed Arguments are bound first when one mentions a Parameter assigned in place, or a written one
+follows an omitted one. Otherwise none is. A tail call names its label
 rather than letting the emission find it. One that ended up inside another Function's loop is then a
 JavaScript syntax error rather than a jump to the wrong loop.
