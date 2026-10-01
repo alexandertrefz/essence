@@ -5051,10 +5051,8 @@ function generatableConformance(
 		}
 
 		let drawn = synthesizedName("drawn", position)
-		// The Namespace is named AT the call, for the reason a predicate
-		// names its own: a Program may declare a second Namespace for the same
-		// Type that writes a `shrink`, and a call that named neither would be
-		// ambiguous where the conformance is not.
+		// Named at the call, as a predicate's Namespace is, since a second
+		// Namespace for the Type may write its own `shrink`.
 		let shrinking: parser.MethodInvocationNode = {
 			nodeType: "MethodInvocation",
 			base: { nodeType: "Identifier", content: drawn, position },
@@ -5929,8 +5927,8 @@ function enrichNamespaceDefinitionStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.NamespaceType,
 ): common.typed.NamespaceDefinitionStatementNode {
-	// Methods and Properties check their own blocks, so this only checks a
-	// `@param` above `namespace`.
+	// Methods and Properties check their own blocks, so this only checks the
+	// Namespace's own `@param` lines.
 	reportDocumentationParameters(node.documentation, [])
 
 	// `namespace Self for Integer { … }`: a Namespace is named and reached like
@@ -6726,15 +6724,9 @@ function enrichProtocolDeclarationStatement(
 	}
 }
 
-// The bodies of a Protocol's own provided Methods. `@` is `Self` BOUNDED
-// by this Protocol, which is the whole of the design: a provided Method is a
-// bounded generic Function over `Self`, so the body may call the Protocol's
-// surface and nothing else, and the hidden conformance Parameter the bound
-// already emits is what those calls dispatch through at run time. Nothing new
-// is invented for it in the Simplifier or the Rewriter.
-//
-// Only the Methods THIS Protocol wrote — an inherited one is emitted where it
-// was written, once, and reached from here through the ancestor.
+// The bodies of a Protocol's own provided Methods. `@` is `Self` bounded by the
+// Protocol, so a body calls the Protocol's surface through the bound's hidden
+// witness. An inherited Method is emitted once, where it was written.
 function enrichProvidedMethods(
 	node: parser.ProtocolDeclarationStatementNode,
 	protocolType: common.ProtocolType,
@@ -6859,12 +6851,9 @@ function narrowedReads(
 	return narrowed
 }
 
-// A body on a `static` or an `overload` entry. Both would need a rail of
-// their own — a static Method takes no receiver for `Self` to be read off, and
-// an Overload's const is named for its slot in a Method Type this side of the
-// Protocol has no conformer to resolve against — so both are refused outright
-// rather than half supported. The signatures still stand as requirements, which
-// is why this reports and returns rather than dropping the Method.
+// A body on a `static` or an `overload` entry is refused. A static Method has
+// no receiver for `Self`, and an Overload has no name of its own to emit under.
+// The signatures still stand as requirements.
 function refuseUnwritableProvidedMethod(
 	method: parser.ProtocolMethods[string],
 ): void {
@@ -6911,8 +6900,8 @@ function refuseUnwritableProvidedMethod(
 	)
 }
 
-// Reported where the Protocol is declared rather than where a value
-// bounded by it is handed on to a bound of the ancestor.
+// Reported at the Protocol rather than where a bounded value reaches the
+// ancestor's bound.
 function refuseIncompatibleRestatements(
 	node: parser.ProtocolDeclarationStatementNode,
 	protocolType: common.ProtocolType,
@@ -7009,20 +6998,10 @@ function quotedSignatures(
 		.join(" and ")
 }
 
-// `infer` marks a Type Parameter a USE works out for itself, from the
-// Arguments it hands over — a call's, a Method's receiver's. A Choice and a Type
-// Alias have no such use: every one of theirs APPLIES its Arguments outright, in
-// a Type position or at a construction, so there is nothing for the marker to
-// mean and it was accepted and ignored. Ignored, it read as a promise that some
-// use site would work the Argument out, and the one thing that came close — a
-// construction reading its Type Arguments off its payload — is exactly what
-// `undecided-type-arguments` replaced.
-//
-// Reported here rather than at the Parser, because the Generic list is the same
-// grammar a Function, a Method and a Namespace write, where `infer` is the whole
-// point. It is reported in the enrichment pass rather than while the Type
-// resolves, so a Choice that only wrote the marker wrongly still hoists and
-// everything that names it stays about itself.
+// `infer` marks a Type Parameter a use works out from its Arguments. A Choice
+// and a Type Alias apply theirs at every use, so the marker means nothing
+// there. Reported in enrichment rather than resolution, so the Choice still
+// hoists.
 function reportInferredTypeParameters(
 	generics: Array<parser.GenericDeclarationNode>,
 	declaration: "Choice" | "Type Alias",
@@ -7080,21 +7059,9 @@ function enrichTypeAliasStatement(
 	}
 }
 
-// The typed predicate the Node carries, for the Language Server alone —
-// the Type above already holds the conjunct keys the Compiler compares, and the
-// clause was resolved to reach them.
-//
-// Its Diagnostics are DROPPED, which is the whole reason this is a function of
-// its own. Whatever the clause has to be told was told: either hoisting resolved
-// it cleanly, in which case a second reading finds nothing, or it did not, in
-// which case the line above resolved it in place and reported. Re-reporting here
-// would say it twice for every refined Alias in the Program.
-//
-// A GENERIC refined Alias is a Generic Alias wrapping the refinement, so
-// `@` is bound to the base one level further in — and in the Alias' own generic
-// Scope, the way the resolution that read the predicate bound it. Reading it
-// against the wrapper instead left `@` typed as a Type that takes Arguments, and
-// the Language Server got an Error where the Compiler had a Boolean.
+// The typed predicate, for the language server alone; the Type already holds
+// the conjunct keys. Its Diagnostics are dropped, since resolution reported
+// them. A generic refined Alias binds `@` to the base one level in.
 function enrichAliasPredicate(
 	node: parser.TypeAliasStatementNode,
 	predicate: parser.ExpressionNode,
@@ -7132,8 +7099,7 @@ function enrichChoiceDeclarationStatement(
 		declareTypeInScope(node.name, type, scope)
 	}
 
-	// A generic Choice resolves to a Generic Alias over the anonymous
-	// Union of its Cases — the Cases to describe are that body Union's members.
+	// A generic Choice is a Generic Alias over the Union of its Cases.
 	let bodyUnion = type.type === "GenericAlias" ? type.aliasedType : type
 	let caseTypes =
 		bodyUnion.type === "UnionType"
@@ -7152,14 +7118,9 @@ function enrichChoiceDeclarationStatement(
 		generics: node.generics.map((generic) =>
 			enrichGenericDeclarationNode(generic, scope),
 		),
-		// A duplicate Case was already diagnosed and dropped from the
-		// Union — its name Identifier borrows the surviving Case's Type so the
-		// typed tree stays complete.
-		//
-		// The fallback stands for a Case of this same Choice, so it
-		// carries what the Choice was stamped with: where every Case that DID
-		// survive is payload-less, so is the one being stood in for, and a
-		// hovering reader gets the same Type either way.
+		// A duplicate Case was reported and dropped from the Union, so its name
+		// borrows the surviving Case's Type. The fallback carries `unitChoice`
+		// when every Case does.
 		cases: node.cases.map((choiceCase) => {
 			let caseType = caseTypes.find(
 				(candidate) => candidate.name === choiceCase.name.content,
@@ -7196,17 +7157,9 @@ function enrichChoiceDeclarationStatement(
 	}
 }
 
-// A Case payload's `= { … }`, enriched against the payload shape it fills
-// — in the Module's own Scope, since a Choice declaration stands in no frame and
-// `@` names nothing here.
-//
-// Where a Parameter's default is evaluated in the CALLEE, a payload's is spliced
-// into every construction, and a construction may stand in a Module that never
-// named the Choice — so a default that read a name THERE would read one that is
-// not there. What a default may say is therefore what can be turned into data
-// HERE: literals and the Lists, Records and Case values built out of them, and
-// the Constants of this Module that hold one, resolved at the declaration and
-// baked into the Case Type. That is what lets the value travel on the Type.
+// A Case payload's `= { … }`, read against the payload Record in the Module's
+// own Scope and baked into the Case Type. See "Case payload defaults" in
+// DEVELOPMENT.md.
 function enrichCasePayloadDefault(
 	choiceCase: parser.ChoiceCaseNode,
 	caseType: common.CaseType,
@@ -7222,17 +7175,14 @@ function enrichCasePayloadDefault(
 	}
 	let value = enrichExpression(choiceCase.defaultValue, scope, payloadType)
 
-	// Already reported — on a generic Choice by the Resolver, which is
-	// where the Type Parameters are in hand. The value is enriched all the same,
-	// so the Language Server answers inside it either way.
+	// Already reported by the resolver for a generic Choice. Enriched anyway,
+	// so the language server answers inside it.
 	if (caseType.choiceGenerics !== undefined) {
 		return value
 	}
 
-	// The Resolver registers nothing for a default that is not a Record
-	// Literal — what a partial fills in is what it spells — so this is where
-	// that spelling is refused, and `payloadDefault` is present below by
-	// construction.
+	// The resolver registers no default that is not a Record Literal, so it is
+	// refused here, and `payloadDefault` is present after this check.
 	if (
 		value.nodeType !== "RecordValue" ||
 		value.type.type !== "Record" ||
@@ -7244,10 +7194,8 @@ function enrichCasePayloadDefault(
 	}
 
 	if (!isPartialOf(payloadType, value.type)) {
-		// A PARTIAL, so what the default leaves out is not missing from
-		// it — filling some members in is what a payload default IS. Only what
-		// it writes can be wrong, which is the second half of the sentence in
-		// the note below, said member by member.
+		// A partial, so a member the default leaves out is not missing. Only
+		// what it writes can be wrong.
 		let record = recordMismatchEvidence(payloadType, value.type, value, {
 			partial: true,
 			subject: `'#${caseType.name}'`,
@@ -7302,37 +7250,22 @@ function enrichCasePayloadDefault(
 	return value
 }
 
-// What a payload default's value came to: either the value baked into the
-// Case Type, or the node the walk gave up at. The walk REPORTS what it gave up
-// at while it is still inside the default — where the author wrote it — and
-// hands the node back once it has followed a name into a Constant, so that the
-// one Diagnostic lands on the name in the default and points at the Constant's
-// own value with a second label.
+// A payload default's value as data baked into the Case Type, or the Node the
+// walk gave up at.
 type BakedCaseDefault =
 	| { baked: common.typed.ExpressionNode }
 	| { offending: common.typed.ExpressionNode }
 
-// One value out of a payload default, resolved to the data spliced into
-// every construction of its Case. A written literal is itself; a NAME is the
-// Constant it stands for, read here — in the Module the Choice is declared in,
-// the only Module that can read it — and baked into the Case Type, so that by
-// the time the Type travels the value has stopped being a name.
-//
-// Following one Constant to another is following one written value to another,
-// so it is allowed as far as it goes; what has to be a literal is every LEAF.
-//
-// `through` is the Constants followed to get here. It is the cycle guard, and it
-// is also what tells "written in the default" (empty) from "found inside a
-// Constant" — which decides where the Diagnostic goes.
+// One value of a payload default resolved to data. See "Case payload defaults"
+// in DEVELOPMENT.md.
 function bakeCaseDefaultValue(
 	node: common.typed.ExpressionNode,
 	scope: enricher.Scope,
 	through: ReadonlyArray<string>,
 ): BakedCaseDefault {
 	switch (node.nodeType) {
-		// An interpolated String is deliberately absent — it holds
-		// Expressions — while a plain String is here, and a bare `#Case` is a
-		// Case value whose payload is null.
+		// An interpolated String holds Expressions and is absent. A bare
+		// `#Case` is a Case value with a null payload.
 		case "IntegerValue":
 		case "RationalValue":
 		case "StringValue":
@@ -7353,9 +7286,7 @@ function bakeCaseDefaultValue(
 				values.push(result.baked)
 			}
 
-			// The node itself where nothing under it was a name, so a
-			// default that never mentions one is carried by the very Nodes the
-			// Enricher typed, exactly as it was before names were allowed.
+			// The Node itself where nothing under it was a name.
 			return { baked: changed ? { ...node, values } : node }
 		}
 		case "RecordValue": {
@@ -7404,40 +7335,27 @@ function bakeCaseDefaultValue(
 	}
 }
 
-// Whether the Enricher has already said what is wrong with this value. A
-// Constant named before it is declared is `unknown-name` and an Error Type, and
-// a second Diagnostic saying the name is not a Constant of this Module would be
-// answering a question the first one already answered — the name IS one, four
-// lines further down, and a Constant does not hoist.
+// Whether the value is already an Error that something reported, such as a
+// Constant named before its declaration.
 function alreadyReportedAbout(node: common.typed.ExpressionNode): boolean {
 	return typeContainsError(node.type)
 }
 
-// A name in a payload default. It stands for its Constant's value when
-// this Module declares one under that name and the value is written down.
-//
-// Anything else is refused rather than followed. A Parameter and a body's
-// binding do not exist where a Choice is declared; a Variable holds whatever it
-// was last assigned, which is not what the declaration read; and an imported
-// Constant's value stays in the Module that wrote it — a Type crosses an import
-// edge, an Expression does not.
+// A name in a payload default stands for this Module's Constant whose value is
+// written down. Anything else is refused.
 function bakeNamedCaseDefaultValue(
 	node: common.typed.IdentifierNode,
 	scope: enricher.Scope,
 	through: ReadonlyArray<string>,
 ): BakedCaseDefault {
 	let name = node.content
-	// The DECLARING Scope's map, rather than the top level one reached
-	// past it, so a binding that shadows a Module's Constant answers with
-	// nothing instead of with the Constant it hides.
+	// The declaring Scope's map, so a binding that shadows a Module Constant
+	// answers nothing.
 	let declaring = findDeclaringScope(name, scope)
 	let value = declaring?.constantValues?.[name]
 
-	// A cycle can not be written today: a Constant is enriched at its own
-	// Statement, so it can only name Constants above it, and a Constant that
-	// named itself would not have resolved. The guard stands because that is a
-	// property of the Enricher's ORDER rather than of this walk, and a walk that
-	// leant on it would stop terminating the day the order changed.
+	// The enrichment order rules out a cycle today, but the guard keeps the
+	// walk terminating regardless.
 	if (value === undefined || through.includes(name)) {
 		if (through.length === 0 && !alreadyReportedAbout(node)) {
 			reportCaseDefaultNameNotAConstant(node, declaring)
@@ -7457,10 +7375,8 @@ function bakeNamedCaseDefaultValue(
 	return result
 }
 
-// One code and four readings, because they are four ways of missing one
-// rule — a payload default is DATA by the time the Case Type carries it. Each
-// says which way, and each carries the rule, so a reader who hits any of them is
-// told what a default may say.
+// One code, read four ways: a payload default must be data by the time the Case
+// Type carries it.
 const CASE_DEFAULT_NOTE =
 	"A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there."
 
@@ -7486,12 +7402,8 @@ function reportCaseDefaultNotARecordLiteral(
 				"Which members a default fills in is read off the ones it writes, so the default itself is spelled out even where the values in it are names.",
 				CASE_DEFAULT_NOTE,
 			],
-			// The member NAMES, which this site holds, rather than the
-			// bare `'= { … }'` it printed — a shape with nothing in it says
-			// only "a Record goes here", which the message above already said.
-			// The values stay the `…` they are: which of them a reader meant is
-			// the one thing this can not know, and a plausible-looking number
-			// would be a guess wearing the Compiler's voice.
+			// The member names fill the Help, while the values stay `…`, since
+			// which value the reader meant can not be known.
 			helps: [
 				`Write the members out — '= { ${Object.keys(caseType.members)
 					.map((member) => `${member} = …`)
@@ -7573,11 +7485,9 @@ function reportCaseDefaultConstantNotALiteral(
 	)
 }
 
-// Left out where the name was declared by the Compiler rather than in
-// Essence — a builtin has no source to point at — and where the declaration
-// stands exactly where a label already does. A Pattern binding is the one that
-// does: the value it reads is a Lookup the Compiler wrote, standing at the span
-// of the name it binds.
+// Left out for a name the compiler declared, which has no source. Also left out
+// where the declaration stands on a span a label marks, as a Pattern binding's
+// does.
 function declarationLabel(
 	name: string,
 	declaring: enricher.Scope | null,
@@ -7599,21 +7509,17 @@ function declarationLabel(
 	return [secondary(position, `'${name}' is declared here`)]
 }
 
-// The condition is enriched BEFORE the branch Scopes exist, which is the
-// whole reason this reads the way it does: what a branch narrows is read off the
-// TYPED condition — which Namespace answered each question, which Overload of it,
-// and what the receiver's Type was where it was asked — and none of that is
-// knowable from the Node the Parser produced.
+// The condition is enriched before the branch Scopes exist, because narrowing
+// reads the typed condition: which Namespace and Overload answered, and the
+// receiver's Type.
 function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
 	let condition = enrichExpression(node.condition, scope)
 	let narrowings = trueBranchNarrowings(condition, scope)
-	// What the condition leaves its `else`, computed once and read twice
-	// — the Scope that branch is enriched in, and the claim the Node carries
-	// that it established anything at all. It was always one answer, and the
-	// second half of it used to go unasked.
+	// What the condition leaves its `else`: that branch's Scope, and whether it
+	// established anything.
 	let complements = falseBranchNarrowings(condition, scope)
 	let trueScope = branchScope(narrowings, scope)
 	let falseScope = branchScope(complements, scope)
@@ -7654,41 +7560,14 @@ function enrichIfStatement(
 	}
 }
 
-// The Argument label a Dictionary lookup writes its key under, and the
-// one both entries of the `value` Overload share.
+// The label a Dictionary lookup writes its key under, shared by both `value`
+// Overloads.
 const keyArgumentLabel = "at"
 
-// `hasKey` is not a cheap test standing in front of an expensive lookup —
-// it IS the lookup. Its body is `@::value(at key)::hasValue()` and nothing
-// else, so a branch guarded by one and opening with that same `value(at:)` asks
-// the Dictionary for the same key twice and throws the first answer away. What
-// the second call comes back with is already the whole of what the first one
-// learned, which is why the Help is to keep that answer rather than to ask for
-// it again.
-//
-// Only a shape a reader could have written the other way is reported, and each
-// of the conditions is one of the ways "the same lookup twice" stops being
-// something a reader can SEE:
-//
-// The condition has to BE the check. A negated one, or one `and`ed with
-// something beside it, is an Invocation of `negate` or of `and` whose base
-// happens to be a `hasKey` — a different shape, and rightly so, since neither
-// branch is entered by the key being there alone.
-//
-// The receiver has to be a NAME. An arbitrary Expression is a second
-// COMPUTATION as well as a second lookup, and two Dictionaries worked out one
-// after the other need not even be the same Dictionary.
-//
-// The key has to be written the same way both times and to hold no call. `key`
-// and `keys::firstItem()` may well be one key, but nothing a reader reads says
-// so, and a key that calls something is a repetition this Warning has nothing
-// to say about.
-//
-// And the lookup has to stand in the branch's FIRST Statement, with the walk
-// stopping at every body it meets — a Function literal's, a Match Handler's.
-// Nothing can run between the two calls then, which is what answers the
-// question a Variable receiver would otherwise raise: there is nowhere to
-// reassign it from, so a Variable is as safe here as a Constant.
+// `hasKey` is the lookup itself: its body is `@::value(at key)::hasValue()`. A
+// branch guarded by it that opens with the same `value(at:)` asks twice.
+// Reported only for a plain `hasKey` on a name, with a key written alike and no
+// call, and the lookup in the branch's first Statement.
 function reportRedundantKeyCheck(
 	condition: common.typed.ExpressionNode,
 	body: Array<common.typed.ImplementationNode>,
@@ -7721,13 +7600,11 @@ function reportRedundantKeyCheck(
 	})
 }
 
-// The name the guarded Dictionary is written under and the spelling of
-// the key it was asked about — everything the branch below it has to repeat
-// before anything is said.
+// The guarded Dictionary's name and the key's spelling, which the branch must
+// repeat.
 type WrittenKeyCheck = { receiver: string; key: string }
 
-// A condition that is exactly one `hasKey` on a Dictionary named by a
-// Constant or a Variable, and null for every other condition there is.
+// A condition that is exactly one `hasKey` on a named Dictionary, or null.
 function writtenKeyCheck(
 	condition: common.typed.ExpressionNode,
 ): WrittenKeyCheck | null {
@@ -7746,14 +7623,9 @@ function writtenKeyCheck(
 	return key === null ? null : { receiver: condition.base.content, key }
 }
 
-// How a key was WRITTEN, as a String two occurrences of it can be
-// compared by — and null for a key that was worked out rather than written
-// down. A literal, a name, a bare Case and a member path of a name are the
-// whole of it: each reads the same way both times, and none of them can run
-// anything on the way. Everything else — a call, a String with a hole in it, a
-// written List or Record, a Case carrying a payload — answers null, so that
-// "the same key" stays something a reader sees rather than something the
-// Compiler worked out for them.
+// How a key was written, as a comparable String, or null for a key that was
+// worked out. A literal, a name, a bare Case and a member path of a name read
+// alike both times and run nothing.
 function writtenKeySpelling(node: common.typed.ExpressionNode): string | null {
 	switch (node.nodeType) {
 		case "StringValue":
@@ -7771,9 +7643,7 @@ function writtenKeySpelling(node: common.typed.ExpressionNode): string | null {
 				? `case:${node.choice?.content ?? ""}#${node.caseName.content}`
 				: null
 		case "Lookup":
-			// A path off a NAME, which is what keeps the base of the
-			// chain something that is merely read. A member reached off
-			// anything else was reached off a value some Expression produced.
+			// A path off a name, so the chain's base is only read.
 			if (
 				node.base.nodeType !== "Identifier" &&
 				node.base.nodeType !== "Lookup"
@@ -7789,12 +7659,9 @@ function writtenKeySpelling(node: common.typed.ExpressionNode): string | null {
 	}
 }
 
-// The `value(at:)` the guard has already asked, found anywhere in the
-// Statement's own Expressions. Every Node kind is named, the way the
-// Optimiser's walk names them, because the two kinds this leaves out are left
-// out ON PURPOSE — a Function literal's body and a Match Handler's both run
-// somewhere this rule can not see, and a Statement kind added later should have
-// to say which of the two it is rather than quietly join the second.
+// The `value(at:)` the guard already asked, found in the Statement's own
+// Expressions. Every Node kind is named, because a Function literal's body and
+// a Match Handler's are left out on purpose.
 function writtenKeyLookup(
 	node: common.typed.ImplementationNode,
 	check: WrittenKeyCheck,
@@ -7844,15 +7711,12 @@ function writtenKeyLookup(
 				),
 				check,
 			)
-		// The subject is read where the Match stands. Its Handlers are
-		// bodies, and the walk stops at a body.
+		// The subject is read where the Match stands; its Handlers are bodies.
 		case "Match":
 			return writtenKeyLookup(node.value, check)
-		// What a `define` evaluates first and unconditionally — its first
-		// arm's Condition, or the `otherwise` value where it has no arms at all
-		// — which is the standing a Match's subject has. Everything else in one
-		// is reached only once a Condition has answered, and a place reached
-		// conditionally is a body by another name: the walk stops at those.
+		// A `define` evaluates its first arm's condition unconditionally, or
+		// its `otherwise` value without arms. Everything else runs
+		// conditionally and is a body here.
 		case "Define": {
 			let first = node.arms[0]
 
@@ -7872,16 +7736,13 @@ function writtenKeyLookup(
 		case "IfStatement":
 		case "IfElseStatement":
 			return writtenKeyLookup(node.condition, check)
-		// The operand of either Keyword is read where the Keyword stands
-		// — neither opens a body — so the walk carries straight on through it.
+		// Neither keyword opens a body, so the walk carries on through the
+		// operand.
 		case "Start":
 		case "Complete":
 			return writtenKeyLookup(node.expression, check)
-		// The walk stops at a refused value rather than carrying on into
-		// what was written in front of it. What this looks for is a lookup to
-		// report a redundant guard about, and a second Diagnostic inside text
-		// that has already been refused is the cascade the refusal recovers to
-		// avoid.
+		// A refused value stops the walk, so no Diagnostic cascades inside
+		// refused text.
 		case "RefusedValue":
 		case "Identifier":
 		case "Self":
@@ -7914,9 +7775,8 @@ function firstWrittenKeyLookup(
 	return null
 }
 
-// Both entries of the `value` Overload count — the one that answers an
-// Optional and the one that takes a `defaultingTo` — because the guard is
-// redundant either way, and the two are one another's alternatives in the Help.
+// Both `value` Overloads count, the Optional one and the `defaultingTo` one,
+// since the guard is redundant either way.
 function isKeyLookup(
 	node: common.typed.MethodInvocationNode,
 	check: WrittenKeyCheck,
@@ -7939,8 +7799,8 @@ function enrichReturnStatement(
 ): common.typed.ReturnStatementNode {
 	return {
 		nodeType: "ReturnStatement",
-		// The nearest declared return Type is the expected Type — the
-		// enclosing Function's, or the Match's for a Handler body.
+		// The nearest declared return Type, the Function's or a Handler's
+		// Match's, is the expected Type.
 		expression: enrichExpression(
 			node.expression,
 			scope,
@@ -7976,20 +7836,10 @@ function enrichFunctionStatement(
 	}
 }
 
-// A bodied entry inside an `overload function` block becomes its own
-// top-level Function, exactly as a bodied `overload` Method becomes one of a
-// Namespace's — the two forms never fork. Only the BODIED entries reach the
-// typed tree; a native entry has no body to emit and survives only in the
-// hoisted `OverloadedStaticMethod` Type, the Rewriter reaching it through the
-// runtime bindings instead. Each survivor is named for its ORIGINAL position in
-// that Type's `overloads` — `loop__overload$N` — so a native sitting between two
-// bodied entries keeps its slot and the emitted name is the one every call site
-// resolves to; naming it by its position among only the bodied entries would
-// define a name nobody calls and clobber the native export that owns the real
-// one. Unlike a source `function`, that name is a synthetic emit target: it is
-// baked into the Node here rather than mangled by the Simplifier (a free
-// `FunctionStatement` passes its name through verbatim), and it is never declared
-// into Scope — the block's base name is already the hoisted member.
+// A bodied entry of an `overload function` block becomes its own top-level
+// Function, named `loop__overload$N` for its index among all the block's
+// entries. A native entry keeps its slot, so call sites and native exports
+// agree. The name is baked in here and never declared into Scope.
 export function enrichOverloadedFunctionStatement(
 	node: parser.OverloadedFunctionStatementNode,
 	scope: enricher.Scope,
@@ -8008,9 +7858,8 @@ export function enrichOverloadedFunctionStatement(
 			continue
 		}
 
-		// The per-entry Function Type is exactly what the call site
-		// resolves against — the hoisted `overloads[index]` lifted to a
-		// `Function` Type.
+		// The hoisted `overloads[index]` as a Function Type, which call sites
+		// resolve against.
 		let type: common.FunctionType = {
 			type: "Function",
 			...overloadedType.overloads[index]!,
@@ -8042,9 +7891,8 @@ export function enrichOverloadedFunctionStatement(
 
 // #region Helpers
 
-// A name declared by the Compiler rather than in Essence — `@`, the
-// builtins — is passed as a bare string and has no Position to point at. The
-// Diagnostic is still worth reporting; it just has nothing to underline.
+// A name the compiler declared, such as `@` or a builtin, is a bare string with
+// no Position to underline.
 function reportDuplicateDeclaration(
 	identifier: parser.IdentifierNode | string,
 	name: string,
@@ -8173,19 +8021,9 @@ function declareProtocolInScope(
 	return scope
 }
 
-// A dotted key reaches into a value that is already there, so it only
-// means anything where there IS one: the value a `with` updates, or the value a
-// default fills in — a Record Parameter's, for the Argument written against it,
-// or a Case's, for its payload. A Literal standing anywhere else writes its
-// members from nothing, and this is where it is turned away; `mergeable` says
-// which of the two it is, and it is decided by the position rather than here.
-//
-// The path members are dropped rather than read under their dotted spelling,
-// which would put a member named `server.port` into the literal's Type and
-// report a second Diagnostic about a Record nobody wrote. A key the Parser
-// already refused as a bare path is left alone: it has its message.
-// Asked only where `hasPathKeys` said there is one, so the Literal every
-// Program is made of neither rebuilds its member Record nor walks it twice.
+// A path key outside a merged position reaches into nothing, so it is reported
+// and dropped. A shorthand path key was already refused by the Parser. Called
+// only where `hasPathKeys` found one. See "Path keys" in DEVELOPMENT.md.
 function refusePathKeys(
 	members: Record<string, parser.RecordValueMemberNode>,
 ): Record<string, parser.RecordValueMemberNode> {
@@ -8241,23 +8079,16 @@ function enrichMembers(
 	return result
 }
 
-// A shorthand member's value is the member's own name, and a name that
-// names nothing is the one Diagnostic the spelling can produce — so it is read
-// through the two steps `enrichExpression` takes for an Identifier, with the
-// flag that says the name stands in both positions. `asValue` is one of those
-// steps: a Function read as a value drops its Parameter defaults here as it
-// does anywhere else.
-//
-// One function, because a path key's leaf is a member like any other and is
-// read a level down from where `enrichMembers` walks.
+// A shorthand member's value is its own name, read with the flag that says it
+// stands in both positions. `asValue` drops a Function's defaults as anywhere
+// else. A path key's leaf is read here too.
 function enrichMember(
 	member: parser.RecordValueMemberNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null,
 ): common.typed.ExpressionNode {
-	// A member with no value at all is a braced descend, and a descend is
-	// a LEVEL rather than a member — `pathUpdate` reaches it through `stepInto`
-	// and never asks for it here.
+	// A member without a value is a braced descend, which `pathUpdate` reaches
+	// through `stepInto` and never asks for here.
 	let value = member.value!
 
 	if (member.shorthand === true && value.nodeType === "Identifier") {
@@ -8269,12 +8100,8 @@ function enrichMember(
 	return enrichExpression(value, scope, expectedType)
 }
 
-// What the item position of an expected Type wants, for the Expressions
-// that react to one. A Union spells its members out — `List<Box<Integer>> |
-// String` still wants a Box in its items — and several Lists in one Union offer
-// the Union of their item Types, which is what a single item may be any of. `null`
-// where nothing there is a List at all, which is what "no expected Type" means to
-// everything downstream.
+// What the item position of an expected Type wants. Several Lists in a Union
+// offer the Union of their item Types. `null` where no arm is a List.
 function expectedListItemType(
 	expectedType: common.Type | null,
 ): common.Type | null {
@@ -8289,9 +8116,8 @@ function expectedListItemType(
 	return itemTypes.length === 0 ? null : buildUnion(itemTypes)
 }
 
-// The same for a Record's members, keyed by name — a member missing from
-// one arm of a Union simply is not offered by it, and one offered by several is
-// their Union, as at an item position.
+// The same for a Record's members, keyed by name. A member offered by several
+// arms is their Union.
 function expectedRecordMembers(
 	expectedType: common.Type | null,
 ): Record<string, common.Type> | null {
@@ -8307,9 +8133,8 @@ function expectedRecordMembers(
 		return null
 	}
 
-	// A null prototype, because the keys are the SOURCE's member names — a
-	// member called 'toString' would otherwise find Object.prototype's function
-	// where the `??=` expects a missing entry.
+	// A null prototype, since the keys are source member names, and a member
+	// called `toString` would otherwise find the prototype's function.
 	let members: Record<string, Array<common.Type>> = Object.create(null)
 
 	for (let record of records) {
@@ -8326,17 +8151,9 @@ function expectedRecordMembers(
 	)
 }
 
-// The frame a native Method's default needs, built where the native
-// itself is skipped. A native has no body, so nothing else in the Enricher ever
-// looks at its Parameter list — but a default written on one is an Essence
-// Expression like any other and has to be enriched, checked and lowered, and
-// `NativeShimNode` says what the Compiler does with the result.
-//
-// The Scope is the one a BODIED Method of the same shape would have been
-// enriched in — the Method's own Generics as opaque Uses, `@` bound for an
-// instance Method and the static barrier set for a static one — so a default on
-// a native is scoped exactly as a default on a bodied Method is, and reads `@`
-// or refuses it for the same reason.
+// The frame a native Method's default needs. A native has no body, but a
+// default on it is an Essence Expression to enrich and lower; see
+// `NativeShimNode`. Its Scope matches a bodied Method's of the same shape.
 function enrichNativeShim(
 	memberName: string,
 	overloadIndex: number | null,
@@ -8356,11 +8173,8 @@ function enrichNativeShim(
 
 	let newScope = methodScope(signature.generics, scope, selfType, isStatic)
 
-	// `signaturesOf` is the one answer to "which signatures does this
-	// Method Type stand for", and it has already dropped the receiver Parameter
-	// a non-static one is prefixed with — the source wrote the rest. An entry of
-	// an Overload block is the numbered slot; every other Method is the only
-	// entry there is.
+	// `signaturesOf` already drops the receiver Parameter. An Overload block's
+	// entry is its numbered slot; any other Method has one entry.
 	let resolved = signaturesOf(methodType ?? { type: "Error" })?.[
 		overloadIndex ?? 0
 	]
@@ -8377,10 +8191,8 @@ function enrichNativeShim(
 		overloadIndex,
 		isStatic,
 		parameters,
-		// Read off the RESOLVED signature rather than off the written
-		// Generics, because that is what the native contract generator counts
-		// its witness slots from — one source for both, so the frame and the
-		// contract can not disagree about how many Arguments arrive.
+		// Read off the resolved signature, which the native contract generator
+		// counts witness slots from, so frame and contract agree.
 		conformances: (resolved?.generics ?? [])
 			.filter((generic) => generic.constraint != null)
 			.map((generic) => generic.name),
@@ -8392,17 +8204,14 @@ function enrichMethods(
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 	methodTypes: Record<string, common.MethodType>,
-	// The constrained Namespace Generics to weave into each conditional
-	// conformance's fulfilling Methods, one list per Overload — empty for every
-	// other Method.
+	// The constrained Namespace Type Parameters for each fulfilling Method, one
+	// list per Overload.
 	injectedGenerics: Map<
 		string,
 		Array<Array<common.typed.GenericDeclarationNode>>
 	> = new Map(),
-	// The Namespace's own Type Parameters, so that a Method's `<…>` can be
-	// read apart here exactly as resolution read it — one pure function over one
-	// parser Node, asked twice, which is what keeps the typed Node's Generics and
-	// the resolved Type's the same list.
+	// The Namespace's own Type Parameters, so a Method's `<…>` is split here as
+	// resolution split it.
 	namespaceGenerics: Array<common.GenericDeclaration> = [],
 ): {
 	methods: common.typed.Methods
@@ -8418,12 +8227,8 @@ function enrichMethods(
 	}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		// A native Method has no body, so there is nothing to enrich and
-		// nothing for the Rewriter to emit — the runtime already implements
-		// it. It stays in the Namespace Type (which is what resolution,
-		// Completion and Hover read) and is simply absent here. A default
-		// written on one is the exception: it IS Essence, and the frame it
-		// needs is synthesized rather than emitted by the runtime.
+		// A native Method has no body to enrich or emit. It stays in the
+		// Namespace Type, and a default on it gets a synthesized frame.
 		if (
 			memberValue.nodeType === "SimpleMethodSignature" ||
 			memberValue.nodeType === "StaticMethodSignature"
@@ -8443,9 +8248,8 @@ function enrichMethods(
 			continue
 		}
 
-		// The name is typed as the Method itself, so that whatever
-		// resolves a Type at the cursor describes the Method when the cursor
-		// is on its name.
+		// Typed as the Method, so a Type at the cursor on the name describes
+		// the Method.
 		let name: common.typed.IdentifierNode = {
 			nodeType: "Identifier",
 			content: memberKey,
@@ -8495,8 +8299,7 @@ function enrichMethods(
 					injected,
 					own,
 				),
-				// Every Overload is bodied here, so the Node's order and
-				// the Type's are the identity.
+				// Every Overload is bodied, so the indices are the identity.
 				overloadIndices: memberValue.methods.map((_, index) => index),
 			}
 		} else if (memberValue.nodeType === "OverloadedStaticMethod") {
@@ -8513,20 +8316,10 @@ function enrichMethods(
 				overloadIndices: memberValue.methods.map((_, index) => index),
 			}
 		} else {
-			// An Overload block in a `declarations { … }` Program may MIX
-			// bodied and native entries. Only the bodied ones have anything to
-			// emit, so only they reach the typed Node — together with the
-			// Generics that were woven into THEIR entry of the resolved Type,
-			// picked out by the original Overload index so the two views stay
-			// aligned even when a native sits between them.
-			// Each survivor's ORIGINAL index travels with it in
-			// `overloadIndices`. That index — its position in the Method
-			// Type's `overloads`, not in this filtered list — is what the
-			// `__overload$N` name is built from, both where a call site
-			// resolves it and where the Simplifier emits the definition. A
-			// native occupies its slot in that numbering even though nothing
-			// is emitted for it, because the runtime export it binds to
-			// already answers to that name.
+			// An Overload block in a `declarations { … }` Program may mix
+			// bodied and native entries, and only bodied ones reach the typed
+			// Node. Each keeps its original index in `overloadIndices`, which
+			// the `__overload$N` name is built from.
 			let bodied: Array<parser.FunctionValueNode> = []
 			let bodiedIndices: Array<number> = []
 			let bodiedInjected: Array<
@@ -8593,10 +8386,8 @@ function enrichMethods(
 	return { methods: result, nativeShims }
 }
 
-// A Parameter list and the Statements its Patterns desugar into, which
-// belong at the HEAD of the body those Parameters were declared for — the same
-// shape a Matcher's bindings take, and for the same reason: a body that reads
-// `width` reads a Constant an author could have written on its first line.
+// A Parameter list and the Statements its Patterns desugar into, which belong
+// at the head of the body, as a Matcher's bindings do.
 function enrichParameterList(
 	nodes: Array<parser.ParameterNode>,
 	scope: enricher.Scope,
@@ -8607,10 +8398,8 @@ function enrichParameterList(
 } {
 	let parameters: Array<common.typed.ParameterNode> = []
 	let bindings: Array<common.typed.ImplementationNode> = []
-	// Built once for the whole list rather than per Parameter — every
-	// default is barred from the same set of names, and which of them are "still
-	// to come" is a comparison against the index rather than a second walk. A
-	// list with no default anywhere builds nothing at all.
+	// Built once for the whole list, since every default is barred from the
+	// same names. A list without defaults builds nothing.
 	let barred = nodes.some((node) => node.defaultValue !== null)
 		? barredParameterNames(nodes)
 		: null
@@ -8630,12 +8419,8 @@ function enrichParameterList(
 	return { parameters, bindings }
 }
 
-// Every name this Parameter list binds, with what a default written in it
-// is allowed to make of each. A Parameter's own name is barred from its own
-// default and from every default before it — it is not bound yet — and a Pattern
-// binding is barred from all of them, since a Pattern desugars into Constants at
-// the head of the BODY and the Parameter list is bound before the body's first
-// Statement runs.
+// Every name this Parameter list binds, with what a default may make of each.
+// See "Parameter defaults" in DEVELOPMENT.md.
 function barredParameterNames(
 	nodes: Array<parser.ParameterNode>,
 ): Map<string, enricher.BarredParameterName> {
@@ -8658,9 +8443,7 @@ function barredParameterNames(
 			continue
 		}
 
-		// Exactly the bindings `declarePatternBindings` declares, asked
-		// the same way — a name that is going to be in Scope for the body is a
-		// name a default has to be told about.
+		// Exactly the bindings `declarePatternBindings` declares.
 		for (let binding of irrefutablePatternBindings(name)) {
 			names.set(binding.name.content, {
 				kind: "pattern",
@@ -8676,12 +8459,11 @@ function barredParameterNames(
 function enrichParameter(
 	node: parser.ParameterNode,
 	scope: enricher.Scope,
-	// Set for an unannotated Parameter, whose Type and label both came
-	// from the expected signature rather than from anything written here.
+	// Set for an unannotated Parameter, whose Type and label came from the
+	// expected signature.
 	contextualParameter?: common.Parameter,
-	// The names this Parameter list binds and which Parameter this one is,
-	// so a default can be told what it may not read. Null for a list that
-	// declares no default at all.
+	// The names the list binds and this Parameter's index, so a default is told
+	// what it may not read. Null for a list without defaults.
 	barrier: enricher.Scope["parameterDefaultBarrier"] | null = null,
 ): {
 	parameter: common.typed.ParameterNode
@@ -8695,11 +8477,9 @@ function enrichParameter(
 
 	let defaultValue = enrichParameterDefault(node, type, scope, barrier)
 
-	// A Pattern where the internal name goes. The Parameter still needs a
-	// name of its own — the desugared Constants read off it, and the Simplifier
-	// would otherwise mint `_0` for it and collide with a sibling `_: Type` at
-	// the same index — so one is synthesized from the Pattern's Position, which
-	// no source could have written and which is the same on every pass.
+	// A Pattern in place of the internal name. The Parameter still needs a name
+	// for the Constants to read off. The simplifier's `_0` could collide with a
+	// sibling `_: Type`, so one is synthesized from the Pattern's Position.
 	if (node.internalName?.nodeType === "Pattern") {
 		let pattern = node.internalName
 		let internalName = synthesizedName("parameter", pattern.position)
@@ -8734,9 +8514,7 @@ function enrichParameter(
 		}
 	}
 
-	// `_: Type` binds no name, so there is nothing to declare — leaving
-	// it out of Scope is what makes the Parameter unreferenceable rather than
-	// merely unused.
+	// `_: Type` binds no name, which makes the Parameter unreferenceable.
 	if (node.internalName !== null) {
 		declareVariableInScope(node.internalName, type, scope, true)
 	}
@@ -8759,21 +8537,9 @@ function enrichParameter(
 	}
 }
 
-// The `= expression` a caller may leave out, enriched in the Parameter
-// list's own Scope and BEFORE this Parameter is declared into it. That one
-// ordering is most of the scoping rule: `@` is already bound — a Method's body
-// Scope binds it before the Parameter list is walked, and a static Method sets
-// the barrier that makes `@` there an `at-in-static-method` — and the Parameters
-// to the left are declared.
-//
-// The rest of it is `parameterDefaultBarrier`, which is what an outer binding of
-// the same name makes necessary: leaving this Parameter and the ones after it
-// merely UNDECLARED would let a module Constant called `x` answer for the
-// Parameter called `x`, and the emitted `(x = x)` would read the Parameter out
-// of its own temporal dead zone instead.
-//
-// Evaluated per call in the callee's frame, never here: it is checked for its
-// Type and lowered, and nothing about it is folded at the Declaration.
+// The `= expression` a caller may leave out, read before this Parameter is
+// declared and under `parameterDefaultBarrier`. See "Parameter defaults" in
+// DEVELOPMENT.md.
 function enrichParameterDefault(
 	node: parser.ParameterNode,
 	type: common.Type,
@@ -8794,23 +8560,14 @@ function enrichParameterDefault(
 
 	let valueType = value.type
 
-	// A default written down where a refinement stands is admitted by
-	// deciding the predicate here, exactly as an Argument written down there is
-	// — `1` really is a NonZeroInteger. The default IS the Argument a call that
-	// omits it passes, so the two questions have to be the same one; asking
-	// only about assignability would refuse the very literal every written call
-	// is admitted by.
+	// A written default is admitted by deciding a refinement's predicate, as a
+	// written Argument is.
 	if (admittedTypeOf(type, value) !== null) {
 		return value
 	}
 
-	// THE one deliberate exception to "a default is a value of its
-	// Parameter's Type". A Record default may fill in only SOME of the
-	// Parameter's members; the members it leaves out are the ones every call
-	// has to write, and `Parameter.defaultMembers` is what says which those
-	// are. Admitted for a Record LITERAL alone, because what a partial default
-	// supplies is read off what it writes — see `recordDefaultMembers`, which
-	// this has to agree with member for member.
+	// A Record default may be a partial Literal; `Parameter.defaultMembers`
+	// records what it leaves out, agreeing with `recordDefaultMembers`.
 	if (
 		type.type === "Record" &&
 		valueType.type === "Record" &&
@@ -8830,9 +8587,8 @@ function enrichParameterDefault(
 			node.externalName?.content ??
 			null
 
-		// Not a partial — the reading above took every default that is
-		// one — so a member the Parameter declares and this does not write IS
-		// missing from it, and is named with the rest.
+		// Not a partial, so a member it does not write is missing and named
+		// with the rest.
 		let record = recordMismatchEvidence(type, valueType, value, {
 			subject: "the Parameter's Type",
 		})

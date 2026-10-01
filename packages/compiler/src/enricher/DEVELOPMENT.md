@@ -68,6 +68,31 @@ They are the prefixed ones without Type Arguments, and the bare ones without a p
 Parameter, so it is matched after the Arguments that can decide them. A bare Case with a payload asks the
 position first and falls back on its payload, which still binds.
 
+### Case payload defaults
+
+A Case may default its payload, as in `Typed { text: String, repeats: Integer } = { repeats = 1 }`. A Parameter's default is evaluated in the callee,
+but a payload default is spliced into every construction of its Case. A construction may stand in a Module that
+never named the Choice, so a name read there might not exist. The default therefore has to become data where the
+Choice is declared, and it travels on the Case Type as `payloadDefault.values`.
+
+`enrichCasePayloadDefault` reads the default against the payload Record in the Module's own Scope. The default is
+a Record Literal whose written members say what it fills in; it is a partial, so members it leaves out are
+fine. `bakeCaseDefaultValue` then turns each member into data. A literal is itself, and a List, Record or Case
+value built of literals is baked member by member. A name stands for a Constant of this Module whose value is
+written down (`bakeNamedCaseDefaultValue`). Following one Constant to another is allowed, as long as every leaf is
+a literal.
+
+Anything else is refused with `case-default-not-a-literal`. A Parameter or a body's binding does not exist where
+the Choice is declared, and a Variable holds whatever it was last assigned. An imported Constant's value stays in
+its own Module, since a Type crosses an import and an Expression does not. The lookup uses the declaring Scope's
+`constantValues`, so a binding that shadows a Module Constant answers nothing.
+
+The walk reports while it is still inside the default, where the author wrote it. Once it has followed a name
+into a Constant, it hands the offending Node back. The one Diagnostic then lands on the name and points at the
+Constant's value with a second label. `through` holds the Constants followed so far. It tells a value written in
+the default from one found inside a Constant. It also guards against a cycle, which the enrichment order rules
+out today.
+
 ## Record and Dictionary updates
 
 `{ … with … }` updates a Record, whose keys are member names it declares. `[ … with … ]` updates a Dictionary,
@@ -274,3 +299,28 @@ view and the witness view exist, and they still agree.
 `ownGenericNames` remembers which names each form declares for itself. A Method Type Parameter with the
 Namespace's name shadows it, and the merged list does not say which is which. An entry that only bounds the
 Namespace's Parameter declares nothing and counts as neither.
+
+## Parameter defaults
+
+A default, `= expression` on a Parameter, is evaluated per call in the callee's own frame. So it is checked for
+its Type and lowered, but never folded at the declaration. It suspends nothing, even in a completing body,
+because the emitted Function fills it in outside the async closure. The completing barrier stands while a
+Parameter list is read.
+
+`enrichParameterDefault` reads the default in the Parameter list's Scope, before its own Parameter is declared.
+`@` is already bound, or barred in a static Method, and the Parameters to its left are declared. The
+`parameterDefaultBarrier` covers the rest (`barredParameterNames`). A Parameter's own name and the names after it
+are barred. So is every Pattern binding, since those are only bound at the head of the body. Leaving these names
+merely undeclared would let an outer binding of the same name answer. The emitted `(x = x)` would then read the
+Parameter before it is initialised.
+
+A written default where a refinement stands is admitted by deciding the predicate, as a written Argument is. The
+default is the Argument that a call omitting it passes. A Record default may be a partial Literal. The members it
+leaves out are the ones every call has to write, and `Parameter.defaultMembers` records which those are. It
+agrees member for member with `recordDefaultMembers`.
+
+A native Method has no body, but a default on it is still Essence. `enrichNativeShim` reads it in the Scope a
+bodied Method of the same shape would have. The typed `NativeShimNode` gives the default a frame of its own.
+
+A Function or Method taken as a value loses its defaults (`asValue`). Only a direct call reaches the callee's
+frame that fills them in, so the Type of the value says every Parameter is written.
