@@ -96,15 +96,26 @@ type Unlisted<Node extends NodeLike> =
 			: never
 		: never
 
+// The listed type a held node is checked against. That is the member of its
+// `kind` where one is listed, else every member of its `nodeType`.
+type ListedAs<Node, Held extends NodeLike> = Held extends { kind: infer Kind }
+	? [Extract<Node, { nodeType: Held["nodeType"]; kind: Kind }>] extends [
+			never,
+		]
+		? Extract<Node, { nodeType: Held["nodeType"] }>
+		: Extract<Node, { nodeType: Held["nodeType"]; kind: Kind }>
+	: Extract<Node, { nodeType: Held["nodeType"] }>
+
 // The kinds a listed node holds as a subtype with node fields that the listed
-// type, and so its entry, lacks.
+// type, and so its entry, lacks. A node told apart by `kind` is checked against
+// its own `kind`'s entry.
 type Widened<Node extends NodeLike> =
 	HeldBy<Node> extends infer Held
 		? Held extends NodeLike
 			? [
 					Exclude<
 						NodeKeys<Held>,
-						NodeKeys<Extract<Node, { nodeType: Held["nodeType"] }>>
+						ContainerKeys<ListedAs<Node, Held>>
 					>,
 				] extends [never]
 				? never
@@ -168,19 +179,40 @@ type Shape<Value> = [Value] extends [NodeLike]
 					: { fields: Entry<Value> }
 
 // Every field of a node or container that holds a node, each with its reach.
-// The key order is the visiting order, which is source order.
-export type Entry<Container> = {
-	[Key in ContainerKeys<Container>]: Reach<
-		FieldValue<Container, Key>,
-		Container
-	>
-}
+// The key order is the visiting order: source order, or the order the
+// simplified tree runs in. A field named `kinds` would read as `KindEntries`.
+export type Entry<Container> =
+	"kinds" extends ContainerKeys<Container>
+		? "rename the field, since `kinds` marks an entry per kind"
+		: {
+				[Key in ContainerKeys<Container>]: Reach<
+					FieldValue<Container, Key>,
+					Container
+				>
+			}
 
-// One entry per kind of `Node`. A kind the union leaves out is a required key
-// whose value is a sentence, so the error names it. So is a kind held with node
-// fields its entry does not reach.
-export type Table<Node extends NodeLike> = {
-	[Kind in Node["nodeType"]]: Entry<Extract<Node, { nodeType: Kind }>>
+// The entries of a kind whose nodes share a `nodeType` and differ by `kind`,
+// one per `kind`.
+export type KindEntries<Node> = [Node] extends [{ kind: string }]
+	? {
+			kinds: {
+				[Kind in Node["kind"]]: Entry<Extract<Node, { kind: Kind }>>
+			}
+		}
+	: "this kind has no `kind` to tell its nodes apart by"
+
+// One entry per kind of `Node`, and per `kind` of each kind `ByKind` names. A
+// kind the union leaves out is a required key whose value is a sentence, so
+// the error names it. So is a kind held with node fields its entry does not
+// reach.
+export type Table<Node extends NodeLike, ByKind extends string = never> = {
+	[Kind in Exclude<Node["nodeType"], ByKind>]: Entry<
+		Extract<Node, { nodeType: Kind }>
+	>
+} & {
+	[Kind in Extract<Node["nodeType"], ByKind>]: KindEntries<
+		Extract<Node, { nodeType: Kind }>
+	>
 } & {
 	[Kind in Unlisted<Node>["nodeType"]]: "list this kind in the node union"
 } & {
@@ -606,19 +638,39 @@ export type ChildWalks<Node extends NodeLike> = {
 	): Result | undefined
 }
 
-export function childWalks<Node extends NodeLike>(
-	table: Table<Node>,
+export function childWalks<Node extends NodeLike, ByKind extends string>(
+	table: Table<Node, ByKind>,
 ): ChildWalks<Node> {
 	let entries: Record<string, CompiledEntry | undefined> = Object.create(null)
+	let kindEntries: Record<
+		string,
+		Record<string, CompiledEntry | undefined> | undefined
+	> = Object.create(null)
 
-	for (let [kind, entry] of Object.entries(
-		table as Record<string, unknown>,
+	for (let [nodeType, entry] of Object.entries(
+		table as Record<string, object>,
 	)) {
-		entries[kind] = compileEntry(entry as AnyEntry, undefined)
+		if (!("kinds" in entry)) {
+			entries[nodeType] = compileEntry(entry, undefined)
+
+			continue
+		}
+
+		let compiled: Record<string, CompiledEntry> = Object.create(null)
+
+		for (let [kind, kindEntry] of Object.entries(
+			entry.kinds as Record<string, object>,
+		)) {
+			compiled[kind] = compileEntry(kindEntry, undefined)
+		}
+
+		kindEntries[nodeType] = compiled
 	}
 
 	function entryOf(node: Node): CompiledEntry {
-		let entry = entries[node.nodeType]
+		let entry =
+			entries[node.nodeType] ??
+			kindEntries[node.nodeType]?.[(node as { kind?: string }).kind ?? ""]
 
 		if (entry === undefined) {
 			throw new Error(`No child table entry for '${node.nodeType}'.`)

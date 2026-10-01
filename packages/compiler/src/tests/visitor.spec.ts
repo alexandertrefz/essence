@@ -6,12 +6,22 @@ import * as path from "node:path"
 import { FIXTURES_DIRECTORY, fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 
+import { containsErrors } from "../diagnostics/index"
 import { canonicalPath } from "../documents"
 import { enrich } from "../enricher/index"
 import { loadStdlib } from "../enricher/stdlib"
 import { loadModuleGraph } from "../modules/graph"
 import { linkModuleGraph } from "../modules/link"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+	unoptimisedOptions,
+} from "../optimiser/index"
+import { rewriteNodes } from "../optimiser/walk"
 import { parseWithDiagnostics } from "../parser"
+import { simplify } from "../simplifier/index"
+import { validate } from "../validator/index"
 import {
 	findParserChild,
 	forEachParserChild,
@@ -24,6 +34,12 @@ import {
 	type TypedNode,
 	typedNodeKinds,
 } from "../visitor/typed"
+import {
+	findSimpleChild,
+	forEachSimpleChild,
+	type SimpleNode,
+	simpleNodeKinds,
+} from "../visitor/typedSimple"
 
 // Programs that between them write every kind of node. A kind added without a
 // fixture here fails the coverage specs.
@@ -309,6 +325,295 @@ const duplicateMethodSource = [
 	"}",
 ].join("\n")
 
+// A Module whose simplified trees, unoptimised, optimised and instrumented for
+// coverage, between them hold every kind. The optimiser writes the intrinsics,
+// the loop turns and the counters. It imports `shapesSource`.
+const simpleSource = `import {
+	from "./Shapes.es" {
+		Shape as Figure
+		unit
+	}
+}
+
+implementation {
+	type Point = { x: Integer, y: Integer }
+	type Box = { size: Integer }
+	type Small = Integer where @::isLessThan(10)
+	type Even = Integer where @::isEven()
+	type Team = { name: String }
+
+	choice Holder<Item> {
+		Full { item: Item },
+		Vacant,
+	}
+
+	protocol Sized {
+		size() -> Integer
+
+		isEmpty() -> Boolean {
+			<- @::size()::is(0)
+		}
+	}
+
+	protocol Shaped is Sized {
+		isFull() -> Boolean {
+			<- @::isEmpty()::negate()
+		}
+	}
+
+	namespace Holders <infer Item> for Holder<Item> is Sized where Item is Sized {
+		size() -> Integer {
+			<- 1
+		}
+	}
+
+	namespace Points for Point is Shaped {
+		static origin = Point ~> { x = 0, y = 0 }
+
+		size() -> Integer {
+			<- @.x::add(@.y)
+		}
+	}
+
+	namespace Teams for Team is Generatable {
+		static generate(from source: Randomness) -> Team {
+			<- { name = "Lions" }
+		}
+	}
+
+	namespace Boxes for Box {
+		tagged(with suffix: String) -> String {
+			<- "box{suffix}"
+		}
+	}
+
+	namespace Flags for Boolean {
+		tagged(with suffix: String) -> String {
+			<- "flag{suffix}"
+		}
+	}
+
+	variable either: Box | Boolean = { size = 3 }
+
+	function identityOf(_ value: Integer | Boolean) -> Integer | Boolean {
+		<- value
+	}
+
+	function flip() -> String {
+		either = true
+
+		<- "!"
+	}
+
+	function describe(_ shape: Figure) -> String {
+		<- match shape -> String {
+			case #Circle({ radius }) where radius::isGreaterThan(unit) {
+				<- "big {radius}"
+			}
+			case Figure#Square(square) {
+				<- square::toString()
+			}
+			case _ {
+				<- "dot"
+			}
+		}
+	}
+
+	function classify(_ value: Integer | String) -> Integer {
+		constant code = match value -> Integer {
+			case 0 {
+				<- 1
+			}
+			case Integer {
+				<- 2
+			}
+			case String {
+				<- 3
+			}
+		}
+
+		<- code
+	}
+
+	function grade(_ score: Integer) -> String {
+		<- define -> String {
+			as "A" if score::isGreaterThan(90)
+			as "F" otherwise
+		}
+	}
+
+	function countdown(_ n: Integer, _ sum: Integer = 0) -> Integer {
+		if n::isLessThan(1) {
+			<- sum
+		} else {
+			<- countdown(n::subtract(1))
+		}
+	}
+
+	function retried(options: { retries: Integer } = { retries = 2 }) -> Integer {
+		<- options.retries
+	}
+
+	function padded(_ text: String, width: Integer = 4, fill: String = " ") -> String {
+		<- "{fill}{text}{width}"
+	}
+
+	function full<infer Value is Shaped>(_ value: Value) -> Boolean {
+		<- value::isFull()
+	}
+
+	function sized<infer Value is Sized>(_ value: Value) -> Integer {
+		<- value::size()
+	}
+
+	function scored(_ standing: Point | Box) -> Integer {
+		<- match standing -> Integer {
+			case { x = 3 } {
+				<- 1
+			}
+			case _ {
+				<- 0
+			}
+		}
+	}
+
+	function first(_ maybe: Optional<Integer | String>) -> Integer {
+		<- match maybe -> Integer {
+			case #Value({ value: Integer }) {
+				<- 1
+			}
+			case _ {
+				<- 0
+			}
+		}
+	}
+
+	function both(_ a: Boolean, _ b: Boolean) -> Boolean {
+		<- a::and(b)::or(a::is(b))
+	}
+
+	function loaded() -> Future<Integer> {
+		constant running = start Async.deferred(() {
+			<- 3
+		})
+
+		<- complete running
+	}
+
+	either::tagged(with flip())
+
+	constant tagged = either::tagged(with flip())
+	constant payload = { item = 1 }
+	constant wrapped = Holder<Integer>#Full(payload)
+	constant shift = { x = 5 }
+	constant shifted = { Points.origin with shift }
+	constant listed: List<Integer> | String = [1, 2]
+	constant maybe: Optional<Integer | String> = Optional<Integer | String>#Value(2)
+	constant lists: List<Integer> | List<String> = [1, 2]
+
+	constant built = loop(from 1, through 4, startingWith [0], (index, list) {
+		<- list::append(index)
+	})
+	constant doubled = [1, 2]::map((item) {
+		<- item::multiply(with 2)
+	})
+	constant ratio = 3/4
+	constant ages = ["kim" = 7]
+	constant older = [ages with "sam" = 9]
+	constant moved = { Points.origin with x = 2 }
+	constant held = Holder<Integer>#Full({ item = 1 })
+	constant circle = Figure#Circle({ radius = 2 })
+
+	Terminal.inspect(countdown(5))
+	Terminal.inspect(retried())
+	Terminal.inspect(both(true, false))
+	Terminal.inspect(built)
+	Terminal.inspect(full(Points.origin))
+	Terminal.inspect(sized(Holder<Point>#Full({ item = Points.origin })))
+	Terminal.inspect(scored(Points.origin))
+	Terminal.inspect(match maybe -> Integer {
+		case #Value({ value: Integer }) {
+			<- 1
+		}
+		case _ {
+			<- 0
+		}
+	})
+	Terminal.inspect(first(#Value(5)))
+	Terminal.inspect([1, 2]::map((item) {
+		<- item::add(1)
+	}))
+	Terminal.inspect(identityOf(5)::toString())
+	Terminal.inspect(match either -> String {
+		case Box {
+			<- "box"
+		}
+		case _ {
+			<- "flag"
+		}
+	})
+	Terminal.inspect(tagged)
+	Terminal.inspect(wrapped)
+	Terminal.inspect(shifted)
+	Terminal.inspect(listed::toString())
+	Terminal.inspect(lists::map((item) {
+		<- item::toString()
+	}))
+	Terminal.inspect(padded("a", fill "-"))
+	Terminal.inspect(loop(from 1, through 3, startingWith 0, (index, total) {
+		<- total::add(index)
+	}))
+	Terminal.inspect(doubled)
+	Terminal.inspect(describe(circle))
+	Terminal.inspect(classify(2))
+	Terminal.inspect(grade(95))
+	Terminal.inspect(ratio)
+	Terminal.inspect(older)
+	Terminal.inspect(moved)
+	Terminal.inspect(held)
+}
+
+export {
+	countdown
+}
+
+tests {
+	constant base = 2
+	constant mixed: Optional<Integer | String> = #Value(1)
+
+	test "adds {base}" {
+		expect base::add(1)::is(3)
+		require #Full(content) = held
+		expect base matches snapshot "2"
+		require { x = 0 } = Points.origin
+		require #Value({ value: Integer }) = mixed
+	}
+
+	suite "tables" {
+		test "row {row}" across [1, 2] (row: Integer) {
+			expect row::isGreaterThan(0)
+		}
+
+		test "pattern rows" across [Points.origin] ({ x, y }: Point) {
+			expect x::is(y)
+		}
+	}
+
+	test "properties {base}" for any (
+		value: Integer,
+		small: Small,
+		even: Even,
+		team: Team,
+		pair: { even: Integer },
+		texts: List<String>,
+		ages: Dictionary<String, Integer>,
+		either: Integer | String,
+	) {
+		expect value::is(value)
+	}
+}
+`
+
 function fixturePrograms(): {
 	parsed: Array<ParserNode>
 	typed: Array<TypedNode>
@@ -368,6 +673,88 @@ function corpusPrograms(): {
 	}
 
 	return { parsed, typed }
+}
+
+// The simplified trees of `simpleSource` and the Module it imports, under each
+// option set that writes a kind of its own. The standard library's are built
+// as the prelude builds them.
+function simplifiedPrograms(): {
+	programs: Array<common.typedSimple.Program>
+	library: Array<common.typedSimple.Program>
+} {
+	let directory = canonicalPath(path.join(tmpdir(), "essence-visitor-simple"))
+	let files: Record<string, string> = {
+		[path.join(directory, "Simple.es")]: simpleSource,
+		[path.join(directory, "Shapes.es")]: shapesSource,
+	}
+	let linked = linkModuleGraph(
+		loadModuleGraph(path.join(directory, "Simple.es"), {
+			readFile: (filePath) => files[filePath],
+		}),
+		{ tests: true },
+	)
+	let optionSets: Array<OptimiserOptions> = [
+		unoptimisedOptions,
+		defaultOptimiserOptions,
+		{ ...defaultOptimiserOptions, coverage: true },
+	]
+	let programs: Array<common.typedSimple.Program> = []
+
+	for (let module of linked.modules.values()) {
+		expect(
+			containsErrors([
+				...module.diagnostics,
+				...validate(module.program),
+			]),
+		).toBe(false)
+
+		for (let options of optionSets) {
+			programs.push(optimise(simplify(module.program), options))
+		}
+	}
+
+	return {
+		programs,
+		library: loadStdlib().typedPrograms.flatMap((program) =>
+			optionSets
+				.slice(0, 2)
+				.map((options) =>
+					optimise(simplify(structuredClone(program)), options),
+				),
+		),
+	}
+}
+
+// Every fixture file that compiles, simplified and optimised with coverage.
+function simplifiedCorpus(): Array<common.typedSimple.Program> {
+	let programs: Array<common.typedSimple.Program> = []
+
+	for (let name of readdirSync(FIXTURES_DIRECTORY)) {
+		if (!name.endsWith(".es")) {
+			continue
+		}
+
+		let source = readFileSync(path.join(FIXTURES_DIRECTORY, name), "utf-8")
+		let parsed = parseWithDiagnostics(source)
+		let enriched = enrich(parsed.program, { tests: true, source })
+
+		if (
+			containsErrors(parsed.diagnostics) ||
+			containsErrors(enriched.diagnostics) ||
+			containsErrors(validate(enriched.program))
+		) {
+			continue
+		}
+
+		programs.push(
+			optimise(simplify(enriched.program, { source }), {
+				...defaultOptimiserOptions,
+				coverage: true,
+			}),
+		)
+	}
+
+	return programs
 }
 
 // How often a full recursive walk with the visitor reaches each node.
@@ -454,6 +841,71 @@ function mismatches(
 
 const noMismatches = { repeated: [], unvisited: [], unexpected: [] }
 
+// How often the fields hold each node. An optimised tree may hold one node in
+// two fields, and each counts. A Type is not entered.
+function heldCounts(roots: Array<object>): Map<object, number> {
+	let counts = new Map<object, number>()
+
+	function scan(value: unknown) {
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		let fields = value as Record<string, unknown>
+
+		if (typeof fields.type === "string" && !("nodeType" in fields)) {
+			return
+		}
+
+		if ("nodeType" in fields) {
+			counts.set(value, (counts.get(value) ?? 0) + 1)
+		}
+
+		for (let key of Object.keys(fields)) {
+			scan(fields[key])
+		}
+	}
+
+	for (let root of roots) {
+		scan(root)
+	}
+
+	return counts
+}
+
+// The nodes a walk reached more often or less often than the fields hold
+// them, or reached where no field holds them.
+function heldMismatches(
+	counts: Map<object, number>,
+	held: Map<object, number>,
+): Record<string, Array<string>> {
+	let kind = (node: object) => (node as { nodeType: string }).nodeType
+
+	return {
+		repeated: [...counts]
+			.filter(([node, count]) => count > (held.get(node) ?? count))
+			.map(([node]) => kind(node)),
+		unvisited: [...held]
+			.filter(([node, count]) => (counts.get(node) ?? 0) < count)
+			.map(([node]) => kind(node)),
+		unexpected: [...counts.keys()]
+			.filter((node) => !held.has(node))
+			.map(kind),
+	}
+}
+
+// A kind told apart by `kind` is spelled with it, as `simpleNodeKinds` does.
+function simpleKindsOf(nodes: Iterable<SimpleNode>): Array<string> {
+	return kindsOf(
+		[...nodes].map((node) =>
+			node.nodeType === "Intrinsic" ||
+			node.nodeType === "IntrinsicStatement"
+				? { nodeType: `${node.nodeType} ${node.kind}` }
+				: node,
+		),
+	)
+}
+
 function kindsOf(nodes: Iterable<{ nodeType: string }>): Array<string> {
 	return [...new Set([...nodes].map((node) => node.nodeType))].sort()
 }
@@ -480,6 +932,8 @@ function isAtOrBefore(a: common.Cursor, b: common.Cursor): boolean {
 describe("The child tables", () => {
 	let { parsed, typed, library } = fixturePrograms()
 	let corpus = corpusPrograms()
+	let simple = simplifiedPrograms()
+	let simpleCorpus = simplifiedCorpus()
 
 	it("reach every kind of the Parser AST from the fixtures", () => {
 		expect(kindsOf(visitCounts(parsed, forEachParserChild).keys())).toEqual(
@@ -580,6 +1034,127 @@ describe("The child tables", () => {
 		}
 
 		expect(misplaced).toEqual([])
+	})
+
+	it("reach every kind of the simplified AST from the fixtures, unoptimised, optimised and instrumented", () => {
+		expect(
+			simpleKindsOf(
+				visitCounts<SimpleNode>(
+					simple.programs,
+					forEachSimpleChild,
+				).keys(),
+			),
+		).toEqual([...simpleNodeKinds].sort())
+	})
+
+	it("reach each simplified node as often as the fields hold it", () => {
+		let programs = [...simple.programs, ...simple.library, ...simpleCorpus]
+
+		expect(
+			heldMismatches(
+				visitCounts<SimpleNode>(programs, forEachSimpleChild),
+				heldCounts(programs),
+			),
+		).toEqual(noMismatches)
+	})
+
+	// The optimiser's walk offers Expressions after their children, so the
+	// visitor's post-order walk, cut down to what it offers, is the same list.
+	it("visit a simplified node's children in the order the optimiser's walk offers them", () => {
+		let misplaced: Array<string> = []
+
+		for (let program of [
+			...simple.programs,
+			...simple.library,
+			...simpleCorpus,
+		]) {
+			let offered: Array<SimpleNode> = []
+
+			rewriteNodes(program, {
+				parameterDefaults: true,
+				expression: (node) => {
+					offered.push(node)
+
+					return node
+				},
+			})
+
+			let offeredNodes = new Set<SimpleNode>(offered)
+			let walked: Array<SimpleNode> = []
+
+			function visit(node: SimpleNode) {
+				forEachSimpleChild(node, visit)
+
+				if (offeredNodes.has(node)) {
+					walked.push(node)
+				}
+			}
+
+			visit(program)
+
+			let first = walked.findIndex(
+				(node, index) => node !== offered[index],
+			)
+
+			if (first !== -1 || walked.length !== offered.length) {
+				misplaced.push(
+					`${walked[first]?.nodeType} for ${offered[first]?.nodeType}`,
+				)
+			}
+		}
+
+		expect(misplaced).toEqual([])
+	})
+
+	it("tell each visit where in a simplified node the child stands", () => {
+		let placesOf = (test: (node: SimpleNode) => boolean) => {
+			let places: Array<string> = []
+
+			forEachSimpleChild(
+				simple.programs
+					.map((program) => findSimple(program, test))
+					.find((node) => node !== undefined)!,
+				(child, _state, field, key, container) =>
+					places.push(
+						`${child.nodeType} ${field} ${key} ${container}`,
+					),
+			)
+
+			return places
+		}
+
+		expect(
+			placesOf(
+				(node) =>
+					node.nodeType === "Intrinsic" &&
+					node.kind === "inline-loop" &&
+					node.driver.kind === "counted",
+			),
+		).toEqual([
+			"Intrinsic from undefined driver",
+			"Intrinsic through undefined driver",
+			"Intrinsic seed undefined driver",
+			"Identifier parameters 0 driver",
+			"Identifier parameters 1 driver",
+			"ReturnStatement body 0 driver",
+		])
+		expect(
+			placesOf(
+				(node) =>
+					node.nodeType === "IntrinsicStatement" &&
+					node.kind === "statement-match" &&
+					node.result.kind === "declaration",
+			),
+		).toEqual([
+			"Identifier name undefined result",
+			"Identifier value undefined undefined",
+			"Intrinsic literal 0 handlers",
+			"ReturnStatement body 0 handlers",
+			"Intrinsic typeTest 1 handlers",
+			"ReturnStatement body 1 handlers",
+			"Intrinsic typeTest 2 handlers",
+			"ReturnStatement body 2 handlers",
+		])
 	})
 
 	it("visit a typed Handler's Matcher literal, Guard and body in written order", () => {
@@ -902,6 +1477,15 @@ function findParsed(
 	return test(node)
 		? node
 		: findParserChild(node, (child) => findParsed(child, test))
+}
+
+function findSimple(
+	node: SimpleNode,
+	test: (node: SimpleNode) => boolean,
+): SimpleNode | undefined {
+	return test(node)
+		? node
+		: findSimpleChild(node, (child) => findSimple(child, test))
 }
 
 function findTyped(

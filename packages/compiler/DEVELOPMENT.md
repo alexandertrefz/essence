@@ -243,9 +243,10 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 1. Interfaces, in `packages/interfaces/src`: the parser node in `parser.ts`, the typed node in
    `common/typedNodes.ts` and the simplified node in `common/typedSimpleNodes.ts`, each joined to its union.
    A new keyword needs a `TokenType` in `lexer.ts`.
-2. Visitor: `bun run typecheck` names the entry the kind needs in `visitor/parser.ts` and `visitor/typed.ts`,
-   and `tests/visitor.spec.ts` needs a fixture that writes it. Walkers built on the tables then reach its
-   children with no edit. See "Adding a node kind" in [the visitor's notes](src/visitor/DEVELOPMENT.md).
+2. Visitor: `bun run typecheck` names the entry the kind needs in `visitor/parser.ts`, `visitor/typed.ts` and
+   `visitor/typedSimple.ts`, and `tests/visitor.spec.ts` needs a fixture that writes it. Walkers built on the
+   tables then reach its children with no edit. See "Adding a node kind" in
+   [the visitor's notes](src/visitor/DEVELOPMENT.md).
 3. Lexer: a new keyword joins `keywords` and `wordTypes` in `lexer/index.ts`, and `tokenTypeLexemes` in
    `parser/descent/tokenStream.ts`.
 4. Parser: a constructor in `parser/nodeGenerators.ts` and the grammar in `parser/descent/parse.ts`. A new

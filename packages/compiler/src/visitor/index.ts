@@ -3,3 +3,8 @@
 
 export { findParserChild, forEachParserChild, type ParserNode } from "./parser"
 export { findTypedChild, forEachTypedChild, type TypedNode } from "./typed"
+export {
+	findSimpleChild,
+	forEachSimpleChild,
+	type SimpleNode,
+} from "./typedSimple"
