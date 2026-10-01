@@ -168,6 +168,48 @@ A condition answering `false` proves the complement of what it asked, but only w
 question. A conjunction answering `false` says that one of its questions failed and not which, so
 `complementEvidence` refuses `::and()` outright.
 
+Only a Constant and `@` narrow (`narrowableReceiverName`). A Variable could be assigned inside the very branch
+that proved something about it. Nothing carries a narrowing through an assignment, so a Variable never
+narrows. A Match Handler's binding is a Constant. A Guard reads it as a member of `@`, though, since the Constant does
+not exist yet where a Guard runs. `lentBindingName` maps such a member read back to the lent name, comparing the
+whole path. It stops at the Scope that binds the `@` being read, because a nested Handler has an `@` of its own.
+
+A branch's body is read in a child Scope of the shadow Scope, even when nothing narrowed (`branchScope`). A
+shadow is a declaration, and the duplicate check is per Scope. Without the extra level,
+`if d::isNot(0) { constant d = 1 }` would report a duplicate against a declaration nobody wrote. A shadow says
+what a name's value is, not where it is read from, so `scopeShadowing` carries a lent name's `selfMemberAliases`
+onto the shadow.
+
+### Choosing a refinement
+
+`narrowingsFor` establishes a declared refinement for a binding when its base accepts the binding's Type and every
+conjunct it proves is one the branch proved. The test is set inclusion, so a two-conjunct condition establishes a
+one-conjunct refinement and never the reverse. The shadow must also flow into the binding's Type, so
+`if n::isOdd()` on a `NonZeroInteger` does not forget that the value is not zero. An Error receiver establishes
+nothing, since an Error matches every Type.
+
+What the binding's Type already proves counts as evidence, so an `else if` inside an `else` adds to what the
+`else` established. The keys are closed over what the conjuncts imply, all at once. The `else` of `@::is(0)` and
+the `else` of `@::isLessThan(0)` together prove that the value is greater than zero. Every comparison uses the one key
+of a resolved conjunct, so a complement spells the key its condition spelled with the polarity flipped.
+
+Where several refinements qualify, the one that answers the most implied questions wins. `PositiveInteger` is one
+leaf and answers three. On a tie, the candidate walked first stands: nearest Scope first, then insertion order
+within a table, with every concrete candidate before a generic one. Two refinements proving the same conjuncts
+over one base are one Type to assignability, dispatch and admission. The tie only decides the name Hover
+prints.
+
+`refinementCandidatesInScope` collects the candidates, an inner declaration shadowing an outer one of the same
+name. A generic refined Alias, such as `NonEmptyList`, is a Generic Alias around its refinement.
+`instantiatedRefinementFor` instantiates it per receiver, binding every Type Parameter from the receiver's
+Type. A receiver that leaves one undecided, such as the `List<Unknown>` of `[]`, gets no candidate.
+
+Instantiations are remembered per Alias, so a receiver gets the same object each time, which the memos keyed by
+Type object depend on. A receiver whose spelling identifies its Type, built only of scalars, Lists and
+Dictionaries (`spellingIdentifies`), is remembered by spelling. Every other receiver is remembered by identity,
+because a name may be declared twice and print alike. A refinement whose predicate is still pending is never
+remembered.
+
 ### Match Handlers and Guards
 
 Only an unconditional Handler retires a Type for a later wildcard. A literal Matcher, a
@@ -175,7 +217,10 @@ value-constrained Record member, a payload Pattern that requires something and a
 
 The Type of `@` in a Handler reads the values earlier Handlers named (`refinedSelfType`). After `case 0`, every
 later Handler is reached by a value that is not `0`, which is the `isNot` a `NonZeroInteger` is declared by. A
-Handler with a Guard names nothing for the Handlers after it, since the Guard may decline the value.
+Handler with a Guard names nothing for the Handlers after it, since the Guard may decline the value. The Handler's
+own literal still proves what it named, because a Guard runs after the Matcher matched. The evidence is read off
+the Matchers alone, so it does not depend on the validator's later checks. Only the declared Type of `@` carries
+it, and the Matcher itself is unchanged, so the rewriter lowers the Match as before.
 
 A Guard runs before any Statement of the body, with the Matcher's own check before it, so what it proves holds
 throughout the body. It is enriched in the body Scope so it can use `@`. The Matcher's bindings are lent to it
@@ -324,3 +369,60 @@ bodied Method of the same shape would have. The typed `NativeShimNode` gives the
 
 A Function or Method taken as a value loses its defaults (`asValue`). Only a direct call reaches the callee's
 frame that fills them in, so the Type of the value says every Parameter is written.
+
+## Written receivers
+
+Every position that admits a written value asks for a Type: a Parameter, a declared Constant, a return Type. A
+receiver asks for none. It is typed bottom-up, and Namespace lookup runs from that Type. So without help, `4`
+would reach `Integer` and never `NonNegativeInteger`, and `4::squareRoot()` would answer an Optional.
+`writtenReceiver` asks the question for it, through `refinedLiteralReceiverType`.
+
+The question goes to every refinement in scope at once, since there is no single one to ask about. The answer is
+the conjunction of everything that admits the value: `3` is not zero and not negative. That conjunction flows
+into each named refinement by the ordinary conjunct-subset rule, so it reaches every Namespace any of them does.
+Hover shows the answer at the receiver, and the rewriter sees the plain value once refinements are erased.
+
+The conjunction is displayed as a declared refinement that proves all of it, counted through what its leaves
+imply: `3` prints as `PositiveInteger`. Where no declared name says the whole of it, the Type prints as the
+declaration a reader would write, such as `Integer where @::isEven()::and(@::isGreaterThan(10))`. A tie between
+two refinements proving the same conjunction falls to the order `refinementsFor` walks, as in narrowing.
+
+A refinement whose predicate is still pending is no candidate. Predicates, Parameter defaults and bodied static
+Properties are enriched while declarations hoist, and a written receiver may stand in any of them.
+
+The answers are remembered per Scope and per written value (`remembersRefinedReceivers`). The same literal
+recurs, and each question walks every Type name on the Scope chain. The table is dropped whenever a Type is
+declared or a hoisted predicate is filled in or poisoned, each of which calls `countTypeDeclaration`. A written
+List is not remembered, since its item Type is part of the question. Conjunctions without a declared name are
+kept per Module (`literalReceiverConjunctions`), so equal proofs share one object.
+
+The Nodes refined are a written Integer, Rational, String, List and Dictionary, and a Dictionary update. A
+Combination's brackets prove only what was set into it, a lower bound; `literalValueOf` in
+`helpers/predicateEval.ts` says what that bound decides. A Boolean is never refined, since no refinement may be
+written on one.
+
+The receiver proves nothing while `erasingRefinementProof` is set. `fallback-never-used` asks what a call would
+answer with no proof at all, and a written receiver's proof is what that probe takes away.
+
+## Return Type inference from a body
+
+A Function literal without `-> Type` takes its return Type from its body (`inferReturnTypeFromBody`). The Type
+of `<- total` depends on the Constants the body declares, so the body is enriched twice. The first time finds
+the Type and drops its Diagnostics; the second is the real one. Several `<-` give the Union of their distinct Types, and a
+completing body's answer is wrapped in a `Future`.
+
+The inference pass seeds `expectedReturnType` with `null`, not with nothing. Left unset, the search would walk out
+to the enclosing Function's return Type, which a `<-` inside the literal has nothing to do with. So a bare Case
+in return position has nothing to resolve against, and a literal returning one has to write its `-> Type`.
+`completing` is cleared the same way, so the enclosing body's asynchrony is not consulted. Parameters are
+declared through `enrichParameterList`, so Pattern bindings are in scope.
+
+`inferReturnTypeFromBodyDepth` counts the passes running, nested literals included. While it is positive,
+`reportUndecidedPayloadTypeArguments` answers with the Type it was handed. An Error there would become the
+literal's return Type, and the call would have nothing left to solve its Type Parameters from.
+
+`refused` tells the caller that the body has errors of its own, which the real pass reports at their lines. The
+caller then stays silent about the return Type, so one mistake is not reported three times. Two codes are left
+out of that test (`undecidedWithoutAReturnType`): `ambiguous-case` and `undecided-type-arguments`. This pass
+causes them by reading without an expected Type, and the real pass silences them through `positionWasRefused`.
+Counting them would leave a body like `((value) { <- #Value(value) })` with no report at all.

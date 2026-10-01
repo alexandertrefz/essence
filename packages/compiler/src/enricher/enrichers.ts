@@ -8630,30 +8630,23 @@ function enrichParameterDefault(
 
 // #region Flow Narrowing
 
-// What a condition PROVES about one binding at the point it was asked —
-// the conjuncts spelled about it, and the Type the binding has there. The Type is
-// read off the typed receiver rather than out of the Scope, because a branch may
-// already have narrowed the name: an `else if` asks its question of a binding the
-// `else` around it has shadowed, and the evidence that shadow carries counts
-// towards what the next branch establishes.
+// What a condition proves about one binding, and the binding's Type where it
+// was asked. The Type comes from the typed receiver, since an enclosing `else`
+// may already have narrowed the name.
 type ProvenConjuncts = {
 	receiverType: common.Type
 	conjuncts: Array<common.PredicateConjunct>
 }
 
-// Keyed by the name a shadow is declared under — an Identifier's own, or
-// "@", which is the name a Match Handler's receiver is bound under too.
+// Keyed by the name a shadow is declared under: an Identifier's, or `@`.
 type ConditionEvidence = Map<string, ProvenConjuncts>
 
 // A binding and the refinement a branch has established for it.
 type Narrowing = { name: string; type: common.RefinementType }
 
-// What a condition ESTABLISHES about the branch it opens. It is answered
-// on its own rather than inside the Scope below it because the ANSWER is
-// reported as well as used: a branch that narrows is a doorway, and a coverage
-// report asks separately whether the guarded path and the fallback were each
-// reached. Nothing else can say so later — checked refinements are erased
-// before the Optimiser sees a Program.
+// What a condition establishes for the branch it opens. The answer is also
+// recorded for coverage, which can not tell later, since refinements are erased
+// before the optimiser runs.
 function trueBranchNarrowings(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -8661,9 +8654,8 @@ function trueBranchNarrowings(
 	return narrowingsFor(conditionEvidence(condition, scope), scope)
 }
 
-// The Scope a branch's body is enriched in — the surrounding one plus
-// whatever the condition established, and a plain child Scope when it established
-// nothing.
+// The Scope a branch's body is enriched in: a child of the shadows, so the body
+// may declare a narrowed name again.
 function branchScope(
 	narrowings: Array<Narrowing>,
 	scope: enricher.Scope,
@@ -8671,14 +8663,8 @@ function branchScope(
 	return childScope(scopeShadowing(narrowings, scope))
 }
 
-// And what it establishes for the branch it answered `false` in, which is
-// the complement of the one question it asked. Answered on its own for the
-// reason the true branch's is: a `define` arm and an `if` each carry the claim,
-// and each needs the narrowings themselves as well.
-//
-// An `else if` needs nothing of its own beyond this: the nested If lives in the
-// `falseBody` Array and is enriched in the Scope these build, so it asks its
-// question of the complement and adds to it.
+// What a condition establishes for the branch it answered `false` in. A nested
+// `else if` is enriched in that Scope, so it adds to the complement.
 function falseBranchNarrowings(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -8686,24 +8672,9 @@ function falseBranchNarrowings(
 	return narrowingsFor(complementEvidence(condition, scope), scope)
 }
 
-// The WRAPPER Scope a branch's shadows are declared in, or the Scope itself
-// when there are none. It exists because a shadow is a declaration and the
-// duplicate check is per-Scope: a body that legally re-declares the very name the
-// condition narrowed — `if d::isNot(0) { constant d = 1 … }` — would otherwise be
-// told the name is already declared, by a declaration nobody wrote and no
-// Diagnostic can point at. The body's own Scope nests INSIDE this one, so its
-// declarations shadow the shadows exactly as they shadow anything else.
-//
-// A shadow says something new about what a name's value IS and nothing at
-// all about where that value is READ FROM, so an alias the shadowed name carries
-// is carried onto the shadow with it. `selfMemberAliases` is consulted on the
-// Scope that DECLARES a name and on no other, and the shadow is now that Scope:
-// left off, a name lent to a Match Guard as `@.member` went back to being a bare
-// Identifier the moment anything inside that Guard narrowed it — a name that
-// does not exist where a Guard runs, carrying a refinement proved of `@.member`
-// and reading whatever else in the file happened to be spelled the same way. A
-// `define` is the first construct that can narrow inside a Guard at all, so
-// nothing exercised this before it.
+// The Scope a branch's shadows are declared in, or the Scope itself when there
+// are none. A shadow carries the name's `selfMemberAliases`. See "Narrowing" in
+// DEVELOPMENT.md.
 function scopeShadowing(
 	narrowings: Array<Narrowing>,
 	scope: enricher.Scope,
@@ -8734,14 +8705,8 @@ function scopeShadowing(
 	return narrowScope
 }
 
-// The evidence a condition hands its true branch. A condition is read as a
-// conjunction and flattened exactly as a `where` clause is — `d::isNot(0)` proves
-// one thing about `d` and `d::isNot(0)::and(d::isLessThan(10))` proves two — and
-// anything else contributes nothing at all.
-//
-// Nothing here reports. A `where` clause is a CLAIM, so a leaf it can not be
-// compared by is a mistake worth naming; an `if` is a question, and a question
-// that happens to prove nothing is an ordinary question.
+// The evidence a condition hands its true branch, read as a flattened
+// conjunction. Nothing here reports, since an `if` asks rather than claims.
 function conditionEvidence(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -8800,20 +8765,9 @@ function collectConditionEvidence(
 	}
 }
 
-// The name a condition's receiver may be narrowed under, or null when it
-// may not be. A Constant and `@` are the only two, and the reason is
-// reassignment: a Variable a branch has proven something about can be written to
-// inside that very branch, and the evidence would then be about a value that is
-// gone. Nothing carries a narrowing forwards through an assignment in v1, so a
-// Variable simply never narrows.
-//
-// A Match Handler's payload binding is a Constant like any other and
-// narrows like one — but a GUARD reads it as `@.member` rather than under its
-// name, because the Constant the body reads does not exist yet where a Guard runs
-// (`scopeLendingBindings` says why). What the Program wrote is the name, and the
-// name is what a shadow can be declared under, so a member read of a LENT name
-// answers with it. `@.item` written out by hand answers the same, and says the
-// same thing about the same value.
+// The name a receiver may be narrowed under: a Constant, `@`, or a member of
+// `@` lent to a Guard. A Variable never narrows. See "Narrowing" in
+// DEVELOPMENT.md.
 function narrowableReceiverName(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -8837,9 +8791,9 @@ function narrowableReceiverName(
 		: null
 }
 
-// The spine of member names a chain of Lookups reads off `@`, outermost
-// step last — `@.state.total` gives `["state", "total"]`. Null where the chain
-// does not bottom out in `@` at all.
+// The member names a chain of Lookups reads off `@`, outermost last:
+// `@.state.total` gives `["state", "total"]`. Null where it does not start at
+// `@`.
 function selfLookupPath(
 	node: common.typed.ExpressionNode,
 ): Array<string> | null {
@@ -8856,16 +8810,8 @@ function selfLookupPath(
 	return prefix === null ? null : [...prefix, node.member.content]
 }
 
-// The name a member of `@` is LENT to in this Scope, or null where the
-// member is nobody's name — an ordinary `@.x` on a Record scrutinee is a member of
-// a value rather than a binding of its own, and nothing narrows it. Nearest Scope
-// first, as every name search is, so the innermost Handler's binding answers for
-// its own Guard.
-//
-// The walk stops at the Scope that BINDS the `@` being read, because nothing
-// further out lends a member of it: a Handler nested inside a Guard has an `@` of
-// its own, and the member names of two Cases can agree while their values have
-// nothing to do with each other.
+// The name a member of `@` is lent to, or null for an ordinary member. Nearest
+// Scope first, stopping at the Scope that binds this `@`.
 function lentBindingName(
 	path: Array<string>,
 	scope: enricher.Scope,
@@ -8878,9 +8824,8 @@ function lentBindingName(
 		for (let [name, alias] of Object.entries(
 			current.selfMemberAliases ?? {},
 		)) {
-			// The WHOLE spine, not its last step. A Pattern lends several
-			// names off one `@`, and `@.x` must not answer with a nested
-			// `origin.x` binding that happens to end in the same member.
+			// The whole path, so `@.x` does not answer with a nested `origin.x`
+			// binding.
 			if (
 				alias.path.length === path.length &&
 				alias.path.every((step, index) => step === path[index])
@@ -8897,22 +8842,8 @@ function lentBindingName(
 	return null
 }
 
-// The refinements a branch's evidence establishes. A declared refinement is
-// established for a binding when its base accepts the binding's Type and every
-// conjunct it proves is one the branch has proven — set INCLUSION, so a
-// two-conjunct condition establishes a one-conjunct refinement and never the
-// other way round. Where several qualify, the one proving the MOST wins, because
-// it is the one that forgets the least.
-//
-// Every path in compares by the ONE key. A conjunct is stored resolved, so a
-// complement is that leaf with its polarity flipped and spells the same key the
-// branch above spelled — where the two used to be told apart by a looser key of
-// the complement's own, because the opposite of `is` had to be guessed as
-// `isNot` with no Overload behind it.
-//
-// A GENERIC refined Alias stands for a different refinement at every use, so
-// it is no candidate until a receiver has decided its Type Arguments — which is
-// why the candidate set is worked out per binding rather than once for the branch.
+// The refinements a branch's evidence establishes. See "Choosing a refinement"
+// in DEVELOPMENT.md.
 function narrowingsFor(
 	evidence: ConditionEvidence,
 	scope: enricher.Scope,
@@ -8930,24 +8861,14 @@ function narrowingsFor(
 	let narrowings: Array<Narrowing> = []
 
 	for (let [name, proven] of evidence) {
-		// An Error matches everything in both directions, so a poisoned
-		// binding would qualify for whichever refinement is declared first and
-		// walk out of the branch better typed than it went in. Whatever produced
-		// the Error was reported; the branch stays about that.
+		// An Error matches every Type, so a poisoned binding establishes
+		// nothing.
 		if (typeContainsError(proven.receiverType)) {
 			continue
 		}
 
-		// Evidence the binding's Type already carries is evidence the branch
-		// has. A Parameter declared `NonZeroInteger` asking `if n::isOdd()` has
-		// proven both things, which is what lets an `else if` inside an `else` add
-		// to what the `else` established rather than start over.
-		//
-		// Closed over what the leaves IMPLY, and closed over the whole of
-		// them at once — the `else` of `@::is(0)` and the `else` of
-		// `@::isLessThan(0)` say nothing apiece and say "above zero" together.
-		// So the two are gathered before the closure rather than keyed as they
-		// arrive.
+		// Evidence the binding's Type already carries counts, closed over what
+		// all the leaves imply together.
 		let keys = impliedConjunctKeys(
 			proven.receiverType.type === "Refinement"
 				? [...proven.conjuncts, ...provenConjuncts(proven.receiverType)]
@@ -8960,11 +8881,8 @@ function narrowingsFor(
 		for (let refinement of refinementsFor(declared, proven.receiverType)) {
 			if (
 				!matchesType(refinement.base, proven.receiverType) ||
-				// A shadow that forgets something the binding's Type already
-				// carries is no narrowing — `if n::isOdd()` on a NonZeroInteger must
-				// not hand the branch a plain Odd — and this is exactly the question
-				// assignability answers: the established Type has to flow into the
-				// declared one.
+				// The shadow must flow into the binding's Type, so it forgets
+				// nothing the Type already proves.
 				!matchesType(proven.receiverType, refinement) ||
 				!provenConjuncts(refinement).every((conjunct) =>
 					keys.has(predicateConjunctKey(conjunct)),
@@ -8973,27 +8891,9 @@ function narrowingsFor(
 				continue
 			}
 
-			// Counted through what a leaf IMPLIES, so that "proves the
-			// most" is about the questions a refinement answers rather than the
-			// ones it spells: `PositiveInteger` is one leaf and answers three,
-			// where `NonZeroInteger` is one leaf and answers one.
-			//
-			// Strictly GREATER, so where two candidates prove the same
-			// number of questions the one walked FIRST stands. That walk is
-			// ordered, and the order is the whole tie-break: nearest Scope first,
-			// insertion order within a table — which puts the builtins ahead of a
-			// Program's own declarations — and every concrete candidate ahead of a
-			// generic one instantiated at this receiver. So a Program declaring a
-			// second Alias with the standard library's own predicate narrows to
-			// `NonZeroInteger` rather than to the name it wrote, while one declared
-			// inside a Function beats both. Pinned in `enricher.spec.ts`.
-			//
-			// Deterministic, and nothing rests on WHICH of them it is: two
-			// refinements proving the same conjuncts over the same base are one
-			// Type to everything that reads conjuncts — assignability, dispatch
-			// specificity and literal admission ask the conjunct set and nothing
-			// besides — so the tie decides the name a Hover prints, not what the
-			// branch may write.
+			// The refinement answering the most implied questions wins, and on
+			// a tie the one walked first stands. The tie only decides the name
+			// Hover prints.
 			if (
 				established === null ||
 				impliedConjunctKeys(
@@ -9017,30 +8917,16 @@ function narrowingsFor(
 	return narrowings
 }
 
-// The refinements declared in scope, told apart by whether a receiver still
-// has to decide something about them: a `concrete` one is a candidate as it
-// stands, a `generic` one is the Generic Alias wrapping a refinement and stands
-// for nothing until its Type Arguments are worked out.
+// The refinements declared in scope. A `generic` one stands for nothing until a
+// receiver decides its Type Arguments.
 type RefinementCandidates = {
 	concrete: Array<common.RefinementType>
 	generic: Array<common.GenericAliasType>
 }
 
-// Every refinement a Type name in scope stands for — the candidates a
-// branch may establish. Nearest Scope first, and a name already seen is skipped,
-// so an inner declaration shadows an outer one here exactly as it does everywhere
-// else.
-//
-// A generic refined Alias is invisible to a search for `type ===
-// "Refinement"` — it is registered as the Generic Alias that applies its
-// Arguments, with the refinement one level in — which is why the two are collected
-// through one walk and kept apart, under the one `seen` set: `NonEmptyList` occupies
-// its name in the Type Scope exactly as `NonZeroInteger` occupies its own.
-//
-// Walked with `for...in` rather than over `Object.entries`, which
-// allocated a pair for every Type name in every Scope on the chain — the
-// standard library's names among them. A written RECEIVER asks this of every
-// literal it meets rather than once per branch, so the allocation showed.
+// Every refinement a Type name in scope stands for, nearest Scope first, an
+// inner name shadowing an outer one. Generic refined Aliases are collected in
+// the same walk.
 function refinementCandidatesInScope(
 	scope: enricher.Scope,
 ): RefinementCandidates {
@@ -9076,8 +8962,8 @@ function refinementCandidatesInScope(
 	return { concrete, generic }
 }
 
-// The candidates ONE receiver could establish — the refinements declared
-// outright, and every generic one this receiver decided the Type Arguments of.
+// The candidates one receiver could establish: the concrete ones, and every
+// generic one this receiver instantiates.
 function refinementsFor(
 	declared: RefinementCandidates,
 	receiverType: common.Type,
@@ -9099,18 +8985,9 @@ function refinementsFor(
 	return refinements
 }
 
-// The refinement a generic Alias stands for AT this receiver — its declared
-// base unified against the receiver's Type to work the Arguments out, then
-// substituted through, mirroring `instantiateChoiceAlias`: receiver-driven,
-// reporting nothing (the receiver is a Type the Enricher already accepted), and
-// stamping the applied spelling so a Hover reads `NonEmptyList<String>` rather than
-// half of it.
-//
-// A unification that leaves a single Parameter undecided is no candidate at all.
-// An empty List Literal's `List<Unknown>` is accepted by `List<Item>` without
-// deciding `Item` — the Unknown is a slot nothing has filled, not a Type — and a
-// refinement over a base nobody decided would put a Type nobody wrote into the
-// branch.
+// The refinement a generic Alias stands for at this receiver, with the applied
+// spelling stamped on. A unification that leaves a Type Parameter undecided is
+// no candidate. See "Choosing a refinement" in DEVELOPMENT.md.
 function instantiatedRefinementFor(
 	alias: common.GenericAliasType,
 	receiverType: common.Type,
@@ -9125,10 +9002,8 @@ function instantiatedRefinementFor(
 
 	if (
 		!matchesTypeWithBindings(refinement.base, receiverType, {
-			// Every Parameter, unlike a signature's, where only an `infer`
-			// one binds — a Type Alias' Parameters are APPLIED rather than
-			// declared bindable, and a receiver standing in front of a branch is
-			// the one thing they are ever worked out FROM.
+			// Every Type Parameter binds, since an Alias applies its Parameters
+			// and a receiver is what they are worked out from here.
 			bindableNames: new Set(
 				alias.generics.map((generic) => generic.name),
 			),
@@ -9139,18 +9014,9 @@ function instantiatedRefinementFor(
 		return null
 	}
 
-	// Remembered per Alias and per RECEIVER — and remembered for the
-	// ANSWER's identity as much as for the work: `namespacesTargeting` keeps
-	// which Namespaces target a Type OBJECT, and a fresh `NonEmptyList<Integer>`
-	// built at every written List receiver missed that memo every time and walked
-	// every Namespace in scope over again. Asked AFTER the unification, which is
-	// the cheap half and the one that answers for every receiver the Alias does
-	// not fit at all.
-	//
-	// Weak on the Alias, so a Program's own goes when the Program does. A pending
-	// predicate is never remembered: the object handed back is a promise the fill
-	// has still to keep, and the copy has to be registered against its source
-	// each time one is taken.
+	// Remembered per Alias and receiver, after the cheap unification, so a
+	// receiver gets the same object each time. A pending predicate is never
+	// remembered.
 	let remembered =
 		refinement.conjuncts === null
 			? undefined
@@ -9181,17 +9047,9 @@ function instantiatedRefinementFor(
 
 	let instantiated = applyGenericBindings(refinement, bindings)
 
-	// A substitution that changed nothing came back as the DECLARED object,
-	// whose base still names the Alias' own Parameters. No value in the branch is
-	// of that Type, and handing the declared object out as a shadow would put a
-	// Parameter nobody can see into the Scope — as well as stamp a spelling onto
-	// the very object a pending predicate is written into.
-	//
-	// The stamp goes through the same door every other copy of a refinement
-	// does. Narrowing only ever runs past hoisting, where the copy above would
-	// have thrown on a pending predicate long before this line — so this is not
-	// where a pending one is expected, it is where the rule stays the same
-	// wherever a refinement is copied.
+	// An unchanged substitution is the declared object, whose base names the
+	// Alias' own Parameters. The stamp goes through
+	// `refinementWithTypeArguments`, like every refinement copy.
 	if (instantiated.type !== "Refinement" || instantiated === refinement) {
 		return null
 	}
@@ -9214,18 +9072,8 @@ function instantiatedRefinementFor(
 	return stamped
 }
 
-// TWO doors, because a spelling does not identify a Type. A NAME is the
-// one thing a Program may spell twice — `type Even = Integer where @::isEven()`
-// at the top of a file and another `Even` inside a Function print alike and
-// prove different things — so a spelling was handing the second receiver the
-// first one's instantiation, and `List<Even>` then narrowed to nothing at all.
-//
-// A Type built out of the scalars and Lists alone IS what its spelling says,
-// and a written receiver's Type is always one of those: that is the door the
-// memo was added for, where a fresh object arrives at every literal. Everything
-// else is remembered by IDENTITY, which costs nothing to ask and is exactly
-// right for a declared binding, whose Type is the one object its declaration
-// made.
+// Remembered by spelling where the spelling identifies the Type, and by
+// identity otherwise, since a name may be declared twice and print alike.
 type RefinementInstantiations = {
 	byType: WeakMap<common.Type, common.RefinementType>
 	bySpelling: Map<string, common.RefinementType>
@@ -9236,10 +9084,8 @@ let instantiatedRefinementMemos = new WeakMap<
 	RefinementInstantiations
 >()
 
-// Whether `describeType` tells this Type apart from every other. Nothing
-// here is printed by a name a Program could declare twice — the scalars print
-// as themselves and a List prints as its items — so two of these that spell
-// alike really are the same Type.
+// Whether `describeType` tells this Type apart from every other: scalars, and
+// Lists and Dictionaries of them.
 function spellingIdentifies(type: common.Type): boolean {
 	switch (type.type) {
 		case "Integer":
@@ -9249,9 +9095,7 @@ function spellingIdentifies(type: common.Type): boolean {
 			return true
 		case "List":
 			return spellingIdentifies(type.itemType)
-		// Both slots, because `describeType` prints both — a spelling that
-		// tells one Dictionary from another has to be a spelling that tells both
-		// of its slots apart.
+		// Both slots, since `describeType` prints both.
 		case "Dictionary":
 			return (
 				spellingIdentifies(type.keyType) &&
@@ -9262,24 +9106,15 @@ function spellingIdentifies(type: common.Type): boolean {
 	}
 }
 
-// The conjunction Types a written receiver has already been given, kept by
-// what they SAY rather than by where they were built: a base and a conjunct set
-// are the whole of what assignability, dispatch specificity and admission read,
-// so two receivers proving the same thing about the same base are one Type and
-// may as well be one object. That identity is what the memos downstream want —
-// `namespacesTargeting` remembers per Type object — and it is why the name is in
-// the key too, so nothing here can hand a reader a name it did not build.
-//
-// Hung off the Scope a Module's own declarations go into, so it lives as long as
-// the Module being enriched and no longer. A process-global one grew for as long
-// as the process ran, which a Language Server does.
+// The conjunction Types written receivers were given, keyed by base, conjuncts
+// and name, so equal proofs share one object. Hung off the Module's root Scope,
+// so it lives only as long as the Module.
 let literalReceiverConjunctions = new WeakMap<
 	enricher.Scope,
 	Map<string, common.RefinementType>
 >()
 
-// The Scope with nothing above it — the one `topLevelScope` builds per
-// Module, and the object a per-compile memo hangs off.
+// The Scope with no parent, which `topLevelScope` builds per Module.
 function rootScopeOf(scope: enricher.Scope): enricher.Scope {
 	let current = scope
 
@@ -9290,42 +9125,9 @@ function rootScopeOf(scope: enricher.Scope): enricher.Scope {
 	return current
 }
 
-// What a written receiver proves about itself. Every other position that
-// admits a written value was ASKED — a Parameter, a declared Constant, a return
-// Type — and a receiver is the one position that asks nothing at all: it is typed
-// bottom-up and Namespace lookup then runs from whatever that came to. So `4`
-// reached `Integer` and never `NonNegativeInteger`, and `4::squareRoot()` came
-// back Optional while a Constant declared `NonNegativeInteger` did not, for no
-// reason a reader could see in the two lines.
-//
-// The question is asked here instead, of every refinement in scope at once,
-// because there is no single one to ask about. What comes back is the CONJUNCTION
-// of everything admitted — `3` is not zero and is not negative, and both are
-// true of it at once — which flows into each of the named refinements by the
-// ordinary conjunct-subset rule and so reaches every Namespace any of them does.
-//
-// It is DISPLAYED as the refinement whose conjuncts are exactly that conjunction
-// where one is declared, which is the usual case: `3` proves what
-// `PositiveInteger` proves and prints as PositiveInteger. Where no declared name
-// says the whole of it — two unrelated refinements a Program declared, both true
-// of one literal — the Type prints as the Declaration a reader would have to
-// write for it, `Integer where @::isEven()::and(@::isGreaterThan(10))`. Each leaf
-// a reader wrote reads back as they wrote it, Argument labels and all. A leaf
-// nobody wrote — a complement, a Matcher's `case 0` — prints as the Essence that
-// asks it, which need not be a spelling the Program had in reach.
-//
-// The tie between two refinements proving the SAME conjunction is settled
-// by the walk `refinementsFor` returns, which is the order narrowing settles its
-// own tie by — nearest Scope first, builtins ahead of a Program's own aliases,
-// concretes ahead of a generic instantiated here. Nothing semantic rests on it:
-// the two are one Type to everything that reads conjuncts, so it decides the name
-// a Hover prints and nothing else.
-//
-// Silent while the caller's proof is erased. `fallback-never-used` asks
-// what a call would have answered had nothing been proven at all, and a written
-// receiver is proof of exactly the kind that probe exists to take away —
-// `[1, 2]::firstItem(defaultingTo 0)` answers bare because the brackets say so,
-// which is what makes the fallback dead and the Warning true.
+// What a written receiver proves about itself: the conjunction of every
+// refinement in scope that admits it. See "Written receivers" in
+// DEVELOPMENT.md.
 function refinedLiteralReceiverType(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -9334,18 +9136,9 @@ function refinedLiteralReceiverType(
 		return null
 	}
 
-	// The whole answer, remembered per Scope and per written value. The
-	// same `7` occurs over and over in a file and asks the same question every
-	// time, and the question is expensive: every Type name in every Scope on the
-	// chain is walked, and every refinement that came back is then asked to admit
-	// the value. A Program declaring refinements of its own paid a multiple of it
-	// at every literal it wrote.
-	//
-	// The answer is a pure function of the Scope chain and the value. It goes
-	// stale when a Type is declared or when hoisting fills in or poisons an
-	// Alias' predicate, and each of those bumps the count that guards it. A
-	// written List is left off, because the Type of its items is part of the
-	// question and its spelling is not part of the key.
+	// Remembered per Scope and written value; see `remembersRefinedReceivers`.
+	// A written List is not remembered, since its item Type is part of the
+	// question.
 	let key = writtenReceiverKey(base)
 
 	if (key === null) {
@@ -9365,10 +9158,8 @@ function refinedLiteralReceiverType(
 	return answer
 }
 
-// The table this Scope's answers live in, thrown away whole the moment a
-// Type is declared anywhere — which is what keeps an answer from outliving the
-// candidates it was worked out from. A Function writing its own `type` empties
-// it once and fills it again, which is the cost of being exact.
+// This Scope's answers, dropped whenever a Type is declared anywhere, so no
+// answer outlives its candidates.
 function remembersRefinedReceivers(
 	scope: enricher.Scope,
 ): Map<string, common.RefinementType | null> {
@@ -9391,11 +9182,8 @@ let refinedReceiverAnswers = new WeakMap<
 	}
 >()
 
-// What the value IS, as a string — the whole of what the question depends
-// on besides the Scope. The kind is checked as well as the shape, because a
-// receiver that has already been refined once is a different question from the
-// bare literal it was written as. Null for everything else, which takes it off
-// the memo rather than onto it under a key that does not identify it.
+// The written value as a key, with its kind, since an already refined receiver
+// is a different question. Null takes the value off the memo.
 function writtenReceiverKey(base: common.typed.ExpressionNode): string | null {
 	switch (base.nodeType) {
 		case "IntegerValue":
@@ -9433,16 +9221,8 @@ function provenLiteralReceiverType(
 	let proven = new Set<string>()
 
 	for (let refinement of refinementsFor(declared, base.type)) {
-		// A predicate nobody has read yet is no candidate. Every other
-		// reader of `conjuncts` refuses the null by throwing, which the hoisting
-		// rounds read as "not this round" — and this rail is the one that RUNS
-		// inside a round: a predicate Expression, a Parameter default and a
-		// bodied static Property are all enriched while declarations hoist, and
-		// a written receiver may stand in any of them. Throwing there escaped the
-		// round entirely, so a Program declaring `type Trimmed = String where …`
-		// could not write a literal receiver anywhere in the file. The Alias is
-		// simply not a candidate until its predicate has arrived, and by the
-		// enrichment pass every one of them has.
+		// A predicate not read yet is no candidate. This runs while
+		// declarations hoist, where throwing would escape the hoisting round.
 		if (refinement.conjuncts !== null && admits(refinement)) {
 			admitted.push(refinement)
 
@@ -9452,18 +9232,13 @@ function provenLiteralReceiverType(
 		}
 	}
 
-	// One admitted refinement IS the conjunction, which is the everyday
-	// case and the one worth not allocating for.
+	// One admitted refinement is the conjunction itself.
 	if (admitted.length <= 1) {
 		return admitted[0] ?? null
 	}
 
-	// Each admitted refinement proves a SUBSET of the conjunction, so one
-	// that proves every question the whole of it asks IS the whole of it, and
-	// gets to name it. Read through what a leaf implies — `PositiveInteger` is
-	// one leaf and `3` is admitted into three Aliases, but a value above zero
-	// has already been proven to be neither zero nor below it, so the one name
-	// covers the three.
+	// A refinement whose implied keys cover the whole conjunction names it:
+	// `PositiveInteger` covers the three refinements `3` is admitted into.
 	let named = admitted.find((refinement) => {
 		let implied = impliedConjunctKeys(
 			provenConjuncts(refinement),
@@ -9496,10 +9271,8 @@ function provenLiteralReceiverType(
 		conjuncts,
 	}
 
-	// Only where the base's own spelling tells it apart from every other,
-	// which every base a written receiver can carry does. The key is a spelling
-	// throughout, and one that does not identify would hand a reader a Type built
-	// over somebody else's base.
+	// Remembered only where the base's spelling identifies it, since the key is
+	// a spelling.
 	if (!spellingIdentifies(base.type)) {
 		return conjunction
 	}
@@ -9523,25 +9296,9 @@ function provenLiteralReceiverType(
 	return remembered
 }
 
-// The receiver Node carrying whatever it proved about itself. Six Node
-// kinds are ever refined and no others — an Integer, a Rational, a String, a
-// List and a Dictionary written down, and an update of a Dictionary — and the
-// switch is what says so in the Types rather than in a comment: every other
-// Expression comes back as itself, untouched and unallocated.
-//
-// Six Nodes over FIVE Types, which is not a miscount. `isRefinableBase` names
-// the Types a refinement may be written ON — Integer, Rational, String, List,
-// Dictionary — and a Dictionary reaches this switch by two Nodes, the literal
-// and the update, because both are written shapes a lower bound can be read off.
-//
-// A Combination is the one of the six that is not a Literal. Its brackets
-// say what was set into it and nothing about the base it was set into, so what
-// it proves is what a lower bound proves; `literalValueOf` is where that is
-// stated and where a question the bound can not decide is refused.
-//
-// A written Boolean is not among them, though `literalValueOf` reads one: it is
-// read because it can stand as a written List's ITEM, and `isRefinableBase`
-// refuses a Boolean outright, so no refinement can ever admit one.
+// The receiver Node carrying what it proved about itself. Only written values
+// and a Dictionary update are refined; every other Expression comes back
+// untouched. See "Written receivers" in DEVELOPMENT.md.
 function writtenReceiver(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -9570,8 +9327,7 @@ function writtenReceiver(
 	}
 }
 
-// `a::and(b)` — the one Expression a condition is read THROUGH rather than
-// as a question of its own.
+// `a::and(b)`, the one Expression a condition is read through.
 function isConjunction(condition: common.typed.MethodInvocationNode): boolean {
 	return (
 		condition.namespace.name === "Boolean" &&
@@ -9580,13 +9336,10 @@ function isConjunction(condition: common.typed.MethodInvocationNode): boolean {
 	)
 }
 
-// What a condition answering `false` proves, which is only readable where
-// the condition asked exactly ONE question. A conjunction answering false says
-// that one of its questions failed and nothing about which — and that is why the
-// chain is refused HERE rather than by counting the conjuncts that came back:
-// `collectConditionEvidence` drops every leaf it can not read, which is right for
-// the true branch, where each conjunct it DID read really is proven, and would
-// make `d::isNot(0)::and(flag)` look like the single question it is not.
+// What a condition answering `false` proves, readable only for a single
+// question. A conjunction is refused here, since `collectConditionEvidence`
+// drops leaves it can not read and `d::isNot(0)::and(flag)` would look like one
+// question.
 function complementEvidence(
 	condition: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -9604,15 +9357,10 @@ function complementEvidence(
 	for (let [name, proven] of evidence) {
 		complemented.set(name, {
 			receiverType: proven.receiverType,
-			// The opposite of a leaf is the leaf with its polarity
-			// flipped, and that is the whole of it. A conjunct is stored
-			// RESOLVED — `@::isZero()` is `Integer::is(0)`, `@::hasCharacters()`
-			// is `String::isEmpty()` negated, `@::isNot(0)` is `Integer::is(0)`
-			// negated — so two Methods the standard library writes as each
-			// other's contraries have already become one leaf in two polarities,
-			// and no table of names is left with anything to pair up. The false
-			// branch of `if n::isZero()` proves exactly the leaf
-			// `NonZeroInteger` is declared by.
+			// The opposite of a leaf is the leaf with its polarity flipped. A
+			// conjunct is stored resolved, so contrary Methods are one leaf in
+			// two polarities: the false branch of `if n::isZero()` proves
+			// `NonZeroInteger`.
 			conjuncts: [negatedPredicateConjunct(proven.conjuncts[0]!)],
 		})
 	}
@@ -9620,24 +9368,9 @@ function complementEvidence(
 	return complemented
 }
 
-// The Type `@` is bound to inside a Match Handler — the Matcher's own,
-// unless a declared refinement says more about the value than the Matcher does.
-// A Match on written values is the second doorway a refinement has, and it is the
-// one nobody has to write a Function for: `case 0` proves the value IS zero, and
-// the Case below it is reached only by a value none of the Cases above named,
-// which is the very `isNot` a `NonZeroInteger` is declared by.
-//
-// The evidence is read off the MATCHERS alone, so it holds whatever the
-// Validator makes of the Match's shape — this can not lean on a check that runs
-// after it. Only an unguarded literal Matcher hands evidence DOWN (a Guard can
-// decline the value it named, so the value reaches the Handlers below and the
-// complement would be a claim about a value that is standing right there), while
-// a Handler's own literal proves what it named either way: a Guard runs after the
-// Matcher matched, not instead of it.
-//
-// The Matcher itself is untouched. Only `@`'s declared Type carries the
-// evidence, which is what leaves the Rewriter with the Match it always had —
-// literal Cases lowering to `anyIs` and a wildcard to a check on the base.
+// The Type of `@` in a Match Handler: the Matcher's, unless a declared
+// refinement says more given the values earlier Handlers named. See "Match
+// Handlers and Guards" in DEVELOPMENT.md.
 function refinedSelfType(
 	matcher: common.Type,
 	namedAbove: Array<common.PredicateConjunct>,
@@ -9655,10 +9388,8 @@ function refinedSelfType(
 		return matcher
 	}
 
-	// The same machinery an `if` narrows through, asked of `@` — which is
-	// what makes a refinement over the wrong base, over a poisoned Type or over a
-	// wildcard nothing is known about (`Unknown`) establish nothing here either,
-	// without a second reading of any of those rules.
+	// The machinery an `if` narrows through, so the wrong base, an Error or an
+	// Unknown wildcard establishes nothing here either.
 	let narrowings = narrowingsFor(
 		new Map([["@", { receiverType: matcher, conjuncts: proven }]]),
 		scope,
@@ -9667,18 +9398,9 @@ function refinedSelfType(
 	return narrowings[0]?.type ?? matcher
 }
 
-// The question a literal Matcher ASKS, as a conjunct — `case 0` is
-// `@::is(0)`, and the Handlers below it are reached by a value that answered
-// `false` to exactly that.
-//
-// Integer and String only, and null for every other kind of value. The
-// Namespace that answers `is` has to be one whose meaning is known here, and what
-// the Matcher compiles to (`anyIs`) has to answer exactly what that Namespace's
-// `is` answers — those two hold for the two scalars a literal `match` admits.
-// A Rational is a refinable base as well now, and `anyIs` cross-multiplies the
-// parts exactly as `Rational.is` does, so the same argument would carry; what is
-// missing is the Matcher, which the Validator still refuses. A Case would need
-// the argument made about it from the start.
+// The question a literal Matcher asks, as a conjunct: `case 0` is `@::is(0)`.
+// Integer and String only, the literals a `match` admits, where `anyIs` answers
+// exactly what the Namespace's `is` does.
 function namedValueConjunct(
 	literal: common.typed.ExpressionNode,
 ): common.PredicateConjunct | null {
@@ -9702,8 +9424,8 @@ function namedValueConjunct(
 
 // #region Body Return Type Inference
 
-// Every `<-` the body reaches, ignoring those belonging to a nested
-// Function literal — those return out of their own literal, not this one.
+// Every `<-` the body reaches, skipping nested Function literals, which return
+// from themselves.
 function collectReturnedTypes(
 	nodes: Array<common.typed.ImplementationNode>,
 	types: Array<common.Type>,
@@ -9726,9 +9448,7 @@ function collectReturnedTypes(
 	}
 }
 
-// One `<-` gives its Type outright; several give the Union of the
-// distinct ones, which is what a Function returning either a value or
-// `nothing` needs.
+// One `<-` gives its Type, several the Union of the distinct ones.
 function unionOfTypes(types: Array<common.Type>): common.Type | null {
 	let distinct = mergeUnionMembers(types)
 
@@ -9743,47 +9463,26 @@ function unionOfTypes(types: Array<common.Type>): common.Type | null {
 	return buildUnion(distinct)
 }
 
-// How many of these passes are running, innermost counted with the rest —
-// a nested Function literal's body is worked out inside its enclosing one's.
-// Read by `reportUndecidedPayloadTypeArguments`, which stays silent for the span
-// and answers with the Type it was handed: dropping the Diagnostics is not
-// enough on its own, because an Error TYPE reported here is what the pass hands
-// back as the literal's return Type, and the call then has nothing left to solve
-// its own Parameters from.
+// How many inference passes are running, nested literals included. See "Return
+// Type inference from a body" in DEVELOPMENT.md.
 let inferReturnTypeFromBodyDepth = 0
 
-// What this pass MANUFACTURES rather than finds. The body is read with no
-// `expectedReturnType` — that is the whole point of it — so a bare Case standing
-// in return position has no position to say which Choice declares its name or
-// what its Type Arguments are, and says so both times. Those are not refusals of
-// the body: the real pass silences the same two for the same reason, in
-// `positionWasRefused`, once the return Type has come back Error.
-//
-// Counting them as a refusal is what left `((value) { <- #Value(value) })`
-// reporting NOTHING AT ALL — this pass refusing the body, so `uninferable-return-
-// type` stood down, and the real pass silencing the bare Case, so nothing was
-// said about a return Type the Compiler could not read. Kept to the two codes a
-// missing return Type is the cause of: everything else a body is refused for is
-// reported again at the line it stands on, which is what `refused` is for.
+// The codes this pass causes by reading without an expected Type, which the
+// real pass silences. See "Return Type inference from a body" in
+// DEVELOPMENT.md.
 const undecidedWithoutAReturnType: ReadonlySet<common.DiagnosticCode> = new Set(
 	["ambiguous-case", "undecided-type-arguments"],
 )
 
-// Working out what a Function literal returns means enriching its body —
-// the Type of `<- total` can not be known without the Constants the body itself
-// declares. The body is enriched twice as a result — once here to find the Type,
-// once for real once it is known — so this pass's Diagnostics are collected and
-// dropped rather than reported. `collectDiagnostics` exists for exactly this.
+// Infers a Function literal's return Type by enriching its body, with the
+// Diagnostics dropped. See "Return Type inference from a body" in
+// DEVELOPMENT.md.
 function inferReturnTypeFromBody(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
 	scope: enricher.Scope,
-	// Set where the body was refused in its own right, which the caller
-	// reads as "this one is already answered". `words::map((w) { <- w.length })`
-	// reported THREE times — `method-called-with-dot` about the `.`, and then
-	// `uninferable-return-type` and `uninferable-type-parameter` about a Type
-	// that could not be read off a body whose Type is Error. One mistake, and
-	// the two reports that restate it are the two that say least.
+	// Set where the body has errors of its own, so the caller does not restate
+	// them as an unreadable return Type.
 	refused?: { body: boolean },
 ): common.Type | null {
 	inferReturnTypeFromBodyDepth += 1
@@ -9792,35 +9491,17 @@ function inferReturnTypeFromBody(
 		let { result, diagnostics } = collectDiagnostics(() => {
 			let inferenceScope = childScope(scope)
 
-			// Declared through the same path the real pass uses, rather
-			// than by hand: a Parameter whose internal name is a Pattern brings
-			// in as many names as the Pattern binds, and a body reading one of
-			// them would otherwise report `unknown-name` HERE — where the
-			// Diagnostics are dropped — and hand back no return Type at all.
-			// The bindings it produces are discarded; only the Scope matters.
+			// Declared as the real pass declares them, so Pattern bindings are
+			// in scope. The bindings themselves are discarded.
 			enrichParameterList(node.parameters, inferenceScope, parameterTypes)
 
-			// No `expectedReturnType` is seeded — there is none yet,
-			// which is the whole reason this runs. A bare Case in return
-			// position has nothing to resolve against and stays unresolved, so
-			// a literal returning one still has to write its `-> Type`.
-			//
-			// Null rather than left out, because leaving it out is not the
-			// absence of one: the search walks out to the ENCLOSING Function,
-			// whose expected return Type this literal's `<-` has nothing to do
-			// with — `<-` returns from the callback, never from the walk around
-			// it. A `loop` nested in another `loop`'s `step` read the outer
-			// callback's `Step<State, Result>` that way and decided its own
-			// `#Done` payload against it, so the inner call finished with the
-			// OUTER's Result Type while the value it actually carried was the
-			// inner one's.
+			// Null rather than unset, so the search does not walk out to the
+			// enclosing Function's return Type. A bare Case after `<-`
+			// therefore stays unresolved.
 			inferenceScope.expectedReturnType = null
 
-			// And the same barrier for asynchrony, for the same reason:
-			// what a `complete` in this body is held to is this literal's own
-			// declaration, which is the very thing being worked out. The
-			// Diagnostics of this pass are dropped, so the barrier decides
-			// nothing but that the enclosing body's is not consulted.
+			// The same barrier for asynchrony, so the enclosing body's is not
+			// consulted.
 			inferenceScope.completing = null
 
 			let types: Array<common.Type> = []
@@ -9832,34 +9513,25 @@ function inferReturnTypeFromBody(
 				types,
 			)
 
-			// A body that returns nothing at all is left to the
-			// Validator, which reports the missing return against the Function
-			// itself.
+			// An Error among the returned Types answers null. A body with no
+			// `<-` also answers null, and the validator reports the missing
+			// return.
 			if (types.some((type) => type.type === "Error")) {
 				return null
 			}
 
 			let answer: common.Type | null = unionOfTypes(types)
 
-			// A completing body's `<-` answers with the VALUE, and the
-			// Function answers with the future around it — so what is read off
-			// the body has to be wrapped back up before it can be the literal's
-			// return Type. `(url) { <- complete headline(url) }` is
-			// `(_: String) -> Future<String>`, which is what the position it
-			// stands in is matched against.
+			// A completing body's `<-` answers the value, so the return Type
+			// wraps it: `(url) { <- complete headline(url) }` is `(_: String)
+			// -> Future<String>`.
 			return answer === null || node.completing !== true
 				? answer
 				: { type: "Future" as const, valueType: answer }
 		})
 
-		// The Diagnostics of this pass are DROPPED — it reads a body that
-		// the real pass reads again — so an error here is one the reader is
-		// about to be told about at the line it stands on. That is the whole of
-		// what `refused` says, and it is asked of the same body this pass just
-		// read rather than guessed at from an Error Type.
-		//
-		// All but the two this pass manufactures for itself: those the real pass
-		// silences, so counting them here would leave the reader with nothing.
+		// Errors here will be reported by the real pass, which is what
+		// `refused` says. The codes this pass causes itself are left out.
 		if (
 			refused !== undefined &&
 			containsErrors(
@@ -9881,25 +9553,13 @@ function inferReturnTypeFromBody(
 // #endregion
 
 // #region Invocation, contextual Function & CaseValue resolution
-//
-// Typing an invocation, a contextually typed Function literal, a
-// CaseValue Expression, a Namespace's property values, or a Type Alias' `where`
-// clause all needs to enrich Expressions — so it lives here, on the enrichment
-// side, rather than in the Resolver. Enrichment imports the Resolver, never the
-// other way round.
+// Typing an Invocation, a contextual Function literal, a Case value, Namespace
+// Property values or an Alias predicate enriches Expressions, so it lives here.
+// The enricher imports the resolver, never the other way round.
 
-// A written container Literal's Node carrying the Type a call decided for
-// the Parameter it stands at — one answer per spelling, and null for every other
-// Expression. The three are the ones a decision can be written ONTO, and each
-// declares the shape that Type may be, so a decision of another shape is no
-// decision for it. They are not the only Expressions whose Type can hold an
-// undecided slot — a `define` whose arms all answer an empty List carries one
-// too, and so does a call that answers its own undecided seed — but a Node built
-// out of other Nodes says what they said, and rewriting the top of one would
-// leave the Types underneath disagreeing with it. A NAME is left alone for a
-// reason of its own: what an empty `[]` bound to a name decides is settled where
-// the name is, and a call that pinned the Type at one of its uses would say
-// something the Declaration never said.
+// A written List, Dictionary or Record literal's Node with the Type a call
+// decided for its Parameter, or null. A Node built from other Nodes keeps their
+// Types, and a name keeps what its Declaration decided.
 function decidedLiteralNode(
 	node: common.typed.ExpressionNode,
 	decided: common.Type,
