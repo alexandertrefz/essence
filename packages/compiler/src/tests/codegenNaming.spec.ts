@@ -17,14 +17,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The same stages the CLI runs, minus bundling — the emitted text is what
-// every assertion below is about, so nothing is written to disk to get it.
-//
-// A naming rule holds for every build the Compiler can do, and turning an
-// Optimiser pass off is one of them — which is why the Options are a Parameter
-// here. They matter to exactly one question below: an un-optimised List literal
-// is `List.createList(…)` and names a Namespace, where the collapsed one is an
-// object literal that names none.
+// The CLI's stages without bundling. A naming rule must hold with any
+// Optimiser pass off, so the Options are a Parameter. An uncollapsed List
+// literal is `List.createList(…)` and names a Namespace.
 function generate(
 	source: string,
 	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
@@ -59,11 +54,9 @@ const withoutCompiledTypeTests: OptimiserOptions = {
 	disabledPasses: new Set(["compile-type-tests"]),
 }
 
-// Every fault here compiled green and only showed itself in the emitted
-// JavaScript — a wrong value, a `TypeError`, or a bundler syntax error quoting
-// generated text — so each is pinned by RUNNING the Program as well as reading
-// it. The emitted imports are absolute paths into this repo's runtime, so the
-// throwaway module resolves from anywhere.
+// A naming fault compiles cleanly and shows only when the JavaScript runs, so
+// the specs run the Program too. The emitted imports are absolute paths, so
+// the throwaway module resolves from anywhere.
 async function run(source: string): Promise<Array<string>> {
 	let js = generate(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-naming-"))
@@ -89,11 +82,8 @@ async function run(source: string): Promise<Array<string>> {
 }
 
 describe("Code Generation — Naming and Escaping", () => {
-	// A Lookup used to be routed by the SPELLING of its base: any
-	// Identifier base was treated as a Namespace, so a local named after one
-	// answered with the standard library's Method. Which of the three a Lookup is
-	// — a static call, a static Property read, a Record field read — is a
-	// question about the base's resolved Type, and is now asked of it.
+	// A Lookup's base's resolved Type, not its spelling, decides whether it is
+	// a static call, a static Property read or a Record field read.
 	describe("A local named after a Namespace", () => {
 		const shadowedOptional = `implementation {
 			function f() -> Integer {
@@ -108,9 +98,6 @@ describe("Code Generation — Naming and Escaping", () => {
 		it("reads the Record field, not the standard library Method", () => {
 			let generated = generate(shadowedOptional)
 
-			// The bug: `Optional.value` became the prelude const for
-			// `Optional::value`, so `f` answered with a JavaScript Function
-			// where an Integer was promised.
 			expect(generated).not.toContain("$es_Optional_value")
 			expect(generated).toContain("$user_Optional.value")
 		})
@@ -120,28 +107,22 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("emits no const for a Method only the shadowing named", () => {
-			// The reachability search reads the same Types, so the edge to
-			// `$es_Optional_value` is not drawn either — a const nothing
-			// references would otherwise be emitted beside the correct read.
+			// The reachability search reads the same Types, so it draws no edge
+			// to `$es_Optional_value`.
 			expect(generate(shadowedOptional)).not.toContain("$es_Optional_")
 		})
 
 		it("keeps a genuine static read on the Namespace itself", () => {
-			// The counterpart guard — an Identifier base whose Type IS a
-			// Namespace still routes through `namespaceMember`, so a static
-			// Property is the plain member read it always was.
+			// A base whose Type is a Namespace still routes through
+			// `namespaceMember`, so a static Property is a plain member read.
 			expect(
 				generate(`implementation { Terminal.inspect(Number.Pi) }`),
 			).toContain("Number.Pi")
 		})
 	})
 
-	// The emitted Program binds seventeen runtime Namespaces, `$_`, `$type`
-	// and `$helpers`, and reads the global `Object` for a Combination. None is an
-	// Essence keyword, so a Program may bind any of them itself — and JavaScript
-	// lexical scoping then points every emitted helper call at the user's value.
-	// `$` is a legal Essence identifier character, so `$type` and `$helpers` are
-	// names a user can write with no way of knowing they are spoken for.
+	// A Program may bind any name emitted code uses for itself. See "Escaped
+	// names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("A binding spelled like a compiler-emitted global", () => {
 		it("does not rebind the List import a list literal calls", async () => {
 			const source = `implementation {
@@ -159,22 +140,18 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			// The literal is a branded object literal — it names no
-			// Namespace at all — and the user's own binding is somewhere else
-			// entirely.
+			// The collapsed literal is a branded object literal, which names no
+			// Namespace.
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).toContain("const $user_List = ")
 			expect(generated).not.toMatch(/\bconst List\b/)
 
-			// And with the collapse turned off the literal is
-			// `List.createList(…)` again, which is the shape the shadowing
-			// could break: that `List` has to be the IMPORT.
+			// Without the collapse the literal is `List.createList(…)`, and that
+			// `List` must be the import.
 			expect(generate(source, withoutCollapsedConstruction)).toMatch(
 				/\bList\.createList\(/,
 			)
 
-			// Before the fix: `TypeError: List.createList is not a
-			// function`.
 			expect(await run(source)).toEqual(["[ 1, 2 ]", "5"])
 		})
 
@@ -193,10 +170,9 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			// A Match reaches `$type` twice over — for the hidden key a
-			// compiled Type test reads, and for the descriptor check the
-			// Matchers that can not be compiled keep — and both have to be the
-			// IMPORT.
+			// A Match reads `$type` for the hidden key a compiled Type test reads
+			// and for the descriptor check of an uncompiled Matcher. Both must be
+			// the import.
 			expect(generated).toContain(
 				'_self[$type.typeKeySymbol] === "Integer"',
 			)
@@ -205,8 +181,6 @@ describe("Code Generation — Naming and Escaping", () => {
 			)
 			expect(generated).toContain("const $user_$type = ")
 
-			// Before the fix: `TypeError: $type.isValueOfType is not a
-			// function`.
 			expect(await run(source)).toEqual([`"integer"`, `"hi"`])
 		})
 
@@ -222,23 +196,21 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			// A collapsed Combination is a spread and names nothing at
-			// all; turn `collapse-combinations` off and `Object.assign` is
-			// back, which is the shape the shadowing could break.
+			// A collapsed Combination is a spread. Without
+			// `collapse-combinations` it is `Object.assign`, which must be the
+			// global.
 			expect(generated).toContain("...base")
 			expect(generated).toContain("const $user_Object = ")
 			expect(generate(source, withoutCollapsedCombinations)).toContain(
 				"Object.assign(",
 			)
 
-			// Before the fix: `TypeError: Object2.assign is not a
-			// function`, esbuild having renamed the shadowing binding.
 			expect(await run(source)).toEqual(["2", "1"])
 		})
 
 		it("does not rebind the global Object for a Namespace either", async () => {
-			// A Namespace is a `class <Name>` — the same shadowing, at the
-			// same module scope, reached through the other emission path.
+			// A user Namespace is a `class <Name>` at module scope, so it could
+			// shadow `Object` the same way.
 			const source = `implementation {
 				namespace Object for Integer {
 					doubled() -> Integer {
@@ -264,9 +236,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("mangles a nested binding named after a runtime Namespace", async () => {
-			// Only an inner scope can hold one of these — at the top level
-			// the Enricher refuses the redeclaration — which is exactly where
-			// JavaScript's own scoping made the shadowing invisible.
+			// Only an inner scope can bind a runtime Namespace's name, since the
+			// Enricher refuses the redeclaration at the top level.
 			const source = `implementation {
 				constant $helpers = 1
 
@@ -286,21 +257,10 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
-	// A user Namespace can be named after a runtime one — `namespace List
-	// for Integer` is a legal Program in any block below the top level, where
-	// `List` is not declared yet and the Enricher has nothing to refuse. Emitted
-	// verbatim, its `class List` shadowed the `import * as List` for the rest of
-	// that block, so the List literal beside it called the USER's class:
-	// `List.createList is not a function`, out of a Program that compiled green.
-	//
-	// Which of the two a `List` means is a lexical question, and the
-	// Enricher answers it lexically — a nested Namespace REPLACES the builtin of
-	// its name for the rest of its block, in Method resolution ('No Method named
-	// 'firstItem'' for a List beside a `namespace List`) and in conformance
-	// solving alike ('String does not conform to 'Comparable'' beside a
-	// `namespace String`). So the Rewriter answers it lexically too, and it is the
-	// USER's Namespace that is mangled: the import keeps the name it was imported
-	// under, which is the name every literal constructor spells.
+	// A nested user Namespace may take a runtime Namespace's name. The user's
+	// class is mangled and the import keeps its name, which every literal
+	// constructor spells. See "Shadowed Namespaces" in
+	// packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("A Namespace named after a runtime Namespace", () => {
 		const shadowedList = `implementation {
 			function f() -> Integer {
@@ -328,31 +288,25 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).not.toMatch(/\bclass List\b/)
 
-			// Before the fix: `TypeError: List.createList is not a
-			// function` — the emitted `class List` had no such static Method.
 			expect(await run(shadowedList)).toEqual(["[ 1, 2 ]", "42"])
 		})
 
 		it("does not shadow it for an un-optimised literal either", () => {
-			// The shape the fault was found in. A collapsed List literal
-			// names no Namespace, so the shadowing can not reach it; turn
-			// `collapse-construction` off and the literal is
-			// `List.createList(…)` again, with the same `class $user_List`
-			// beside it.
+			// Without `collapse-construction` the literal is `List.createList(…)`
+			// beside the user's `class $user_List`.
 			let generated = generate(shadowedList, withoutCollapsedConstruction)
 
 			expect(generated).toContain("class $user_List {")
-			// `\b` does not fire between `_` and `L`, so this asks for the
-			// BARE name — the import the literal has to keep reaching.
+			// `\b` does not match between `_` and `L`, so this finds only the
+			// bare import name.
 			expect(generated).toMatch(/\bList\.createList\(/)
 			expect(generated).not.toMatch(/\bclass List\b/)
 		})
 
 		it("leaves a sibling Function on the runtime Namespace", async () => {
-			// The mangling has to stop at the block that declares the
-			// Namespace. `g` never saw the user's `List`, so every `List` in it is
-			// the standard library's — mangling those alongside would answer a
-			// `ReferenceError` for a Program that was always fine.
+			// The mangling stops at the block that declares the Namespace. `g`
+			// never sees the user's `List`, so its `List` is the standard
+			// library's.
 			const source = `implementation {
 				function f() -> Integer {
 					namespace List for Integer {
@@ -384,9 +338,7 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("closes the Namespace's scope with its block", async () => {
-			// The sanity case the whole fix is for: a Namespace named `List`
-			// and List literals in the ONE Function, both working. Inside the
-			// Conditional `List` is the user's; the moment the block closes it is
+			// Inside the Conditional `List` is the user's. After the block it is
 			// the standard library's again, and `firstItem` resolves on it.
 			const source = `implementation {
 				function f() -> Integer {
@@ -418,9 +370,8 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain("$es_List_firstItem")
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 
-			// And with the collapse off, where the literal names the
-			// import again — the shape the scoping rule is actually about, in
-			// the Function whose block the user's `List` closed inside.
+			// Without the collapse the literal names the import, after the
+			// block where the user's `List` closed.
 			expect(generate(source, withoutCollapsedConstruction)).toMatch(
 				/\bList\.createList\(/,
 			)
@@ -429,12 +380,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("does not route a shadowing Method to the standard library's const", async () => {
-			// The other half of the same fault, through the other spelling.
-			// An Essence-implemented standard library Method is its own top-level
-			// `$es_<Namespace>_<member>` const, and a user Namespace sharing the
-			// Namespace's NAME and a Method's name was routed straight to it:
-			// `$es_List_contains(5, 5)` ran the library's List.contains against an
-			// Integer and died inside `reduce`.
+			// An Essence-bodied standard library Method is a `$es_<Namespace>_<member>`
+			// const. A user Namespace sharing both names must not be routed to it.
 			const source = `implementation {
 				function f() -> Boolean {
 					namespace List for Integer {
@@ -454,15 +401,12 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain("$user_List.contains(")
 			expect(generated).not.toContain("$es_List_contains")
 
-			// Before the fix: `TypeError: value is not iterable`.
 			expect(await run(source)).toEqual(["true"])
 		})
 
 		it("escapes a static call and a dispatch branch alike", async () => {
-			// Every emission site that names a Namespace has to agree with
-			// the class declaration — a `Lookup`'s static call and each
-			// `dispatchMethod` branch among them, both of which reach the same
-			// `namespaceMember`.
+			// A `Lookup`'s static call and each `dispatchMethod` branch reach
+			// `namespaceMember`, so they agree with the class declaration.
 			const source = `implementation {
 				function f() -> Integer {
 					namespace List for Integer {
@@ -498,16 +442,13 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain("$user_List.zero()")
 			expect(generated).toContain("$user_List.describe")
 			expect(generated).toContain("$user_Record.describe")
-			// The runtime Namespaces the emitted helpers reach are
-			// untouched — the String literal's constructor, and the hidden Type
-			// key a collapsed List literal brands itself with.
+			// The String literal's constructor and the List literal's Type key
+			// still reach the runtime Namespaces.
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).toMatch(/\bString\.createString\(/)
 
-			// The List literal names its Namespace again with the
-			// collapse off, and it is still the import it names — beside a
-			// `class $user_List` holding a static Method of its own, which is
-			// the collision this Program is built out of.
+			// Without the collapse the List literal names the import, beside a
+			// `class $user_List` with a static Method of its own.
 			expect(generate(source, withoutCollapsedConstruction)).toMatch(
 				/\bList\.createList\(/,
 			)
@@ -516,9 +457,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("escapes a conformance witness on the shadowing Namespace", async () => {
-			// A witness is an object literal of Methods read off the
-			// conforming Namespace, and its Namespace arrives as a bare string
-			// with no Type to ask — so it rests on the same lexical answer.
+			// A witness names its Namespace as a bare string with no Type, so it
+			// relies on the same lexical answer.
 			const source = `implementation {
 				protocol Showable {
 					toString() -> String
@@ -556,11 +496,9 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("escapes a top-level Namespace of that name as well", () => {
-			// The Enricher refuses `namespace List` at the TOP level —
-			// 'Variable 'List' is already declared' — so this shape can not be
-			// written as a source Program, and the Rewriter must not rest on that
-			// refusal staying in place. The typed Program is handed straight to it
-			// instead.
+			// The Enricher refuses `namespace List` at the top level, so the spec
+			// builds the typed Program by hand. The Rewriter must not rely on that
+			// refusal.
 			let listNamespace = {
 				nodeType: "Identifier",
 				name: "List",
@@ -626,10 +564,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
-	// A declaration was escaped and its references were not, so the two
-	// disagreed — `constant this = { x = 1 }` bound `_this` and read `this.x`,
-	// which bundles to `exports.x` and reads `undefined`. Lookup bases and
-	// Namespace class names go through the same escape as a Constant now.
+	// A declaration and its references go through one escape, including Lookup
+	// bases and Namespace class names.
 	describe("A JavaScript reserved word", () => {
 		it("escapes the base of a Record field read", async () => {
 			const source = `implementation {
@@ -641,17 +577,15 @@ describe("Code Generation — Naming and Escaping", () => {
 			let generated = generate(source)
 
 			expect(generated).toContain("_this.x")
-			// `\b` does not fire inside `_this`, so this asks for the
-			// BARE reserved word — which bundles to `exports.x` and reads
-			// `undefined`.
+			// `\b` does not match inside `_this`, so this finds only the bare
+			// reserved word, which would bundle to `exports.x`.
 			expect(generated).not.toMatch(/\bthis\.x/)
 
 			expect(await run(source)).toEqual(["1"])
 		})
 
 		it("escapes a base that would not even bundle", async () => {
-			// `new.x` is not a member read at all — esbuild died with
-			// `Unexpected "x"` on generated text.
+			// `new.x` is not even a member read in JavaScript.
 			const source = `implementation {
 				constant new = { x = 1 }
 
@@ -663,9 +597,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("escapes a Namespace's class name and its references alike", async () => {
-			// `class new {` was a bundler error — `Expected identifier but
-			// found "new"`. `namespace new for Integer` is a legal Program: `new`
-			// is not an Essence keyword.
+			// `new` is no Essence keyword, so `namespace new for Integer` is legal,
+			// but `class new {` does not parse.
 			const source = `implementation {
 				namespace new for Integer {
 					static zero() -> Integer {
@@ -685,13 +618,9 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
-	// A user Namespace is a `class`, and a class refuses two member names
-	// an object literal accepts: no static member may be named `prototype`, and
-	// no field may be named `constructor`. Both are ordinary Essence
-	// identifiers, so `namespace Shape for Shape { prototype () -> … }` compiled
-	// green and died in the bundler — `Invalid static method name "prototype"`
-	// quoting generated text. Such a member is mangled instead, at the class
-	// body and at every read alike.
+	// A class refuses a static member named `prototype` and a field named
+	// `constructor`, which an object literal accepts. Such a Namespace member is
+	// mangled at the class body and at every read.
 	describe("A Namespace member a class can not hold", () => {
 		it("mangles a Method named prototype, at definition and call", async () => {
 			const source = `implementation {
@@ -735,8 +664,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("leaves a Record member of either name alone", async () => {
-			// A Record is an object literal, which holds both names happily
-			// — and the read has to match the key the literal wrote.
+			// A Record is an object literal, which holds both names, so the read
+			// matches the key as written.
 			const source = `implementation {
 				constant r = { prototype = 1 }
 
@@ -751,12 +680,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
-	// The Lexer ends an Identifier only at one of ITS symbols, and `?`,
-	// `+`, `!`, `%`, `*`, `&`, `^` and `;` are not among them — so `ok?` and
-	// `a+b` are single Identifier Tokens every stage carries to the Rewriter.
-	// Emitted raw they are not JavaScript at all, and the build died in the
-	// bundler with an esbuild syntax error quoting generated text at a line
-	// number that does not exist in the author's file.
+	// `ok?` and `a+b` are single Identifiers that JavaScript cannot spell. See
+	// "Escaped names" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("An identifier JavaScript can not spell", () => {
 		it("mangles a Constant, at binding and reference", async () => {
 			const source = `implementation {
@@ -787,9 +712,7 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("mangles distinct names distinctly", async () => {
-			// The encoding is injective — every character JavaScript
-			// accepts is kept and every other becomes `_<code point>_`, and `_`
-			// can appear nowhere else, so two names can not mangle alike.
+			// The encoding is injective, since `_` appears in no Essence name.
 			const source = `implementation {
 				constant a+b = 1
 				constant a?b = 2
@@ -817,9 +740,8 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("spells a Record field as a string key and a bracketed read", async () => {
-			// A member name is never ESCAPED — the read has to match the
-			// key the literal wrote — but it does have to be spellable, so both
-			// positions become the string form together.
+			// A member name is not escaped, so the read matches the key as
+			// written. Both positions use the string form instead.
 			const source = `implementation {
 				constant r = { ok? = true, a+b = 5 }
 
@@ -855,8 +777,7 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 
 		it("leaves an ordinary name untouched", () => {
-			// The whole point of the three narrow tests above — a Program
-			// that trips none of them emits exactly what it always did.
+			// A Program with no such name emits its names unmangled.
 			let generated = generate(`implementation {
 				constant value = 5
 
@@ -868,11 +789,9 @@ describe("Code Generation — Naming and Escaping", () => {
 		})
 	})
 
-	// `BigInt` is not a decimal parser: it reads `"0xFF"` as 255 and THROWS
-	// on `"FF"`. The Lexer refuses a non-decimal Number Literal with a positioned
-	// Diagnostic, so nothing should reach here — this is the belt to those
-	// braces, because either failure would be silent or would abort the Rewriter
-	// with a JavaScript error carrying no source location.
+	// `BigInt` reads `"0xFF"` as 255 and throws on `"FF"`. The Lexer already
+	// refuses such a Literal, so this is a second guard against a silent wrong
+	// value or a throw with no source location.
 	describe("A Number Literal that is not decimal digits", () => {
 		function emitInteger(value: string): string {
 			let program = {
