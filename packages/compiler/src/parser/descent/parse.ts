@@ -3394,12 +3394,9 @@ class DescentParser {
 	protected parseProtocolDeclarationStatement(): parser.ProtocolDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordProtocol)
 		let name = this.parseIdentifier()
-		// The extension list reads exactly as a Namespace's conformance
-		// list does, through the very same parse — `protocol Orderable is
-		// Comparable` says of the Protocol what a conformance clause says of a
-		// Type. A `where` clause parses here and is refused at the Enricher,
-		// which is where the Diagnostic can say that a Protocol has no Type
-		// Parameters for one to bound.
+		// `protocol Orderable is Comparable` reads as a conformance list. The
+		// enricher refuses a `where` clause, since a Protocol has no Type
+		// Parameters.
 		let conformsTo = this.parseConformanceClauses()
 
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
@@ -3407,8 +3404,7 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseProtocolBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		// A Protocol's signatures are name-keyed exactly as a
-		// Namespace's Methods are, and lose the first definition the same way.
+		// A Protocol's signatures are name-keyed like a Namespace's Methods.
 		this.reportDuplicateNames(body, "Method", "duplicate-method", [
 			"Write both signatures inside one 'overload' block when both are meant to exist.",
 		])
@@ -3428,8 +3424,7 @@ class DescentParser {
 	protected parseProtocolBodyNode(): parser.ProtocolMethods[string] {
 		let token = this.peekOrFail()
 
-		// A signature takes its Documentation from its own line — an
-		// `overload` block owns no signature line, so its Documentation is
+		// An `overload` block owns no signature line, so its Documentation is
 		// read here.
 		let documentation = this.tokens.documentationAbove(
 			token.position.start.line,
@@ -3503,12 +3498,8 @@ class DescentParser {
 		}
 	}
 
-	// A Protocol Method is a requirement or a PROVIDED one, and the brace
-	// after the return Type is the whole of the difference. The provided branch
-	// builds the same Function Definition the bodied `declarations` Method form
-	// builds, over the very Parameter and return Type Nodes the signature keeps
-	// — so a provided Method is enriched and emitted by the code every other
-	// bodied Method goes through.
+	// A Protocol Method is a requirement, or a provided one with a block. A
+	// provided body builds the Function Definition any bodied Method builds.
 	protected parseProtocolMethodSignature(): parser.ProtocolMethodSignatureNode {
 		let documentation = this.documentationHere()
 		let parameterList = this.parseParameterList()
@@ -3568,17 +3559,8 @@ class DescentParser {
 		return null
 	}
 
-	// `expect EXPR`, `require EXPR` and `require MATCHER = EXPR` — one
-	// method, because the two Keywords differ in what a failure does and in
-	// nothing else the grammar can see. `expect` judges a Boolean; `require`
-	// judges a Boolean or takes a value apart.
-	//
-	// The Matcher stands where a Declaration's name stands, and for the reason
-	// every other binding site has it there: a name is introduced left of `=`,
-	// in a Parameter, or in a Handler head — never on the right of anything.
-	// `expect` has no such form at all, because it records its result and the
-	// test carries on: a name it introduced would stand below a line that may
-	// never have run.
+	// `expect EXPR`, `require EXPR` and `require MATCHER = EXPR`.
+	// See "Assertions" in DEVELOPMENT.md.
 	protected parseAssertionStatement():
 		| parser.ExpectStatementNode
 		| parser.RequireStatementNode {
@@ -3643,16 +3625,8 @@ class DescentParser {
 		return generators.expectStatement(value, null, snapshot, position)
 	}
 
-	// The Matcher of `require MATCHER = EXPR`, read speculatively. A
-	// Matcher and an Expression begin alike — `{ team, points }` and
-	// `#Value(second)` are both — and a Matcher holds what no Expression can
-	// (`points: Integer`, `} as whole`), so one reading can not stand for both
-	// and be reinterpreted afterwards. The Matcher is read first and kept only
-	// where the `=` behind it says that is what was written; where it is not,
-	// the reading is given back whole and the Expression is read instead.
-	//
-	// `startsMatcher` is what keeps an assertion whose subject can not be a
-	// Matcher from speculating at all.
+	// The Matcher of `require MATCHER = EXPR`, kept only where an `=` follows.
+	// See "Assertions" in DEVELOPMENT.md.
 	protected speculateAssertionMatcher(): parser.MatcherNode | null {
 		if (!startsMatcher(this.tokens.peek())) {
 			return null
@@ -3664,10 +3638,7 @@ class DescentParser {
 		)
 	}
 
-	// `expect MATCHER = EXPR` — the form `require` has, written on the
-	// Keyword that can not have it. Read to the end of the Expression before
-	// it is refused, so what is dropped is the whole Statement rather than a
-	// tail of it read again as one of its own.
+	// `expect MATCHER = EXPR`, refused after the whole Statement is read.
 	protected refuseMatcherOnExpect(
 		keyword: Token,
 		matcher: parser.MatcherNode,
@@ -3693,10 +3664,8 @@ class DescentParser {
 		)
 	}
 
-	// The two Matchers that can not mean anything left of `=`. Every
-	// other one may stand there, whether it binds or not: `require #Empty = x`
-	// and `require Integer = x` name a shape and bind nothing, which is what a
-	// test asks when the shape is the whole of what it is proving.
+	// A wildcard or a literal means nothing left of `=`. A shape that binds
+	// nothing, as in `require #Empty = x`, is fine.
 	protected refuseUnusableMatcher(
 		matcher: parser.MatcherNode,
 		value: parser.ExpressionNode,
@@ -3725,27 +3694,16 @@ class DescentParser {
 				"this is a value, not a shape",
 				{
 					code: "literal-in-require",
-					// The value the line was written OVER, pointed at so
-					// that both sides of the comparison the Help spells stand on
-					// the report. It is also the only record of where that value
-					// ends: the Statement is dropped whole, so nothing
-					// downstream — an Editor writing the comparison above all —
-					// could work it out from the tree.
+					// The Quick Fix reads where the value ends off this Label,
+					// since the Statement is dropped.
 					labels: [
 						secondary(value.position, "the value it asks about"),
 					],
 					notes: [
 						"'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.",
 					],
-					// Built from the two things that were WRITTEN, the
-					// way the Quick Fix on this very Diagnostic builds its
-					// edit — a hardcoded 'require x::is(3)' asked a reader
-					// looking at `require "Lions" = name` to find themselves in
-					// it. The value is spelled where it is a name, which is what
-					// a `require` line left of `=` almost always has on its
-					// right; anything else is a schematic and says so, since the
-					// Parser holds Nodes rather than the text they were read
-					// from.
+					// Spelled from what was written, as the Quick Fix spells
+					// its edit.
 					helps: [
 						`Compare instead: '${writtenValueText(value)}::is(${
 							writtenText(this.sourceLines, matcher.position) ||
@@ -3757,14 +3715,8 @@ class DescentParser {
 		}
 	}
 
-	// `EXPR is MATCHER` — the form a writer reaches for who has met a
-	// Matcher behind an `is` somewhere else, recognised here only to say that
-	// this language has no such form. `is` is not a Keyword: it is the
-	// Equatable Method every value already has (`a::is(b)`), which is exactly
-	// why a Matcher written behind it reads as a comparison that USES the name
-	// it is declaring. The Matcher is read to its end before the report, so
-	// the Diagnostic underlines the whole of what was written and the
-	// Statement dropped is the whole Statement.
+	// `EXPR is MATCHER`, a form this language does not have, refused after the
+	// Matcher is read. See "Assertions" in DEVELOPMENT.md.
 	protected refuseMatcherAfterValue(is: Token): never {
 		this.tokens.next()
 
@@ -3787,15 +3739,8 @@ class DescentParser {
 		)
 	}
 
-	// `require MATCHER = EXPR matches snapshot` — a snapshot asked of
-	// the one assertion form that has no value to give it. A snapshot records
-	// a value; this line took one apart, and what came of that is the names it
-	// introduced. Recording one of them is a Statement of its own, written
-	// below: `expect item matches snapshot`.
-	//
-	// The snapshot is read to its end before the report, so the Diagnostic
-	// underlines the whole of what was written and no tail of it is read again
-	// as a Statement of its own.
+	// `require MATCHER = EXPR matches snapshot`, refused after the snapshot is
+	// read: this line took a value apart rather than holding one.
 	protected refuseSnapshotAfterMatcher(matcher: parser.MatcherNode): never {
 		let snapshot = this.parseSnapshot()
 
@@ -3805,9 +3750,8 @@ class DescentParser {
 			"there is no value here to record",
 			{
 				code: "snapshot-after-matcher",
-				// The names the Matcher introduced, since one of them is
-				// what the line below has to record. The Statement is dropped
-				// here, so nothing downstream ever sees the Matcher again.
+				// The Matcher's names, for the Quick Fix that records one of
+				// them on a line of its own.
 				data: {
 					kind: "introduced-names",
 					names: matcherNames(matcher),
@@ -3823,12 +3767,8 @@ class DescentParser {
 		)
 	}
 
-	// `matches snapshot` and the two shapes a snapshot takes. An INLINE
-	// one carries its recorded text in the source, written there by the first
-	// run — `matches snapshot` alone is one that has never run. A STORED one
-	// names an entry of `__snapshots__/<File>.es.snap` and says so with `from`,
-	// which is what keeps the two apart: the text of an inline snapshot is a
-	// String Literal, and so is the name of a stored one.
+	// `matches snapshot`, inline or stored with `from`.
+	// See "Assertions" in DEVELOPMENT.md.
 	protected parseSnapshot(): parser.SnapshotNode {
 		let matches = this.tokens.next()
 		let keyword = this.peekOrFail("'snapshot'")
@@ -3862,10 +3802,8 @@ class DescentParser {
 
 		let token = this.tokens.peek()
 
-		// An interpolated String reaches `parseSnapshotText`, which
-		// refuses it with a message about why — left alone it would read as a
-		// Statement of its own on the line below an empty snapshot, which is
-		// two readings of one line and no Diagnostic about either.
+		// An interpolated String goes on to `parseSnapshotText`, which
+		// refuses it.
 		if (
 			token?.type !== TokenType.LiteralString &&
 			token?.type !== TokenType.LiteralStringStart
@@ -3890,9 +3828,8 @@ class DescentParser {
 		)
 	}
 
-	// A plain String Literal — an interpolated one holds Expressions,
-	// and neither a recorded value nor the name of a stored snapshot is
-	// something a run works out.
+	// A plain String Literal, since a recorded value or a snapshot's name
+	// holds no Expressions.
 	protected parseSnapshotText(what: string): parser.StringValueNode {
 		let token = this.peekOrFail(what)
 
@@ -3909,10 +3846,8 @@ class DescentParser {
 		return generators.stringValueNode(token.value, token.position)
 	}
 
-	// An assertion belongs to a test — to the test's own block and to
-	// every block nested inside it, and to nothing else. A Function literal
-	// written in a test body is the boundary: its body runs wherever it is
-	// handed to, which is not something the test can answer for.
+	// An assertion belongs to a test's own block and the blocks nested in it,
+	// not to a Function literal written there.
 	protected reportAssertionOutsideTest(
 		keyword: Token,
 		position: common.Position,

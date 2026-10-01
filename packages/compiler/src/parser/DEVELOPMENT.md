@@ -275,3 +275,37 @@ That start is a `{`, or the `across` or `for` of a table or a property list.
 - `focused tagged slow { … }`: `tagged` has a name after it, so it is a Modifier, and `slow` is its argument.
 - `tagged slow focused { … }`: no lookahead settles it. `tagged` takes no argument, and `focused` becomes the
   argument of a Modifier `slow`.
+
+## Assertions
+
+`parseAssertionStatement` reads `expect EXPR`, `require EXPR` and `require MATCHER = EXPR`. The two Keywords differ
+in what a failure does and in nothing else the grammar sees. `expect` judges a Boolean. `require` judges a Boolean
+or takes a value apart.
+
+The Matcher stands where a Declaration's name stands. A name is introduced left of `=`, in a Parameter, or in a
+Handler head, and never on the right of anything. `expect` has no Matcher form, because it records its result and
+the test carries on. A name it introduced would stand after a line that may not have run.
+
+A Matcher and an Expression begin alike, as `{ team, points }` and `#Value(second)` do. A Matcher also holds what no
+Expression can, such as `points: Integer` or `} as whole`. So `speculateAssertionMatcher` reads a Matcher first
+and keeps it only where an `=` follows. Otherwise the reading is given back and the Expression is read instead.
+`startsMatcher` keeps a subject that can not be a Matcher from speculating at all.
+
+Several shapes are read to their end and then refused. The Diagnostic covers what was written, and no tail is read
+again as a Statement:
+
+- `expect MATCHER = EXPR`, by `refuseMatcherOnExpect`.
+- `require _ = x` and `require 3 = x`, by `refuseUnusableMatcher`. Every other Matcher may stand left of `=`, even
+  one that binds nothing, such as `require #Empty = x`.
+- `EXPR is MATCHER`, by `refuseMatcherAfterValue`. `is` is the Equatable Method every value has, so this would read
+  as a comparison that uses the name it declares.
+- `require MATCHER = EXPR matches snapshot`, by `refuseSnapshotAfterMatcher`. A snapshot records a value, and this
+  line took one apart.
+
+An assertion belongs to a test's own block and every block nested in it. A Function literal in a test body is the
+boundary, since its body runs wherever it is handed. `insideTestBody` tracks this, and `reportAssertionOutsideTest`
+reports an assertion outside it.
+
+A snapshot is inline or stored. An inline one carries its recorded text as a String Literal, written there by the
+first run, so `matches snapshot` alone has never run. A stored one names an entry of `__snapshots__/<File>.es.snap`
+after `from`, which keeps the two apart.
