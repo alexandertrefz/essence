@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { fixturePath } from "@essence-lang/fixtures"
 import type { common, parser } from "@essence-lang/interfaces"
+import { readStdlibFiles } from "@essence-lang/standard-library"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -3372,33 +3373,41 @@ describe("Choices", () => {
 			).toEqual(["3"])
 		})
 
-		// Every payload-free library Choice answers without declaring it.
+		// Every payload-free library Choice answers without declaring it. The
+		// Choices and their Cases are read off the sources, so a new one is
+		// asked too.
 		it("answers for every mode Choice the library declares", async () => {
+			let modes = readStdlibFiles().flatMap(({ filePath, sourceText }) =>
+				parseStdlibSource(filePath, sourceText)
+					.program.implementation.nodes.filter(
+						(node): node is parser.ChoiceDeclarationStatementNode =>
+							node.nodeType === "ChoiceDeclarationStatement" &&
+							node.generics.length === 0 &&
+							node.cases.every(
+								(choiceCase) => choiceCase.type === null,
+							),
+					)
+					.map((choice) => ({
+						name: choice.name.content,
+						cases: choice.cases.map(
+							(choiceCase) => choiceCase.name.content,
+						),
+					})),
+			)
+
+			expect(modes.map((mode) => mode.name)).toEqual(
+				expect.arrayContaining(["Side", "HttpMethod", "Redirects"]),
+			)
 			expect(
-				await run(`implementation {
-					Terminal.inspect(Side.cases()::toString())
-					Terminal.inspect(CaseSensitivity.cases()::toString())
-					Terminal.inspect(NormalizationForm.cases()::toString())
-					Terminal.inspect(Ordering.cases()::toString())
-					Terminal.inspect(SortOrder.cases()::toString())
-					Terminal.inspect(Rounding.cases()::toString())
-					Terminal.inspect(NumberFormat.cases()::toString())
-					Terminal.inspect(SignStyle.cases()::toString())
-					Terminal.inspect(Division.cases()::toString())
-					Terminal.inspect(Stream.cases()::toString())
-				}`),
-			).toEqual([
-				'"[Start, End, BothEnds]"',
-				'"[Sensitive, Insensitive]"',
-				'"[ComposedCanonical, DecomposedCanonical, ComposedCompatibility, DecomposedCompatibility]"',
-				'"[Less, Equal, Greater]"',
-				'"[Ascending, Descending]"',
-				'"[Nearest, NearestEven, Down, Up, TowardZero]"',
-				'"[Fraction, Decimal, Percent, Scientific]"',
-				'"[Negative, Always]"',
-				'"[Euclidean, Truncating]"',
-				'"[Output, Error]"',
-			])
+				await run(
+					`implementation {\n${modes
+						.map(
+							(mode) =>
+								`\tTerminal.inspect(${mode.name}.cases()::toString())`,
+						)
+						.join("\n")}\n}`,
+				),
+			).toEqual(modes.map((mode) => `"[${mode.cases.join(", ")}]"`))
 		})
 
 		// A generic payload-free Choice answers through a bound, where its Type
