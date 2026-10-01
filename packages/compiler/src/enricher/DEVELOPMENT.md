@@ -946,3 +946,89 @@ Of two declarations of one name only the first counts. The cycles are reported i
 `reportRecursiveProtocolDeclarations` does the same for a Protocol that extends itself, as `recursive-protocol`.
 Such a Protocol stays in the rounds and resolves to its own surface with its extensions skipped, so its conformers
 are still read against it.
+
+## Derived conformances
+
+Some conformances are fabricated rather than written. Every Choice is Equatable: a Case is decided by its tag, and
+its payload is a Record, which compares structurally. A Choice whose Cases carry no payload can also print its Case
+names and list its Cases. Each derive is a Namespace fabricated on demand (`derivedEquatableNamespace`,
+`derivedPrintableNamespaceForChoice`, `derivedEnumerableNamespaceForChoice`). It is a fallback, never an
+override: a written Namespace that declares the Method keeps deciding for its Choice.
+
+Equality and Case listing are facts about the declaration, so nobody declares them. How a Choice reads is a
+decision, so printing is derived only where a Namespace over the Choice states `is Printable`. A Namespace that
+writes a `cases` of its own replaces the derived listing. Writing `is` or `cases` without declaring `Equatable` or
+`Enumerable` is refused (`reportUndeclaredDerivedConformance`). Where a Namespace claims a Protocol,
+`derivedConformanceSource` fills in for it only when it writes none of the Protocol's Methods. A witness names one
+Namespace, so half-written equality can not be half derived.
+
+### Derived equality for a generic Choice
+
+For a generic Choice, the derived `is` and `isNot` are conditional. They take the Type Parameters some payload
+mentions as `Equatable` bounds, and the unapplied body Union as their Parameters. Invocation inference binds the
+Parameters from the receiver, and the conformance rail produces a witness per Parameter. A Type Parameter no
+payload mentions needs neither a bound nor a witness.
+
+The Methods borrow the Choice's Type Parameters under names no source can spell (`borrowedGenericName`). The
+Choice's own names could also be the caller's. Take `function same<infer T is Equatable>(_ a: Maybe<T>, …)` over a
+`choice Maybe<T>`: a pin of `T` would be renamed along with the Parameter and match nothing. A receiver's Type
+Arguments pin the Parameters as defaults rather than leaving them to inference. A receiver narrowed to one Case
+matches only that Case's arm, which may not mention every Parameter. A pin is still checked against the Arguments.
+
+### Equality descriptors
+
+A derived comparison follows a descriptor: per Case tag, how each payload member is compared. `describeMember`
+compares a member that names no Type Parameter structurally (`eq`), and a bare Type Parameter through the witness
+at its slot. A composite is compared part by part. A List goes item by item, a Dictionary by key and by value, a
+Record or Case member by member, a Union arm by arm. A refinement compares as its base does, since the predicate never
+reaches run time.
+
+The slots are hidden conformance Arguments. The Type Parameters some payload mentions take the first slots, in
+declaration order (`constrainedGenericOrder`). A payload member whose own conformance is not the structural one,
+such as `tag: Tag` with a written `is`, takes the next free slot (`choiceMemberRouting`). So does a member whose
+Type has no conformance at all. Its slot becomes a bound pinned to that Type, and the call reports
+`unsatisfied-bound` as for any other Type Argument. A refusal the solve already reported, or one from its cycle
+guard, takes no slot.
+
+`choiceRouting` builds the whole plan once, and both rails read it: the witness a bounded call is handed and the
+descriptor a direct call emits. The walk takes Cases, then members, in declaration order, so both rails agree on
+every slot. A Choice that routes nothing and has no Type Parameter a payload mentions has no plan. It emits the
+flat `choiceIs`, and its witness is the plain unconditional one.
+
+### Union payloads
+
+A Union-typed payload member decides at run time which arm a value belongs to, with the two checks the runtime
+has. The first is the value's `typeKeySymbol` tag (`runtimeTagOf`), and the second the structural check a Match
+narrows with. A tag names a kind rather than a Type: every Record carries "Record". So a concrete
+`{ code: Integer }` arm and a `T` bound to `{ name: String }` claim the same tag. The concrete arm then also claims
+by its shape (`runtimeShapeOf`), so the Type Parameter's values fall through to its witness. Dropping the concrete
+arm instead would send its own values to a witness written for a Type they are not. An arm mentioning a Type
+Parameter is the fallback, which compares whatever no other arm claims.
+
+Two arms mentioning Type Parameters, such as in `T | List<T>`, would be two fallbacks. Each takes the shape its
+Type Argument gives it at this receiver. Where the receiver leaves them unbound, no descriptor can tell them apart,
+and the comparison is refused as `indistinguishable-union-arms`. A concrete arm that accepts exactly the values of
+a Type Parameter's arm stops claiming, since the witness answers for both. Where a Type Argument strictly refines a
+concrete arm, the Type Parameter's arm takes a shape of its own.
+
+Record shapes are open, so `{ code: Integer }` also accepts a `{ name: String, code: Integer }`. `orderClaims`
+therefore puts the most specific shape first, and a tie goes to the Type Parameter's arm. A shape is a Type cut down
+to what the runtime checks. A Case keeps its payload, since all instantiations of a Case share its tag.
+
+### Records that route their members
+
+A Record conforms through its members, as a List conforms through its items. `recordMemberRouting` asks each
+member the Record's Type declares. A member compared or printed structurally needs nothing, and one with its own
+conformance routes its witness through the Record's. A member with no conformance refuses the Record. Only the
+declared members are asked. A value may carry more members than its Type shows, and those are compared and
+printed structurally. So the answer at a narrower static Type may differ from the answer at a wider one.
+
+The members are asked silently. A refusal the solve reported comes back with an empty chain, and the member stays
+structural. The mistake keeps its Diagnostic where it was made. An `ambiguous-conformance` is forwarded with a
+Note naming the member, because nothing else would report it. A refusal travels up as a dotted member path, such as
+`inner.run`.
+
+A bounded call, such as `Terminal.print(r)`, reaches the routing through `solveConformance`. A direct call, such as
+`r::is(other)`, resolves its Method off the standard library's `Record` Namespace, which has no `where` clause to
+solve. `routedRecordCall` asks for it there, and the answer becomes the call's conformance Arguments. `isNot` is
+provided by `Equatable` over the Record's own witness, so the direct rail leaves it alone.
