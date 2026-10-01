@@ -136,7 +136,19 @@ function testsNodeSymbols(
 					detail: modifierDetail(node.modifiers),
 					range: node.position,
 					selectionRange: node.name.position,
-					children: symbolsOfBody(node.body),
+					// The head too: the name, a table's rows and the Parameters'
+					// defaults stand before the body.
+					children: [
+						...symbolsOfNode(node.name),
+						...(node.table === null
+							? []
+							: [
+									...symbolsOfNode(node.table.value),
+									...symbolsOfDefaults(node.table.parameters),
+								]),
+						...symbolsOfDefaults(node.properties?.parameters ?? []),
+						...symbolsOfBody(node.body),
+					],
 				},
 			]
 		}
@@ -149,7 +161,10 @@ function testsNodeSymbols(
 					detail: modifierDetail(node.modifiers),
 					range: node.position,
 					selectionRange: node.name.position,
-					children: testsNodeSymbols(node.nodes),
+					children: [
+						...symbolsOfNode(node.name),
+						...testsNodeSymbols(node.nodes),
+					],
 				},
 			]
 		}

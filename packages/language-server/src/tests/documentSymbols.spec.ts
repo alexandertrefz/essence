@@ -789,3 +789,55 @@ describe("Document Symbols inside a default value", () => {
 		expect(circle.range.end).toEqual({ line: 7, column: 6 })
 	})
 })
+
+// A test's head, its name and table, stands outside its body.
+describe("Document Symbols inside a test's head", () => {
+	let source = [
+		"implementation {}",
+		"",
+		"tests {",
+		'\ttest "row" across [',
+		"\t\t[1]::map((item) {",
+		"\t\t\tconstant tripled = item::add(3)",
+		"",
+		"\t\t\t<- tripled",
+		"\t\t}),",
+		"\t] (row: List<Integer>) {",
+		"\t\texpect row::isEmpty()::negate()",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should nest what a table's rows declare under the test", () => {
+		let [test] = symbolsOf(source)
+
+		expect(test.children.map((child) => child.name)).toEqual(["tripled"])
+	})
+
+	it("should put the inferred Type beside it", () => {
+		expect(
+			detailOf(detailedSymbolsOf(source, { tests: true }), "tripled"),
+		).toBe("Integer")
+	})
+
+	// The default is refused, but the outline shows what is written.
+	it("should nest what a generated Parameter's default declares under the test", () => {
+		let [test] = symbolsOf(
+			[
+				"implementation {}",
+				"",
+				"tests {",
+				'\ttest "any" for any (count: Integer = [2]::map((item) {',
+				"\t\tconstant doubled = item::add(2)",
+				"",
+				"\t\t<- doubled",
+				"\t})::length()) {",
+				"\t\texpect count::is(count)",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+
+		expect(test.children.map((child) => child.name)).toEqual(["doubled"])
+	})
+})
