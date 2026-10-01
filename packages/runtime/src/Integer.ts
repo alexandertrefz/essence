@@ -16,53 +16,27 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// An Integer is HYBRID. It holds a JavaScript number while its value is
-// one a double holds exactly — `|value| ≤ 2⁵³ − 1` — and a bigint beyond that,
-// so the ordinary Integer costs a double in a field rather than a heap bigint
-// and the unbounded ones stay exact.
-//
-// THE CANONICAL INVARIANT, which everything below and every emitted
-// arithmetic site leans on: a value in safe range is ALWAYS a number and a
-// value outside it is ALWAYS a bigint. One mathematical Integer therefore has
-// exactly ONE representation — which is what lets the Compiler emit `===` for
-// equality, what lets an operation check its own ANSWER rather than reason
-// about its operands, and what makes `0` a number everywhere so that a test
-// against zero can be written with one.
+// A number while a double holds the value exactly, and a bigint beyond that.
+// INVARIANT: a value in the safe range is always a number. See "Integers" in
+// DEVELOPMENT.md.
 export type IntegerType = {
 	[typeKeySymbol]: "Integer"
 	value: number | bigint
 }
 
-// `Number.MAX_SAFE_INTEGER`, spelled as itself so the bound is readable
-// and as a bigint so the escaped side compares without converting. The
-// Compiler writes the same bound into every emitted arithmetic guard;
-// `src/tests/hybridIntegers.spec.ts` in the compiler holds the two to each
-// other.
+// The safe bound, also as bigints so the escaped side compares without
+// converting. The Compiler's emitted guards write the same bound.
 const SAFE = Number.MAX_SAFE_INTEGER
 const SAFE_AS_BIG = 9007199254740991n
 const LEAST_SAFE_AS_BIG = -9007199254740991n
 
-// THE one place the invariant is established. Everything that builds an
-// Integer — a literal, a native, the client bridge, an escaped arithmetic
-// result — comes through here, and hands over whichever representation it
-// happened to compute in.
+// Every Integer is built here, in whichever representation it was computed.
 export function createInteger(value: number | bigint): IntegerType {
 	return { [typeKeySymbol]: "Integer", value: canonical(value) }
 }
 
-// `createInteger` for the client bridge, and through it every host that
-// builds an Integer out of a JavaScript number of its own. `createInteger`
-// establishes the canonical invariant but NOT integrality — nothing inside this
-// package or in emitted code can reach it with a fraction, and the check would
-// sit on the hottest construction path there is — so the door a host comes
-// through is where a value from outside is asked to be an Integer at all. A
-// `1.5` admitted here is an "Integer" that adds, prints and compares as a
-// fraction until the numeric tower converts it and throws about a BigInt.
-//
-// A number past safe range is refused rather than widened, which is what
-// the marshaller's own door decides for the same value: `2 ** 53` is a double
-// that has already lost whatever made it that, and a host that means an Integer
-// that large has a bigint to say so with.
+// `createInteger` for a host, refusing a fraction and a number past the safe
+// range. A host that means a larger Integer passes a bigint.
 export function createIntegerFrom(value: number | bigint): IntegerType {
 	if (typeof value === "number" && !Number.isSafeInteger(value)) {
 		throw new Error(
@@ -73,79 +47,31 @@ export function createIntegerFrom(value: number | bigint): IntegerType {
 	return createInteger(value)
 }
 
-// Both directions. A bigint that fits becomes a number — an escaped
-// subtraction landing back in range must not leave a second spelling of a value
-// that already has one — and a number that does not fit becomes a bigint, which
-// only a runtime handed a value from outside can produce (`2 ** 60` reaching
-// `fromJS`), since every operation here checks its own answer.
-//
-// Exported because an inlined counted walk reaches for it directly. Its
-// counter is a raw value rather than an Integer wherever the body only reads
-// what the Integer holds, and a walk whose bounds sent it to bigint counts
-// through values a double holds exactly — so the turn's value is canonicalised
-// here rather than by the `createInteger` the elision took away.
-//
-// `BigInt(value)` can not throw on that arm: a double above 2⁵³ has no
-// fractional part left to reject.
+// The value in its one representation, converting either way. An inlined
+// counted walk calls it on its raw counter. `BigInt` can not throw here, since a
+// double past 2⁵³ is whole.
 export function canonical(value: number | bigint): number | bigint {
 	if (typeof value === "number") {
 		return value >= -SAFE && value <= SAFE ? value : BigInt(value)
 	}
 
-	// Written as the REFUSAL rather than as the acceptance, and with the
-	// upper bound first, so that a value past safe range on the positive side —
-	// which is nearly every value that reaches here, since escaping is what
-	// growing does — is settled by ONE comparison. A bigint comparison is not
-	// cheap: measured at about 8 ns on Bun and 1 ns on V8, and the pair of them
-	// was most of what an escaped operation cost over the bigint-only
-	// arithmetic it replaced.
-	//
-	// The lower bound is a constant rather than a negation of the upper
-	// one: negating a bigint ALLOCATES a bigint, and doing it here would do it
-	// once per operation that escaped.
+	// The upper bound first, since most values here have grown past it. The
+	// lower bound is a constant, since negating a bigint allocates.
 	return value > SAFE_AS_BIG || value < LEAST_SAFE_AS_BIG
 		? value
 		: Number(value)
 }
 
-// A value as the escaped arm needs it. `BigInt(value)` would answer the
-// same thing, but it is a call the engine does not fold away when the value is
-// already a bigint — measured at ~5 ns a side, which is the second largest of
-// the things an escaped operation pays over the bigint-only arithmetic it
-// replaced. The largest is the range test above.
+// A value as a bigint. The engine does not fold away `BigInt` on a value that
+// is one already.
 function escaped(value: number | bigint): bigint {
 	return typeof value === "bigint" ? value : BigInt(value)
 }
 
 // #region Emitted arithmetic
 
-// The three operations the Compiler emits inline. Each is reached two
-// ways: as the whole operation, where the operands are expressions the emitted
-// guard may not read twice, and as the escape arm of an inlined guard that
-// already decided the fast path did not apply. Both hand over the two RAW
-// values rather than the Integers holding them, because the inline site has
-// them already and neither wants the Integer back.
-//
-// The fast path is the same shape in all three: both operands are
-// numbers, the operation is performed as doubles, and the ANSWER is checked
-// against safe range. That check is exact rather than approximate. IEEE 754
-// `+`, `-` and `*` are correctly rounded, so the double answer is the nearest
-// double to the true result; rounding is monotone and 2⁵³ is representable, so
-// a true result of magnitude ≥ 2⁵³ can only round to a double of magnitude
-// ≥ 2⁵³, which fails the check. A true result inside safe range is exactly
-// representable and rounds to itself. So the check passes exactly when the
-// double IS the true result — including for a product, where two small factors
-// can leave safe range and the rounded product can not sneak back in.
-//
-// Neither arm below canonicalises where the answer is already known to be
-// outside safe range, because asking costs two bigint comparisons and asking is
-// what an escaped operation spends most of its extra time on. Two arguments say
-// when it is known. A pair of NUMBER operands whose double answer failed the
-// check had a true answer of magnitude ≥ 2⁵³ — that is the exactness argument
-// above, read the other way round — so the bigint answer is outside safe range
-// by construction. And a bigint operand is outside safe range by the canonical
-// invariant, so a PRODUCT with one can only be `|left · right| ≥ |the bigger|`
-// unless the other operand is zero.
+// The operations the Compiler emits inline, over raw values. A double answer
+// inside the safe range is exact. See "Integer arithmetic" in DEVELOPMENT.md.
 export function sum(
 	left: number | bigint,
 	right: number | bigint,
@@ -163,8 +89,7 @@ export function sum(
 		}
 	}
 
-	// A sum with an escaped operand CAN come back inside — the two may
-	// very nearly cancel — so this one is asked.
+	// The operands may nearly cancel, so the answer is canonicalised.
 	return createInteger(escaped(left) + escaped(right))
 }
 
@@ -205,9 +130,7 @@ export function product(
 		}
 	}
 
-	// Zero is the number `0` by the invariant and never `0n`, so the one
-	// case that CAN answer inside safe range is asked with two comparisons
-	// against a double rather than with a range test over a bigint.
+	// Zero is the one factor that brings a bigint product back into range.
 	if (left === 0 || right === 0) {
 		return { [typeKeySymbol]: "Integer", value: 0 }
 	}
@@ -244,26 +167,15 @@ export function multiply__overload$1(
 
 // #region Everyday methods
 
-// `0 - value` rather than `-value`, which is the same negation without
-// the negative zero: `-0` is a number in safe range and so canonical, and it
-// compares and prints as `0` everywhere — but there is no reason to make a
-// reader prove that, and no cost to not making one.
+// `0 - value`, since `-value` answers a negative zero for zero.
 export function negate(integer: IntegerType): IntegerType {
 	let value = integer.value
 
 	return createInteger(typeof value === "number" ? 0 - value : -value)
 }
 
-// Native so that the answer can be declared a `NonNegativeInteger`: a
-// refinement erases before anything runs, and an Essence body could only
-// answer a bare Integer for the arm that negates. The value itself is handed
-// back where it is not negative — the same object, since an Integer is never
-// changed in place — so the ordinary call allocates nothing. `NonZeroInteger`
-// declares this Function again under its own name, where the same answer is a
-// `PositiveInteger`.
-//
-// `0` rather than `0n`: an ordering comparison is exact across the two
-// representations, so one spelling asks both.
+// Native so that its Type can promise a `NonNegativeInteger`. A value that is
+// not negative is answered as itself.
 export function absolute(integer: IntegerType): IntegerType {
 	return integer.value < 0 ? negate(integer) : integer
 }
@@ -272,9 +184,7 @@ export function remainder__overload$1(
 	integer: IntegerType,
 	divisor: IntegerType,
 ): OptionalType<IntegerType> {
-	// Zero is in safe range, so by the canonical invariant it is the
-	// number `0` and never `0n` — which is why this asks with a number. `0n`
-	// would answer `false` for the very value it is looking for.
+	// Zero is always the number `0`, so `0n` would never match.
 	if (divisor.value === 0) {
 		return createEmpty()
 	}
@@ -282,9 +192,7 @@ export function remainder__overload$1(
 	return createValue(remainder__overload$2(integer, divisor))
 }
 
-// The divisor of this entry is a `NonZeroInteger` in the source — proven
-// while compiling, erased to an Integer here — so there is no empty arm to
-// build.
+// The divisor is a proven `NonZeroInteger`, so there is no empty arm.
 export function remainder__overload$2(
 	integer: IntegerType,
 	divisor: IntegerType,
@@ -292,12 +200,7 @@ export function remainder__overload$2(
 	let value = integer.value
 	let by = divisor.value
 
-	// Euclidean remainder — the result is always in
-	// `0 ≤ r < |divisor|`, whatever the signs of the operands.
-	//
-	// JavaScript's `%` on doubles is EXACT for integer operands — it is
-	// fmod, which is defined as the exact remainder and needs no rounding —
-	// so the number arm answers what the bigint arm would.
+	// Euclidean: `0 ≤ r < |divisor|`. `%` on two whole doubles is exact.
 	if (typeof value === "number" && typeof by === "number") {
 		let remainder = value % by
 
@@ -317,17 +220,13 @@ export function remainder__overload$2(
 	return createInteger(remainder)
 }
 
-// The other half of the same division, and it has to agree with
-// `remainder` exactly: `quotient · divisor + remainder` must be the original
-// Integer. Since the remainder is Euclidean — never negative — the quotient is
-// floored towards negative infinity for a positive divisor rather than
-// truncated towards zero, which is where it parts company with JavaScript's
-// `/`. `(-7) ÷ 3` is `-3` remainder `2`, not `-2` remainder `-1`.
+// The quotient that pairs with the Euclidean remainder, so `(-7) ÷ 3` is `-3`
+// rather than JavaScript's `-2`.
 export function quotient__overload$1(
 	integer: IntegerType,
 	divisor: IntegerType,
 ): OptionalType<IntegerType> {
-	// The number `0`, for the reason `remainder` asks with one.
+	// Zero is always the number `0`.
 	if (divisor.value === 0) {
 		return createEmpty()
 	}
@@ -335,9 +234,7 @@ export function quotient__overload$1(
 	return createValue(quotient__overload$2(integer, divisor))
 }
 
-// The divisor of this entry is a `NonZeroInteger` in the source — proven
-// while compiling, erased to an Integer here — so there is no empty arm to
-// build.
+// The divisor is a proven `NonZeroInteger`, so there is no empty arm.
 export function quotient__overload$2(
 	integer: IntegerType,
 	divisor: IntegerType,
@@ -345,13 +242,8 @@ export function quotient__overload$2(
 	let value = integer.value
 	let by = divisor.value
 
-	// `Math.trunc(a / b)` is EXACT for two safe integers, which is not
-	// obvious and is what this arm rests on. The double quotient `x = a/b`
-	// carries an error of at most `|x|·2⁻⁵³`, while a non-integer `a/b` sits at
-	// least `1/|b|` away from the nearest integer — and `|x|·2⁻⁵³ < 1/|b|` is
-	// exactly `|a| < 2⁵³`, which holds for every safe integer. So the rounding
-	// can never carry the quotient across an integer boundary, and a quotient
-	// that IS an integer is representable and rounds to itself.
+	// `Math.trunc(a / b)` is exact for two safe integers. See "Integer
+	// arithmetic" in DEVELOPMENT.md.
 	if (typeof value === "number" && typeof by === "number") {
 		let truncated = Math.trunc(value / by)
 		let remainder = value % by
@@ -366,8 +258,8 @@ export function quotient__overload$2(
 	let truncated = left / right
 	let remainder = left % right
 
-	// A negative remainder means the truncation rounded the wrong way for
-	// a Euclidean pairing; step the quotient one towards the divisor's sign.
+	// A negative remainder means truncation rounded the wrong way for a
+	// Euclidean pairing.
 	if (remainder < 0n) {
 		truncated += right < 0n ? 1n : -1n
 	}
@@ -375,10 +267,7 @@ export function quotient__overload$2(
 	return createInteger(truncated)
 }
 
-// Division by a divisor the Types have already proven not to be zero —
-// `NonZeroInteger` erases to an Integer, so the Parameter reads as one here —
-// which is why there is no empty arm to build: the check the sibling entries
-// open with was made while compiling.
+// The divisor is a proven `NonZeroInteger`, so there is no empty arm.
 export function divide__overload$4(
 	integer: IntegerType,
 	divisor: IntegerType,
@@ -386,23 +275,13 @@ export function divide__overload$4(
 	return createRational(escaped(integer.value), escaped(divisor.value))
 }
 
-// Raised in bigint whatever the operands hold. `**` on doubles is
-// `Math.pow`, which the specification only requires to be APPROXIMATED — the
-// correctly-rounded argument the three inlined operations rest on does not
-// cover it, so a double power can not be checked after the fact the way a
-// product can.
-//
-// The power itself, for every pair it is defined at — a non-negative
-// exponent answers a whole number and a negative one the exact reciprocal. The
-// one pair with no power at all, zero to a negative exponent, is decided by
-// each entry before it reads this. `NonZeroInteger.raise` is this Function
-// under that Namespace's name: a base that is not zero has every power.
+// Raised in bigint, since `**` on doubles need only approximate. A negative
+// exponent answers the exact reciprocal. Each caller rules out zero to a
+// negative exponent first.
 export function power(
 	base: IntegerType,
 	exponent: IntegerType,
 ): IntegerType | RationalType {
-	// `0` rather than `0n`: an ordering comparison is exact across the
-	// two representations, so one spelling asks both.
 	return exponent.value >= 0
 		? raise__overload$3(base, exponent)
 		: createRational(1n, escaped(base.value) ** -escaped(exponent.value))
@@ -419,11 +298,7 @@ export function raise__overload$1(
 	return createValue(power(base, exponent))
 }
 
-// The exponent of this entry is a `NonNegativeInteger` in the source —
-// proven while compiling, erased to an Integer here — so the reciprocal arm
-// above is unreachable and the answer is always whole. It holds the whole power
-// rather than reading it back out of the Optional entry, which is the direction
-// `remainder` and `quotient` pair their two entries in as well.
+// The exponent is a proven `NonNegativeInteger`, so the power is whole.
 export function raise__overload$3(
 	base: IntegerType,
 	exponent: IntegerType,
@@ -433,29 +308,23 @@ export function raise__overload$3(
 
 // #endregion
 
-// A number's own `toString` reaches for exponential notation at 1e21,
-// which would spell an Integer in a way the language never writes — but a
-// number-held Integer is at most 2⁵³ − 1, five orders of magnitude below that,
-// so the decimal spelling is the only one either representation produces.
+// A number switches to exponential notation only at 1e21, far past the safe
+// range.
 export function toString__overload$1(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }
 
 // #region Radix
 
-// The digits every base writes, in value order: `0` through `9` and then
-// `a` through `z`, which is the alphabet `Number.prototype.toString` and every
-// peer's radix printer already agree on. Thirty-six of them is what fixes the
-// highest base.
+// The digits of every base in value order, as `Number.prototype.toString`
+// writes them. Their count fixes the highest base.
 const RADIX_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 const LOWEST_RADIX = 2
 const HIGHEST_RADIX = 36
 
-// The base is read as a count rather than as a mode, so a value outside
-// what any positional notation can write is brought to the nearest edge rather
-// than refused. Both entries clamp through here, which is what keeps the pair
-// a round trip at every base a Program can write down.
+// A base outside 2 to 36 is clamped to the nearest edge. Printing and parsing
+// both clamp here, so the pair round-trips at every base.
 function radixOf(base: IntegerType): number {
 	const value = Number(base.value)
 
@@ -466,9 +335,8 @@ function radixOf(base: IntegerType): number {
 	return value > HIGHEST_RADIX ? HIGHEST_RADIX : value
 }
 
-// `value.toString(radix)` is exact for both representations: a bigint
-// converts digit by digit, and a number-held Integer is a safe integer, which
-// has no fractional part for the conversion to approximate.
+// `toString(radix)` is exact for both representations, since a number here is
+// a safe integer.
 export function toString__overload$8(
 	integer: IntegerType,
 	base: IntegerType,
@@ -476,18 +344,9 @@ export function toString__overload$8(
 	return createString(integer.value.toString(radixOf(base)))
 }
 
-// Native, because the digits have to be read at the base the call names
-// and accumulated in bigint. `parseInt` reads a radix and answers a double, so
-// it loses every Integer past 2⁵³ — which is exactly the range this Type is
-// unbounded for.
-//
-// The same shape the base-less entry reads, at every base: a sign in
-// front, and an underscore between two digits and nowhere else. A capital digit
-// reads as its lowercase besides, since the printer writes lowercase and a
-// Program pasting a hexadecimal constant from anywhere else has capitals in it.
-// The two entries of one Overload reading one text two ways is what this
-// avoids. Nothing else is lenient: a sign anywhere but the front, a digit the
-// base has no room for, and the empty text each answer nothing.
+// Accumulates in bigint, since `parseInt` answers a double. It reads what the
+// base-less entry reads: a sign in front and an underscore between two digits.
+// A capital digit reads as lowercase. Anything else answers nothing.
 export function parse__overload$3(
 	text: StringType,
 	base: IntegerType,
@@ -529,10 +388,8 @@ export function parse__overload$3(
 
 // #region Number theory
 
-// Euclid's algorithm, imported from `bigRational.ts` rather than written
-// again: the reduction every Rational runs is the same walk, and the sign is
-// taken off both operands there. A gcd is never negative, which is the promise
-// `NonNegativeInteger` carries in the declaration.
+// The walk every Rational's reduction runs. It is never negative, as its Type
+// promises.
 export function greatestCommonDivisor(
 	integer: IntegerType,
 	other: IntegerType,
@@ -542,13 +399,8 @@ export function greatestCommonDivisor(
 	)
 }
 
-// `|a · b| / gcd(a, b)`, with the gcd divided out of the product rather
-// than out of an operand first. Both operands are bigints here, so the product
-// can not overflow, and dividing after keeps the one division exact.
-//
-// Zero has no multiple above zero, so a zero operand answers zero. That
-// is the value every peer answers, and it keeps `lcm · gcd = |a · b|` true for
-// every pair.
+// `|a · b| / gcd(a, b)` in bigint. A zero operand answers zero, which keeps
+// `lcm · gcd = |a · b|` for every pair.
 export function leastCommonMultiple(
 	integer: IntegerType,
 	other: IntegerType,
@@ -571,7 +423,6 @@ export function leastCommonMultiple(
 export function factorial__overload$1(
 	integer: IntegerType,
 ): OptionalType<IntegerType> {
-	// `0` rather than `0n`, for the reason `remainder` asks with one.
 	if (integer.value < 0) {
 		return createEmpty()
 	}
@@ -579,10 +430,7 @@ export function factorial__overload$1(
 	return createValue(createInteger(factorialOf(escaped(integer.value))))
 }
 
-// The product built upwards, one multiplication per step. A halving
-// product tree is asymptotically faster and is what a factorial big enough to
-// notice would want; the crossover is past what a Program that calls this
-// waits for, and the loop is what a reader checks in one breath.
+// The product built upwards, one multiplication per step.
 function factorialOf(value: bigint): bigint {
 	let product = 1n
 
@@ -593,17 +441,11 @@ function factorialOf(value: bigint): bigint {
 	return product
 }
 
-// The first twelve primes, which are the witnesses a deterministic
-// Miller-Rabin test needs to decide every Integer below
-// 3,317,044,064,679,887,385,961,981 — the bound Sorenson and Webster proved
-// for this set. Above it the test is a strong probable-prime test over the
-// same twelve, and the declaration says so.
+// The witnesses of the Miller-Rabin test. See "Integer arithmetic" in
+// DEVELOPMENT.md.
 const PRIME_WITNESSES = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n]
 
-// Trial division decides the small cases the witnesses would otherwise
-// have to be run for, and it is what makes the common answer — a small
-// composite — cost one or two remainders rather than twelve modular
-// exponentiations.
+// Trial division by the witnesses settles a small composite first.
 export function isPrime(integer: IntegerType): BooleanType {
 	const value = escaped(integer.value)
 
@@ -621,8 +463,8 @@ export function isPrime(integer: IntegerType): BooleanType {
 		}
 	}
 
-	// `value - 1 = odd · 2^exponent`, the decomposition every witness is
-	// tested against. The value is odd here, since 2 is a witness above.
+	// `value - 1 = odd · 2^exponent`. The value is odd, since 2 divides none
+	// that reach here.
 	let odd = value - 1n
 	let exponent = 0n
 
@@ -663,9 +505,7 @@ function isStrongProbablePrime(
 	return false
 }
 
-// Square-and-multiply, which is what keeps the test logarithmic in the
-// exponent. `base ** exponent % modulus` would build the whole power first, and
-// for a value of any size that is a bigint with more digits than memory holds.
+// Square-and-multiply, rather than building the whole power first.
 function modularPower(base: bigint, exponent: bigint, modulus: bigint): bigint {
 	let result = 1n
 	let factor = base % modulus
@@ -702,8 +542,7 @@ export function squareRoot__overload$1(
 		denominator: 1n,
 	})
 
-	// A negative has no real root, and `squareRootOfRational` has already
-	// said so — this hands its answer on rather than deciding again.
+	// A negative has no real root.
 	if (root[typeKeySymbol] === "Optional#Empty") {
 		return root
 	}
@@ -711,7 +550,7 @@ export function squareRoot__overload$1(
 	const value = root.item
 
 	if (value[typeKeySymbol] === "Rational") {
-		// A whole number's exact root is whole — surface it as one.
+		// A whole number's exact root is whole.
 		return createValue(createInteger(value.numerator))
 	}
 
@@ -720,16 +559,8 @@ export function squareRoot__overload$1(
 
 // #endregion
 
-// `<` and `>` are defined across a number and a bigint and decide the
-// MATHEMATICAL order, without converting either side — so one pair of tests
-// answers for all four pairings of the two representations.
-//
-// Same-kind ordering stays native deliberately. Routing it through the
-// covering `Number.compare` reads better, but that Method decides every
-// cross-kind cell, so comparing two Integers would drag the Algebraic,
-// Transcendental and Rational machinery into any Program that compares two
-// Integers, which is nearly all of them. `is` and the inequalities are still
-// written in Essence on top of this.
+// `<` and `>` compare a number and a bigint exactly. Native rather than
+// `Number.compare`, which would bring in the whole numeric tower.
 export function compare(
 	originalInteger: IntegerType,
 	otherInteger: IntegerType,

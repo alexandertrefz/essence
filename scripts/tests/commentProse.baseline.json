@@ -249,7 +249,6 @@
 	"packages/language-server/src/tests/testsSection.spec.ts": {"sentence-length": 13, "em-dash": 15, "all-caps": 9, "history": 1},
 	"packages/language-server/src/tests/textEdits.ts": {"sentence-length": 1},
 	"packages/language-server/src/tests/workspace.spec.ts": {"sentence-length": 61, "em-dash": 48, "all-caps": 24, "history": 2, "position": 3, "block-length": 2},
-	"packages/runtime/src/Integer.ts": {"sentence-length": 46, "em-dash": 31, "all-caps": 22, "position": 5, "block-length": 10},
 	"packages/runtime/src/Testing.ts": {"sentence-length": 190, "em-dash": 128, "all-caps": 119, "position": 5, "block-length": 21},
 	"packages/runtime/src/internalHelpers.ts": {"sentence-length": 58, "em-dash": 46, "all-caps": 44, "history": 2, "position": 6, "block-length": 20, "stacked": 1},
 	"packages/runtime/src/keyEncoding.ts": {"sentence-length": 61, "em-dash": 35, "all-caps": 50, "position": 8, "block-length": 11},

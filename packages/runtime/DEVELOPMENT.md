@@ -954,3 +954,52 @@ weight is zero, the pick is even.
 
 `shuffle` is Fisher and Yates, walked from the back, so every order is equally likely. It reorders an Array of its
 own and leaves the receiver as it was.
+
+## Integers
+
+An Integer is hybrid. It holds a JavaScript number while a double holds its value exactly, `|value| ≤ 2⁵³ − 1`, and a
+bigint beyond that. So the ordinary Integer costs a double in a field rather than a bigint on the heap, and a large
+one stays exact.
+
+INVARIANT: a value in the safe range is always a number, and a value outside it is always a bigint. One Integer then
+has one representation. The Compiler emits `===` for equality, an operation checks its own answer, and zero is the
+number `0` everywhere. `createInteger` establishes the invariant through `canonical`, which converts both ways. An
+escaped subtraction can land back in range, and a host can hand over a number past it. An inlined counted walk calls
+`canonical` itself, since its counter is a raw value rather than an Integer. The Compiler writes the same bound into
+every emitted guard, and `hybridIntegers.spec.ts` in the Compiler holds the two together.
+
+An ordering comparison is exact across a number and a bigint. So `value < 0` asks the question of either
+representation, and `compare` needs one pair of tests for every pairing.
+
+`createInteger` does not check that a number is whole. Nothing in the runtime or in emitted code hands it a
+fraction, and it is the hottest construction path there is. `createIntegerFrom` is the door for a host. It refuses
+a fraction, and a number past the safe range, since `2 ** 53` as a double has already lost precision.
+
+### Integer arithmetic
+
+The Compiler emits `+`, `-` and `*` inline. `sum`, `difference` and `product` are the escape arm of that guard, and
+the whole operation where an operand can not be read twice. They take raw values, since the call site holds them
+already. The fast path works in doubles and checks the answer against the safe range, and that check is exact. IEEE
+754 `+`, `-` and `*` round correctly, rounding is monotone, and 2⁵³ is a double. So a true result of magnitude 2⁵³ or
+more rounds to a double that fails the check. A true result inside the range is exact.
+
+An answer known to lie outside the safe range skips `canonical`, whose bigint comparisons are most of what an
+escaped operation costs. Two number operands that failed the check had a true answer past 2⁵³. A product with a
+bigint operand stays past it unless the other operand is zero, which is always the number `0`. A sum with a bigint
+operand can cancel back into range, so it asks. `canonical` tests the upper bound first, since growing values escape
+upwards. Its lower bound is a constant, since negating a bigint allocates one.
+
+`power` raises in bigint whatever the operands hold. `**` on doubles need only approximate, so no check after the
+fact can catch a wrong answer.
+
+Division is Euclidean. The remainder is never negative, and the quotient agrees with it, so
+`quotient · divisor + remainder` is the dividend: `(-7) ÷ 3` is `-3` remainder `2`. On two numbers `%` is exact, and
+so is `Math.trunc(a / b)`. The double quotient errs by at most `|a/b|·2⁻⁵³`, and a quotient that is not whole lies
+at least `1/|b|` from the nearest integer. The first is smaller exactly when `|a| < 2⁵³`.
+
+`isPrime` is a Miller-Rabin test with the first twelve primes as witnesses, which decides every Integer under
+3,317,044,064,679,887,385,961,981. Past that it is a strong probable-prime test, as the declaration says. Trial
+division by the same twelve settles a small composite before any modular power is taken.
+
+`compare` stays native rather than going through `Number.compare`. That Method decides every pairing of the numeric
+tower, and would bring the whole tower into any Program that compares two Integers.
