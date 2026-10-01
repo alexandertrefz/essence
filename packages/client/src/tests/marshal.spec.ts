@@ -975,7 +975,7 @@ describe("Numbers", () => {
 
 	// Two numbers would pass `reduced` without a throw and leave number parts,
 	// so only the constructor's checks refuse a pair of fractions.
-	it("refuses a pair that is two numbers", () => {
+	it("refuses a pair of number parts that are not both whole", () => {
 		expect(() => new EssenceRational(Number.NaN, 2)).toThrow(RangeError)
 		expect(() => new EssenceRational(0.1, 0.3)).toThrow(TypeError)
 		expect(() => new EssenceRational(1.5, 2.5)).toThrow(TypeError)

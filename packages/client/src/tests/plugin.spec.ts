@@ -286,8 +286,7 @@ export const table = Direction
 		expect(bundle.table).toEqual({ Up: "Up", Down: "Down" })
 	})
 
-	// A `.es` file that imports another works through a build.
-	it("hands over one standalone Module for a whole graph", async () => {
+	it("builds a `.es` file that imports another", async () => {
 		let directory = project({
 			"Main.es": `import {
 	from "./Math.es" { square }
