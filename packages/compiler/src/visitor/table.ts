@@ -335,7 +335,11 @@ export function visitInterleaved(
 			return result
 		}
 
-		previous = start
+		// The bound only moves forward, so a Method out of written order, as a
+		// duplicate is, never reopens a property already visited.
+		if (previous === null || !isAtOrBefore(start, previous)) {
+			previous = start
+		}
 	}
 
 	return visitProperties(

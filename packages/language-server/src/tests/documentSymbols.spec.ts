@@ -865,3 +865,43 @@ describe("Document Symbols inside a refinement's predicate", () => {
 		expect(detailOf(detailedSymbolsOf(source), "limit")).toBe("Integer")
 	})
 })
+
+// The second `b` takes the first one's key, so the Methods stand out of
+// written order around the property between them.
+describe("Document Symbols of a Namespace with a duplicate Method", () => {
+	it("should list what a property declares once", () => {
+		let symbols = symbolsOf(
+			[
+				"implementation {",
+				"\tnamespace Twice for Integer {",
+				"\t\tb() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"",
+				"\t\ta() -> Integer {",
+				"\t\t\t<- 2",
+				"\t\t}",
+				"",
+				"\t\tstatic q = () -> Integer {",
+				"\t\t\tconstant inQ = 1",
+				"",
+				"\t\t\t<- inQ",
+				"\t\t}",
+				"",
+				"\t\tb() -> Integer {",
+				"\t\t\t<- 3",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+
+		expect(flatten(symbols).map((symbol) => symbol.name)).toEqual([
+			"Twice",
+			"q",
+			"inQ",
+			"b",
+			"a",
+		])
+	})
+})

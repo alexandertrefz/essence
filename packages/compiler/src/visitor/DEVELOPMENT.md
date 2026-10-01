@@ -76,9 +76,11 @@ of them once. It checks its own fixtures, the standard library, and every file i
 ### Order
 
 A parsed node's children are visited in written order, which the spec checks over the same files. A Namespace's
-properties and Methods are two Records, so `visitInterleaved` merges them back into written order by their names. An
-export block's bare names and its groups are merged by Position, so an empty or unfinished group is reached too. The
-export and tests blocks may stand in either order below the implementation, and are visited in the order written.
+properties and Methods are two Records, so `visitInterleaved` merges them back into written order by their names. A
+duplicate Method is stored under the first one's key, which breaks that order, but each property is still visited
+once. An export block's bare names and its groups are merged by Position, so an empty or unfinished group is reached
+too. The export and tests blocks may stand in either order below the implementation, and are visited in the order
+written.
 
 In the typed AST, a node the enricher desugars stands where the enricher put it, with a Position borrowed from what the
 author wrote. So the typed walk is in written order only up to them. Such nodes include:

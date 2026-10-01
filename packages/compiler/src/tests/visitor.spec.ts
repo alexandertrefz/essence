@@ -287,6 +287,28 @@ const unfinishedSources = [
 	'import {\n\tfrom "./b.es" {\n\t}\n}\n\nimplementation {\n\tconstant a = 1\n}\n',
 ]
 
+// The second `b` takes the first one's key in the Record, so the Methods stand
+// out of written order around the property between them.
+const duplicateMethodSource = [
+	"implementation {",
+	"\tnamespace Twice for Integer {",
+	"\t\tb() -> Integer {",
+	"\t\t\t<- 1",
+	"\t\t}",
+	"",
+	"\t\ta() -> Integer {",
+	"\t\t\t<- 2",
+	"\t\t}",
+	"",
+	"\t\tstatic q = 3",
+	"",
+	"\t\tb() -> Integer {",
+	"\t\t\t<- 3",
+	"\t\t}",
+	"\t}",
+	"}",
+].join("\n")
+
 function fixturePrograms(): {
 	parsed: Array<ParserNode>
 	typed: Array<TypedNode>
@@ -509,6 +531,24 @@ describe("The child tables", () => {
 			mismatches(
 				visitCounts(corpus.typed, forEachTypedChild),
 				reflectiveNodes(corpus.typed, new Set(["dispatch"])),
+			),
+		).toEqual(noMismatches)
+	})
+
+	it("reach each node once where a duplicate Method breaks written order, in both trees", () => {
+		let program = parseWithDiagnostics(duplicateMethodSource).program
+		let typedProgram = enrich(program).program
+
+		expect(
+			mismatches(
+				visitCounts([program], forEachParserChild),
+				reflectiveNodes([program], new Set()),
+			),
+		).toEqual(noMismatches)
+		expect(
+			mismatches(
+				visitCounts([typedProgram], forEachTypedChild),
+				reflectiveNodes([typedProgram], new Set(["dispatch"])),
 			),
 		).toEqual(noMismatches)
 	})
