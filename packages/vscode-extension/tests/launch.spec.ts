@@ -12,9 +12,8 @@ import {
 	resolveServer,
 } from "../launch.js"
 
-// Every function here is a pure function of its arguments, so a machine
-// is a set of paths that exist, an environment, and what the login shell
-// would say — and the specs build one per case.
+// A machine for the pure functions of `launch.js`: the paths that exist, an
+// environment, and what the login shell would say.
 function machine(
 	existing: Array<string>,
 	overrides: Record<string, unknown> = {},

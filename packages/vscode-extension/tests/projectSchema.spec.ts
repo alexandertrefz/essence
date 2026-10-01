@@ -4,11 +4,9 @@ import * as path from "node:path"
 
 import { projectSchema } from "@essence-lang/compiler/configuration"
 
-// The extension bundles the JSON Schema for `essence.json` and registers
-// it for the filename, which is what gives the file completion, hover text and
-// validation without a line of server code. The copy is generated from the
-// reader's catalogue; this spec re-renders and compares, and NEVER writes — a
-// drifted copy is fixed by `bun run generate:schema`.
+// The bundled JSON Schema for `essence.json`, generated from the reader's
+// catalogue. This spec compares and never writes; `bun run generate:schema`
+// regenerates a stale copy.
 const BUNDLED_COPY = path.resolve(
 	import.meta.dirname,
 	"../schemas/essence.schema.json",

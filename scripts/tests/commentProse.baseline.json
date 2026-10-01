@@ -198,13 +198,7 @@
 	"packages/runtime/src/tests/testing.spec.ts": {"sentence-length": 39, "em-dash": 35, "all-caps": 19, "position": 2, "block-length": 1, "counts": 1},
 	"packages/runtime/src/tests/unicodeEdges.spec.ts": {"sentence-length": 17, "em-dash": 13, "all-caps": 18, "history": 1},
 	"packages/runtime/src/tests/writing.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 2},
-	"packages/vscode-extension/tests/contribution.spec.ts": {"sentence-length": 8, "em-dash": 7, "all-caps": 3, "block-length": 1},
-	"packages/vscode-extension/tests/fileOperations.spec.ts": {"sentence-length": 2, "em-dash": 1, "all-caps": 1},
 	"packages/vscode-extension/tests/grammar.spec.ts": {"sentence-length": 25, "em-dash": 17, "all-caps": 12, "position": 4, "block-length": 1},
-	"packages/vscode-extension/tests/launch.spec.ts": {"sentence-length": 1, "em-dash": 1},
-	"packages/vscode-extension/tests/projectSchema.spec.ts": {"sentence-length": 1, "em-dash": 1, "all-caps": 1},
-	"packages/vscode-extension/tests/renameAt.spec.ts": {"sentence-length": 3, "em-dash": 4, "all-caps": 1},
-	"packages/vscode-extension/tests/snippets.spec.ts": {"sentence-length": 3, "em-dash": 3, "all-caps": 3},
 	"packages/vscode-extension/tests/testModel.spec.ts": {"sentence-length": 11, "em-dash": 8, "all-caps": 5, "position": 1},
 	"packages/vscode-extension/tests/testView.spec.ts": {"sentence-length": 12, "em-dash": 11, "all-caps": 5, "block-length": 1},
 	"packages/vscode-extension/tests/vscodeStub.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 5, "citation": 1}

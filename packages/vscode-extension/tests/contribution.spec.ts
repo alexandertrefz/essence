@@ -2,9 +2,8 @@ import { describe, expect, it } from "bun:test"
 
 import manifest from "../package.json"
 
-// The manifest is data VS Code reads, not code anything type-checks —
-// a missing `breakpoints` entry or a snippet without its required attribute
-// fails silently in the product, so the contract is pinned here instead.
+// Nothing type-checks the manifest, and a mistake in it fails silently in VS
+// Code, so its contract is pinned here.
 describe("the debugger contribution", () => {
 	const debuggers = manifest.contributes.debuggers
 
@@ -26,8 +25,8 @@ describe("the debugger contribution", () => {
 		])
 	})
 
-	// A starter configuration that omits a required attribute is a
-	// launch.json the user has to repair before first use.
+	// A starter configuration missing a required attribute would need repair
+	// before first use.
 	it("writes complete starter configurations", () => {
 		for (let configuration of debuggers[0]!.initialConfigurations) {
 			expect(configuration.type).toBe("essence")
@@ -42,16 +41,14 @@ describe("the debugger contribution", () => {
 		}
 	})
 
-	// VS Code derives every activation event this extension needs from
-	// its contributions — the language and the debugger both — so none may be
-	// spelled out: a spelled-out one is the warning the manifest linter raises.
+	// VS Code derives the activation events from the contributions, and the
+	// manifest linter warns about any spelled out.
 	it("relies on the generated activation events", () => {
 		expect(manifest).not.toHaveProperty("activationEvents")
 	})
 
-	// Every one of these settings names an executable to spawn, so every
-	// one is ignored in untrusted workspaces — a workspace could point any of
-	// them at a program it ships itself.
+	// Each setting names an executable to spawn, so untrusted workspaces
+	// cannot set them to a program they ship.
 	it("restricts every executable-path setting", () => {
 		let restricted =
 			manifest.capabilities.untrustedWorkspaces.restrictedConfigurations
@@ -78,9 +75,8 @@ describe("the debugger contribution", () => {
 	})
 })
 
-// The live test session is a thing that RUNS a project's code as it is
-// typed, so the setting that declines it is part of the contract rather than a
-// convenience — a reader who cannot find it has no way to stop it.
+// The live session runs a project's code as it is typed, so the setting that
+// switches it off is part of the contract.
 describe("the test session contribution", () => {
 	it("offers the setting that switches the live session off", () => {
 		let properties = manifest.contributes.configuration.properties
@@ -92,12 +88,9 @@ describe("the test session contribution", () => {
 	})
 
 	it("keeps the lens commands out of the palette", () => {
-		// `essence.test.run` and `essence.test.debug` are registered in
-		// `extension.js` and invoked by a Code Lens, which carries the ids to
-		// run. A command in `contributes.commands` is a command the palette
-		// offers with no ids at all, which could only ever do nothing. The two
-		// that ARE offered take no arguments: what failed, and where the
-		// session writes.
+		// A lens command such as `essence.test.run` needs the ids its lens
+		// carries, which the palette cannot pass. Only commands without
+		// arguments are offered.
 		expect(
 			manifest.contributes.commands.map((command) => command.command),
 		).toEqual([
@@ -107,8 +100,8 @@ describe("the test session contribution", () => {
 		])
 	})
 
-	// The palette groups by the prefix, and a `category` beside a title
-	// that already carries one reads as "Test: Essence: …".
+	// The title carries the prefix, so a `category` would read as
+	// "Test: Essence: …".
 	it("names every palette command the same way", () => {
 		for (let command of manifest.contributes.commands) {
 			expect(command.title.startsWith("Essence: ")).toBe(true)
@@ -116,9 +109,8 @@ describe("the test session contribution", () => {
 		}
 	})
 
-	// The live session runs a project's code on every edit, so whether it
-	// runs and how often are settings rather than constants — and each one is
-	// only real because the Server reads it back out of the client.
+	// Whether the live session runs and how often are settings, which the
+	// Server reads from the client.
 	it("offers the settings that say whether it runs and how often", () => {
 		let properties: Record<string, unknown> =
 			manifest.contributes.configuration.properties
@@ -127,27 +119,20 @@ describe("the test session contribution", () => {
 			type: "number",
 			default: 450,
 		})
-		// Off by default, and it has to be: instrumenting compiles a
-		// different bundle from the one a build produces and makes the program
-		// do more work on every keystroke.
+		// Off by default: an instrumented bundle differs from a build's and
+		// does more work on every keystroke.
 		expect(properties["essence.tests.coverage"]).toMatchObject({
 			type: "boolean",
 			default: false,
 		})
-		// And WHAT runs is deliberately not among them. Which tags a run
-		// skips is a fact about the project rather than about the reader, so it
-		// lives in the `essence.json` the terminal reads too — a setting here
-		// would be a second list to keep agreeing with that one.
+		// Which tags a run skips belongs to the project, so it lives in the
+		// `essence.json` the terminal reads too.
 		expect(properties).not.toHaveProperty("essence.tests.skipTags")
 	})
 
-	// The project file. VS Code has no `essence.json` of its own, so the
-	// extension says three things about one: that it is JSON with comments, so
-	// a reason written beside a setting is not red; that the Schema generated
-	// from the reader's catalogue describes it, which is where completion and
-	// hover over a key come from; and — through the Language Client's document
-	// selector — that the Server is to be told about it, which is what puts a
-	// mistake in it on the file rather than nowhere.
+	// The project file is JSON with comments, described by the generated
+	// Schema for completion and hover. The client's document selector also
+	// sends it to the Server, which reports mistakes on the file.
 	describe("the project file contribution", () => {
 		it("reads essence.json as JSON with comments", () => {
 			expect(manifest.contributes.languages).toContainEqual({

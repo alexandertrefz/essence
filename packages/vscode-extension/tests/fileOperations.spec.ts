@@ -3,18 +3,12 @@ import { describe, expect, it } from "bun:test"
 import { serverCapabilities } from "@essence-lang/language-server/server"
 import { minimatch } from "minimatch"
 
-// What the Server ADVERTISES for `workspace/willRenameFiles` is only half
-// of whether it is ever asked: the client decides, and it decides by matching
-// each filter's glob against the file's absolute path with minimatch — the same
-// library and the same defaults this reads them with. So a glob that looks
-// right and reaches nothing is a rename that silently leaves every dependent's
-// specifier pointing at a file that is no longer there, with no Diagnostic and
-// no edit to undo.
+// The client asks `workspace/willRenameFiles` only when a filter's glob
+// matches the absolute path under minimatch's defaults, as read here. A glob
+// that misses leaves every importer pointing at the old file, silently.
 //
-// `dot: false` is the default, and under it neither `*` nor `**` crosses a
-// segment that opens with a `.`. A project living under `~/.local/…`, or a
-// source in a `.generated/` folder, is therefore a shape the plain globs can
-// not see at all.
+// Under the default `dot: false`, neither `*` nor `**` crosses a segment
+// starting with `.`, such as `~/.local` or a `.generated/` folder.
 
 let filters = serverCapabilities.workspace?.fileOperations?.willRename?.filters
 
