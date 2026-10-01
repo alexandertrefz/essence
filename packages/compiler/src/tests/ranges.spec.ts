@@ -13,11 +13,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// `List.of`'s six range entries, each compiled AND run. The direction one
-// of them counts is what it is CALLED now rather than what its two bounds
-// happen to say, so every claim here is about a value the walk answered, not
-// about a Type it was given: a range that counts the wrong way is a Program
-// that prints the wrong List, and nothing else reports it.
+// `List.of`'s range entries, each compiled and run. An entry counts in the
+// direction its name says, whatever its bounds say. A range counting the wrong
+// way only shows in the printed List, so every spec checks a printed value.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -63,8 +61,8 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	return enrich(parsed.program).diagnostics
 }
 
-// One Program per block rather than one per claim, because each range is
-// a line of output and the pipeline runs once for all of them.
+// Each range prints one line, so one Program and one pipeline run serve a
+// whole spec.
 async function ranges(...calls: Array<string>): Promise<Array<string>> {
 	return run(`implementation {
 ${calls.map((call) => `\t\tTerminal.inspect(${call}::toString())`).join("\n")}
@@ -83,9 +81,8 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"[1, 2, 3, 4]"', '"[1]"', '"[]"', '"[-2, -1, 0, 1]"'])
 	})
 
-	// The empty answer is the whole reason `through:` stopped counting
-	// down. A range written from the length of an empty List reaches
-	// `through -1`, which used to answer `[0, -1]` and now answers nothing.
+	// `through:` never counts down, so a range written from the length of an
+	// empty List reaches `through -1` and answers nothing.
 	it("answers the empty List for a range written from an empty length", async () => {
 		expect(
 			await run(`implementation {
@@ -146,10 +143,8 @@ describe("List.of counts the direction its label says", () => {
 		])
 	})
 
-	// A step of zero reaches no end, so the walk behind it would never
-	// finish. `NonZeroInteger` is what keeps it out, and a written `0` is its
-	// own proof that it is not one — so this is refused while compiling rather
-	// than hung at run time.
+	// A step of zero would never finish. `NonZeroInteger` keeps it out, and a
+	// written `0` proves it is not one, so compiling refuses it.
 	it("refuses a step of zero at compile time", () => {
 		let diagnostics = diagnosticsOf(`implementation {
 			Terminal.inspect(List.of(integersFrom 0, through 5, by 0)::toString())
@@ -163,8 +158,7 @@ describe("List.of counts the direction its label says", () => {
 		)
 	})
 
-	// A computed step is refused too, because the proof is about the
-	// VALUE and a value the Program is handed carries none.
+	// A computed step carries no proof about its value, so it is refused too.
 	it("refuses a step nothing proved is not zero", () => {
 		let diagnostics = diagnosticsOf(`implementation {
 			constant step = 3::subtract(3)
@@ -190,9 +184,9 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"4"', '"1"', '"Value(1)"'])
 	})
 
-	// `NonEmptyList::indices` is native and answers a List that is never
-	// empty, and `List.repeat` is written on the up-counting entry, which
-	// answers nothing for a count below one.
+	// `NonEmptyList::indices` is native and never answers an empty List.
+	// `List.repeat` uses the up-counting entry, which answers nothing for a
+	// count below one.
 	it("keeps the promises the library's own bodies rest on", async () => {
 		expect(
 			await run(`implementation {

@@ -3,36 +3,21 @@ import path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 
-// THE guard that type matching comes back. Every job below is one where a
-// Namespace's Type Parameter and a caller's are spelled the SAME, which is the
-// shape a Type Parameter's identity — its name, and nothing else — can not tell
-// apart on its own. Before `bindNamespaceTarget` alpha-renamed a Namespace's
-// Generics and `isOpenBindable` grew its occurs check, such a Program bound
-// `Item := List<Item>` off the first member of a Record target and then chased
-// that name through itself: 363 million `matchGenericUse` turns in 25 seconds,
-// flat memory, and no answer ever. `esc` had to be killed.
+// Type matching must return when a Namespace's Type Parameter and a caller's
+// share a name, since a Type Parameter's identity is its name. Without
+// protection, matching binds `Item := List<Item>` and chases it forever.
 //
-// Run in a CHILD process, one per job, under a wall clock. A spin can not
-// be caught in the process that started it — `bun test` would inherit it and
-// report nothing at all, which is exactly what a guard against spinning must not
-// do. The timeout is far above what the work costs (well under a second either
-// way) so that a loaded machine can not turn it red; what it catches is
-// unboundedness, not slowness.
+// Each job runs in a child process under a wall clock, because a spin cannot be
+// caught in the process that started it. The budget is far beyond the work's
+// cost: it catches unboundedness, not slowness.
 //
-// TWO KINDS of job, because the two protections sit at different depths
-// and a guard that can only see one of them is half a guard. The `source` jobs
-// are the Programs a reader writes, and they are answered by the alpha-renaming:
-// break that and they spin. The `match` jobs reach past it, handing the matcher
-// a context whose Parameters were never renamed — the collision the renaming
-// normally prevents, put there on purpose — so they are answered by the occurs
-// check alone: break THAT and they spin. Each was confirmed to time out with
-// its own protection reverted and the other left in place.
+// The `source` jobs are Programs, which the alpha-renaming in
+// `bindNamespaceTarget` answers. The `match` jobs hand the matcher Parameters
+// that were never renamed, so only the occurs check in `isOpenBindable` answers
+// them. Each kind fails if its own protection breaks.
 //
-// The Programs are the FAMILY, not the one report. Several are errors
-// under the per-Method bound rules and are expected to stay errors — that is the
-// point. Whether a Program compiles is decided elsewhere; termination is not
-// allowed to depend on it, and a Program that stops being an error must still be
-// listed here.
+// Some Programs are errors under the per-Method bound rules. Termination must
+// not depend on whether a Program compiles, so they stay listed either way.
 const TERMINATION_BUDGET_MS = 60_000
 
 const RUNNER = path.join(import.meta.dir, "enricherTerminationRunner.ts")
@@ -247,9 +232,8 @@ describe("Type matching terminates under a Type Parameter name collision", () =>
 				let output = await new Response(child.stdout).text()
 				let errors = await new Response(child.stderr).text()
 
-				// The word, not merely a zero exit — a child killed by the
-				// wall clock above exits non-zero, and so does one that threw.
-				// The three are told apart here so a failure says which happened.
+				// A killed child and one that threw both exit non-zero, so the
+				// expectation includes the output to say which happened.
 				expect(`${exitCode} ${output} ${errors}`).toBe("0 returned ")
 			},
 			TERMINATION_BUDGET_MS + 30_000,

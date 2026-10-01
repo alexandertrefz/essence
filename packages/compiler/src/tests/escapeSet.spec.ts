@@ -4,23 +4,15 @@ import { quotedText } from "@essence-lang/runtime/String"
 
 import { actsOnTerminal } from "../helpers/terminalText"
 
-// WHICH characters the printer escapes, pinned as a SET rather than one
-// at a time. `roundTrip.spec.ts` holds the promise that whatever is printed
-// reads back, and that promise can not see an escape that is MISSING: a raw
-// U+2069 pasted back into a Literal lexes to U+2069, so the round trip passes
-// while the printed line has already been reordered by something the reader can
-// not see. Three mutations of the set survived an adversarial review for
-// exactly that reason — one isolate dropped, one separator too many, and a
-// normalisation at lex time — and this is what closes them.
+// Pins the whole set of characters the printer escapes. `roundTrip.spec.ts`
+// cannot see a missing escape: a raw U+2069 reads back as itself, so the round
+// trip passes while the printed line is already reordered.
 //
-// The expectation is derived from the DOCUMENTED sentence, written out
-// again here, and not from the code under test. A table captured from the
-// printer would agree with whatever the printer does, which is the one thing a
-// test about a set must not do. The sentence is
-// `packages/website/src/content/docs/language/programs-and-values.mdx`:
-// the seven with a spelling of their own; the C0 controls, DEL and the C1
-// controls; the two line separators; the byte order mark; and the bidi
-// controls U+061C, U+200E, U+200F, U+202A–U+202E and U+2066–U+2069.
+// The expectation is written from the documentation, not captured from the
+// printer, which would agree with whatever the printer does. The set holds the
+// characters with a short escape, the C0 controls, DEL and the C1 controls. It
+// also holds U+2028, U+2029, the byte order mark, and the bidi controls U+061C,
+// U+200E, U+200F, U+202A to U+202E and U+2066 to U+2069.
 
 const SHORT_ESCAPES: { [code: number]: string } = {
 	0x5c: "\\\\",
@@ -32,11 +24,8 @@ const SHORT_ESCAPES: { [code: number]: string } = {
 	0x7d: "\\}",
 }
 
-// The invisible half of the set, said as the documentation says it. It is
-// deliberately a ladder of comparisons naming each range, because a range
-// written as a bound that is one off — `U+202F` instead of `U+202E`, `U+2068`
-// instead of `U+2069` — is precisely the mistake this file exists to catch, and
-// a reader checking it against the docs has to be able to read the bounds.
+// The invisible part of the set. Each range spells out its bounds for checking
+// against the documentation, since an off-by-one bound is what this spec catches.
 function documentedAsInvisible(code: number): boolean {
 	return (
 		code <= 0x1f ||
@@ -68,17 +57,13 @@ function named(code: number): string {
 	return `U+${code.toString(16).toUpperCase().padStart(4, "0")}`
 }
 
-// Every code point up to U+2FFF, which is every one of them that the set
-// names something in, with the two isolates' neighbours and the byte order
-// mark's above it. A run rather than a list, because what is being checked is
-// as much what is NOT escaped as what is: U+202F is one past the last override
-// and U+206A one past the last isolate, and both of them have to print as
-// themselves.
+// Every code point up to U+2FFF, which covers each range the set names but the
+// byte order mark. It is a run rather than a list because what is left alone
+// matters too: U+202F and U+206A must print as themselves.
 const SWEPT = 0x3000
 
-// Above the sweep, where the set names one character and the interesting
-// thing is everything around it. A surrogate is left out — it is not a
-// character, it has its own rule and its own tests.
+// Above the sweep the set names only the byte order mark, so its neighbours
+// are sampled. A lone surrogate is not a character and has its own specs.
 const SAMPLED = [
 	0x3000, 0x4e00, 0x7fff, 0xd7ff, 0xe000, 0xfefe, 0xfeff, 0xff00, 0xfffd,
 	0xfffe, 0xffff,
@@ -123,9 +108,8 @@ describe("the escape set", () => {
 		expect(mismatches).toEqual([])
 	})
 
-	// An astral character is one character, and the set names none of
-	// them — a printer that judged its two code units separately would escape
-	// both halves of every emoji.
+	// The set names no astral character. A printer judging the two code units
+	// separately would escape both halves of every emoji.
 	it("leaves every astral character as itself", () => {
 		let mismatches: Array<number> = []
 
@@ -140,11 +124,9 @@ describe("the escape set", () => {
 		expect(mismatches).toEqual([])
 	})
 
-	// The toolchain's OWN rule for text it is about to print — a
-	// Diagnostic naming a character, a test name in the reporter — is the same
-	// set less the four the printer escapes so that its output reads back as a
-	// Literal. Two sets that are meant to agree and are written twice is a
-	// drift waiting to happen, so it is checked rather than trusted.
+	// `actsOnTerminal` guards text the toolchain prints, such as a Diagnostic or
+	// a test name. It must match the invisible part of the set, which leaves out
+	// `\`, `"`, `{` and `}` since only a Literal needs those escaped.
 	it("agrees with what the toolchain will not echo", () => {
 		let disagreements: Array<string> = []
 
