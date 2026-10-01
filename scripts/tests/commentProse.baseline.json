@@ -1,6 +1,5 @@
 {
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
-	"packages/compiler/src/tests/asynchrony.spec.ts": {"sentence-length": 25, "em-dash": 20, "all-caps": 13, "block-length": 1, "counts": 1},
 	"packages/compiler/src/tests/attribution.spec.ts": {"sentence-length": 4, "em-dash": 3, "all-caps": 3},
 	"packages/compiler/src/tests/benchmarkFiles.spec.ts": {"sentence-length": 5, "em-dash": 3, "all-caps": 2, "counts": 1},
 	"packages/compiler/src/tests/builtins.spec.ts": {"sentence-length": 21, "em-dash": 17, "all-caps": 6, "history": 1, "position": 4, "block-length": 3, "counts": 1},
