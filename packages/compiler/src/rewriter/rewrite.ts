@@ -6940,18 +6940,8 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	// An absolute path rather than `@essence-lang/runtime/<Name>`, because
-	// the emitted module is written to the user's directory and handed to esbuild
-	// from there — a package specifier would have to resolve against wherever
-	// that is. The Bundler inlines these and they never reach the output.
-	//
-	// A HOST's build is the other way around. Nothing is inlined there —
-	// the Modules are handed over one at a time and the host resolves what they
-	// import — and an absolute path into this Compiler's own installation is not
-	// something a host bundler will read, let alone transpile. The package
-	// specifier is: the runtime is a dependency of the client the host already
-	// installed, and every Module of every entry importing it BY NAME is what
-	// leaves one runtime, and therefore one Type key, in the finished app.
+	// An absolute path for a bundle, which the bundler inlines, and the package
+	// specifier for a host. See "Emit targets" in DEVELOPMENT.md.
 	const specifier =
 		emission.target.mode === "host"
 			? `${RUNTIME_PACKAGE}/${fileName}`
@@ -6981,10 +6971,7 @@ function importNamespaceSpecifier(
 	}
 }
 
-// Arrays have to be checked before the general object case — they are
-// `typeof "object"` too, and emitting one as an ObjectExpression would turn a
-// Union's member list into `{ 0: …, 1: … }`, which no longer has the Array
-// Methods the runtime Type check calls on it.
+// Arrays first, since they are objects too and must stay Arrays.
 function convertValueToExpression(value: unknown): estree.Expression {
 	if (Array.isArray(value)) {
 		return {
@@ -7003,12 +6990,8 @@ function convertValueToExpression(value: unknown): estree.Expression {
 	} as estree.Literal
 }
 
-// A derived-equality descriptor emitted as a plain JSON-shaped literal.
-// Its keys are Case tags like `"Choice#Case"` and the payload member names
-// underneath them, neither of which a JavaScript IdentifierName is guaranteed
-// to spell, so every key here is a string Literal — one rule for the whole
-// tree, where `convertObjectToObjectExpression` asks `memberKey` per key and
-// leaves the ordinary names unquoted.
+// A derived-equality descriptor as a JSON-shaped literal. Its keys are Case
+// tags and member names, so every key is a string Literal.
 function jsonExpression(value: unknown): estree.Expression {
 	if (Array.isArray(value)) {
 		return {
@@ -7040,15 +7023,8 @@ function jsonExpression(value: unknown): estree.Expression {
 	} as estree.Literal
 }
 
-// A Type descriptor emitted as the object literal the runtime's Type
-// check reads. Most of its keys are the descriptor's own fields — `type`,
-// `members`, `itemType` — but a Record descriptor's `members` map is keyed by
-// Essence member names, and an Essence identifier may hold characters no
-// JavaScript IdentifierName may: `case { ok?: Boolean }` emitted
-// `members: { ok?: … }`, which no JavaScript parser accepts, so a Program that
-// compiled without a single Diagnostic died in the bundler instead. `memberKey`
-// is the same answer the Record literal and the member read give, so all three
-// spell such a name alike.
+// A Type descriptor as the object literal the runtime's Type check reads.
+// Keys go through `memberKey`, since a Record's members may be named `ok?`.
 function convertObjectToObjectExpression(
 	object: object,
 ): estree.ObjectExpression {
@@ -7070,28 +7046,9 @@ function convertObjectToObjectExpression(
 	}
 }
 
-// A Type SERIALIZED for the runtime, which is every place a Type stops
-// being something the Compiler reasons about and becomes data a Program carries.
-// A checked refinement may not reach one: its predicate is not a check the
-// runtime can make, so an emitted descriptor naming it would ask
-// `isValueOfType` a question it has no answer to and quietly claim every value
-// fails it.
-//
-// So this refuses, loudly and at compile time, rather than emitting it. Nothing
-// a Program can WRITE gets here — the Optimiser stage erases every refinement
-// out of the tree before the Rewriter sees it — which is exactly why this is
-// worth having: it is the assertion that the erasure was complete, and it names
-// the Compiler, not the reader, when it is not.
-//
-// And it strips a Record's display spelling on the way, because the walk
-// above writes out whatever fields a Type is holding: `Standing` is what a
-// reader calls a shape and says nothing to `isValueOfType`, so a Program
-// matching on an Alias would ship the name as dead bytes and pool two spellings
-// of one shape as two constants. Stripped BEFORE the assertion, so the Type
-// Arguments a spelling carries are not held to an erasure that is about the
-// members — `Box<NonZeroInteger>` erases to `{ value: Integer }`, and the
-// refinement left in what the reader CALLS it is not a refinement anything
-// emits.
+// A Type serialized for the runtime, without a Record's display name. A
+// refinement here means the optimiser's erasure missed one, so it throws.
+// See "Type descriptors" in DEVELOPMENT.md.
 function typeDescriptorExpression(
 	type: common.Type,
 	where: string,
@@ -7110,19 +7067,13 @@ function typeDescriptorExpression(
 
 // #region Tests
 
-// The name the test runtime is imported under, and the name a test's
-// context is bound to inside the Function the section becomes. Both are in
-// `compilerOwnedNames`, so a Program writing either binds a mangled name
-// instead — `$` is a legal Essence identifier character, and neither of these
-// is a name an author can be told is taken.
+// The test runtime's import name and the name of a test's context, both in
+// `compilerOwnedNames`.
 const TESTING_MODULE = "$testing"
 const TEST_CONTEXT = "$context"
 
-// What a bundle publishes so a runner can reach the tests of EVERY Module
-// in it: the registry, and the runner that drives it. Both come from INSIDE the
-// bundle — see `entryPoints` in the runtime's `Testing` module — because every
-// Essence value carries a hidden Type key belonging to the runtime instance
-// that built it, and a bundle inlines its own.
+// What a bundle exports so a runner reaches every Module's tests. It comes
+// from inside the bundle, whose runtime owns its values' Type key.
 const TEST_ENTRY_POINTS = "$tests"
 
 function testingModule(): estree.Identifier {
@@ -7145,11 +7096,8 @@ function testingCall(
 	}
 }
 
-// The whole `tests { … }` block as ONE Statement: a call registering the
-// Module's manifest, whose `run` is the section itself as a Function of the
-// per-test context. Running it evaluates the setup the selected test can see,
-// afresh, and then that test — which is the literal reading of "a tests-section
-// constant is indistinguishable from fresh evaluation per test".
+// The `tests` block as one call registering the Module's manifest. Its `run`
+// evaluates the setup a selected test sees afresh, then that test.
 function rewriteTestsSection(
 	section: common.typedSimple.TestsSectionNode,
 ): Array<estree.Statement> {
@@ -7171,10 +7119,8 @@ function rewriteTestsSection(
 	]
 }
 
-// The section itself, as the Function of the per-test context the
-// manifest carries. It is `async` exactly where something inside it waits — a
-// setup Constant that completes, or a test that does — and the runner awaits
-// what it answers with either way.
+// The section as a Function of the per-test context, `async` exactly where
+// something inside it waits.
 function sectionRun(
 	section: common.typedSimple.TestsSectionNode,
 ): estree.ArrowFunctionExpression {
@@ -7195,19 +7141,14 @@ function sectionRun(
 	return run
 }
 
-// One Scope's run of Nodes. A suite is a BLOCK, which is what JavaScript's
-// own scoping needs to keep a suite's Constants inside it and let one shadow the
-// section's — the Enricher gave each its own Scope, and an emission that flattened
-// them would declare one name twice in one block.
+// One Scope's run of Nodes. A suite gets a block of its own, so its Constants
+// stay inside it and may shadow the section's.
 function rewriteTestsNodes(
 	nodes: Array<common.typedSimple.TestsNode>,
 ): Array<estree.Statement> {
 	return nodes.flatMap((node) => {
 		if (node.nodeType === "TestEntry") {
-			// In the order the Arguments stand, because rewriting is not
-			// free of order: a Constant the name pools is pooled before one the
-			// body pools, and the pool's names are what a reader of the emitted
-			// Module sees.
+			// In Argument order, so pooled constants are numbered in that order.
 			let name = testName(node.name)
 			let body = testBody(node.body)
 
@@ -7215,12 +7156,8 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// A benchmark is the same call through the sibling
-						// entry point — one entry, one body, and a runtime that
-						// times the body rather than running it once. Which of
-						// the two is emitted is the whole of the difference: the
-						// key its baseline is stored under rides the manifest,
-						// where every durable identity already is.
+						// A benchmark is the same call through `benchmark`, whose
+						// runtime times the body.
 						expression: awaitedRegistration(
 							testingCall(
 								node.benchmark ? "benchmark" : "entry",
@@ -7267,10 +7204,7 @@ function rewriteTestsNodes(
 				[
 					{
 						type: "ExpressionStatement",
-						// A benchmark's rows go through the sibling entry
-						// point the way a plain benchmark goes through
-						// `benchmark`; each row's baseline key is its own
-						// manifest entry's, the row spelled as its last step.
+						// Benchmark rows go through `benchmarkRows`.
 						expression: awaitedRegistration(
 							testingCall(
 								node.benchmark ? "benchmarkRows" : "rows",
@@ -7334,9 +7268,8 @@ function rewriteTestsNodes(
 		}
 
 		if (node.nodeType === "TestScope") {
-			// A call rather than a bare block, so that the runtime can
-			// decline to evaluate a suite the running test is not in. The
-			// closure is the Scope JavaScript needs either way.
+			// A call rather than a block, so the runtime can skip a suite the
+			// running test is not in.
 			let held: estree.ArrowFunctionExpression = {
 				type: "ArrowFunctionExpression",
 				expression: false,
@@ -7369,12 +7302,8 @@ function rewriteTestsNodes(
 	})
 }
 
-// A generator as the test runtime reads it: plain data, apart from the
-// two leaves that carry an Expression. Both of those are emitted as a closure
-// of the ONE name they bind — a refinement's check takes the candidate, a
-// `Generatable` call takes the source — which is the same shape a table's rows
-// are given, and for the same reason: the interpreter holds a value and the
-// emitted code is what knows what to do with it.
+// A generator as plain data, but for the leaves that carry an Expression,
+// which become closures of the one name they bind.
 function testGenerator(
 	generator: common.typedSimple.TestGenerator,
 ): estree.Expression {
@@ -7393,11 +7322,8 @@ function testGenerator(
 				property("value", testGenerator(generator.value)),
 			)
 
-			// The key Type's Equatable witness, where one was resolved —
-			// what every drawn Dictionary is built through, so that two keys the
-			// Program calls one key are one key here too. Absent for a bare
-			// `Dictionary`, and the runtime falls back to its universal
-			// comparison there.
+			// The key witness every drawn Dictionary is built through, where
+			// one was resolved.
 			if (generator.keyConformance !== undefined) {
 				properties.push(
 					property(
@@ -7416,10 +7342,7 @@ function testGenerator(
 			break
 		case "case":
 			properties.push(
-				// The tag every value of the Case carries, spelled the
-				// way `createCase` stamps it — through `renderIdentity`, so a
-				// Choice declared in another Module is named as this bundle
-				// spells it.
+				// Through `renderIdentity`, as `createCase` stamps it.
 				property("tag", {
 					type: "Literal",
 					value: renderIdentity(generator.tag),

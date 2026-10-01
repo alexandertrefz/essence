@@ -765,3 +765,18 @@ continue $tail_0;
 
 Where any Argument must be held, all are, so the rebinding is simultaneous: the turn reads both names before
 writing either. Where no written Argument reads a Parameter the turn assigns in place, the pass holds none.
+
+## Type descriptors
+
+`typeDescriptorExpression` serializes a Type as the object literal `$type.isValueOfType` reads, for a
+Matcher's check, a Union dispatch case or a pooled descriptor. Every string in it goes through
+`renderIdentity`, and every key through `memberKey`.
+
+It first strips a Record's display name with `withoutRecordNames`. A name such as `Standing` tells
+`isValueOfType` nothing, and keeping it would ship dead bytes and pool two spellings of one shape as two
+constants. The stripping comes before the refinement check. A refinement left only in a display name, as
+in `Box<NonZeroInteger>`, is then not held against the erased members.
+
+A checked refinement must never reach a descriptor: the runtime can not check its predicate, and the
+descriptor would quietly fail every value. The optimiser erases every refinement before the Rewriter runs, so
+the throw only fires when that erasure missed one, and it names the compiler.
