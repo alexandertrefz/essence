@@ -419,3 +419,24 @@ three `MatchedValueBinding`s:
 
 The pass also lifts a compiled Union dispatch that holds operands. `compile-union-dispatch` binds those as the
 Parameters of an arrow it calls at once, and in a Statement position they become the `const`s of a block.
+
+### compile-type-tests
+
+Without this pass a Handler's Type check is `$type.isValueOfType(_self, <descriptor>)`, which walks a descriptor the
+compiler built, reads the tag, and then walks the payload. A List descriptor walks every item, so the check costs time
+in proportion to the List. Where `matcherResidual` answers `tag`, the pass writes the comparison instead,
+`_self[$type.typeKeySymbol] === "Optional#Value"`. Any other check becomes a `type-test` over a `type-descriptor`,
+which emits the same call. It stands in an Expression position, where `pool-constants` can hoist the descriptor.
+
+A literal Matcher, such as `case 0`, has no Type check, and the rewriter falls back to the structural `anyIs`.
+Where the scrutinee and the literal are both exactly `Integer` or both exactly `String`, the pass writes a
+`raw-equals` instead, as `lower-scalar-operations` does for `a::is(b)`. A Union-typed scrutinee is left alone,
+since `.value` does not decide it, and a Match over a Boolean is refused by the validator. The `literal` stays on
+the Handler, since `elide-final-match-test` reads it and a build without this pass emits from it.
+
+A Case Matcher's payload Pattern requires Types of members, and `memberTypes` holds them by member path. Each
+becomes a test of the member read, decided by the same rules against the Type the value declares at that path.
+Member literals and Guards are ANDed onto the Matcher's test, so they stay as they are. An assertion such as
+`require #Value(first) = x` is a Handler too, and is compiled the same way.
+
+The tests carry no Position, since nobody wrote them. A debugger steps over them.
