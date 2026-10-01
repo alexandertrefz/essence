@@ -16,11 +16,9 @@ import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
 import type { Module, ModuleGraph } from "./graph"
 
-// What a top level declaration was written as, which is what decides the
-// two Diagnostics that turn on the kind rather than on the Type: a Variable can
-// not be exported at all, and a Constant can not be imported across a cycle.
-// Everything else — a Function, a Namespace, a Type Alias, a Choice, a Protocol —
-// hoists, and hoisting is exactly what makes a cycle work.
+// What a top-level declaration was written as. A Variable can not be
+// exported, and a Constant can not be imported across a cycle. Every other
+// kind hoists.
 export type DeclaredKind =
 	| "constant"
 	| "variable"
@@ -35,16 +33,9 @@ export type Declaration = {
 	position: common.Position
 }
 
-// What a Module offers the Modules that import it, keyed by the name it is
-// exported UNDER — `as` is applied here, so an importer never has to know what
-// the declaration was called at home.
-//
-// `kinds` is the export list itself: a name is exported exactly when it has an
-// entry there. The tables beside it hold what the name RESOLVED to, and one of
-// them may still be empty while a cycle is being hoisted — which is the
-// difference between "this Module does not export that" and "it does, but not
-// yet". One entry carries its name across every table it is bound in, so a
-// `type Foo` and a Namespace `Foo` travel together.
+// What a Module offers its importers, keyed by the exported name with `as`
+// applied. A name is exported exactly when `kinds` has it. The tables beside it
+// may still be empty while a cycle hoists.
 export type ExportSurface = {
 	values: Record<string, common.Type>
 	types: Record<string, common.Type>
@@ -61,25 +52,14 @@ export type ExportSurface = {
 export type LinkedModule = {
 	module: Module
 	program: common.typed.Program
-	// This Module's own Diagnostics, in stage order: what the graph found
-	// about its specifiers, what linking found about its entries, what enrichment
-	// found in its body, and what the export block and the unused entries came to
-	// last. Collected per Module because the dedup key carries no file — one
-	// shared collection would swallow a second Module's identical error.
+	// This Module's own Diagnostics, in stage order. Each Module collects its
+	// own, since `report` would drop another file's equal Diagnostic.
 	diagnostics: Array<common.Diagnostic>
 	surface: ExportSurface
-	// The written annotations paired with what each resolved to — empty
-	// unless this is the Module `annotationsFor` asked about. Only a Hover ever
-	// wants them, and only for the file under the cursor.
+	// Empty unless this is the Module `annotationsFor` names.
 	annotations: Array<common.TypeAnnotation>
-	// What this Module's `import { … }` block BOUND, under the local name
-	// each entry binds it as. The typed Program's own entries carry one Type
-	// apiece and no Protocol at all — see `boundEntryType` — which is enough to
-	// emit and to Hover over and not enough to say what a name in this file
-	// reaches: a Protocol imported to be used as a BOUND is in no table there,
-	// and a name that came across as both a Type and a Namespace shows only the
-	// value. A Language Server resolving a name against this Module needs the
-	// three tables its Scope was seeded with, so they are kept.
+	// What the import block bound, by local name. The typed entries carry one
+	// Type each and no Protocol, so the language server resolves names here.
 	imported: ImportedNames
 }
 
@@ -93,18 +73,13 @@ export type ImportedNames = {
 
 export type LinkedGraph = {
 	entryPath: string
-	// Dependency-first, the entry last — the graph's order, kept, because
-	// it is the order the Module bodies run in.
+	// The graph's order, which the Module bodies run in.
 	modules: Map<string, LinkedModule>
 	diagnostics: Array<common.Diagnostic>
-	// What every Module of the graph declares at its top level, which
-	// linking read off the AST before anything was enriched. Kept because
-	// linking ONE more Module against this graph needs the same answer — see
-	// `linkContextOf` — and reading it again is a walk per Module for something
-	// that was already computed here.
+	// Each Module's top-level declarations, kept for `linkContextOf`.
 	declarations: Map<string, Map<string, Declaration>>
-	// Every Protocol the graph declares, by identity: the registry each
-	// Module's Scope is linked with.
+	// Every Protocol the graph declares, by identity, which each Module's Scope
+	// is linked with.
 	protocols: Map<string, common.ProtocolType>
 }
 
@@ -120,11 +95,8 @@ function emptySurface(): ExportSurface {
 	}
 }
 
-// A list rather than one entry, because a Declaration whose name is a
-// Pattern declares as many names as the Pattern binds. This runs BEFORE the
-// Enricher, so the desugar that turns those into Constants everywhere else has
-// not happened yet and can not be waited for — which is exactly why the names
-// are read off the Pattern here instead.
+// A Pattern declares every name it binds. Linking runs before the enricher
+// desugars Patterns, so the names are read off the Pattern.
 function declarationsOf(
 	node: parser.ImplementationNode,
 ): Array<{ name: parser.IdentifierNode; kind: DeclaredKind }> {
@@ -167,12 +139,9 @@ function declarationsOf(
 	}
 }
 
-// Read off the AST rather than off the Scope, because both questions it
-// answers have to be answerable before anything has been enriched: whether an
-// import collides with a declaration this file makes, and what kind a name was
-// declared as. Only the FIRST declaration of a name is kept — a second one is a
-// duplicate that never reaches Scope, so it is not what an export of that name
-// would forward either.
+// Read off the AST, since collisions and kinds are needed before enrichment.
+// A name's first declaration is kept, since a duplicate never reaches the
+// Scope.
 function topLevelDeclarations(
 	program: parser.Program,
 ): Map<string, Declaration> {
@@ -194,9 +163,8 @@ function topLevelDeclarations(
 	return declarations
 }
 
-// The export block by the name each entry publishes under. A second entry
-// publishing a name is dropped rather than reported: what it would collide with
-// is another entry of the same block, which the Formatter writes side by side.
+// The export block by published name. A second entry publishing a name is
+// dropped rather than reported.
 function exportedEntries(
 	program: parser.Program,
 ): Map<string, parser.ExportNode> {
@@ -213,12 +181,11 @@ function exportedEntries(
 	return entries
 }
 
-// The canonical order of an import block: by specifier, then by name, then
-// by the local name — never the order the entries were written in. It is the
-// order `esfmt` writes the block in (`compareGroups` and `compareEntries` in the
-// Formatter's `sections.ts`), and Namespace dispatch is seeded in it, so
-// re-sorting a block can never change which Namespace a Method call resolves
-// to. Compared by code unit rather than by locale, so every machine agrees.
+// By specifier, name and local name, in code units. Namespace dispatch is
+// seeded in this order, so reordering an import block never changes which
+// Namespace a Method call resolves to. It is the order `esfmt` writes with
+// `compareGroups` and `compareEntries` in `packages/formatter/src/sections.ts`,
+// except that two groups for one file stay apart there.
 function compareEntries(left: parser.ImportNode, right: parser.ImportNode) {
 	let keyOf = (entry: parser.ImportNode) => [
 		entry.source.path,
@@ -242,14 +209,10 @@ function compareEntries(left: parser.ImportNode, right: parser.ImportNode) {
 type ImportBinding = {
 	entry: parser.ImportNode
 	localName: string
-	// The canonical path the entry's specifier resolved to, or null when it
-	// resolved to nothing at all — the graph reported that already, and this
-	// entry is left alone rather than reported about twice.
+	// Null when the specifier resolved to nothing, which the graph reported.
 	dependencyPath: string | null
 	state: "pending" | "bound" | "refused"
-	// How many of the three tables the entry has bound so far — see
-	// `tablesOffered`. Zero until it binds, and what says whether a bound entry
-	// is still missing half of what its name means.
+	// How many tables the entry has bound, compared with `tablesOffered`.
 	boundTables: number
 }
 
@@ -262,22 +225,15 @@ type ModuleState = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// Whether a name the surface publishes is one the emitted JavaScript
-// binds. A Type Alias, a Choice and a Protocol erase — the Rewriter emits an
-// empty Statement where each was declared — so an entry naming one must carry
-// no ESM binding, or the bundle would import a name the dependency's JavaScript
-// never exports; a Case needs none of its own either, since its tag is a String
-// Literal. The question is asked of the `values` table rather than of the
-// declared KIND because one name travels across every table it is bound in: a
-// `type Rectangle` beside a `namespace Rectangle` is declared as a Type first
-// and is a class in the emitted output all the same.
+// Whether the emitted JavaScript binds a published name. Type Aliases, Choices
+// and Protocols erase. It asks `values` rather than the kind, since a
+// `type Rectangle` beside a `namespace Rectangle` still emits a class.
 function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
 	return surface !== null && surface.values[name] !== undefined
 }
 
-// What a Hover over an entry prints — the member bound under the local
-// name, or the Type where only a Type came across. A name bound in both tables
-// answers with the member, which is what the name means in expression position.
+// What a Hover over an entry prints. A name bound in both tables answers with
+// the member, which is what it means in an expression.
 function boundEntryType(
 	scope: enricher.Scope,
 	name: string,
@@ -285,14 +241,9 @@ function boundEntryType(
 	return scope.members[name] ?? scope.types[name] ?? null
 }
 
-// The two sections as the emitted Program needs them, attached to the
-// typed Program linking hands back. Enrichment leaves both null: whether an
-// entry names something the JavaScript binds is read off the other Module's
-// export surface, and enrichment never sees one.
-//
-// Only an entry that bound is carried. One that did not names something the
-// Module can not reach, which is a Diagnostic already — and code generation
-// never runs over a Module that reported one.
+// The typed import and export sections, which enrichment leaves null since it
+// never sees another Module's surface. An entry that did not bind is left out,
+// since it was reported.
 function moduleSections(
 	state: ModuleState,
 	surface: ExportSurface,
@@ -392,10 +343,8 @@ function moduleSections(
 	}
 }
 
-// A Namespace import binds a shallow COPY carrying the local name, because
-// the emitted Method call reads the Namespace Type's own `name` — an alias that
-// stopped at the Scope would emit a reference to a name the bundle never binds.
-// Nothing else may key off that name.
+// A shallow copy carrying the local name, since an emitted Method call reads
+// the Namespace Type's own `name`. Nothing else may key off that name.
 function underLocalName(type: common.Type, localName: string): common.Type {
 	return type.type === "Namespace" ? { ...type, name: localName } : type
 }
@@ -431,23 +380,15 @@ function bindInto(
 		scope.protocols[localName] = protocol
 	}
 
-	// The import entry, never the declaration in the other file: a
-	// Diagnostic about a use is rendered against THIS Module's source, and a
-	// Position from another file would point into the wrong text entirely.
+	// The import entry's Position, since a Diagnostic about a use renders
+	// against this Module's source.
 	scope.declarations[localName] = position
 }
 
-// What is left of an entry that has been reported about: the local name
-// bound to an Error, so that every use of it in this Module stays quiet. Without
-// it one refused entry becomes a file's worth of `unknown-name` about a name the
-// reader can see written at the top, and the one Diagnostic that says what is
-// actually wrong is buried under them.
-//
-// Both tables, because the kind an entry was after is often exactly what could
-// not be established — and an Error in a table nothing reads costs nothing,
-// while a missing one costs a cascade. Protocols are left out: their slot takes
-// a Protocol Type rather than a Type, and a Protocol always hoists in the first
-// round, so an entry naming one is never left waiting.
+// Binds a reported entry's name to an Error in both tables, so that its uses
+// stay quiet rather than each reporting `unknown-name`. The Protocol table
+// takes no Error Type, and needs none, since a Protocol always hoists in the
+// first round.
 function bindAsError(
 	scope: enricher.Scope,
 	localName: string,
@@ -492,13 +433,9 @@ function reportDuplicateImport(
 	})
 }
 
-// The name the dependency publishes the DECLARATION under, where that is
-// not the name it was declared with. An `as` on an export entry renames the
-// declaration for everyone, so `export { area as squareArea }` leaves `area`
-// private and an importer asking for it has to ask for the other name — telling
-// them to add `area` to the block would publish one function twice. Matched on
-// the declaration's Position, which is what the surface records against each
-// public name, among the names it does not forward from another file.
+// The name a dependency publishes a declaration under, found by its Position.
+// `export { area as squareArea }` leaves `area` private, so an importer is
+// told to ask for `squareArea`.
 function exportedAs(
 	surface: ExportSurface,
 	declaration: Declaration,
@@ -534,11 +471,8 @@ function reportMissingExport(
 						"declared in that Module, but private",
 					),
 				],
-				// The `as` rule only where it is the ANSWER. A reader
-				// looking at a block that plainly lists the declaration has no
-				// other way of knowing why the name is still private here —
-				// while on a block that simply leaves it out, the sentence is
-				// about a spelling nobody wrote.
+				// The `as` rule only where the block lists the declaration
+				// under another name.
 				notes: [
 					"A name is private unless the Module's 'export { … }' block lists it.",
 					...(alias === null
@@ -547,12 +481,8 @@ function reportMissingExport(
 								"An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.",
 							]),
 				],
-				// Three answers, in the order they stop being wrong. A
-				// declaration the block already publishes under another name is
-				// asked for by THAT name — adding this one would publish one
-				// function twice. A Module publishing nothing at all has no
-				// block to add to, so the Help asks for the block. Otherwise
-				// the entry goes in the block that is there.
+				// A declaration published under another name is asked for by
+				// that name, since adding this one would publish it twice.
 				helps: [
 					alias !== null
 						? `${specifier} exports it as '${alias}' — import that name instead.`
@@ -566,9 +496,7 @@ function reportMissingExport(
 		return
 	}
 
-	// The names the Module really publishes are in hand, so a near miss is
-	// answered rather than left to the reader — `aera` beside an exported `area`
-	// was a report with nothing in it but a spelling check.
+	// A near miss among the published names, such as `aera` for `area`.
 	let suggestion = closestMatch(source.content, Object.keys(surface.kinds))
 
 	reportError(
@@ -586,9 +514,7 @@ function reportMissingExport(
 					: [`Did you mean '${suggestion}'?`]),
 				"Check the spelling, and that the specifier names the file you meant.",
 			],
-			// The name the Module does publish, for the Quick Fix that
-			// writes it — the Editor has no export surface of its own to read,
-			// and this is the payload every other near miss is answered with.
+			// For the quick fix, since the editor has no export surface.
 			...(suggestion === null
 				? {}
 				: {
@@ -601,20 +527,13 @@ function reportMissingExport(
 	)
 }
 
-// One graph is linked in ONE mode — see `CompileMode` — so every Module
-// of it enriches the section and synthesizes the goals the run asked for.
+// One graph links in one `CompileMode`, which every Module of it shares.
 export type LinkOptions = CompileMode & {
-	// The canonical path of the one Module whose written annotations
-	// are wanted alongside its typed Program — the Hover seam.
+	// The canonical path of the one Module whose annotations Hover wants.
 	annotationsFor?: string
-	// The Scope each Module is linked into, when the default is wrong.
-	// Two things make it wrong for the standard library. It must carry NO
-	// `modulePath`, because that is what names a Choice
-	// `<modulePath>#<Name>` — and a builtin Choice is named by its bare name,
-	// which the runtime switches on. And it must not start from
-	// `builtinMembers()`, which `topLevelScope` reads: the standard library
-	// IS the builtins, and asking for them while loading them is unbounded
-	// recursion, since the cache is only filled once the load returns.
+	// The standard library's Scope has no `modulePath`, so its Choices keep
+	// bare names. It must not start from `builtinMembers()`, which would load
+	// the library recursively.
 	scopeFor?: (module: Module) => enricher.Scope
 }
 
@@ -622,10 +541,8 @@ export function linkModuleGraph(
 	graph: ModuleGraph,
 	options: LinkOptions = {},
 ): LinkedGraph {
-	// Every Module's declarations up front, because a Diagnostic about an
-	// entry has to tell "that Module does not export this" from "that Module has
-	// no such name" — and the second question is about a file the entry's own
-	// Module knows nothing else about.
+	// Every Module's declarations up front, so a refused entry can tell a
+	// private name from a missing one.
 	let declarations = new Map<string, Map<string, Declaration>>()
 
 	for (let [filePath, module] of graph.modules) {
@@ -665,12 +582,8 @@ export function linkModuleGraph(
 	}
 }
 
-// What linking ONE more Module against a graph that is already linked
-// needs of that graph, and nothing else: the export surface every Module in it
-// published, what each declares, and which Modules each names. Held apart from
-// the `LinkedGraph` itself because a caller that keeps one of these keeps Type
-// tables and name lists, while keeping the graph would pin every typed Program
-// it produced.
+// What linking one more Module against a linked graph needs. Keeping this
+// rather than the `LinkedGraph` does not pin every typed Program.
 export type LinkContext = {
 	surfaces: Map<string, ExportSurface>
 	declarations: Map<string, Map<string, Declaration>>
@@ -697,17 +610,9 @@ export function linkContextOf(linked: LinkedGraph): LinkContext {
 	}
 }
 
-// One Module, linked against dependencies that are linked already —
-// which is what a Language Server's probe is. A probe is the document with a
-// synthetic member written into it, so its whole import block resolves to the
-// same Modules the document's did, and re-reading and re-linking those on every
-// keystroke is the whole of what makes linking too expensive to probe through.
-// The surfaces are final and simply read back, exactly as they are for a lone
-// Module of an ordinary link.
-//
-// The Module's own surface is dropped first: it is the one thing in the context
-// that this link REPLACES, and `surfaceOf` reads a finished surface back before
-// it asks the Module being linked to build one.
+// One Module linked against dependencies linked already, as a language server
+// probe is. Its own surface is dropped first, since `surfaceOf` would read it
+// back.
 export function linkModuleAgainst(
 	module: Module,
 	context: LinkContext,
@@ -737,12 +642,9 @@ export function linkModuleAgainst(
 	)[0]!
 }
 
-// One group is one hoisting pass. For a lone Module every dependency is
-// linked already and its whole import block is seeded before anything is
-// resolved; for a cycle the entries naming a Module of the same group can not be,
-// because the declaration they name has not been hoisted yet — so they are
-// offered again between the hoist rounds, which is what lets a Function in one
-// Module take a Type declared in another that takes something back.
+// One group is one hoisting pass. Entries naming a Module of the same cycle
+// are offered again between hoist rounds. See "Linking a cycle" in
+// DEVELOPMENT.md.
 function linkGroup(
 	group: Array<Module>,
 	declarations: Map<string, Map<string, Declaration>>,
@@ -752,10 +654,7 @@ function linkGroup(
 	options: LinkOptions,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
-	// The Declaration rather than a yes: a name a dependency declares and
-	// publishes under ANOTHER one is the difference between "add it to the
-	// block" and "import the name it is published as", and only the Position on
-	// the Declaration can tell the two apart.
+	// The Declaration, whose Position `exportedAs` matches.
 	let declares = (filePath: string, name: string): Declaration | null =>
 		declarations.get(filePath)?.get(name) ?? null
 
@@ -832,10 +731,8 @@ function linkGroup(
 		return bound
 	}
 
-	// Once before the hoist, so a lone Module — whose dependencies are all
-	// linked and final — has its whole block in Scope before a single declaration
-	// is resolved, and again from inside the hoist for the entries only a cycle
-	// leaves pending.
+	// Once before the hoist, which binds a lone Module's whole block, and then
+	// between the hoist rounds for what a cycle leaves pending.
 	seedRound(false)
 
 	let annotationsIndex = [...states.values()].findIndex(
@@ -846,9 +743,8 @@ function linkGroup(
 		[...states.values()].map((state) => ({
 			program: state.module.program,
 			scope: state.scope,
-			// Only a test compile reads it: the `@example` blocks of a `§§`
-			// block are compiled out of the file's own lines, and a value
-			// comment outside the tests is found in them.
+			// Only a test compile reads it, for `@example` blocks and value
+			// comments.
 			source: state.module.sourceText,
 		})),
 		{
@@ -894,11 +790,8 @@ function linkGroup(
 	})
 }
 
-// Read off the Scope rather than off the surfaces the entries were bound
-// from, so that what is reported is what the Module actually ended up with: an
-// entry the hoist rounds never bound is absent, and one whose name a
-// declaration of this Module's own took is the declaration — which is the name
-// this file reaches, whatever the entry asked for.
+// Read off the Scope, so that it reports what the Module ended up with,
+// including a name a declaration of its own took.
 function importedNames(state: ModuleState): ImportedNames {
 	let imported: ImportedNames = { values: {}, types: {}, protocols: {} }
 
@@ -927,12 +820,9 @@ function importedNames(state: ModuleState): ImportedNames {
 	return imported
 }
 
-// The surface of a Module already linked is final and simply read back; a
-// Module of the group being linked is asked to build one out of whatever its
-// Scope holds right now, which is what the seeding between the hoist rounds
-// consults. `visiting` closes a re-export chain that leads back into the group —
-// two facades forwarding each other's names is a cycle like any other, and
-// forwarding what is not there yet is what an unfinished group looks like.
+// A linked Module's final surface, or one built from the current Scope of a
+// Module in the group. `visiting` stops a re-export chain that leads back into
+// the group.
 function surfaceOf(
 	filePath: string,
 	states: Map<string, ModuleState>,
@@ -1048,12 +938,8 @@ function surfaceOf(
 	return surface
 }
 
-// How many of the three tables a surface offers a name — the value, the
-// Type and the Protocol. One name travels across every table it is declared in:
-// a `type NonEmptyList` beside a `namespace NonEmptyList` is a Type AND a value,
-// and only both together let an importing file dispatch a `::` call through the
-// Namespace. The count is what tells a bound entry that its dependency has since
-// published the other half.
+// How many tables a surface offers a name. A rise tells a bound entry that its
+// dependency has since published another half of the name.
 function tablesOffered(surface: ExportSurface, exportedName: string): number {
 	return (
 		(surface.values[exportedName] === undefined ? 0 : 1) +
@@ -1062,22 +948,9 @@ function tablesOffered(surface: ExportSurface, exportedName: string): number {
 	)
 }
 
-// Every entry that can be bound now, bound. Answers whether anything new
-// was — which is what keeps the hoist rounds going through a cycle. An entry that
-// names something the dependency does not export is reported and refused on the
-// first pass: that answer can not change, because an export list is read off the
-// AST rather than resolved.
-//
-// An entry already bound is offered its dependency's surface again while
-// that surface can still grow, which is only ever inside the group being linked —
-// a Module already linked has a final surface, read straight back. The two halves
-// of one name do not hoist in the same round: a refined Alias hoists as a
-// skeleton and the Namespace targeting it lands only once the predicate has been
-// filled, and a cycle seeds its imports BETWEEN rounds. An entry that stopped at
-// the round it first bound in kept the Type and never saw the Namespace, so every
-// `::` call on that Type in the importing file fell to the base Namespace —
-// `pieces::firstItem()` on a `NonEmptyList<String>` answered an Optional inside
-// `String.es` and the item itself everywhere else.
+// Binds every entry that can be bound now, and answers whether any was. A
+// bound entry is offered a growing surface again. See "Linking a cycle" in
+// DEVELOPMENT.md.
 function seedImports(
 	state: ModuleState,
 	states: Map<string, ModuleState>,
@@ -1100,10 +973,8 @@ function seedImports(
 			continue
 		}
 
-		// A bound entry is asked again only while the dependency is still
-		// being linked, and only while a table it will come to offer is missing.
-		// Three is every table there is, so each entry is re-bound at most twice
-		// and the rounds still terminate.
+		// A bound entry is asked again only while its dependency is in the
+		// group and a table is still missing, so the rounds terminate.
 		if (
 			rebinding &&
 			(!states.has(dependencyPath) || binding.boundTables >= 3)
@@ -1111,12 +982,9 @@ function seedImports(
 			continue
 		}
 
-		// This Module's own declarations are read off the AST rather than
-		// off the Scope, so a collision with one is reported on the FIRST pass —
-		// before hoisting has put it in Scope, and before the import could shadow
-		// it. Refusing the entry is what keeps the report to one Diagnostic: the
-		// local declaration then lands in an empty slot and is not a duplicate of
-		// anything. A re-binding entry is what took the name, so it is not asked.
+		// A collision with a declaration of this Module is found on the AST, so
+		// it is reported before hoisting. Refusing the entry keeps it to one
+		// Diagnostic.
 		if (
 			!rebinding &&
 			(state.declarations.has(localName) ||
@@ -1164,11 +1032,8 @@ function seedImports(
 			continue
 		}
 
-		// A Constant does not hoist, so across a cycle there is no moment
-		// at which its value exists and the importer has not run — the emitted
-		// ESM binding is in its temporal dead zone. Reported here rather than
-		// left to the runtime, and the name is bound as an Error so that the
-		// Module reads as one mistake instead of one per use.
+		// A Constant does not hoist, so across a cycle its ESM binding may be
+		// read in its temporal dead zone.
 		if (kind === "constant" && states.has(dependencyPath)) {
 			reportCyclicConstantImport(entry)
 			bindAsError(state.scope, localName, entry.name.position)
@@ -1198,10 +1063,8 @@ function seedImports(
 	return bound
 }
 
-// What is still pending once the rounds are over names something that IS
-// exported and never resolved — the Module declaring it reported why, so nothing
-// is said here a second time. The name is seeded as an Error for the same reason
-// a cyclic Constant is.
+// An entry still pending names an export that never resolved, which its own
+// Module reported. Its name is bound as an Error.
 function refuseUnboundImports(state: ModuleState): void {
 	for (let binding of state.imports) {
 		if (binding.state !== "pending") {
@@ -1243,10 +1106,7 @@ function reportCyclicConstantImport(entry: parser.ImportNode): void {
 	)
 }
 
-// Whether anything in this Module writes to `name` — the whole Program,
-// because an assignment inside a Function body is as much an assignment as one
-// at the top level, and either is what makes rewriting the Declaration to a
-// Constant a refused edit rather than a fix.
+// Whether anything in the Module, Function bodies included, assigns to `name`.
 function isAssignedIn(module: Module, name: string): boolean {
 	let found = false
 
@@ -1285,10 +1145,8 @@ function isAssignedIn(module: Module, name: string): boolean {
 	return found
 }
 
-// Both mistakes an export block can make on its own: a name this Module
-// never declared, and a Variable — mutable state one Module writes and another
-// reads is not something a `from` clause can express. A re-export is checked
-// against the Module it forwards from, under the same two codes an import is.
+// An entry naming nothing this Module declares, and an exported Variable. A
+// re-export is checked against its Module as an import is.
 function reportExportProblems(
 	state: ModuleState,
 	declares: (filePath: string, name: string) => Declaration | null,
@@ -1344,14 +1202,8 @@ function reportExportProblems(
 					notes: [
 						"An entry with no 'from' clause exports something this Module's implementation declares.",
 					],
-					// The forwarding Help only where there is something to
-					// forward FROM. A `from "…" { … }` group is an answer when
-					// one of this Module's dependencies exports the name — and
-					// then the specifier is in hand, so the Help spells it
-					// rather than a `…` the reader has to fill from nowhere.
-					// Where no dependency has it, forwarding names a Module that
-					// does not exist, and the two things left to do are to
-					// declare the name or to stop exporting it.
+					// Forwarding is offered only where a dependency exports the
+					// name, and then with its specifier.
 					helps: [
 						forwardableFrom === null
 							? `Declare '${entry.name.content}' in this Module, or remove the entry.`
@@ -1376,13 +1228,9 @@ function reportExportProblems(
 					notes: [
 						"A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.",
 					],
-					// "Declare it as a Constant" is withheld where anything
-					// in this Module ASSIGNS to the name, because following it
-					// answers `constant-reassignment` at every one of those
-					// assignments — whose own Help asks for the `variable` back.
-					// A closed loop between two codes is worse than one Help
-					// that leaves something out, and the Quick Fix reads this
-					// text back, so withholding the clause withholds the fix.
+					// "Declare it as a Constant" is withheld where the Module
+					// assigns to the name, whose `constant-reassignment` Help
+					// asks for the `variable` back. The quick fix reads this text.
 					helps: isAssignedIn(state.module, entry.name.content)
 						? ["Export a Function that answers with its value."]
 						: [
@@ -1394,26 +1242,16 @@ function reportExportProblems(
 	}
 }
 
-// Every name this Module's body reads, over-collected on purpose. An
-// `unused-import` Warning that fires on a name the Module does use is worse than
-// one that stays silent, so a Method name that happens to be spelled like an
-// import counts as a use — while every shape that genuinely IS one is covered.
-//
-// Two trees, because neither alone holds the answer. The written one carries the
-// Type positions: an imported Type named in an annotation resolves to a Type
-// object and leaves no Identifier in the typed tree at all. The typed one carries
-// implicit dispatch: `rect::area()` never spells `RectangleMeasurable`, and the
-// only trace of it is the Namespace name on the resolved Invocation — which is
-// the LOCAL name, because a Namespace import binds a copy carrying it.
+// Every name the Module reads, from both trees and collected generously. See
+// "Unused imports" in DEVELOPMENT.md.
 function usedNames(
 	module: Module,
 	program: common.typed.Program,
-	// The names the Enricher reached a conformance through in this
-	// Module's Scope, which is how a Module reads an imported name without
-	// writing it anywhere. See `collectReachedNames`.
+	// Names a conformance was reached through without being written. See
+	// `collectReachedNames`.
 	reachedNames: Set<string>,
-	// The Protocols this Module's Scope binds, by local name. The typed
-	// tree names a Protocol by identity, and every name bound to one is read.
+	// By local name. The typed tree names a Protocol by identity, and every
+	// name bound to a Protocol it names is read.
 	protocols: Record<string, common.ProtocolType>,
 ): Set<string> {
 	let names = new Set(reachedNames)
@@ -1451,18 +1289,13 @@ function usedNames(
 			}
 		}
 
-		// A Union receiver's per-member branch, and a Protocol conformance
-		// witness — the two shapes that name a Namespace without an Invocation of
-		// their own to hang it off.
+		// A Union receiver's branch, or a conformance witness.
 		if (typeof record["namespaceName"] === "string") {
 			names.add(record["namespaceName"])
 		}
 
-		// A PROVIDED Method reads the Protocol that wrote its body, and
-		// the Invocation is named after the NAMESPACE whose conformance put it
-		// in reach — so `square::describe()` spells neither `Shape` nor
-		// `describe`'s declaration anywhere else. Reaching a provided Method
-		// needs the Protocol in Scope, so an import that carries it is used.
+		// A provided Method needs its Protocol in Scope, though the call
+		// names only the conforming Namespace.
 		if (typeof record["providedBy"] === "string") {
 			identities.add(record["providedBy"])
 		}
@@ -1474,13 +1307,8 @@ function usedNames(
 			names.add(record["name"])
 		}
 
-		// A named Type the tree resolved to does not count as a use.
-		// Every Type object in either tree carries a name, so if it counted, an
-		// import whose Type merely flows through, `Standing` beside a `make`
-		// that answers one, would never be reported although removing the
-		// entry compiles. A Choice reaching this file as a Type Argument, whose
-		// Equatable is derived by looking the Choice up by name, is recorded
-		// where that lookup happens and arrives here as `reachedNames`.
+		// A resolved Type's name is not a use, or an import whose Type only
+		// flows through would never be reported.
 
 		for (let value of Object.values(record)) {
 			visit(value)
@@ -1488,12 +1316,7 @@ function usedNames(
 	}
 
 	visit(module.program.implementation)
-	// The PARSER's tests section, whatever the compile asked for. An
-	// import a file uses only in its tests is used — the block is written, and
-	// a build stripping it is not the file changing its mind about needing the
-	// name. Read off the Parser's tree because that is the one that carries the
-	// section in every mode; the typed one below carries it only in a test
-	// compile.
+	// The parser's tests section, which only a test compile types.
 	visit(module.program.tests)
 	visit(program)
 
@@ -1513,18 +1336,8 @@ function reportUnusedImports(
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
-	// And silent for a Module the Parser abandoned TEXT in. Every use this
-	// counts is read off a tree, and a Statement the recovery dropped is in
-	// neither of them — so the one line that reads an import can go missing and
-	// leave the entry looking unread. It is the over-collection above carried
-	// one step further, and for the same reason: a Warning that fires on a name
-	// the Module does use is worse than one that stays silent.
-	//
-	// The LINES rather than the record, because a Recovery is also
-	// written for a dropped Pattern binder, which abandons a NAME while the
-	// Matcher around it parses whole. No text went missing there, so no line
-	// that reads an import did either — asking whether the record exists
-	// switched the Warning off for a Module the Parser read from end to end.
+	// Silent where the parser abandoned lines, which may have read an import.
+	// A dropped Pattern binder loses no line.
 	if (
 		bound.length === 0 ||
 		(state.module.program.recovery?.lines.length ?? 0) > 0
@@ -1567,12 +1380,8 @@ function reportUnusedImports(
 	}
 }
 
-// The first thing this Module's body does that is not a declaration. A
-// hoisted declaration is in place before any body runs, and a Constant or
-// Variable is only reachable from another Module through an import, which
-// `cyclic-constant-import` answers for — everything else is a Statement that
-// simply happens, and inside a cycle the order those happen in is not something
-// the source states.
+// The body's first Statement that is not a declaration. Inside a cycle, the
+// order such Statements run in is not stated.
 function sideEffectIn(module: Module): parser.ImplementationNode | null {
 	for (let node of module.program.implementation.nodes) {
 		if (declarationsOf(node).length === 0) {
@@ -1616,14 +1425,8 @@ function reportCyclicSideEffects(
 	)
 }
 
-// The Namespaces this Module's dependencies export and it has not brought
-// in, which is what turns "no such Method" into "you did not import the Namespace
-// that declares it". Only the dependencies it ALREADY names are asked: their
-// specifiers are written in the file, so the help names a path the reader can
-// see, and the Quick Fix has one to insert.
-//
-// "Not brought in" is "not reachable by that name here" — a local declaration of
-// the name shadows the offer as surely as an import of it satisfies it.
+// Namespaces that dependencies the Module already names export, and that no
+// name here reaches. An unknown Method's Help offers to import one.
 function unimportedNamespacesFor(
 	state: ModuleState,
 	surfaces: Map<string, ExportSurface>,
@@ -1657,10 +1460,9 @@ function unimportedNamespacesFor(
 	return candidates
 }
 
-// The Modules this one reaches that declare a Protocol of this name, read
-// off the declarations so that a private one is found too, or that publish one
-// they declare under this name. Only what it reaches, and by path, so that its
-// Diagnostics do not depend on the graph's entry.
+// The reachable Modules that declare a Protocol of this name, private ones too,
+// or publish one under it. Ordered by path, so Diagnostics do not depend on the
+// entry.
 function protocolDeclarationsFor(
 	state: ModuleState,
 	name: string,
@@ -1716,11 +1518,9 @@ function protocolDeclarationsFor(
 	return found
 }
 
-// The names a Module publishes each Protocol it declares under, by the
-// declared name. A linked Module's surface is matched on the declaration's
-// Position among the names it does not forward, since a standard library
-// Protocol's identity carries no path. Null for a Module that is neither linked
-// nor being linked.
+// The public names of each Protocol a Module declares. A surface is matched on
+// Position, since a standard library Protocol's identity carries no path. Null
+// for a Module neither linked nor being linked.
 function publishedProtocols(
 	local: Map<string, Declaration>,
 	surface: ExportSurface | null,
@@ -1770,9 +1570,8 @@ function publishedProtocols(
 	return published
 }
 
-// The one name an import of a declaration is written with, out of those
-// its Module publishes it under: its own where that is one of them, since the
-// rest of a report spells it so, and otherwise the first the export block lists.
+// The name an import is told to use: the declared name where it is published,
+// otherwise the first public name.
 function publishedName(
 	declaredName: string,
 	publicNames: Array<string>,

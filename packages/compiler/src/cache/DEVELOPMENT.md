@@ -94,6 +94,6 @@ A snapshot can neither make an answer wrong nor stop a compile:
   simply not stored.
 
 `prune` runs only after a write, so a process that finds its snapshot touches nothing else. It keeps the newest
-`KEPT_PER_KIND` files of a kind, since the key changes on every edit to the compiler. More than one is kept
-because a test suite that toggles optimiser passes uses several prelude variants at once. Every pruning failure is ignored, since Windows
-refuses to delete a file another process has open.
+`KEPT_PER_KIND` files of a kind, since the key changes on every edit to the compiler. More than one is kept because a
+test suite that toggles optimiser passes uses several prelude variants at once. Every pruning failure is ignored,
+since Windows refuses to delete a file another process has open.

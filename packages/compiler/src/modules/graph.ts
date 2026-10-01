@@ -16,62 +16,44 @@ import {
 	type SpecifierResolver,
 } from "./resolve"
 
-// One file, parsed once, named by the one canonical spelling of its path.
-// `sourceText` travels with the Module because every Diagnostic rendered against
-// it needs the exact text it was parsed from — a Module the Language Server
-// holds unsaved can not be read back off disk to render an excerpt.
+// One file, parsed once, named by its canonical path. `sourceText` travels
+// with it because an unsaved document can not be read back to render an
+// excerpt.
 export type Module = {
 	filePath: string
 	sourceText: string
 	program: parser.Program
-	// This Module's parse Diagnostics and the resolution Diagnostics of
-	// its own entries, and nothing else. Collected per Module because the dedup
-	// key is severity, code, message and Position with no file: one shared
-	// collection would silently swallow a second Module's identical error at the
-	// same line.
+	// Its parse and resolution Diagnostics. Each Module collects its own, since
+	// `report` would drop another file's equal Diagnostic as a duplicate.
 	diagnostics: Array<common.Diagnostic>
-	// Canonical paths, in the order the entries first name them. Both
-	// sections contribute — a facade whose only mention of a Module is a
-	// re-export still depends on it.
+	// Canonical paths, in the order the entries first name them. A re-export
+	// is a dependency too.
 	dependencies: Array<string>
-	// Keyed by the specifier exactly as it was written, so an Import or
-	// Export entry finds the Module it names without resolving a second time. A
-	// specifier that named no Module at all is absent.
+	// Keyed by the specifier as written, so an entry finds its Module without
+	// resolving again. A specifier that named no Module is absent.
 	resolutions: Map<string, string>
 }
 
 export type ModuleGraph = {
 	entryPath: string
-	// Dependency-first — insertion order IS the order, and the entry comes
-	// last, because everything reachable is something it depends on. Every
-	// Module a Module names is ahead of it, except across a cycle, where the
-	// group is the unit and the order inside it is not something the source
-	// states.
+	// In insertion order, dependencies first and the entry last. A cycle has no
+	// order inside it.
 	modules: Map<string, Module>
-	// The same Modules, grouped into Strongly Connected Components. A group
-	// holds more than one Module exactly when those Modules import each other,
-	// and that group is what the single hoisting pass has to run over as a whole
-	// — nothing inside a cycle can be enriched before the rest of it.
+	// The same Modules as strongly connected components. A cycle is one group,
+	// which is enriched as a whole.
 	groups: Array<Array<Module>>
-	// What belongs to no Module: the entry itself could not be read. Every
-	// other Diagnostic here is positioned in some Module's own source and lives
-	// on that Module.
+	// What belongs to no Module, which is an entry that could not be read.
 	diagnostics: Array<common.Diagnostic>
 }
 
-// The group a specifier was written on, rather than the specifier alone:
-// what a refused one has to say depends on which SECTION it stands in and on
-// the names under it — an entry an import block can simply drop is one an export
-// block has to keep, under another spelling.
+// A refusal's Help depends on the specifier's section and the names under it.
 type WrittenSpecifier = {
 	source: parser.ModuleSpecifierNode
 	section: "import" | "export"
 	names: Array<string>
 }
 
-// Both sections, imports first, in written order — one specifier per
-// group, since a group writes its specifier once however many names it holds,
-// and a refused one is refused once.
+// One specifier per group, imports first, in written order.
 function specifiersOf(program: parser.Program): Array<WrittenSpecifier> {
 	return [
 		...(program.imports?.groups ?? []).map((group) => ({
@@ -87,10 +69,8 @@ function specifiersOf(program: parser.Program): Array<WrittenSpecifier> {
 	]
 }
 
-// The extensions a reader reaches for when they mean a file this language
-// can not import. Essence reads `.es` and nothing else, and the interop runs the
-// OTHER way — a JavaScript Program embeds a built Essence one — so `./clock.js`
-// is not one edit away from compiling and no Help may pretend it is.
+// Files Essence can not import. The interop runs the other way, so the Help
+// for one says to embed the Program rather than to rename the file.
 const javaScriptExtensions = [
 	".js",
 	".mjs",
@@ -102,10 +82,8 @@ const javaScriptExtensions = [
 	".tsx",
 ]
 
-// Anything else written behind a dot. A specifier naming one is not a
-// Module either, and `Write '<specifier>.es'` would name a file that could only
-// ever be `./data.json.es` — so the extensionless spelling is the one case that
-// Help is certainly right for, and the only one it is offered for.
+// `Write '<specifier>.es'` is offered only where this finds no extension,
+// since `./data.json.es` is nobody's file.
 function extensionOf(specifier: string): string | null {
 	let name = specifier.slice(specifier.lastIndexOf("/") + 1)
 	let dot = name.lastIndexOf(".")
@@ -160,14 +138,8 @@ function reportRejection(
 					notes: [
 						"Package specifiers are reserved: today a Module names its dependencies by where they sit relative to it, and nothing is searched for.",
 					],
-					// The second branch says '.es' out loud, because the
-					// specifier that gets here without one is a PACKAGE name —
-					// `lodash` — and a Help that asks only for a './' sends the
-					// reader to `./lodash`, which is refused again for the
-					// extension and then resolves to a file that was never going
-					// to be there. One edit, one Diagnostic: what follows a
-					// './lodash.es' is `module-not-found`, which is the next
-					// genuinely different thing to know.
+					// A specifier without '.es' here is a package name, so the
+					// Help asks for the extension as well as the './'.
 					helps: [
 						specifier.endsWith(".es")
 							? `Write './${specifier}' if the file sits beside this one.`
@@ -190,16 +162,9 @@ function reportRejection(
 					notes: [
 						"A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.",
 					],
-					// One answer per shape, because appending '.es' is right
-					// for exactly one of them. A path ending in '/' names a
-					// directory, and the Help asks for the file. A specifier that
-					// already carries an extension names a file of some other
-					// kind, and './clock.js.es' is not a file anybody has — so
-					// the Help says what is true instead, and says nothing a
-					// Quick Fix could read back as an edit. JavaScript gets its
-					// own sentence because it is the one other kind with an
-					// answer: the interop runs the other way round, from a
-					// JavaScript Program embedding a built Essence one.
+					// Appending '.es' is right only for a specifier with no
+					// extension. The other Helps state a fact that no quick fix
+					// could read as an edit.
 					helps: [
 						specifier.endsWith("/")
 							? "Name the file itself, ending in '.es'."
@@ -228,12 +193,8 @@ function reportRejection(
 				notes: [
 					"The standard library is one shared declaration space rather than a graph of Modules, and everything it declares is already in scope in every Program.",
 				],
-				// The GROUP rather than "the entry". This Diagnostic is
-				// reported on the specifier, and an entry in this language is a
-				// NAME — so a reader who deletes one is left with the same
-				// `from "…" { }` and the same report. What has to go is the
-				// whole group, and the Help says so in the text it is written
-				// in.
+				// The whole group, since an entry is a name and removing one
+				// leaves the specifier and this report.
 				helps: [
 					`Remove the whole 'from "${specifier}" { … }' group — every name it asks for is a builtin.`,
 				],
@@ -253,14 +214,9 @@ function reportRejection(
 				notes: [
 					"Everything a Module declares is in scope inside it already, whether or not it is exported.",
 				],
-				// The two sections want opposite things. An import group
-				// naming this file asks for names that are in scope already, so
-				// the whole group goes. An export group naming this file is
-				// PUBLISHING names this Module declares, which is something it
-				// is entitled to do — it has only written it the forwarding way
-				// — so the answer is to write them bare rather than to stop
-				// exporting them. "Point it at the Module that declares the
-				// name" was unfollowable there: this Module is that Module.
+				// An import group asks for names already in scope, so it goes.
+				// An export group publishes this Module's own names, which it
+				// writes bare instead.
 				helps: [
 					section === "import"
 						? `Remove the whole 'from "${specifier}" { … }' group — every name it asks for is in scope here already.`
@@ -288,10 +244,8 @@ function reportMissingModule(
 	})
 }
 
-// One resolution per distinct specifier text, but one Diagnostic per
-// written specifier: two groups naming the same unreachable Module are two
-// mistakes to underline, and Diagnostics dedup by Position, so each is reported
-// once.
+// One resolution per distinct specifier text, but one Diagnostic per written
+// specifier, since each is a mistake to underline.
 function resolveDependencies(
 	module: Module,
 	readModule: (filePath: string) => Module | null,
@@ -335,13 +289,9 @@ function resolveDependencies(
 	return dependencies
 }
 
-// Tarjan's algorithm, over the edges each Module resolved. An SCC is only
-// closed once every Module reachable from it has been, so the groups come out
-// dependency-first — which is both the order they have to be enriched in and
-// the order their bodies run in. That holds per root and across roots, so
-// several roots may be given: an entry Program reaches every Module that
-// matters to it, but a collection loaded as a whole — the standard library —
-// has files nothing imports, and visiting only the first would drop them.
+// Tarjan's algorithm, which closes a group only after everything it reaches.
+// So the groups come out dependency-first, the order of enrichment and of
+// running. Several roots reach files nothing imports.
 function groupModules(
 	roots: Array<Module>,
 	loaded: Map<string, Module>,
@@ -368,10 +318,8 @@ function groupModules(
 			}
 
 			if (indices.has(dependencyPath)) {
-				// A dependency that is done and off the stack belongs to a
-				// group of its own that is already closed — it is reachable from
-				// here, but this Module is not reachable from it, so it says
-				// nothing about where this group ends.
+				// One off the stack belongs to a closed group, which can not
+				// reach this Module.
 				if (stacked.has(dependencyPath)) {
 					lowLinks.set(
 						module.filePath,
@@ -407,9 +355,7 @@ function groupModules(
 				}
 			}
 
-			// Reversed, so a group reads in the order the cycle was walked
-			// in — the Module that was reached first ahead of the ones it
-			// reached — rather than in the order the stack unwound.
+			// Reversed, so the Module reached first comes first.
 			groups.push(group.reverse())
 		}
 	}
@@ -423,9 +369,8 @@ function groupModules(
 	return groups
 }
 
-// Every file reachable from the entry, parsed once and ordered. The host
-// is asked for each file exactly once, so a Module reached from two importers is
-// one Module, and a diamond is not read twice.
+// Every file reachable from the entry, parsed once and ordered. The host is
+// asked for each file once, so a Module two importers reach is one Module.
 export function loadModuleGraph(
 	entryPath: string,
 	host: ModuleHost,
@@ -472,9 +417,8 @@ export function loadModuleGraph(
 	let entryModule = readModule(entry)
 
 	if (entryModule === null) {
-		// The one placeless Diagnostic this stage reports. There is no
-		// source to point into: the file the caller named is the file that could
-		// not be read.
+		// Placeless, since the file to point into is the one that could not be
+		// read.
 		return {
 			entryPath: entry,
 			modules: new Map(),
@@ -503,11 +447,8 @@ export function loadModuleGraph(
 	}
 }
 
-// A work list rather than a recursive descent, so that a Module's entries
-// are resolved inside its OWN Diagnostic collection. Resolving a dependency's
-// entries from inside its importer's collection would nest the two, and
-// per-Module collection is what keeps two Modules' identical errors from
-// deduplicating against each other.
+// A work list rather than recursion, so each Module's entries resolve in its
+// own collection rather than nested in its importer's.
 function resolveAll(
 	roots: Array<Module>,
 	readModule: (filePath: string) => Module | null,
@@ -535,13 +476,9 @@ function resolveAll(
 	}
 }
 
-// A graph over Programs that are already parsed and already in memory,
-// with a resolver of the caller's choosing — the standard library, which is read
-// and parsed by its own package before the Compiler ever sees it, resolves a
-// specifier against that set by name rather than against the file system.
-// EVERY entry is a root: a collection loaded as a whole has files nothing
-// imports, `Prelude.es` among them, and a graph rooted at one entry would leave
-// those out.
+// A graph over Programs already parsed and in memory, as the standard library
+// is, with the caller's resolver. Every entry is a root, since some files,
+// such as `Prelude.es`, are imported by nothing.
 export function loadModuleGraphOver(
 	entries: Array<{
 		filePath: string

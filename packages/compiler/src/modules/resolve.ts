@@ -2,16 +2,9 @@ import * as path from "node:path"
 
 import { canonicalPath, isStdlibDocument } from "../documents"
 
-// A specifier is a relative path including the `.es` extension, and
-// nothing else — no bare name, no absolute path, no directory that a file name
-// is guessed inside of. What a Module names is exactly what is read, so the
-// dependency of a file can be found by anyone reading it, without knowing where
-// a resolver would have looked.
-//
-// Why a rejection is a reason rather than a Diagnostic: the Position a
-// Diagnostic needs belongs to the `ModuleSpecifierNode` the specifier was
-// written on, and the resolver is handed the text alone — the graph holds the
-// Node, so the graph does the reporting.
+// A specifier is a relative path with its `.es` extension, so a reader finds a
+// file's dependency without knowing where a resolver would look. A rejection
+// is a reason, and the graph, which holds the Node, reports it.
 export type SpecifierRejection =
 	| "absolute"
 	| "not-relative"
@@ -23,27 +16,20 @@ export type SpecifierResolution =
 	| { kind: "module"; filePath: string }
 	| { kind: "rejected"; reason: SpecifierRejection }
 
-// How a specifier becomes a path, as a parameter. `resolveSpecifier` below
-// is the one every user Program is built with; the standard library hands in its
-// own, because its sources are already parsed and in memory and it must resolve
-// against that set rather than against the file system — and because the rule
-// below deliberately refuses a specifier that lands inside it.
+// User Programs resolve with `resolveSpecifier`. The standard library hands in
+// its own resolver, since its sources are in memory and `resolveSpecifier`
+// refuses a path inside it.
 export type SpecifierResolver = (
 	specifier: string,
 	importerPath: string,
 ) => SpecifierResolution
 
-// The one spelling of a path every other spelling of it agrees with is
-// what makes one file one Module, so it is answered by `documents.ts` rather
-// than by a rule of this stage's own: two paths for one file would be two
-// Modules — parsed twice, enriched twice, and their Types not interchangeable.
-// Re-exported because a Module's canonical path is its identity, and every
-// caller of this stage keys on it.
+// A Module's canonical path is its identity, and every caller of this stage
+// keys on it. Two paths for one file would make two Modules with distinct Types.
 export { canonicalPath }
 
-// Resolved against the importer's own directory rather than the working
-// directory, so a specifier means the same thing however `esc` was invoked and
-// wherever the Editor's process happens to be rooted.
+// Resolved against the importer's directory, so a specifier means the same
+// whatever the working directory.
 export function resolveSpecifier(
 	specifier: string,
 	importerPath: string,
@@ -69,11 +55,8 @@ export function resolveSpecifier(
 		return { kind: "rejected", reason: "self-import" }
 	}
 
-	// Asked of `documents.ts` rather than compared against a path of this
-	// stage's own, because that answer already resolves the two layouts the
-	// standard library ships in — `packages/standard-library/sources` in a workspace, and
-	// the copy written beside the bundled Language Server in the VS Code
-	// extension. Hardcoding either one is what shipped the extension broken.
+	// `isStdlibDocument` finds the standard library wherever it ships, as a
+	// workspace's sources or beside the extension's bundled server.
 	if (isStdlibDocument(filePath)) {
 		return { kind: "rejected", reason: "standard-library" }
 	}

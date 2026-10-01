@@ -1,6 +1,4 @@
-// One stage, one entry in the Compiler's exports map — `@essence-lang/cli`
-// and `@essence-lang/language-server` both load a graph, and neither should have
-// to know which file inside this directory holds which part of the answer.
+// The stage's one entry in the package's exports map.
 export {
 	loadModuleGraph,
 	loadModuleGraphOver,
