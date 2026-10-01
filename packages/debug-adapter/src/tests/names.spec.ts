@@ -1,10 +1,35 @@
 import { describe, expect, it } from "bun:test"
 
-import {
-	demangleName,
-	escapeNameForEvaluation,
-	isCompilerBinding,
-} from "../names"
+import { Lexer } from "@essence-lang/compiler/lexer"
+import { escapeName } from "@essence-lang/compiler/rewriter/names"
+
+import { demangleName, isCompilerBinding, isSingleWord } from "../names"
+
+// Whether the Lexer reads all of `text` as one Identifier, Keyword or Boolean.
+function lexesAsOneWord(text: string): boolean {
+	let reader = new Lexer()
+
+	reader.reset(text)
+
+	let first = reader.next()
+
+	if (
+		first === undefined ||
+		first.value !== text ||
+		reader.next() !== undefined
+	) {
+		return false
+	}
+
+	let type: string = first.type
+
+	return (
+		type === "Identifier" ||
+		type === "LiteralTrue" ||
+		type === "LiteralFalse" ||
+		type.startsWith("Keyword")
+	)
+}
 
 describe("demangleName", () => {
 	it("reads a standard library Method as Namespace.member", () => {
@@ -43,12 +68,54 @@ describe("demangleName", () => {
 		expect(demangleName("greet")).toBe("greet")
 		expect(demangleName("describe")).toBe("describe")
 	})
+
+	// The Rewriter mangles a name it uses itself, such as `$type` or
+	// `Object`, and keeps a name JavaScript can spell, such as `café`.
+	it("reads back every name the Rewriter escapes", () => {
+		for (let name of [
+			"ok?",
+			"a+b",
+			"new",
+			"greet",
+			"$type",
+			"$context",
+			"Object",
+			"List",
+			"café",
+		]) {
+			expect(demangleName(escapeName(name))).toBe(name)
+		}
+	})
 })
 
-describe("escapeNameForEvaluation", () => {
-	it("round-trips with the demangler", () => {
-		for (let name of ["ok?", "a+b", "new", "greet"]) {
-			expect(demangleName(escapeNameForEvaluation(name))).toBe(name)
+describe("isSingleWord", () => {
+	it("takes as one word what the Lexer reads as one word", () => {
+		for (let text of [
+			"greet",
+			"ok?",
+			"a+b",
+			"new",
+			"with",
+			"true",
+			"$type",
+			"café",
+			"x2",
+			"initial.degrees",
+			"f()",
+			"x[0]",
+			"a b",
+			"2x",
+			"12",
+			"#Case",
+			"name§",
+			'"text"',
+			"a_b",
+			"",
+		]) {
+			expect([text, isSingleWord(text)]).toEqual([
+				text,
+				lexesAsOneWord(text),
+			])
 		}
 	})
 })

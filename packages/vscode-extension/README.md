@@ -258,8 +258,8 @@ debug a precompiled bundle without compiling at all. "Uncaught
 Exceptions" under Breakpoints pauses runtime failures on the mapped line with
 the failure's own message. The Debug Console evaluates JavaScript in the
 compiled frame — documented rather than hidden — though results render as
-Essence values, and a lone identifier like `ok?` or `new` is retried under
-its compiled name.
+Essence values, and a lone identifier like `ok?`, `new` or `Object` is tried
+first under its compiled name, then as JavaScript.
 
 Debugging needs the `essence` CLI: `essence.cli.path` names it explicitly,
 and otherwise the installed `essence` is used.

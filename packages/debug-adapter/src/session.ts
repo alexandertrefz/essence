@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { escapeName } from "@essence-lang/compiler/rewriter/names"
 import {
 	DebugSession,
 	ExitedEvent,
@@ -23,7 +24,7 @@ import type { CompileDiagnostic, CompileFunction } from "./compile"
 import { type CdpCallFrame, type PresentedFrame, presentFrames } from "./frames"
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
-import { escapeNameForEvaluation } from "./names"
+import { isSingleWord } from "./names"
 import {
 	type DescribedValue,
 	DESCRIBE_BATCH_SOURCE,
@@ -982,24 +983,19 @@ export class EssenceDebugSession extends DebugSession {
 				expression,
 			})
 
-		let result = await evaluate(args.expression)
+		// The console evaluates JavaScript in the compiled frame. A single word
+		// is tried first under the spelling the bundle gives an author's name,
+		// such as `ok?`, `new` or `Object`, and then as JavaScript.
+		let escaped = isSingleWord(args.expression)
+			? escapeName(args.expression)
+			: args.expression
+		let result = await evaluate(escaped)
 
-		// The console evaluates JavaScript in the compiled frame. A single
-		// identifier the bundle binds differently, such as `ok?` or `new`, is
-		// retried under its emitted spelling.
 		if (
 			result.exceptionDetails !== undefined &&
-			/^\S+$/.test(args.expression)
+			escaped !== args.expression
 		) {
-			let escaped = escapeNameForEvaluation(args.expression)
-
-			if (escaped !== args.expression) {
-				let retried = await evaluate(escaped)
-
-				if (retried.exceptionDetails === undefined) {
-					result = retried
-				}
-			}
+			result = await evaluate(args.expression)
 		}
 
 		if (result.exceptionDetails !== undefined) {

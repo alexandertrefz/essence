@@ -6,7 +6,6 @@ export {
 	type EmitTarget,
 	emitTargetKey,
 	emittedIdentity,
-	escapeName,
 	type EssenceMember,
 	essenceMemberBands,
 	type EssenceMemberReferences,
@@ -22,3 +21,4 @@ export {
 	runtimeNamespaceNames,
 	type SourceMapOptions,
 } from "./rewrite"
+export { escapeName } from "./names"

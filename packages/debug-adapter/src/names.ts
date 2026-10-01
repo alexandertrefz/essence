@@ -1,6 +1,6 @@
 // The compiler's naming read backwards: what a JavaScript frame or binding is
-// called in Essence. Each rule mirrors an injective one in
-// `packages/compiler/src/rewriter/rewrite.ts`, so reading it back is exact.
+// called in Essence. Each rule mirrors an injective one of the Rewriter, so
+// reading it back is exact.
 //
 // - `$user_` mangling keeps `[A-Za-z0-9$]` and writes any other character as
 //   `_<hex>_`. No Essence identifier holds a `_`, which lexes as a Symbol.
@@ -9,63 +9,15 @@
 // - A Protocol's provided Method is `$es_<Protocol>__<member>` or
 //   `$es_<Protocol>_<n>__<member>`.
 
-const mangledNamePrefix = "$user_"
+import { isSynthesizedName } from "@essence-lang/compiler/helpers"
+import {
+	mangledNamePrefix,
+	reservedJavaScriptWords,
+} from "@essence-lang/compiler/rewriter/names"
+
 const stdlibMethodPrefix = "$es_"
 const overloadSuffix = /__overload\$\d+$/
 const providedMethod = /^([^_]+)(?:_\d+)?__(.+)$/
-
-// The words the Rewriter escapes. A `_new` in a frame is the user's `new`,
-// while `_self` is the compiler's receiver.
-const reservedJavaScriptWords = new Set([
-	"break",
-	"case",
-	"catch",
-	"class",
-	"const",
-	"continue",
-	"debugger",
-	"default",
-	"delete",
-	"do",
-	"else",
-	"enum",
-	"export",
-	"extends",
-	"false",
-	"finally",
-	"for",
-	"function",
-	"if",
-	"import",
-	"in",
-	"instanceof",
-	"new",
-	"null",
-	"return",
-	"super",
-	"switch",
-	"this",
-	"throw",
-	"true",
-	"try",
-	"typeof",
-	"var",
-	"void",
-	"while",
-	"with",
-	"yield",
-	"let",
-	"static",
-	"implements",
-	"interface",
-	"package",
-	"private",
-	"protected",
-	"public",
-	"await",
-	"arguments",
-	"eval",
-])
 
 function demangleUserName(mangled: string): string {
 	return mangled
@@ -74,8 +26,6 @@ function demangleUserName(mangled: string): string {
 			String.fromCodePoint(Number.parseInt(hex, 16)),
 		)
 }
-
-import { isSynthesizedName } from "@essence-lang/compiler/helpers"
 
 // One emitted name as the author spelled it. The overload suffix is appended
 // to an escaped name, so it comes off first.
@@ -103,6 +53,8 @@ export function demangleName(name: string): string {
 		return demangleUserName(base)
 	}
 
+	// A `_new` in a frame is the user's `new`, while `_self` is the compiler's
+	// receiver.
 	if (base.startsWith("_") && reservedJavaScriptWords.has(base.slice(1))) {
 		return base.slice(1)
 	}
@@ -110,27 +62,13 @@ export function demangleName(name: string): string {
 	return base
 }
 
-// The forward direction, for `evaluate`: a single identifier the user types is
-// retried under its escaped name. Unlike `escapeName`, it leaves names in
-// `compilerOwnedNames` unmangled.
-export function escapeNameForEvaluation(name: string): string {
-	if (reservedJavaScriptWords.has(name)) {
-		return `_${name}`
-	}
+// Whether the Lexer reads `text` as one word, such as `ok?`, `new` or
+// `with`: no whitespace, Symbol or sigil in it, and no leading digit.
+const singleWord =
+	/^[^0-9 \t\r\n\uFEFF"§(){}[\]<>|/@,.:=\-~_#][^ \t\r\n\uFEFF"§(){}[\]<>|/@,.:=\-~_#]*$/
 
-	if (/^[A-Za-z0-9$]+$/.test(name)) {
-		return name
-	}
-
-	let mangled = mangledNamePrefix
-
-	for (let character of name) {
-		mangled += /^[A-Za-z0-9$]$/.test(character)
-			? character
-			: `_${character.codePointAt(0)!.toString(16)}_`
-	}
-
-	return mangled
+export function isSingleWord(text: string): boolean {
+	return singleWord.test(text)
 }
 
 // Whether a binding is the compiler's own rather than the author's, which the

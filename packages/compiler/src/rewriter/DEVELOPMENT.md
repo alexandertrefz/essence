@@ -1,8 +1,8 @@
 # Developing the rewriter
 
 The rewriter turns simplified Programs into JavaScript. `packages/compiler/DEVELOPMENT.md` places it in the
-pipeline and lists its module state. This page holds the reasoning behind `rewrite.ts`, `stdlibPrelude.ts`
-and `emitTarget.ts`.
+pipeline and lists its module state. This page holds the reasoning behind `rewrite.ts`, `stdlibPrelude.ts`,
+`emitTarget.ts` and `names.ts`.
 
 ## Emit targets
 
@@ -457,6 +457,9 @@ reserved word starts with `_`.
 Member positions do not go through `escapeName`. A reserved word is a legal property key, as in
 `record.case`, and `memberKey` quotes a key JavaScript can not spell. `escapeName` is exported so a host's
 binding names, read off an Export Surface, agree with the bundle's.
+
+`escapeName` and the sets it reads live in `names.ts`, which imports nothing from the pipeline. The debug
+adapter escapes what the Debug Console is asked through it without loading the Rewriter.
 
 ### Shadowed Namespaces
 

@@ -26,6 +26,7 @@
 		"./optimiser/coverage": "./src/optimiser/passes/instrumentCoverage.ts",
 		"./rewriter": "./src/rewriter/index.ts",
 		"./rewriter/emitTarget": "./src/rewriter/emitTarget.ts",
+		"./rewriter/names": "./src/rewriter/names.ts",
 		"./bundler": "./src/bundler/index.ts",
 		"./cache": "./src/cache/index.ts",
 		"./embed": "./src/embed/index.ts",

@@ -196,6 +196,73 @@ describe("a debug session", () => {
 		])
 	}, 60_000)
 
+	// The bundle binds these as `$user_$type` and `$user_Object`, beside the
+	// compiler's own `$type` and the global `Object`.
+	it("evaluates a name the compiler also uses as the author's binding", async () => {
+		client = await startedClient()
+
+		let directory = realpathSync(
+			mkdtempSync(path.join(tmpdir(), "essence-dap-spec-")),
+		)
+		let programPath = path.join(directory, "Owned.es")
+
+		writeFileSync(
+			programPath,
+			"implementation {\n" +
+				"\n" +
+				"\tfunction shown(_ amount: Integer) -> String {\n" +
+				'\t\tconstant $type = "mine"\n' +
+				"\t\tconstant Object = amount::add(1)\n" +
+				"\n" +
+				'\t\tTerminal.print("paused")\n' +
+				"\n" +
+				'\t\t<- "{$type} {Object}"\n' +
+				"\t}\n" +
+				"\n" +
+				"\tTerminal.print(shown(41))\n" +
+				"}\n",
+		)
+
+		try {
+			let initialized = client.waitForEvent("initialized")
+			let launched = client.launch({ program: programPath } as never)
+
+			await initialized
+
+			// Line 7 is `Terminal.print("paused")`, after both bindings.
+			await client.setBreakpointsRequest({
+				source: { path: programPath },
+				breakpoints: [{ line: 7 }],
+			})
+
+			let stopped = client.waitForEvent("stopped")
+
+			await client.configurationDoneRequest()
+			await launched
+			await stopped
+
+			let stack = await client.stackTraceRequest({ threadId: 1 })
+			let evaluated = async (expression: string) =>
+				(
+					await client!.evaluateRequest({
+						expression,
+						frameId: stack.body.stackFrames[0]!.id,
+						context: "repl",
+					})
+				).body.result
+
+			expect(await evaluated("Object")).toBe("42")
+			expect(await evaluated("$type")).toBe('"mine"')
+
+			await Promise.all([
+				client.continueRequest({ threadId: 1 }),
+				client.waitForEvent("terminated"),
+			])
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	}, 60_000)
+
 	it("stops on entry at the first line the author wrote", async () => {
 		client = await startedClient()
 
