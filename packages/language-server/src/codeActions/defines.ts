@@ -4,35 +4,19 @@ import { indentationOf, overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk, walkNode } from "./lookups"
 
-// An if/else whose every branch does nothing but answer IS a definition
-// by cases, written the other way round — the branch first and the case after
-// it, rather than the case first and the branch after. Both spellings say the
-// same thing and the Compiler makes the same Program of them, so the rewrite
-// goes in both directions and neither is preferred.
-//
-// Every Expression either direction moves has to be written on ONE line. The
-// two spellings put a Condition in different columns — `if c {` opens its line
-// where `as answer if c` is written mid-line — so a Condition laid out over
-// several lines would land at an indentation nobody wrote. The answers are
-// under the same rule for the same reason, and one rule reads better than two.
-//
-// And what the Nodes say the span reads as is compared against what the buffer
-// actually holds, whitespace apart, before anything is written. This rewrite
-// retypes the STRUCTURE around the Expressions it copies, so a Comment written
-// between two of those Expressions has nowhere to go — and a span the buffer
-// does not read the way the Nodes say is not one to retype at all.
+// Rewrites between an if/else whose branches only answer and a `define`, both
+// ways, neither preferred. See "Between if/else and define" in DEVELOPMENT.md.
 
 type Arm = {
 	value: parser.ExpressionNode
-	// Null on the arm that answers where nothing above it did — the
-	// `otherwise`, and the last `else`.
+	// Null on the `otherwise` arm or the last `else`.
 	condition: parser.ExpressionNode | null
 }
 
 type Reading = {
 	arms: Array<Arm>
-	// What the Nodes above say their span is written as, whitespace
-	// removed — the shape the live text is measured against.
+	// What the Nodes say their span reads as, without whitespace. See
+	// "Retyping structure" in DEVELOPMENT.md.
 	written: string
 }
 
@@ -42,21 +26,15 @@ export function defineActions(
 	range: common.Position,
 ): Array<CodeActionEntry> {
 	let entries: Array<CodeActionEntry> = []
-	// Built on the first if/else that gets this far and not before — the
-	// Nodes this answers about are rare, and walking every Function of a
-	// Program to find the one a Statement stands in is not work to do on a
-	// request that offers nothing.
+	// Built on the first if/else that needs it, not on every request.
 	let answers: Map<
 		parser.ImplementationNode,
 		parser.TypeDeclarationNode | null
 	> | null = null
 	let answeredType = (node: parser.ImplementationNode) =>
 		(answers ??= answeredTypes(program)).get(node) ?? null
-	// The `else if`s of a cascade the outermost `if` already answers for.
-	// Every one of them is an if/else of its own and would offer a `define` of
-	// its own — the same rewrite, one arm shorter, under the same title. The
-	// walk reaches a Node before the Nodes it holds, so the outer one is always
-	// offered first and says which of the inner ones it took with it.
+	// The `else if`s an outer offer already covers, which would otherwise
+	// offer a shorter copy. The walk visits outer Nodes first.
 	let chained = new Set<parser.ImplementationNode>()
 
 	walk(program, (node) => {
@@ -119,10 +97,8 @@ export function defineActions(
 	return entries
 }
 
-// The arms an if/else cascade spells out, or null where one of its
-// branches does anything other than answer. An `else if` is read recursively,
-// which is what turns a cascade into one flat list of arms — the shape a
-// `define` is written in.
+// The arms of an if/else cascade as one flat list, or null where a branch
+// does more than answer.
 function readIfElse(
 	node: parser.IfElseStatementNode,
 	lines: Array<string>,
@@ -162,19 +138,15 @@ function readIfElse(
 
 	let rest = readIfElse(only, lines)
 
-	// `head` ends on the `else` and the reading below opens on its `if`,
-	// so the two meet as `} else if` — the chained form, and the only one this
-	// admits. `else { if … }` is the same AST written with two more braces, and
-	// the comparison against the buffer is what tells them apart.
+	// The parts meet as `} else if`. `else { if … }` has the same AST, and
+	// only the comparison with the buffer turns it away.
 	return rest === null
 		? null
 		: { arms: [opening, ...rest.arms], written: head + rest.written }
 }
 
-// The arms of a `define`, which are already the shape an if/else is
-// written from. An arm answering with a `define` of its own is left alone: the
-// inner ladder would have to be written as the answer of one branch, on lines
-// of its own, at an indentation this rewrite has no way to correct.
+// The arms of a `define`. An arm answering with another `define` is turned
+// away, since its lines could not be indented correctly.
 function readDefine(
 	node: parser.DefineNode,
 	lines: Array<string>,
@@ -222,28 +194,15 @@ function readDefine(
 	}
 }
 
-// One arm to a line, at one indent inside the block, exactly as the
-// `missing-case` fix writes its Handlers. The column the Formatter draws every
-// arm's `if` through is deliberately not written here: which arms share one is
-// settled against the room left on the page when the run is reached, which is
-// something only the renderer knows.
-//
-// The `-> Type` is what a `<-` at the rewritten Statement answers, the
-// enclosing Function's or Match's (see `answeredTypes`), copied as it was
-// spelled. A `define` does not take its Type from the `<-` it stands under,
-// which is what lets an arm answer with a bare `#Case` at all, so an if/else
-// whose branches leaned on the return Type would stop compiling without it.
+// One arm to a line, one indent inside the block, with the `-> Type` a `<-`
+// there answers. See "Between if/else and define" in DEVELOPMENT.md.
 function writtenDefine(
 	arms: Array<Arm>,
 	returnType: parser.TypeDeclarationNode | null,
 	lines: Array<string>,
 	indentation: string,
 ): string | null {
-	// A return Type laid out over several lines can not be copied into
-	// the one the `define` is written on, and leaving it out is not the same
-	// rewrite — an arm answering with a bare `#Case` has nothing left to read
-	// its Choice off. Nothing is offered rather than something that may not
-	// compile.
+	// A return Type over several lines cannot be copied onto the `define`'s line.
 	if (returnType !== null && !writtenOnOneLine(returnType)) {
 		return null
 	}
@@ -264,15 +223,9 @@ function writtenDefine(
 	return `<- define${answered} {\n${written}${indentation}}`
 }
 
-// One block per arm, joined by the `else` between them — an arm with a
-// Condition writes its `if` in front of its block and the `otherwise` writes
-// none, so the cascade falls out as `if … {} else if … {} else {}`. `else if`
-// is one written form rather than a block holding an `if`, which is what keeps
-// a ladder of five arms at one indentation instead of five.
-//
-// The `-> Type` a `define` may carry is dropped: a `<-` takes its Type from the
-// enclosing Function's or Match's return Type, which is where the annotation
-// came from in the first place.
+// One block per arm joined by `else`, giving `if … {} else if … {} else {}` at
+// one indentation. The `define`'s `-> Type` is dropped, since a `<-` takes the
+// enclosing Type.
 function writtenIfElse(
 	arms: Array<Arm>,
 	lines: Array<string>,
@@ -293,9 +246,7 @@ function writtenIfElse(
 		.join(" else ")
 }
 
-// What a branch of exactly one Return answers with, and null for every
-// other branch — a branch that declares something, that answers in two places,
-// or that falls off its end has no arm to become.
+// What a branch of exactly one Return answers with, or null.
 function onlyReturn(
 	body: Array<parser.ImplementationNode>,
 ): parser.ExpressionNode | null {
@@ -308,8 +259,7 @@ function onlyReturn(
 	return only.expression
 }
 
-// The `else if` rungs below one if/else — everything an offered rewrite
-// takes with it, and so everything that must not be offered again on its own.
+// The `else if` rungs inside one if/else, which its rewrite takes with it.
 function chainOf(
 	node: parser.IfElseStatementNode,
 ): Array<parser.IfElseStatementNode> {
@@ -322,16 +272,9 @@ function chainOf(
 	return [only, ...chainOf(only)]
 }
 
-// What a `<-` written at each Statement of the Program ANSWERS, which is
-// what a `define` standing in for one has to be annotated with. Not the
-// enclosing Function's return Type: a Match Handler's body answers the MATCH,
-// which carries a `-> Type` of its own, and a `define` written there with the
-// Function's Type on it is the wrong Type on every arm. The same reading
-// `matchOnValue` takes of a Handler's body, for the same reason.
-//
-// Innermost last, so the innermost wins: the walk reaches a Function before the
-// Functions and Matches written inside it, and each of those overwrites what it
-// holds.
+// The Type a `<-` at each Statement answers: the enclosing Function's, or a
+// Match's inside a Handler's body. The walk visits outer Nodes first, so the
+// innermost overwrites.
 function answeredTypes(
 	program: parser.Program,
 ): Map<parser.ImplementationNode, parser.TypeDeclarationNode | null> {
@@ -388,9 +331,7 @@ function rewrite(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// Never, for the reason the path rewrite is not: the two
-		// spellings mean one thing, and an Editor applying one of them unasked
-		// would be deciding a matter of taste for the reader.
+		// Both spellings mean one thing; the choice is the author's.
 		isPreferred: false,
 		edits: [{ range, newText }],
 	}

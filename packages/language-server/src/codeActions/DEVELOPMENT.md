@@ -70,3 +70,29 @@ also stops at forms read only conditionally: a `define` arm, a Match Guard, and 
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match
 with a `case #Value(item)` can be lifted. Every Expression `collectEager` reaches is read where the Statement
 stands, so the check holds for all of them today. It guards against a form added to that walk that does not.
+
+## Retyping structure
+
+Some refactorings retype the structure around the Expressions they copy: a member path and its Function literal,
+an if/else and a `define`. Before writing, each rebuilds what its Nodes say the span reads as, with whitespace
+removed, and compares that with the buffer. Text the Nodes do not account for, such as a Comment between two
+Expressions, would have nowhere to go. So a span that does not read as the Nodes say is not rewritten.
+
+## Between if/else and define
+
+An if/else whose every branch only answers is a definition by cases written the other way round. Both spellings
+mean the same thing, so `defineActions` rewrites in both directions and prefers neither.
+
+Every Expression either direction moves must be written on one line. The two spellings put a Condition in
+different columns, so a Condition over several lines would land at an indentation nobody wrote. The answers follow
+the same rule. An `else if` chain is read as one flat list of arms, and its inner rungs are not offered again on
+their own.
+
+The `define` written for an if/else carries the `-> Type` a `<-` there answers, copied as written. `answeredTypes`
+finds that Type: a Function's return Type, or a Match's own inside a Handler's body. The position would offer the
+same Type, so the arrow only states it. A return Type written over several lines cannot be copied onto the
+`define`'s line, so nothing is offered then. Going the other way, the `define`'s `-> Type` is dropped, since a `<-`
+takes its Type from the enclosing Function or Match.
+
+The arms of a written `define` stand one to a line, one indent inside the block. The column the formatter aligns
+their `if`s on is left to the formatter, since it depends on the room left on the page.
