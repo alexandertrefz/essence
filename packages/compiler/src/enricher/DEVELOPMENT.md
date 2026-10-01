@@ -530,3 +530,62 @@ Up to and including that first match, a probe reports and records where it stand
 enriched once. Probes after it are speculative: an unannotated Function literal is re-resolved for each candidate
 and reports from inside its body. So their reports and recordings are held, and only the committed candidate
 hands them on.
+
+### The no-matching-overload report
+
+`overloadRefusalReport` builds every `no-matching-overload` report, whether the call is a `::` call, one member of
+a Union receiver's dispatch, or a `Namespace.method(…)` call. What each candidate refused is not recorded while
+candidates are probed, since a call that resolves also probes candidates that fail. `refusedCandidates` matches
+every candidate once more for the report. Each match stops at its first refusal, where that candidate's probe
+stopped, so every Argument it asks about answers from the typer's cache. An unannotated Function literal is read
+again, so its recording and Diagnostics are thrown away.
+
+The report leads with the closest candidate (`closestRefusal`): the one that answered the most Parameters before
+refusing. At the same depth a refusal over a Type beats one over a label, since labels are compared first. Ties
+go to the candidate declared first. A candidate whose Parameters the Arguments could not be paired with refused
+the call's shape. If every candidate did, the report says how many Arguments the call passed and of which Types,
+and names any label no candidate declares (`unknownLabelEvidence`).
+
+Otherwise the primary label names the refused Argument and what it is. A secondary label at the callee says
+what the closest candidate takes there. A label mismatch is reported without asking the Argument's Type, which was
+never read. A Type mismatch adds notes about a refused Record member, a write into an undecided slot, or a Future
+where its value is wanted. The data for the `complete` Quick Fix is carried only for a written Argument, never a
+receiver, because `complete` takes the whole chain behind it.
+
+Before either, `argumentsInOtherOrder` checks whether two Arguments fit the closest candidate the other way round,
+labels moved with them. Only a swap that fixes the call, and that writing the labels alone would not fix, counts,
+and only when exactly one pair qualifies.
+
+Each candidate gets a note with its signature (`candidateNote`). A clause says how the call disagreed with it,
+unless that is what the labels already say. Candidates refused the same way as the closest one, or refused by
+arity, add no clause. At most five notes are listed (`listedCandidateNotes`), the closest candidate always among
+them, followed by a count of the rest.
+
+A derived `is`, `isNot` or Printable Method answers only where no written Namespace declares the name. When a
+Namespace declaring the name replaced it, `replacedFallbackNotes` says so, since nothing in the signatures shows
+it.
+
+### Union receivers
+
+A `::` call on a Union receiver first looks for a Namespace covering the whole Union, such as `Ordering`, which
+takes precedence. Where none resolves the Method, or the covering Namespaces' Overloads refuse the Arguments,
+`resolveUnionMethodDispatch` resolves the Method once per member. The call is valid only when every member
+resolves unambiguously, and its Type is the Union of the branches' return Types. With a covering Namespace in
+hand, a failure reports the Arguments against the receiver as written. Naming one member, such as
+`Optional#Value`, would name a Case the author never wrote.
+
+Each branch commits its own recordings as it settles. The Invocation's shared Argument Nodes end up typed by the
+last branch. An Argument that reads its position, an unannotated Function literal or a member path, also gets a
+copy per branch (`contextualArgumentsForBranch`). The emitted dispatch hands each branch its own copy, so
+`(item) { <- item::label() }` calls each member's own `label`. A body that does not compile against one member's
+Method is an error about the call. A fault every branch shares is reported once, because Diagnostics
+deduplicate. Unbound Type Parameters depend on the shared Arguments, so they are reported for the first member
+only.
+
+At runtime `dispatchMethod` takes the first branch whose member Type the receiver matches. That match is open, so
+`{ width: Integer }` accepts a `{ width: Integer, height: Integer }`, and each branch must come before the branches
+that would swallow it. "Strictly more specific" is a partial order, which a `sort` can not apply, since it compares
+only the pairs its algorithm reaches. `orderDispatchCasesBySpecificity` places each branch after every branch
+strictly more specific than it, walking in declaration order to keep the rest stable. A Type Parameter or Unknown
+member matches every value at runtime (`isRuntimeCatchAllType`), so it goes last, and two of them make the call
+`undispatchable-method`.

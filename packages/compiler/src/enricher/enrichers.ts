@@ -11654,10 +11654,8 @@ function methodCandidates(
 	)
 }
 
-// What the call would have had to write at one Parameter of one candidate.
-// The receiver is not a Parameter a call can count to: it is written left of the
-// `::`, so a report about it says what it is rather than which place it stands
-// in.
+// What the call would have had to write at one Parameter of one candidate. The
+// receiver is written left of the `::`, so it is named rather than counted.
 function describeCandidateParameter(
 	candidate: OverloadCandidate,
 	parameterIndex: number,
@@ -11672,21 +11670,9 @@ function describeCandidateParameter(
 			)
 }
 
-// Every candidate matched once more, for the report alone. What a refusal
-// was ABOUT is not recorded while the candidates are probed, because a call that
-// RESOLVES probes candidates that fail on the way to the one that answers: the
-// happy path would pay for a Diagnostic nobody reports.
-//
-// Nothing is enriched here that the probes did not enrich already. Each match
-// stops at the first refusal — `collectAllMismatches` is deliberately not asked
-// for — which is exactly where that candidate's own probe stopped, so every
-// Argument whose Type this asks for has been asked before and answers from the
-// typer's cache. That is what makes it safe to run under `collectDiagnostics`:
-// what is thrown away here is what was already reported, or already held back,
-// while the candidates were probed. An unannotated Function literal is the one
-// Argument read again rather than read back, and reading it again reports from
-// inside its body and records what it resolved to — so the recording is thrown
-// away with the Diagnostics, and the committed one stands.
+// Every candidate matched once more for the report, under silenced Diagnostics
+// and dropped recordings. See "The no-matching-overload report" in
+// DEVELOPMENT.md.
 function refusedCandidates(
 	candidates: Array<OverloadCandidate>,
 	matchableArguments: Array<MatchableArgument>,
@@ -11703,12 +11689,9 @@ function refusedCandidates(
 	return result.result
 }
 
-// One candidate's first refusal, or null where its Parameters and this
-// call's Arguments could not be paired at all. A Generic signature is matched
-// under a freshened inference context of its own, exactly as `inferInvocation`
-// matches it — a Parameter mentioning a Type Parameter the call binds is not a
-// Type anything can be measured against until the Argument that binds it has
-// been.
+// One candidate's first refusal, or null where the Arguments could not be
+// paired. A generic signature is matched under a fresh inference, as
+// `inferInvocation` matches it.
 function candidateRefusal(
 	candidate: OverloadCandidate,
 	matchableArguments: Array<MatchableArgument>,
@@ -11732,11 +11715,9 @@ function candidateRefusal(
 	return explain[0] ?? null
 }
 
-// Whether a candidate ACCEPTS these Arguments, asked of a call that has
-// already been refused and only ever of Arguments rearranged from the ones it
-// wrote. Probed exactly as `refusedCandidates` probes — the recordings and the
-// Diagnostics of a reading nobody keeps are thrown away, and what is left is
-// the yes or no.
+// Whether a candidate accepts these Arguments, asked only of rearranged
+// Arguments after the call was refused. Probed silently, as `refusedCandidates`
+// does.
 function candidateAccepts(
 	candidate: OverloadCandidate,
 	matchableArguments: Array<MatchableArgument>,
@@ -11766,11 +11747,8 @@ function candidateAccepts(
 	return result.result
 }
 
-// The Arguments as they would stand after one edit — two of them
-// exchanged where `swap` says so, and each of the two carrying the label its new
-// Parameter declares. A reader swapping two Arguments writes the labels that go
-// with them, so a reading that did not would answer about a call nobody would
-// write.
+// The Arguments after one edit: two exchanged where `swap` says so, each taking
+// the label its new Parameter declares, as a reader would write it.
 function rearrangedArguments(
 	candidate: OverloadCandidate,
 	matchableArguments: Array<MatchableArgument>,
@@ -11807,18 +11785,9 @@ function rearrangedArguments(
 	return rearranged
 }
 
-// The two Arguments a call wrote the other way round, or null where it
-// wrote none. `[1, 2, 3]::reduce((total, item) { … }, 0)` is the everyday shape
-// of it: the seed and the step, in the order the language a reader came from
-// writes them, and the report it got was about the label the first Argument was
-// missing — whose Help, followed, wrote the label onto the step and answered
-// with three more Diagnostics.
-//
-// Asked of the closest candidate alone, and answered only where the swap is what
-// fixes the call: where writing the labels WITHOUT swapping fixes it too, the
-// mistake is the labels and the report about them is the one to make. Exactly
-// one pair may qualify — two would be a call this can not read, and a guess
-// about which of them was meant is worth less than the report it would replace.
+// The two Arguments a call wrote the other way round, as in `[1, 2,
+// 3]::reduce((total, item) { … }, 0)`, or null. See "The no-matching-overload
+// report" in DEVELOPMENT.md.
 function argumentsInOtherOrder(
 	candidate: OverloadCandidate,
 	matchableArguments: Array<MatchableArgument>,
@@ -11871,10 +11840,7 @@ function argumentsInOtherOrder(
 	return found
 }
 
-// What a call that wrote two Arguments the other way round is answered
-// with — where each of the two belongs, and the one edit that puts them there.
-// The Notes stay what they were: the signatures are still what a reader checks
-// the order against.
+// The report for a call that wrote two Arguments the other way round.
 function swappedOrderReport(
 	candidate: OverloadCandidate,
 	swapped: { first: number; second: number },
@@ -11907,10 +11873,7 @@ function swappedOrderReport(
 	}
 }
 
-// The one edit, labels and all. A Parameter that declares a label is
-// written with it wherever it stands, so an edit that moves an Argument moves
-// the label with it — and a reader who exchanged the two values and nothing else
-// would be answered next by the label they did not write.
+// The one edit, labels and all, since a moved Argument takes its label along.
 function swappedOrderHelp(
 	candidate: OverloadCandidate,
 	swapped: { first: number; second: number },
@@ -11929,21 +11892,8 @@ function swappedOrderHelp(
 	}.`
 }
 
-// The candidate a report LEADS with — the one this call came closest to
-// answering, measured in Parameters answered before the refusal. A candidate
-// whose Parameters the Arguments could not even be paired with is not in the
-// running: it refused the call's shape rather than one of its Arguments, and the
-// count the whole report falls back to is what says so.
-//
-// A refusal over a Type beats one over a LABEL at the same depth. Both stopped
-// at the same Parameter, but a label is compared BEFORE a Type, so a candidate
-// that agreed on every label got further into the call than one that did not —
-// `[1]::append(contentsOf ["a"])` is the everyday shape of it, where the entry
-// taking a bare item disagrees at the same Parameter as the entry the call
-// clearly meant.
-//
-// Ties go to the candidate declared first, which is the order they were probed
-// in and the order their Notes are listed in.
+// The candidate a report leads with. See "The no-matching-overload report" in
+// DEVELOPMENT.md.
 function closestRefusal(
 	refusals: Array<CandidateRefusal>,
 ): { candidate: OverloadCandidate; detail: ArgumentMismatchDetail } | null {
@@ -11971,17 +11921,12 @@ function closestRefusal(
 	return closest
 }
 
-// How many candidates a report LISTS. `Number.highest(1)` reaches
-// fourteen entries, and fourteen signatures under one Label is a wall to read
-// past rather than a list to read — the entry a reader is looking for is in
-// there, and finding it is the work the report was supposed to save them.
+// How many candidates a report lists. `Number.highest(1)` reaches fourteen
+// entries, too many to read.
 const listedCandidateNotes = 5
 
-// The first five, in the order they are DECLARED, which is the order they
-// were probed in — and a sentence saying how many are left. The closest
-// candidate's Note is always among them, moved to the front where it would
-// otherwise fall outside: it is the one the report's own Labels are about, and a
-// list that named every entry but that one would be the list of the wrong five.
+// The first five in declaration order and a count of the rest. The closest
+// candidate's note moves to the front if it would fall outside.
 function cappedNotes(notes: Array<string>, closest: number): Array<string> {
 	if (notes.length <= listedCandidateNotes) {
 		return notes
@@ -12001,22 +11946,8 @@ function cappedNotes(notes: Array<string>, closest: number): Array<string> {
 	]
 }
 
-// One Note per candidate — what it takes, and where this call disagreed
-// with it where that is NOT what the report's own Labels already say. The clause
-// is what turns a list of signatures a reader has to compare by eye into a list
-// they can read: with three entries of one `append` in front of them, the entry
-// that refused a label and the entry that refused a Type are told apart by it.
-//
-// Which is also why a candidate that refused the call the same way the closest
-// one did says nothing more. `5::add("one")` reaches eight entries that all
-// refuse the same Argument for being a String, and eight copies of that sentence
-// under a Label already saying it is noise a reader has to read past to find the
-// entry they meant.
-//
-// A candidate that refused the ARITY says nothing more either. The count it
-// takes stands in its signature and the count the call passes stands in the
-// Label, so a clause holding one against the other is a third spelling of the
-// same sentence.
+// One note per candidate: what it takes, and how this call disagreed with it
+// where the labels do not already say so.
 function candidateNote(
 	{ candidate, detail }: CandidateRefusal,
 	matchableArguments: Array<MatchableArgument>,
@@ -12033,12 +11964,9 @@ function candidateNote(
 	}.`
 }
 
-// Whether two candidates were refused over the same thing — the same
-// Argument, over a Type rather than a label or the other way round, and the same
-// Type read off it. The Type is compared as it is SPELLED, which is how a report
-// tells two of them apart: an Argument read against one candidate's Parameter
-// Types can come to a different Type under another's, and an unannotated
-// Function literal is exactly that.
+// Whether two candidates were refused over the same Argument the same way,
+// Types compared as spelled, since an Argument may type differently per
+// candidate.
 function refusedAlike(
 	detail: ArgumentMismatchDetail,
 	lead: ArgumentMismatchDetail | null,
@@ -12052,9 +11980,7 @@ function refusedAlike(
 		: describeType(detail.argumentType) === describeType(lead.argumentType)
 }
 
-// What this call did at the Parameter one candidate refused, said from the
-// CALL's side — the Notes describe candidates, so the clause that ends one has
-// to say which of them the call is being measured against.
+// What this call did at the refused Parameter, said from the call's side.
 function refusalClause(
 	candidate: OverloadCandidate,
 	detail: ArgumentMismatchDetail,
@@ -12078,19 +12004,15 @@ function refusalClause(
 	return `this call passes ${describeWrittenArgument(detail.argumentType)} as ${name}`
 }
 
-// An Argument as a report names it. An Error is a Type nobody wrote: it is
-// what an Argument that could not be read at all answers, and it already carries
-// a Diagnostic of its own — so the report says that much and leaves the Type it
-// does not have out of it.
+// An Argument as a report names it. An Error already has its own Diagnostic, so
+// the report does not print it as a Type.
 function describeWrittenArgument(type: common.Type): string {
 	return typeContainsError(type)
 		? "an Argument whose Type could not be read"
 		: withArticle(describeType(type))
 }
 
-// An English list, for the one report that has to name several Types in a
-// row. Written here rather than joined with commas throughout, because "a String
-// and an Integer" is what the reader would have said about their own call.
+// An English list, for naming several Types in a row.
 function joinedWithAnd(described: Array<string>): string {
 	if (described.length < 2) {
 		return described.join("")
@@ -12099,17 +12021,9 @@ function joinedWithAnd(described: Array<string>): string {
 	return `${described.slice(0, -1).join(", ")} and ${described[described.length - 1]}`
 }
 
-// A label no candidate declares anywhere, for the report that fell back to
-// the call's shape. A written label is matched before anything is typed and a
-// Parameter it names nowhere takes an Argument away from the Parameter that
-// needed it, so the count comes out wrong and the report is about a count nobody
-// miscounted — `numbers::slice(at 1)` passes the one Argument `slice` takes and
-// is refused for passing one Argument. The label is what went wrong, and it is
-// said here rather than left to be spotted in a list of signatures.
-//
-// Where a candidate PAIRED the Argument the label is not this report's business:
-// the refusal is then the label mismatch itself, which names the Parameter the
-// call meant and says how to write it.
+// A label no candidate declares, for the report about the call's shape. Such a
+// label takes an Argument from the Parameter that needed it, so the count looks
+// wrong: `numbers::slice(at 1)`.
 function unknownLabelEvidence(
 	refusals: Array<CandidateRefusal>,
 	matchableArguments: Array<MatchableArgument>,
@@ -12145,13 +12059,8 @@ function unknownLabelEvidence(
 	return { notes, helps }
 }
 
-// What a call whose shape no candidate takes handed over. The count is
-// what refused it and the Types are what a reader still has to learn from the
-// report — they can count the Arguments in their own source, and they can not
-// see what each of them came to.
-//
-// Left out where one of them could not be read: that Argument carries a
-// Diagnostic of its own, and "an Error" names no Type anybody wrote.
+// What a call whose shape no candidate takes passed: the count and each
+// Argument's Type. The Types are left out when one could not be read.
 function passedArgumentsLabel(passed: Array<common.Type>): string {
 	let counted = `this call passes ${countOf(passed.length, "Argument")}`
 
@@ -12160,62 +12069,36 @@ function passedArgumentsLabel(passed: Array<common.Type>): string {
 		: `${counted}: ${joinedWithAnd(passed.map((type) => withArticle(describeType(type))))}`
 }
 
-// The Labels, Notes and Helps every `no-matching-overload` report is built
-// from, whichever of the three shapes of call raised it — a `::` call, one
-// member of a Union receiver's dispatch, and a `Namespace.method(…)` call whose
-// receiver is an ordinary Argument.
-//
-// The report LEADS with the closest candidate: its Label names the Argument that
-// was refused and says what it is, and the Label beside it says what that
-// candidate takes there. Naming only what every candidate DECLARES — which is
-// what this report used to do — left the one thing the call got wrong to be
-// worked out from a list, and the Argument's own Type, the half a reader can not
-// read off the signature, was never said at all.
-//
-// Where no candidate takes this many Arguments there is no Argument to lead
-// with: nothing was refused for what it is, and the report stays about the call's
-// shape.
+// The labels, notes and helps of every `no-matching-overload` report. See "The
+// no-matching-overload report" in DEVELOPMENT.md.
 function overloadRefusalReport(
 	refusals: Array<CandidateRefusal>,
 	matchableArguments: Array<MatchableArgument>,
-	// Where each matchable Argument is WRITTEN, the receiver's place
-	// included, so that a report can point at the one that was refused. Parallel
-	// to `matchableArguments`, which is what pairs a refusal with a place.
+	// Where each matchable Argument is written, receiver included, parallel to
+	// `matchableArguments`.
 	positions: Array<common.Position>,
 	call: {
 		position: common.Position
-		// Where the callee is NAMED, which is where the secondary Label
-		// saying what it takes belongs — the Argument's own place is taken by the
-		// Label saying what was passed.
+		// Where the callee is named, for the label saying what it takes.
 		callee: common.Position
-		// And what it is called, for the sentences that are about the call
-		// rather than about one candidate of it. Spelled as a report writes it,
-		// quotes and all.
+		// The callee's name, as a report writes it, quotes included.
 		name: string
-		// Asked only where the report falls back to the call's shape, and
-		// asked as a function because asking ENRICHES: a call no candidate could
-		// pair its Arguments with has typed none of them, and the Types are read
-		// out here rather than under the probe that threw its Diagnostics away.
+		// Asked only for the report about the call's shape, and lazily, since
+		// reading the Types enriches.
 		passed: () => Array<common.Type>
-		// Whether the body this call stands in may write `complete` — see
-		// `bodyCanWait`. A refused Argument that is a Future is answered by the
-		// word wherever the word stands, and by reaching through the Future
-		// wherever it does not. Defaulted for the callers that do not ask.
+		// Whether the enclosing body may write `complete`; see `bodyCanWait`.
+		// Decides how a Future Argument is answered.
 		canWait?: boolean
-		// And which of the four barriers said no, where one did — the edit
-		// a property body is left with is not the edit a plain Function is left
-		// with, and `barredCompletion` is the one place that knows which.
+		// Which barrier refused `complete`, since each leaves a different edit;
+		// see `barredCompletion`.
 		barrier?: enricher.CompletionBarrier | null
 	},
 ): {
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
 	notes: Array<string>
 	helps: Array<string>
-	// Carried out of here for the one refusal that has a mechanical
-	// answer — an Argument that is a Future where its value is wanted. The
-	// Validator has said this on `argument-type-mismatch` since asynchrony
-	// landed, and a call refused for picking no Overload never reached it: the
-	// Quick Fix is keyed on the DATA, so both reports have to carry it.
+	// The data for the Quick Fix that writes `complete`, which the validator's
+	// `argument-type-mismatch` carries too.
 	data?: common.DiagnosticData
 } {
 	let closest = closestRefusal(refusals)
@@ -12248,9 +12131,7 @@ function overloadRefusalReport(
 
 	let { candidate, detail } = closest
 
-	// Asked before either branch below, because both of them answer about
-	// ONE Argument and this is a mistake about two. A call whose Arguments fit
-	// the other way round is not a call that got one of them wrong.
+	// Asked first, since a swap is a mistake about two Arguments, not one.
 	let swapped = argumentsInOtherOrder(candidate, matchableArguments)
 
 	if (swapped !== null) {
@@ -12264,11 +12145,8 @@ function overloadRefusalReport(
 	)
 	let position = positions[detail.argumentIndex] ?? call.position
 
-	// A LABEL that does not agree is what the call got wrong, and the Type
-	// behind it was never asked for — matching reads a label first, and an
-	// Argument nothing committed to must not be enriched to describe a mistake
-	// that is not about it. The Help is the Validator's own, word for word: one
-	// mismatch, one edit, however the callee was reached.
+	// A label mismatch: the Argument's Type was never read, so it is not
+	// enriched now. The Help is the validator's own.
 	if (detail.argumentType === null) {
 		let label = matchableArguments[detail.argumentIndex]?.name ?? null
 
@@ -12296,35 +12174,22 @@ function overloadRefusalReport(
 		}
 	}
 
-	// The pair the blank question is about is finally in hand here — the
-	// Parameter Type the closest candidate held this Argument to, and the Type
-	// the Argument came to. A `List<Unknown>` Parameter refuses a write for being
-	// a write into a blank rather than for holding the wrong thing, and nothing
-	// else in this report says so.
+	// A `List<Unknown>` Parameter refuses a write into a blank, which a note
+	// says.
 	let undecided = undecidedSlotEvidence(
 		detail.expectedType,
 		detail.argumentType,
 		null,
 	)
-	// And the other difference a Type name alone does not explain: the
-	// Argument describes work rather than being what the work answers with.
-	// `show(work)` is the shape a forgotten `complete` takes in everyday code,
-	// and it reads as a plain mismatch between `Future<Integer>` and `Integer`
-	// until this says otherwise. Written in the Validator's own words, which is
-	// where the reader meets the same sentence on every other position.
+	// A Future passed where its value is wanted, said in the validator's words.
 	let asynchrony = asynchronyHelps(
 		detail.expectedType,
 		detail.argumentType,
 		call.canWait !== false,
 		call.barrier ?? null,
 	)
-	// And which member of a written Record the closest candidate turned
-	// away, as Notes alone — which is what handing it no Node asks for. The two
-	// Labels here are spoken for: one points at the Argument and one at the
-	// callee that refused it, and those are what a report about a CALL says
-	// before it says anything about a Record. A third arrow into the middle of
-	// the Argument would be pointing at a member while the Label around it is
-	// still explaining which Overload was being tried.
+	// A refused Record member, as notes, since the two labels name the Argument
+	// and the callee.
 	let record = recordMismatchEvidence(
 		detail.expectedType,
 		detail.argumentType,
@@ -12346,11 +12211,8 @@ function overloadRefusalReport(
 		],
 		notes: [...notes, ...record.notes, ...undecided.notes],
 		helps: [...asynchrony, ...record.helps, ...undecided.helps],
-		// And the DATA for the fix that writes the word, for an Argument
-		// the caller wrote and never for the RECEIVER of a `::` call. `complete`
-		// takes the whole postfix chain behind it, so the word written in front
-		// of a receiver waits for the call it is the receiver of — which is the
-		// one place this edit would not be the edit the Help describes.
+		// Only for a written Argument, never a receiver: `complete` in front of
+		// a receiver would wait for the whole call.
 		data:
 			detail.argumentIndex < candidate.receiverParameters
 				? undefined
@@ -12362,11 +12224,8 @@ function overloadRefusalReport(
 	}
 }
 
-// What a candidate is CALLED in a report. A provided Method's pseudo
-// Namespace is keyed by the conformance source it came through, and two
-// Protocols providing one name through one source need two keys — so the key is
-// what tells them apart internally, and the Namespace's own name is what a
-// reader is shown.
+// What a candidate is called in a report. A provided Method's pseudo Namespace
+// is keyed by its conformance source; the reader sees the Namespace's own name.
 function candidateNamespaceName(
 	key: string,
 	namespaceType: common.NamespaceType,
@@ -12374,10 +12233,8 @@ function candidateNamespaceName(
 	return namespaceType.providedBy === undefined ? key : namespaceType.name
 }
 
-// What a reader would have to WRITE to name this candidate at the call —
-// the Namespace for a written Method, and the Protocol for a provided one,
-// because `value::<Name>method()` reaches a provided Method only through the
-// Protocol that offers it.
+// What a reader writes to name this candidate at the call: the Namespace, or
+// the Protocol for a provided Method.
 function candidateSpecifierName(
 	key: string,
 	namespaceType: common.NamespaceType,
@@ -12388,13 +12245,8 @@ function candidateSpecifierName(
 		: describeProtocol(namespaceType.providedBy, scope)
 }
 
-// What one candidate DECLARES, as a note. A written Method is the
-// Namespace's own and is said so; a provided one is a Protocol's body reached
-// THROUGH the Namespace, and both halves have to be said. Naming the Namespace
-// alone claimed a declaration a reader would not find in that file, and it
-// printed one line twice where two Protocols provide one name through one
-// Namespace — which is exactly the ambiguity being reported. The Protocol named
-// here is also what a `value::<Name>method(…)` specifier has to write.
+// What one candidate declares, as a note. A provided Method names both the
+// Protocol and the Namespace it is reached through.
 function describeCandidateDeclaration(
 	key: string,
 	namespaceType: common.NamespaceType,
@@ -12406,34 +12258,9 @@ function describeCandidateDeclaration(
 		: `'${describeProtocol(namespaceType.providedBy, scope)}' provides '${methodName}' for '${namespaceType.name}'.`
 }
 
-// A DERIVE is a fallback: it answers only where no written Namespace
-// declares the name, which a Namespace declaring it takes away. So a Namespace
-// declaring the name takes the whole name — even one that declares no
-// conformance and means something else entirely by it — and a reader looking at
-// `'Extras::isEmpty' takes 1 Argument` has no way to see that the derived
-// `isNot` was in reach and was replaced. This note says so.
-//
-// A PROVIDED Method needs no note of its own any more. It stands on the
-// specificity ladder beside the written Methods, so a call that reached one and
-// missed is describing it already — `methodCandidates` names it and the
-// Protocol that wrote it.
-//
-// Said as a note rather than refused. Which Namespace answers a name is the
-// Program's to decide, and tying the two candidates together would refuse
-// Programs that mean nothing by the shared name at all.
-//
-// `answered` is the set the Diagnostic is already describing, and a derive in
-// it was replaced by nothing: it IS what the call reached, and only the
-// Arguments were wrong.
-//
-// The receiver's Namespaces are looked up again rather than taken from the
-// caller, because `answered` is the subset that DECLARES the name and the
-// printing derive reads the whole set: it answers where one of them declared
-// `is Printable`, which need not be one that declares the Method.
-//
-// Only `no-matching-overload` wants this. `unknown-method` is raised where no
-// Namespace declared the name at all, so no fallback was passed over — the
-// derive itself would have answered.
+// A derived Method answers only where no written Namespace declares the name.
+// When one replaced it, a note says so. The receiver's Namespaces are looked up
+// again, since a Printable derive reads the whole set.
 function replacedFallbackNotes(
 	methodName: string,
 	answered: Map<string, common.NamespaceType>,
@@ -12467,9 +12294,8 @@ function replacedFallbackNotes(
 			]
 }
 
-// `memberType` is set only where a Union receiver's per-member dispatch
-// raised this — every candidate is then measured against that member, which is
-// the receiver the Arguments would have been passed to.
+// `memberType` is set only for one member of a Union receiver's dispatch, the
+// receiver every candidate is measured against.
 function reportNoMatchingOverload(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
@@ -12534,10 +12360,8 @@ function reportNoMatchingOverload(
 	)
 }
 
-// Each candidate as a pair — what it DECLARES and what a call would have
-// to WRITE to pick it. The two differ for a provided Method: it is declared by
-// the Protocol that wrote the body and reached through the Namespace whose
-// conformance offered it, and it is written by naming the Protocol.
+// Each candidate as what it declares and what a call writes to pick it, which
+// differ for a provided Method.
 function reportAmbiguousNamespace(
 	node: parser.MethodInvocationNode,
 	candidates: Array<{ declaration: string; specifier: string }>,
@@ -12557,10 +12381,8 @@ function reportAmbiguousNamespace(
 			helps: [
 				`Name it at the call, e.g. 'value::<${candidates[0]?.specifier}>${node.member.content}(…)'.`,
 			],
-			// The specifiers rather than the declarations, and every one
-			// of them rather than the first: the Help can only show one shape
-			// and a Quick Fix offers a choice, which is what this Diagnostic
-			// has to be answered with.
+			// Every specifier, since a Quick Fix offers the choice the Help can
+			// only show one of.
 			data: {
 				kind: "namespace-candidates",
 				names: candidates.map((candidate) => candidate.specifier),
@@ -12569,16 +12391,9 @@ function reportAmbiguousNamespace(
 	)
 }
 
-// A receiver with an undecided slot in it — the `List<Unknown>` an empty
-// List Literal has — is matched by every Namespace whose target is a List, in
-// both directions, because an Unknown fits anything and anything fits it. The
-// specificity order then reads that as a genuine overlap and hands the call to
-// the narrower target, so `[]::tag()` would silently be the nested Namespace's
-// `tag` rather than the flat one's. What is undecided must not be what decides,
-// which is why more than one match over such a receiver is refused here instead
-// of ordered: the receiver has to say what it holds first. Exactly one match is
-// left alone — nothing was picked by the Unknown when there was nothing to pick
-// between.
+// A receiver with an undecided slot, such as `[]`'s `List<Unknown>`, matches
+// every List Namespace both ways, so specificity would pick by a Type nothing
+// decided. More than one match is refused; exactly one is left alone.
 function reportUndecidedReceiverType(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -12620,17 +12435,9 @@ function reportUndecidedReceiverType(
 	)
 }
 
-// The one shape of this refusal the Compiler knows the answer to. A Type
-// Parameter with no bound reaches no Namespace at all — that is what being
-// unbounded MEANS — and a Program written `<infer Item>` is one word away from a
-// Program where the call resolves. The Protocols that declare the Method are
-// looked up rather than guessed at, so the bound offered is one that answers this
-// very call; several are offered in turn where several would, which is the same
-// rule `ambiguous-case` follows about naming only one candidate.
-//
-// Empty for every other receiver — a bound is not an edit that means anything to
-// a String — and empty where nothing in scope declares the name, since there
-// would be nothing to bound it BY.
+// A Type Parameter without a bound reaches no Namespace. The Helps offer each
+// Protocol in scope that declares the Method as the bound. Empty for any other
+// receiver, or where nothing declares the name.
 function unboundedParameterHelps(
 	baseType: common.Type,
 	methodName: string,
@@ -12646,22 +12453,10 @@ function unboundedParameterHelps(
 	)
 }
 
-// A Type Parameter that no Scope here declares — a name that reached this
-// body out of a CALLEE's signature rather than out of the source. It gets there
-// when an Invocation fails to select an Overload: the last candidate's recorded
-// Parameter Types stand in for the Function literal Argument, so that the
-// literal is not reported as uninferable on top of the failure, and its
-// Parameters are then typed in the callee's Generics. A body typed that way is
-// enriched all the same, and a call in it reports against a name the reader can
-// not see — `price::isPositive()` inside a refused `Result::keep` said "this is
-// a ValueType", naming the standard library's own Type Parameter in a user's
-// file.
-//
-// So it is treated as the poison Type is treated one branch up: the Invocation
-// around it has already reported, and this is its cascade. A Type Parameter the
-// reader DID write — a Method's own `<infer Item>`, a generic Namespace's
-// `ItemType` — is in Scope and reports as before, since asking a Method of an
-// unbounded Generic is a real mistake with nothing else to say about it.
+// A Type Parameter no Scope here declares. It comes from a callee's signature:
+// a call that selected no Overload types a Function literal by its last
+// candidate. The failed call already reported, so this stays silent; a Type
+// Parameter the reader wrote still reports.
 function isUnwrittenTypeParameter(
 	type: common.Type,
 	scope: enricher.Scope,
@@ -12695,12 +12490,8 @@ function resolveMethodInvocation(
 		scope,
 	)
 
-	// One mistake, one report. A specifier that names something other than
-	// a Namespace has been refused as such, and the empty lookup it leaves behind
-	// is that refusal and not a second one — running the search on regardless
-	// reported `no-namespace-for-value` about a receiver whose own Namespace
-	// answers the Method perfectly well, which is a sentence that is simply not
-	// true.
+	// A specifier that names no Namespace was already refused, and its empty
+	// lookup is no second mistake.
 	if (specifierWasRefused(node.namespaceSpecifier)) {
 		return resolveFailedMethodInvocation()
 	}
@@ -12718,26 +12509,24 @@ function resolveMethodInvocation(
 			),
 		)
 
-	// A Union-typed receiver falls back to per-member dispatch whenever
-	// no Namespace covering the whole Union can resolve the Method — a
-	// covering Namespace that can (`Ordering`) keeps taking precedence.
+	// A Union receiver falls back to per-member dispatch when no covering
+	// Namespace resolves the Method. A covering one, such as `Ordering`, takes
+	// precedence.
 	if (matchingNamespaces.size === 0) {
 		if (baseType.type === "UnionType") {
 			return resolveUnionMethodDispatch(node, baseType, scope, typer)
 		}
 
-		// The name resolves, just not to something an instance call can
-		// reach — reported before the two "no such Method" Diagnostics, which
-		// would both be untrue.
+		// The name resolves, but only to a static Method, which neither "no
+		// such Method" report would say.
 		if (staticNamespaces.size > 0) {
 			reportStaticMethodOnValue(node, baseType, null, staticNamespaces)
 
 			return resolveFailedMethodInvocation()
 		}
 
-		// Nothing targets the value at all, versus something does but
-		// has no Method of this name — two different mistakes, so they keep
-		// two different Diagnostics.
+		// No Namespace targets the value, or one does without a Method of this
+		// name: two mistakes, two Diagnostics.
 		if (namespaces.size === 0) {
 			if (
 				baseType.type !== "Error" &&
@@ -12785,12 +12574,8 @@ function resolveMethodInvocation(
 
 	let resolvedMethods = []
 
-	// Every Namespace is probed even after one has matched — that is how
-	// an ambiguity is found — and a probe RECORDS what an unannotated Function
-	// literal Argument resolved to against that candidate's Parameter Types.
-	// Each probe's recordings are therefore held aside and only the selected
-	// candidate's are committed, so the literal's body is typed by the
-	// Namespace that actually won rather than by whichever was probed last.
+	// Every Namespace is probed, to find an ambiguity. Each probe's recordings
+	// are held, and only the selected candidate's are committed.
 	let lastRecording: ContextualFunctionTypeRecording | undefined
 
 	for (let [namespaceName, namespaceType] of matchingNamespaces) {
@@ -12825,10 +12610,9 @@ function resolveMethodInvocation(
 	}
 
 	if (resolvedMethods.length > 1) {
-		// An undecided receiver is refused before the order is asked
-		// anything — see `reportUndecidedReceiverType`. The shared filter itself
-		// stays as it is: Completion runs it over the same Namespaces and must
-		// keep listing them for a receiver the user is still writing.
+		// An undecided receiver is refused before the specificity order is
+		// asked; see `reportUndecidedReceiverType`. Completion still lists
+		// every Namespace.
 		if (typeContainsUnknown(baseType)) {
 			commitContextualFunctionTypes(lastRecording)
 
@@ -12847,9 +12631,8 @@ function resolveMethodInvocation(
 			return resolveFailedMethodInvocation()
 		}
 
-		// The Namespaces here are the raw, unspecialized ones the Scope
-		// holds, so a generic candidate still spells its target with its own
-		// Generics — which is what the specificity order compares.
+		// The raw Namespaces, whose generic targets keep their own Type
+		// Parameters for the specificity order to compare.
 		resolvedMethods = filterMostSpecificByTarget(
 			resolvedMethods,
 			(candidate) => candidate.namespace.type,
@@ -12857,9 +12640,8 @@ function resolveMethodInvocation(
 	}
 
 	if (resolvedMethods.length === 0) {
-		// The covering Namespace has the Method but its overloads
-		// reject the Arguments — per-member dispatch may still accept them,
-		// since each member is matched with its own receiver Type.
+		// The covering Namespace rejects the Arguments, but per-member dispatch
+		// may accept them with each member's own receiver Type.
 		if (baseType.type === "UnionType") {
 			return resolveUnionMethodDispatch(
 				node,
@@ -12870,10 +12652,8 @@ function resolveMethodInvocation(
 			)
 		}
 
-		// No candidate to commit, so the last probe's recordings stand
-		// in: the Invocation is an Error either way, and a literal left with no
-		// recording at all would report its Parameters as uninferable on top of
-		// the Diagnostic below.
+		// No candidate to commit, so the last probe's recordings stand in,
+		// keeping a literal from also reporting its Parameters as uninferable.
 		commitContextualFunctionTypes(lastRecording)
 
 		reportNoMatchingOverload(
@@ -12890,9 +12670,8 @@ function resolveMethodInvocation(
 
 		commitContextualFunctionTypes(resolvedMethod.recording)
 
-		// Unbound Type Parameters are only reported for the selected
-		// candidate — losing overloads and Namespaces must not leak
-		// Diagnostics.
+		// Reported only for the selected candidate, so losing Overloads and
+		// Namespaces leak nothing.
 		reportUnboundGenerics(
 			resolvedMethod.unboundGenerics,
 			node.position,
@@ -12901,17 +12680,15 @@ function resolveMethodInvocation(
 			node.arguments,
 		)
 
-		// The Overload was selected while this Namespace was probed; what
-		// that selection reported becomes the call's Diagnostics now that the
-		// Namespace is the one being committed.
+		// What selecting the Overload reported, now that this Namespace is
+		// committed.
 		for (let diagnostic of resolvedMethod.selectionDiagnostics) {
 			report(diagnostic)
 		}
 
-		// A direct `is`/`isNot`/`toString` on a RECORD is the one call the
-		// conformance rail never asked about: the builtin Record Namespace
-		// declares no `where` clause, so nothing solved its members. It is asked
-		// here, and what it answers becomes this call's own hidden Arguments.
+		// A direct `is`, `isNot` or `toString` on a Record. The builtin Record
+		// Namespace declares no `where`, so its members' conformances are
+		// solved here as the call's hidden Arguments.
 		let routedRecord = routedRecordCall(
 			resolvedMethod.namespace.name,
 			resolvedMethod.namespace.type,
@@ -12933,10 +12710,9 @@ function resolveMethodInvocation(
 			...(routedRecord === null
 				? {}
 				: { derivedMembers: routedRecord.members }),
-			// A direct `is`/`isNot` on a generic Choice widens at emission
-			// — the descriptor its runtime helper follows is recovered from the
-			// receiver's Choice, whose DECLARED Alias the applied receiver Type
-			// erased.
+			// A direct `is` or `isNot` on a generic Choice: the runtime
+			// helper's descriptor comes from the Choice's declared Alias, which
+			// the applied receiver erased.
 			derivedDescriptor:
 				resolvedMethod.namespace.name === derivedEquatableNamespaceName
 					? (derivedEquatableDescriptorFor(
@@ -12948,8 +12724,8 @@ function resolveMethodInvocation(
 			dispatch: null,
 		}
 	} else {
-		// As above — an ambiguity leaves no winner, so the last probe's
-		// recordings stand in rather than none at all.
+		// An ambiguity leaves no winner, so the last probe's recordings stand
+		// in.
 		commitContextualFunctionTypes(lastRecording)
 
 		reportAmbiguousNamespace(
@@ -12973,15 +12749,8 @@ function resolveMethodInvocation(
 	}
 }
 
-// Which members of the Union answer the name and which do not. The report
-// above names the ONE member the walk stopped at, and the note beside it says
-// "every member must provide this" — which leaves the reader to try each member
-// in turn to find out how far off they are. A Union half of whose members have
-// the Method is a different situation from one where none of them has it, and
-// this is the sentence that tells the two apart.
-//
-// Empty where no member answers at all: the sentence would then name every
-// member of the Union twice over and say nothing the note above it has not.
+// Which members of the Union answer the name and which do not, so the reader
+// sees how far off the call is. Empty where no member answers.
 function dividedUnionNotes(
 	node: parser.MethodInvocationNode,
 	unionType: common.UnionType,
@@ -13008,29 +12777,18 @@ function dividedUnionNotes(
 			]
 }
 
-// Per-member dispatch for a Union-typed receiver — the Method is
-// resolved statically for every member Type, and the Invocation is only
-// valid when every member resolves unambiguously. Its Type is the Union of
-// the branch return Types. The receiver's actual Type picks the branch at
-// runtime, so more specific member Types are ordered first — an open Record
-// member would otherwise swallow values of any member assignable to it.
+// Per-member dispatch for a Union receiver: the Method resolves for each
+// member, and the Type is the Union of the branches' return Types. More
+// specific members come first, so an open Record member does not swallow the
+// others at runtime.
 function resolveUnionMethodDispatch(
 	node: parser.MethodInvocationNode,
 	unionType: common.UnionType,
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
-	// The Namespaces that cover the WHOLE Union and declare this Method,
-	// when per-member dispatch is being tried as a second chance after their
-	// Overloads rejected the Arguments. Empty when the whole-receiver lookup
-	// found nothing, which is the other way in here.
-	//
-	// It decides what a failure says. With a covering Namespace in hand the
-	// truth is "the receiver has this Method and the Arguments are wrong", so
-	// the report names the receiver as written; without one it is "no member
-	// provides this Method", and naming the member is the whole point. Reporting
-	// the member either way was how `firstItem()::value(defaultingTo 0)` on an
-	// `Optional<Rational>` came to say `for Optional#Value` — a Case the writer
-	// never mentioned.
+	// The Namespaces covering the whole Union that declare the Method, when
+	// dispatch is a second chance after their Overloads refused. With them, a
+	// failure reports the receiver as written rather than one member.
 	coveringNamespaces: Map<string, common.NamespaceType> = new Map(),
 ): ResolvedMethodInvocation {
 	let members = flattenUnionMembers(unionType)
@@ -13058,9 +12816,8 @@ function resolveUnionMethodDispatch(
 			)
 
 		if (matchingNamespaces.size === 0) {
-			// As for a non-Union receiver — this member's Method exists
-			// and is called on its Namespace, which is not the same as the
-			// member not providing it at all.
+			// As for a plain receiver: the member's Method exists but is
+			// static.
 			if (staticNamespaces.size > 0) {
 				reportStaticMethodOnValue(
 					node,
@@ -13072,10 +12829,8 @@ function resolveUnionMethodDispatch(
 				return resolveFailedMethodInvocation()
 			}
 
-			// A covering Namespace declares the Method — this member
-			// simply does not, which is not what went wrong. What went wrong is
-			// the Arguments, and the receiver they were passed to is the Union
-			// as written.
+			// A covering Namespace declares the Method, so the Arguments are
+			// what went wrong, reported against the Union as written.
 			if (coveringNamespaces.size > 0) {
 				reportNoMatchingOverload(
 					node,
@@ -13088,15 +12843,10 @@ function resolveUnionMethodDispatch(
 				return resolveFailedMethodInvocation()
 			}
 
-			// The near miss is looked for on the Namespaces that target
-			// the WHOLE Union, not on this member's — a covering Namespace is
-			// the likeliest thing a mistyped call meant, and it is exactly
-			// where per-member dispatch does not look. `Optional` is the
-			// everyday case: `firstItem()::hasValu()` reaches here because no
-			// Case declares the name, and the Method it meant is one letter
-			// away on the Namespace over both Cases.
-			// Silent for a Method the Parser dropped out of its Namespace,
-			// for the reason `reportUnknownMethod` is.
+			// The near miss and the evidence come from the Namespaces over the
+			// whole Union, the likeliest meaning: `firstItem()::hasValu()`.
+			// Silent for a Method the Parser dropped, as in
+			// `reportUnknownMethod`.
 			if (memberDeclarationWasAbandoned(scope, node.member.content)) {
 				return resolveFailedMethodInvocation()
 			}
@@ -13106,10 +12856,8 @@ function resolveUnionMethodDispatch(
 				node.namespaceSpecifier,
 				scope,
 			)
-			// And the evidence is looked for on the whole Union too. An
-			// `Optional<Integer>` arrives here member by member, so the Case
-			// under the cursor is what the Method was missing from — while what
-			// the reader HOLDS is the Optional, and `Integer` is a payload of it.
+			// What the reader holds is the whole Union, such as an Optional, so
+			// the evidence is read off it.
 			let held = heldValueEvidence(node, unionType, coveringLookup, scope)
 			let suggestion =
 				held === null ? closestMethodName(node, coveringLookup) : null
@@ -13148,10 +12896,8 @@ function resolveUnionMethodDispatch(
 		}
 
 		let resolvedMethods = []
-		// As in `resolveMethodInvocation` — every Namespace is probed
-		// before one is selected, so what a probe recorded for a contextually
-		// typed Function literal Argument is held aside until this member's
-		// branch has picked its Namespace.
+		// As in `resolveMethodInvocation`, each probe's recordings are held
+		// until this member's branch picks its Namespace.
 		let lastRecording: ContextualFunctionTypeRecording | undefined
 
 		for (let [namespaceName, namespaceType] of matchingNamespaces) {
@@ -13180,9 +12926,8 @@ function resolveUnionMethodDispatch(
 		}
 
 		if (resolvedMethods.length > 1) {
-			// As in `resolveMethodInvocation` — a member Type with an
-			// undecided slot in it must not have its Namespace picked for it by
-			// the order.
+			// As in `resolveMethodInvocation`, an undecided member Type does
+			// not let the order pick its Namespace.
 			if (typeContainsUnknown(memberType)) {
 				commitContextualFunctionTypes(lastRecording)
 
@@ -13210,9 +12955,8 @@ function resolveUnionMethodDispatch(
 		if (resolvedMethods.length === 0) {
 			commitContextualFunctionTypes(lastRecording)
 
-			// As above — a covering Namespace's rejection is the one
-			// worth reporting, since it is the receiver the call was written
-			// against.
+			// A covering Namespace's refusal is the one reported, against the
+			// receiver as written.
 			reportNoMatchingOverload(
 				node,
 				coveringNamespaces.size > 0
@@ -13252,9 +12996,8 @@ function resolveUnionMethodDispatch(
 					helps: [
 						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType, scope)}>${node.member.content}(…)'.`,
 					],
-					// As at the report for a receiver that is no Union —
-					// a specifier written at the call picks the candidate for
-					// every member of the Union at once.
+					// As for a receiver that is no Union; a specifier picks the
+					// candidate for every member at once.
 					data: {
 						kind: "namespace-candidates",
 						names: resolvedMethods.map((method) =>
@@ -13273,19 +13016,13 @@ function resolveUnionMethodDispatch(
 
 		let resolvedMethod = resolvedMethods[0]
 
-		// One recording per member, each committed as its branch is
-		// settled — so the Invocation's own Argument Nodes, enriched once when
-		// this returns, are typed by the LAST branch that resolved them. That is
-		// a choice about the shared Nodes only: a contextually typed literal
-		// means whatever the branch it is passed to says it means, and the copy
-		// each branch keeps below is what the emitted dispatch actually hands
-		// it. The last branch's typing stands for the shared Node because it has
-		// to stand for something and every branch that cares carries its own.
+		// Each branch commits its recording as it settles, so the shared
+		// Argument Nodes are typed by the last branch. Each branch keeps its
+		// own copy of the Arguments that read their position.
 		commitContextualFunctionTypes(resolvedMethod.recording)
 
-		// Unbound Type Parameters depend on the Arguments, which every
-		// branch shares — reporting them for the first member only keeps the
-		// Diagnostic from repeating per member.
+		// The shared Arguments decide unbound Type Parameters, so only the
+		// first member reports them.
 		if (memberIndex === 0) {
 			reportUnboundGenerics(
 				resolvedMethod.unboundGenerics,
@@ -13296,10 +13033,8 @@ function resolveUnionMethodDispatch(
 			)
 		}
 
-		// As in `resolveMethodInvocation` — the branch's own selection
-		// Diagnostics, replayed now that its Namespace is settled. Every branch
-		// selects against the same Arguments, so a shared failure deduplicates to
-		// one report.
+		// The branch's selection Diagnostics, replayed now that its Namespace
+		// is settled. A failure every branch shares deduplicates.
 		for (let diagnostic of resolvedMethod.selectionDiagnostics) {
 			report(diagnostic)
 		}
@@ -13307,13 +13042,9 @@ function resolveUnionMethodDispatch(
 		dispatchCases.push({
 			memberType,
 			namespaceName: resolvedMethod.namespaceName,
-			// Read off the Namespace this branch resolved to, exactly as
-			// the single-receiver path reads it off `node.namespace.type` —
-			// the Protocol's pseudo Namespace carries the Protocol's name in
-			// both fields, and a real Namespace may be spelled the same, so
-			// the name alone can not tell the Rewriter which one to emit.
-			// Without it a branch answering with a provided Method emits a
-			// member read on the Protocol, which binds nothing at runtime.
+			// Read off the resolved Namespace, as the single-receiver path
+			// does. The name alone can not tell a Protocol's pseudo Namespace
+			// from a real one of the same name.
 			providedBy: resolvedMethod.namespaceType.providedBy,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 			conformances: resolvedMethod.conformances,
@@ -13323,9 +13054,8 @@ function resolveUnionMethodDispatch(
 				scope,
 				resolvedMethod.recording,
 			),
-			// A branch resolving to a generic Choice's derived `is`/`isNot`
-			// widens the same way a direct call does — the descriptor recovered
-			// from this member's Choice.
+			// A branch resolving to a generic Choice's derived `is` or `isNot`
+			// widens as a direct call does.
 			derivedDescriptor:
 				resolvedMethod.namespaceName === derivedEquatableNamespaceName
 					? (derivedEquatableDescriptorFor(
@@ -13382,31 +13112,15 @@ function resolveUnionMethodDispatch(
 		type: buildUnion(mergeUnionMembers(caseReturnTypes)),
 		overloadedMethodIndex: null,
 		conformances: [],
-		// Held on each branch instead — every branch resolves to a
-		// different Method, so there is no one answer here.
+		// Held per branch, since each resolves to a different Method.
 		omittedParameterIndices: [],
 		dispatch: orderDispatchCasesBySpecificity(dispatchCases),
 	}
 }
 
-// The Arguments a dispatch branch needs a copy of its own — a Function
-// literal that omitted its annotations, which is the only Expression whose Type
-// the Method it is passed to decides. Each is enriched again under the branch's
-// own recording, so its Parameters are the Types THIS branch's Method declared
-// and its body resolves against them: the same `(item) { <- item::label() }`
-// compiles to a call on one Namespace's `label` for one branch and on another's
-// for the next, and the runtime hands each branch the copy that was compiled
-// for it. Nothing else in the Invocation reads its context, so nothing else is
-// copied — a literal nested inside another Argument is typed by the Function
-// IT is passed to, which no branch changes.
-//
-// Enriching a body per branch is what lets a Diagnostic that holds for one
-// branch only be reported at all: until now a literal was compiled against one
-// Method and passed to every branch, so what its body meant to the other
-// branches was never asked. Every member of a Union must provide what is asked
-// of it, so a body that does not compile against a member's Method is an error
-// about the call. Diagnostics deduplicate, so a fault every branch shares is
-// still reported once.
+// The Arguments a dispatch branch needs its own copy of: those that read their
+// position, enriched again under the branch's recording. See "Union receivers"
+// in DEVELOPMENT.md.
 function contextualArgumentsForBranch(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
@@ -13415,11 +13129,8 @@ function contextualArgumentsForBranch(
 	let contextualArguments: common.DispatchCase["contextualArguments"] = []
 
 	for (let [index, argument] of node.arguments.entries()) {
-		// The Arguments that react to the position they stand in — an
-		// unannotated Function literal and a member path, which is one the
-		// Compiler wrote. Each branch matches with its own receiver Type, so
-		// each needs its own typed copy of them; every other Argument means the
-		// same thing in all of them.
+		// An unannotated Function literal and a member path read their
+		// position, so each branch needs its own typed copy.
 		let readsItsPosition =
 			argument.value.nodeType === "MemberPath" ||
 			(argument.value.nodeType === "FunctionValue" &&
@@ -13447,10 +13158,8 @@ function contextualArgumentsForBranch(
 	return contextualArguments
 }
 
-// Is `dispatchCase` the branch that has to be tried FIRST of the two —
-// every value the runtime would hand to it would also be accepted by `other`,
-// but not the other way round. A runtime catch-all accepts every value there
-// is, so anything else outranks it without the Types being compared at all.
+// Whether `dispatchCase` must be tried before `other`. A runtime catch-all
+// accepts every value, so anything else outranks it.
 function dispatchCaseIsMoreSpecific(
 	dispatchCase: common.DispatchCase,
 	other: common.DispatchCase,
@@ -13468,20 +13177,9 @@ function dispatchCaseIsMoreSpecific(
 	)
 }
 
-// `dispatchMethod` takes the FIRST branch whose member Type the receiver
-// matches, and that match is open — a Record value "may carry more besides",
-// so `{ width: Integer }` accepts a `{ width: Integer, height: Integer }`.
-// Every branch must therefore stand before the branches that would swallow it.
-//
-// A `sort` can not do this: "strictly more specific" is a PARTIAL order, its
-// comparator has to answer 0 for the incomparable pairs, and `sort` only ever
-// compares the pairs its own algorithm reaches. With an incomparable member
-// (`Boolean`) sitting between an open Record and the more specific Record it
-// swallows, the two are never compared and the array keeps declaration order —
-// which made a Union's runtime behaviour depend on how its members were
-// spelled. Emitting each branch after everything strictly more specific than it
-// compares every pair that matters, and walking the branches in declaration
-// order keeps the rest of the order — and the emitted code — stable.
+// Orders the branches so each stands after every branch strictly more specific
+// than it, since `dispatchMethod` takes the first open match. See "Union
+// receivers" in DEVELOPMENT.md.
 function orderDispatchCasesBySpecificity(
 	dispatchCases: Array<common.DispatchCase>,
 ): Array<common.DispatchCase> {
@@ -13493,11 +13191,9 @@ function orderDispatchCasesBySpecificity(
 			return
 		}
 
-		// Marked before the recursion rather than after, so that a
-		// relation that somehow cycles terminates here instead of overflowing
-		// the stack. A cycle can not arise from the definition above — it takes
-		// two Types each strictly more specific than the other — which is
-		// exactly why nothing but termination has to be salvaged.
+		// Marked before the recursion, so a cycle would terminate. None can
+		// arise, since it takes two Types each strictly more specific than the
+		// other.
 		placed.add(dispatchCase)
 
 		for (let other of dispatchCases) {
@@ -13519,20 +13215,14 @@ function orderDispatchCasesBySpecificity(
 	return ordered
 }
 
-// `isValueOfType` answers true for every value on these — such a
-// member can only ever be the last dispatch branch, and two of them can not
-// coexist in one dispatched Union.
+// `isValueOfType` is true for every value on these, so such a member is the
+// last branch, and two can not share one dispatched Union.
 function isRuntimeCatchAllType(type: common.Type): boolean {
 	return type.type === "GenericUse" || type.type === "Unknown"
 }
 
-// An Identifier callee names itself and a `Namespace.method` Lookup
-// spells both halves; anything else that answers with a Function has no one
-// name to give, and the Position the Diagnostic carries says which call is
-// meant either way. The Validator's own `describeCallee` stops at the
-// Identifier and says "This call" for everything else — it names a callee only
-// inside "This is a bug in the Compiler" messages, which nobody reads for the
-// signature they should have passed.
+// An Identifier callee names itself and a `Namespace.method` Lookup spells both
+// halves. Any other callee is "This callee"; the Position says which call.
 function describeInvocationCallee(name: parser.ExpressionNode): string {
 	if (name.nodeType === "Identifier") {
 		return `'${name.content}'`
@@ -13545,12 +13235,9 @@ function describeInvocationCallee(name: parser.ExpressionNode): string {
 	return "This callee"
 }
 
-// Whether this call is the one the `Terminal.inspect` escape Help is an
-// edit for. Read off the callee as WRITTEN, the same two shapes
-// `describeInvocationCallee` above reads: a Program that renames the Namespace
-// on import is not spelling this call, and a Program that shadows `Terminal`
-// with one of its own is not making it. Either way the Help is withheld rather
-// than offered wrongly, which is the direction a Help has to fail in.
+// Whether this is a `Terminal.print` call, which the `Terminal.inspect` Help is
+// an edit for. Read off the callee as written, so a renamed `Terminal` gets no
+// Help.
 function isPrintingCall(name: parser.ExpressionNode): boolean {
 	return (
 		name.nodeType === "Lookup" &&
@@ -13568,18 +13255,13 @@ function resolveFunctionInvocation(
 ): {
 	type: common.Type
 	conformances: Array<common.Conformance>
-	// Which overload the Arguments picked, or null when the callee is not
-	// overloaded. The Simplifier reads it to mangle the callee to `__overload$N`
-	// — for an Identifier callee (an overloaded free Function) as much as for a
-	// `Namespace.method` Lookup.
+	// Which Overload the Arguments picked, or null. The simplifier mangles the
+	// callee to `__overload$N` with it.
 	overloadedMethodIndex: number | null
 	omittedParameterIndices: Array<number>
-	// Whether a candidate was actually SELECTED, which the answer's Type
-	// alone does not say: a lone signature whose Arguments did not match still
-	// answers its declared return Type below, so that the Validator reports the
-	// Argument rather than a cascade on top of it. Read by the dead-fallback
-	// re-probe, which must not read a Type nothing resolved to as an answer the
-	// call could have given.
+	// Whether a candidate was selected. A lone signature that did not match
+	// still answers its return Type, so the validator reports the Argument. The
+	// dead-fallback re-probe must not read that as an answer.
 	selected: boolean
 } {
 	const type = nameType
@@ -13591,12 +13273,8 @@ function resolveFunctionInvocation(
 	) {
 		let matchableArguments = argumentMatchables(node.arguments, typer)
 
-		// A callee without an `overload` block is its own single
-		// candidate — one signature to match, one set of bounds to solve and
-		// one set of bindings to keep is what `selectOverload` does for one
-		// Overload, so both callee shapes take the same path and can not drift.
-		// The same reasoning already puts a SimpleMethod through it, see
-		// `resolveInvokedMethodInNamespace`.
+		// A callee without an `overload` block is a set of one candidate, so
+		// both callee shapes take the same path, as a SimpleMethod does.
 		let selected = selectOverload(
 			[type],
 			matchableArguments,
@@ -13616,8 +13294,8 @@ function resolveFunctionInvocation(
 				node.arguments,
 			)
 
-			// What selecting this candidate reported was held back until
-			// it was known to be the selection; it is the call's to report now.
+			// Held until the candidate was selected, and the call's to report
+			// now.
 			for (let diagnostic of selected.diagnostics) {
 				report(diagnostic)
 			}
@@ -13632,18 +13310,10 @@ function resolveFunctionInvocation(
 			}
 		}
 
-		// With one candidate a mismatch is not "no Overload accepts these
-		// Arguments" but a plain Argument mismatch, which is the Validator's to
-		// report against the one signature there is. The Arguments are matched
-		// once more all the same: a Function literal that omitted its
-		// annotations takes them from the Parameter it is passed to, and
-		// matching is what hands each Argument the Parameter's Type to read them
-		// off. Every Argument is asked — a probe stops at the first mismatch, so
-		// without this the literals behind it were left with no context at all
-		// and reported as uninferable, while the identical literal passed to a
-		// METHOD resolved fine. The Type Parameters nothing bound are
-		// substituted as Errors rather than handed on as Generics no Scope
-		// declares.
+		// With one candidate a mismatch is a plain Argument mismatch, which the
+		// validator reports. Every Argument is still matched, so a Function
+		// literal after the first mismatch reads its Parameter Type rather than
+		// reporting as uninferable.
 		let { parameterTypes, context, freshToOriginal } =
 			createFreshenedInference(type)
 
@@ -13652,13 +13322,10 @@ function resolveFunctionInvocation(
 			inference: context,
 		})
 
-		// A signature with a Protocol-bounded Type Parameter is only
-		// well formed with a witness per bound, and a call that did not select
-		// has none — nothing bound the Parameter, so there was nothing to solve
-		// one for. Saying the call's own Type is an Error is what says it never
-		// resolved: the Validator reports the Argument mismatch, which is the
-		// real news, instead of asserting the missing witness and reporting the
-		// Compiler's own bug channel over a Program that is simply wrong.
+		// A bounded Type Parameter needs a witness, and a call that selected
+		// nothing has none. An Error Type says the call never resolved, so the
+		// validator reports the Argument mismatch rather than a missing
+		// witness.
 		let unresolvedBound = type.generics.some(
 			(generic) => generic.constraint != null,
 		)
@@ -13700,8 +13367,8 @@ function resolveFunctionInvocation(
 				node.arguments,
 			)
 
-			// What selecting this candidate reported was held back until it
-			// was known to be the selection; it is the call's to report now.
+			// Held until the candidate was selected, and the call's to report
+			// now.
 			for (let diagnostic of selected.diagnostics) {
 				report(diagnostic)
 			}
@@ -13716,10 +13383,9 @@ function resolveFunctionInvocation(
 			}
 		}
 
-		// Every candidate is listed the way THIS call writes it — a Method
-		// reached through its Namespace passes its receiver as an ordinary first
-		// Argument, so unlike the `::` twin nothing is dropped from the
-		// signature.
+		// Candidates are listed as this call writes them. A Method reached
+		// through its Namespace passes its receiver as an ordinary Argument, so
+		// nothing is dropped.
 		let callee = describeInvocationCallee(node.name)
 		let { labels, notes, helps, data } = overloadRefusalReport(
 			refusedCandidates(
@@ -13771,10 +13437,8 @@ function resolveFunctionInvocation(
 							`this is ${withArticle(describeType(type))}`,
 						),
 					],
-					// The parentheses are what made this a call, so they
-					// are what goes — the name beside them reads a value, which
-					// is what it already holds. A Method is the other reading,
-					// and it is reached with `::` rather than by calling a name.
+					// The parentheses made this a call, so they are what goes.
+					// A Method is the other reading, reached with `::`.
 					helps: [
 						"Remove the '()' — the name already reads the value.",
 						"Or call a Method on it with '::', which is how a Method is reached.",
