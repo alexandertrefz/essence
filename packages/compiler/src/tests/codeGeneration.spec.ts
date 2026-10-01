@@ -78,8 +78,9 @@ function generate(
 async function run(
 	source: string,
 	modulePath?: string,
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
 ): Promise<Array<string>> {
-	let js = generate(source, modulePath)
+	let js = generate(source, modulePath, optimiserOptions)
 	let directory = mkdtempSync(join(tmpdir(), "essence-e2e-"))
 	let file = join(directory, "program.ts")
 
@@ -1922,13 +1923,19 @@ describe("Code Generation", () => {
 		})
 
 		// With `compile-union-dispatch` off, the runtime's own search dispatches.
-		it("should let the runtime search open a branch's holes too", () => {
-			expect(
-				generate(divergentDispatch, undefined, {
-					enabled: true,
-					disabledPasses: new Set(["compile-union-dispatch"]),
-				}),
-			).toContain("$type.dispatchMethod")
+		it("should let the runtime search open a branch's holes too", async () => {
+			let options = {
+				enabled: true,
+				disabledPasses: new Set(["compile-union-dispatch"]),
+			}
+
+			expect(generate(divergentDispatch, undefined, options)).toContain(
+				"$type.dispatchMethod",
+			)
+			expect(await run(divergentDispatch, undefined, options)).toEqual([
+				"30",
+				"3",
+			])
 		})
 	})
 
