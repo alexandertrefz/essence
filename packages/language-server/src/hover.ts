@@ -890,6 +890,12 @@ function visitInvokedMethod(
 	node: common.typed.MethodInvocationNode,
 	state: State,
 ) {
+	// Resolving the signatures copies each Overload, so a name that can not win
+	// is not resolved.
+	if (!wins(state, node.member.position)) {
+		return
+	}
+
 	let signatures = invokedSignatures(node)
 
 	if (signatures === null) {
