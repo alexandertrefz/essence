@@ -24,11 +24,9 @@ export enum TokenType {
 	LiteralTrue = "LiteralTrue",
 	LiteralFalse = "LiteralFalse",
 	LiteralString = "LiteralString",
-	// The three pieces an interpolated String Literal lexes into — the
-	// text before the first hole (`Start`), the text between two holes
-	// (`Middle`) and the text after the last hole (`End`), with the hole's own
-	// Tokens lexed in place between them. A String with no holes stays a single
-	// `LiteralString`, so nothing that reads a plain String has to change.
+	// An interpolated String lexes into the text before its first hole, the
+	// text between holes and the text after its last hole. Each hole's own
+	// Tokens stand between them. A String without holes is one `LiteralString`.
 	LiteralStringStart = "LiteralStringStart",
 	LiteralStringMiddle = "LiteralStringMiddle",
 	LiteralStringEnd = "LiteralStringEnd",
@@ -76,12 +74,8 @@ export interface Token {
 	value: string
 	type: TokenType
 	position: Position
-	// Where the Token stands in the source as absolute offsets — `start`
-	// is the first character of it, `end` the one after its last, so
-	// `source.slice(start, end)` is the Token as it was written. The same span
-	// `position` describes, counted the one way that needs no line table: it is
-	// what an incremental Lexer would key its reuse on, and what maps an editor
-	// position onto a Token without walking lines. Nothing reads them yet.
+	// The span of `position` as absolute offsets, so `source.slice(start, end)`
+	// is the Token as written.
 	start: number
 	end: number
 }
