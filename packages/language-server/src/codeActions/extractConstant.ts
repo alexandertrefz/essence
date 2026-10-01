@@ -19,19 +19,9 @@ import { enclosingStatementOf, findInnermostNodeContaining } from "./lookups"
 import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 
-// An Expression lifted out of the Statement it was written in, and left
-// behind as the name of a Constant declared above it. The whole of what makes
-// it safe is that the Expression is EVALUATED where it was: everything below
-// turns away a selection that would move an Expression from a place that runs
-// it sometimes to a place that runs it always, or from a place where a name is
-// in scope to one where it is not.
-//
-// WHICH Expression: the smallest one that CONTAINS the trimmed selection,
-// rather than the one whose Position matches it. A reader dragging over
-// `order.price` is dragging over characters and is off by one about as often as
-// not, and the Node they were pointing at is the same Node either way — while a
-// match on the Position exactly would offer nothing at all half the time, with
-// nothing on screen to say why.
+// Lifts an Expression into a Constant declared before its Statement. It is
+// offered only where the Expression is still evaluated exactly when it was.
+// See "Extracting a Constant" in DEVELOPMENT.md.
 
 export function extractConstantActions(
 	program: parser.Program,
@@ -60,17 +50,14 @@ export function extractConstantActions(
 
 	let statement = enclosing.statement
 
-	// The Expression has to be one the Statement evaluates on its way
-	// through — see `collectEager`. A `define` arm's value and a Match Handler's
-	// Guard are inside the Statement and are read only when the arm is reached,
-	// so a Constant above the Statement would run what the Program declined to.
+	// Only an Expression the Statement always evaluates, as `collectEager`
+	// finds them.
 	if (!collectEager(statement).has(expression)) {
 		return []
 	}
 
-	// The Constant is written as a whole line, so the Statement it goes
-	// above has to own its line. A `case Integer { <- total() }` written on one
-	// line has no point above the Return that is not in the middle of the arm.
+	// The Constant is written as a whole line, so the Statement must open
+	// its own.
 	if (!opensItsLine(lines, statement.position.start)) {
 		return []
 	}
@@ -106,9 +93,7 @@ export function extractConstantActions(
 			kind: "refactor.extract",
 			diagnosticCode: null,
 			diagnosticPosition: null,
-			// Never preferred. Nothing was wrong with what the reader
-			// wrote — this is one of two spellings of it, and the Editor must
-			// not pick between them on its own.
+			// Nothing was wrong; this is another spelling.
 			isPreferred: false,
 			edits,
 			command: renameCommand(documentPath, {
@@ -119,13 +104,8 @@ export function extractConstantActions(
 	]
 }
 
-// What is worth naming, listed rather than subtracted — everything not
-// named here is turned away. A bare Identifier already has a name and a scalar
-// Literal already reads as its own value, so a Constant over either says
-// nothing the line did not say. The three that are absent for a harder reason
-// take their meaning from the position they were written in and would lose it:
-// a Function literal and a bare `#Case` take their Type from it, and a member
-// path stands for a Function of whatever Argument it is handed.
+// What is worth naming; anything else is turned away. See "Extracting a
+// Constant" in DEVELOPMENT.md.
 function isExtractable(
 	node: parser.ImplementationNode,
 ): node is parser.ExpressionNode {
@@ -141,10 +121,8 @@ function isExtractable(
 		case "DictionaryValue":
 		case "InterpolatedStringValue":
 			return true
-		// Both are ordinary values — a `Started` and whatever was waited for
-		// — and both read better under a name where a line holds the Keyword and a
-		// chain besides. The Constant lands in the same body, so a `complete`
-		// lifted out of one is a `complete` in the body it already suspended.
+		// Ordinary values. The Constant stays in the same body, so a lifted
+		// `complete` still suspends that body.
 		case "Start":
 		case "Complete":
 			return true
@@ -155,13 +133,8 @@ function isExtractable(
 	}
 }
 
-// The Expressions a Statement reads every time it is reached, which is
-// the whole set a Constant above it may hold. The walk stops at everything that
-// opens a body of its own — a Function literal, a Match Handler — because a
-// selection inside one of those has a body of its OWN to be lifted into and
-// `enclosingStatementOf` answers with that body instead; and it stops at the
-// two forms that are read conditionally without opening a body: a `define`'s
-// arms, and a Parameter's or a Case's default.
+// The Expressions a Statement reads every time it is reached. See
+// "Extracting a Constant" in DEVELOPMENT.md.
 function collectEager(
 	statement: parser.ImplementationNode,
 ): Set<parser.ImplementationNode> {
@@ -177,9 +150,8 @@ function collectInto(
 	found: Set<parser.ImplementationNode>,
 ) {
 	switch (node.nodeType) {
-		// The Statements, which are not themselves candidates — what a
-		// Constant can hold is an Expression. A body one of them opens is
-		// deliberately not walked, for the reason above.
+		// Statements are not candidates, and the bodies they open are not
+		// walked.
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
@@ -194,10 +166,7 @@ function collectInto(
 		case "IfElseStatement":
 			collectInto(node.condition, found)
 			return
-		// A declaration evaluates nothing where it stands: a Function
-		// Statement's body runs when it is called, a Namespace's static
-		// Property when the Namespace is first reached, and a Type says nothing
-		// at run time at all.
+		// A declaration evaluates nothing where it stands.
 		case "FunctionStatement":
 		case "OverloadedFunctionStatement":
 		case "NamespaceDefinitionStatement":
@@ -271,8 +240,7 @@ function collectInto(
 			}
 
 			return
-		// The scrutinee is read on the way in; every Handler is a body of
-		// its own, and a Guard is read only for the values its Matcher caught.
+		// Only the scrutinee is always read.
 		case "Match":
 			collectInto(node.value, found)
 			return
@@ -290,18 +258,9 @@ function collectArguments(
 	}
 }
 
-// Whether every name the Expression reads is already in scope where the
-// Constant will stand. Constants and Variables are not hoisted, so a name
-// declared between the insertion point and the Expression is a name the
-// Constant can not see.
-//
-// The skip is the half that DOES work here today: a name declared INSIDE the
-// Expression travels with it, which is what lets a whole Match carrying a
-// `case #Value(item)` be lifted at all. The refusal is the invariant `collectEager`
-// is trusted for, checked rather than assumed — every Expression that walk
-// reaches is read where the Statement stands, so every name in it already
-// resolved there. The day a form is added to that walk that does not, this is
-// what turns it away instead of writing source that does not compile.
+// Whether every name the Expression reads is in scope where the Constant will
+// stand. A name declared inside the Expression travels with it. See
+// "Extracting a Constant" in DEVELOPMENT.md.
 function readsResolveAbove(
 	index: RenameIndex,
 	extracted: common.Position,
@@ -330,11 +289,8 @@ function readsResolveAbove(
 	return true
 }
 
-// What the Expression is ABOUT, read off its own head — the Method a call
-// invokes, the member a lookup reads, the Function a call names. It is a
-// placeholder either way: the action ends by opening rename on it, and a
-// derived name is what makes that a decision the reader confirms rather than
-// one they have to make from nothing.
+// A placeholder name from the Expression's head: the Method a call invokes,
+// the member a lookup reads, the Function a call names. Rename opens on it.
 function derivedName(node: parser.ExpressionNode): string {
 	let derived = headName(node)
 
@@ -348,8 +304,8 @@ function headName(node: parser.ExpressionNode): string {
 			return node.member.content
 		case "FunctionInvocation":
 			return headName(node.name)
-		// The name comes from under the Keyword — what `complete
-		// headline(url)` is about is the headline, not the waiting.
+		// Named for what is waited on, so `complete headline(url)` gives
+		// `headline`.
 		case "Start":
 		case "Complete":
 			return headName(node.expression)
@@ -357,8 +313,7 @@ function headName(node: parser.ExpressionNode): string {
 			return node.content
 		case "MemberPath":
 			return node.steps[node.steps.length - 1]?.content ?? "value"
-		// Lowercased, because a Case is written `#Win` and a value is
-		// not written `Win` — the sigil is what carries the capital.
+		// Lowercased: `#Win` gives `win`.
 		case "CaseValue":
 			return `${node.caseName.content.charAt(0).toLowerCase()}${node.caseName.content.slice(1)}`
 		default:

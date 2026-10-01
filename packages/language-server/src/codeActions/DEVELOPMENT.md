@@ -46,3 +46,27 @@ has that shape, since a written member stands inside its braces.
 The enriched payload cannot tell a written Record from a wrapped value on its own, though. So a payload the source
 already wrote as the Case's Record, which the Parser AST shows, is never expanded. Expanding a refused
 `#Circle({ radius = "big" })` would write `{ radius = { radius = "big" } }` and bring the same Diagnostic back.
+
+## Extracting a Constant
+
+`extractConstantActions` lifts an Expression out of its Statement into a Constant declared on the line before it.
+It is safe only because the Expression is still evaluated exactly where it was. A selection is turned away if the
+lifted Expression would run where the Program ran it only sometimes. So is one that would read a name out of scope.
+
+The Expression is the smallest one that contains the trimmed selection, not one whose Position matches it exactly.
+A reader dragging over characters is often off by one, and still means the same Node.
+
+Only some Expressions are worth naming, and `isExtractable` lists them. A bare Identifier already has a name, and
+a scalar Literal reads as its own value. Others take their meaning from where they are written and would lose it.
+A Function literal and a bare `#Case` take their Type from their position. A member path stands for a Function of
+the Argument it is handed.
+
+`collectEager` collects the Expressions a Statement reads every time it is reached, which are the ones a Constant
+before it may hold. Its walk stops at anything that opens a body of its own, such as a Function literal or a Match
+Handler. A selection inside such a body is lifted within it instead, as `enclosingStatementOf` finds it. The walk
+also stops at forms read only conditionally: a `define` arm, a Match Guard, and a Parameter's or Case's default.
+
+`readsResolveAbove` checks that every name the Expression reads is in scope where the Constant will stand, since
+Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match
+with a `case #Value(item)` can be lifted. Every Expression `collectEager` reaches is read where the Statement
+stands, so the check holds for all of them today. It guards against a form added to that walk that does not.

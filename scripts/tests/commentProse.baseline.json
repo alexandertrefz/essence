@@ -106,7 +106,6 @@
 	"packages/compiler/src/tests/unknownNarrowing.spec.ts": {"sentence-length": 20, "em-dash": 24, "all-caps": 10, "history": 2, "block-length": 1},
 	"packages/compiler/src/tests/validator.spec.ts": {"sentence-length": 101, "em-dash": 84, "all-caps": 39, "history": 1, "position": 4, "block-length": 5},
 	"packages/language-server/src/codeActions/defines.ts": {"sentence-length": 19, "em-dash": 13, "all-caps": 4, "position": 2, "block-length": 3},
-	"packages/language-server/src/codeActions/extractConstant.ts": {"sentence-length": 14, "em-dash": 11, "all-caps": 7, "position": 3, "block-length": 3},
 	"packages/language-server/src/codeActions/extractFunction.ts": {"sentence-length": 17, "em-dash": 12, "all-caps": 15, "position": 2, "block-length": 3},
 	"packages/language-server/src/codeActions/fixes.ts": {"sentence-length": 141, "em-dash": 79, "all-caps": 62, "history": 1, "position": 9, "block-length": 33},
 	"packages/language-server/src/codeActions/futureFixes.ts": {"sentence-length": 15, "em-dash": 10, "all-caps": 4, "position": 2, "block-length": 6},
