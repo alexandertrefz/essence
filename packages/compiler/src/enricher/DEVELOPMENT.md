@@ -1083,3 +1083,35 @@ keyed by identity, which hits because Scopes share it. A receiver whose Type is 
 one entry per tag (`tagOnlyTypes`). Any other receiver is keyed by identity in a `WeakMap`. Poisoning a refinement
 to its base changes a target in place, so it calls `forgetNamespaceTargets` to drop the indexes and answers. The fill
 also writes a pending predicate in place, but no answer can have read it, since reading one throws.
+
+## Defaults and Argument pairing
+
+An Argument is paired with a Parameter by its label before any Type is read. A call's shape can then be checked
+against every Overload candidate before its Arguments are typed. Completion can offer labels in a call that is half
+written. With defaults, the pairing walks both lists from the left. It takes the Argument where the labels
+agree, and skips a Parameter that has a default.
+
+`refuseIndistinguishableDefaults` keeps that walk from ever needing to backtrack: a defaulted Parameter may not be
+followed by any Parameter carrying the same label. An unlabelled Parameter counts as carrying the empty label. So
+`(_ a: Integer, _ b: Integer = 2, to x: Integer)` is accepted, and `(to a: Integer = 1, to b: Integer)` is refused.
+A rule allowing defaults only at the end would refuse both.
+
+### Defaults in an Overload
+
+A default can make two entries of one `overload` block accept the same call. `refuseAmbiguousOverloadDefaults`
+enumerates each entry's accepted shapes: the label sequences left when any subset of its defaulted Parameters is
+dropped. A shape reachable only by leaving a default out may not equal any shape of another entry, and is reported
+at that default as `ambiguous-overload-default`. Shapes reached without leaving anything out are not compared, so
+entries told apart by their Types stay legal. A signature with more defaults than `MAXIMUM_ENUMERATED_DEFAULTS` is
+not enumerated.
+
+The clash is refused at the declaration rather than broken at the call. Selection takes the first entry that fits,
+in an order that already differs from the source (`overloadProbeOrder`). An entry's position is also its emitted
+name (`__overload$N`) and its native binding. And only at the declaration can the report name both entries and
+point at the default.
+
+A partial Record default adds no shape, but it widens the values an entry accepts. A Record without the members
+the default fills in now fits. `refuseAmbiguousPartialDefaults` refuses two entries of one shape that one Argument
+list fits only through such a default (`partialDefaultClash`). It compares the resolved signatures. A clash is
+mapped back to the written Parameter from the end, since a Method's resolved signature starts with the receiver.
+The Argument tried is the union of the members each side requires (`parameterOverlap`).

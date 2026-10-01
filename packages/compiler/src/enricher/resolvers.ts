@@ -9363,18 +9363,13 @@ export function resolveMethodLookupNamespacesForReceiverType(
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
-	// Error Types match any targetType — instead of every Namespace,
-	// they match none, so that a broken base expression does not produce
-	// follow-up Diagnostics.
+	// An Error receiver matches no Namespace, so it raises nothing further.
 	if (baseType.type === "Error") {
 		return matchingNamespaces
 	}
 
-	// A receiver whose Type is a Protocol-bounded Type Parameter
-	// resolves ONLY through its Protocol — the pseudo-Namespace below, named
-	// after the hidden conformance parameter. The Simplifier emits the
-	// Namespace name as the call base, so bodies compile to
-	// `Item__conformance.method(item, …)` without any further machinery.
+	// A bounded Type Parameter resolves only through its Protocol, emitted
+	// as `Item__conformance.method(item, …)`.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
 		let conformance = conformanceNamespaceFor(baseType, scope)
 
@@ -9385,39 +9380,23 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	// An unbounded Type Parameter has no Methods — it resolves only
-	// through a Protocol bound, handled above. The cut says that outright
-	// rather than relying on no Namespace happening to match: a Namespace whose
-	// target Union carries a bindable Generic member binds the bare Parameter
-	// and would offer its Methods on every `T`. `Optional` was that Namespace,
-	// back when its target was `ItemType | Nothing`, which is why
-	// `"essence"::hasValue()` used to name it among the Namespaces it searched.
-	// A user's own generic Choice can be written in the same shape, so this
-	// stays.
+	// An unbounded Type Parameter has no Methods, even where a Namespace's
+	// target Union has a bindable member that would bind it.
 	if (baseType.type === "GenericUse") {
 		return matchingNamespaces
 	}
 
-	// Returned as it comes back rather than copied into the Map above.
-	// The copy this replaces protected nothing: every caller
-	// (`resolveMethodInvocation`, `resolveUnionMethodDispatch`, the near-miss
-	// lookup) only ever iterates the answer or reads names off it, and the
-	// three functions they hand it to — `namespacesDeclaringMethod`,
-	// `partitionInstanceMethodNamespaces`, `methodNamesOf` — each build a Map
-	// of their own. The answer is memoised and therefore SHARED, so a caller
-	// that ever needs to mutate it has to copy it where it mutates.
+	// The memoised answer is shared, so a caller copies it before changing
+	// it.
 	return namespacesTargeting(
 		getAllNamespacesInScope(scope, namespaceSpecifier),
 		baseType,
 	)
 }
 
-// Which of the Namespaces declaring the Method can answer an INSTANCE
-// call, and which only declare it as static. Every Method Invocation is an
-// instance call — the receiver written left of the `::` is the first Argument —
-// so a static declaration is not a candidate at all. Keeping the static ones
-// rather than dropping them is what lets the Diagnostic say the Method exists
-// and is called differently, instead of claiming there is no such Method.
+// The Namespaces declaring the Method as an instance Method, apart from
+// those declaring it static, which no `::` call reaches. A Diagnostic can then
+// say the Method is called differently.
 export function partitionInstanceMethodNamespaces(
 	methodName: string,
 	namespaces: Map<string, common.NamespaceType>,
@@ -9439,25 +9418,10 @@ export function partitionInstanceMethodNamespaces(
 	return { instanceNamespaces, staticNamespaces }
 }
 
-// A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
-// `ambiguous-namespace` report is answered when the two candidates are two
-// Protocols providing one name — `Name the Namespace` has to name something a
-// call can write, and a written Namespace is not what either of them is.
-//
-// The receiver's own Namespaces are looked up again, unspecified, because they
-// are the evidence the conformance is read from: the specifier's lookup came
-// back empty (a Protocol is not in the members table), and asking the door with
-// nothing would leave a Namespace-declared conformance unseen.
-//
-// Every candidate the named Protocol offers is kept, not one: a provided Method
-// is a candidate of each Namespace that declares the conformance, so naming the
-// Protocol narrows the ladder to that Protocol's rungs and leaves the ladder.
-// `5::<Orderable>isBetween(1, and 3/2)` still falls from Integer's rung to the
-// covering Number's, exactly as the unqualified call does.
-//
-// A REQUIREMENT is not reachable this way. It is written by a Namespace, and
-// that Namespace is what a specifier names; only a provided Method is the
-// Protocol's own to offer.
+// `value::<Name>method()` naming a Protocol, which settles two Protocols
+// providing one name. Every candidate of that Protocol is kept, so
+// `5::<Orderable>isBetween(1, and 3/2)` still falls to Number's. A requirement
+// is reached through the Namespace that writes it.
 function providedMethodNamespacesNamed(
 	specifier: parser.IdentifierNode,
 	methodName: string,
@@ -9491,23 +9455,16 @@ function providedMethodNamespacesNamed(
 	return named
 }
 
-// Which of the Namespaces found for a receiver actually declare the
-// Method — the written ones, a Protocol's PROVIDED ones beside them, and the
-// ONE door the derived Namespaces come through, for both the whole-Union lookup
-// and the per-member one. The derives are consulted only when the written
-// Namespaces have already come up empty, which is what makes a derive a
-// fallback rather than a competitor: a Namespace that writes its own `is` or
-// `toString` is never tied against one, so it can not be made ambiguous by it.
+// Which of the Namespaces found for a receiver declare the Method. These are
+// the written ones and the provided Methods beside them. The derives answer
+// only where nothing written does.
 export function namespacesDeclaringMethod(
 	methodName: string,
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
-	// The name a `value::<Name>method()` wrote, when it wrote one. Only
-	// the provided-Method door reads it: `namespaces` is already the answer to
-	// the specifier for every WRITTEN Namespace, and comes back empty where the
-	// name is a Protocol's, which lives in another table entirely.
+	// The `<Name>` a call wrote, read only for a Protocol's provided Methods.
 	specifier: parser.IdentifierNode | null = null,
 ): Map<string, common.NamespaceType> {
 	if (specifier !== null && namespaces.size === 0) {
@@ -9528,14 +9485,8 @@ export function namespacesDeclaringMethod(
 		}
 	}
 
-	// The derives are asked only where nothing WRITTEN answered, and a
-	// derive that answers answers alone. A derive is fabricated FOR this
-	// receiver — its `isNot` takes the whole Choice, so
-	// `Ordering#Less::isNot(#Equal)` answers — while a provided Method is one
-	// body over the conformer's own Type, which a receiver narrowed to a single
-	// Case binds to that Case, leaving no sibling Case assignable to it. Both
-	// answer the same question, so the one that answers it for every receiver
-	// goes first, and the other is not put on the ladder beside it.
+	// A derive that answers answers alone, ahead of the provided Methods: it
+	// takes the whole Choice, so `Ordering#Less::isNot(#Equal)` resolves.
 	if (matchingNamespaces.size === 0) {
 		let derived = derivedEquatableNamespace(baseType, scope, position)
 
@@ -9543,10 +9494,7 @@ export function namespacesDeclaringMethod(
 			matchingNamespaces.set(derivedEquatableNamespaceName, derived)
 		}
 
-		// The printing derive reads the Namespaces already found for the
-		// receiver, because it answers only where one of them declared
-		// `is Printable` — which is the difference between the two derives, and
-		// the reason this one takes them and the one above does not.
+		// The printing derive needs a Namespace that declared `is Printable`.
 		let printable = derivedPrintableNamespace(
 			baseType,
 			namespaces.values(),
@@ -9565,15 +9513,8 @@ export function namespacesDeclaringMethod(
 		}
 	}
 
-	// A Protocol's PROVIDED Methods stand on the specificity ladder
-	// BESIDE the written ones, one rung per Namespace that declares the
-	// conformance. That is the override rule as it really is: a Namespace
-	// writing the name replaces the provided Method on ITS OWN rung — the walk
-	// leaves that source out — and takes nothing from any other Namespace's. So
-	// `3::isLessThan(Number.Pi)` is offered Integer's written entries and the
-	// covering Number's provided one, and falls to Number's when Integer's
-	// reject the Argument, exactly as `5::compare(1/2)` falls to
-	// `Number::compare`.
+	// The provided Methods stand beside the written ones. See "Provided
+	// Methods at a call" in DEVELOPMENT.md.
 	for (let [name, namespace] of providedMethodNamespaces(
 		methodName,
 		baseType,
@@ -9587,9 +9528,8 @@ export function namespacesDeclaringMethod(
 	return matchingNamespaces
 }
 
-// The Parameter Types of a signature, carrying whatever documents each
-// Parameter. A Parameter is described either by a `§§` block of its own or by
-// the `@param` line standing at its position in the Declaration's.
+// The Parameter Types of a signature, each with its documentation: a `§§`
+// block of its own, or the `@param` line at its position.
 function resolveParameterTypes(
 	definition: {
 		parameters: Array<parser.ParameterNode>
@@ -9602,23 +9542,15 @@ function resolveParameterTypes(
 	])
 	refuseIndistinguishableDefaults(definition.parameters)
 
-	// The single choke point through which every `common.Parameter` is
-	// built — the free-Function, Protocol-signature and Namespace-Method paths
-	// all route through here — which is why `hasDefault` and `defaultMembers`
-	// are set only here. The expression itself stays on the Parameter Node; a
-	// Type only has to say what a caller may leave out.
+	// Every `common.Parameter` is built here, so `hasDefault` and
+	// `defaultMembers` are set here alone. The default itself stays on the Node.
 	return definition.parameters.map((parameter, index) => {
 		let type = resolveDeclaredType(parameter.type, scope)
 		let defaultMembers = recordDefaultMembers(type, parameter.defaultValue)
-		// Left off entirely where nothing nests, so a signature whose
-		// default reaches into nothing stays structurally the Type it was.
+		// Absent where nothing nests.
 		let defaultNesting = recordDefaultNesting(type, parameter.defaultValue)
-		// A PARTIAL Record default fills in some of its Parameter's
-		// members and leaves the rest to every caller, so the Argument is still
-		// required — which is exactly `hasDefault` being unset, and is why
-		// `pairArguments` needs no change at all: it reads labels and
-		// `hasDefault`, and `hasDefault` still means only "this Argument may be
-		// absent".
+		// A partial Record default leaves members to every caller, so the
+		// Argument stays required and `hasDefault` stays unset.
 		let isPartial =
 			defaultMembers !== null &&
 			type.type === "Record" &&
@@ -9644,35 +9576,15 @@ function resolveParameterTypes(
 	})
 }
 
-// Two entries of one `overload` block that accept the same call. An
-// entry's accepted shapes are the label sequences left when any subset of its
-// defaulted Parameters is dropped, and the clash is refused when a shape
-// reachable ONLY by omitting a default equals ANY shape of another entry.
-//
-// The "only by omitting" qualifier is what keeps every type-dispatched Overload
-// legal: `Integer.add` has four entries all of shape `(_)` and they resolve by
-// Type, exactly as they always did. The new hazard is only ever a shape that
-// did not exist before a default was written.
-//
-// Refused at the DECLARATION rather than tie-broken at the call. Selection is
-// first fit over an order that is already not source order — `overloadProbeOrder`
-// hoists the entries asking for a refinement — and layering specificity on top
-// of that produces a resolution story nobody can hold in their head. An
-// Overload's slot is also baked into its emitted name (`__overload$N`) and its
-// native binding is keyed by position, so the set is a stable enumerable thing
-// rather than a lattice. And the mistake is here: reported here it names both
-// entries and points at the `=` that caused it, reported at a call it names
-// neither.
+// Refuses a default that makes two entries of one `overload` block accept the
+// same call. See "Defaults in an Overload" in DEVELOPMENT.md.
 function refuseAmbiguousOverloadDefaults(
 	entries: Array<{
 		parameters: Array<parser.ParameterNode>
 		position: common.Position
 	}>,
 ): void {
-	// The hazard is a shape reachable ONLY by leaving something out, so an
-	// Overload block with no default anywhere has none — which is most of the
-	// standard library's blocks and every block anybody wrote before this
-	// existed. Asked first, because everything below enumerates subsets.
+	// A block without a default has no such clash.
 	if (
 		entries.length < 2 ||
 		!entries.some((entry) =>
@@ -9685,10 +9597,7 @@ function refuseAmbiguousOverloadDefaults(
 	}
 
 	let shapes = entries.map((entry) => acceptedShapes(entry.parameters))
-	// Which entries accept each shape, built once — the search below is
-	// "does any OTHER entry accept this shape", and asking it by scanning every
-	// other entry's shapes made the whole check quadratic in the number of
-	// shapes, which is itself exponential in the number of defaults.
+	// Which entries accept each shape, built once for the search.
 	let entriesByShape = new Map<string, Array<number>>()
 
 	for (let [index, entryShapes] of shapes.entries()) {
@@ -9763,23 +9672,8 @@ function refuseAmbiguousOverloadDefaults(
 	}
 }
 
-// The other half of the same hazard, and the one a PARTIAL Record default
-// opens. A partial default adds no accepted SHAPE — its Argument is still
-// written, so the label sequence is unchanged — but it widens the set of
-// Argument VALUES an entry accepts, because a Record written without the
-// members the default fills in now fits a Parameter it did not fit before. Two
-// entries of one shape that resolved by the Types of their Records can
-// therefore both come to accept one call.
-//
-// Refused on the same terms as the shape clash above: only where a value
-// is reachable ONLY by leaving a member out. Entries that already overlapped by
-// Type stay exactly as they were, which is what keeps `Integer.add`'s four
-// same-shaped entries legal — none of them carries a Record default at all.
-//
-// Asked of the RESOLVED signatures rather than of the Parameter Nodes,
-// because what a Record Parameter accepts is a question about Types. The two
-// lists are aligned from the END: a non-static Method's resolved signature is
-// prefixed with the receiver, which the source did not write.
+// Refuses a partial Record default that makes two entries of one shape
+// accept one Argument list. See "Defaults in an Overload" in DEVELOPMENT.md.
 function refuseAmbiguousPartialDefaults(
 	entries: Array<{
 		parameters: Array<parser.ParameterNode>
@@ -9849,10 +9743,8 @@ function refuseAmbiguousPartialDefaults(
 	}
 }
 
-// The Parameter position at which `left` accepts a Record it could only
-// accept through its default and `right` accepts the same one — null where no
-// single Argument list satisfies both, which is every pair that was already
-// telling itself apart.
+// The Parameter position where `left` takes a Record only through its
+// default and `right` takes it too. Null where no Argument list fits both.
 function partialDefaultClash(
 	left: Array<common.Parameter>,
 	right: Array<common.Parameter>,
@@ -9882,22 +9774,15 @@ function partialDefaultClash(
 	return needsDefault === null ? null : { index: needsDefault }
 }
 
-// Whether one Argument can answer both Parameters, and whether the LEFT
-// one needs its own default to take it.
-//
-// The candidate is the union of what each side REQUIRES — every member of a
-// Parameter with no Record default, and the members a default does not fill in
-// where there is one. Nothing smaller satisfies both, and nothing larger helps:
-// a Parameter reading a Record partially admits only members it declares, so a
-// candidate that grows past what one of them declares is refused by it.
+// Whether one Argument answers both Parameters, and whether `left` needs its
+// default for it. The Argument tried holds the members each side requires,
+// since a partial Record admits only members it declares.
 function parameterOverlap(
 	left: common.Parameter,
 	right: common.Parameter,
 ): { leftNeedsDefault: boolean } | null {
 	if (left.type.type !== "Record" || right.type.type !== "Record") {
-		// Anything else is the type dispatch an `overload` block is FOR,
-		// and is weighed only for whether some value fits both — which is what
-		// makes this pair of entries reachable by one call at all.
+		// Any other pair overlaps where some value fits both.
 		return matchesType(left.type, right.type) ||
 			matchesType(right.type, left.type)
 			? { leftNeedsDefault: false }
@@ -9915,9 +9800,8 @@ function parameterOverlap(
 		let inLeft = Object.hasOwn(leftMembers, member)
 		let inRight = Object.hasOwn(rightMembers, member)
 
-		// A member one side declares and the other reads partially can
-		// not be written at all — a partial Argument may only name members its
-		// Parameter declares — so there is no candidate and no clash.
+		// A member one side lacks while reading partially can not be
+		// written, so there is no clash.
 		if (
 			(!inLeft && left.defaultMembers !== undefined) ||
 			(!inRight && right.defaultMembers !== undefined)
@@ -9942,9 +9826,8 @@ function parameterOverlap(
 	}
 }
 
-// The members a call has to write into a Record Argument — every one
-// where the Parameter has no Record default, and the ones the default does not
-// fill in where it has.
+// The members a call must write into a Record Argument: those the default
+// does not fill in, or all of them without one.
 function requiredRecordMembers(parameter: common.Parameter): Array<string> {
 	let members = Object.keys((parameter.type as common.RecordType).members)
 
@@ -9957,17 +9840,13 @@ function requiredRecordMembers(parameter: common.Parameter): Array<string> {
 	return members.filter((member) => !filled.has(member))
 }
 
-// "'host', 'retries'" — the spelling every Diagnostic that lists members
-// uses.
+// Members spelled as Diagnostics list them: `'host', 'retries'`.
 function quotedMemberNames(names: ReadonlyArray<string>): string {
 	return names.map((name) => `'${name}'`).join(", ")
 }
 
-// Every label sequence a Parameter list accepts, keyed by the labels an
-// Argument list would carry, with the Parameters that had to be left out to
-// reach it. `2 ** defaults` sequences, which is a handful for anything anybody
-// writes; a signature carrying more defaults than the cap is left alone rather
-// than enumerated, since a set that large is not what this Diagnostic is about.
+// A signature with more defaults than this is not enumerated, since its
+// shapes number `2 ** defaults`.
 const MAXIMUM_ENUMERATED_DEFAULTS = 10
 
 function acceptedShapes(
@@ -9991,10 +9870,7 @@ function acceptedShapes(
 		let omitted = defaults.filter(
 			(_, index) => (subset & (1 << index)) !== 0,
 		)
-		// A Set, because `kept` is asked once per Parameter and the
-		// enumeration already costs `2 ** defaults` — an `includes` over the
-		// omitted list on top of that is the one part of this that grows with
-		// the signature for no reason.
+		// A Set, since it is asked once per Parameter.
 		let dropped = new Set(omitted)
 		let kept = parameters.filter((parameter) => !dropped.has(parameter))
 
@@ -10022,22 +9898,9 @@ function describeAcceptedShape(key: string): string {
 		.join(" then ")}`
 }
 
-// An Argument is paired with a Parameter by its LABEL, before any Type
-// is read — that is what lets a call's shape be worked out for every Overload
-// candidate before paying for Argument typing, and what keeps Completion able
-// to offer labels for a call that is still half written. Defaults turn that
-// exact pairing into a subsequence pairing: walk both lists left to right,
-// consume the Argument when the labels agree, skip the Parameter when it has a
-// default. That greedy walk finds a valid pairing whenever one exists exactly
-// when no defaulted Parameter is followed by a Parameter carrying the same
-// label — so this is the rule that makes it complete, and with it there is
-// nothing to search and nothing to backtrack.
-//
-// Every unlabelled Parameter carries the same label — none — so an unlabelled
-// Parameter with a default may not be followed by any other unlabelled one.
-// This is deliberately NOT the trailing-run rule: `(_ a: Integer, _ b: Integer
-// = 2, to x: Integer)` is perfectly unambiguous, and `(to a: Integer = 1, to b:
-// Integer)` is not, and the trailing-run rule gets both of those backwards.
+// Refuses a default followed by a Parameter of the same label, so pairing
+// Arguments by label never backtracks. See "Defaults and Argument pairing" in
+// DEVELOPMENT.md.
 function refuseIndistinguishableDefaults(
 	parameters: Array<parser.ParameterNode>,
 ): void {
@@ -10080,34 +9943,17 @@ function refuseIndistinguishableDefaults(
 	}
 }
 
-// A `@param` line documents the Parameter at its OWN POSITION: the first
-// line documents the first Parameter, the second the second, and the name it
-// writes is the name the signature writes for that Parameter — its label, or
-// `_` where it carries none. A line that names something else describes a
-// Parameter the reader then goes looking for and cannot find, which is the
-// failure mode a rename leaves behind. The Warning is what makes it visible;
-// the rendering is unchanged, since dropping the section would take the text
-// away from the one person who can still fix it.
-//
-// Position rather than name, because a name is not enough to tell a `_` from
-// another `_`, and because the order of the lines is then the order of the
-// signature — the one arrangement a reader can check by looking.
-//
-// `signatures` is a list rather than one Parameter list because a `§§` block
-// above an `overload` keyword documents the set as a whole. Position means
-// nothing across a set whose entries take different Parameters, so such a block
-// is held to the older rule: a name any one of its Overloads takes is a name
-// that exists. Each Overload's own block is checked against its own Parameters,
-// by position.
+// Warns where a `@param` line does not name the Parameter at its position by
+// its label, or `_`. Position tells one `_` from another. A block above an
+// `overload` keyword instead accepts any name one of its entries takes.
 export function reportDocumentationParameters(
 	documentation: common.Documentation | null | undefined,
 	signatures: Array<Array<parser.ParameterNode>>,
 ): void {
 	let tags = documentation?.parameters ?? []
 
-	// Nothing to point at: a block that writes no `@param`, a builtin
-	// Namespace that documents itself in TypeScript, or a Documentation already
-	// attached to a resolved signature, whose tag Positions are gone.
+	// No tag Position to point at, as in a block without `@param` or a
+	// resolved signature's Documentation.
 	if (!tags.some((tag) => tag.tag !== undefined)) {
 		return
 	}
@@ -10121,30 +9967,16 @@ export function reportDocumentationParameters(
 	reportUnknownDocumentationNames(tags, signatures)
 }
 
-// How closely a `§§` block's `@param` lines are held to the signature.
-//
-// `"strict"` is the rule as written: one line per Parameter, in order, each
-// naming its Parameter the way the signature writes it. `"lenient"` accepts two
-// things besides — a run that stops before the last Parameter, and a line
-// naming a Parameter's INTERNAL name where the signature gives it a label.
-//
-// `"strict"` is what every Program is held to, the standard library's own tags
-// included. `"lenient"` stays as the named alternative
-// `documentationParameterProblems` can be asked for, which is how
-// `documentation.spec.ts` reads each half of the rule on its own.
-//
-// A block writing NO `@param` at all is left alone in both modes. It documents
-// the Declaration as a whole, which is what most of them do; asking for a line
-// per Parameter everywhere is the next notch to tighten, and it belongs beside
-// the `undocumented` walk below.
+// How closely `@param` lines are held to the signature. `"strict"` wants one
+// line per Parameter, in order, named as the signature writes it.
+// `"lenient"` also accepts a run that stops early, and an internal name where
+// there is a label. A block without `@param` is left alone in both.
 type DocumentationStrictness = "lenient" | "strict"
 
 export const documentationStrictness: DocumentationStrictness = "strict"
 
-// The two names a Parameter can be written under, as the rule sees them:
-// the label a call site writes, and the name the body reads it under. Either
-// can be absent — a positional Parameter has no label, and a Parameter taken
-// apart by a Pattern has no single internal name.
+// A Parameter's label and the name its body reads it under. A positional
+// Parameter has no label, and a Pattern Parameter no single internal name.
 export type DocumentedParameter = {
 	label: string | null
 	internalName: string | null
@@ -10158,8 +9990,7 @@ type DocumentationParameterProblem =
 	// A Parameter no line reached. Strict only.
 	| { kind: "undocumented"; index: number }
 
-// The rule itself, as a pure function of the two lists, so that both
-// strictnesses can be read and tested without a Program around them.
+// The rule as a pure function, so both strictnesses can be tested alone.
 export function documentationParameterProblems(
 	tags: Array<string>,
 	parameters: Array<DocumentedParameter>,
@@ -10202,14 +10033,13 @@ function namesParameter(
 	)
 }
 
-// What the signature writes for a Parameter, which is what its `@param`
-// writes too — the label, or `_` where there is none.
+// What the signature and its `@param` write for a Parameter: the label, or
+// `_`.
 function writtenParameterName(parameter: DocumentedParameter): string {
 	return parameter.label ?? "_"
 }
 
-// What a reader is shown in place of a bare `_`: the name the body reads
-// the Parameter under, which is the only name a positional Parameter has.
+// What a reader is shown in place of `_`: the internal name.
 function displayParameterName(parameter: DocumentedParameter): string {
 	return parameter.label ?? parameter.internalName ?? "_"
 }
@@ -10226,12 +10056,9 @@ function documentedParameter(
 const positionalRule =
 	"A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none."
 
-// The line a Quick Fix would write, for the ONE Parameter that has a
-// place to write it: the first the run falls short of. The lines document
-// Parameters by position, so a line for the Parameter below that one would
-// leave a hole above it — and writing the one above puts it back in reach on
-// the next analysis. Spread rather than assigned, for `suggestionData`'s
-// reason.
+// The line a Quick Fix would write, only for the first Parameter the run
+// falls short of, since a later line would leave a gap. Spread as
+// `suggestionData` is.
 function documentationLineData(
 	tags: Array<common.DocumentationParameter>,
 	parameter: string,
@@ -10266,15 +10093,8 @@ function reportPositionalDocumentation(
 	for (let problem of problems) {
 		if (problem.kind === "undocumented") {
 			let parameter = signature[problem.index]!
-			// Where this Parameter's name is ALREADY written on the run,
-			// at a line that documents another Parameter, the two reports on
-			// this block are one missing line seen from both ends — and the
-			// order they are answered in shows. Writing this line first leaves
-			// the name standing twice until the misnamed one is put right, and
-			// nothing said so: a reader who took the Quick Fix on this report
-			// alone was left looking at two '@param by' lines. The order is what
-			// this says, so that either way round reads as a sequence rather
-			// than as a fix that half worked.
+			// Where the name is already on another Parameter's line, both
+			// reports describe one missing line. The Note says which to fix first.
 			let alreadyWritten = tags.findIndex(
 				(tag) => tag.name === written[problem.index],
 			)
@@ -10313,9 +10133,7 @@ function reportPositionalDocumentation(
 
 		let tag = tags[problem.index]
 
-		// A tag Position is what these two underline, so a block whose
-		// Positions were stripped is skipped rather than reported against the
-		// Declaration it documents.
+		// A tag without a Position is skipped.
 		if (tag?.tag === undefined) {
 			continue
 		}
@@ -10355,9 +10173,7 @@ function reportPositionalDocumentation(
 		let elsewhere = written.indexOf(tag.name)
 		let notes = [positionalRule, ...order]
 
-		// The common shape of the mistake is a line left out rather than
-		// a name misspelled: the lines describe the second Parameter first,
-		// because the first one was never written about.
+		// Usually a line was left out, so the lines run one Parameter late.
 		if (elsewhere !== -1 && elsewhere !== problem.index) {
 			notes.push(
 				`'${tag.name}' is Parameter ${elsewhere + 1}, so a line for each Parameter before it belongs above this one.`,
@@ -10369,9 +10185,7 @@ function reportPositionalDocumentation(
 			tag.tag.position,
 			{
 				code: "misnamed-documentation-parameter",
-				// What the signature WRITES for the Parameter rather than
-				// what a reader is shown for it — the fix rewrites the tag, and
-				// a tag names a Parameter by its label or by `_`.
+				// The fix writes the name a tag uses: the label, or `_`.
 				...suggestionData(written[problem.index]!),
 				labels: [
 					primary(
@@ -10390,9 +10204,8 @@ function reportPositionalDocumentation(
 	}
 }
 
-// A `§§` block above an `overload` keyword, where position says nothing.
-// A name any Overload of the set takes is a name that exists; anything else is
-// a description of a Parameter no entry has.
+// A `§§` block above an `overload` keyword, where position says nothing. A
+// name some entry takes is accepted.
 function reportUnknownDocumentationNames(
 	tags: Array<common.DocumentationParameter>,
 	signatures: Array<Array<parser.ParameterNode>>,
@@ -10452,9 +10265,8 @@ function reportUnknownDocumentationNames(
 	}
 }
 
-// What documents ONE Parameter: its own `§§` block where it carries one,
-// and otherwise the `@param` line standing at its position in the enclosing
-// block.
+// What documents one Parameter: its own `§§` block, else the `@param` line
+// at its position.
 export function parameterDocumentation(
 	parameter: parser.ParameterNode,
 	documentation: common.Documentation | null,
@@ -10467,17 +10279,9 @@ export function parameterDocumentation(
 	return documentation?.parameters[index]?.text
 }
 
-// The Documentation a resolved signature hands out. Each `@param` is
-// renamed to what the signature shows for the Parameter it stands at — the
-// label, or the internal name where the Parameter is positional — so that a
-// Hover reads `**other** — …` rather than the bare `_` the line was written
-// with.
-//
-// A COPY, because the Parser's Node keeps what was written: the Formatter
-// compares two ASTs for the one thing formatting may change, and a
-// Documentation rewritten in place would no longer be the one the file holds.
-// The tag Positions go with it — they exist to underline a line while it is
-// being reported, which has already happened by the time a signature resolves.
+// The Documentation a resolved signature hands out, each `@param` renamed to
+// the label or internal name, so Hover shows no bare `_`. A copy, since the
+// formatter compares the parsed Documentation. The tag Positions are dropped.
 export function resolvedDocumentation(
 	documentation: common.Documentation | null | undefined,
 	parameters: Array<parser.ParameterNode>,
@@ -10502,30 +10306,9 @@ export function resolvedDocumentation(
 	}
 }
 
-// One Method form's `<…>` read apart: the Type Parameters it declares for
-// ITSELF, and the BOUNDS it puts on Parameters the Namespace already declared.
-//
-// `differing<Item is Equatable>()` inside a `namespace Pairing<infer Item>` does
-// not introduce a second `Item`. There is one `Item`, the Namespace's, worked
-// out from the receiver at every call; what the Method writes is a REQUIREMENT
-// on it, for this Method alone. So the entry leaves the Method's own Generics
-// and becomes a bound woven in beside the ones a conditional conformance's
-// `where` contributes — same three views, same hidden conformance Parameter,
-// same witness. A name that is NOT one of the Namespace's stays an ordinary
-// Method Type Parameter and is untouched.
-//
-// Two spellings are refused rather than read, by `refuseMalformedMethodBounds`,
-// and neither leaves a second `Item` behind for anything downstream to see:
-//
-//   • `differing<Item>()`, with no bound at all, could only ever shadow — the
-//     entry is not `infer`, so nothing can bind it, and the Method became
-//     uncallable in silence. Dropped.
-//   • `differing<infer Item is Equatable>()`, which RESTATES what the Namespace
-//     already said. It is read as the bound it plainly means, so one mistake
-//     gives one Diagnostic rather than a cascade, and the Help drops the word.
-//     This spelling used to be the only one that worked, by declaring a second
-//     `Item` the receiver bound: two spellings for one meaning, and the one that
-//     reads like a declaration won. The standard library was converted with it.
+// One Method form's `<…>` read apart: its own Type Parameters, and the bounds
+// it puts on the Namespace's. See "Method bounds on Namespace Type Parameters"
+// in DEVELOPMENT.md.
 export type MethodGenericSplit = {
 	own: Array<parser.GenericDeclarationNode>
 	bounds: Map<string, string>
@@ -10557,7 +10340,7 @@ export function splitMethodGenerics(
 
 		let protocol = resolveWrittenProtocol(generic.constraint, scope)
 
-		// Refused as a Method's own bound is, and not carried either.
+		// Refused and not carried, as a Method's own bound is.
 		if (protocol === null) {
 			reportUnknownProtocol(generic.constraint, scope)
 		} else {
@@ -10568,25 +10351,10 @@ export function splitMethodGenerics(
 	return { own, bounds }
 }
 
-// Which Namespace Generics belong on one Method signature, ahead of the
-// Method's own, so that the signature is self-contained for inference and the
-// receiver Argument re-binds them at every invocation. A Namespace Generic is
-// merged in when the resolved signature — the injected `self` Parameter, the
-// declared Parameters and the return Type — mentions it, or when the Method
-// BOUNDS it: a Generic nothing in the signature names and nothing requires
-// could never be bound by inference at a call site, so carrying it would leave
-// a phantom Type Parameter (and a hidden conformance Parameter with nothing to
-// prove it). A bounded one is retained whatever the signature mentions, because
-// its witness is passed at every call and the emitted arity has to agree; where
-// nothing can bind it the call reports that, which is the honest answer rather
-// than a silently dropped requirement.
-//
-// A Method Generic of the same name no longer shadows — `splitMethodGenerics`
-// has already taken those entries out, so what arrives here declares names the
-// Namespace does not.
-// The retained Namespace Generics keep their declaration order and LEAD the
-// Method's own, because hidden conformance Parameters, witness Arguments and
-// `boundConformance` conditions are all emitted in that order.
+// The Namespace Type Parameters one Method signature carries, ahead of its
+// own and in declaration order: those the signature mentions, and every
+// bounded one. See "Method bounds on Namespace Type Parameters" in
+// DEVELOPMENT.md.
 function mergeNamespaceGenerics(
 	namespaceGenerics: Array<common.GenericDeclaration>,
 	methodGenerics: Array<common.GenericDeclaration>,
@@ -10628,12 +10396,8 @@ function mergeNamespaceGenerics(
 	return [...used, ...methodGenerics]
 }
 
-// One signature of a Namespace Method, in the shape resolution actually
-// reads. A bodied Method and a body-less native signature differ only in
-// whether a block follows — everything the Method's *Type* is made of
-// (Generics, Parameters, return Type, documentation) is written the same way
-// in both — so both are read through this and the resolution below never forks
-// on nativeness.
+// One signature of a Namespace Method, bodied or native, in the shape
+// resolution reads.
 type MethodSignatureEntry = {
 	generics: Array<parser.GenericDeclarationNode>
 	parameters: Array<parser.ParameterNode>
@@ -10662,18 +10426,15 @@ function methodSignatureEntry(
 		parameters: node.value.parameters,
 		returnType: node.value.returnType,
 		documentation: node.value.documentation,
-		// The FunctionValue's Position, not the Definition's — it is what
-		// the bodied path has always pointed its Diagnostics at.
+		// The FunctionValue's Position, where Diagnostics point.
 		position: node.position,
 		native: false,
 	}
 }
 
-// A Namespace Method reduced to the four shapes resolution
-// distinguishes, with bodied and native entries already flattened into one
-// list. An Overload block may MIX the two, so the list is per entry and keeps
-// the WRITTEN ORDER — the index of an Overload is load-bearing, it picks the
-// `__overload$N` name the Simplifier emits and the runtime export it binds to.
+// A Namespace Method reduced to the shapes resolution distinguishes, its
+// bodied and native entries in written order, which picks each
+// `__overload$N` name.
 type NormalizedMethod = {
 	kind: common.MethodType["type"]
 	// Exactly one entry for the two non-overloaded forms.
@@ -10727,11 +10488,8 @@ function normalizeMethod(
 	}
 }
 
-// Every form of one Namespace Method read apart, in WRITTEN ORDER — one
-// entry for a non-overloaded Method, one per Overload otherwise. The index is
-// load-bearing everywhere the three views of a Method's Type Parameters are
-// kept in step, so the splits are produced once, here, from the same
-// normalisation resolution reads.
+// Every form of one Namespace Method read apart, in written order. The index
+// keeps the views of its Type Parameters in step.
 export function methodGenericSplits(
 	node: parser.NamespaceMethods[string],
 	namespaceGenerics: Array<common.GenericDeclaration>,
@@ -10742,11 +10500,8 @@ export function methodGenericSplits(
 	)
 }
 
-// Which entries of a Namespace Method are bound to the runtime rather
-// than implemented in Essence, in written order — one flag for a
-// non-overloaded Method, one per Overload otherwise. The standard library
-// loader records these so that the runtime-export check knows which Methods it
-// must find an implementation for, and which must NOT have one.
+// Which entries of a Namespace Method are native, in written order, for the
+// standard library loader.
 export function nativeMethodEntries(
 	node: parser.NamespaceMethods[string],
 ): Array<boolean> {
@@ -10807,23 +10562,15 @@ export function resolveMethodType(
 		selfType = { type: "Error" }
 	}
 
-	// The receiver Parameter every non-static signature is prefixed with.
-	// Null exactly when the Method is static, which is when it is not injected.
+	// The receiver Parameter, null for a static Method.
 	const receiverType: common.Type | null = isStatic ? null : selfType
 
-	// Resolved per entry — Overloads differ in what they mention, so each
-	// gets the Namespace Generics its own signature actually uses. The Generics
-	// are resolved BEFORE the signature, as the object literal this replaced
-	// did: both report Diagnostics, and they are reported in the order the
-	// Method reads.
+	// Per entry, since Overloads mention different Type Parameters. The Type
+	// Parameters resolve before the signature, the order the Method reads.
 	let resolveEntry = (entry: MethodSignatureEntry) => {
-		// The entries that BOUND one of the Namespace's own Parameters are
-		// not Type Parameters of this Method and must not be registered as such:
-		// registered, the name would be a fresh opaque Generic in the signature's
-		// Scope, and the receiver Type — written in the Namespace's `Item` —
-		// would stop matching it. The bound reaches the same Parameter through
-		// `mergeNamespaceGenerics` instead, where it lands on the Namespace's
-		// entry and is carried into the one place the Rewriter reads.
+		// An entry bounding a Namespace Type Parameter is no Type Parameter
+		// of the Method, or the receiver's `Item` would stop matching. The
+		// bound arrives through `mergeNamespaceGenerics`.
 		let split = splitMethodGenerics(
 			entry.generics,
 			namespaceGenerics,
