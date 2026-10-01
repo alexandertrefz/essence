@@ -11,9 +11,8 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The same stages the CLI runs, minus bundling — what a body that falls
-// off its end answers is only visible once the emitted Function RUNS, so these
-// go all the way through.
+// The stages the CLI runs, minus bundling, since what a body that falls off
+// its end answers shows only when the emitted Function runs.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -27,10 +26,8 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// Writes the emitted Program to a throwaway module and imports it so its
-// top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
-// this repo's runtime, so the module resolves from anywhere; `console.log` is
-// captured to collect the output, then restored.
+// Imports the emitted Program from a throwaway module, which resolves because
+// its imports are absolute paths into this repository's runtime.
 async function run(source: string): Promise<Array<string>> {
 	let js = generate(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-return-"))
@@ -55,15 +52,8 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// Regression tests — a body promising unit, the empty Record `{}`, is
-// allowed to fall off its end, and the emitted JavaScript Function then
-// answered `undefined`. That is not an Essence value: it carries no hidden Type
-// key, so the failure surfaced somewhere else entirely, in whatever read that
-// key next — printing the result, holding it in a Record, or matching on it all
-// died with a `TypeError` naming the runtime's internals, out of a Program that
-// compiled with zero Diagnostics. What the Simplifier appends is the empty
-// Record the Signature promised, so every one of those reads finds a real
-// value.
+// A body promising the unit Type `{}` may fall off its end. The Simplifier
+// appends a Return of `{}`, since `undefined` is no Essence value.
 describe("Return Synthesis", () => {
 	describe("a Function body that falls off its end", () => {
 		it("answers the unit Record its Signature promised", async () => {
@@ -111,11 +101,8 @@ describe("Return Synthesis", () => {
 		})
 	})
 
-	// A Handler body is under the same rule for the same reason — it is
-	// lowered to a Function of its own, and the emitted `if` chain's value is
-	// the Match's value. The Union being matched on is `Integer | String`
-	// because a Match needs something to narrow at all; the Handlers' own
-	// Return Type is what this pins.
+	// A Handler body is lowered to a Function of its own, so the same rule
+	// holds there.
 	it("answers unit for a Handler that writes no Return", async () => {
 		expect(
 			await run(`implementation {
@@ -131,9 +118,7 @@ describe("Return Synthesis", () => {
 		).toEqual(["{}"])
 	})
 
-	// The synthesised Return is appended only where one is missing —
-	// a body that already ends in `<- {}` must not grow a second, unreachable
-	// one behind it.
+	// A body that already ends in `<- {}` gets no second Return.
 	it("leaves a body that returns explicitly alone", () => {
 		let generated = generate(`implementation {
 			function explicit () -> {} {

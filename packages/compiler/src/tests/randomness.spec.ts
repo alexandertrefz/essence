@@ -14,19 +14,15 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The Namespace a Program could not reach until `entropy()` and
-// `seeded(_)` were declared, tested by running Programs that build a source and
-// draw from it. `packages/runtime/src/tests/randomness.spec.ts` drives the
-// natives directly and is where a draw's range, exactness and replay are
-// pinned; what is checked here is the half only a compiled Program shows: that
-// the two statics resolve on a Namespace targeting a primitive Type, that a
-// seed replays through the whole pipeline, and that no pass pools or hoists a
-// draw.
+// `Randomness` in compiled Programs.
+// `packages/runtime/src/tests/randomness.spec.ts` pins a draw's range,
+// exactness and replay against the natives. Here the statics resolve on a
+// Namespace targeting a primitive Type. A seed replays through the whole
+// pipeline, and no pass pools or hoists a draw.
 //
-// Every assertion over a drawn value is about a RANGE or a replay, never
-// about a number, so nothing here is pinned to the generator's own words. A
-// seeded draw is the same draw at every run, so only the two tests over
-// `entropy()` can miss at all, and the odds are written beside each.
+// Every assertion over a drawn value is about a range or a replay, never a
+// number. A seeded draw is the same at every run, so only tests over
+// `entropy()` can miss, and the odds are written beside each.
 
 function compile(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -43,10 +39,8 @@ function compile(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// The lines a Program printed, in order. `Terminal.print` adds its
-// newline in Essence and hands the text to `Terminal.write`, which reaches
-// `process.stdout.write` on a host with streams — so that is what is
-// intercepted here, as `terminal.spec.ts` intercepts it.
+// The lines a Program printed. `Terminal.print` reaches
+// `process.stdout.write` through `Terminal.write`, so that is intercepted.
 async function linesOf(source: string): Promise<Array<string>> {
 	let javaScript = compile(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-randomness-"))
@@ -73,14 +67,9 @@ async function linesOf(source: string): Promise<Array<string>> {
 	return written.split("\n").slice(0, -1)
 }
 
-// A `for any` run of the Program's own `tests { … }` section, driven
-// through the loaded program's OWN `$tests` for the reason
-// `testingProperties.spec.ts` states: every Essence value carries a hidden Type
-// key belonging to the runtime instance that built it.
-//
-// What comes back is every test's outcome and its name, rather than the
-// failures alone. A list of failures is empty when a property held and empty
-// again when nothing ran at all, and the two are the same reading.
+// A `for any` run of the Program's own `tests { … }` section, through its own
+// `$tests`. Every value carries a Type key of the runtime that built it. It
+// answers every outcome, since an empty list of failures can mean none ran.
 type Loaded = { $tests: typeof entryPoints }
 
 async function outcomesOf(source: string): Promise<Array<string>> {
@@ -172,10 +161,8 @@ describe("Randomness", () => {
 			expect(lines[0]).not.toBe(lines[1] as string)
 		})
 
-		// The rule the `§§` block states, run: a source is carried by
-		// hand, and every draw off the one it is handed advances it. So the
-		// items of a mapped List are drawn one after the other rather than
-		// being one draw repeated.
+		// Every draw advances the source it is handed, so a mapped List's
+		// items are separate draws.
 		it("draws once for each item of a mapped List", async () => {
 			let lines = await linesOf(`implementation {
 				constant source = Randomness.seeded("beef")
@@ -206,11 +193,9 @@ describe("Randomness", () => {
 			expect(lines[0]).toBe("true")
 		})
 
-		// What the purity table decides, seen from the emitted Program.
-		// `Randomness` has no entry in it — the table is an allowlist
-		// (`packages/compiler/src/optimiser/purity.ts`) — so no pass pools the
-		// two Argument-identical draws into one const, hoists either out, or
-		// drops the second. Both stand in the emitted expression.
+		// `Randomness` is not on the purity allowlist in
+		// `packages/compiler/src/optimiser/purity.ts`, so no pass pools, hoists
+		// or drops either draw.
 		it("emits both draws of one expression", () => {
 			let javaScript = compile(`implementation {
 				Terminal.print(
@@ -226,9 +211,8 @@ describe("Randomness", () => {
 			expect(javaScript.split("Randomness.entropy()").length).toBe(3)
 		})
 
-		// The same again, run rather than read: two draws of the emitted
-		// expression answer two values. A span of 10^15 answers the same number
-		// twice with odds of one in 10^15.
+		// Run rather than read. Two draws over a span of 10^15 agree with odds
+		// of one in 10^15.
 		it("answers two values for two draws in one expression", async () => {
 			let lines = await linesOf(`implementation {
 				constant source = Randomness.entropy()
@@ -332,10 +316,8 @@ describe("Randomness", () => {
 			expect(lines[1]).toBe('["Lions", "Tigers", "Bears", "Wolves"]')
 		})
 
-		// The proven entries, reached by a written Argument the Compiler
-		// read the proof off. The two annotations are the whole assertion: a
-		// bare `List<Integer>` is refused where a `NonEmptyList<Integer>` is
-		// declared, so a run that compiles is a run that reached them.
+		// The annotations are the assertion: a bare `List<Integer>` is refused
+		// where a `NonEmptyList<Integer>` is declared.
 		it("carries a proof through the shuffle and the counted pick", async () => {
 			let lines = await linesOf(`implementation {
 				constant source = Randomness.seeded("beef")
@@ -351,10 +333,8 @@ describe("Randomness", () => {
 		})
 	})
 
-	// The two promises a draw makes over EVERY input rather than over the
-	// ones a case happened to write down: a drawn number is inside the range
-	// whichever way round the bounds were given, and one seed answers one
-	// sequence whatever the seed says.
+	// For every input, a drawn number lands in the range whichever way round
+	// the bounds are given, and one seed answers one sequence.
 	describe("properties", () => {
 		it("draws inside the range for any pair of bounds", async () => {
 			expect(

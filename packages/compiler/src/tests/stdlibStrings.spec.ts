@@ -11,12 +11,10 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The String Methods written in Essence on the native searches —
-// `contains`, `doesNotContain`, `replaceFirst` — and `pad`, run through the
-// whole pipeline as `stdlibSearch.spec.ts` runs its Lists. What these guard
-// is not observable at the Type level: an ASCII String and a String the scan
-// refuses take two different routes through the runtime, and every answer
-// below is asked over both, so that the two routes are held to one answer.
+// The String Methods written in Essence on the native searches, `contains`,
+// `doesNotContain` and `replaceFirst`, and `pad`, run as `stdlibSearch.spec.ts`
+// runs its Lists. An ASCII String and one the ASCII scan refuses take two
+// routes through the runtime, and every question is asked over both.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -54,10 +52,9 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// A four-person family emoji — eleven code units joined by zero-width
-// joiners, ONE character — spliced into the source so that the same question
-// can be asked of a String the ASCII scan refuses. The Lexer knows no `\u`
-// escape, so the JavaScript String carries the code points in.
+// A family emoji, eleven code units joined by zero-width joiners, is one
+// character. It is spliced into the sources as a String the ASCII scan
+// refuses.
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
 
 describe("Stdlib String bodies", () => {
@@ -85,9 +82,8 @@ describe("Stdlib String bodies", () => {
 		})
 	})
 
-	// The one rule for the empty part, stated once above `contains` in
-	// `String.es` and answered by five entries: it matches nowhere, except as a
-	// position at either end.
+	// The rule `String.es` states for the empty part: it matches nowhere,
+	// except as a position at either end.
 	describe("the empty part", () => {
 		it("is a position at either end and an occurrence nowhere", async () => {
 			expect(
@@ -146,9 +142,7 @@ describe("Stdlib String bodies", () => {
 			).toEqual(['"b-a-a"', '"a-abc"', '"abxyz"', '""', '"abc"', '"abc"'])
 		})
 
-		// The two cuts are by grapheme, so a replacement beside a joined
-		// emoji lands beside the whole of it, and a part that is one is cut
-		// out whole.
+		// The cuts are by grapheme, so a joined emoji is never split.
 		it("cuts by grapheme when a side is not ASCII", async () => {
 			expect(
 				await run(`implementation {
@@ -167,9 +161,8 @@ describe("Stdlib String bodies", () => {
 	})
 
 	describe("String.pad(to:with:at:)", () => {
-		// A padding of several characters is repeated one copy past the
-		// whole copies that fit and then cut to what is needed, so the cut
-		// lands inside a copy wherever the shortfall is not a multiple.
+		// A padding of several characters is repeated and then cut to length,
+		// so the cut can land inside a copy.
 		it("cuts a multi-character padding to the length needed", async () => {
 			expect(
 				await run(`implementation {
