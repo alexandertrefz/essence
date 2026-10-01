@@ -52,3 +52,78 @@ holds.
 `BRIDGE_KEY` names the bridge in the compiler's cache key, since a bundle with the bridge and one without are
 different bytes from the same sources. The doors are not in the key: which a bundle gets follows from its sources,
 which the key already stands for.
+
+## Descriptors
+
+`describe.ts` is the compile-time half of the boundary between Essence and JavaScript, and the only half that
+knows what a `common.Type` is. It writes a Descriptor, plain JSON that `@essence-lang/client`'s `marshal-runtime`
+interprets without ever meeting a Type. It lives in the compiler because the client and `build --embed` both
+write Descriptors, and only the client has the client.
+
+The split follows where each decision can be made. Resolving an Alias, unwrapping a refinement, spelling a Case's
+tag and printing a Type for an Error are all decided once, at build time. Whether a value
+fits can only be decided when the value is in hand. So a browser serving a marshalled Module needs no compiler.
+
+Nothing is decided on both sides. A rule lives on one side and the other reads its answer. Case tags are baked
+here because `emittedIdentity` is the Rewriter's. A value built with a tag and the emitted `match` reading it
+agree by construction. Every node carries `shown`, the Type as `printType` writes it, so a refusal names a Type
+the same way on both sides. `shown` drops Record Alias names at every depth, since its reader is a JavaScript
+author who was never handed `Standing`. A generated `.d.ts` still prints the name wherever the Module exports
+one, since its naming table is keyed by this spelling.
+
+### Shapes
+
+There is no node for a refinement or an Alias. A refined value is built against its base, and the predicate is not
+run at the boundary. An applied Alias is already substituted on an Export Surface, so an unapplied one ends at a
+`GenericUse`, which describes as a refusal. Exactly the pair of `Optional`'s two Cases collapses to an `optional`
+node, which JavaScript spells `T | undefined`. A Union offering `Optional` beside other arms still decides arm by
+arm in written order. An Overload set or a Namespace has no one signature, so either describes as a refusal. A
+Type that reaches itself describes as a refusal too, so a Descriptor is a tree, and walks over it need no visited
+set.
+
+A Dictionary crosses as a `Map`, the one JavaScript shape holding an entry per key of any kind, in insertion
+order. The store, its generation stamp and the key encoding are not described. The runtime's
+`createDictionaryFrom` builds one and `liveEntriesOf` reads one, both reached through the bridge. A `Map` tells
+keys apart by `===` and a Dictionary by the key Type's `is`. Where they disagree, the boundary refuses: two `Map`
+entries that are one key going in, two keys that are one JavaScript value coming out. The boundary builds with the
+standard library's equality, so it can not see an `is` a Namespace wrote for the key Type.
+
+A Future and a Started cross as a `Promise` of their value, and only as an answer. That position rule is the
+marshaller's, since it is about where a value stands. A Future is started to be read, and a Started is only waited
+for.
+
+### Members and Cases
+
+`optional` on a member or a Parameter is omitted when false, and absence reads as required, so a Descriptor
+without the flag keeps its meaning. A member is a node of its own because whether it may be left out is a fact
+about its position, not its Type. A Record Parameter's omittable members are marked on that Parameter's
+Descriptor alone, since the callee fills them in. A Case payload's members carry a `fill` as well. A Case is built
+where it is written, here by the host, so the default's value crosses with the Type.
+A payload default is always a literal, so `Fill` holds it as data. Integers and Rationals are decimal text, since
+JSON holds no bigint.
+
+`unitChoice` is all or nothing per Choice. A Choice whose every Case has an empty payload is spelled by bare Case
+names on the JavaScript side. A Choice mixing payloads keeps the object form for every Case, so a host never
+tells two spellings of one Choice apart by `typeof`. The Enricher stamps the answer at the declaration, since it
+is about a Case's siblings. `Optional` is compared by whole identity and is spelled by absence, so a Module's own
+`choice Optional` is a Choice like any other.
+
+### Modules
+
+`describeModule` decides by an export's Type, not its `kind`: a `type Rectangle` sharing its name with
+`namespace Rectangle` is exported as a type but binds a Namespace. A Choice binds nothing, since its Cases are
+erased Types, so the Descriptor offers one constructor per Case. Where the Module also exports a Namespace of
+that name, the constructors join it. Where it exports another value of that name, the value wins. Constructors
+are offered only under the Choice's own name, not an Alias' or an `as` name.
+
+An Overload set binds a refusal under its name, listing each Overload as `name__overload$N`, the names the bundle
+binds. A Namespace's Overload is bound under the bare Method name and printed under the qualified one. Namespace
+members are keyed as written, and `namespaceMemberName` mangles only `prototype` and `constructor`, which a class
+refuses as static members. An instance Method's receiver is already its first Parameter on the Export Surface.
+
+`describeTypes` lists declared Types and Protocols in export order, kept beside the `ModuleDescriptor` because
+nothing at run time reads a Type Alias. `carriesDictionary` and `carriesFuture` ask both, since a Dictionary in an
+exported `type` reaches a host through the declaration file. The answer is derived each time rather than stored in
+a sidecar, where it could go stale. `carriesFuture` asks every position, not only answers: the marshaller writes
+its refusals from the Descriptor, so a door it does not need changes nothing. `reaches` names every Descriptor kind
+in its `switch`, so a new kind must be answered there.

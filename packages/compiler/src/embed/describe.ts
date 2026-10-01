@@ -15,143 +15,64 @@ import {
 	namespaceMemberName,
 } from "../rewriter/index"
 
-// The COMPILE-TIME half of the boundary between Essence and JavaScript —
-// the only half that knows what a `common.Type` is. Everything here reads the
-// Compiler's own vocabulary once and writes down what it found: a Descriptor,
-// which is plain JSON, which an interpreter marshals by without ever meeting a
-// Type. `@essence-lang/client`'s `marshal-runtime` is that interpreter, and this
-// is the whole of what it has to be told.
-//
-// It lives in the COMPILER rather than beside the interpreter because
-// there are two things that write a Descriptor and neither may depend on the
-// other: the client, which describes a Module it has just compiled in memory,
-// and `esc build --embed`, which writes one beside a bundle for a host to load
-// later. Both have the Compiler; only one of them has the client.
-//
-// The seam is where the two costs part. Resolving an Alias, unwrapping a
-// refinement to its base, spelling a Case's tag the way the bundle spells it and
-// printing a Type for an Error to name are all decisions that can be made ONCE,
-// on a machine that has the Compiler; deciding whether the value in hand fits can
-// only be made when the value is in hand. Before the seam the two were one
-// function, so serving a marshalled Module out of a bundler would have meant
-// shipping the Compiler to a browser to describe an `Optional<Integer>` — and the
-// describing had been over since the build.
-//
-// Nothing here decides anything the interpreter also decides. Where both
-// halves would have to know a rule, the rule lives on ONE side and the other
-// reads its answer: the tags are baked here because `emittedIdentity` is the
-// Compiler's, and the wording of every refusal a Type can be named in is written
-// here because `printType` is. A second copy of either is the only way the two
-// could ever come to disagree.
+// The compile-time half of the boundary between Essence and JavaScript: Types
+// described as plain JSON for the client's marshaller. See "Descriptors" in
+// DEVELOPMENT.md.
 
 // #region The Descriptor
 
-// A Type as the interpreter needs it, and NOTHING else — closed, and JSON
-// all the way down, so that it survives being written beside a bundle, embedded
-// in a generated Module or handed across a wire. Every node carries `shown`: the
-// Type as `printType` writes it, which is what an Error names when a value does
-// not fit. That string is the only reason a refusal reads the same on both sides
-// of the seam.
-//
-// There is no node for a refinement or for an Alias. Marshalling never had
-// a rule for either — a refined Type is built against its base and an applied
-// Alias is already substituted — so describing unwraps them rather than carrying
-// a shape the interpreter would have to unwrap again.
+// A Type as the marshaller needs it, JSON all the way down. `shown` is the Type
+// as `printType` writes it, for refusals. Refinements and Aliases are unwrapped.
 export type Descriptor =
 	| { kind: "integer"; shown: string }
 	| { kind: "rational"; shown: string }
 	| { kind: "string"; shown: string }
 	| { kind: "boolean"; shown: string }
 	| { kind: "list"; of: Descriptor; shown: string }
-	// The two slots of a `Map`, described independently — a Dictionary
-	// takes two Type Parameters and neither says anything about the other.
+	// A `Map`'s two slots, described independently.
 	| { kind: "dictionary"; key: Descriptor; value: Descriptor; shown: string }
 	| { kind: "record"; members: Members; shown: string }
-	// The one Union with a JavaScript spelling of its own — `T |
-	// undefined`. It reaches a Surface as the Union of `Optional`'s two Cases and
-	// is collapsed here, because every rule about it is a rule about the pair.
+	// `Optional`'s two Cases, which JavaScript spells `T | undefined`.
 	| { kind: "optional"; of: Descriptor; shown: string }
 	| { kind: "union"; arms: Array<Descriptor>; shown: string }
-	// Work that has not run, and one run of it — a `Promise` on the other
-	// side, in the one position a promise may stand: a call's ANSWER. What each
-	// of them HOLDS is described like any other Type Argument, because that is
-	// the value which finally crosses; the description itself is a closure and
-	// the run is a promise and a controller, and none of that is written down
-	// here for the reason no half of a Dictionary's box is. The marshaller says
-	// why the answer is the only position, and `bridge.ts` says when a bundle
-	// carries the door.
+	// Work not yet run, and one run of it: a `Promise` of what it holds, allowed
+	// only as an answer, as the marshaller decides.
 	| { kind: "future"; of: Descriptor; shown: string }
 	| { kind: "started"; of: Descriptor; shown: string }
 	| CaseDescriptor
 	| FunctionDescriptor
-	// A Type this boundary has no mapping for, carrying the sentence that
-	// says why. Written where the Type could still be printed and read where a
-	// value of it is finally met.
+	// A Type with no mapping, carrying the sentence that says why.
 	| { kind: "refused"; why: string; shown: string }
 
 export type CaseDescriptor = {
 	kind: "case"
-	// The tag as the emitted JavaScript spells it —
-	// `./Geometry.es#Shape#Circle`, relative to the entry inside a bundle and to
-	// the root of a host's project inside one of those — which is the one
-	// spelling a value built for that JavaScript may carry.
+	// The tag as the emitted JavaScript spells it, such as
+	// `./Geometry.es#Shape#Circle`.
 	tag: string
-	// The Choice as it was DECLARED, which is what a host writes: a `$case`
-	// reads `Shape#Circle` or the bare `Circle`, never the Module path the tag
-	// carries.
+	// The Choice as declared, which a host's `$case` writes.
 	choice: string
 	name: string
-	// Whether this is the builtin `Optional`'s own Case — the Choice
-	// spelled by ABSENCE rather than by a `$case`. Met on its own where a
-	// `constant thing = Optional<Integer>#Value(3)` is inferred as the Case
-	// rather than as the Union an annotation would have named.
+	// Whether this is a Case of the builtin `Optional`, spelled by absence rather
+	// than by a `$case`.
 	optional: boolean
-	// Whether EVERY Case of this Case's Choice has an empty payload — a
-	// unit Choice, spelled on the JavaScript side by its bare Case name rather
-	// than by a `$case` object, in both directions. `payload` is then always
-	// `{}`, and `optional` is always false: `Optional` carries an `item`.
-	//
-	// All-or-nothing per Choice, which is why the answer is not simply
-	// "this Case has no payload". A mixed Choice (`#Circle(radius)` beside
-	// `#Blank`) keeps the object form for every one of its Cases — one Choice
-	// with two JavaScript spellings would be a Union a host has to discriminate
-	// by `typeof` before it can read it.
+	// Whether every Case of this Choice has an empty payload, so each is spelled by
+	// its bare name. All or nothing per Choice. See "Members and Cases" in
+	// DEVELOPMENT.md.
 	unitChoice: boolean
 	payload: Members
 	shown: string
 }
 
-// The members of a Record or of a Case's payload, each with the Type it
-// holds and whether the boundary may leave it out.
-//
-// `optional` is OPTIONAL on the wire and its absence reads as
-// "required" — the same rule, for the same reason, as a Function Descriptor's
-// Parameter: this shape is written to `<output>.descriptor.json` and inlined as
-// JSON into generated wrappers, so a sidecar written before Record defaults
-// existed has to keep loading and meaning what it always meant.
-//
-// A member is a Node of its own rather than a bare Descriptor because
-// there was nowhere else to put the flag — a Descriptor describes a TYPE, and
-// whether a member may be left out is a fact about the place it stands in.
-//
-// `fill` is carried by a Case payload's members and by nothing else, and
-// it is the difference between the two positions a member may be left out at. A
-// Record Parameter's is filled by the CALLEE — the boundary omits the key and the
-// Function's own prologue writes it — while a Case is BUILT where it is written,
-// and a host writing one is where it is written, so the value has to cross with
-// the Type. It is only ever a literal, which is the rule a payload default lives
-// by for its own reason: the merge is spliced per construction, and a Module that
-// never named the Choice has no name of the declaring one's to read.
+// The members of a Record or a Case payload. `optional` absent means required.
+// `fill` is a payload default's value, built at the boundary. See "Members and
+// Cases" in DEVELOPMENT.md.
 export type Members = Record<
 	string,
 	{ of: Descriptor; optional?: true; fill?: Fill }
 >
 
-// A payload default's value as data — the shape of the literal the Case
-// declared, so the boundary can build it without an Expression to evaluate.
-// Integers and Rationals are decimal TEXT for the same reason a predicate's
-// Arguments are: this is written to `<output>.descriptor.json`, and JSON holds
-// no bigint.
+// A payload default's literal as data. Numbers are decimal text, since JSON
+// holds no bigint.
 export type Fill =
 	| { kind: "integer"; value: string }
 	| { kind: "rational"; numerator: string; denominator: string }
@@ -163,12 +84,7 @@ export type Fill =
 
 export type FunctionDescriptor = {
 	kind: "function"
-	// `optional` marks a Parameter the Essence side gave a default, which
-	// a JavaScript call may leave out. It is OPTIONAL on the wire and its
-	// absence reads as "required": this shape is written to
-	// `<output>.descriptor.json` and inlined as JSON into generated wrappers,
-	// so a sidecar written before defaults existed has to keep loading and
-	// meaning what it always meant.
+	// `optional` marks a Parameter with a default. Absent means required.
 	parameters: Array<{
 		label: string | null
 		of: Descriptor
@@ -178,9 +94,8 @@ export type FunctionDescriptor = {
 	shown: string
 }
 
-// A whole Module: every export, what it is bound AS, and what the bundle
-// binds it under. Between this and the bundle there is nothing left for a host to
-// have the Compiler for.
+// A whole Module: each export, what it is, and the name the bundle binds it
+// under.
 export type ModuleDescriptor = {
 	exports: Record<string, ExportDescriptor>
 }
@@ -188,27 +103,14 @@ export type ModuleDescriptor = {
 export type ExportDescriptor =
 	| { kind: "constant"; emitted: string; of: Descriptor }
 	| { kind: "function"; emitted: string; of: FunctionDescriptor }
-	// The one export that binds to a REFUSAL rather than to a value —
-	// which Overload a call means is decided by the Argument Types, and a
-	// JavaScript value carries none. It has no `emitted` of its own: an Overload
-	// set binds no name, each of its Overloads binds one.
+	// An Overload set binds a refusal, since a JavaScript value carries no Types to
+	// pick an Overload by. Each Overload binds its own name.
 	| { kind: "overloaded"; overloads: Array<OverloadDescriptor> }
 	| ChoiceDescriptor
 	| NamespaceDescriptor
 
-// A Choice, which binds NOTHING at all — its Cases are Types, and a Type
-// is erased before a byte is emitted. What a host gets under the name is
-// therefore built rather than bound: one constructor per Case, which is the one
-// piece of a Module's surface this side writes instead of reading. Spelling
-// `{ $case: "Shape#Circle", radius: 3n }` by hand is spelling a string the
-// Compiler already knows, and a typo in it is a Union arm that quietly never
-// matches.
-//
-// `emitted` is absent for the same reason: there is nothing to read it
-// off. Where the Module ALSO exports a Namespace of that name — `namespace
-// Shape for Shape`, which is the ordinary way to give a Choice its Methods —
-// the constructors ride on the Namespace instead and no entry of this kind is
-// written, because one name can only be bound once.
+// A Choice binds nothing, so the Descriptor offers one constructor per Case.
+// Where a Namespace of that name is exported, they ride on it instead.
 export type ChoiceDescriptor = {
 	kind: "choice"
 	name: string
@@ -218,16 +120,12 @@ export type ChoiceDescriptor = {
 export type NamespaceDescriptor = {
 	kind: "namespace"
 	emitted: string
-	// The Namespace as it was declared, which is what qualifies its
-	// members in an Error — `Point.shifted`. Not always the export name: a
-	// Namespace can be exported under an Alias' name.
+	// The Namespace as declared, which qualifies its members in an Error. An
+	// export may use an Alias' name.
 	name: string
 	properties: Record<string, { emitted: string; of: Descriptor }>
 	methods: Record<string, NamespaceMethod>
-	// The Cases of the Choice this Namespace shares its name with, where
-	// there is one. They are constructors rather than members — see
-	// `ChoiceDescriptor` — and they are here because `Shape.Circle(…)` beside
-	// `Shape.area(…)` is one object either way.
+	// The constructors of a same-named Choice, beside the Methods.
 	cases?: Array<CaseDescriptor>
 }
 
@@ -236,31 +134,17 @@ export type NamespaceMethod =
 	| { kind: "overloaded"; overloads: Array<OverloadDescriptor> }
 
 export type OverloadDescriptor = {
-	// `from__overload$1` — the name the raw door binds this Overload
-	// under, and the only name a host can actually call it by.
+	// `from__overload$1`, the name the bundle binds this Overload under.
 	name: string
 	emitted: string
-	// The whole line a refusal lists it as, name and all. Rendered here
-	// because `printSignature` is the Compiler's.
+	// The line a refusal lists it as, rendered by `printSignature`.
 	signature: string
-	// The signature itself, which nothing at run time reads — an Overload
-	// set binds to the refusal above rather than to a call. It is here because a
-	// DECLARATION file has to spell each Overload out under the name the bundle
-	// binds it as, and a Descriptor that could not answer that would send the
-	// generated declarations back to the Compiler for the one shape they could
-	// not describe.
+	// The signature, for a declaration file to spell each Overload.
 	of: FunctionDescriptor
 }
 
-// A Type the Module exports under a name of its own — everything the
-// `type` and `choice` declarations put on an Export Surface, and the Protocols,
-// which are a name and nothing else: a Namespace conforms to one and no value is
-// ever of one, so there is no shape to describe and `of` is `null`.
-//
-// Kept BESIDE a `ModuleDescriptor` rather than inside it. Nothing at run
-// time reads a Type Alias — every use of one is already substituted where a value
-// crosses — so carrying them in the Descriptor a wrapper embeds would ship a
-// browser the one part of the boundary that never runs.
+// A Type the Module exports under its own name, or a Protocol with a null `of`.
+// Kept apart from `ModuleDescriptor`, since nothing at run time reads one.
 export type DeclaredType = {
 	name: string
 	of: Descriptor | null
@@ -270,11 +154,8 @@ export type DeclaredType = {
 
 // #region Describing
 
-// What a Descriptor is spelled against — the entry the Modules were
-// emitted for, and the target they were emitted to. A Case tag is spelled
-// relative to one of the two directories those decide between, so a Descriptor
-// is only good beside the JavaScript it was described alongside; see
-// `emittedIdentity`, which is the same rule and the only one.
+// What a Descriptor is spelled against. Case tags depend on the entry and the
+// target, as in `emittedIdentity`.
 export type DescribeContext = { entryPath: string; emit?: EmitTarget }
 
 export function describe(
@@ -284,8 +165,7 @@ export function describe(
 	return describeWith(type, context, new Set())
 }
 
-// One Function's signature, which is no Type at all — a Namespace carries
-// its Methods as `BaseFunction`s, and `wrapFunction` is handed one directly.
+// One Function's signature, as a Namespace carries its Methods.
 export function describeSignature(
 	signature: common.BaseFunction,
 	context: DescribeContext,
@@ -293,28 +173,15 @@ export function describeSignature(
 	return signatureWith(signature, context, new Set())
 }
 
-// `printing` is the Types currently being walked, so that one reaching
-// itself is answered rather than followed. Nothing can spell such a Type today —
-// `recursive-type-declaration` refuses a declaration that names itself — so this
-// is what keeps the day they land from being the day this overflows its stack
-// instead of saying what it does not know.
+// `printing` holds the Types being walked, so one reaching itself is refused
+// rather than followed.
 function describeWith(
 	type: common.Type,
 	context: DescribeContext,
 	printing: Set<common.Type>,
 ): Descriptor {
-	// Spelled WITHOUT a Record's Alias name, at every depth — the one
-	// place in the toolchain where naming one is the wrong answer. Whoever
-	// reads a `shown` is a JavaScript author: it is what a generated `.d.ts`
-	// comment says, what a refused Argument is measured against ("expected …,
-	// got an empty Map") and what an Overload listing spells out, and none of
-	// them can look `Standing` up in a file they were never handed. The shape
-	// is the thing they have to build.
-	//
-	// The `.d.ts` still prints the name wherever the Module EXPORTS one: its
-	// naming table is keyed by this very spelling, so the declaration and each
-	// use of it meet on the shape and come back out as the word — which is the
-	// name a JavaScript author does have.
+	// Without Record Alias names at every depth, since a JavaScript author reads
+	// `shown`. See "Descriptors" in DEVELOPMENT.md.
 	let shown = printType(withoutRecordNames(type))
 
 	if (printing.has(type)) {
@@ -355,34 +222,8 @@ function describeBody(
 				of: describeWith(type.itemType, context, printing),
 				shown,
 			}
-		// A `Map`, whatever the key Type is — the one JavaScript shape
-		// that holds an entry per key of any kind at all, in the order the
-		// entries were put in, which is exactly what a Dictionary is. A plain
-		// object was the alternative and only for a `Dictionary<String, V>`:
-		// one shape would then have crossed as two things depending on a Type
-		// Parameter, an integer-looking key would have come back first however
-		// it was written down, and a key that is not a String would have had
-		// nowhere to go.
-		//
-		// Neither half of the box is described — not the shared store,
-		// not the generation stamp, and not the key encoding that finds a slot.
-		// Building one is `createDictionaryFrom`'s and reading one is
-		// `liveEntriesOf`'s, both the runtime's own and both reached through
-		// the bridge, so the interpreter holds no copy of a rule this side of
-		// the seam owns. `bridge.ts` says when a bundle carries them.
-		//
-		// What crosses is what the ENTRIES are, and the identity a `Map`
-		// gives them is not the identity a Dictionary gives them: a Map tells
-		// its keys apart by `===` and a Dictionary by the key Type's own `is`.
-		// Where the two disagree the boundary refuses rather than decides — two
-		// entries of a Map that are one key are refused on the way in, and two
-		// keys of a Dictionary that are one JavaScript value are refused on the
-		// way out. The one thing it can not see is an `is` a NAMESPACE wrote
-		// for the key Type: the equality the boundary builds with is the
-		// standard library's own, so a `Dictionary<NonEmptyString, V>` whose
-		// Program calls two Strings equal by a rule of its own can be handed a
-		// Map holding both. It is the same unproven crossing a refinement makes
-		// below, and it is stated in the README beside it.
+		// A `Map`, whatever the key Type. The runtime builds and reads it through the
+		// bridge. See "Shapes" in DEVELOPMENT.md.
 		case "Dictionary":
 			return {
 				kind: "dictionary",
@@ -400,12 +241,8 @@ function describeBody(
 			return describeCase(type, context, printing, shown)
 		case "UnionType":
 			return describeUnion(type, context, printing, shown)
-		// Unwrapped rather than described. A refinement's predicate is not
-		// run at the boundary yet, so a value of one is built against its base;
-		// and an APPLIED Alias is already substituted by the time it reaches an
-		// Export Surface, so what is left to meet here is the unapplied form,
-		// whose body still mentions its own Type Parameters. Walking into that
-		// lands on a `GenericUse`, which says so.
+		// Unwrapped: a refined value is built against its base, and an unapplied Alias
+		// ends at a `GenericUse`.
 		case "Refinement":
 			return describeWith(type.base, context, printing)
 		case "GenericAlias":
@@ -420,10 +257,7 @@ function describeBody(
 		case "SimpleMethod":
 		case "StaticMethod":
 			return signatureWith(type, context, printing)
-		// Callable and still described as a refusal, because neither has
-		// ONE signature a call could be marshalled against — an Overload set
-		// names several and a Namespace names none. A Function with one is
-		// described above and crosses in both directions.
+		// Refused, since neither has one signature to marshal a call against.
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
 			return {
@@ -437,14 +271,8 @@ function describeBody(
 				why: `${shown} is a Namespace rather than a value — there is nothing on the JavaScript side to build one from.`,
 				shown,
 			}
-		// Asynchrony, which crosses as a `Promise` of what the work
-		// answers with — so what is described is that value, and the two kinds are
-		// told apart because they are not reached alike: a Future has not run and
-		// is started to be read, a Started is running already and is only waited
-		// for. WHICH positions may hold one is the marshaller's rule rather than
-		// this one's, for the reason a refinement's predicate is left to it — that
-		// is a question about the place a value stands in, and a Type is described
-		// wherever it is met.
+		// A `Promise` of what the work answers. Where one may stand is the marshaller's
+		// rule.
 		case "Future":
 			return {
 				kind: "future",
@@ -457,8 +285,7 @@ function describeBody(
 				of: describeWith(type.valueType, context, printing),
 				shown,
 			}
-		// The numeric tower above Rational, for now, and whatever else
-		// arrives before its mapping does.
+		// Algebraic, Transcendental, and anything else without a mapping.
 		default:
 			return {
 				kind: "refused",
@@ -468,13 +295,8 @@ function describeBody(
 	}
 }
 
-// EXACTLY the pair collapses. A Union that offers an `Optional` beside
-// other arms — `Box | Optional<Integer>` — still decides arm by arm in the order
-// it was written, and collapsing it would change which arm takes a value.
-//
-// The collapsed node is shown as the UNION was — `Optional<Integer>`,
-// which is what a reader wrote and what an Error has to name. The `#Value` arm
-// on its own prints as `Optional#Value`, which names the bookkeeping instead.
+// Only exactly the pair collapses, shown as the Union was. A Union with more
+// arms decides arm by arm in written order.
 function describeUnion(
 	type: common.UnionType,
 	context: DescribeContext,
@@ -519,9 +341,7 @@ function describeCase(
 ): CaseDescriptor {
 	return {
 		kind: "case",
-		// `emittedIdentity` is the Rewriter's own rule, so the tag a value
-		// is built with here and the tag the emitted `match` reads are the same
-		// string by construction rather than by agreement.
+		// `emittedIdentity` is the Rewriter's rule, so tags agree by construction.
 		tag: `${emittedIdentity(
 			context.entryPath,
 			type.choice,
@@ -529,18 +349,9 @@ function describeCase(
 		)}#${type.name}`,
 		choice: displayChoiceName(type.choice),
 		name: type.name,
-		// The identity is compared whole rather than by its display name,
-		// so a Module declaring a `choice Optional` of its own is a Choice like
-		// any other.
+		// Compared by whole identity, so a Module's own `choice Optional` is ordinary.
 		optional: type.choice === "Optional",
-		// Read off the Case rather than worked out here, because the
-		// question is about the Case's SIBLINGS and this side is handed one
-		// Type with no scope behind it — the Enricher stamps the answer at the
-		// declaration. The builtin `Optional` is excluded by the same
-		// whole-identity comparison as above: it is spelled by absence, which
-		// is a spelling of its own and outranks this one. It carries a payload
-		// and so would never be stamped anyway; saying so here is what keeps
-		// the two rules from having to be read together.
+		// Stamped by the Enricher, since it is about the Case's siblings.
 		unitChoice: type.unitChoice === true && type.choice !== "Optional",
 		payload: withPayloadDefault(
 			describeMembers(type.members, context, printing),
@@ -551,12 +362,8 @@ function describeCase(
 	}
 }
 
-// The members a Case payload's default fills in, marked on the payload
-// with the value each is filled WITH. Unlike a Record Parameter, whose default
-// the callee writes in, there is nothing between a host's object and the Case it
-// becomes — a Case constructor writes the tag onto what it was handed and
-// marshals nothing — so the boundary is where the fill has to happen, and the
-// value has to be here for it to happen with.
+// The members a Case payload's default fills in, with their values. Nothing
+// between a host's object and its Case marshals, so the boundary fills them.
 function withPayloadDefault(
 	members: Members,
 	payloadDefault: common.CasePayloadDefault | undefined,
@@ -581,10 +388,8 @@ function withPayloadDefault(
 	return marked
 }
 
-// A payload default's typed literal as data. Every shape the Enricher
-// admits is here and nothing else is, so `null` is unreachable for a default
-// that was accepted — it is the answer for one that was not, whose Module is
-// already reporting.
+// A payload default's typed literal as data, or null for a default the
+// Enricher refused.
 function fillOf(
 	node: common.typed.ExpressionNode,
 	context: DescribeContext,
@@ -675,12 +480,8 @@ function describeMembers(
 	return described
 }
 
-// The signature WITHOUT its name — `printSignature` writes the name in
-// front of what it prints, so a nameless print is the tail every spelling of it
-// shares and the interpreter puts back whichever name the call it is refusing was
-// reached under. It is also exactly `printType` of a Function Type, so one string
-// names the signature in an Error about a call and in an Error about a value
-// alike.
+// The signature without its name, which is also `printType` of the Function
+// Type. The marshaller adds the name a refused call was reached under.
 function signatureWith(
 	signature: common.BaseFunction,
 	context: DescribeContext,
@@ -697,18 +498,13 @@ function signatureWith(
 			...(parameter.hasDefault ? { optional: true as const } : {}),
 		})),
 		returns: describeWith(signature.returnType, context, printing),
-		// Spelled by shape rather than by Alias name, for the reason
-		// `describeWith` is — this string is read by a JavaScript author, and
-		// `(_ Point) -> Point` names two Types they were never handed.
+		// Spelled by shape, as in `describeWith`.
 		shown: printSignature(withoutRecordNamesInSignature(signature)),
 	}
 }
 
-// The members a Record Parameter's default fills in, marked on the
-// Parameter's OWN Descriptor — which is where the fact lives, because it is one
-// about the place the Record stands in and not about the Record Type. Every
-// other position describing that same Type gets an unmarked Descriptor, and a
-// value coming OUT of one carries every member, since the callee filled them in.
+// The members a Record Parameter's default fills in, marked on that Parameter's
+// Descriptor alone, since the callee fills them in.
 function withOmittableMembers(
 	descriptor: Descriptor,
 	defaultMembers: ReadonlyArray<string> | undefined,
@@ -739,13 +535,9 @@ function isOptionalCase(type: common.Type, name: string): boolean {
 
 // #region Modules
 
-// What a name is bound to is decided by the Export Surface's TYPE, never by
-// its `kind`. A `type Rectangle` sharing its name with `namespace Rectangle` is
-// exported under kind `type` and is a Namespace value, so describing by kind
-// would promise a constant that is really a class.
-//
-// `surface.values` is the list, not `surface.kinds`, for the same reason:
-// `values` holds exactly the exports that have a runtime binding.
+// Decided by each export's Type, not its `kind`. Every exported name is
+// visited: a value from `surface.values`, and a Choice, which binds nothing, from
+// `surface.types`. See "Modules" in DEVELOPMENT.md.
 export function describeModule(
 	surface: ExportSurface,
 	entryPath: string,
@@ -761,12 +553,8 @@ export function describeModule(
 		let cases = choiceCasesOf(surface.types[name], name, context)
 
 		if (cases !== null) {
-			// One name binds one thing. Where the Module exports a value
-			// of that name as well, the constructors join it if it is a
-			// Namespace — which is where a reader would look for them anyway —
-			// and lose to it otherwise: a value the Module actually binds is
-			// something a host asked for, and constructors it can still spell by
-			// hand are not worth taking one away.
+			// One name binds one thing: constructors join a same-named Namespace, and lose
+			// to any other value.
 			if (entry === undefined) {
 				exports[name] = { kind: "choice", name, cases }
 
@@ -809,9 +597,7 @@ function describeValue(
 			}
 		case "Namespace":
 			return describeNamespace(type, name, context)
-		// Everything a value can be MADE of — a constant, and nothing
-		// else, since the Validator refuses to export a `variable` and a
-		// Method is only ever reached through the Namespace that holds it.
+		// A constant. The Validator refuses to export a `variable`.
 		default:
 			return {
 				kind: "constant",
@@ -821,17 +607,8 @@ function describeValue(
 	}
 }
 
-// The Cases a name is the CHOICE of, or `null` where it names something
-// else. A Choice reaches an Export Surface as the Union of its Cases — and as a
-// lone Case where it declares exactly one — so what is asked is whether every
-// arm is a Case of one Choice, and whether that Choice is this very name.
-//
-// The name has to match because a Type Alias for a Choice is the same
-// Union — `type Figure = Shape` is indistinguishable from `Shape` by shape
-// alone. Constructors under the Alias would build values that say `Shape#Circle`
-// while the name that offered them said `Figure`, and a second door onto one set
-// of constructors is a second thing to keep true. The same rule leaves a Choice
-// exported under an `as` name alone, for the same reason.
+// The Cases of the Choice this name declares, or null. An Alias or an `as`
+// name for a Choice gets no constructors.
 function choiceCasesOf(
 	type: common.Type | undefined,
 	name: string,
@@ -846,10 +623,7 @@ function choiceCasesOf(
 	let cases: Array<CaseDescriptor> = []
 
 	for (let arm of arms) {
-		// `Optional`'s own two Cases are spelled by absence rather than by
-		// a `$case`, so there is nothing for a constructor to build — and a
-		// Module declaring a `choice Optional` of its own is not one of them,
-		// which is what `optional` says.
+		// `Optional`'s Cases are spelled by absence, so they get no constructors.
 		if (arm.kind !== "case" || arm.optional || arm.choice !== name) {
 			return null
 		}
@@ -860,15 +634,8 @@ function choiceCasesOf(
 	return cases.length === 0 ? null : cases
 }
 
-// The Types the Module declares, in the order it exported them — what a
-// declaration file names its shapes after, and the only part of a Module a
-// generated one can not read off the exports. A Protocol is described as a name
-// alone: a Namespace conforms to one, and no value is ever of one.
-//
-// `surface.kinds` is the list here, rather than `surface.types`, because
-// the ORDER is the order the export block was written in — which is the order a
-// reader of the source already knows the Module by. A name with no Type behind it
-// is a value's, and is left to `describeModule`.
+// The Types and Protocols the Module declares, in export order, for a
+// declaration file.
 export function describeTypes(
 	surface: ExportSurface,
 	entryPath: string,
@@ -894,25 +661,8 @@ export function describeTypes(
 	return declared
 }
 
-// Whether any position of this Module's boundary is a Dictionary, which
-// is what decides whether its bundle carries the two runtime Functions a
-// Dictionary crosses through — see `DICTIONARY_BRIDGE_MODULES`. It is asked of
-// the values AND of the declared Types, because both halves are the boundary: a
-// Dictionary a Module never exports by name still reaches a host through the
-// Type of something it does, and a Module whose only Dictionary sits in an
-// exported `type` publishes it in the declaration file and hands it to a host
-// marshalling against `surface.types`. A boundary that names one anywhere has
-// to be able to cross it everywhere.
-//
-// Both are Parameters rather than one `describeModule` answer, because
-// `ModuleDescriptor` is the VALUE side alone — it is what a
-// `<name>.descriptor.json` holds and what the marshaller reads — and the
-// declared Types are described beside it by every injector already.
-//
-// The answer is DERIVED from the Descriptor rather than carried in it. It
-// is a fact about a Module the Compiler can work out whenever it is asked, and a
-// `<name>.descriptor.json` that stated it as well would be a second copy that
-// could go stale against the tree it is about.
+// Whether any position of the boundary, values or declared Types, is a
+// Dictionary, so the bundle carries that door. See "Modules" in DEVELOPMENT.md.
 export function carriesDictionary(
 	module: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
@@ -924,18 +674,7 @@ export function carriesDictionary(
 	)
 }
 
-// The same question for asynchrony — whether any position of the boundary
-// is a Future or a Started, which is what decides whether the bundle carries the
-// three runtime Functions one crosses through. See `FUTURE_BRIDGE_MODULES`,
-// which is where that door is and why it is not carried always.
-//
-// Asked of every position rather than of the ANSWERS alone, though an
-// answer is the only position the marshaller will cross one at. A Future
-// anywhere else is refused — and a refusal is a sentence the marshaller writes
-// out of the Descriptor, not out of the bridge, so the door being there changes
-// nothing about it. Asking the narrower question would mean stating the
-// marshaller's rule here as well, and two copies of that rule is exactly how a
-// boundary comes to refuse what the door was carried for.
+// Whether any position of the boundary is a Future or a Started.
 export function carriesFuture(
 	module: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
@@ -948,9 +687,7 @@ export function carriesFuture(
 	)
 }
 
-// Every Descriptor a Module's boundary is made of, asked one question —
-// the walk both doors are decided by, written once because it is the same walk:
-// what differs between them is the node they are looking for and nothing else.
+// Whether any Descriptor of a Module's boundary is `wanted`.
 function boundaryReaches(
 	module: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
@@ -1011,16 +748,8 @@ function boundaryReaches(
 	return false
 }
 
-// No guard against walking a node twice, because a Descriptor is a TREE —
-// a Type that reaches itself is answered with a `refused` node rather than
-// followed — which is the same reason the interpreter can compile a node's
-// children while compiling the node.
-//
-// The question is asked of the node BEFORE its children, so a door's own
-// kind stops the walk there — and every other kind is walked through whatever it
-// holds, a Future and a Started included: what a Future answers with is a value
-// that crosses, so a `Future<Dictionary<String, Integer>>` names a Dictionary on
-// this boundary exactly as a Function answering one does.
+// A Descriptor is a tree, so no visited set. A wanted node stops the walk, and
+// every other kind is walked through, Futures included.
 function reaches(
 	descriptor: Descriptor,
 	wanted: (descriptor: Descriptor) => boolean,
@@ -1056,11 +785,7 @@ function reaches(
 					reaches(parameter.of, wanted),
 				) || reaches(descriptor.returns, wanted)
 			)
-		// Every remaining kind spelled out rather than left to a bare
-		// `default`, so a Descriptor kind added later has to be answered here
-		// instead of falling through as "reaches none" — the failure of which
-		// is a bundle with no door for a boundary that needs one, and a value
-		// refused at run time with a sentence blaming a stale bundle.
+		// Every kind is named, so a new one must be answered here.
 		case "integer":
 		case "rational":
 		case "string":
@@ -1070,17 +795,8 @@ function reaches(
 	}
 }
 
-// A Namespace's members are keyed by the name as it was WRITTEN —
-// `memberKey` quotes what JavaScript can not spell rather than escaping it, so a
-// Method named `ok?` is the property `"ok?"`. `escapeName` belongs to the top
-// level alone and would look for a member nothing binds. The one exception is
-// `namespaceMemberName`'s own: a class refuses a static member named `prototype`
-// or `constructor`, so the Rewriter mangles those two.
-//
-// An INSTANCE Method keeps the receiver it is emitted with as its first
-// Parameter — the Export Surface already carries it, typed as the Namespace's
-// target — so nothing here has to add it, and a caller passes it where there is
-// no `::` to put it before the name.
+// Members are keyed as written, since `memberKey` quotes what JavaScript can not
+// spell. An instance Method's receiver is already its first Parameter.
 function describeNamespace(
 	type: common.NamespaceType,
 	name: string,
@@ -1124,16 +840,8 @@ function describeNamespace(
 	}
 }
 
-// An Overload set binds no name of its own — each Overload is its own
-// `name__overload$N` — so what is described is the list of those, each with the
-// line a refusal spells it out as. The name is bound to that refusal rather than
-// left off: reaching it says what is wrong and where the Overloads are, where a
-// missing name would only say that something the Module exports is not there.
-//
-// A Namespace's Overload is BOUND under the bare Method name and NAMED
-// under the qualified one — `Point.from__overload$1` is what a reader has to
-// find, and `from__overload$1` is what the class actually holds. So the
-// qualifier goes into the printed line and nowhere else.
+// Each Overload as `name__overload$N` with its printed line. A Namespace's is
+// bound under the bare name and printed under the qualified one.
 function describeOverloads(
 	type: common.OverloadedMethodType | common.OverloadedStaticMethodType,
 	name: string,
