@@ -59,7 +59,6 @@
 	"packages/compiler/src/testing/corpus.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 16, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/coverage.ts": {"sentence-length": 21, "em-dash": 15, "all-caps": 16, "block-length": 4},
 	"packages/compiler/src/testing/coverageReports.ts": {"sentence-length": 6, "em-dash": 4, "all-caps": 5, "position": 1, "block-length": 1},
-	"packages/compiler/src/testing/index.ts": {"sentence-length": 33, "em-dash": 28, "all-caps": 13, "position": 2, "block-length": 2},
 	"packages/compiler/src/testing/snapshots.ts": {"sentence-length": 11, "em-dash": 10, "all-caps": 9, "block-length": 3},
 	"packages/compiler/src/testing/staging.ts": {"sentence-length": 1},
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
