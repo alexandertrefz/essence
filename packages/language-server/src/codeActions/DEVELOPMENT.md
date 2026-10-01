@@ -14,3 +14,11 @@ stands between a stale span and the reader's code.
 Edits are written into the source text, so the actions read the Parser AST, whose Positions match the text. The
 typed Program erases and rewrites what the text says, and is read where an action needs Types. The Parser drops a
 refused Statement, so a fix for one starts from the span its Diagnostic measured rather than from a Node.
+
+## Holes
+
+Some fixes scaffold code the reader still has to complete. They write an `otherwise` arm, the missing `case`s of a
+Match, the members a Record Literal lacks, or a Protocol's Methods. Where a value or a body belongs, they write
+`{}`. A blank would not parse, and a buffer that does not parse loses every other report with it. `{}` is the unit
+value. It parses and is visibly not an answer, and where a Type is expected it is refused with a Diagnostic the
+reader can act on.

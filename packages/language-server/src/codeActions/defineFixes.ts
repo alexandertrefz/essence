@@ -10,24 +10,14 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findInnermostNodeContaining, findNodeAt } from "./lookups"
 
-// The three things a `define` can be wrong about: an arm below the one
-// that always holds, no arm that always holds, and nothing but the one that
-// always holds. Each of the three is answered from the arms themselves — the
-// `otherwise` arm's own line, its value's text — which is why they share a file
-// rather than a shape.
+// Fixes for a `define` with an arm after its `otherwise` arm, without one, or
+// with nothing else. Each is answered from the arms' own text.
 
 const armPattern = /^as\b/
 
-// An arm below the `otherwise` one has TWO answers and the Diagnostic's
-// Help gives both: it is dead where it stands, so either it goes or it belongs
-// higher up. Deleting is preferred because the arm is unreachable — removing it
-// provably leaves the Program answering exactly what it answered before, which
-// moving it above the `otherwise` arm just as provably does not.
-//
-// The arm is not on the Node — an unreachable one is never recorded, which is
-// what keeps "the `otherwise` arm is last" true of every `define` that can be
-// built — so the Diagnostic's own span is the whole of what says where the arm
-// ends, and the buffer is read back to check it still says it.
+// An arm after the `otherwise` arm is removed or moved above it. Removal is
+// preferred, since the unreachable arm changes nothing. The Node does not
+// record such an arm, so its span comes from the Diagnostic.
 export function unreachableDefineArmActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -43,9 +33,8 @@ export function unreachableDefineArmActions(
 		return []
 	}
 
-	// The arm's own line where it stands on one, and the arm with the
-	// blank in front of it where it shares a line — `as 0 otherwise as 2 if
-	// other` deleted without that blank leaves `otherwise  }` behind.
+	// The arm's own line, or the arm with the blank before it when it shares
+	// a line.
 	let removal = removeLinesEdit(lines, diagnostic.position)
 
 	let entries: Array<CodeActionEntry> = [
@@ -62,11 +51,8 @@ export function unreachableDefineArmActions(
 	let otherwise = define.otherwise.position.start
 	let before = lineAt(lines, otherwise.line).slice(0, otherwise.column - 1)
 
-	// The move writes whole LINES, so it is offered only where the
-	// `otherwise` arm opens one. A `define` written on a single line has no line
-	// above its `otherwise` to write into — the start of that line is the start
-	// of the Statement the `define` stands in — and deleting the arm is the
-	// answer that still holds there.
+	// The move writes whole lines, so it needs the `otherwise` arm to open
+	// its line. A single-line `define` gets only the removal.
 	if (before.trim() !== "") {
 		return entries
 	}
@@ -94,11 +80,8 @@ export function unreachableDefineArmActions(
 
 const defineKeyword = "define"
 
-// A `define` whose only arm is the `otherwise` one IS the value it answers
-// with, written the long way round — so the fix is that value, in place of the
-// whole `define`. The Warning spans the `define` exactly, which is the Node this
-// finds it by; the value's text is copied rather than retyped, since a fix that
-// rewrites an Expression it has no reason to read is a fix that can corrupt one.
+// A `define` with only its `otherwise` arm is replaced by that arm's value,
+// copied as written.
 export function inlineDefineValueAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -129,22 +112,9 @@ export function inlineDefineValueAction(
 	}
 }
 
-// A `define` short of its `otherwise` arm is refused, so there is no Node
-// to read — the Diagnostic spans the `define` keyword through its closing brace,
-// and the buffer is what says the two are still there.
-//
-// Not preferred, and honest about why: the arm it writes holds a hole rather than
-// a value, so the file does not compile until the reader fills one in. What the
-// fix buys is that hole in the place it belongs, at the indentation the arms
-// above it stand at — and the title says as much, since a fix named for the
-// Diagnostic it does not clear reads as one that failed.
-//
-// The hole is `{}` and not a blank. `as  otherwise` does not PARSE, and a buffer
-// that no longer parses is a buffer whose every other report goes with it — the
-// one scaffolding fix in this family whose result was worse than the hole it
-// filled. `{}` is the unit value: it parses, it is visibly not an answer, and in
-// any position that names a Type it is refused as "this arm does not answer with
-// the Type this 'define' has", which is the report a reader can act on.
+// Adds an `otherwise` arm to a refused `define`, whose Diagnostic spans it
+// from keyword to closing brace. Its value is a hole for the reader to fill,
+// so the fix is not preferred. See "Holes" in DEVELOPMENT.md.
 export function otherwiseArmAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,

@@ -4,27 +4,19 @@ import { isSamePosition } from "../positions"
 import { isBefore, removeLinesEdit } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 
-// Every `unused-import` in the document answered at once, as the one
-// SOURCE action this Server offers. There is deliberately no fix-all beside it:
-// a bulk action has to be both unambiguous and semantics-preserving, and
-// removing an entry nothing reads is the only rewrite here that is both — every
-// other fix is applied by hand and read before it is accepted.
+// Every `unused-import` in the document answered at once, as the Server's only
+// source action. No other fix is safe to apply in bulk, so there is no fix-all.
+// The formatter alone sorts an import block.
 //
-// Sorting is not its job, whatever the LSP kind is called. The Formatter sorts
-// an import block and it is the only thing that may, since a Code Action writing
-// a second ordering beside it would be two answers to one question.
-//
-// The Warnings are read from the whole document rather than from the requested
-// range: a `source.*` action stands for the document, and an Editor asks for it
-// from the Source Action menu rather than from a lightbulb over one line.
+// A `source.*` action stands for the whole document, so the Warnings are read
+// from all of it rather than from the requested range.
 
 export function organizeImportActions(
 	program: parser.Program,
 	lines: Array<string>,
 	diagnostics: Array<common.Diagnostic>,
 ): Array<CodeActionEntry> {
-	// The Positions rather than the Diagnostics — what is asked of them
-	// below is only which entry each one names.
+	// Only the Positions matter: they name the entries.
 	let unused = diagnostics.flatMap((diagnostic) =>
 		diagnostic.code === "unused-import" && diagnostic.position !== null
 			? [diagnostic.position]
@@ -38,10 +30,8 @@ export function organizeImportActions(
 	let edits: Array<CodeActionEdit> = []
 
 	for (let group of program.imports?.groups ?? []) {
-		// The Warning points at the LOCAL name, which is the alias where
-		// there is one — the same reading `removeImportAction` makes of one
-		// entry, so the two can not come to disagree about which entry a
-		// Warning names.
+		// The Warning points at the local name, the alias where there is one,
+		// as `removeImportAction` reads it.
 		let removed = group.entries.filter((entry) =>
 			unused.some((position) =>
 				isSamePosition((entry.alias ?? entry.name).position, position),
@@ -52,11 +42,8 @@ export function organizeImportActions(
 			continue
 		}
 
-		// A group with nothing left in it goes whole — `from "./A.es" {}`
-		// imports nothing and says so on two lines — and as ONE deletion rather
-		// than one per entry, or the lines the group is written on would be
-		// deleted by the entries standing on them and by the group around them
-		// both.
+		// A group left empty goes whole, as one deletion, so no line is
+		// deleted by both an entry and its group.
 		edits.push(
 			...(removed.length === group.entries.length
 				? [removeLinesEdit(lines, group.position)]
@@ -74,26 +61,21 @@ export function organizeImportActions(
 		{
 			title: "Remove the unused imports",
 			kind: "source.organizeImports",
-			// Null although this answers Warnings — SEVERAL of them, and
-			// the pair names one. What the pair is for is finding the client's
-			// own Diagnostic to retire once the action lands, and a source
-			// action is not offered against any one of them.
+			// Null: the pair names one Diagnostic for the client to retire,
+			// and this answers several.
 			diagnosticCode: null,
 			diagnosticPosition: null,
-			// Nor preferred, for the same reason: `isPreferred` picks
-			// between the actions offered on one span, and this one is offered
-			// on none.
+			// `isPreferred` chooses among actions on one span, and this one
+			// has none.
 			isPreferred: false,
 			edits: merged(lines, edits),
 		},
 	]
 }
 
-// Two entries written on ONE line are two deletions that each take the
-// blanks beside them, and the blanks BETWEEN them belong to both. An Editor
-// refuses a Workspace Edit whose ranges overlap, so ranges that meet are folded
-// into one first — every edit here deletes, so their union deletes exactly what
-// each of them asked for and nothing else.
+// Deletions of entries on one line share the blanks between them, and an
+// editor refuses overlapping ranges. Since every edit deletes, ranges that meet
+// are folded into their union.
 function merged(
 	lines: Array<string>,
 	edits: Array<CodeActionEdit>,
@@ -117,9 +99,8 @@ function merged(
 		}
 	}
 
-	// And a fold that ends up covering everything written on ONE line
-	// takes the line, which is what each of the deletions it is made of would
-	// have done had it stood there on its own.
+	// A fold covering everything on one line takes the line, as each of its
+	// deletions would alone.
 	return folded.map((edit) =>
 		edit.range.start.line === edit.range.end.line
 			? removeLinesEdit(lines, edit.range)
