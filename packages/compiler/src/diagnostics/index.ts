@@ -2,16 +2,13 @@ import { isDeepStrictEqual } from "node:util"
 
 import type { common } from "@essence-lang/interfaces"
 
-// The active Diagnostic list is module state so that the Enricher and
-// Validator do not have to thread a collector through every function. Both
-// stages run synchronously, so there is never more than one collection active
-// per nesting level.
+// The open collection, kept in module state so that no stage threads a
+// collector through its functions. Stages run synchronously, so collections
+// only ever nest.
 let activeDiagnostics: Array<common.Diagnostic> = []
 
-// A few Nodes are still typed more than once within one enrichment — a
-// Function definition's signature is resolved both for its own Type and while
-// its typed body is built. Deduplication keeps those repeated resolutions from
-// reporting the same Diagnostic twice.
+// A Node typed more than once in one enrichment reports its problems each
+// time, so `report` keeps only the first of equal Diagnostics.
 function isDuplicate(diagnostic: common.Diagnostic): boolean {
 	return activeDiagnostics.some(
 		(existingDiagnostic) =>
@@ -22,9 +19,6 @@ function isDuplicate(diagnostic: common.Diagnostic): boolean {
 	)
 }
 
-// Label constructors rather than object literals, so that the common
-// case — a primary Label on the Diagnostic's own Position — stays one short
-// line at every report site and the `kind` is never left to a default.
 export function primary(
 	position: common.Position,
 	message: string,
@@ -45,10 +39,8 @@ export function report(diagnostic: common.Diagnostic): void {
 	}
 }
 
-// `code` and `labels` are required; `notes` and `helps` default to
-// empty, because writing `notes: []` at a site that has nothing to add is
-// noise while omitting a Label never is — see the invariant on
-// `common.Diagnostic`.
+// `notes` and `helps` default to empty, since a site with nothing to add
+// would only write `[]` there.
 type DiagnosticDetails = {
 	code: common.DiagnosticCode
 	notes?: Array<string>
@@ -57,11 +49,9 @@ type DiagnosticDetails = {
 	data?: common.DiagnosticData
 }
 
-// The overloads are what carry the invariant down to the call sites: a
-// Diagnostic with a Position must name at least one Label, a placeless one
-// must name none. A site holding a `Position | null` matches neither and has
-// to branch — which is the point, because the two cases genuinely produce
-// different reports.
+// The overloads require a Diagnostic with a Position to name at least one
+// Label, and a placeless one to name none. A site holding a
+// `Position | null` matches neither, and branches.
 type LocatedDetails = DiagnosticDetails & {
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
 }
@@ -121,11 +111,9 @@ export function reportWarning(
 	report(buildDiagnostic("warning", message, position, details))
 }
 
-// The quietest of the three, and the one nothing has to act on: a remark
-// about what the Compiler DID, where a reader who never reads it still has a
-// correct Program. Everything about the shape is a Warning's — a code, a
-// primary Label, notes and helps — because a remark a reader can not look up
-// or place is worth less than saying nothing.
+// A remark about what the compiler did, which a reader may ignore and still
+// have a correct Program. It has a Warning's shape, so it can be looked up
+// and placed.
 export function reportInformation(
 	message: string,
 	position: common.Position,
@@ -144,10 +132,8 @@ export function reportInformation(
 	report(buildDiagnostic("information", message, position, details))
 }
 
-// For the Diagnostics that are about the Compiler run rather than about
-// a Program — a file that could not be read, a bundle that failed. They have
-// no source to point into, which is exactly the placeless half of the
-// `Diagnostic` union.
+// A Diagnostic about the run rather than a Program, such as a file that could
+// not be read. It has no source to point into.
 export function placelessDiagnostic(
 	severity: common.DiagnosticSeverity,
 	message: string,
@@ -168,20 +154,10 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
-// Reading a report is reading a file, so the Diagnostics come out in the
-// order the lines do — whichever stage found each of them. Left alone a report
-// is ordered by STAGE, because each stage reads the file whole before the next
-// one starts: the Lexer's bad escape on line 6 printed above the Parser's `let`
-// on line 2, and now that every stage runs, a Type error on line 3 would print
-// above a syntax error on line 40.
-//
-// A STABLE sort, so two Diagnostics about one Position stay in the order the
-// stages made them — which is the order that reads best, since the earlier
-// stage is the one that explains the later.
-//
-// A placeless Diagnostic goes first. It is about the compilation rather than
-// about the source — a file that could not be read, a bundle that failed — so
-// there is no line to put it beside and the top is where it is seen.
+// Orders a report by line rather than by the stage that found each
+// Diagnostic. The sort is stable, so on a shared Position the earlier stage,
+// which explains the later, stays first. A placeless Diagnostic has no line
+// and goes first.
 export function inSourceOrder(
 	diagnostics: Array<common.Diagnostic>,
 ): Array<common.Diagnostic> {
@@ -208,18 +184,9 @@ export function inSourceOrder(
 		.map(({ diagnostic }) => diagnostic)
 }
 
-// Whether a verdict of this code already stands about this line — and,
-// where `message` is given, that verdict and no other. The one question a report
-// asks about the ones made in front of it, and it has two callers.
-//
-// The bare-Case answer is a GUESS about a name, and a guess is worth making only
-// where nothing has already said that the line is another language's: `throw new
-// Error("x")` is three names, and `Stream` declaring an `#Error` is not a reason
-// to offer `#Error` for the third of them.
-//
-// A String written in the other quotes is broken into several names by the
-// braces of its holes, and one refusal about it is one mistake answered: the
-// names behind the first are pieces of the same String.
+// Whether a Diagnostic of this code, and of `message` when given, already
+// stands on this line. The resolvers ask before refusing the next piece of a
+// foreign String, or guessing a bare Case on a foreign line.
 export function reportedOnLine(
 	code: common.DiagnosticCode,
 	line: number,
@@ -234,12 +201,9 @@ export function reportedOnLine(
 	)
 }
 
-// A savepoint in the active collection, for speculative work that is
-// abandoned far more often than it is kept — the parser backtracks on nearly
-// every Expression, and a fresh collection per attempt is a per-Expression
-// allocation. Marking costs a length read; rewinding drops exactly the
-// Diagnostics reported since the mark, which are the ones that belong to a
-// reading the caller decided against.
+// A savepoint in the open collection, for speculative work that is mostly
+// abandoned. It is cheaper than a fresh collection per attempt. Rewinding
+// drops what the rejected reading reported since the mark.
 export function markDiagnostics(): number {
 	return activeDiagnostics.length
 }
@@ -248,10 +212,9 @@ export function rewindDiagnostics(mark: number): void {
 	activeDiagnostics.length = mark
 }
 
-// Collections nest — Diagnostics reported inside `work` are captured
-// into a fresh list and do not leak into the surrounding collection. This
-// allows speculative resolution whose Diagnostics are only committed (via
-// `report`) when the speculation is kept.
+// Collects what `work` reports into a fresh list, which never leaks into the
+// surrounding collection. Speculative work hands on what it keeps with
+// `report`.
 export function collectDiagnostics<T>(work: () => T): {
 	result: T
 	diagnostics: Array<common.Diagnostic>

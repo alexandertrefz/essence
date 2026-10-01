@@ -18,15 +18,9 @@ interface RenderOptions {
 	color?: boolean
 }
 
-// How a report names a file. A path given as an absolute one is usually
-// still inside the project, and the part that matters is the part below the
-// working directory; the longer of the two spellings is never the more useful
-// one.
-//
-// Here rather than in whichever program is doing the printing, because
-// every one of them shows the same Diagnostics and a file has to be called the
-// same thing in all of them — `esc`'s report, its JSON, and the report a host
-// gets thrown at it out of the client.
+// How every report names a file: the shorter of its own path and its path
+// from the working directory, when it lies inside that. The CLI and the client
+// share it, so a file has one name everywhere.
 export function displayPath(fileName: string): string {
 	let relative = path.relative(process.cwd(), fileName)
 
@@ -37,9 +31,8 @@ export function displayPath(fileName: string): string {
 	return relative.length < fileName.length ? relative : fileName
 }
 
-// Compiler Positions are 1-based with exclusive end columns, counted in
-// UTF-16 code units (the lexer advances per code unit), hence the "utf16"
-// index type below.
+// Compiler Positions are 1-based with exclusive end columns, counted in UTF-16
+// code units, so the report's Config reads offsets as "utf16".
 function toOffset(source: Source, cursor: common.Cursor): number {
 	let line = source.line(
 		Math.min(Math.max(cursor.line - 1, 0), source.lines.length - 1),
@@ -54,9 +47,8 @@ function toOffset(source: Source, cursor: common.Cursor): number {
 	return Math.min(offset, source.text.length)
 }
 
-// A Position that points past the end of the source — or backwards,
-// after clamping — must still render. Ariadne's `Label` throws on an inverted
-// span, so the clamping happens here rather than there.
+// A Position past the end of the source, or inverted after clamping, still
+// renders. Ariadne's `Label` throws on an inverted span.
 function toSpan(
 	source: Source,
 	position: common.Position,
@@ -87,10 +79,8 @@ export function renderDiagnostic(
 			: diagnostic.severity === "warning"
 				? config.warningColor()
 				: config.adviceColor()
-	// Secondary Labels each get their own generated color so that a
-	// report with several of them stays readable — the arrows are what tie a
-	// message to its span, and identically colored arrows that cross are not
-	// followable.
+	// Each secondary Label gets its own color, since crossing arrows of one
+	// color can not be followed.
 	let secondaryColors = new ColorGenerator()
 	let labels: Array<Label> = []
 	let primaryOffset = 0
@@ -99,10 +89,7 @@ export function renderDiagnostic(
 		primaryOffset = toSpan(source, diagnostic.position).start
 	}
 
-	// No fallback for a Diagnostic with a Position and no Labels — the
-	// `Diagnostic` type makes that combination unrepresentable, which is what
-	// keeps a bare underline with no explanation from ever being rendered
-	// again.
+	// A Diagnostic with a Position always has a Label, as its Type requires.
 	for (let label of diagnostic.labels) {
 		let isPrimary = (label.kind ?? "primary") === "primary"
 		let labelColor: Color | null = null
@@ -115,23 +102,18 @@ export function renderDiagnostic(
 			new Label(toSpan(source, label.position), {
 				message: label.message,
 				color: labelColor ?? undefined,
-				// Left at 0 unless a Diagnostic asks otherwise — Labels
-				// are grouped into one source excerpt only while their order
-				// agrees with their line order, and an order taken from the
-				// array index tears a two-line report into two separate
-				// excerpts.
+				// Ariadne groups Labels into one excerpt only while their order
+				// agrees with their line order, so the array index would split
+				// a report.
 				order: label.order ?? 0,
-				// The primary Label wins when spans overlap — the
-				// mistake is what the reader came for, not the declaration it
-				// is measured against.
+				// The primary Label wins where spans overlap.
 				priority: isPrimary ? 1 : 0,
 			}),
 		)
 	}
 
 	let report = new Report({
-		// ariadne's third kind is called "advice", which is what an
-		// `information` Diagnostic is.
+		// Ariadne calls an `information` Diagnostic "advice".
 		kind:
 			diagnostic.severity === "information"
 				? "advice"
@@ -156,9 +138,7 @@ export function renderDiagnostics(
 ): string {
 	let source = new Source(sourceText)
 
-	// A blank line between reports. Each report already ends in a rule
-	// that closes it off, but run together they read as one wall — the gap is
-	// what lets the eye find where the next problem starts.
+	// A blank line between reports, so that the next one is easy to find.
 	let reports = diagnostics
 		.map((diagnostic) =>
 			renderDiagnostic(diagnostic, source, fileName, options),
@@ -168,10 +148,8 @@ export function renderDiagnostics(
 	return `${reports}${renderSummary(diagnostics, options)}`
 }
 
-// The tally goes underneath rather than on top. Above the reports it
-// would be read before it means anything; below, it answers the question the
-// reader actually has once they have scrolled — whether that was all of it.
-// Nothing is rendered when there is nothing to count.
+// The tally goes under the reports, where it tells a reader who has scrolled
+// whether that was all of them.
 function renderSummary(
 	diagnostics: Array<common.Diagnostic>,
 	options: RenderOptions,

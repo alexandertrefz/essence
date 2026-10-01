@@ -59,8 +59,6 @@
 	"packages/compiler/src/cache/snapshot.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 4, "history": 1, "position": 2, "block-length": 1},
 	"packages/compiler/src/compileMode.ts": {"sentence-length": 11, "em-dash": 5, "all-caps": 8, "position": 1, "block-length": 1},
 	"packages/compiler/src/configuration.ts": {"sentence-length": 55, "em-dash": 41, "all-caps": 26, "history": 5, "position": 3, "block-length": 11, "stacked": 3},
-	"packages/compiler/src/diagnostics/index.ts": {"sentence-length": 13, "em-dash": 12, "all-caps": 4, "block-length": 2},
-	"packages/compiler/src/diagnostics/render.ts": {"sentence-length": 7, "em-dash": 8, "position": 2, "block-length": 1},
 	"packages/compiler/src/documents.ts": {"sentence-length": 12, "em-dash": 13, "all-caps": 8, "position": 1, "block-length": 3},
 	"packages/compiler/src/embed/bridge.ts": {"sentence-length": 27, "em-dash": 21, "all-caps": 19, "position": 3, "block-length": 8, "counts": 1},
 	"packages/compiler/src/embed/describe.ts": {"sentence-length": 77, "em-dash": 62, "all-caps": 49, "position": 4, "block-length": 19, "counts": 2},
