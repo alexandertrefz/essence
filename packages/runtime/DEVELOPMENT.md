@@ -544,3 +544,136 @@ The Dictionary kind is registered by the first construction rather than at the t
 Program imports every runtime module and leaves esbuild to shake away the unused ones. A top-level call is a side
 effect a bundler must keep. A Program that holds a Dictionary built it through one of the constructors, so the kind is
 registered before anything prints or compares one.
+
+## Strings
+
+### Quoting a String
+
+`quotedText` in `String.ts` writes a String the way a Program would write it down. It quotes the text and escapes
+what a String Literal has to escape, and nothing else. Its answer reads back: pasted into a source file, it is a
+Literal the Lexer accepts and decodes to the same value. `roundTrip.spec.ts` in the Compiler holds it to that. Every
+rendering in the runtime that quotes a String asks it, and the `quote` native hands the same text to a Program. The
+Debug Adapter's Variables view keeps a copy, `quoted` in `packages/debug-adapter/src/render.ts`, which has to change
+with it.
+
+The escape set is a table with one mark per code unit of the Basic Multilingual Plane, built on first use. A table
+filled at load would put a loop at the top of the module. A debugger stopping on entry would then pause in a frame no
+`.es` line maps to. It marks the C0 controls, DEL and the C1 controls. It marks the four characters a Literal escapes
+for its own sake: `"`, `\`, `{` and `}`. The braces are escaped because a bare `{` opens an interpolation hole when
+the text is read back. The table also marks the characters that change how the text around them reads. Those are the
+Arabic letter mark, the bidi marks, embeddings, overrides and isolates, and the line and paragraph separators. A
+value that reorders or breaks the line it is printed on could make a report say something other than what it holds.
+The byte order mark is marked because it arrives invisibly on pasted text. The zero-width joiner and non-joiner are
+not marked. They change how their neighbours draw, not how they read, and escaping one would take an emoji sequence
+apart. `escapeSet.spec.ts` pins the set.
+
+The table covers every code unit `charCodeAt` can answer, so the scan is one indexed load per code unit with no range
+test. `escapeOf` decides only how a marked unit is written. Seven characters have short escapes, and the rest are
+written as `\u{…}` with the code point in upper case. A whole surrogate pair is written as itself. A lone surrogate
+can only arrive from a JavaScript host, since no Essence String holds one. Its own escape would be one the Lexer
+refuses. So it is written as the replacement character's, which is what encoding it as UTF-8 produces anyway.
+
+`itemText` holds the rule for a value inside a structure: a String is quoted there and bare on its own.
+`Terminal.print("x")` writes `x`, but `["a", "", "b"]` has to be told apart from `[a, , b]`. The tag is read rather
+than the `Printable` witness, since `String.toString` is the identity and says nothing about the kind.
+
+### String characters
+
+The position Methods count characters, which are grapheme clusters of the String's NFC form. `Intl.Segmenter` makes
+one cluster of a base with its combining marks, of a joined emoji sequence and of a flag's regional indicators. So
+`length`, `character(at:)`, `slice` and `reverse` never split one. Normalising first gives canonically equivalent
+Strings the same characters, which is what makes `is` and `compare` agree. The Segmenter is built on first use. So a
+Program that never segments does not pay for it, and the module keeps no top-level side effect.
+
+Segmenting costs far more than anything built on it, and the position Methods ask the same String for the same view
+over and over. So a String remembers its clusters, its count, its NFC form and whether it is ASCII, under Symbol
+keys. A Symbol key is invisible to `Object.keys`, `Object.entries` and `Object.hasOwn`, which is all that Record
+equality, the printer and the type tests read. A String never changes. So a measured String is indistinguishable from
+one that was not measured. The keys are separate fields rather than one record, which would cost an object per
+String.
+
+A String assembled from known clusters, by `createSegmentedString`, keeps those clusters. Segmenting the joined text
+again does not always answer them back, since cluster boundaries depend on neighbours: three regional indicators
+re-pair however they stand.
+
+### String windows
+
+A String cut out of another may share its parent's cluster Array rather than copying it. `viewStartKey` says where
+the window's characters begin and `graphemeCountKey` how many are its own. A window also carries the text the
+clusters partition, `viewTextKey`, and `viewOffsetsKey`, the code-unit offset where each cluster begins in it. The
+window's own text is then one engine `slice` between two offsets. That is exactly the clusters joined, since the
+clusters partition the text, so everything downstream sees the same text a copy would have had. Consuming a String
+from the front this way is linear, where copying the rest at every step is quadratic. The offset table is built on
+the first cut and shared by every window of that Array.
+
+`cutFromView` shares only where the window holds at least half of its parent, as `List.ts` does for a shared suffix.
+What the rule bounds is retention. A window keeps the parent's Array, offset table and text alive, and a short token
+must not pin a long source. The rule is asked in characters and then in code units. Cluster widths vary, so half the
+characters can be a small fraction of the text. With both, a window pins at most twice its own characters and twice
+its own text. The character question comes first, because the unit question needs the offset table, which costs a
+pass to build. A drain still copies only a logarithmic number of times, since each copy halves what the next window
+can share. A copy joins its clusters rather than slicing the text, because an engine's sliced String keeps its source
+alive.
+
+`split`, `reverse` and `separate` walk a whole String. They ask `graphemesIn` for an Array of their own, which copies
+a window's clusters out once. The two replacements walk a whole String too, but read a window through `viewOf` on
+purpose. They build their answer from the clusters they pass, so they need no Array of their own and leave the window
+sharing. A drain asks `length`, `character(at:)`, `slice`, the prefix and suffix tests and the searches every turn.
+Those read the shared Array through the offset instead.
+
+### The ASCII route
+
+A String of ASCII code units with no carriage return skips the Segmenter. Each unit is its own cluster, and the text
+is its own NFC form. A carriage return is the exception, since CR LF is one cluster. `isAsciiIn` remembers the
+answer. A Method that maps ASCII to ASCII builds its answer with `createAsciiString`, which marks it without a scan.
+Joining two such Strings can produce neither a non-ASCII unit nor a carriage return, so `append` keeps the mark and
+adds the counts.
+
+`readsByUnit` decides whether a position Method takes the code-unit route through the JavaScript intrinsics. A String
+that already has a view is never scanned for that answer. Every turn of a drain is a new String, so scanning the rest
+of it every turn would be quadratic. A window of a String the scan refused therefore stays on the view route, even
+once the rest is ASCII.
+
+`normalisedFormOf` asks a narrower question: a String with a view is normalised by the engine rather than scanned.
+The engine answers at once for text it can see is normalised. It does not call `readsByUnit`, so a Program that only
+prints Strings does not carry the cutting machinery.
+
+### Searching a String
+
+The searches are native, so a question about a position never builds the pieces `split` would. Each reads the same
+character view as `split`. An occurrence is a whole run of characters on cluster boundaries, matched by canonical
+equivalence, so a separator never lands inside a cluster. Where both sides are ASCII without a carriage return, the
+JavaScript intrinsics answer instead. That is the same answer, since each unit is a character and neither side has
+anything to normalise. The rule for an empty part is stated once, beside `contains` in `String.es`, and the guards in
+`String.ts` answer it.
+
+`#Insensitive` folds each character on its own with `toLowerCase`. A position Method answers a position of the
+receiver. A folding that maps one character onto several code points would move every position after it. Folding per
+character keeps a match exactly as wide as the part, so the searches and the replacements cut on the receiver's own
+boundaries. `is` and `compare` with `#Insensitive` fold the whole String instead. The two rules differ over the Greek
+final sigma: `"ΟΣ"::is("ος", comparing #Insensitive)` holds, but `contains("ος", comparing #Insensitive)` does not
+find it.
+
+The walks that visit the whole receiver anyway, `count`, `everyIndex`, `split` and the replacements, fold it once,
+through `foldedText` or `foldedWalk`. The first-match searches must cost only the distance to the match, so a drain
+that asks one every turn stays linear. They fold in chunks instead: fold a chunk, search it, and fold the next only
+if the part was not there. The chunks double, so a late match is reached in a logarithmic number of foldings. A
+search that reads everything folds the receiver about once. Each chunk overlaps the one before it by one character
+less than the part, the most a match across the boundary can hang over. A chunk also takes in what remains when that
+is not longer than the chunk, so a short receiver is read in one call.
+
+A chunk is at least twice the part. A chunk no wider than the part would overlap the whole of itself and the search
+would stand still. Its floor differs by route. On the ASCII route a chunk costs a cut, a fold and an engine search,
+and the cut and the fold both copy it. So `FOLD_CHUNK` is wide. On the view route a chunk is a loop and a small
+Array. So `FOLD_RUN` is small, and a match near the front costs only the front. Chunks of text are folded only on the
+ASCII route. There lower-casing maps each unit to one unit and never depends on a neighbour. So a position in a
+folded chunk is a position in the receiver. Outside ASCII, `İ` folds to two code points and a final sigma folds by
+its neighbours.
+
+`lastIndex` may find an occurrence overlapping an earlier one: `"aaa"` holds `"aa"` at 1, as `lastIndexOf` answers.
+Its folded search refolds a chunk twice as wide each time from the back, since an Array can not grow at its front for
+free. `count` and `everyIndex` are one walk, `eachOccurrence`, which steps over each match as `split` does. So
+`"aaa"::count(of "aa")` is 1, one less than the pieces `split` answers.
+
+The prefix and suffix tests fold only as many of the receiver's characters as the part has. So a test costs the part,
+not the receiver.
