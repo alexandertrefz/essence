@@ -196,3 +196,91 @@ The enumeration reads a Namespace by name, but a Program may declare a nested Na
 whose Methods can do anything. So `isPureExpression` takes `shadowed`, the Program's `nested` Namespaces, as a
 required Argument, and refuses a call on any of those names anywhere in the Program. A caller for whom the
 answer does not matter still passes the Program's set rather than an empty one.
+
+## Matcher residuals
+
+A Matcher's run-time check is `$type.isValueOfType(value, <descriptor>)`, which walks a descriptor and knows
+nothing about the value. At most sites the compiler already knows which branches of that walk can be taken.
+`residual.ts` computes what is left, in one place, so that every pass reads `isValueOfType` the same way:
+
+- `compile-type-tests` rewrites a Handler's check into the answer of `matcherResidual`, and each member
+  requirement into the answer of `matcherResidualOverMembers`.
+- `elide-final-match-test` asks `matcherResidual` whether a check is decided by tags at all.
+- `compile-union-dispatch` asks `matcherResidualOverMembers` about a dispatch case's member Type, since its
+  cases are exactly the values that can arrive.
+- `compile-record-members` reads `recordMatcherTests`, and `prune-dead-match-arms` reads `matcherIsRefuted`.
+
+The rules are conservative in one direction. Each narrows a check to a cheaper one that answers the same for
+every value that can arrive. Where that can not be shown, the answer is `descriptor` and the full check stays. A
+missing rule costs speed, and only a wrong one costs correctness.
+
+### Tags
+
+`runtimeTagOf` names the hidden Type key a value of a Type carries, which `isValueOfType` compares first: a
+kind, or `<Choice>#<Case>` for a Case. A Function carries no key. It is named `"Function"`, which no key holds,
+so a Function answers no tag test. A Type Parameter or `Unknown` has no tag that can be named, so nothing follows
+from a tag matching or failing to match.
+
+A check reduces to the tag comparison in two ways:
+
+- `checkIsTagAlone` holds where the tag is the whole check for every value. That is a scalar, a `Future` or
+  `Started`, a List or Dictionary that names no item Types, and a Record or Case with no members.
+- `soleClaimantOf` finds exactly one member of what can arrive that carries the tag, and that member implies the
+  Matcher. `{ x: Integer, y: Integer } | String` is the common shape. Two members sharing a tag, such as
+  `List<Alpha> | List<Beta>` or two Records, have no sole claimant. A member without a nameable tag refuses the
+  question.
+
+`lowerableTagOf` never offers a Function Matcher, whose check is `typeof` rather than a key read.
+
+The residual is `always` where `checkIsImplied` holds for every member that can arrive. `checkIsImplied` follows
+`isValueOfType` clause for clause. It answers true where the runtime answers true without looking, as for a Type
+Parameter, `Unknown` or an erased item Type. It answers false where the runtime looks at something the compiler
+can not see. A Record Matcher is open, so the value must declare every member it names. A Case Matcher is
+nominal first, then structural over its payload. A value's Union must be implied member by member, while a
+Matcher's Union needs one arm that implies.
+
+`declaredMemberOf` reads members with `Object.hasOwn`, as the runtime does. A plain index would answer
+`toString` out of `Object.prototype`.
+
+### Refutation
+
+`matcherIsRefuted` answers whether a check fails for every value that can arrive. Such a Handler can never run,
+which the validator reports as `unreachable-case`. Refutation rests on tags alone: two different nameable tags
+fail before anything else is read. A Type Parameter, `Unknown` or a Matcher that accepts everything refutes
+nothing. Two Types sharing a tag are not refuted either, since the empty List passes both `List<Alpha>` and
+`List<Beta>`. It is asked apart from `matcherResidual`, so that only `prune-dead-match-arms` drops an arm.
+
+### Record Matcher decision trees
+
+`recordMatcherTests` reduces a Record Matcher's check to `MatcherMemberTest`s that are ANDed, each a tag
+comparison or a walk at a member path. It answers null where the argument fails, and the walk stays.
+
+Against a Record descriptor, `isValueOfType` is a conjunction of independent, total questions without side
+effects. It asks whether the value's tag is `Record`, then for each member the Matcher names, `Object.hasOwn` and
+a check of the member's value. A Record Matcher is open, so nothing else is asked. Each rule drops one question,
+or replaces it with one that answers the same for every value that can arrive:
+
+- The `Record` tag test is dropped where every arriving member is a Record. A member without a nameable tag
+  refuses the plan, since its value could be a Record that lacks the members.
+- A member every arriving Record declares is present, and the Types they declare are what can stand there. If
+  they all imply the requirement, the member is not tested. Otherwise the residual over them becomes a tag test,
+  a nested plan for a Record requirement, or a walk of that member alone.
+- A member that some arriving Record does not declare may or may not be there, and what openness adds is
+  unconstrained. Its requirement is measured against `Unknown`, and only a requirement one tag comparison
+  answers survives. The read goes through `?.`, so an absent member reads `undefined` and an inherited one reads
+  a Function, neither holding a Type key. Any other requirement needs a presence test the tree has no form for,
+  so the plan is refused.
+
+A checked refinement is erased before any pass runs, so it is tested as its base Type. A Type Parameter or
+`Unknown` is implied as a requirement, but refuses the plan as something that can arrive. A Union-typed member
+contributes all of its members to both questions.
+
+A test is sound only once every test on a prefix of its path has passed. `orderedTests` sorts by cost, every tag
+comparison before every walk, then by depth, then by written order. A walk is a leaf, since a member is either
+descended into or walked. So every test that guards another is a tag comparison on a strictly shorter path. The
+order changes only the time taken, since every test reads an immutable value and none can fail or observe
+anything.
+
+`planRecordTests` refuses a Matcher it is already planning. A Type graph may hold a back edge, where the runtime walks
+a finite value. `checkIsImplied`, which every level asks first, walks the same Type graph with no guard of its own.
+The enricher refuses the recursive Type declaration such a Record would need, so this guard is insurance.

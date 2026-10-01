@@ -96,7 +96,6 @@
 	"packages/compiler/src/optimiser/passes/poolConstants.ts": {"sentence-length": 27, "em-dash": 22, "all-caps": 24, "position": 1, "block-length": 7},
 	"packages/compiler/src/optimiser/passes/pruneDeadMatchArms.ts": {"sentence-length": 7, "em-dash": 4, "all-caps": 2, "history": 1},
 	"packages/compiler/src/optimiser/passes/unboxConditions.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 6},
-	"packages/compiler/src/optimiser/residual.ts": {"sentence-length": 77, "em-dash": 51, "all-caps": 63, "position": 7, "block-length": 13},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
 	"packages/compiler/src/testing/corpus.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 16, "block-length": 2, "stacked": 1},
