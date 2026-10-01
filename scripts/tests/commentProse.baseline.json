@@ -12,7 +12,6 @@
 	"packages/compiler/src/tests/configuration.spec.ts": {"sentence-length": 10, "em-dash": 9, "all-caps": 4, "history": 1},
 	"packages/compiler/src/tests/conformanceHelps.spec.ts": {"sentence-length": 15, "em-dash": 14, "all-caps": 12, "history": 4, "block-length": 3},
 	"packages/compiler/src/tests/corpusFiles.spec.ts": {"sentence-length": 10, "em-dash": 6, "all-caps": 8},
-	"packages/compiler/src/tests/coverage.spec.ts": {"sentence-length": 23, "em-dash": 20, "all-caps": 15, "position": 2, "block-length": 3},
 	"packages/compiler/src/tests/decimalLiterals.spec.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 1},
 	"packages/compiler/src/tests/diagnosticFactory.ts": {"sentence-length": 1, "em-dash": 2},
 	"packages/compiler/src/tests/dictionaries.spec.ts": {"sentence-length": 40, "em-dash": 21, "all-caps": 42, "position": 5, "block-length": 8},

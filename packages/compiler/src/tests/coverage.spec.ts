@@ -35,10 +35,7 @@ import {
 import { validate } from "../validator/index"
 
 // What `instrument-coverage` writes into a Program, what the emitted
-// JavaScript then counts, and what a report makes of the counts. The three are
-// here together for the reason the test lowering's spec gives: a table that
-// says where a counter stands proves nothing on its own, and a run that
-// reports 94% says nothing about which line the 6% is.
+// JavaScript then counts, and what a report makes of the counts.
 
 const coverageOptions: OptimiserOptions = {
 	enabled: true,
@@ -120,10 +117,8 @@ tests {
 }
 `
 
-// A `define` of its own rather than an arm added to `fixtures`, because
-// every expectation up there is read off a line number and a `define` written
-// into it would move all of them. The ladder narrows nothing; `narrowingArms`
-// below is the one that does.
+// A `define` of its own, since the expectations on `fixtures` are read off
+// line numbers. This ladder narrows nothing; `narrowingArms` does.
 const defineArms = `implementation {
 	function grade(_ score: Integer) -> String {
 		<- define {
@@ -141,11 +136,9 @@ tests {
 }
 `
 
-// The two claims an arm's Condition can make, one `define` each and
-// pointing opposite ways. `separator::isEmpty()` establishes nothing where it
-// HOLDS and proves `NonEmptyString` where it does not — which is what lets the
-// `otherwise` arm call `split`. `n::isGreaterThan(0)` is the other way round: it
-// proves `PositiveInteger` for its own arm and leaves the arm below it nothing.
+// The two claims an arm's Condition can make, pointing opposite ways.
+// `separator::isEmpty()` proves `NonEmptyString` only where it fails, and
+// `n::isGreaterThan(0)` proves `PositiveInteger` only where it holds.
 const narrowingArms = `implementation {
 	function pieces(_ text: String, on separator: String) -> List<String> {
 		<- define {
@@ -163,10 +156,7 @@ const narrowingArms = `implementation {
 }
 `
 
-// The same two claims an `if` can make, and pointing opposite ways for the
-// reason `narrowingArms` gives — an arm and the `otherwise` below it ARE an `if`
-// and its `else`, so the pair that tells the claims apart is written twice, once
-// in each shape.
+// The same two claims as `narrowingArms`, written as an `if` and its `else`.
 const narrowingBranches = `implementation {
 	function pieces(_ text: String, on separator: String) -> NonEmptyList<String> {
 		if separator::isEmpty() {
@@ -230,12 +220,8 @@ describe("The coverage instrumentation pass", () => {
 		expect(branches.every((point) => point.refinement)).toBe(true)
 	})
 
-	// What a condition proves where it HOLDS and what it proves where it
-	// fails are two claims, and neither implies the other — so each half of the
-	// branch is marked with the one that is about the path IT counts. This is
-	// the pair that tells them apart in both directions: `separator::isEmpty()`
-	// establishes nothing for the branch it opens and proves `NonEmptyString`
-	// for the `else`, and `n::isGreaterThan(0)` is the other way round.
+	// A condition makes one claim where it holds and another where it fails.
+	// Each half of the branch is marked by the claim about its own path.
 	it("marks each half of a branch by the claim about it", () => {
 		let branches = pointsOf(instrumented(narrowingBranches)).filter(
 			(point) => point.kind === "branch",
@@ -281,10 +267,8 @@ describe("The coverage instrumentation pass", () => {
 		])
 	})
 
-	// An arm IS a branch — one question, the path taken where it holds and
-	// the fallback below it where it does not — so it is counted as one, under
-	// the two labels an `if` already writes. Nothing in `testing/coverage.ts`
-	// hears that `define` exists.
+	// An arm is a branch, so it is counted as one, under the labels an `if`
+	// writes.
 	it("counts every arm of a define, and the otherwise arm below them", () => {
 		expect(labelsOf(instrumented(defineArms), "branch")).toEqual([
 			"grade › if",
@@ -302,10 +286,7 @@ describe("The coverage instrumentation pass", () => {
 		expect(branches.every((point) => point.refinement)).toBe(false)
 	})
 
-	// An arm's own claim and what it leaves the arm below it are two
-	// claims, and neither implies the other — so each counter is marked with the
-	// one that is about the path IT counts, and this is the `define` pair that
-	// tells them apart in both directions.
+	// Each counter is marked by the claim about the path it counts.
 	it("marks an arm and its fallback by the claim about each", () => {
 		let branches = pointsOf(instrumented(narrowingArms)).filter(
 			(point) => point.kind === "branch",
@@ -321,13 +302,9 @@ describe("The coverage instrumentation pass", () => {
 		])
 	})
 
-	// An arm has no body to write a Statement into, so its counter goes
-	// INSIDE the Expression — in front of the answer rather than around it,
-	// which is what makes an arm count when it is TAKEN. It is the reading the
-	// Statement in front of an `if` body already gives: the branch is counted on
-	// the way in, so an answer that throws while it is built was still the arm
-	// the ladder chose. `pool-constants` has put the answers behind references
-	// by then, so what is read here is the pair around each of them.
+	// An arm has no body, so its counter goes in front of the answer inside the
+	// Expression, and an arm counts when it is taken. `pool-constants` has put
+	// the answers behind references by then.
 	it("counts an arm before it builds the answer", () => {
 		let generated = rewrite(instrumented(defineArms), coverageOptions)
 
@@ -337,11 +314,8 @@ describe("The coverage instrumentation pass", () => {
 		expect(generated).not.toContain("(function")
 	})
 
-	// And a construction counts AFTER the value, which is the other half
-	// of the same rule rather than an inconsistency with it. What that point
-	// claims is that a `#Played` was BUILT, and a payload that threw halfway
-	// built none — so counting one in front of the value it counts would count
-	// something that did not happen, the one direction this pass never goes.
+	// A construction counts after the value, since its point claims the Case
+	// was built. A payload that throws halfway builds none.
 	it("counts a construction only once it is built", () => {
 		let generated = rewrite(instrumented(fixtures), coverageOptions)
 
@@ -412,8 +386,8 @@ tests {
 	}
 }`)
 
-		// The Function's own `<- "hello"` and nothing else — neither the
-		// Type Alias nor the Function declaration is a thing that RUNS.
+		// The Function's own `<- "hello"` alone. Neither the Type Alias nor the
+		// Function declaration runs.
 		expect(pointsOf(program)).toHaveLength(1)
 	})
 
@@ -445,11 +419,8 @@ tests {
 	})
 
 	it("keys on what will happen, not on what was asked for", () => {
-		// With the phase off, the disabled names decide nothing else, so
-		// `off` says nothing about them — but they still decide whether the
-		// instrumentation runs, and a compile that asked for coverage and
-		// turned the pass off emits the bytes a compile that asked for neither
-		// does.
+		// A compile that asked for coverage and disabled the pass emits the
+		// bytes of a compile that asked for neither.
 		expect(
 			optimiserOptionsKey({
 				...unoptimisedOptions,
@@ -460,8 +431,8 @@ tests {
 	})
 
 	it("names a literal arm by its value rather than by its Type", () => {
-		// `case 0` and `case Integer` are two arms of one `match`, and a
-		// report that called them both `case Integer` would name neither.
+		// `case 0` and `case Integer` are two arms of one `match`, so a literal
+		// arm is named by its value.
 		let program = instrumented(`implementation {
 	function readCount(_ count: Integer) -> String {
 		<- match count -> String {
@@ -480,10 +451,9 @@ tests {
 	})
 
 	it("never instruments the standard library", () => {
-		// An implementation of one Statement whose test reaches into the
-		// library, so the emitted file holds the library's own bodies. Exactly
-		// as many counter calls as the Module has points: if the prelude were
-		// instrumented there would be hundreds.
+		// The test reaches into the library, so the emitted file holds the
+		// library's own bodies. The counter calls match the Module's points
+		// exactly.
 		let program = instrumented(`implementation {
 	constant items = [1, 2]
 }
@@ -505,9 +475,8 @@ tests {
 	})
 
 	it("writes no table for a Module with nothing to count", () => {
-		// Imports and tests, and the tests build no Case — so there is
-		// nothing to count and nothing to declare, and a report has no row for
-		// it rather than a row of dashes.
+		// The tests build no Case, so there is nothing to count or declare and a
+		// report has no row for the Module.
 		let program = instrumented(`implementation {}
 
 tests {
@@ -532,11 +501,9 @@ tests {
 	})
 })
 
-// An emitted `.ts` program imports the runtime by its absolute path,
-// which is the very module this file imports — so every program loaded here
-// counts into ONE table, and the coverage of the program just loaded is the
-// LAST record in it. A bundle has no such trouble: esbuild inlines a runtime of
-// its own.
+// WARNING: every program loaded in this process counts into one table, shared
+// with the runtime this file imports. The program just loaded is the last
+// record in it.
 async function runWithCoverage(source: string): Promise<{
 	events: Array<TestEvent>
 	coverage: Extract<TestEvent, { kind: "coverage" }>
@@ -565,9 +532,8 @@ async function runWithCoverage(source: string): Promise<{
 			{ kind: "coverage" }
 		>
 
-		// Folded over THIS program's report alone, for the reason above:
-		// the events carry one for every program this spec file has ever
-		// loaded, because they all count into one table.
+		// Folded over this program's report alone, since the events carry
+		// one for every program this file has loaded.
 		return { events, coverage, summary: collectCoverage([coverage]) }
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
@@ -615,8 +581,7 @@ describe("A run that asked for coverage", () => {
 		)
 
 		// 85 declines the first arm and is answered by the second, so the
-		// `otherwise` arm below them was never reached — which is the whole of
-		// what branch coverage over a ladder is for.
+		// `otherwise` arm is never reached.
 		expect(branches.map((point) => [point.label, point.count])).toEqual([
 			["if", 0],
 			["if", 1],
@@ -686,10 +651,8 @@ tests {
 	})
 })
 
-// The repository's own tests fixture, counted. It is the one file in the
-// repository that writes every shape a coverage run has to say something about
-// — a Choice, a Match over all of it, an `else if` chain, a Namespace, a
-// private free Function — so what it counts is a fixed point worth pinning.
+// The repository's tests fixture, counted. It writes a Choice, a Match over
+// it, an `else if` chain, a Namespace and a private free Function.
 describe("The Tests.es fixture, counted", () => {
 	const fixture = readFileSync(fixturePath("Tests.es"), "utf8")
 
@@ -718,13 +681,9 @@ describe("The Tests.es fixture, counted", () => {
 		expect(neverConstructed(summary)).toEqual([])
 	})
 
-	// And this is the fixture's most useful claim. It FOCUSES one test,
-	// so focusing changes which tests run — and changes the coverage not at
-	// all, because what its counters counted is mostly its own Program body,
-	// which runs when the Module is loaded. That is deliberate: a Module is
-	// evaluated once however many times its tests are run, and a run resets the
-	// counts to what LOADING left rather than to zero, so a top-level Statement
-	// is never reported as never executed.
+	// The fixture focuses one test, which changes which tests run but barely
+	// the coverage. A run resets the counts to what loading left, not to zero,
+	// so a top-level Statement is never reported as never executed.
 	it("counts what loading the Module did, whatever the run selects", async () => {
 		let focused = await runWithCoverage(fixture)
 		let all = await runWithCoverage(fixture.replace(" focused {", " {"))
@@ -732,14 +691,8 @@ describe("The Tests.es fixture, counted", () => {
 		expect(focused.summary.files[0]!.lines.total).toBe(
 			all.summary.files[0]!.lines.total,
 		)
-		// NOT equal, and the difference is the point of the comparison
-		// rather than a hole in it. The fixture's own tests reach two lines
-		// loading it does not — `pointsFor`'s `case #Loss`, which only a table
-		// row and an example ever score, and `Supported.generate`, which only a
-		// property test ever draws through — so a focused run counts two fewer.
-		// What has to hold is that a focused run counts nearly all of them
-		// anyway: the Module was evaluated, and a run resets the counts to what
-		// evaluating it left rather than to zero.
+		// Not equal: the unfocused tests reach two lines loading does not,
+		// `pointsFor`'s `case #Loss` and `Supported.generate`.
 		expect(focused.summary.files[0]!.lines.covered).toBeGreaterThanOrEqual(
 			all.summary.files[0]!.lines.covered - 2,
 		)
@@ -804,10 +757,8 @@ const sampleFile = fileCoverageOf("/project/Standings.es", [
 
 describe("Folding a coverage run", () => {
 	it("counts a line once, however many points stand on it", () => {
-		// Lines 1 and 2 hold Statements, line 4 a branch and line 7 an
-		// arm — four lines, of which the one that ran and the one the branch
-		// was taken on are covered. The construction on line 9 is no line of
-		// its own: the Statement it stands in is counted already.
+		// Lines 1, 2, 4 and 7 hold points, and lines 1 and 4 ran. The
+		// construction on line 9 is no line of its own.
 		expect(sampleFile.lines).toEqual({ covered: 2, total: 4 })
 	})
 
@@ -864,10 +815,8 @@ describe("Folding a coverage run", () => {
 	})
 
 	it("replaces a report whose points moved under it", () => {
-		// The same number of points at different Positions is a different
-		// COMPILE — a watch session mid-edit holds a stale table beside a fresh
-		// one — and adding those would attribute one compile's counts to
-		// another compile's points.
+		// Points at different Positions are a different compile, such as a
+		// stale table beside a fresh one mid-edit, so their counts are not added.
 		let summary = collectCoverage([
 			{
 				schema: 1,
@@ -966,8 +915,7 @@ describe("Folding a coverage run", () => {
 			"/project/A.es",
 			"/project/B.es",
 		])
-		// The re-run says nothing built a `#Red` this time, and the file
-		// that was not re-run never built one — so the answer changed.
+		// The re-run built no `#Red`, and the file not re-run never built one.
 		expect(neverConstructed(merged)).toEqual([
 			{ choice: "Colour", tag: "#Red" },
 			{ choice: "Colour", tag: "#Blue" },
@@ -978,9 +926,8 @@ describe("Folding a coverage run", () => {
 const writtenSummary: CoverageSummary = {
 	files: [
 		sampleFile,
-		// A `Foo.tests.es` — all tests, no implementation. It counts the
-		// Cases its tests build and has no coverage of its own, and neither
-		// written form says a word about it.
+		// A tests-only file counts the Cases its tests build but has no
+		// coverage of its own, so neither written form mentions it.
 		fileCoverageOf("/project/Season.tests.es", []),
 	],
 	choices: [
@@ -1011,8 +958,7 @@ describe("Writing a coverage run out", () => {
 
 	it("keeps a comma out of an lcov branch name", () => {
 		// A `BRDA` record is four comma-separated fields, and a Record
-		// Matcher's label holds commas of its own — which would move the count
-		// into the name and leave the record unreadable.
+		// Matcher's label holds commas of its own.
 		let written = toLcov({
 			files: [
 				fileCoverageOf("/project/Match.es", [
