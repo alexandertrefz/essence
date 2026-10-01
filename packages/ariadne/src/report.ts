@@ -46,8 +46,8 @@ export interface ReportOptions<Id = unknown> {
 	kind: ReportKind
 	// The primary location at which the problem should be reported.
 	span: Span<Id>
-	// A stable identifier for this kind of report, shown before the kind name
-	// as `[code] Error: ...`.
+	// A stable identifier for this kind of report, shown as `[code]` on its own
+	// line above the header.
 	code?: string
 	message?: string
 	labels?: Array<Label<Id>>
