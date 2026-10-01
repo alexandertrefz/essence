@@ -14,6 +14,7 @@ import {
 	asynchronyHelps,
 	booleanQuestionFor,
 	countOf,
+	describeMatcher,
 	describeParameter,
 	describeSignature,
 	describeType,
@@ -1283,24 +1284,19 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		// Flattened, so a nested Union is discharged by Handlers for its
 		// members. See "Match" in DEVELOPMENT.md.
 		let memberTypes = flattenUnionMembers(node.value.type)
-		let unhandledTypes: Array<common.Type> = []
-
-		for (let memberType of memberTypes) {
-			let isHandled = node.handlers.some(
-				(handler) =>
-					isUnconditionalHandler(handler) &&
-					matchesType(handler.matcher, memberType),
-			)
-
-			if (!isHandled) {
-				unhandledTypes.push(memberType)
-			}
-		}
+		let unhandledTypes = memberTypes.filter(
+			(memberType) =>
+				!node.handlers.some(
+					(handler) =>
+						isUnconditionalHandler(handler) &&
+						matchesType(handler.matcher, memberType),
+				),
+		)
 
 		// One Diagnostic for every unhandled member, which share a cause and
 		// a fix.
 		if (unhandledTypes.length > 0) {
-			let descriptions = unhandledTypes.map(describeType)
+			let descriptions = unhandledTypes.map(describeMatcher)
 
 			reportError(
 				`This Match Expression does not handle every Case`,

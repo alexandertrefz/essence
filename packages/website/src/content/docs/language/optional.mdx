@@ -278,19 +278,19 @@ implementation {
 
 ```
 [unknown-method]
-Error: No Method named 'uppercase' for Optional#Value
+Error: No Method named 'uppercase' for Optional<String>#Value
    ╭─┤ nickname.es:5:28 │
    │
  5 │        Terminal.print(nickname::uppercase())
    │                       ────┬───  ────┬────
    │                           ╰─────────│────── this is an Optional<String>
    │                                     │
-   │                                     ╰────── Optional#Value has no Method of this name
+   │                                     ╰────── Optional<String>#Value has no Method of this name
    │
    │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::uppercase()' on it, or reach through it with '::map((value) { <- value::uppercase() })'.
    │ Help 2: Or take it apart with a 'match', and call '::uppercase()' on the payload.
    │
-   │ Note 1: 'uppercase' is a Method of String, and 'Optional#Value' carries one.
+   │ Note 1: 'uppercase' is a Method of String, and 'Optional<String>#Value' carries one.
    │ Note 2: Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.
 ───╯
 ```

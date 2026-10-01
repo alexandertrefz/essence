@@ -146,7 +146,7 @@ describe("A Method of what the value holds", () => {
 			let diagnostic = firstOf(source, "unknown-method")
 
 			expect(diagnostic.notes[0]).toBe(
-				"'add' is a Method of Integer, and 'Optional#Value' carries one.",
+				"'add' is a Method of Integer, and 'Optional<Integer>#Value' carries one.",
 			)
 			expect(diagnostic.helps).toEqual([
 				"Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.",
@@ -165,7 +165,7 @@ describe("A Method of what the value holds", () => {
 			)
 
 			expect(diagnostic.notes[0]).toBe(
-				"'add' is a Method of Integer, and 'Result#Value' carries one.",
+				"'add' is a Method of Integer, and 'Result<Integer, String>#Value' carries one.",
 			)
 		})
 

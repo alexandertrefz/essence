@@ -2659,6 +2659,17 @@ describe("Choices", () => {
 					}`),
 				).toEqual([])
 			})
+
+			it("names the Case with its Type Arguments where a report shows it", () => {
+				let labels = labelsOf(`implementation {
+					type Item = { price: Integer, tag: Integer }
+
+					constant items: List<Item> = [{ price = 3, tag = Optional<String>#Empty }, { price = 4, tag = 1 }]
+				}`)
+
+				expect(labels).toHaveLength(1)
+				expect(labels[0]).toContain("tag: Optional<String>#Empty }")
+			})
 		})
 	})
 

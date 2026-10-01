@@ -256,6 +256,27 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// A Case Matcher takes no Type Arguments, so the Case is written as its
+		// Choice declares it.
+		it("should write an applied Choice's Case without its Type Arguments", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant maybe: Optional<Integer> = #Value(1)",
+				"\tconstant described = match maybe -> String {",
+				'\t\tcase #Value { <- "some" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Add missing Cases")
+			expect(result[4]).toBe("\t\tcase Optional#Empty {}")
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(codesOf(result)).not.toContain("missing-case")
+		})
+
 		it("should indent from the line the match keyword sits on", () => {
 			let lines = [
 				"implementation {",

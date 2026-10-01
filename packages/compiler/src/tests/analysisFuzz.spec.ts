@@ -351,6 +351,27 @@ describe("the same broken Program, analysed twice", () => {
 		}
 	}, 60_000)
 
+	// A derived Method borrows its Choice's Type Parameters under the separator
+	// with no counter, and a Case is shown with its Type Arguments.
+	it("names no Type Parameter a derived Method borrowed", () => {
+		let texts = analyseSource(`implementation {
+			choice Box<Value> { Full { value: Value }, Empty }
+
+			constant b: Box<Integer> = Box<Integer>#Empty
+			constant x = b::is(5)
+		}`).diagnostics.flatMap((diagnostic) => [
+			diagnostic.message,
+			...(diagnostic.notes ?? []),
+			...(diagnostic.helps ?? []),
+			...diagnostic.labels.map((label) => label.message),
+		])
+
+		expect(texts).toContain(
+			"'Choice_Equatable::is' takes 1 Argument: Parameter 1 is Box<Value>#Full | Box<Value>#Empty.",
+		)
+		expect(texts.filter((text) => text.includes("​"))).toEqual([])
+	})
+
 	// The whole report three times in one process. A counter, a wrongly keyed
 	// cache or a Map filled in another order shows only here, since other specs
 	// analyse each source once.

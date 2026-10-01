@@ -10987,7 +10987,7 @@ function payloadsOf(caseType: common.CaseType): Array<HeldValue> {
 	return Object.values(caseType.members).map((payload) => ({
 		type: payload,
 		kind: "case" as const,
-		carrier: `${displayChoiceName(caseType.choice)}#${caseType.name}`,
+		carrier: describeType(caseType),
 	}))
 }
 

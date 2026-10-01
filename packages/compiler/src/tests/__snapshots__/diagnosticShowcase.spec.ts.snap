@@ -1796,19 +1796,19 @@ Error: No Method named 'add' for this value
 ────╯
 
 [unknown-method]
-Error: No Method named 'add' for Optional#Value
+Error: No Method named 'add' for Optional<Integer>#Value
     ╭─┤ KnownAnswers.es:29:38 │
     │
  29 │     Terminal.print(primes::firstItem()::add(1)::toString())
     │                    ─────────┬─────────  ─┬─  
     │                             ╰────────────│─── this is an Optional<Integer>
     │                                          │   
-    │                                          ╰─── Optional#Value has no Method of this name
+    │                                          ╰─── Optional<Integer>#Value has no Method of this name
     │ 
     │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.
     │ Help 2: Or take it apart with a 'match', and call '::add(…)' on the payload.
     │ 
-    │ Note 1: 'add' is a Method of Integer, and 'Optional#Value' carries one.
+    │ Note 1: 'add' is a Method of Integer, and 'Optional<Integer>#Value' carries one.
     │ Note 2: Every member of the Union must provide 'add' — the receiver's Type is only known at runtime.
 ────╯
 

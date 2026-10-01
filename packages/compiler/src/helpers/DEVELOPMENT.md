@@ -279,7 +279,8 @@ So `createFreshenedInference` renames a signature's Generics for the span of one
 name is the declared name, a zero-width space and a counter. No written Generic holds a zero-width space, and no
 other call shares the counter, so a fresh name collides with nothing. Only the Parameter Types matched are renamed.
 `unfreshenBindings` translates the bindings back, so the return Type, the conformances and every Diagnostic read in
-the names the source wrote. `displayGenericName` strips what is left of a fresh name wherever one is printed.
+the names the source wrote. `displayGenericName` strips what is left of a fresh or borrowed name wherever one is
+printed.
 
 `createFreshenedChoiceInference` does the same for a Choice's Type Parameters during the one payload match that
 binds them. A callback inside `myCount<State>` that answers `#Done(current.carried)` hands `Step<State, Result>` a

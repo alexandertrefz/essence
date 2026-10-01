@@ -13,11 +13,12 @@ import {
 } from "./types"
 
 // The name a Generic is shown under. `createFreshenedInference` renames a
-// callee's Generics per call to the name, a zero-width space and a counter. An
-// unbound one keeps that name in the stamped Types. No written Generic holds a
-// zero-width space, so stripping it touches nothing written.
+// callee's Generics per call to the name, a zero-width space and a counter, and
+// `borrowedGenericName` appends the space alone. An unbound one keeps that name
+// in the stamped Types. No written Generic holds a zero-width space, so
+// stripping it touches nothing written.
 export function displayGenericName(name: common.GenericName): string {
-	return name.replace(/\u200B\d+$/, "")
+	return name.replace(/\u200B\d*$/, "")
 }
 
 // The Help for a Union no call can dispatch on, shared by the Enricher's
@@ -176,7 +177,7 @@ export function describeType(type: common.Type): string {
 
 			return type.types.map(describeType).join(" | ")
 		case "Case":
-			return `${displayChoiceName(type.choice)}#${type.name}`
+			return `${describeCaseChoice(type)}#${type.name}`
 		// A refinement is named, not spelled out, and an applied one with all
 		// its Arguments, even Type Parameters. A bare `NonEmptyList` is not a
 		// Type a reader can write.
@@ -237,6 +238,24 @@ export function describeType(type: common.Type): string {
 		default:
 			return type.type
 	}
+}
+
+// A member Type as a `case` writes it. A Case Matcher takes no Type Arguments
+// and covers every application of its Case, so a Case is spelled without them.
+export function describeMatcher(type: common.Type): string {
+	return type.type === "Case"
+		? `${displayChoiceName(type.choice)}#${type.name}`
+		: describeType(type)
+}
+
+// The Choice a Case belongs to, applied as `Box<Integer>` where the Case carries
+// the Type Arguments an application bound.
+export function describeCaseChoice(type: common.CaseType): string {
+	let choiceName = displayChoiceName(type.choice)
+
+	return type.typeArguments === undefined
+		? choiceName
+		: `${choiceName}<${type.typeArguments.map(describeType).join(", ")}>`
 }
 
 // A function Type as a Type Annotation spells it, `(_: Integer) -> Integer`,

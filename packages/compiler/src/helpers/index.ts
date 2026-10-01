@@ -26,6 +26,7 @@ export {
 	choiceIdentity,
 	countOf,
 	describeArgumentCount,
+	describeMatcher,
 	describeParameter,
 	describeSignature,
 	describeType,

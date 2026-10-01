@@ -1,6 +1,6 @@
 import {
 	caseDefaults,
-	describeType,
+	describeMatcher,
 	flattenUnionMembers,
 } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
@@ -16,7 +16,7 @@ import type { CodeActionEntry } from "./index"
 
 // Scaffolds a Match over the value under the cursor, one empty arm per Union
 // member in declaration order. It shares `isWritableMatcher` and
-// `describeType` with the `missing-case` fix, so the two write the same arms.
+// `describeMatcher` with the `missing-case` fix, so the two write the same arms.
 
 // What a Match can be scaffolded over: a name, a member read, or a call. A
 // Literal would take apart what it just built.
@@ -72,7 +72,7 @@ function scaffoldFor(
 ): Array<CodeActionEntry> {
 	let { value, answers } = scaffold
 	let matchers = flattenUnionMembers(value.type as common.UnionType).map(
-		describeType,
+		describeMatcher,
 	)
 	let writable = matchers.filter(isWritableMatcher)
 	// As in the `missing-case` fix, one `case _` covers the members no

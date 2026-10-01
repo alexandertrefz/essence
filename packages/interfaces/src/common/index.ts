@@ -113,7 +113,7 @@ export type Diagnostic = {
 )
 
 // Keyed by `kind`, since several codes share a payload. `unhandled` holds
-// `describeType` spellings in declaration order. `suggestion` holds the bare
+// `describeMatcher` spellings in declaration order. `suggestion` holds the bare
 // name, so a Case's renders as `#Add` and replaces only `Add`.
 export type DiagnosticData =
 	| { kind: "missing-case"; unhandled: Array<string> }

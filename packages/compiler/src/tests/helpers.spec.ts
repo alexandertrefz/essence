@@ -257,6 +257,34 @@ describe("Helpers", () => {
 
 			expect(describeType(overloaded)).toBe("Function")
 		})
+
+		it("should print a Case under the Type Arguments its Choice was applied to", () => {
+			expect(
+				describeType({
+					type: "Case",
+					choice: "/project/Main.es#Optional",
+					name: "Empty",
+					members: {},
+					typeArguments: [{ type: "String" }],
+				}),
+			).toBe("Optional<String>#Empty")
+			expect(
+				describeType({
+					type: "Case",
+					choice: "Colour",
+					name: "Red",
+					members: {},
+				}),
+			).toBe("Colour#Red")
+		})
+
+		// A fresh name ends in the separator and a counter, a borrowed one in
+		// the separator alone. Neither may reach a Diagnostic.
+		it("should print an invented Type Parameter under its written name", () => {
+			for (let name of ["Value​", "Value​12"]) {
+				expect(describeType({ type: "GenericUse", name })).toBe("Value")
+			}
+		})
 	})
 
 	describe("matchesType", () => {
