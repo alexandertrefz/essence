@@ -756,20 +756,13 @@ export function partition__overload$1<ItemType extends AnyType>(
 	}
 }
 
-// A negative position counts back from the end — -1 is the last item, and
-// -length the first. The arithmetic is a double's, which is exact for every
-// position a List can have and for every index a caller can pass: an out-of-
-// range answer stays out of range at any size, since a double does not wrap the
-// way a 32-bit narrowing used to.
+// A negative position counts back from the end, so -1 is the last item. Double
+// arithmetic keeps an out-of-range position out of range at any size.
 export function positionFromEnd(
 	index: number | bigint,
 	length: number,
 ): number {
-	// A bigint index is outside safe range by the canonical invariant, so
-	// it is past either end of any Array JavaScript can hold — which is all a
-	// caller needs of it. Answering with the nearest position that is out of
-	// range says exactly that, and says it without building a bigint length to
-	// compare against.
+	// A bigint index is outside the safe range, so past either end of any Array.
 	if (typeof index !== "number") {
 		return index < 0n ? -1 : length
 	}
@@ -777,17 +770,8 @@ export function positionFromEnd(
 	return index < 0 ? index + length : index
 }
 
-// Reading a position does NOT combine the runs — an upgraded List has to
-// stay O(1) to index — so the view decides which run holds the item and the
-// item is read straight out of it.
-//
-// `viewOf` rather than `walkOf`, and that is load-bearing rather than
-// tidy. Reading one position hands no Array to anybody, so there is nothing to
-// seal — and sealing here would cost the language its positional writes: "read
-// the cell before, write this one" is what a DP table and a heap are, and a
-// reader that closed the run to in-place writes would put the copy back into
-// every turn of them. What this TRIMS is the half rule's business, as it has
-// always been.
+// Reads the item out of its run without combining the runs. `viewOf` rather than
+// `walkOf`, since a seal would make every positional write after it copy.
 export function item__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
@@ -803,24 +787,9 @@ export function item__overload$1<ItemType extends AnyType>(
 	}
 }
 
-// `firstItem(where:)` is no longer here — it is written in Essence now, on
-// `reduce`'s early-stopping entry, which `#Done`s at the first accepted item.
-// The eager `everyItem` beside `reduce` is what it used to be compared against;
-// the `Step` Choice is what let the short-circuiting version leave the native.
-
-// `firstIndex` is no longer here — both of its entries are written in
-// Essence, on `reduce`'s early-stopping entry, which `#Done`s at the first
-// match; the item `is` arrives as the bound's hidden conformance Argument.
-
-// The one backwards walk. `reduce` runs forwards and nothing in Essence
-// walks a List the other way without copying it, so `lastIndex(where:)` is
-// native and `lastIndex(of:)` and `lastItem(where:)` are written on it. The
-// back run is walked from its end and then the front run from its START, since
-// the front is stored reversed and its logical head is its last element — so
-// the walk stops at the last accepted item having visited nothing after it.
-// The body this replaces reversed the whole List first: two thousand calls on
-// 20,000 items with the last item accepted measured 57 ms that way and 19 ms
-// here, best of three with the subprocess startup inside both.
+// The backwards walk, which Essence can not write without copying the List.
+// The back run is walked from its end, then the reversed front run from its
+// start.
 export function lastIndex__overload$3<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
@@ -847,10 +816,8 @@ export function slice<ItemType extends AnyType>(
 	from: IntegerType,
 	to: IntegerType,
 ): ListType<ItemType> {
-	// Half-open [from, to). A negative end counts back from the List's
-	// end — `slice(from 0, to -1)` drops the last item — and only THEN is each
-	// end clamped, so a position that reaches back past the start settles on
-	// zero rather than wrapping a second time.
+	// Half-open. A negative end counts back from the end, and then each end is
+	// clamped, so a position before the start settles on zero.
 	let view = runsOf(originalList)
 	let length = view.total
 	let fromPosition = positionFromEnd(from.value, length)
@@ -863,17 +830,12 @@ export function slice<ItemType extends AnyType>(
 		return createList([])
 	}
 
-	// The window the receiver can answer with by sharing both runs. It is
-	// what makes `removeLast()` and `removeFirst()` — the stdlib's two slices at
-	// the ends — cost nothing but a box, and a middle window of an upgraded List
-	// with it.
+	// A window containing the seam shares both runs.
 	if (first <= view.frontCount && last >= view.frontCount) {
 		return sharedWindowOf(originalList, view, first, last)
 	}
 
-	// A suffix of a box whose seam is at zero, under the half rule —
-	// `removeFirst()` and `removeFirst(count)` are this window, and after the
-	// upgrade the whole drain is windows.
+	// A suffix of a box with its seam at zero, under the half rule.
 	if (view.frontCount === 0 && last === length && first <= length - first) {
 		return sharedWindowOf(
 			originalList,
@@ -883,12 +845,7 @@ export function slice<ItemType extends AnyType>(
 		)
 	}
 
-	// An interior window of a box whose seam is at neither end of it, under
-	// THE THREE QUARTERS RULE — the box moves its seam into the middle of the
-	// window, and a walk dropping an item from each end per turn is windows from
-	// here on. The bar is higher than the half the two rules above use because
-	// this move is the only one a window can be charged for that a second window
-	// need never repay: see the rule's own NOTE beside `upgradedAroundWindow`.
+	// An interior window keeping at least three quarters of the List.
 	if ((last - first) * 4 >= length * 3) {
 		return sharedWindowOf(
 			originalList,
@@ -898,15 +855,10 @@ export function slice<ItemType extends AnyType>(
 		)
 	}
 
-	// Every other window lies wholly inside ONE run, since containing the
-	// seam and being moved onto it are the only ways not to, so what is left is
-	// a copy out of that run — a bulk one for the back, and a reversed walk for
-	// the front, whose head is stored last.
+	// Every other window lies inside one run and is copied out of it.
 	if (last < view.frontCount) {
 		let count = last - first
-		// The argument is the answer's LENGTH. The rule below suggests
-		// `Array.from({ length })` instead, which fills through an iterator —
-		// the very turn-by-turn work these three fills exist to avoid.
+		// `Array.from({ length })` would fill through an iterator.
 		// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 		let items: Array<ItemType> = new Array(count)
 		let front = view.front
@@ -924,27 +876,10 @@ export function slice<ItemType extends AnyType>(
 	)
 }
 
-// The item at a position is ABSENT from the answer, and every position
-// naming no item leaves the List alone: one reaching back past the first item,
-// and one standing at or past the end. That is the four-branch Essence body this
-// replaces, said once — the position is resolved from the end BEFORE either
-// decision, because `-1` is the last item and the branch that drops it has to
-// know which item that is.
-//
-// Native because no Essence composition can avoid the intermediates. The
-// body was two `slice`s and an `append(contentsOf:)`, which builds the whole
-// answer twice over and reads the receiver twice; here it is one Array of the
-// answer's own size, filled once — the same reason `split` and `of` stayed
-// native.
-//
-// Dropping the FIRST item of a box with a front run, or the LAST of one
-// with a back run, is a window rather than a fill: it shrinks the run it touches
-// and shares both. Dropping the first item of a box whose seam is at zero
-// upgrades it first, as `slice` does for the same window, so `remove(at 0)`
-// drains an append-built List in the time `removeFirst()` does. The last item
-// of a box whose back is empty lives at the bottom of the front run, where no
-// view can reach it, so that one goes the general way rather than growing
-// front-tail surgery for it.
+// The List without the item at the position, filled once. A position naming no
+// item leaves the List alone. Dropping the first or the last item is a shared
+// window where the runs allow one. The last item of a box with an empty back
+// takes the general path.
 export function remove<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	at: IntegerType,
@@ -974,12 +909,9 @@ export function remove<ItemType extends AnyType>(
 		return sharedWindowOf(originalList, view, 0, view.total - 1)
 	}
 
-	// Everything before the position and everything after it, with each run
-	// walked in two halves split there. The position falls in ONE of the runs, so
-	// the pair of loops on the other side runs the whole of it and the split
-	// leaves nothing out: no turn asks whether this is the item being dropped.
-	//
-	// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+	// Each run is walked in two halves split at the position, so no turn asks
+	// whether its item is the one dropped.
+	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let items: Array<ItemType> = new Array(view.total - 1)
 	let front = view.front
 	let frontCount = view.frontCount
@@ -1021,23 +953,9 @@ export function reverse<ItemType extends AnyType>(
 	return createList(materialise(originalList).slice(0).reverse())
 }
 
-// Everything before the position, the item, then everything from the
-// position on — what the Essence body built with `slice`, `append` and
-// `append(contentsOf:)`, kept exactly. The position is resolved from the end
-// and CLAMPED, so one before the start settles on zero and one past the end on
-// the length: there is no position that drops the item, which is what lets the
-// Declaration promise a `NonEmptyList` and is why the body could not stay in
-// Essence — every step of it answered a plain `List`.
-//
-// Clamped exactly as `slice` clamps — a position outside the List settles
-// on the nearest end rather than wrapping to the far one.
-//
-// Both ENDS are what the two growers already do, so both are handed
-// straight to them and inherit their upgrade-or-push. There is no fast path at
-// the seam and there can not be one: an item pushed onto the front run lands at
-// the logical HEAD, not between the runs, so neither push can say what a seam
-// insertion means. Everything between the ends is one Array of the answer's own
-// size, filled once from the two runs.
+// The position is clamped as `slice` clamps, so no position drops the item and
+// the Type may promise a `NonEmptyList`. The two ends go to `prepend` and
+// `append`, and every other position fills one Array of the answer's size.
 export function insert<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
@@ -1056,13 +974,9 @@ export function insert<ItemType extends AnyType>(
 		return append__overload$1(originalList, item)
 	}
 
-	// Everything before the position, the item, everything from it on —
-	// the three parts, with each run walked in two halves split at the position.
-	// The position falls in ONE of the runs, so one of the two splits sits at an
-	// end of its run and the pair of loops on that side runs the whole of it and
-	// nothing of the other: no turn asks where the item goes.
-	//
-	// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+	// Each run is walked in two halves split at the position, so no turn asks
+	// where the item goes.
+	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let items: Array<ItemType> = new Array(view.total + 1)
 	let front = view.front
 	let frontCount = view.frontCount
@@ -1098,20 +1012,9 @@ export function insert<ItemType extends AnyType>(
 	return createList(items)
 }
 
-// ONE ITEM OUT AND ONE ITEM IN, and nothing at all when the position names
-// no item — a position reaching back past the first item and one standing at or
-// past the end both leave the List alone, which is what the four-branch Essence
-// body this replaces said at greater length. Every case keeps the length, which
-// is why `NonEmptyList` may answer this with the proof its receiver carried and
-// why the two Namespaces are one Function.
-//
-// Native, and the reason is the whole of `listWrites.ts`. `List::replace`
-// was `@::remove(at index)::insert(item, at index)` in Essence — two whole fills
-// per write — and `NonEmptyList::replace` copied the run the position fell in.
-// Either way one positional write cost the List, so the accumulator a sieve, a
-// DP table, a heap, a board or a histogram is was quadratic: filling 40,000
-// cells measured 2,739 ms, and a sieve to 30,000 measured 2,447 ms against
-// 0.9 ms of JavaScript. Both are 25 ms here, and 640,000 cells are 117 ms.
+// One item out and one in, keeping the length. A position naming no item leaves
+// the List alone. Native so that a write into the back run can happen in place.
+// See "The List write log" in DEVELOPMENT.md.
 export function replace__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
@@ -1125,11 +1028,8 @@ export function replace__overload$1<ItemType extends AnyType>(
 		return originalList
 	}
 
-	// The front run is stored reversed, so the logical position counts
-	// back from its end — and a front run is never written in place: every front
-	// Array in this file is built fresh, and a List a Program writes positions
-	// into is one built flat. So this half is what it always was, the touched run
-	// copied and the other one shared.
+	// A front run is never written in place, so the touched run is copied and
+	// the back run shared.
 	if (position < view.frontCount) {
 		let front = view.front.slice(0, view.frontCount)
 
@@ -1141,23 +1041,9 @@ export function replace__overload$1<ItemType extends AnyType>(
 	return writtenInBack(originalList, view, position - view.frontCount, item)
 }
 
-// THE IN-PLACE WRITE. A box may write its back run where it is CURRENT for
-// that run's log — the writes it has seen are all the writes there are — and the
-// log is not sealed. It records what stood at the position, writes over it and
-// counts one version up; the answer views the new version and the receiver is
-// left viewing the old one, which is exactly what `listWrites.ts` catches up.
-//
-// A box with NO log copies once, and the COPY gets the log. Every box that
-// exists today holds a bare Array — a literal the Optimiser wrote out, a fresh
-// one a native handed to `createList`, the bridge's — and could never learn of a
-// write into it, so there is nothing to attach a log to but an Array this write
-// makes. The sieve pays that one copy and then writes in place for good.
-//
-// The log is BOUNDED by the run's length: past that the next write copies
-// and mints a fresh log, so what a chain holds is at most the Array and about as
-// much again, and the copies amortise to constant work per write. The old Array
-// and its old log are left exactly as they are, since whoever is behind on them
-// still catches up through them — a log is never reset where it stands.
+// Writes in place when the box is current for an unsealed log with room left.
+// Otherwise it copies, and the copy gets a fresh log. See "The List write log" in
+// DEVELOPMENT.md.
 function writtenInBack<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
@@ -1185,10 +1071,8 @@ function writtenInBack<ItemType extends AnyType>(
 
 		let seen = { log, seen: log.version }
 
-		// The two shapes the rest of this file builds, written out here
-		// rather than one shape with the front fields left undefined: a flat box
-		// is what a Program writes positions into, and every read of one is a
-		// read of the same shape `createList` and the Optimiser's literal make.
+		// A flat box keeps the shape `createList` and the Optimiser's literal
+		// build, rather than carrying undefined front fields.
 		if (view.frontCount === 0) {
 			return {
 				[typeKeySymbol]: "List",
@@ -1208,13 +1092,7 @@ function writtenInBack<ItemType extends AnyType>(
 		}
 	}
 
-	// The copy is this answer's ALONE, which is the one condition a log
-	// may be minted under and the reason a log is never attached to a run whose
-	// provenance is unknown. It is minted at EVERY size rather than above one: a
-	// board of nine squares written down every branch of a nine queens search
-	// measured 34 ms with the log, 34 ms with a size floor under it, and 34 ms
-	// before any of this — so a floor bought nothing, and cost a second path
-	// through the one piece of code everything here rests on.
+	// INVARIANT: a log is minted only on an Array no other box holds.
 	let copied = back.slice(0, count)
 
 	copied[position] = item
@@ -1226,17 +1104,9 @@ function writtenInBack<ItemType extends AnyType>(
 	return answer
 }
 
-// The ordering asked rather than imposed, and native because every
-// Essence body for it builds something. The adjacent pairs
-// `@::pair(with @::removeFirst())` makes allocate a Record per item, and a fold
-// carrying the item before pays a Record spread per item; two thousand checks of
-// a two thousand item sorted List measured 64 ms and 127 ms against 21 ms here.
-// This walk holds the item before in a local and leaves at the first pair out of
-// order, where the pairs build their whole List anyway and measured 57 ms.
-//
-// A descending check turns the comparison around rather than negating the
-// answer, exactly as `sort` does, so items the order calls `#Equal` are in
-// order in either direction.
+// Native because every Essence body for it allocates per item. It stops at the
+// first pair out of order. A descending check swaps the comparison, as `sort`
+// does, so equal items are in order either way.
 export function isSorted<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	order: SortOrderType,
@@ -1290,18 +1160,8 @@ function outOfOrder<ItemType extends AnyType>(
 	return ordering[typeKeySymbol] === "Ordering#Greater"
 }
 
-// `sort` is one Method with three Overloads, all native, binding by
-// position. `$1` reads the direction and orders by the items' own `compare`,
-// whose conformance its `Comparable` bound hands in as the trailing Argument;
-// `$2` takes the comparison outright and needs no direction, since a comparison
-// says which way it runs; `$3` below orders by a key read off each item. The
-// first two land on the same walk.
-//
-// A descending sort hands the SAME comparison the pair the other way
-// round rather than reversing the answer. `Array.sort` is stable, and two items
-// the comparison calls `#Equal` still call each other `#Equal` swapped — so a
-// tie keeps the order it had in either direction, which reversing the answer
-// would break.
+// Orders by the items' own `compare`. A descending sort swaps the pair rather
+// than reversing the answer, so the stable `Array.sort` keeps ties in order.
 export function sort__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	order: SortOrderType,
@@ -1322,10 +1182,7 @@ export function sort__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	order: (first: ItemType, second: ItemType) => OrderingType,
 ): ListType<ItemType> {
-	// A copy is sorted, since every List operation returns a new value.
-	// `Array.sort` is stable, so items the comparison calls equal keep their
-	// original order. The Ordering Case is read by tag, mapped to the sign
-	// `sort` expects.
+	// A copy is sorted, and `Array.sort` is stable.
 	let sorted = materialise(originalList).slice(0)
 
 	sorted.sort((first, second) => signOf(order(first, second)))
@@ -1343,34 +1200,9 @@ function signOf(ordering: OrderingType): number {
 	}
 }
 
-// `$3` orders by a KEY read off each item, and the key is read ONCE per
-// item rather than twice per comparison: every key is read into an Array, the
-// POSITIONS are sorted on those keys through the key Type's `compare` — the
-// hidden conformance Argument, as `$1`'s is — and the items are read back out
-// in the order the positions ended in. The Essence body this replaces handed
-// `$2` a comparison calling the key on both sides, which is 2·n·log₂n key reads
-// against n: with a key costing four hundred loop turns, 20,000 rows in
-// scrambled order measured 178 ms that way against 28 ms here, best of three
-// with the subprocess startup inside both, and the hand-written
-// decorate-sort-undecorate through `map` measured 29.
-//
-// SORTING POSITIONS rather than an Array of `{ key, item }` Records, and
-// that is what makes a CHEAP key cost nothing: three sorts of 200,000 rows on a
-// member path measured 103 ms through the comparison, 100 ms here, and 131 ms
-// with the Records — one object per item is a heavier debit than the key reads
-// this is here to save. The receiver is read through `materialise` for the same
-// reason `$1` and `$2` read it that way: a flat box hands over the Array it
-// already holds, and a two-run box is combined and demoted once.
-//
-// Rows in a strictly descending order are ONE run to `Array.sort`, which
-// finishes them in n comparisons and hides the key's cost entirely — a probe
-// has to scramble its keys, or it measures nothing.
-//
-// Stable, as the two beside it are, and for the same reason: a
-// descending sort hands the pairs of keys the other way round rather than
-// reversing the answer. Two items whose keys compare `#Equal` keep the order
-// they had in either direction, because `Array.sort` is stable and the
-// positions it is sorting start out in the receiver's order.
+// Orders by a key read once per item. The positions are sorted on the keys, so
+// no Record is built per item. Stable in either direction, as the other entries
+// are.
 export function sort__overload$3<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	key: (item: ItemType) => Key,
@@ -1411,14 +1243,8 @@ export function sort__overload$3<ItemType extends AnyType, Key extends AnyType>(
 	return createList(sorted)
 }
 
-// Lexicographic comparison — the item `compare` arrives as the hidden
-// conformance Argument (curried by `boundConformance` for a nested List). The
-// first pair that is not `Equal` decides; on an equal prefix the shorter List
-// is `Less`, and two equal-length Lists compare `Equal`.
-//
-// Both sides are read through a view, for the reason `is` is: two Lists
-// holding the same items compare `Equal` whichever representation each of them
-// happens to be in.
+// Lexicographic: the first pair that is not `#Equal` decides, and on an equal
+// prefix the shorter List is `#Less`. Both sides are sealed, as in `is`.
 export function compare<ItemType extends AnyType>(
 	first: ListType<ItemType>,
 	second: ListType<ItemType>,
@@ -1452,12 +1278,7 @@ export function compare<ItemType extends AnyType>(
 	return equal
 }
 
-// Joining asks nothing of the items but that each can say what it is, so
-// the Method is bounded by `Printable` rather than fixed to a List of Strings —
-// the conforming Namespace's method map arrives as the hidden trailing
-// Argument, exactly as `sort`'s does, and its `toString` is the whole of the
-// conversion. For a List of Strings that `toString` is the identity, so the
-// original behaviour is unchanged.
+// Bounded by `Printable`, so any items join through their `toString`.
 export function join<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	separator: StringType,
@@ -1479,17 +1300,9 @@ export function join<ItemType extends AnyType>(
 	return createString(pieces.join(separator.value))
 }
 
-// What a READER sees, which is the form a Program writes the List down
-// in: `[1, 2, 3]`, and `[]` for the empty one. Here rather than in Essence
-// because the brackets are String concatenation: written there it would call
-// `String::append`, the only edge this Namespace drew into a Namespace that is
-// written on THIS one.
-//
-// Not `join` with brackets around it any more, and the difference is the
-// one rule `itemText` holds: a String item is QUOTED here where `join` leaves
-// it bare. Joining answers the raw text — `["a", "b"]::join(with ", ")` is
-// `a, b` — and printing answers what was written down, so `["a", "", "b"]`
-// reads as three items rather than as `[a, , b]`.
+// The List as a Program writes it, so a String item is quoted where `join`
+// leaves it bare. Native, since an Essence body would call `String::append`,
+// and `String` is written on `List`.
 export function toString<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	conformance: {
@@ -1527,15 +1340,8 @@ export function flatten<ItemType extends AnyType>(
 	return createList(flattened)
 }
 
-// One walk up, and one Function under both Namespaces' names: there is a
-// position for every item, so a receiver with something in it answers with
-// something in it and `NonEmptyList` re-exports this rather than counting a
-// second time. Written here because the proven entry could not be written in
-// Essence without borrowing a promise from somewhere: its body counted DOWN
-// through `List.of(integersFrom:downTo:)`, which promises a non-empty answer,
-// and turned the count round — a second walk over an Array of Integers already
-// built, which measured 0.90 ms per 100,000 positions against 0.55 ms for the
-// single walk. A calling Program is 2,097 bytes smaller for it.
+// One position for every item, so `NonEmptyList` re-exports this as its proven
+// entry.
 export function indices__overload$1(
 	originalList: ListType<AnyType>,
 ): ListType<IntegerType> {
@@ -1549,15 +1355,8 @@ export function indices__overload$1(
 	return createList(positions)
 }
 
-// One walk and one Record per item — the position beside the item it
-// stands at, so a fold that needs both does not have to carry a counter of its
-// own. Written here rather than in Essence because the Essence body would be
-// `@::indices()::map(…)`, and reading each item back by position builds an
-// Optional per item to take apart again.
-//
-// `materialise` rather than a view, as `pair` reads its two Lists: the
-// answer is a fresh Array of the receiver's whole length either way, so there
-// is nothing to gain by walking the two runs apart.
+// Each item beside its position. An Essence body would read each item back by
+// position and build an Optional per item.
 export function enumerate<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListType<RecordType & { index: IntegerType; item: ItemType }> {
@@ -1595,17 +1394,9 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 	return createList(pairs)
 }
 
-// A group size below one names no grouping, and the answer is the whole
-// List in ONE group — nothing is dropped and nothing is refused. `1` rather
-// than `1n`: an ordering comparison reads both representations, so one spelling
-// asks the question of either. That clamp is what makes the loop below safe to
-// read as it is: the size is never below one, and a group is opened only while
-// an item remains to put in it, so every group comes back with at least one
-// item. The declared item Type `NonEmptyList<ItemType>` rests on exactly that.
-//
-// The empty List answers with no groups at all, for every size, because
-// there is no item to put in one. That is the same answer a valid size gives
-// it, so the size below one changes nothing there either.
+// A group size below one answers the whole List as one group. A group opens
+// only while an item remains, so every group holds one, as its Type promises.
+// The empty List answers no groups.
 export function split__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	groupSize: IntegerType,
@@ -1623,16 +1414,9 @@ export function split__overload$1<ItemType extends AnyType>(
 	return createList(groups)
 }
 
-// One walk behind all four range natives. The step is signed and never
-// zero, so the values run from the first and stop where a step passes the last,
-// whichever side of it the step approaches from. `atLeastOne` is the promise the
-// `downTo:` entries carry into their Type: where the first value is already past
-// the end, the walk answers that value rather than nothing.
-//
-// Counted in numbers where every bound is held as one, which is every
-// range a List can actually hold — a range needing bigint ends spans more items
-// than there is memory for, and is only ever reached to be refused by whatever
-// runs out first.
+// The walk behind the range natives. The step is signed and never zero.
+// `atLeastOne` keeps the `downTo:` promise: a first value already past the end
+// is answered alone. A range with bigint ends could not fit in memory anyway.
 function integerRange(
 	firstInteger: IntegerType,
 	lastInteger: IntegerType,
@@ -1686,14 +1470,9 @@ function integerRange(
 	return createList(integers)
 }
 
-// The four range natives, each a step and a promise handed to one walk.
-// The step is passed as the value it holds rather than as an Integer, because
-// `Integer.ts` and this file import each other and a module level
-// `createInteger(1)` here would run before the safe bound it reads is bound.
-// `$1` counts up through its end and `$3` counts down through its own, which is
-// what puts the direction in the label rather than in the pair of bounds. The
-// `upTo:` entries beside them are written in Essence, over an end one step
-// nearer, because what they add is an adjustment rather than a walk.
+// The step is passed as a number. `Integer.ts` imports this module through
+// `String.ts`, so a top-level `createInteger(1)` here could run before
+// `Integer.ts` binds its bounds.
 export function of__overload$1(
 	firstInteger: IntegerType,
 	lastInteger: IntegerType,
@@ -1724,14 +1503,8 @@ export function of__overload$6(
 	return integerRange(firstInteger, lastInteger, stepInteger.value, true)
 }
 
-// The count of this entry is a `PositiveInteger` in the source — proven
-// while compiling, erased to an Integer here — so the answer certainly holds
-// something and the Namespace may say so. The Essence entry beside it can not:
-// its body is a `map` over `of`, and what that answers is a `List`.
-//
-// The count is a JavaScript number, for the reason `of` counts in one. A
-// count needing a bigint asks for more items than there is memory for, and is
-// only ever reached to be refused by whatever runs out first.
+// The count is a proven `PositiveInteger`, so the answer is never empty, which
+// the Essence entry can not say.
 export function repeat__overload$2<ItemType extends AnyType>(
 	item: ItemType,
 	count: IntegerType,
@@ -1745,39 +1518,17 @@ export function repeat__overload$2<ItemType extends AnyType>(
 	return createList(copies)
 }
 
-// THE SET-SHAPED NATIVES, and the one structure all five rest on: a
-// `KeySet` (`keyEncoding.ts`) holding what the walk has met, keyed by the
-// canonical encoding a Dictionary finds a slot by. What a fold on `contains`
-// costs is a scan of everything kept so far per item, which is quadratic; each
-// of these is one walk and one lookup per item. One `removeDuplicates` over
-// 20,000 items with 2,000 distinct measured 106 ms as such a fold, 23 ms
-// through the `tally()::keys()` this replaced, and 22 ms here; with all 20,000
-// distinct the fold measured 650 ms and this walk 22 ms. Best of three, with
-// the 21 ms of subprocess startup inside every figure.
+// The set-shaped natives walk once with one `KeySet` lookup per item, where a
+// fold on `contains` would be quadratic. See "Finding a Dictionary key" in
+// DEVELOPMENT.md.
 //
-// The encoding lives in a module of its own so that this can reach it
-// without the store, the version stamps, the kind registry and the written
-// form arriving behind it — which is what `@::tally()::keys()` in `Dictionary.es`
-// used to drag into any Program that asked a List for its distinct items.
-// `bundleSize.spec.ts` holds the figure that trade is worth.
-//
-// The witness decides, not the encoding. `encodeKey` answers `null` for a
-// witness the Compiler has not branded structural, and every lookup then walks
-// the keys and asks that witness — the same scan path a Dictionary takes for the
-// same reason, and invisible from Essence apart from the time it costs.
-
-// The whole item standing as its own key, so that the `on:` entries and
-// the bare ones are one walk each rather than two written twice. A monomorphic
-// identity call per item is inside the noise of the `encodeKey` beside it.
+// The item as its own key, so the bare entries share the `on:` entries' walk.
 function itself<ItemType extends AnyType>(item: ItemType): ItemType {
 	return item
 }
 
-// Every key of a List, in one set. `sealedRunsOf` rather than `viewOf`,
-// for the reason `GroupedList` gives — this walk visits each item once and has
-// no reason to trim the caller's List for it — and sealing rather than a bare
-// `runsOf`, because the key Function and the item's own witness are user code
-// running while the run Array is held.
+// Every key of a List. The key Function and the witness are user code, so the
+// runs are sealed.
 function keySetOver<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
@@ -1797,10 +1548,8 @@ function keySetOver<ItemType extends AnyType, Key extends AnyType>(
 	return set
 }
 
-// The intersection and the difference in one walk, told apart by which
-// answer of the membership test keeps an item. Both are filters over the
-// receiver rather than set operations over it: an item is kept every time it
-// occurs, which is what `everyItem(where:)` beside them does with a check.
+// The intersection and the difference as filters over the receiver, so an
+// item is kept every time it occurs.
 function keptByMembership<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<ItemType>,
@@ -1830,9 +1579,8 @@ function keptByMembership<ItemType extends AnyType>(
 	return createList(kept)
 }
 
-// The first item met at each key, which is what both `removeDuplicates`
-// entries answer. `addKey` says whether the key was new, so the membership test
-// and the insertion are one lookup rather than two.
+// The first item met at each key. `addKey` answers whether the key was new, so
+// the test and the insertion are one lookup.
 function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
@@ -1861,10 +1609,7 @@ function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
 	return createList(kept)
 }
 
-// The same walk, stopped at the first key it has already met — which is
-// the whole of what `hasDuplicates` asks, and the reason it is not
-// `removeDuplicates()::length()` compared against the receiver's. It seals as
-// `keySetOver` does, and for the same reason.
+// Stops at the first key met twice, which is all `hasDuplicates` asks.
 function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
@@ -1888,11 +1633,9 @@ function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
 	return createBoolean(false)
 }
 
-// The subset question. The receiver is indexed and the ARGUMENT is
-// walked, so the answer is settled at the first item that is not there. Both
-// sides are sealed — the receiver by `keySetOver` and the Argument here. The
-// empty List asks nothing of the receiver, which is what makes the answer
-// `true` before either List is read.
+// The subset question. The receiver is indexed and the Argument walked, so the
+// first missing item settles it. Both are sealed, and an empty Argument answers
+// `true` at once.
 export function contains__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<ItemType>,
@@ -1973,22 +1716,9 @@ export function hasDuplicates__overload$2<
 	return meetsAKeyTwice(originalList, keyOf, conformance)
 }
 
-// Sealed as the set-shaped natives are, though it asks no witness: every
-// item is counted by its canonical encoding alone, so no user code runs while
-// the run Array is held.
-//
-// The item counted highest, and the sixth Method resting on
-// `keyEncoding.ts` rather than on a container. It is here beside the
-// set-shaped natives because it is one of them with a tally instead of a
-// membership test: one walk, one lookup per item, and the earliest of the keys
-// counted highest — earliest because a later key has to BEAT the count rather
-// than meet it, and the keys are held in the order each was first met.
-//
-// The three Namespaces that declare it — `NonEmptyIntegerList`,
-// `NonEmptyRationalList` and `NonEmptyNumberList` — are one Function here, and
-// the answer is the key's FIRST occurrence, which is the item a Dictionary
-// would have kept. That matters where two spellings are one key: `[2/4, 1/2,
-// 1/2]` answers `2/4`, and `[3, 3/1, 4]` answers the Integer `3`.
+// The item counted highest by its canonical encoding, the earliest key on a
+// tie. It answers a key's first occurrence, as a Dictionary keeps it: `[3, 3/1,
+// 4]` answers the Integer `3`.
 export function mode<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
@@ -2014,11 +1744,8 @@ export function mode<ItemType extends AnyType>(
 	return count.keys[highest]
 }
 
-// The pieces a separator leaves, which is `String::split(on:)`'s shape
-// over items. A piece is opened before the first item and closed by every
-// accepted one, so a List holding n accepted items answers n+1 pieces and a
-// List holding none answers one — including the empty List, whose one piece is
-// empty. That is what the declared `NonEmptyList<List<ItemType>>` rests on.
+// The pieces between accepted items, as `String::split(on:)` cuts. There is
+// always one piece more than accepted items, so the answer is never empty.
 export function split__overload$3<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
@@ -2054,15 +1781,9 @@ export function split__overload$3<ItemType extends AnyType>(
 	return createList(pieces)
 }
 
-// Every stretch of one size, one position apart. The loop condition is
-// what makes a size above the length answer nothing: the first window would
-// have to reach past the last item. The size is a `PositiveInteger` in the
-// source — proven while compiling, erased to an Integer here — so a stretch
-// always holds something and the Namespace may say so.
-//
-// `Number` on the size for the reason `repeat` counts in one: a window
-// needing a bigint size spans more items than there is memory for, and reaches
-// the comparison below only to fail it.
+// Every stretch of one size, one position apart. A size above the length
+// answers nothing. The size is a proven `PositiveInteger`, so every stretch
+// holds an item.
 export function windows<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	windowSize: IntegerType,
@@ -2078,11 +1799,8 @@ export function windows<ItemType extends AnyType>(
 	return createList(stretches)
 }
 
-// The maximal stretches of neighbours the check accepts. A stretch is
-// opened by the first item accepted after a refusal and closed by the next
-// refusal, so every one that reaches the answer holds an item — which is what
-// the declared `NonEmptyList<ItemType>` item Type rests on, and what no Essence
-// fold over the accepted items could say.
+// The longest stretches of neighbours the check accepts. Each holds an item,
+// which its Type promises and no Essence fold could.
 export function runs<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
@@ -2120,14 +1838,8 @@ export function runs<ItemType extends AnyType>(
 	return createList(stretches)
 }
 
-// The inner Lists read as columns. The shortest one decides how many
-// there are, which is `pair(with:)`'s rule one dimension along, and it is found
-// in the same walk that materialises the rows — so each inner List is combined
-// at most once however many columns are read out of it.
-//
-// `NestedList` re-exports this, as it re-exports `flatten`: the operation
-// is written here beside the List internals it reads, and the Namespace is a
-// name for the receivers that can answer it.
+// The inner Lists read as columns. The shortest decides how many, as in
+// `pair(with:)`, and each row is combined once.
 export function transpose<ItemType extends AnyType>(
 	originalList: ListType<ListType<ItemType>>,
 ): ListType<ListType<ItemType>> {
