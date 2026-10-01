@@ -11,36 +11,22 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// A bound Type Parameter is answered by a WITNESS handed in beside the
-// Arguments, and a conditional conformance's witness is `boundConformance(<map>,
-// [<witnesses>])` — one level per container. So a call binding `Key :=
-// List<Item>` owes exactly one level, and a level too many hands `List::is` two
+// A conditional conformance's witness is `boundConformance(<map>,
+// [<witnesses>])`, one level per container. A call binding a Parameter to
+// `List<Item>` owes exactly one level. A level too many hands `List::is` two
 // items as if each were a List.
 //
-// That is what `nestedDistinct` below used to emit, and only when the CALLER's
-// Type Parameter is spelled the same as the callee's: `createFreshenedInference`
-// alpha-renames the callee's Generics for the span of one invocation, and
-// `unfreshenBindings` puts the declared names back, after which the two `Key`s
-// are one name. Substituting the invocation's own bindings into a binding the
-// ARGUMENTS produced then rewrote the caller's Parameter along with the
-// callee's, wrapping `List<Key>` into `List<List<Key>>`.
+// The hazard is a caller whose Type Parameter shares the callee's name.
+// `createFreshenedInference` renames the callee's Generics for one invocation
+// and `unfreshenBindings` restores them, so the caller's Parameter must not be
+// rewritten along with the callee's.
 //
-// The witness is the only thing that knows which `is`, `compare` or `toString`
-// to run, so a wrong one is a wrong ANSWER rather than a wrong Type: with the
-// standard library's structural `is` two different Lists compared equal, and
-// with a written `is` that reads its value the Program died inside the String
-// runtime. Every case here therefore asserts what the Program PRINTS, against
-// the same question asked with no generics at all — which is the oracle,
-// because the shapes this file is about all used to answer wrongly.
-//
-// Two of the guards here are stronger than the rest, and deliberately so.
-// A Dictionary reads a List key through the canonical encoding rather than
-// through the witness, so a Program using only the standard library's `is`
-// answers RIGHT even under a wrong witness — the encoding routes past the
-// comparison the extra level breaks. What a wrong witness can not survive is
-// the LEVEL COUNT read off the emitted text, and a WRITTEN `is`, `compare` or
-// `toString` that the encoding has no shortcut for. Reverting the fix leaves
-// the three plain-String cases green and turns those five red.
+// The witness decides which `is`, `compare` or `toString` runs, so a wrong one
+// is a wrong answer. Each spec asserts what the Program prints beside the same
+// question asked with no generics. A Dictionary reads a List key through its
+// encoding rather than the witness. So the strongest guards are the level count
+// in the emitted text and a written `is`, `compare` or `toString`. See
+// "Conformance witnesses" in packages/runtime/DEVELOPMENT.md.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -55,8 +41,8 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// The emitted module is written to a throwaway file and imported, as in
-// `hybridIntegers.spec.ts` — what is asserted is what the Program PRINTS.
+// Writes the emitted module to a throwaway file and imports it, capturing what
+// the Program prints.
 async function outputOf(source: string): Promise<Array<string>> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-witness-"))
 	let file = join(directory, "program.ts")
@@ -88,10 +74,9 @@ async function outputOf(source: string): Promise<Array<string>> {
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
-// One emitted Function, from its `function <name>(` line to the `}` that
-// closes it in column one — the witness Expression is written across several
-// lines, so counting on a single line would miss the second level exactly where
-// it matters.
+// One emitted Function, from its `function <name>(` line to the `}` in column
+// one. The witness Expression spans several lines, so one line would miss the
+// second level.
 function bodyOf(generated: string, name: string): string {
 	let lines = generated.split("\n")
 	let start = lines.findIndex((line) => line.startsWith(`function ${name}(`))
@@ -109,9 +94,8 @@ function levelsIn(body: string): number {
 	return body.split("boundConformance").length - 1
 }
 
-// A written `is` that READS its value, so a witness handed the wrong kind
-// of value does not quietly answer `true` — it dies in the String runtime, which
-// is what master does with the `nestedDistinct` shape.
+// A written `is` that reads its value. A witness handed the wrong kind of
+// value then fails in the String runtime rather than answering `true`.
 const byLength = [
 	"		namespace ByLength for NonEmptyString is Equatable {",
 	"			is(_ other: NonEmptyString) -> Boolean {",
@@ -136,9 +120,6 @@ function program(body: string): string {
 	return `implementation {\n${body}\n}`
 }
 
-// The Namespace, the three values and the calls all live inside a
-// Function, because a Namespace written for a refinement has to be declared
-// where it is used.
 function inRun(body: string): string {
 	return `	function run() -> {} {\n${byLength}\n\n${body}\n	}\n\n	run()`
 }
@@ -158,11 +139,9 @@ describe("the witness a bound Type Parameter is handed", () => {
 			].join("\n"),
 		)
 
-		// `distinct`'s item Type is `List<Item>`, so the witness owed is
-		// `boundConformance(List, [Item__conformance])` — ONE level. Read off
-		// the emitted text rather than off the answer, because the answer can
-		// be right for the wrong reason: a branded witness routes a List key
-		// past the comparison the extra level would have broken.
+		// `distinct`'s item Type is `List<Item>`, so the witness owed is one
+		// level. The answer alone can be right for the wrong reason, since a
+		// branded witness routes a List key past the comparison.
 		it("should carry one boundConformance level per container", () => {
 			expect(levelsIn(bodyOf(generate(source), "nestedDistinct"))).toBe(1)
 		})
@@ -172,9 +151,8 @@ describe("the witness a bound Type Parameter is handed", () => {
 		})
 	})
 
-	// The whole bug in two lines. `sameName` and `otherName` are the same
-	// Function under two spellings of one Type Parameter, and only the spelling
-	// that collides with the callee's used to answer wrongly.
+	// `sameName` and `otherName` are one Function under two spellings of its
+	// Type Parameter. Only `sameName`'s collides with the callee's.
 	describe("a caller whose Type Parameter is spelled like the callee's", () => {
 		it("should answer what the same Function under another name answers", async () => {
 			expect(
@@ -204,9 +182,8 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the depth the Type Parameter stands at", () => {
-		// One, two and three containers between the Parameter and the
-		// item — each level is a `boundConformance` the call has to curry, and
-		// the fault multiplied them rather than counting them.
+		// Each container between the Parameter and the item is one more
+		// `boundConformance` level, which the call must count rather than multiply.
 		it("should answer alike one, two and three deep", async () => {
 			expect(
 				await outputOf(
@@ -242,9 +219,8 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("a witness forwarded before it is used", () => {
-		// Through one more Function, through two, and captured in a
-		// closure — each hop re-solves the bound, so a hop that wrapped the
-		// witness once would wrap it again.
+		// Each hop re-solves the bound, so a hop that wrapped the witness once
+		// would wrap it again.
 		it("should answer alike through one hop, two hops and a closure", async () => {
 			expect(
 				await outputOf(
@@ -305,11 +281,9 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("a written witness whose answer differs from the structural one", () => {
-		// `ByLength` says "ab" is "cd" and is not "c". A witness one
-		// level too deep hands it a List where it expects a String and dies
-		// reading the String's characters — on master this Program does not
-		// finish. The last pair is the same question with no generics, which is
-		// what the six before it have to agree with.
+		// `ByLength` says "ab" is "cd" and is not "c". A witness one level too
+		// deep hands it a List and fails reading the characters. The last pair
+		// asks the same question with no generics.
 		it("should run the written is at every depth", async () => {
 			expect(
 				await outputOf(
@@ -346,10 +320,8 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the container the Type Parameter is bound to", () => {
-		// Every generic shape the language has, each holding the
-		// `ByLength` String so a wrong witness shows as a wrong count rather
-		// than as two values that happen to compare equal. The last pair is the
-		// oracle: the same two values, no generics anywhere.
+		// Each generic shape holds a `ByLength` String, so a wrong witness shows
+		// as a wrong count. The last pair asks the same question with no generics.
 		it("should answer alike for every one of them", async () => {
 			expect(
 				await outputOf(
@@ -495,12 +467,9 @@ describe("the witness a bound Type Parameter is handed", () => {
 	})
 
 	describe("the Protocol the bound names", () => {
-		// Equatable is not the only conditional conformance a container
-		// carries. `Backwards` orders "a" above "b" and `Shout` renders a
-		// String as its own uppercase, so `sort`, `highestItem`, `join` and an
-		// interpolation each answer something the structural witness never
-		// would — and each of them reaches the witness through the same
-		// forwarding. Every nested answer is asserted beside the direct one.
+		// Comparable and Printable witnesses are forwarded the same way.
+		// `Backwards` orders "b" before "a" and `Shout` uppercases a String. Each
+		// nested answer is asserted beside the direct one.
 		it("should carry Comparable and Printable the same way", async () => {
 			expect(
 				await outputOf(
