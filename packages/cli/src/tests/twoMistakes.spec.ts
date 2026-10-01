@@ -9,29 +9,16 @@ import { analyse } from "@essence-lang/language-server/analyse"
 import { compileFile } from "../pipeline"
 import { withFiles } from "./harness"
 
-// The guard that says one run reports every INDEPENDENT mistake — and
-// nothing else. Each Program below holds two mistakes that have nothing to do
-// with one another, and the assertion is the EXACT set of codes and lines, so
-// it fails both ways: a genuine mistake that goes missing, and a cascade that
-// turns up beside the one that caused it.
+// One run reports every independent mistake and nothing else. Each Program holds
+// two unrelated mistakes, and the assertion is the exact set of codes and lines.
+// So it fails on a missing mistake and on a cascade alike. A check of "at least
+// these" would pass a Compiler that says nothing.
 //
-// It is written as exact sets rather than as "contains" for the reason the
-// stand-downs exist at all. Every one of them buys silence, and a check written
-// as "at least these" can be satisfied by a Compiler that says nothing about
-// anything. The pairs come from a survey of the recovery's reach: a name
-// dropped in one body and read in another, a `<-` orphaned by a dropped head
-// and a `<-` written at the top level on purpose, a Choice taken down whole and
-// a Case nothing declares.
-//
-// It is a CLI spec because the CLI is the only package that can reach all three
-// readers — the command line, the Editor, and the seam a host embeds the
-// Compiler through. All three are held to the same list: a reader who meets a
-// mistake in one of them and not in another has no way to tell which is telling
-// them the truth about their file.
+// Only the CLI reaches all three readers: the command line, the Editor, and the
+// seam a host embeds the Compiler through. All three are held to one list.
 
-// `code@line` — the two halves a reader acts on. The column and the
-// message are the business of the specs that own each Diagnostic; what this one
-// is about is WHICH mistakes were found and where.
+// `code@line`, what a reader acts on. Columns and messages belong to the specs
+// that own each Diagnostic.
 function placedCodes(diagnostics: Array<common.Diagnostic>): Array<string> {
 	return diagnostics.map(
 		(diagnostic) =>
@@ -47,8 +34,8 @@ type TwoMistakes = {
 }
 
 const PROGRAMS: Array<TwoMistakes> = [
-	// The shape every stand-down here is about: a Statement the Parser
-	// dropped, and a second mistake further down that has nothing to do with it.
+	// The shape every stand-down concerns: a Statement the Parser dropped, and an
+	// unrelated second mistake further down.
 	{
 		name: "a dropped Constant and a Function that falls off the end",
 		source: `implementation {
@@ -63,9 +50,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@2", "missing-return@4"],
 	},
-	// The other side of it. The `missing-return` for `doubled` is NOT
-	// owed — the `<-` that would have made it return is the text the Parser
-	// dropped — while `tripled`, written whole, really does fall off its end.
+	// The `missing-return` for `doubled` is not owed, since the dropped text holds
+	// its `<-`. `tripled`, written whole, really does fall off its end.
 	{
 		name: "a Method whose Return was dropped and a Method that has none",
 		source: `implementation {
@@ -84,8 +70,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@5", "missing-return@7"],
 	},
-	// A dropped Constant leaves no body without a head, so the `<-` below
-	// it is one the reader wrote at the top level and is owed its report.
+	// A dropped Constant leaves no body without a head, so the `<-` below it is a
+	// top-level one and is owed its report.
 	{
 		name: "a dropped Constant and a '<-' written at the top level",
 		source: `implementation {
@@ -96,7 +82,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@2", "top-level-return@4"],
 	},
-	// And far away from it, under a Function the Parser read whole.
+	// And far from it, under a Function the Parser read whole.
 	{
 		name: "a Constant dropped inside a body and a '<-' far below it",
 		source: `implementation {
@@ -116,9 +102,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@3", "top-level-return@13"],
 	},
-	// The dropped HEAD, which is the case the stand-down exists for. Its
-	// body is left standing where the top level is, and every `<-` in it is the
-	// one syntax error over again.
+	// A dropped head leaves its body at the top level, and every `<-` in it repeats
+	// the one syntax error, so they stay silent.
 	{
 		name: "a Function head that lost its brace",
 		source: `implementation {
@@ -129,8 +114,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@3", "unexpected-token@5"],
 	},
-	// One missing brace, several orphaned Returns — all from the one
-	// mistake, so all silent.
+	// One missing brace orphans several Returns, all silent.
 	{
 		name: "a dropped head that orphans two Returns",
 		source: `implementation {
@@ -142,7 +126,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@3", "unexpected-token@6"],
 	},
-	// A head dropped BELOW the `<-` orphans nothing above it.
+	// A head dropped below the `<-` orphans nothing above it.
 	{
 		name: "a '<-' at the top level above the run that was abandoned",
 		source: `implementation {
@@ -156,8 +140,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["top-level-return@2", "syntax-error@5"],
 	},
-	// A name dropped inside one Function's body is not in scope in the
-	// next Function along, so the read there is a second mistake.
+	// A name dropped inside one Function's body is not in scope in the next
+	// Function, so the read there is a second mistake.
 	{
 		name: "a Variable dropped in one body and read in another",
 		source: `implementation {
@@ -186,8 +170,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@3", "unknown-name@7"],
 	},
-	// A `type` is hoisted only at a section's top level, so one dropped
-	// inside a body is not a Type the Parameter below can name.
+	// A `type` is hoisted only at a section's top level, so one dropped inside a
+	// body is not a Type the Parameter can name.
 	{
 		name: "a Type dropped inside a body and named outside it",
 		source: `implementation {
@@ -203,10 +187,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@3", "unknown-type@7"],
 	},
-	// And the silence a top-level `choice` IS owed, both ways it is named
-	// — `Signal` as a Type and `Signal#Red` as a qualified Case. The Match
-	// below is written against a Choice whose Cases were dropped, so what it
-	// does not handle says nothing either.
+	// A dropped top-level `choice` is owed silence as `Signal` and as `Signal#Red`.
+	// The Match against it says nothing about unhandled Cases either.
 	{
 		name: "a dropped Choice named as a Type and as a qualified Case",
 		source: `implementation {
@@ -226,9 +208,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@5"],
 	},
-	// A Choice dropped inside a BODY, and a Case of the whole Choice
-	// named at the top level. The inner `choice Other` is not what `Signal#Green`
-	// is about, so the Case nothing declares is still owed its report.
+	// A Choice dropped inside a body, and a Case of another Choice named at the top
+	// level. That undeclared Case is still owed its report.
 	{
 		name: "a Choice dropped in a body and a Case nothing declares",
 		source: `implementation {
@@ -249,8 +230,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["unclosed-block@8", "syntax-error@11", "unknown-case@14"],
 	},
-	// A Match that really does not handle every Case, beside a syntax
-	// error written where the Match can not reach.
+	// A Match that does not handle every Case, beside a syntax error it cannot
+	// reach.
 	{
 		name: "a dropped Constant and a Match that misses a Case",
 		source: `implementation {
@@ -301,9 +282,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@2", "argument-type-mismatch@8"],
 	},
-	// A Function that calls itself on every path really can never return
-	// — and the syntax error two lines up is about a Constant that has nothing
-	// to do with it.
+	// A Function that calls itself on every path never returns, and the syntax error
+	// above it concerns an unrelated Constant.
 	{
 		name: "a dropped Constant and a Method that recurses forever",
 		source: `implementation {
@@ -318,9 +298,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@2", "infinite-recursion@5"],
 	},
-	// And the same check standing down, because the dropped Statement is
-	// written INSIDE the body whose paths are being counted: a `<-` may be
-	// exactly what went missing.
+	// The same check stands down when the dropped Statement is inside the body whose
+	// paths are counted, since it may be the missing `<-`.
 	{
 		name: "a Statement dropped inside the body that would recurse",
 		source: `implementation {
@@ -334,9 +313,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@4"],
 	},
-	// Three stages, three mistakes, one run — the finding this whole seam
-	// was built for, with a fourth thing that is NOT owed: the `label` the
-	// Parser dropped.
+	// Three stages, three mistakes, one run, and the dropped `label` is not owed.
 	{
 		name: "a dropped Constant, a Record missing a member and an undeclared name",
 		source: `implementation {
@@ -357,9 +334,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 			"unknown-name@10",
 		],
 	},
-	// Two mistakes with no syntax error between them, which is the
-	// baseline every stand-down is measured against: nothing was abandoned, so
-	// nothing is owed silence.
+	// Two mistakes with no syntax error: nothing was dropped, so nothing is owed
+	// silence.
 	{
 		name: "two Functions returning the wrong Type",
 		source: `implementation {
@@ -374,8 +350,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["return-type-mismatch@3", "return-type-mismatch@7"],
 	},
-	// An Error INSIDE a written List does not stop the List from having a
-	// Type, so the Constant it is assigned to is still judged.
+	// An Error inside a written List still leaves it a Type, so its Constant is
+	// still judged.
 	{
 		name: "an undeclared name in a List and a List assigned to a String",
 		source: `implementation {
@@ -390,8 +366,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["unknown-name@6", "assignment-type-mismatch@8"],
 	},
-	// And inside a written Record, with a member nothing declares read
-	// off it below.
+	// Likewise inside a written Record, with an undeclared member read off it.
 	{
 		name: "an undeclared name in a Record and a member nothing declares",
 		source: `implementation {
@@ -409,9 +384,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 			"unknown-member@7",
 		],
 	},
-	// A Protocol whose member list lost an entry. The Namespace below
-	// conforms to what the Protocol was left with, so nothing is owed about the
-	// conformance — the one mistake is the entry.
+	// A Protocol lost a member entry. The Namespace conforms to what remains, so the
+	// one mistake is the entry.
 	{
 		name: "a Protocol member dropped and a Namespace conforming to the rest",
 		source: `implementation {
@@ -429,11 +403,9 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@4"],
 	},
-	// A Namespace with no target Type can not hold a Method that takes
-	// one, so the Method is refused where it is written and left carrying an
-	// Error receiver. Every call of it then counted one Parameter more than the
-	// reader can see — the Namespace's mistake reported a second time, as
-	// something wrong with a call that is written exactly right.
+	// A Namespace without a target Type refuses a Method that takes one, which then
+	// carries an Error receiver. Its calls must not report a Parameter the reader
+	// cannot see.
 	{
 		name: "a Method in an untyped Namespace and a name nothing declares",
 		source: `implementation {
@@ -449,9 +421,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["untyped-namespace-method@3", "unknown-name@9"],
 	},
-	// A hole in a POSITIONAL Argument moves every Argument after it, so
-	// the rest of the call can not be measured — the `99` may be standing where
-	// the signature's first Parameter is. The call stands down whole.
+	// A hole in a positional Argument shifts every later one, so the call stands
+	// down whole.
 	{
 		name: "an undeclared positional Argument beside one of the wrong Type",
 		source: `implementation {
@@ -464,9 +435,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["unknown-name@6"],
 	},
-	// And a hole under a LABEL moves nothing — a labelled Argument is
-	// matched by its label before its Type is looked at — so the second mistake
-	// is found in the same run as the first.
+	// A hole under a label shifts nothing, since labelled Arguments match by label,
+	// so the second mistake is found too.
 	{
 		name: "an undeclared labelled Argument beside one of the wrong Type",
 		source: `implementation {
@@ -479,11 +449,9 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["unknown-name@6", "argument-type-mismatch@6"],
 	},
-	// A static Property dropped out of a Namespace body, read with `.`
-	// below it, beside a member of the same Namespace that really is not there.
-	// The `::` side of the lookup has always stood down for a dropped member;
-	// the `.` side never did, so the one syntax error reported again at every
-	// read of what it took away.
+	// A static Property dropped from a Namespace body, read with `.`, beside a
+	// member that is really missing. Like `::`, the `.` lookup stands down for a
+	// dropped member.
 	{
 		name: "a dropped static Property and a member nothing declares",
 		source: `implementation {
@@ -498,8 +466,8 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@4", "unknown-member@8"],
 	},
-	// And the files that hold ONE mistake, which is what says the pairs
-	// above are pairs rather than a Compiler that reports everything twice.
+	// Files with one mistake each, so the pairs above are not a Compiler reporting
+	// everything twice.
 	{
 		name: "a Method that calls itself on every path, alone",
 		source: `implementation {
@@ -566,11 +534,8 @@ describe("two mistakes in one run", () => {
 			await withFiles(
 				{ "Main.es": program.source },
 				async (directory) => {
-					// Through `realpath`, because every reader
-					// canonicalises the entry it was handed and a temporary
-					// directory on macOS is reached through a symbolic link —
-					// so the path a group is filed under is not the path this
-					// spec wrote the file at.
+					// Through `realpath`: every reader canonicalises its entry, and a temporary
+					// directory on macOS is reached through a symbolic link.
 					let readings = await readingsOf(
 						path.join(realpathSync(directory), "Main.es"),
 					)
