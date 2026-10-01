@@ -1,23 +1,20 @@
-// Everything the site says about itself that is not content. Kept in one
-// place because a drifted copy is the kind of wrong nobody notices.
+// Everything the site says about itself that is not content, in one place so
+// no copy drifts.
 
 import cliPackage from "../../../cli/package.json" with { type: "json" }
 
 export const SITE_NAME = "essence"
 export const SITE_URL = "https://essencelang.org"
 /**
- * What every page tells a search engine and a link preview it is. Written for
- * that job: plain, substantive, and it names the things somebody would search
- * for. The landing page's own line is `HERO_SUBLINE` — a hook has to earn a
- * click, which is the opposite of what belongs in a meta description.
+ * What every page tells a search engine and a link preview: plain, and naming
+ * what people search for. The landing page's hook is `HERO_SUBLINE` instead.
  */
 export const SITE_DESCRIPTION =
 	"A language for the web with exact arithmetic, immutable data and a type system that finds every error before you ship."
 
 /**
- * The line under the landing page's headline, and nowhere else. Its three
- * clauses answer the headline's three words in order — reliable, flexible,
- * delightful — without saying any of them a second time.
+ * The line under the landing page's headline, and nowhere else. Its clauses
+ * answer the headline's words in order without repeating them.
  */
 export const HERO_SUBLINE =
 	"A language for the web that catches your bugs as you are writing them, fits the stack you already have, and is a joy to use."
@@ -32,15 +29,13 @@ export const VERSION: string = cliPackage.version
 
 export const GITHUB_URL = "https://github.com/alexandertrefz/essence"
 export const GITHUB_ISSUES_URL = `${GITHUB_URL}/issues`
-// There is no changelog page and no releases feed yet — the commit log is
-// the honest answer to "what changed".
+// Without a changelog page or releases feed, the commit log answers "what
+// changed".
 export const GITHUB_COMMITS_URL = `${GITHUB_URL}/commits/master`
 export const GITHUB_CONTRIBUTING_URL = `${GITHUB_URL}/blob/master/Readme.md`
 
 /**
- * Where the chrome points. Real pages only — nothing here is aspirational,
- * and every documentation slug named here is one the site's page list
- * carries.
+ * Where the chrome points. Every documentation slug here is a real page.
  */
 export const ROUTES = {
 	home: "/",

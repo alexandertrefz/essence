@@ -1,14 +1,9 @@
 /*
- * The index the ⌘K palette fetches, built once at build time — there is no
- * server behind this site, and it is far too small to want a search engine.
- *
- * One entry per docs page, carrying the page's own headings so a query can
- * land on a section rather than only on a page. The palette deep-links a
- * heading hit with `#slug`; `searchDepth` decides how deep that goes. It
- * defaults to `tocDepth`, so a page that hides its h3s from the on-this-page
- * list keeps them out of search too — unless it says otherwise, which is what
- * a library type page does: its rail shows the reader groups, and its eighty
- * member headings still have to be findable by name.
+ * The index the ⌘K palette fetches, built at build time, since the site is
+ * static and small. One entry per docs page with its headings, so a query can
+ * land on a section. `searchDepth` limits the headings and defaults to
+ * `tocDepth`. A library type page sets it deeper, so its members are found by
+ * name.
  */
 
 import type { APIRoute } from "astro"
@@ -18,9 +13,9 @@ import { SECTIONS } from "../content.config.ts"
 
 type Section = (typeof SECTIONS)[number]
 
-// The heading a result groups under: a second copy of the labels in
-// `SECTIONS` of `lib/navigation.ts`, which this build-time route could import
-// instead. The order travels to the browser as `groupOrder` on every entry.
+// The heading a result groups under. These copy the labels in
+// `lib/navigation.ts`, which this route could import instead. The order travels
+// to the browser as `groupOrder` on every entry.
 const SECTION_LABELS: Record<Section, string> = {
 	"getting-started": "Getting started",
 	language: "Language",
@@ -70,8 +65,8 @@ export const GET: APIRoute = async () => {
 			url: `/docs/${entry.id}`,
 			group: SECTION_LABELS[entry.data.section],
 			groupOrder: SECTIONS.indexOf(entry.data.section),
-			// The reference is its own root in the crumb: an entry there is
-			// looked up, not read as a page filed under `docs /`.
+			// The reference is its own root in the crumb, not filed under
+			// `docs /`.
 			crumb: (entry.data.section === "reference"
 				? segments
 				: ["docs", ...segments]

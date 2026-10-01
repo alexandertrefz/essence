@@ -1,22 +1,19 @@
 /*
- * The Essence samples on a documentation page, read the one way both of their
- * readers need: the Shiki transformer in `astro.config.ts`, which draws them,
- * and `tests/docsExamples.spec.ts`, which compiles, formats and runs them.
+ * The Essence samples on a documentation page, read one way for both readers:
+ * the Shiki transformer in `astro.config.ts` and `tests/docsExamples.spec.ts`.
  *
- * A sample may open with one marker line, written for the gate and never
- * meant for a reader:
+ * A sample may open with one marker line, for the gate rather than the reader:
  *
- *   § fragment       the block is shown and never compiled — a signature, or
- *                    one arm of a construct taught in full elsewhere;
- *   § file: Name.es  the block is one file of several, and the blocks beside
- *                    it on the same page import it by that name.
+ *   § fragment       the block is shown and never compiled, such as a
+ *                    signature;
+ *   § file: Name.es  the block is one file of several, which the blocks beside
+ *                    it import by that name.
  *
- * The published page hides the line and turns a file's name into the block's
- * caption. The `§ …` comments at the end of a `Terminal.print` line stay: they
- * are the output a reader would see, written where the reader looks for it.
+ * The published page hides the line and captions a named file. A `§ …` comment
+ * ending a `Terminal.print` line stays, since it shows the output.
  *
- * Nothing here imports Astro or Shiki. The root `tsc` program reaches
- * this file through the spec, and it has to type-check on a fresh clone.
+ * Nothing here imports Astro or Shiki, so the root `tsc` program can check it
+ * on a fresh clone.
  */
 
 export const FRAGMENT_MARKER = "§ fragment"
@@ -60,8 +57,7 @@ export function readSampleMarker(code: string): SampleMarker {
 	return { code, fragment: false, file: undefined }
 }
 
-// The pages open every Essence fence at the start of a line with no meta
-// string, so the pattern needs no more than that.
+// The pages open every Essence fence at a line's start with no meta string.
 const ESSENCE_FENCE = /```essence[^\n]*\n([\s\S]*?)```/g
 
 const EXPECTED_OUTPUT = /Terminal\.(?:print|inspect)\(.*\)\s*§ (.*)$/

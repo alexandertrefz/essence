@@ -1,10 +1,8 @@
 import { glob } from "astro/loaders"
 import { defineCollection, z } from "astro:content"
 
-// The section a page belongs to is a closed set rather than a free
-// string, because it is also the sidebar's grouping and its fixed order —
-// a typo in frontmatter would otherwise silently invent a group nobody
-// navigates to.
+// A page's section is a closed set, since it is also the sidebar's grouping.
+// A typo in frontmatter would otherwise invent a group nobody reaches.
 export const SECTIONS = [
 	"getting-started",
 	"language",
@@ -22,10 +20,9 @@ let docs = defineCollection({
 			section: z.enum(SECTIONS),
 			order: z.number(),
 			/**
-			 * The labelled run of its section the page sits under in the
-			 * sidebar, e.g. `Basics`. A section groups every top-level page or
-			 * none, and a group is one run in `order` — `getSidebar` refuses
-			 * anything else — so the label never reorders a page.
+			 * The labelled run the page sits under in the sidebar, such as
+			 * `Basics`. `getSidebar` requires all or none of a section's
+			 * top-level pages to have one, each a single run in `order`.
 			 */
 			group: z.string().optional(),
 			/** Which page template renders this entry. */
@@ -49,20 +46,17 @@ let docs = defineCollection({
 			since: z.string().optional(),
 
 			/*
-			 * Library type page meta, written by the generator. `namespaces` is
-			 * every Namespace the page folds, as the sources spell them (`List`,
-			 * `NonEmptyList`, `IntegerList`, …); `aliases` is every refinement
-			 * alias it hosts. `tests/stdlibMembers.spec.ts` checks the page's
-			 * member manifest against the standard library, so that every Member
-			 * has a page and no page claims a Member the library does not declare.
+			 * Library type page meta, written by the generator: every Namespace
+			 * the page folds, as the sources spell them, and every refinement
+			 * alias it hosts. `tests/stdlibMembers.spec.ts` checks the manifest.
 			 */
 			namespaces: z.array(z.string()).default([]),
 			aliases: z.array(z.string()).default([]),
 			/** Protocols the type conforms to, with the `where` clause when conditional. */
 			conformsTo: z.array(z.string()).default([]),
 		})
-		// A key the schema does not name is an error, not a silent extra,
-		// so a field the schema drops can not linger in frontmatter doing nothing.
+		// A key the schema does not name is an error, so a dropped field
+		// cannot linger in frontmatter.
 		.strict()
 		.transform((data) => ({
 			...data,
