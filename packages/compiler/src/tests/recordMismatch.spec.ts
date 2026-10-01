@@ -174,6 +174,28 @@ describe("a Record that does not fit another", () => {
 				"'inner.d' is a String; Inner declares an Integer.",
 			)
 		})
+
+		it("labels a nested Literal with the members it leaves out", () => {
+			let nested = implementation(`${standing}
+	constant blank: Standing = { team = { name = "a" }, played = 0, points = 0 }`)
+			let short = onlyError(nested)
+
+			expect(labelsOf(short)).toEqual(["'team.code' is missing"])
+			expect(spansOf(nested, short)).toEqual(['{ name = "a" }'])
+		})
+
+		// As at the top level, a Label inside the Literal leads and the missing
+		// member moves to a note.
+		it("notes the members a nested Literal leaves out beside a wrong one", () => {
+			let nested = implementation(`${standing}
+	constant blank: Standing = { team = { name = 1 }, played = 0, points = 0 }`)
+			let both = onlyError(nested)
+
+			expect(labelsOf(both)).toEqual([
+				"this is an Integer, and Team declares a String",
+			])
+			expect(both.notes).toContain("'team.code' is missing.")
+		})
 	})
 
 	describe("a Record a default fills in", () => {

@@ -159,7 +159,9 @@ listed as missing either.
 
 Where a member is a Record on both sides and the value wrote a Literal there, `nestedDifferences` walks into it.
 So `team.code` is named at the depth it is wrong. The walk goes only as far as the Literals do. A member whose
-nested Literal differs in nothing its members explain is named at its own level.
+nested Literal differs in nothing its members explain is named at its own level. The members a nested Literal
+leaves out are named by their path, as in `'team.code' is missing`, and placed as the top level places them: a
+Label on the nested Literal where nothing inside it has one, and a note otherwise.
 
 Where the position holds a Union of Records, the value is compared against the closest arm. That is the arm
 with the fewest differences, or the first one on a tie. A note then names the arm, so the list of differences reads as the

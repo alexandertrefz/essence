@@ -678,8 +678,9 @@ type MemberDifference = {
 	// The member's path from the outermost Record, such as `team.code`, for the
 	// sentences alone.
 	path: string
-	// Where the member's value was written, or null outside a Literal. Only the
-	// levels a dotted key built carry a name's Position, in `memberPositions`.
+	// Where the member's value was written, or null outside a Literal and for a
+	// note alone. Only the levels a dotted key built carry a name's Position, in
+	// `memberPositions`.
 	position: common.Position | null
 	label: string
 	note: string
@@ -732,7 +733,9 @@ export function recordMismatchEvidence(
 	let labelled = differences
 		.slice(0, labelledMembers)
 		.filter((difference) => difference.position !== null)
-	let noted = differences.slice(labelled.length)
+	let noted = differences.filter(
+		(difference) => !labelled.includes(difference),
+	)
 	let listed = noted.slice(0, notedMembers)
 	let [lead, ...rest] = labelled
 	let misspelled = differences.filter(
@@ -941,7 +944,8 @@ function memberDifferences(
 
 // The differences one step further in. Null where the member is not a Record
 // Literal on both sides, or where the nested Literal differs in nothing its
-// members explain. Empty where it only leaves members out.
+// members explain. The members it leaves out are one more difference, placed
+// as the top level places them.
 function nestedDifferences(
 	declaredType: common.Type,
 	writtenType: common.Type,
@@ -971,11 +975,23 @@ function nestedDifferences(
 	)
 	let missing = missingMemberNames(target, source, nested, {})
 
-	if (nested.length === 0) {
-		return missing.length === 0 ? null : []
+	if (missing.length === 0) {
+		return nested.length === 0 ? null : nested
 	}
 
-	return nested
+	let clause = missingClause(missing.map((missed) => `${path}.${missed}`))
+
+	return [
+		...nested,
+		{
+			path,
+			// A Label on the nested Literal only where nothing inside it has one.
+			position:
+				nested.length === 0 ? memberPosition(literal, name) : null,
+			label: clause,
+			note: `${clause}.`,
+		},
+	]
 }
 
 // The members the Record declares and the value does not write. None for a
