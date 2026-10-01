@@ -6749,26 +6749,8 @@ function rewriteParameter(
 	}
 }
 
-// The one choke point every emitted Function goes through, and so the one
-// place a COMPLETING body is turned into what it means:
-//
-//   function headline(url) {
-//       return $future.of(async ($ctx) => { … await … ; return v })
-//   }
-//
-// Calling such a Function is an ordinary synchronous call that BUILDS a future
-// and runs nothing; the body is the future's own `run`, and the context it runs
-// under arrives as that closure's one Parameter. The Parameters and their
-// defaults stay on the OUTER Function, because a default is filled in when the
-// future is built rather than when it is run — which is also why nothing here
-// may suspend outside the closure.
-//
-// The context Parameter is always spelled `$ctx`, in every completing body
-// at every depth, and it is lexical scoping that makes that right rather than a
-// problem: a sync closure written inside such a body closes over the body's
-// `$ctx`, so the work it starts belongs to the run that built it, while a
-// completing body written inside one binds a `$ctx` of its own that shadows the
-// outer name for exactly the span its own work runs in.
+// Every emitted Function goes through here, so a completing body becomes a
+// Function answering a `Future`. See "Completing bodies" in DEVELOPMENT.md.
 function rewriteFunctionExpression(
 	node: common.typedSimple.FunctionDefinitionNode,
 ): estree.FunctionExpression {
@@ -6780,8 +6762,8 @@ function rewriteFunctionExpression(
 	}
 }
 
-// The BODY half of the emission above, shared with the free-Function
-// Declaration, which builds its own Node around the same block.
+// The body of `rewriteFunctionExpression`, shared with a free Function's
+// declaration.
 function completingBodyOf(
 	node: common.typedSimple.FunctionDefinitionNode,
 ): estree.BlockStatement {
@@ -6823,22 +6805,8 @@ function completingBodyOf(
 	}
 }
 
-// `$tail_0: while (true) { … }` around the whole body of a Function
-// `loop-self-tail-calls` looped, and the body untouched where it did not. Every
-// `TailCallStatement` inside ends its turn with `continue $tail_0`, so the loop
-// is left exactly where the Program answers — by a Return, or by a throw. There
-// is no way out at the bottom: a body whose last Statement is not an answer is
-// one the Simplifier gave a Return to, so control never reaches the brace.
-//
-// `while (true)` rather than `for (;;)` for one reason: it is what a
-// reader of the emitted file sees and recognises, and the two are the same
-// program. The label is what makes the `continue` unambiguous where a lowered
-// Match has put labelled blocks between the two.
-//
-// It goes around the WHOLE body, prologue included — a Pattern in a
-// Parameter binds at the head of the body and a turn is a call, so a turn binds
-// it again. The per-turn `const`s the pass writes for a slotted Parameter stand
-// at the very top of that body for the same reason.
+// `$tail_0: while (true) { … }` around the whole body of a looped Function.
+// See "Self tail calls" in DEVELOPMENT.md.
 function tailLoopBody(
 	node: common.typedSimple.FunctionDefinitionNode,
 	body: estree.BlockStatement,
@@ -6863,20 +6831,8 @@ function tailLoopBody(
 	}
 }
 
-// One turn — the Arguments that have to be held, the Parameters the call
-// changes, and back to the top:
-//
-//   const $tail_0_t0 = removeFirst(rest);
-//   sum = sum + head;
-//   rest = $tail_0_t0;
-//   continue $tail_0;
-//
-// The held Arguments come first and ALL of them are held where any is,
-// which is what makes the rebinding simultaneous: `<- swap(b, a)` reads both
-// names before either is written. Where nothing a turn assigns can be read by an
-// Argument of that turn, the pass holds none and the assignments are written
-// straight — which is the usual case and why an accumulator walk emits two
-// assignments and a `continue`.
+// One turn of a looped Function: held Arguments, Parameter assignments and
+// `continue`. See "Self tail calls" in DEVELOPMENT.md.
 function rewriteTailCallStatement(
 	node: common.typedSimple.TailCallStatementNode,
 ): Array<estree.Statement> {
@@ -6916,21 +6872,12 @@ function futureModule(): estree.Identifier {
 	return { type: "Identifier", name: "$future" }
 }
 
-// The context a completing body's work runs under — the Parameter of the
-// closure above, and what every `start` and `complete` inside it is handed. A
-// Program can not bind this name: `compilerOwnedNames` holds it.
+// The context a completing body's work runs under.
 function contextIdentifier(): estree.Identifier {
 	return { type: "Identifier", name: "$ctx" }
 }
 
-// `start x` — the future put in flight, answering the one run of it. It
-// never waits, so it is emitted as the plain call it is, wherever it stands.
-//
-// The context is `$ctx` where one is lexically in scope and a fresh root
-// where none is — and which of those it is, is a question about the emitted
-// JavaScript rather than about the Program, which is why this Node reaches the
-// Rewriter whole. `$future.root()` is the top level's own context: work started
-// there answers to nothing above it, because there is nothing above it.
+// `start x`, which puts the future in flight and never waits.
 function rewriteStart(
 	node: common.typedSimple.StartNode,
 ): estree.CallExpression {
@@ -6942,9 +6889,7 @@ function rewriteStart(
 	}
 }
 
-// `complete x` — the `await` the language has no word for. A Future is
-// started under a context of its own and waited for; a Started is waited for
-// again, which answers the same value it always did.
+// `complete x`, an `await` of the started run.
 function rewriteComplete(
 	node: common.typedSimple.CompleteNode,
 ): estree.AwaitExpression {
@@ -6959,17 +6904,11 @@ function rewriteComplete(
 	}
 }
 
-// Which context the run belongs to. `$ctx` is in scope exactly where a
-// completing body encloses this one lexically — including through sync closures
-// written inside it, which close over it like any other binding — and the
-// Rewriter knows that because it is emitting the closure it is inside of. A
-// counter rather than a stack: nothing needs to know WHICH body, only whether
-// there is one, since every one of them binds the same name.
+// How many completing bodies lexically enclose the code being emitted, which
+// decides whether `$ctx` is in scope.
 let completingDepth = 0
 
-// Whether the body being rewritten has reached for `$ctx` — read by
-// `testBody`, which binds a context only where one is asked for. Every other
-// caller of `contextArgument` is inside a body that binds the name already.
+// Whether the body being rewritten has used `$ctx`, which `testBody` reads.
 let contextTaken = false
 
 function contextArgument(): estree.Expression {
@@ -7608,9 +7547,7 @@ function rowClosure(
 	}
 }
 
-// The name an item is handed, and only where it INTERPOLATES — a plain
-// one is in the manifest already. Written once because the two calls a test may
-// be emitted as, and the two a benchmark may be, all take it in the same place.
+// An item's interpolated name, or `null` for a plain one in the manifest.
 function testName(
 	name: common.typedSimple.ExpressionNode | null,
 ): estree.Expression {
@@ -7619,25 +7556,9 @@ function testName(
 		: rewriteExpression(name)
 }
 
-// A test body is a completing body in everything but its Type: it may
-// wait, the runner drives one at a time and awaits each, and what it starts is
-// its own. So it is emitted with a context of ITS OWN, bound here rather than
-// taken from an enclosing body — there is none — and STOPPED when the body
-// settles, however it settles.
-//
-// The stop is the point. Without it a `start` a test leaves behind goes on
-// running into the next test: what it prints is captured under that test's sink,
-// which is a report naming the wrong test, and `essence test` stays open for as
-// long as the abandoned work has left to run. Stopping it is the language's own
-// rule — stopping a run stops everything it started — applied at the one edge a
-// test has, and it is what makes `unobserved-started` inside a test mean
-// something: the run is fire-and-forget for the length of the test and no
-// longer.
-//
-// Only where the body reaches for the context at all. A test that waits
-// for nothing and starts nothing is emitted exactly as it was before any of this
-// existed, so a Module of such tests neither binds a context nor imports the
-// module it would come from.
+// A test body with a context of its own, aborted when the body settles,
+// where the body uses one. `contextTaken` is restored only when the body does
+// not throw. See "Test bodies" in DEVELOPMENT.md.
 function testBody(
 	body: Array<common.typedSimple.ImplementationNode>,
 ): estree.ArrowFunctionExpression {
@@ -7719,16 +7640,8 @@ function testBody(
 	}
 }
 
-// A registration call the runner has to WAIT for. Every Function here is
-// handed over and called by the runtime, so an `await` written inside one
-// belongs to that Function: it is made `async`, which makes what the runtime
-// hands back a promise, and the call is awaited so that the wait stays where
-// the source put it. The runtime's own entry points pass that promise straight
-// on, one Scope at a time, up to the `run` the runner awaits.
-//
-// And nowhere else. A test that completes nothing is emitted, called and
-// reported exactly as it was before any of this existed — no `async`, no
-// promise, and a body that throws still throws where the runner catches it.
+// A registration call, made `async` and awaited only where the Function it
+// registers awaits. See "Test bodies" in DEVELOPMENT.md.
 function awaitedRegistration(
 	call: estree.CallExpression,
 	handed: estree.ArrowFunctionExpression,

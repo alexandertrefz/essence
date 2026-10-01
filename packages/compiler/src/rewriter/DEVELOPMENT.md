@@ -700,3 +700,68 @@ canonicalises, so it need not be read together with every write to be believed.
 
 `inlinedCallback` takes the swaps in a fixed order. It checks the dropped accumulator, hands the State's body
 to the walk and swaps the counter. Only then does it try `pushedWhereBound`, on the Statements as emitted. The counter and the State are different Parameters, so neither swap disturbs the other.
+
+## Completing bodies
+
+A Function whose body completes something answers with a `Future`. `completingBodyOf` emits it as:
+
+```
+function headline(url) {
+    return $future.of(async ($ctx) => { … await … ; return v })
+}
+```
+
+Calling it is an ordinary synchronous call that builds a future and runs nothing. The body is the future's
+`run`, and the context it runs under arrives as the closure's one Parameter, `$ctx`. The Parameters and
+their defaults stay on the outer Function, because a default is filled in when the future is built, not
+when it runs.
+
+Every completing body names its context `$ctx`, and lexical scope makes that right. A synchronous closure
+inside such a body closes over the body's `$ctx`, so work it starts belongs to the run that built it. A
+completing body nested inside binds its own `$ctx`, shadowing the outer one for exactly its own run.
+`compilerOwnedNames` holds `$ctx`, so a Program can not bind it.
+
+`start x` emits `$future.start(x, context)`, which never waits. `complete x` emits
+`await $future.complete(x, context)`; a Started waited for again answers the same value. The context is
+`$ctx` where a completing body encloses the expression lexically, and `$future.root()` elsewhere. That is a
+fact about the emitted JavaScript, so `Start` and `Complete` reach the Rewriter whole. `completingDepth`
+counts the enclosing completing bodies; a count suffices, since every one binds the same name.
+
+### Test bodies
+
+A test body may wait like a completing body, and the runner drives one test at a time and awaits each.
+`testBody` gives it a context of its own, `$future.root()`, and aborts that context's controller in a
+`finally` when the body settles. A `start` a test leaves behind would otherwise run into the next test,
+and its output would be reported under the wrong test. `essence test` would also stay open while it ran.
+Stopping it is the language's rule that stopping a run stops everything it started.
+
+A test body that never reaches for the context binds none. `contextArgument` sets `contextTaken` when it
+hands out `$ctx`, and `testBody` reads it to decide. `testBody` restores `completingDepth` in a `finally`,
+but restores `contextTaken` only after a body that did not throw. Every reader resets `contextTaken` before
+reading it, so a value left by a throw is never read.
+
+`awaitedRegistration` makes a registration call `async` and awaits it only where the Function it registers
+awaits. A test that completes nothing is emitted, called and reported synchronously, and a body that throws
+still throws where the runner catches it.
+
+## Self tail calls
+
+`loop-self-tail-calls` turns a Function's self tail calls into a loop. `tailLoopBody` wraps the whole body,
+the prologue included, in a labelled `while (true)`. A turn is a call, so a Parameter's Pattern binds again
+at the head of each turn. There is no way out at the bottom: a body that can fall off its end was given a
+closing Return by the Simplifier. The label keeps each `continue` unambiguous where a lowered Match put
+labelled blocks in between.
+
+`rewriteTailCallStatement` writes one turn: the held Arguments, the Parameter assignments, and
+`continue <label>`. The turn of `<- swap(b, a)` is:
+
+```
+const $tail_0_t0 = b;
+const $tail_0_t1 = a;
+a = $tail_0_t0;
+b = $tail_0_t1;
+continue $tail_0;
+```
+
+Where any Argument must be held, all are, so the rebinding is simultaneous: the turn reads both names before
+writing either. Where no written Argument reads a Parameter the turn assigns in place, the pass holds none.
