@@ -118,7 +118,9 @@ disagree about what they reached.
 A lowered form is walked like what it came from. A lowered Match holds the same positions in the same order as the
 Match Expression. An inlined loop is walked like the call it replaced, its callback bodies offered to both hooks. An
 assertion is walked as the Handler it is. A conformance witness a Node carries is walked like the trailing Arguments
-of a bounded call. Intrinsics are walked like any other Node, so a pass reads what an earlier pass produced.
+of a bounded call. Intrinsics are walked like any other Node, so a pass reads what an earlier pass produced. A
+native shim's prologue, which merges a Record default, is walked as a body, like the same prologue at the head of a
+bodied Method.
 
 Some positions are not values and are never offered. They are a `type`, a Match's `matcher`, a `MethodInvocation`'s
 `base` and a `Lookup`'s `member`. A Parameter is a binding, not a value. `rewriteExpressionsIn` walks a single

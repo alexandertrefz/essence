@@ -4087,7 +4087,8 @@ declarations {
 			})
 
 			// Each default member is merged with `??`, so a member the call wrote
-			// survives, and the Argument's own `url` comes through unchanged.
+			// survives, and the Argument's own `url` comes through unchanged. The
+			// prologue is optimised like any body, so each default is pooled.
 			it("merges every member the default fills in", () => {
 				let code = generate(`implementation {
 	constant answered = complete Http.send({ url = "http://x.test/" })
@@ -4096,15 +4097,21 @@ declarations {
 }`)
 
 				expect(code).toContain("url: request.url")
-				expect(code).toContain(
-					'method: request.method ?? $type.createCase("HttpMethod#Get")',
-				)
-				expect(code).toContain(
-					'body: request.body ?? $type.createCase("Optional#Empty")',
-				)
-				expect(code).toContain(
-					'redirects: request.redirects ?? $type.createCase("Redirects#Follow")',
-				)
+
+				for (let [member, tag] of [
+					["method", "HttpMethod#Get"],
+					["body", "Optional#Empty"],
+					["redirects", "Redirects#Follow"],
+				]) {
+					let pooled = new RegExp(
+						`${member}: request\\.${member} \\?\\? (\\$pool_\\d+)`,
+					).exec(code)?.[1]
+
+					expect(pooled).toBeDefined()
+					expect(code).toContain(
+						`const ${pooled} = $type.createCase("${tag}")`,
+					)
+				}
 			})
 
 			// `Http.get` calls `Http.send({ url, method = #Get, headers })` and omits

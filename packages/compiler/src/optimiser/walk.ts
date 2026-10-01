@@ -347,16 +347,22 @@ function walkImplementationChildren(
 				return { ...entry, method: { ...entry.method, value } }
 			})
 
-			// A native Method's shim has only its Parameter defaults to walk.
+			// A native Method's shim has its Parameter defaults to walk, and
+			// the prologue that merges a Record default, which is a body.
 			let nativeShims = mapArray(node.nativeShims, (shim) => {
 				let parameters = walkParameterDefaults(
 					shim.parameters,
 					rewrites,
 				)
+				// INVARIANT: a prologue declares no Constant only the native
+				// call reads. That call is emitted, not walked, so
+				// `eliminate-dead-code` would drop such a Constant.
+				let prologue = walkBody(shim.prologue, rewrites)
 
-				return parameters === shim.parameters
+				return parameters === shim.parameters &&
+					prologue === shim.prologue
 					? shim
-					: { ...shim, parameters }
+					: { ...shim, parameters, prologue }
 			})
 
 			if (

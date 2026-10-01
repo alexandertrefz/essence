@@ -2144,6 +2144,40 @@ describe("Optimiser", () => {
 			})
 		}
 
+		// A shim's prologue merges a Record default into the written Argument,
+		// so it is a body like the one a bodied Method's default opens.
+		it("walks the prologue of a native Method's shim as a body", () => {
+			let http = stdlibPrelude().find(
+				(namespace) => namespace.name === "Http",
+			)
+			let shim = http?.node.nativeShims.find(
+				(each) => each.prologue.length > 0,
+			)
+			let program = simplifiedSource(`implementation {}`)
+			let offered: Array<unknown> = []
+
+			expect(shim).toBeDefined()
+
+			rewriteNodes(
+				{
+					...program,
+					implementation: {
+						...program.implementation,
+						nodes: [http!.node],
+					},
+				},
+				{
+					body: (nodes) => {
+						offered.push(nodes)
+
+						return nodes
+					},
+				},
+			)
+
+			expect(offered.includes(shim!.prologue)).toBe(true)
+		})
+
 		it("offers a Statement after the Expressions below it", () => {
 			// An Expression written for its effects is both, so a Statement pass reads
 			// what the Expression hook left.
