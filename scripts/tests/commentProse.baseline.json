@@ -359,7 +359,6 @@
 	"packages/language-server/src/codeActions/valueFixes.ts": {"sentence-length": 7, "em-dash": 4, "all-caps": 5, "block-length": 2},
 	"packages/language-server/src/codeLenses.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 4, "block-length": 2},
 	"packages/language-server/src/compilation.ts": {"sentence-length": 5, "em-dash": 2, "all-caps": 1},
-	"packages/language-server/src/completion.ts": {"sentence-length": 92, "em-dash": 77, "all-caps": 37, "position": 7, "block-length": 17},
 	"packages/language-server/src/conversion.ts": {"sentence-length": 3, "em-dash": 3, "position": 1},
 	"packages/language-server/src/defineArmChildren.ts": {"sentence-length": 5, "em-dash": 4, "all-caps": 2},
 	"packages/language-server/src/documentSymbols.ts": {"sentence-length": 15, "em-dash": 22, "all-caps": 5, "position": 3},

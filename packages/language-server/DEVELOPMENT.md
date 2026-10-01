@@ -339,3 +339,53 @@ another.
 
 The walk reads edges only, with no enrichment and no parse beyond what `refreshAllEdges` pays. The result is sorted,
 so which root a batch starts from does not depend on discovery order.
+
+## Completion
+
+`findCompletions` in `src/completion.ts` tells its modes apart by the text before the cursor, in this order:
+
+- Inside an `import { … }` or `export { … }` block: the specifiers and names the block can hold. Nothing else is an
+  answer there, so the block is handled first and on its own.
+- After `::`, optionally with a `<Namespace>` specifier: the Methods of every Namespace whose target Type matches the
+  receiver.
+- After `.`: the members of a Record, or the properties and Methods of a Namespace accessed statically.
+- After `#`: the Cases a Case reference can name there.
+- Otherwise: every name visible in the lexical Scope at the cursor, from the Scope model `src/rename.ts` builds. What
+  precedes the word decides between the value and the Type space. Record members and argument labels join the names in
+  Scope, and Keywords and snippets join the value space.
+
+### Probes
+
+A member or Method list needs the receiver's Type at the cursor's own Scope, with its Function's Parameters, `@` and
+the rest. A probe finds it. The document up to the trigger is parsed again with `.lspProbeMember` or
+`::lspProbeMember()` appended, closed by enough brackets to make a valid Program. The enriched Lookup or Method
+Invocation of the made-up member carries the receiver's Type in `base.type`. A Module's probe links against the
+dependencies the Workspace already linked, so imported names resolve.
+
+The two triggers probe differently on purpose. A written value proves what it can about itself where a Method is
+looked up on it, so `4::` offers the Methods of `NonNegativeInteger` too. A Lookup probe would type the same `4` as
+an Integer alone.
+
+After a `.`, the readings run in this order:
+
+1. The path-key reading. `{ config with server.<cursor> }` names a member of the value being updated, so the probe
+   writes `.lspProbeKey = 0` there. It answers only where the Enricher wrote out a nested update. A separate probe
+   name keeps a key reading from answering an ordinary Lookup on whatever `server` names in Scope.
+2. The ordinary probe, when the path-key reading found nothing.
+3. The probe with the rest of the document behind it, when the first two found nothing or an Error. Only this reading
+   sees a declaration after the cursor, such as a `namespace` or `choice` written under the line being typed.
+4. The named base, when every probe found nothing or an Error. A Choice without a Namespace, or a Type Parameter
+   bounded by a Protocol, reads its members off a Namespace nobody declared. The probe's made-up member types such a
+   base as an Error. The name is resolved in the Type space instead.
+
+A `#` is probed differently. The whole document is parsed with `#LspProbeCase` in place of the Case name being typed,
+so a Choice declared after the cursor stays in view. That one Program answers the expected Type and the Choices in
+Scope.
+
+### Ranking
+
+An Editor sorts on `sortText`, not on the order of the list, so every entry carries a tier from `completionTiers`. The
+cursor's own Scope comes first, then Record members and labels, the document, the builtins, Keywords and snippets.
+Tiers are single digits, since `sortText` compares as text. A snippet ranks after the Keyword that shares its label,
+because a reader typing `test` usually means the word. An offer from another Module ranks last, because accepting it
+edits the import block too.
