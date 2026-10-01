@@ -31,22 +31,15 @@ import {
 	type TestRunNotification,
 } from "../testProtocol"
 
-// The real Server, driven the way an Editor drives it: over a connection,
-// through the document store, past the debounce, one request at a time. Every
-// other test in this package calls a request's insides directly, which is the
-// right way to check WHAT it answers and no way at all to check what it COSTS —
-// the costs live in the loop around them.
-//
-// In-process rather than over a spawned stdio process for one reason: the
-// counters. `compilationCounts` is a module-level tally inside this process, and
-// a child process can not be asked for it without inventing a protocol to ask
-// with.
+// The real Server, driven as an Editor drives it: over a connection, through
+// the document store and the debounce. Other specs check what a request answers,
+// and this harness checks what it costs. It runs in-process, since
+// `compilationCounts` is a module-level tally a child process could not report.
 
 export type SessionRequestResult<Result> = {
 	result: Result
-	// What answering the request compiled. The debounce is what makes this
-	// readable at all: nothing runs between two awaits unless a timer fired, and
-	// the harness decides when timers fire.
+	// What answering the request compiled. Nothing runs between two awaits
+	// unless a timer fires, and the harness decides when timers fire.
 	compilations: CompilationTally
 	milliseconds: number
 }
@@ -101,23 +94,21 @@ export function startSession() {
 	let published = new Map<string, Array<Diagnostic>>()
 	let publishCount = 0
 	let versions = new Map<string, number>()
-	// Every publish as it came over the wire, rather than only the latest
-	// per URI. What a Server sends that changes nothing is invisible in the state
-	// it leaves behind, and it is exactly what a client pays for.
+	// Every publish as it came over the wire, not only the latest per URI. A
+	// publish that changes nothing leaves no trace in the state, but a client
+	// still pays for it.
 	let publishLog: Array<{ uri: string; version?: number }> = []
 	let testRuns: Array<TestRunNotification> = []
 	let watchers: Array<{ stop: () => void }> = []
 
-	// The custom notification the test session pushes. Kept as a log
-	// rather than as a latest-value, because what a client pays for is every
-	// one of them and a run is two: a `start` and an `end`.
+	// The test session's notifications, kept as a log since a run sends a
+	// `start` and an `end`.
 	client.onNotification(TEST_RUN_NOTIFICATION, (notification) => {
 		testRuns.push(notification as TestRunNotification)
 	})
-	// The Server registers its watcher and its configuration listener
-	// dynamically, and a registration is a REQUEST — unanswered, it stays
-	// pending for the whole session and the first `Promise.all` a test writes
-	// never settles.
+	// The Server registers its watcher and configuration listener dynamically.
+	// A registration is a request, and an unanswered one keeps the first
+	// `Promise.all` a spec writes from settling.
 	client.onRequest(RegistrationRequest.type, () => undefined)
 	client.onRequest(UnregistrationRequest.type, () => undefined)
 	client.onNotification(PublishDiagnosticsNotification.type, (params) => {
@@ -127,20 +118,16 @@ export function startSession() {
 	})
 	client.listen()
 
-	// The capabilities a client advertises decide what the Server may
-	// send it, so the default here is VS Code's: it takes a Workspace Edit in
-	// either shape and creates the files one asks it to. A test about an editor
-	// that can do LESS says so, by handing its own `workspace` block over — the
-	// whole block, so that what such a client says is written out rather than
-	// merged with a default nobody reads.
+	// The capabilities a client advertises decide what the Server may send it.
+	// The default is VS Code's: either shape of Workspace Edit, and file
+	// creation. A spec about a less capable editor hands over its whole
+	// `workspace` block.
 	async function initialize(
 		folders: Array<string>,
 		workspace: object = {
 			workspaceFolders: true,
-			// False on purpose: a client that answers no configuration
-			// request is the case the Server has to keep its Inlay Hints under,
-			// and it is one less round trip between a keystroke and a
-			// measurement.
+			// False on purpose: the Server must keep its Inlay Hints for a client
+			// that answers no configuration request, and it saves a round trip.
 			configuration: false,
 			workspaceEdit: {
 				documentChanges: true,
@@ -161,10 +148,8 @@ export function startSession() {
 		await client.sendNotification(InitializedNotification.type, {})
 	}
 
-	// The language id is the client's, and a client forwards more than
-	// Essence: the extension's document selector names `essence.json` too, so
-	// that the Server can report on a project file it could not read. Defaulted
-	// rather than passed everywhere, because every other caller opens a source.
+	// The language id is the client's. The extension's document selector names
+	// `essence.json` too, so the Server can report on a project file.
 	async function open(
 		filePath: string,
 		text: string,
@@ -210,14 +195,9 @@ export function startSession() {
 		})
 	}
 
-	// A request and what it cost, which is the whole point of the harness.
-	// The tally is read around the await rather than inside the handler: what a
-	// request costs includes everything it made the Server do, cache misses in
-	// other files included.
-	// Sent by method name rather than by request type. The typed overloads
-	// pin the parameters to the exact request, which is what a handler wants and
-	// the opposite of what a harness wants — one function that sends any of them
-	// and hands back what came over the wire.
+	// A request and what it cost. The tally is read around the await, so the
+	// cost includes everything the request made the Server do. It is sent by
+	// method name, so one function sends any request.
 	async function request<Result>(
 		type: { method: string },
 		params: object,
@@ -252,17 +232,9 @@ export function startSession() {
 				(diagnostic) => diagnostic.code,
 			),
 		testRuns: () => testRuns,
-		// Waits for a NUMBER of finished runs rather than for a length of
-		// time: a compile takes as long as the machine takes.
-		//
-		// The deadline THROWS, and it is the whole budget every caller's
-		// own `it` was given rather than half of it. Handing back the runs that
-		// did arrive made a starved worker read as a false claim about the
-		// Server — the caller asserted on a short list and named the behaviour
-		// it was checking — and a deadline under the test's own only took the
-		// report away from bun's timeout, which says how long the test actually
-		// ran. Every caller here waits for a count it positively expects, so
-		// nothing uses the timeout to prove an absence.
+		// Waits for a number of finished runs rather than a length of time. The
+		// deadline throws and spends the caller's whole budget. A short list would
+		// make a starved Worker read as a false claim about the Server.
 		waitForTestRuns: async (count: number, timeout = 60_000) => {
 			let deadline = Date.now() + timeout
 			let ended = () =>
@@ -280,14 +252,9 @@ export function startSession() {
 
 			return testRuns.filter((run) => run.kind === "end")
 		},
-		// The finished run the Server ANSWERED a request with, waited for
-		// by the number it answered with rather than by its ordinal among the
-		// runs the session has seen. A session runs on its own account as well
-		// — an edit, a settings change, a folder arriving — so "the second run
-		// that ended" and "the run this request asked for" are two questions,
-		// and only one of them is what a test asking about a request means.
-		//
-		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		// The finished run the Server answered a request with, found by its
+		// number. A session also runs on its own account, so the second run to
+		// end may not be this request's. The deadline throws.
 		waitForTestRun: async (run: number, timeout = 60_000) => {
 			let deadline = Date.now() + timeout
 			let ended = () =>
@@ -310,15 +277,9 @@ export function startSession() {
 
 			return found
 		},
-		// The run a cycle IN FLIGHT carries — started, not yet ended —
-		// which is the state a request has to land in for the session to defer
-		// it rather than start a cycle of its own. A test that means to ask
-		// what a deferred request is answered with waits for this rather than
-		// sleeping towards it: how long a compile takes is a fact about the
-		// machine, and the window a sleep would aim at is the very thing the
-		// question is about.
-		//
-		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		// The run of a cycle in flight, which a request must land in to be
+		// deferred. A spec waits for it rather than sleeping, since a compile
+		// takes as long as the machine takes. The deadline throws.
 		waitForRunInFlight: async (timeout = 60_000) => {
 			let deadline = Date.now() + timeout
 			let flying = () => {
@@ -349,21 +310,9 @@ export function startSession() {
 
 			return found
 		},
-		// The same question asked of a run NOBODY numbered — one an edit
-		// caused rather than one a request answered with an ordinal. A session
-		// defers a cycle it was asked for while another was in flight and arms
-		// it the moment that one ends, so opening a file ends two runs of the
-		// same text: the scan's, and the one the overlay asked for. A test that
-		// waits for "the second run to end" and then asks what the edit it made
-		// in between did is therefore asking about the DEFERRED cycle whenever
-		// the machine is slow enough for that window to fire first — a truth
-		// about the runner rather than about the Server, and one that reads as
-		// a flake.
-		//
-		// So the wait is over what a run SAYS, the way `waitForCodeToClear`
-		// waits over the state rather than over a length of time.
-		//
-		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		// A run nobody numbered, found by what it says. Opening a file ends two
+		// runs of the same text, so the second run to end may predate an edit.
+		// The deadline throws.
 		waitForTestRunWhere: async (
 			description: string,
 			matches: (run: TestRunNotification) => boolean,
@@ -393,19 +342,10 @@ export function startSession() {
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,
-		// Waits until the Server has linked COUNT graphs since a mark,
-		// rather than for a length of time — what a link costs is a fact about
-		// the machine, and what a test wants to say is "once the analysis has
-		// started". The tally is a module-level counter inside this process, so
-		// unlike a publish there is no wire between the fact and the reading of
-		// it.
-		//
-		// Polled on a macrotask deliberately: the analysis loop hands the event
-		// loop back between two of its callbacks (see `armSweepChunk`), so a poll
-		// that is itself a macrotask wakes up once per callback and sees the
-		// Server one whole analysis at a time. A microtask would spin between two
-		// of them and see nothing move.
-		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		// Waits until the Server has linked `count` graphs since a mark. It polls
+		// on a macrotask, since the analysis loop yields between callbacks (see
+		// `armSweepChunk`) and a microtask would see nothing move. The deadline
+		// throws.
 		waitForLinks: async (
 			before: CompilationTally,
 			count: number,
@@ -432,22 +372,11 @@ export function startSession() {
 
 			return linked
 		},
-		// The most graphs the Server linked inside ONE turn of the event
-		// loop, watched from the moment this is called until it is stopped. What
-		// a test that types mid-sweep wants to say is that the change batch took
-		// the roots reaching the change and not the ones the queue still owes,
-		// and the fact that distinguishes those two is the SHAPE of the work
-		// rather than its amount: a chunked sweep advances the tally by one root
-		// per callback, and a batch that swallowed the queue advances it by a
-		// project's worth inside a single one. Read that way the reading is a
-		// fact about the loop rather than about how fast a link is — the total
-		// at any given instant is the drain rate racing the debounce, and that
-		// one moves with the machine.
-		//
-		// Polled on a macrotask for the reason `waitForLinks` is, and it reads
-		// two in the turn a due window fires in: timers run before the check
-		// phase, so the batch's link and the sweep's next root land between the
-		// same two polls.
+		// The most graphs the Server linked inside one turn of the event loop. A
+		// chunked sweep links one root per callback, and a batch that swallowed
+		// the queue links many in one. It polls on a macrotask like `waitForLinks`,
+		// and reads two when a due window fires, since timers run before the check
+		// phase.
 		watchLinkBursts: () => {
 			let most = 0
 			let previous = compilationCounts.links
@@ -478,11 +407,9 @@ export function startSession() {
 
 			return watcher
 		},
-		// The same kind of wait over the WIRE rather than over the tally:
-		// what a test that has just typed something waits for is the answer to
-		// what it typed, and everything else arriving is the Server doing its
-		// other work beside it. The mark is where to start looking, since the
-		// file has usually been published for already.
+		// Waits over the wire for the answer to what a spec just typed. The mark
+		// is where to start looking, since the file has usually been published
+		// before.
 		waitForPublishOf: async (
 			filePath: string,
 			mark: number,
@@ -501,20 +428,9 @@ export function startSession() {
 
 			return arrived()
 		},
-		// Waits for a Diagnostic to be GONE from a file, for a test that
-		// has just made the thing it reported true again. The wait is over the
-		// state rather than over a length of time on purpose: a run's results
-		// and the republish that carries them are two callbacks — `notify` puts
-		// the run's end on the wire and `onResults` re-analyses and publishes
-		// after it (see `server.ts`) — so a test that has seen the end has not
-		// yet seen the publish, and how long the analysis between them takes is
-		// a fact about the machine. A sleep long enough for this Mac is not
-		// long enough for a starved two-core runner, and it fails there as a
-		// stale list rather than as a slow one.
-		//
-		// The deadline THROWS, for the reason `waitForTestRuns` gives: a
-		// Diagnostic that never clears is the failure this is watching for, and
-		// it should be reported as itself rather than as the assertion after it.
+		// Waits for a Diagnostic to be gone from a file. `notify` sends a run's
+		// end before `onResults` republishes, and the analysis between them takes
+		// as long as the machine does. The deadline throws.
 		waitForCodeToClear: async (
 			filePath: string,
 			code: string,
@@ -542,40 +458,19 @@ export function startSession() {
 		resetCounts: resetCompilationCounts,
 		counts: currentTally,
 		tallySince: tallyOf,
-		// Waits for the Server to have CAUGHT UP — the window fired, the
-		// batch or the sweep it fired into run to the end, every Diagnostic it
-		// published across the pipe — which is the state an Editor spends its
-		// time in and the state every measurement here is taken from. Asked of
-		// the Server rather than waited out: the answer is written behind the
-		// last publish, so nothing the Server said is still in flight when it
-		// arrives, and a Server that had nothing to do answers at once. What
-		// this used to be was a sleep of some multiple of the debounce, which
-		// was most of what this file cost and a bet on the machine besides.
-		//
-		// Not a way to prove an absence over time — a test that means to
-		// say "and nothing happened for a while" says how long, in its own
-		// sleep, because that is a fact about a clock and this is not.
+		// Waits until the Server has caught up and every Diagnostic has crossed
+		// the pipe, since the idle answer is written behind the last publish. It
+		// proves no absence over time.
 		settle: async () => {
 			await client.sendRequest(IDLE_REQUEST)
 		},
-		// Every document is closed first, which is what hands each of them
-		// back to disk the way a closing Editor does — and closing SCHEDULES an
-		// analysis rather than cancelling one, since what a file on disk says is
-		// still true once its buffer is gone. What cancels the window is the
-		// shutdown request below: a debounced analysis firing after the
-		// connection has gone publishes into nothing, and a throw out of a timer
-		// callback is the process (see `connection.onShutdown`).
-		//
-		// The connections are disposed and the pipes deliberately are NOT.
-		// `createConnection` installs `process.exit` on its input stream's `end`
-		// and `close` — right for a Server whose Editor went away, and fatal
-		// here, where closing a pipe would take the test runner with it. A
-		// PassThrough holds nothing open on its own.
+		// Closing a document schedules an analysis, and the shutdown request
+		// cancels the window. The pipes stay open, since `createConnection` exits
+		// the process when its input ends, which would end the test runner.
 		dispose: async () => {
-			// Every watcher stopped first. A poll that re-arms itself on
-			// `setImmediate` holds the loop open for as long as it runs, and a
-			// test that threw before it stopped its own would leave the runner
-			// spinning rather than reporting the failure.
+			// A poll that re-arms itself on `setImmediate` holds the loop open, so
+			// a spec that threw before stopping its own would leave the runner
+			// spinning.
 			for (let watcher of watchers) {
 				watcher.stop()
 			}
@@ -584,9 +479,8 @@ export function startSession() {
 				await close(filePath)
 			}
 
-			// The shutdown request rather than merely dropping the pipes:
-			// it is what stops the test session's Worker, and a Worker left
-			// running keeps compiling for a Server nobody is listening to.
+			// The shutdown request stops the test session's Worker, which would
+			// otherwise keep compiling for nobody.
 			await client.sendRequest(ShutdownRequest.type).catch(() => {})
 			await new Promise<void>((resolve) => setTimeout(resolve, 50))
 
@@ -596,9 +490,8 @@ export function startSession() {
 	}
 }
 
-// A workspace is a directory of files, the way `workspace.spec.ts` builds
-// one — which specifier resolves to which path is a fact about a filesystem, and
-// an in-memory host would leave exactly that untested.
+// A workspace is a directory of files, as `workspace.spec.ts` builds one,
+// since which path a specifier resolves to is a fact about a filesystem.
 export function makeSessionWorkspace(files: Record<string, string>): {
 	root: string
 	pathOf: (name: string) => string
