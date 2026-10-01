@@ -4,17 +4,13 @@ import type { common } from "@essence-lang/interfaces"
 
 import { parseWithDiagnostics } from "../parser/index"
 
-// The fifteen ways a file is first broken — a bracket left open, one too
-// many, a `{` that a block needs and did not get. None of them is interesting
-// on its own; what is interesting is WHERE each is reported, because a Parser
-// that speculates can answer a mistake on line 6 at a Token on line 4 and be
-// green in every other test it has. So each of these pins the code, the
-// sentence and the Position, and a change that moves one says so here.
+// The common ways a file is first broken: a bracket left open, one too many,
+// a `{` a block needs and did not get. What matters is where each is reported,
+// since a speculating Parser can answer a mistake on line 6 at a Token on line
+// 4. So each slip pins the code, the sentence and the Position.
 //
-// Deliberately no habit from another language — `{ x: 0 }`, `==`, `=>`,
-// `;`, `//`. Those are answered by refusals of their own, written where the
-// Token is first seen, and a corpus that pinned their generic messages would
-// have to be rewritten the day each one arrives.
+// Habits from other languages, such as `{ x: 0 }`, `==`, `=>`, `;` and `//`,
+// are left out. They get refusals of their own where the Token is first seen.
 
 type Slip = {
 	name: string
@@ -22,12 +18,11 @@ type Slip = {
 	code: common.DiagnosticCode
 	message: string
 	at: common.Cursor
-	// Where the bracket this one is short of was opened, for the slips
-	// that are noticed a line or more below it.
+	// Where the missing bracket's opener stands, for a slip noticed a line or
+	// more later.
 	openedAt?: common.Cursor
-	// And where the `}` that took a block's brace was written, for the one
-	// slip whose second Label says that instead — a block left open is reported
-	// about the block, not about the end of the input. See `outdentedClose`.
+	// Where the `}` that took a block's brace stands, for a block left open,
+	// which is reported about the block. See `outdentedClose`.
 	closedAt?: common.Cursor
 }
 
@@ -238,11 +233,9 @@ describe("Syntax slips", () => {
 		})
 	}
 
-	// Which block a `}` closes is COUNTED, so a file one brace short hands
-	// every `}` below the mistake to the block above the one it was written for
-	// — and the report used to come out about the outermost block, which is the
-	// one place the mistake is not. Its Help, followed, wrote a `}` at the end
-	// of the file and made the file compile with the wrong meaning.
+	// Which block a `}` closes is counted, so a file one brace short hands each
+	// later `}` to the enclosing block. The report must still name the inner
+	// block, or its Help would put the `}` at the end of the file.
 	describe("a block whose '}' another block took", () => {
 		let blocks: Array<[string, string, common.Cursor, common.Cursor]> = [
 			[
@@ -297,10 +290,8 @@ describe("Syntax slips", () => {
 
 		for (let [name, source, opened, closed] of blocks) {
 			describe(name, () => {
-				// The one `unclosed-block` of the file, which is not
-				// always the only Diagnostic in it: an arm read past the brace
-				// it is short of is read as text nobody wrote, and what that
-				// text says is reported where it stands.
+				// The file's one `unclosed-block`. An arm read past its missing
+				// brace can add Diagnostics of its own.
 				let report = parseWithDiagnostics(source).diagnostics.find(
 					(diagnostic) => diagnostic.code === "unclosed-block",
 				)
@@ -316,9 +307,6 @@ describe("Syntax slips", () => {
 					expect(report?.labels[1]?.position.start).toEqual(closed)
 				})
 
-				// The Help is the other half of the finding: "Add the
-				// missing '}'" over a report about the outermost block sent a
-				// reader to the end of the file.
 				it("should say where the brace goes", () => {
 					expect(report?.helps).toEqual([
 						"Write the '}' where this block's Statements end.",
@@ -328,13 +316,8 @@ describe("Syntax slips", () => {
 		}
 	})
 
-	// The fifteen above are pinned one slip at a time, because each of
-	// them is a shape of its own. This one is a shape every LIST has, and what
-	// it holds is that they all answer it alike: a trailing comma used to lose
-	// the "opened here" Label, because the reader that met the wrong bracket was
-	// then the one reading a member rather than the one closing the list, and
-	// only the closer has the opener in hand. Eleven readers share the loop;
-	// these are the eight a Program written by hand reaches.
+	// Every list answers a wrong closing bracket behind a trailing comma
+	// alike, keeping the "opened here" Label.
 	describe("a list closed by the wrong bracket behind a trailing comma", () => {
 		let lists: Array<[string, string, string, common.Cursor]> = [
 			[
@@ -403,8 +386,6 @@ describe("Syntax slips", () => {
 			})
 		}
 
-		// The other half: a trailing comma in front of the list's OWN
-		// bracket is written on purpose, and every one of these parses clean.
 		it("should keep a trailing comma in front of the right bracket", () => {
 			let sources = [
 				"implementation {\n\tconstant point = {\n\t\tx = 1,\n\t\ty = 2,\n\t}\n\tTerminal.print(point.x)\n}",
@@ -422,10 +403,7 @@ describe("Syntax slips", () => {
 		})
 	})
 
-	// A Comment runs to the end of its line and no further, so there is
-	// no such thing as one that is never closed — the question a reader coming
-	// from a language with `/* … */` asks, answered by the two files below
-	// parsing clean rather than by a Diagnostic that can not exist.
+	// A Comment runs to the end of its line, so none is ever left open.
 	it("should end a '§' Comment at its line and never leave one open", () => {
 		let sources = [
 			`implementation {
