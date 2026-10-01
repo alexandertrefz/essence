@@ -383,3 +383,29 @@ Every key position reads a path, such as `server.port`, since one key list serve
 The enricher refuses a path key outside an update with `path-key-outside-combination`, where the whole Record is
 in hand. After a step's dot, a `{` opens a braced descend, `server.{ port = 1, host }`, which ends the key.
 Shorthand is allowed inside a descend, because no whole value can be merged there.
+
+## Argument labels
+
+An Argument is `value` or `label value`, and both can start with an Identifier. `argumentIsLabelled` decides from
+the Token after the leading Identifier, before any speculation. Labelled Arguments are the norm, and reading the
+Expression first would fail on each of them after several throws of its own.
+
+It decides only what speculation would have decided, so every Diagnostic stays where it was. The Expression reading
+takes the Identifier and continues it, and only a `.`, a `(`, a `::`, or a `#` written flush continues one. Any
+other Token either begins a value of its own, so only the label reading spans the Argument, or ends the Argument.
+So the Argument is labelled exactly when the next Token begins an Expression and does not continue the Identifier.
+
+- A `#`, `.` or `[` continues the Identifier when written flush, as in `Choice#Case`, `order.isPaid` and the
+  refused index `primes[0]`. After a space each opens a value of its own: `as #ComposedCanonical` passes a bare
+  Case, `by .price` a member path, `contentsOf [1, 2]` a List.
+- A `<` stays speculative. It continues the Identifier in `Holder<Integer>#Full(…)` and also opens a Generic
+  Function literal that could be a label's value.
+- Before another language's operator the Argument is read as an Expression, so `total + tax` reports the `+` where
+  the Expression ends.
+- `start` and `complete` are never a label. Where the Keyword form opens, the Keyword wins, so
+  `Terminal.print(complete headline(url))` waits. Elsewhere the word is a name, and `compute(start .price)` reads a
+  member of a value called `start`. `parameterLabel` refuses either word as a Parameter's label.
+
+Where the label is not decided, `parseArgumentValue` tries the Expression reading first and falls back to the label
+reading. Exactly one of them can reach the end of the Argument. A failed Expression reading fails in the words of the
+Argument list's own close: "Expected ')' but found 'X'". The furthest failure reports it where it got further.

@@ -6985,10 +6985,8 @@ class DescentParser {
 		)
 	}
 
-	// A signature with no body has nothing for a Pattern's bindings to be
-	// read in — a native Method ends at its return Type and a Protocol Method
-	// never had a block. Refused here rather than in the Enricher, because the
-	// Parameter is well-formed and only its POSITION is wrong.
+	// A signature without a body has nowhere to read a Pattern's bindings.
+	// Refused here, since the Parameter is well-formed and only misplaced.
 	protected refusePatternParameters(
 		parameters: Array<parser.ParameterNode>,
 		kind: string,
@@ -7011,11 +7009,8 @@ class DescentParser {
 		}
 	}
 
-	// The two positions where a Parameter is well-formed but a default on
-	// it could never fire, refused here for the same reason
-	// `refusePatternParameters` is: the Parameter parses, only its POSITION is
-	// wrong. The default is dropped once reported, so that one misplaced `=`
-	// does not cascade into everything downstream that reads it.
+	// Refuses a default where it could never apply, on a Function literal or
+	// a Protocol requirement, and drops it once reported.
 	protected refuseDefaultValues(
 		parameters: Array<parser.ParameterNode>,
 		kind: "Function literal" | "Protocol requirement",
@@ -7051,20 +7046,11 @@ class DescentParser {
 						labels: [primary(position, "this default")],
 						notes: [
 							"A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.",
-							// A Note rather than the Help it used to be.
-							// "Write the default on the named Function or
-							// Method this value is passed to" is an edit in
-							// somebody else's Declaration, and often in nobody's
-							// at all: a literal handed to `map` is passed to a
-							// Method of the standard library, and a literal
-							// bound to a name is passed to nothing yet. What is
-							// true of every one of them is the rule, and the
-							// rule is what this says.
+							// A Note, since the Declaration the literal is
+							// passed to is often not the reader's.
 							"A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.",
 						],
-						// The same edit the Quick Fix makes. The two used
-						// to disagree — the fix took the default out and the
-						// Help sent the reader somewhere else entirely.
+						// The edit the Quick Fix makes.
 						helps: ["Remove the default."],
 					},
 				)
@@ -7115,47 +7101,9 @@ class DescentParser {
 		}
 	}
 
-	// Whether `label value` is what stands here, read off the Token AFTER
-	// the leading Identifier instead of by parsing an Expression and finding
-	// that it did not span the argument. Labelled arguments are the norm in
-	// Essence, and the speculation below costs three or four throws for each
-	// one of them — the label alone is an Expression, so the reading that is
-	// tried first always fails, after `parsePrimaryExpression` has itself
-	// speculated a typed Record literal and a Case construction on the way.
-	//
-	// This decides only what the speculation would have decided anyway, which
-	// is what keeps every Diagnostic where it was. The Expression reading takes
-	// the leading Identifier and continues it, and only three Token types
-	// continue one: `.`, `(`, and `::` — plus a `#` written FLUSH against the
-	// Identifier, which makes `Choice#Case`. Everything else that could stand
-	// there either begins a value of its own, and then the label reading is the
-	// only one that can span the argument, or ends the argument, and then the
-	// Expression is the Identifier alone. So: labelled exactly when the next
-	// Token begins an Expression, minus the two that continue the Identifier
-	// instead.
-	//
-	// `#` is the parser's adjacency rule, and the standard library leans
-	// on it everywhere — `normalize(as #ComposedCanonical)` is a bare Case
-	// passed under the label `as`, and `Ordering#Less` is a Choice prefix. The
-	// space between them is the whole difference.
-	//
-	// `<` stays speculative. It continues the Identifier as
-	// `Holder<Integer>#Full(…)` and it also opens a Generic Function literal
-	// that could be a labelled argument's value, and only a parse can tell
-	// which — `parsePrimaryExpression` says the same thing about the same `<`.
-	//
-	// `start` and `complete` are never read as a label, whichever Token
-	// stands behind them. Where the Keyword form opens, the two readings span
-	// the same two Tokens — the label reading takes the word and the value, the
-	// Keyword reading the word and the Expression — and the Keyword wins, so
-	// that `Terminal.print(complete headline(url))` is the wait it reads as.
-	// Where it does not open, the word is a NAME and what follows is read off
-	// it: `compute(start .price)` is the member path of a value called `start`,
-	// not an Argument labelled with a word no call could write.
-	//
-	// The reservation itself is made where the signature is read —
-	// `parseParameterHead` refuses either word as a Parameter's label — so
-	// there is no Declaration left for a label spelled with one to fit.
+	// Whether `label value` stands here, read off the Token after the leading
+	// Identifier rather than by speculation. See "Argument labels" in
+	// DEVELOPMENT.md.
 	protected argumentIsLabelled(): boolean {
 		let token = this.tokens.peek()!
 		let following = this.tokens.peek(1)
@@ -7175,30 +7123,14 @@ class DescentParser {
 			return false
 		}
 
-		// A label never stands in front of another language's operator.
-		// `Terminal.print(total + tax)` read `total` as one and `+ tax` as its
-		// value, and what came of that was `Expected ')' but found 'tax'` — the
-		// Argument list complaining about text that was never an Argument's.
-		// Read as an Expression instead, the `+` is met where the Expression
-		// ENDS, which is where the operator table answers for it.
+		// A label never stands before another language's operator, as in
+		// `total + tax`.
 		if (this.foreignTextFollowing() !== null) {
 			return false
 		}
 
-		// '#', '.' and '[' all continue the Identifier when they are
-		// written flush against it — `Choice#Case`, `order.isPaid` and the
-		// `primes[0]` that is refused as an index — and each opens an Expression
-		// of its own when a space stands between: `label #Case` passes a bare
-		// Case, `label .price` a member path, `contentsOf [1, 2]` a List. The
-		// space is the whole difference, and it is the same rule the prefixed
-		// Case construction is read by.
-		//
-		// The `[` is here so that `Terminal.print(primes[0])` is answered
-		// about the index rather than about the Argument it is not: read as a
-		// label, `primes` labelled a List and the report was
-		// `argument-label-mismatch` about a label nobody wrote. Read as an
-		// Expression, the brackets are met where the Expression ENDS, which is
-		// where they are refused and named.
+		// '#', '.' and '[' continue the Identifier when flush, and open a value
+		// of their own after a space.
 		if (
 			following!.type === TokenType.SymbolHash ||
 			following!.type === TokenType.SymbolDot ||
@@ -7231,19 +7163,8 @@ class DescentParser {
 				return generators.argument(name, value)
 			}
 
-			// An Identifier can start both a plain Expression argument
-			// and a labelled argument, so we try the Expression reading first
-			// and fall back to the labelled reading — exactly one of the two
-			// can reach the end of the argument.
-			//
-			// The failure is phrased as the Argument list's own close
-			// would phrase it — "Expected ')' but found 'X'" at the Token the
-			// Expression stopped in front of — rather than as a remark about
-			// the reading ("Expression does not span the whole argument"). It
-			// used to be neither reported nor positioned, because the labelled
-			// reading below always answered for the text; furthest-failure
-			// tracking reports it wherever this reading got FURTHER than that
-			// one, and a call missing its `)` is exactly when it does.
+			// The Expression reading first, then the labelled one. See
+			// "Argument labels" in DEVELOPMENT.md.
 			let unlabelledArgument = this.backtrack(() => {
 				let value = this.parseExpression()
 				let next = this.tokens.peek()?.type
@@ -7275,11 +7196,9 @@ class DescentParser {
 
 	// #region Types
 
-	// `|` binds loosest, so a Union is parsed on top of Generic
-	// application — `List<Item> | String` is a Union of `List<Item>` and
-	// `String`, not a Generic over a Union. A Union is still reachable as a
-	// Generic argument (`List<Item | String>`), where the angle brackets
-	// delimit it.
+	// `|` binds loosest: `List<Item> | String` is a Union of an application
+	// and `String`. Inside angle brackets, `List<Item | String>`, it is an
+	// Argument.
 	protected parseType(): parser.TypeDeclarationNode {
 		this.enterNesting()
 
@@ -7311,26 +7230,15 @@ class DescentParser {
 
 		let leftAngleToken = this.tokens.peek()
 
-		// A `<` continues the base Type as a generic application
-		// (`List<Integer>`) ONLY when it sits on the SAME line as the Type it
-		// applies to. A `<` that opens the NEXT line begins a new declaration —
-		// the next entry of an `overload` block leading with its own `<infer …>`
-		// clause is the case in point: a body-less entry returning a bare Generic
-		// (`… -> Result`) sits directly above the next entry's `<`, and reading
-		// the two as `Result<infer …>` would swallow that clause. A Type
-		// application is always written on one line, so this rejects nothing a
-		// declaration means to say.
+		// A `<` applies the Type only on the Type's own line. On the next line it
+		// may open an `overload` entry's `<infer …>` list.
 		if (
 			leftAngleToken?.type === TokenType.SymbolLeftAngle &&
 			leftAngleToken.position.start.line === baseType.position.end.line
 		) {
 			let { typeArguments, position } = this.parseTypeArgumentList()
 
-			// From the base Type, not from the `<` — the Node stands for
-			// `List<Item>`, so that is what it spans. Starting at the bracket
-			// would leave `List` inside no Node at all, which is what made the
-			// Editor underline the Arguments alone while naming the whole
-			// application.
+			// The Node spans `List<Item>`, from the base Type.
 			return generators.genericTypeDeclaration(baseType, typeArguments, {
 				start: baseType.position.start,
 				end: position.end,
@@ -7340,9 +7248,8 @@ class DescentParser {
 		return baseType
 	}
 
-	// `<Integer, String>` — the Arguments of an application, wherever one
-	// is written. An annotation's `Holder<Integer>` and a value's
-	// `Holder<Integer>#Full` are the same list, so they are the same parse.
+	// `<Integer, String>`: the Arguments of an application, in an annotation
+	// or in a value's `Holder<Integer>#Full`.
 	protected parseTypeArgumentList(): {
 		typeArguments: Array<parser.TypeDeclarationNode>
 		position: common.Position
