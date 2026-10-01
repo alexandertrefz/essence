@@ -8,23 +8,15 @@ import {
 	helpsOfCode,
 } from "./followedHelps"
 
-// One promise per report: a Help names an edit the reader can make HERE,
-// and following it reaches a Program that compiles or a GENUINELY different
-// mistake. Every Help below is printed by the Compiler and then written into the
-// probe it came from, so a Help that stops being followable fails here rather
-// than in a reader's afternoon.
-//
-// The withheld cases are pinned beside the offered ones. Half of what this audit
-// found was a Help that was perfectly true somewhere else — a Match that narrows
-// a Union of DECLARED Types, a `complete` in a body that waits — and a condition
-// that stops being tested is a condition that quietly stops holding.
+// A Help names an edit the reader can make here, and following it reaches a
+// Program that compiles or a different mistake. Each Help is written into the
+// probe it came from and compiled. A Help withheld in one place is often true
+// in another, so the withheld cases are pinned beside the offered ones.
 
 describe("The harness these Helps are compiled by", () => {
-	// The audit ran in four branches and briefly had two harnesses, one of
-	// which stopped after the Enricher — so a Help followed into a Validator
-	// refusal read there as a Help that works. There is one now, and it runs
-	// every stage: this Program is one the Enricher has nothing to say about and
-	// the Validator refuses, which is the difference between the two in a line.
+	// The harness must run every stage, so a Help followed into a Validator
+	// refusal fails. The Enricher accepts this Program and the Validator refuses
+	// it.
 	let unreturned = `implementation {
 		function half(_ number: Integer) -> Integer {
 			if number::isGreaterThan(0) {
@@ -45,10 +37,8 @@ describe("A member path with no Function around it", () => {
 		constant price = .price
 	}`
 
-	// Two answers where the position names nothing at all. The move comes
-	// first because it needs no Type written — a path is for the positions that
-	// name a Function of one Parameter, and this one names none. The literal is
-	// second, with both of its Types spelled as the blanks they are.
+	// The move comes first because it needs no Type written. The literal comes
+	// second, with both of its Types spelled as blanks.
 	it("offers the move first and spells both of the literal's Types", () => {
 		expect(codesOfSource(source)).toEqual(["path-without-context"])
 		expect(helpsOfCode(source, "path-without-context")).toEqual([
@@ -57,8 +47,8 @@ describe("A member path with no Function around it", () => {
 		])
 	})
 
-	// And it is withheld where the position DOES name a Type — a `::map`
-	// answers a List, which fits an Integer position no better than the path did.
+	// Where the position names a Type the move is withheld, since a `::map`
+	// answers a List.
 	it("withholds the move where the position names a Type", () => {
 		let returned = `implementation {
 		function priceOf() -> Integer {
@@ -73,9 +63,8 @@ describe("A member path with no Function around it", () => {
 		).toBe(false)
 	})
 
-	// The literal the Help writes compiles once each `<Type>` is filled in.
-	// A literal outside Argument position takes no Types from around it, so one
-	// that left out its `-> Type` would meet `missing-return-type`.
+	// A literal outside Argument position takes no Types from around it, so
+	// leaving out its `-> Type` would meet `missing-return-type`.
 	it("compiles with the blanks filled in", () => {
 		expect(
 			compiles(`implementation {
@@ -86,8 +75,8 @@ describe("A member path with no Function around it", () => {
 		).toBe(true)
 	})
 
-	// A position naming a Type other than a Function wants a VALUE, and no
-	// Function literal fits it however its Types are written.
+	// A position naming a Type other than a Function wants a value, which no
+	// Function literal fits.
 	it("offers a value where the position names no Function", () => {
 		let returned = `implementation {
 		function priceOf() -> Integer {
@@ -108,11 +97,8 @@ describe("A Method that can not be dispatched", () => {
 		}
 	}`
 
-	// A Match narrows NOTHING over a Union of Type Parameters — Types erase
-	// before one runs — so the Help that offered one sent the reader into
-	// `erased-case-conflict`, whose own Help swaps the two arms and produces its
-	// own mirror image. A closed loop, and the only report in this family that
-	// had one.
+	// Types erase before a Match runs, so a Match narrows nothing over a Union
+	// of Type Parameters. Offering one would lead into `erased-case-conflict`.
 	it("names the signature that works instead of a Match", () => {
 		expect(helpsOfCode(source, "undispatchable-method")).toEqual([
 			"Take one Type Parameter in place of the Union — '<infer Item is Printable>(_ value: Item)' — since Types erase before a Match runs, and a Match is the only thing that narrows.",
@@ -131,10 +117,9 @@ describe("A Method that can not be dispatched", () => {
 })
 
 describe("A Type Parameter nothing bound", () => {
-	// `Other` belongs to `Result::andThen`, and it is written in the step's
-	// own answer Type — so it HAS a place among the Parameters, and the Help that
-	// asked for one was asking the reader to edit the standard library. What is
-	// actually missing is the literal's `-> Type`.
+	// `Answer` belongs to `loop` and is written in the step's answer Type, so
+	// it has a place among the Parameters already. The literal's `-> Type` is
+	// what is missing.
 	let source = `implementation {
 		constant never = loop(startingWith 0,
 			step (state) { <- #Continue(state::add(1)) })
@@ -155,11 +140,8 @@ describe("A Type Parameter nothing bound", () => {
 		).toBe(true)
 	})
 
-	// And a literal in the call is not on its own a reason to name one:
-	// this signature writes `B` in the callee's OWN answer Type and nowhere in
-	// the step's, so the literal's missing `-> Type` has nothing to do with `B`
-	// and a reader who wrote one in got the identical code and the identical
-	// report back. The name has to be one the literal ANSWERS.
+	// `B` appears only in the callee's answer Type, not in the literal's, so
+	// the literal's `-> Type` would not bind it.
 	it("keeps the general pair for a name the literal does not answer", () => {
 		let elsewhere = `implementation {
 		function make<infer A, infer B>(_ step: (_ n: Integer) -> A) -> Dictionary<String, B> {
@@ -175,9 +157,8 @@ describe("A Type Parameter nothing bound", () => {
 		])
 	})
 
-	// And the pair it used to print stands where it is TRUE — a signature
-	// naming a Type Parameter only in its answer Type is unbindable from any
-	// call, and there the two ends really are the reader's to hold.
+	// A Type Parameter named only in the answer Type cannot be bound by any
+	// call, so both general Helps apply.
 	it("keeps the general pair for a signature no Argument binds", () => {
 		let unbindable = `implementation {
 		function blank<infer Item>() -> List<Item> {
@@ -201,9 +182,8 @@ describe("A return Type nothing could read off the body", () => {
 		})
 	}`
 
-	// The annotation alone moved the report to `missing-return` one run
-	// later, which is the same mistake in another stage's words — and the docs
-	// have said all along that a forgotten `<-` is the usual cause.
+	// A forgotten `<-` is the usual cause. An annotation alone would only move
+	// the report to `missing-return`.
 	it("names the missing '<-' first", () => {
 		expect(helpsOfCode(source, "uninferable-return-type")).toEqual([
 			"Return the value with '<-' — a body whose last line is a value answers with nothing.",
@@ -221,9 +201,7 @@ describe("A return Type nothing could read off the body", () => {
 		).toBe(true)
 	})
 
-	// Withheld where the body DOES return and still answers nothing — the
-	// `<-` is written, and telling its author to write one is advice about a
-	// Program they do not have.
+	// Where the body already returns, asking for a `<-` would not help.
 	it("withholds it where the body already returns", () => {
 		let returns = `implementation {
 		function half(_ text: String) -> Result<Integer, String> {
@@ -240,9 +218,8 @@ describe("A return Type nothing could read off the body", () => {
 })
 
 describe("A Function literal outside Argument position", () => {
-	// Two round trips for one under-annotated literal: the Parameter was
-	// reported, and only once it carried a Type was the missing `-> Type`
-	// reported in turn. Both halves are named where the first of them is raised.
+	// Both Types are asked for in one report, so the literal takes one round
+	// trip rather than two.
 	it("asks for the Parameter Type and the return Type together", () => {
 		let source = `implementation {
 		constant double = (number) {
@@ -255,7 +232,6 @@ describe("A Function literal outside Argument position", () => {
 		])
 	})
 
-	// And the return Type is spelled out where the body says what it is.
 	it("spells the return Type the body answers with", () => {
 		let source = `implementation {
 		type Product = { price: Integer }
@@ -277,9 +253,8 @@ describe("A Function literal outside Argument position", () => {
 })
 
 describe("A Namespace specifier that names something else", () => {
-	// One mistake, one report. The empty lookup a refused specifier leaves
-	// behind read as "no Namespace targets this value", which is false — the very
-	// call without the specifier compiles.
+	// A refused specifier must not also report that no Namespace targets the
+	// value, since the call without the specifier compiles.
 	it("reports once and does not deny the receiver its Namespace", () => {
 		let source = `implementation {
 		constant total = 1
@@ -303,9 +278,8 @@ describe("A 'where' clause on a base that can not carry one", () => {
 		type Yes = Boolean where @::is(true)
 	}`
 
-	// Dropping the clause compiles, and it answers a DIFFERENT Declaration
-	// — "a Boolean that is true" becomes "any Boolean". So the edit says what it
-	// costs, and the other half names what the intent survives on.
+	// Dropping the clause compiles but changes the Declaration to any Boolean,
+	// so the Help says so and names the bases a refinement can stand on.
 	it("says what dropping the clause costs", () => {
 		expect(helpsOfCode(source, "invalid-refinement-predicate")).toEqual([
 			"Drop the 'where' clause from 'Yes', which leaves the Alias naming Boolean and nothing more.",
@@ -325,9 +299,8 @@ describe("A 'where' clause on a base that can not carry one", () => {
 })
 
 describe("A payload that spells the Case's members", () => {
-	// The shorthand sentence fired for every multi-member mismatch there
-	// is, because its guard counted members and looked at nothing else. A payload
-	// that already writes the Record took a shortcut with nothing.
+	// A payload that already writes the Record took no shorthand, so the
+	// shorthand sentence is withheld.
 	it("withholds the shorthand sentence", () => {
 		let source = `implementation {
 		choice Shape {
@@ -340,8 +313,7 @@ describe("A payload that spells the Case's members", () => {
 		expect(helpsOfCode(source, "payload-type-mismatch")).toEqual([])
 	})
 
-	// And keeps it where a value really was handed over on its own, which
-	// is the one shape the sentence was written for.
+	// A value handed over on its own is the shape the sentence is for.
 	it("keeps it where the payload is not the Case's Record", () => {
 		let source = `implementation {
 		choice Shape {
@@ -366,9 +338,8 @@ describe("A Future where its value is wanted", () => {
 		"	}",
 	].join("\n")
 
-	// `complete` in a body that answers no Future is
-	// `complete-outside-future`, so the word was offered where writing it is a
-	// refusal — and the Quick Fix keyed on the same data wrote it.
+	// `complete` in a body that answers no Future is `complete-outside-future`,
+	// so neither the Help nor its Quick Fix offers it there.
 	it("withholds 'complete' where the body can not wait", () => {
 		let source = `implementation {
 ${fetched}
@@ -397,8 +368,7 @@ ${fetched}
 		])
 	})
 
-	// The same rule on the Declaration rail, where the surveyed Quick Fix
-	// wrote the word into a body that could not hold it.
+	// The same rule for a Declaration.
 	it("withholds it on a Declaration in a body that can not wait", () => {
 		let source = `implementation {
 ${fetched}
@@ -417,12 +387,9 @@ ${fetched}
 })
 
 describe("One mistake, one report", () => {
-	// The program the survey named. A literal whose return Type could not
-	// be read reported four times — the literal itself, the Type Parameter the
-	// call could not bind, the `#Failure(…)` measured against an Error and the
-	// `#Value(…)` beside it with no Choice to pick from — and only the first of
-	// the four named an edit that helps. Plus one warning that really is
-	// independent, which is what keeps this from being a test about silence.
+	// A literal whose return Type cannot be read is reported once, not again
+	// for the unbound Type Parameter and each Case in its body. The independent
+	// warning shows the spec is not about silence.
 	let source = `implementation {
 		function half(_ text: String) -> Result<Integer, String> {
 			<- Integer.parse(text)::toResult(failingWith "not a number")::andThen((value) {
@@ -458,9 +425,8 @@ describe("One mistake, one report", () => {
 		).toEqual(["fallback-never-used"])
 	})
 
-	// And a capture refused before its Type was decided answers for the
-	// call around it too — `items::length()` reported the capture and then
-	// reported `ItemType` on top of it.
+	// A capture refused before its Type is decided also answers for the call
+	// on it, so `ItemType` is not reported again.
 	it("reports a capture once, not once per Type Parameter", () => {
 		expect(
 			codesOfSource(`implementation {
@@ -473,8 +439,6 @@ describe("One mistake, one report", () => {
 		).toEqual(["uninferable-item-type"])
 	})
 
-	// And a call on a value that is not a Function is one mistake however
-	// many stages notice it.
 	it("reports a call on a value once", () => {
 		expect(
 			codesOfSource(`implementation {
@@ -485,9 +449,8 @@ describe("One mistake, one report", () => {
 		).toEqual(["not-a-function"])
 	})
 
-	// A body refused in its OWN right answers for the literal around it,
-	// and the two reports about a Type that could not be read off it stand down.
-	// `.length` is a Method read as a member under every return Type there is.
+	// A body refused in its own right answers for the literal around it, so the
+	// reports about its unreadable Types stand down.
 	it("reports a refused body once, not three times", () => {
 		expect(
 			codesOfSource(`implementation {
@@ -498,11 +461,8 @@ describe("One mistake, one report", () => {
 		).toEqual(["method-called-with-dot"])
 	})
 
-	// The other side of that gate, and the one silence has to stop at. A
-	// bare Case in return position is refused by the inference pass BECAUSE
-	// there is no return Type yet — the real pass silences it for the same
-	// reason — so counting it as a refused body left this Program reporting
-	// nothing at all while the Compiler could not say what the literal answers.
+	// A bare Case in return position is refused only because no return Type is
+	// known yet. That is no refused body, so the return Type is still reported.
 	it("still reports a return Type it could not read off a bare Case", () => {
 		expect(
 			codesOfSource(`implementation {
@@ -517,9 +477,8 @@ describe("One mistake, one report", () => {
 })
 
 describe("Reports that knew the fix and said nothing", () => {
-	// Each of these had the answer in hand — the value's Type, the Type's
-	// arity, the declared return Type — and printed a Note about the mistake
-	// without naming the edit.
+	// Each report knows the edit from the value's Type, the Type's arity or the
+	// declared return Type, so its Help names it.
 	it("names the question an Optional answers", () => {
 		let source = `implementation {
 		constant found: Optional<Integer> = #Value(1)
@@ -602,9 +561,8 @@ describe("Reports that knew the fix and said nothing", () => {
 		type Small = Integer where @::absolute()
 	}`
 
-		// Of '@' and not of what the clause answers — a predicate is ONE
-		// call on '@', so a comparison chained onto `@::absolute()` is refused
-		// by the rail beside this one.
+		// A predicate is one call on '@', so the Help asks a question of '@'
+		// rather than chaining onto `@::absolute()`.
 		expect(helpsOfCode(source, "predicate-not-boolean")).toEqual([
 			"Call a Method on '@' that answers a Boolean — '@::isGreaterThan(0)', for instance.",
 		])
@@ -641,9 +599,8 @@ describe("Reports that knew the fix and said nothing", () => {
 		).toBe(true)
 	})
 
-	// An unbounded Type Parameter reaches no Namespace at all — that is
-	// what being unbounded means — and the Protocol that answers the call is
-	// looked up rather than guessed at.
+	// An unbounded Type Parameter reaches no Namespace. The Help names the
+	// Protocol that declares the Method.
 	it("names a Protocol that would give the Parameter a Namespace", () => {
 		let source = `implementation {
 		function show<infer Item>(_ item: Item) -> String {
@@ -664,11 +621,9 @@ describe("Reports that knew the fix and said nothing", () => {
 	})
 })
 
-// The one Note in this family that claimed more than the rule does. It
-// said no DECLARATION may take the name, and the Compiler refuses only the
-// forms that declare a TYPE — a Constant, a Function, a Case or a member called
-// `Self` compiles, and a reader looking at one was told their Program could not
-// be the Program in front of them.
+// Only a Type may not be named `Self`. A Constant, a Function, a Case or a
+// member called `Self` compiles, so the Note says the name is reserved for
+// Types alone.
 describe("The name a Protocol reserves", () => {
 	it("says which declarations the name is taken for", () => {
 		expect(
