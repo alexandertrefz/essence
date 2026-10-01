@@ -1136,13 +1136,25 @@ describe("Dictionary literals", () => {
 			).toEqual(['"[\\"alex\\" = 40, \\"sam\\" = 25, \\"kim\\" = 7]"'])
 		})
 
-		// A Record key, found through the witness the literal carried.
-		it("holds a key the runtime can only find by comparing", async () => {
+		it("holds a Record key, found by its encoding", async () => {
 			expect(
 				await run(
 					block(
 						"\tconstant scores = [{ x = 1, y = 2 } = 10]",
 						"\tTerminal.inspect(scores::value(at { x = 1, y = 2 }, defaultingTo 0))",
+					),
+				),
+			).toEqual(["10"])
+		})
+
+		// An Algebraic has no canonical encoding, so the lookup compares it
+		// through `Number`'s `is`.
+		it("holds a key the runtime can only find by comparing", async () => {
+			expect(
+				await run(
+					block(
+						"\tconstant scores: Dictionary<Number, Integer> = [2::squareRoot() = 10, 1/2 = 2]",
+						"\tTerminal.inspect(scores::value(at 2::squareRoot(), defaultingTo 0))",
 					),
 				),
 			).toEqual(["10"])
