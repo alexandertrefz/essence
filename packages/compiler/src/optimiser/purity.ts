@@ -1,5 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { findSimpleChild, type SimpleNode } from "../visitor/typedSimple"
+
 // Whether an Expression can be left unevaluated without the Program noticing.
 // `true` means the compiler can name every reason it could matter, and none
 // applies. `shadowed` is the Program's nested Namespaces, and is required. See
@@ -9,9 +11,6 @@ export function isPureExpression(
 	node: common.typedSimple.ExpressionNode,
 	shadowed: ReadonlySet<string>,
 ): boolean {
-	let isPure = (child: common.typedSimple.ExpressionNode): boolean =>
-		isPureExpression(child, shadowed)
-
 	switch (node.nodeType) {
 		// The leaves. No Essence value has a getter for a read to run.
 		case "StringValue":
@@ -25,27 +24,16 @@ export function isPureExpression(
 			return true
 		// Every member the Type names is there, so a read can not fail.
 		case "Lookup":
-			return isPure(node.base)
 		case "RecordValue":
-			return Object.values(node.members).every(isPure)
 		case "ListValue":
-			return node.values.every(isPure)
 		// Building a Dictionary compares keys through a witness, which runs
 		// nothing.
 		case "DictionaryValue":
-			return node.entries.every(
-				(entry) => isPure(entry.key) && isPure(entry.value),
-			)
 		case "CaseValue":
-			return node.value === null || isPure(node.value)
 		case "Combination":
-			return isPure(node.lhs) && isPure(node.rhs)
 		// A witness is a method map of references, never calls.
 		case "ConformanceValue":
-			return (
-				node.conditions.every(isPure) &&
-				(node.groupConditions ?? []).every(isPure)
-			)
+			return partsArePure(node, shadowed)
 		// A call. A Function value may be a native such as `loop` that runs its
 		// callbacks, and a Union dispatch is a Method call.
 		case "FunctionInvocation":
@@ -64,11 +52,7 @@ export function isPureExpression(
 		// A `define` holds only Expressions. Every Condition is weighed,
 		// including those that never run.
 		case "Define":
-			return (
-				node.arms.every(
-					(arm) => isPure(arm.condition) && isPure(arm.value),
-				) && isPure(node.otherwise)
-			)
+			return partsArePure(node, shadowed)
 		// A trace writes into the test's trace buffer, which is its whole
 		// point.
 		case "TestTrace":
@@ -85,6 +69,27 @@ export function isPureExpression(
 		case "Intrinsic":
 			return isPureIntrinsic(node, shadowed)
 	}
+}
+
+// Whether every Expression a node is built from is pure. A part that is no
+// Expression matches no case of `isPureExpression`, and so is refused.
+function partsArePure(
+	node: SimpleNode,
+	shadowed: ReadonlySet<string>,
+): boolean {
+	return findSimpleChild(node, isImpurePart, shadowed) === undefined
+}
+
+function isImpurePart(
+	child: SimpleNode,
+	shadowed: ReadonlySet<string>,
+): true | undefined {
+	return isPureExpression(
+		child as common.typedSimple.ExpressionNode,
+		shadowed,
+	)
+		? undefined
+		: true
 }
 
 // A hole is weighed as `a::toString()` written out would be. See "Holes and
@@ -157,20 +162,24 @@ function isPureIntrinsic(
 	node: common.typedSimple.IntrinsicNode,
 	shadowed: ReadonlySet<string>,
 ): boolean {
-	let isPure = (child: common.typedSimple.ExpressionNode): boolean =>
-		isPureExpression(child, shadowed)
-
 	switch (node.kind) {
 		case "tag-test":
 		case "essence-boolean":
 		case "raw-boolean":
-			return isPure(node.value)
+		case "type-test":
+		case "raw-boolean-op":
+		case "raw-compare":
+		case "raw-equals":
+		case "raw-arithmetic":
+		case "direct-record":
+		case "direct-case":
+		case "direct-list":
+		case "spread-combination":
+			return partsArePure(node, shadowed)
 		// The site holds a name. `pool-constants` asks a stricter question of
 		// the value.
 		case "pooled-reference":
 			return true
-		case "type-test":
-			return isPure(node.value) && isPure(node.descriptor)
 		// Data, a Function reference, and the literal `undefined`.
 		case "type-descriptor":
 		case "direct-method":
@@ -182,38 +191,13 @@ function isPureIntrinsic(
 		// A loop runs Statement bodies, and may never end.
 		case "inline-loop":
 			return false
-		case "raw-boolean-op":
-			return (
-				isPure(node.operand) &&
-				(node.other === null || isPure(node.other))
-			)
-		case "raw-compare":
-		case "raw-equals":
-		case "raw-arithmetic":
-			return isPure(node.left) && isPure(node.right)
 		// The fallback counts though it may not run, since the question is
 		// whether moving this observes anything.
 		case "member-or-default":
-			return isPure(node.base) && isPure(node.fallback)
-		case "direct-record":
-			return Object.values(node.members).every(isPure)
-		case "direct-case":
-			return (
-				Object.values(node.members).every(isPure) &&
-				(node.payload === null || isPure(node.payload))
-			)
-		case "direct-list":
-			return node.values.every(isPure)
 		// Only an inlined loop holds a build, and loops are refused, but the
 		// items are weighed anyway.
 		case "list-build":
-			return node.additions.every((addition) => isPure(addition.value))
-		case "spread-combination":
-			return (
-				isPure(node.lhs) &&
-				Object.values(node.members).every(isPure) &&
-				(node.rhs === null || isPure(node.rhs))
-			)
+			return partsArePure(node, shadowed)
 	}
 }
 

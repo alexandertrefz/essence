@@ -160,6 +160,9 @@ including the Conditions that never run. A Condition that would have printed is 
 trace, a coverage counter, a `start` and a `complete` are never pure, since recording, counting, starting and waiting
 are what they are for.
 
+The parts of a value are read off the simplified child table, so a part in a field added later is weighed too. A
+kind still needs a case of its own, since a new kind may be a call.
+
 ### The enumeration
 
 `pureMethods` is an allowlist: a Namespace with no entry has every Method refused. A Method call is pure only when its
