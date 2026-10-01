@@ -156,3 +156,17 @@ and compiles again.
 
 A compile is held as a promise, so a wrapper and its raw door asked for together wait on one compile. A compile that
 failed is dropped at once, since the next request may find the sources fixed.
+
+### Watch files under Vite
+
+Every source a served module was compiled from is a watch file of it. Vite turns a watch file into an edge of its
+module graph. An edit then travels from the changed file through the modules that import it, along the Essence
+imports, up to the nearest module that accepts. The plugin only names the files and forgets what an edit made stale
+through `invalidate`. A dev server names the changed file, and a rebuild names none.
+
+The plugin names the files in `load` and again in `transform`. Vite records the files `load` names against the
+module's node, and a module nobody has imported yet has no node until its load returns. A module requested straight
+away, as a test or a second tab does, can lose them. An edit to its sources then never reaches it, and the stale text
+is served again. Whether that happens depends on a race with the analysis of the importer that would have created the
+node. By `transform` the node exists, so the edge is drawn either way. The `load` call stays, because it is also what
+puts the file under the real watcher.
