@@ -1,6 +1,14 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
+import {
+	findParserChild,
+	forEachParserChild,
+	forEachTypedChild,
+	type ParserNode,
+	type TypedNode,
+} from "../visitor/index"
 import { conformanceParameterName } from "./names"
+import { forEachHeldRecord } from "./nodes"
 import { patternBindings } from "./patterns"
 import { resolveOverloadedMethodName, typeMentionsGeneric } from "./types"
 
@@ -19,23 +27,28 @@ export function providedBodyReads(
 	let named = new Set<string>()
 	let whole = false
 
-	eachRecord([body.body, defaultsOf(body)], (record) => {
-		if (record.nodeType === "MethodInvocation") {
-			noteNamed((record as parser.MethodInvocationNode).member.content)
-		} else if (record.nodeType === "Lookup") {
-			let lookup = record as parser.LookupNode
-
-			if (namesSelf(lookup.base)) {
-				noteNamed(lookup.member.content)
+	// A Type annotation naming `Self` is read too, since the visitor reaches
+	// the parser's Type declarations.
+	let noteReads = (node: ParserNode): void => {
+		if (node.nodeType === "MethodInvocation") {
+			noteNamed(node.member.content)
+		} else if (node.nodeType === "Lookup") {
+			if (namesSelf(node.base)) {
+				noteNamed(node.member.content)
 			}
 		} else if (
-			record.nodeType === "IdentifierTypeDeclaration" &&
-			(record as parser.IdentifierTypeDeclarationNode).type.content ===
-				"Self"
+			node.nodeType === "IdentifierTypeDeclaration" &&
+			node.type.content === "Self"
 		) {
 			whole = true
 		}
-	})
+
+		forEachParserChild(node, noteReads)
+	}
+
+	for (let node of [...body.body, ...defaultsOf(body)]) {
+		noteReads(node)
+	}
 
 	function noteNamed(name: string): void {
 		if (Object.hasOwn(methods, name)) {
@@ -405,7 +418,7 @@ export function providedBodyReads(
 				case "OverloadedFunctionStatement":
 				case "ExpectStatement":
 				case "RequireStatement":
-					if (reachesAnything(statement)) {
+					if (reachesAnything(statement) === true) {
 						whole = true
 					}
 
@@ -420,22 +433,11 @@ export function providedBodyReads(
 
 	// `@` or a name holding `Self` anywhere inside a declaration or an
 	// assertion, which are not read closely.
-	let reachesAnything = (node: parser.ImplementationNode): boolean => {
-		let found = false
-
-		eachRecord(node, (record) => {
-			if (
-				record.nodeType === "Self" ||
-				(record.nodeType === "Identifier" &&
-					heldBy((record as parser.IdentifierNode).content) !==
-						"none")
-			) {
-				found = true
-			}
-		})
-
-		return found
-	}
+	let reachesAnything = (node: ParserNode): true | undefined =>
+		node.nodeType === "Self" ||
+		(node.nodeType === "Identifier" && heldBy(node.content) !== "none")
+			? true
+			: findParserChild(node, reachesAnything)
 
 	// A name may come to hold `Self` after it is first read, so the body is
 	// read again until no name holds more.
@@ -504,7 +506,6 @@ export function typedBodyReads(
 	let witness = conformanceParameterName("Self")
 	let named = new Set<string>()
 	let whole = false
-	let seen = new WeakSet<object>()
 
 	let noteHandedOn = (identity: string): void => {
 		let handed = methodsOf(identity)
@@ -536,89 +537,83 @@ export function typedBodyReads(
 		}
 	}
 
-	let visit = (value: unknown, skipped: ReadonlySet<string>): void => {
-		if (whole || typeof value !== "object" || value === null) {
-			return
-		}
-
-		if (Array.isArray(value)) {
-			for (let item of value) {
-				visit(item, NOTHING_SKIPPED)
-			}
-
-			return
-		}
-
-		let record = value as Record<string, unknown>
-
-		// A Type names no witness.
-		if (typeof record.type === "string" && record.nodeType === undefined) {
-			return
-		}
-
-		if (seen.has(record)) {
-			return
-		}
-
-		seen.add(record)
-
-		let skip = new Set(skipped)
-
-		if (record.nodeType === "MethodInvocation") {
-			let invocation =
-				record as unknown as common.typed.MethodInvocationNode
-
-			if (invocation.namespace.name === witness) {
-				noteCall(
-					invocation.member.name,
-					invocation.overloadedMethodIndex,
-				)
-				skip.add("namespace")
-			}
-
-			for (let branch of invocation.dispatch ?? []) {
-				if (branch.namespaceName === witness) {
-					noteCall(
-						invocation.member.name,
-						branch.overloadedMethodIndex,
-					)
-				}
-
-				visit(branch, new Set(["namespaceName"]))
-			}
-
-			skip.add("dispatch")
-		} else if (
-			record.nodeType === "Lookup" &&
-			record.conformanceName === witness
-		) {
-			noteCall(
-				(record as unknown as common.typed.LookupNode).member.content,
-				null,
-			)
-			skip.add("conformanceName")
-		} else if (
-			typeof record.protocolName === "string" &&
-			handsOn(record.source, witness)
-		) {
-			noteHandedOn(record.protocolName)
-			skip.add("source")
-		}
-
-		for (let [key, item] of Object.entries(record)) {
-			if (skip.has(key) || key === "position") {
-				continue
-			}
-
-			if (item === witness) {
+	// The witness named in any other field hands it on.
+	let readFields = (record: object, skipped?: string): void => {
+		for (let field in record) {
+			if (
+				field !== skipped &&
+				(record as Record<string, unknown>)[field] === witness
+			) {
 				whole = true
-			} else {
-				visit(item, NOTHING_SKIPPED)
 			}
 		}
 	}
 
-	visit(body, NOTHING_SKIPPED)
+	let readHeld = (
+		record: Record<string, unknown>,
+		field: string,
+		holder: Record<string, unknown>,
+	): boolean => {
+		if (
+			field === "source" &&
+			typeof holder.protocolName === "string" &&
+			handsOn(record, witness)
+		) {
+			noteHandedOn(holder.protocolName)
+
+			return false
+		}
+
+		// A call through the witness, which `visit` noted.
+		if (
+			field === "namespace" &&
+			holder.nodeType === "MethodInvocation" &&
+			record.name === witness
+		) {
+			return false
+		}
+
+		readFields(record, field === "dispatch" ? "namespaceName" : undefined)
+
+		return true
+	}
+
+	let visit = (node: TypedNode): void => {
+		if (whole) {
+			return
+		}
+
+		let skipped: string | undefined
+
+		if (node.nodeType === "MethodInvocation") {
+			if (node.namespace.name === witness) {
+				noteCall(node.member.name, node.overloadedMethodIndex)
+			}
+
+			for (let branch of node.dispatch ?? []) {
+				if (branch.namespaceName === witness) {
+					noteCall(node.member.name, branch.overloadedMethodIndex)
+				}
+
+				// A branch types its Function literal Arguments anew.
+				for (let contextual of branch.contextualArguments) {
+					visit(contextual.argument)
+				}
+			}
+		} else if (
+			node.nodeType === "Lookup" &&
+			node.conformanceName === witness
+		) {
+			noteCall(node.member.content, null)
+			skipped = "conformanceName"
+		}
+
+		readFields(node, skipped)
+		forEachHeldRecord(node, readHeld)
+		forEachTypedChild(node, visit)
+	}
+
+	visit(body)
 
 	return Object.entries(methods).flatMap(([name, method]) =>
 		witnessEntries(name, method).filter(
@@ -626,8 +621,6 @@ export function typedBodyReads(
 		),
 	)
 }
-
-const NOTHING_SKIPPED: ReadonlySet<string> = new Set()
 
 // Whether a Conformance's source is the witness itself, handed on as the
 // witness for the Protocol that Conformance names.
@@ -697,26 +690,4 @@ function defaultsOf(
 
 function namesSelf(expression: parser.ExpressionNode): boolean {
 	return expression.nodeType === "Identifier" && expression.content === "Self"
-}
-
-// Every Node under a value, in no particular order.
-function eachRecord(
-	value: unknown,
-	visit: (record: { nodeType: string }) => void,
-): void {
-	if (Array.isArray(value)) {
-		for (let item of value) {
-			eachRecord(item, visit)
-		}
-	} else if (typeof value === "object" && value !== null) {
-		if (typeof (value as { nodeType?: unknown }).nodeType === "string") {
-			visit(value as { nodeType: string })
-		}
-
-		for (let [key, item] of Object.entries(value)) {
-			if (key !== "position") {
-				eachRecord(item, visit)
-			}
-		}
-	}
 }

@@ -3298,6 +3298,24 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["is", "isNot", "visit"])
 		})
 
+		// Each branch types the Function literal anew, and only the `Self`
+		// branch calls `label` through the witness.
+		it("should read what a Function literal calls on `Self` in a Union receiver's branch", () => {
+			expect(
+				readsOf(
+					"Boolean",
+					"namespace Texts for String {",
+					"\tvisit(_ f: (_: String) -> Boolean) -> Boolean { <- f(@) }",
+					"\tlabel() -> String { <- @ }",
+					"}",
+					"",
+					"constant value: Self | String = other",
+					"",
+					"<- value::visit((item) { <- item::label()::isEmpty() })",
+				),
+			).toEqual(["visit", "label__overload$1"])
+		})
+
 		// The body is typed once before the Program is, to read it, and
 		// that typing leaves nothing behind for the one reported.
 		it("should keep the report of a Function literal nothing types", () => {
