@@ -1,15 +1,12 @@
 import * as path from "node:path"
 
-// Where the Essence sources the test suite compiles live. Resolved off
-// this module's own location rather than the working directory — the same trick
-// `@essence-lang/standard-library` uses for its sources — so that a spec finds a
-// fixture from whichever package it lives in, and `bun test` behaves the same
-// run from the repository root or from inside a single package.
+// Where the Essence sources the test suite compiles live, resolved from this
+// module rather than the working directory. So a spec in any package finds them,
+// wherever `bun test` runs.
 export const FIXTURES_DIRECTORY = path.resolve(import.meta.dirname, "../files")
 
-// Segments rather than one string so that call sites do not have to pick
-// a separator, and so that `fixturePath("diagnostics", "Syntax.es")` reads the
-// same way as the directory it names.
+// Segments rather than one string, so call sites pick no separator.
+// `fixturePath("diagnostics", "Syntax.es")` reads like the directory it names.
 export function fixturePath(...segments: Array<string>): string {
 	return path.join(FIXTURES_DIRECTORY, ...segments)
 }

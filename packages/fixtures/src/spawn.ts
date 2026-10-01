@@ -12,8 +12,8 @@ export type Finished = {
 	stderr: string
 }
 
-// Under the suite's 60 s test budget, so that a stuck child fails its test
-// by name rather than leaving the runner to report only that time ran out.
+// Under the suite's per-test budget, so a stuck child fails its own test
+// rather than timing the test out anonymously.
 export const SPAWN_DEADLINE_MILLISECONDS = 50_000
 
 // Awaited, because a synchronous spawn inside `bun test` can go on
