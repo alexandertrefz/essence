@@ -3,20 +3,12 @@ import { describe, expect, test } from "bun:test"
 import { readAll, readLine, withInputSource } from "../Terminal"
 import { typeKeySymbol } from "../type"
 
-// The reading half of `writing.spec.ts`, and host-dependent for the same
-// reason: Bun and Node read descriptor 0 through `node:fs`, Deno through
-// `Deno.stdin.readSync`, and a browser has neither. What a Program reads is
-// also the one thing the runtime BUFFERS — a host answers bytes at whatever
-// boundary it had them, and a line ends where the text says — so most of what
-// is asserted here is that the buffering hands out exactly what came in.
-//
-// Two ways in. `withInputSource(text, …)` stages the whole input, which
-// is what pins the line rules; a staged `Deno` stages the HOST, which is what
-// pins the chunking and the decoding underneath them. The end-to-end path, a
-// compiled Program reading a pipe, is `packages/cli/src/tests/terminalInput.spec.ts`.
+// `withInputSource(text, …)` stages the whole input and pins the line rules. A
+// staged `Deno` stages the host and pins the chunking and decoding under them.
+// `packages/cli/src/tests/terminalInput.spec.ts` reads a pipe end to end. See
+// "Reading input" in packages/runtime/DEVELOPMENT.md.
 
-// An answer read back as plain JavaScript, so that a test asserts on a
-// line rather than on an Optional's shape. `null` is `#Empty`.
+// An answer read back as plain JavaScript, with `null` for `#Empty`.
 function lineOf(answer: ReturnType<typeof readLine>): string | null {
 	return answer[typeKeySymbol] === "Optional#Empty" ? null : answer.item.value
 }
@@ -25,9 +17,8 @@ function linesOf(text: string): Array<string | null> {
 	return withInputSource(text, () => {
 		let seen: Array<string | null> = []
 
-		// One read past the end on purpose: the end of the input has to
-		// stay the end, rather than becoming an empty line for every further
-		// call.
+		// One read past the end, since the end must stay the end rather than
+		// become an empty line.
 		while (seen.length < 40) {
 			let line = lineOf(readLine())
 
@@ -47,9 +38,8 @@ describe("reading lines from a staged input", () => {
 		expect(linesOf("alpha\nbeta\n")).toEqual(["alpha", "beta", null])
 	})
 
-	// A text that stops without a break still ends in a line. The
-	// alternative — dropping it — loses the last line of every file an editor
-	// wrote without a final newline.
+	// Dropping it would lose the last line of a file written without a final
+	// newline.
 	test("a last line without a break is a line", () => {
 		expect(linesOf("alpha\nbeta")).toEqual(["alpha", "beta", null])
 	})
@@ -62,9 +52,8 @@ describe("reading lines from a staged input", () => {
 		expect(linesOf("")).toEqual([null])
 	})
 
-	// The three breaks `String::lines` splits on, so that reading a text
-	// line by line and splitting the same text into lines answer the same
-	// lines.
+	// The breaks `String::lines` splits on, so that reading line by line and
+	// splitting answer the same lines.
 	test("a Windows break is one break", () => {
 		expect(linesOf("alpha\r\nbeta\r\n")).toEqual(["alpha", "beta", null])
 	})
@@ -79,9 +68,7 @@ describe("reading lines from a staged input", () => {
 })
 
 describe("reading everything left", () => {
-	// Unchanged, which is what makes `readAll` the reading side of
-	// `write`: a Program that reads its input and writes it back writes what it
-	// was given, final break included.
+	// So a Program that echoes its input writes back what it was given.
 	test("answers the text exactly, break at the end included", () => {
 		expect(withInputSource("alpha\nbeta\n", () => readAll().value)).toBe(
 			"alpha\nbeta\n",
@@ -100,8 +87,6 @@ describe("reading everything left", () => {
 		).toBe("")
 	})
 
-	// The two Methods read one stream, so what a line took is gone and
-	// what `readAll` takes is the rest of it — including the middle of a line.
 	test("answers what the lines already read left behind", () => {
 		expect(
 			withInputSource("alpha\nbeta\ngamma", () => {
@@ -123,9 +108,8 @@ describe("reading everything left", () => {
 	})
 })
 
-// The staged source is scoped to the call, exactly as an output sink is —
-// which is what makes reading testable at all, since the buffer under these
-// Methods is the one piece of state a caller can not otherwise reach.
+// The staged source is scoped to the call, as an output sink is, since a caller
+// can not reach the buffer otherwise.
 describe("the staged source", () => {
 	test("puts the buffer back when the call it wrapped is over", () => {
 		let outer = withInputSource("outer\n", () => {
@@ -140,11 +124,8 @@ describe("the staged source", () => {
 	})
 })
 
-// A host that answers bytes rather than text, staged as Deno's — the one
-// host whose reading is a Method of its own rather than `node:fs`. It is also
-// how the pieces underneath a line are reached: a read answers what the host
-// HAS, so a line arrives in as many pieces as the host felt like, and a
-// character of three bytes can arrive in two of them.
+// A host that answers bytes, staged as Deno's. A read answers what the host has,
+// so a line may arrive in several pieces and a character across two.
 type Reader = (into: Uint8Array) => number | null
 
 function withHostReader<Value>(read: Reader | null, run: () => Value): Value {
@@ -158,9 +139,8 @@ function withHostReader<Value>(read: Reader | null, run: () => Value): Value {
 	}
 
 	try {
-		// `null` as the staged text means the HOST's input, read from the
-		// start — which is what puts the buffer back to empty around each of
-		// these.
+		// `null` reads the host's input from the start, so each test begins
+		// with an empty buffer.
 		return withInputSource(null, run)
 	} finally {
 		if (previous === undefined) {
@@ -171,8 +151,7 @@ function withHostReader<Value>(read: Reader | null, run: () => Value): Value {
 	}
 }
 
-// A reader that hands over one chunk per call and answers the end of the
-// input the way Deno does, with `null` rather than with zero.
+// Hands over one chunk per call and answers the end with `null`, as Deno does.
 function chunkedReader(chunks: Array<Uint8Array>): Reader {
 	let index = 0
 
@@ -204,10 +183,6 @@ describe("reading from a host that answers bytes", () => {
 		expect(seen).toEqual(["alpha", "beta", null])
 	})
 
-	// A decoder told `stream: true` holds the half of a character it has
-	// until the rest arrives. Without it the two halves each become the
-	// replacement character, and a text read in pieces stops being the text
-	// that was written.
 	test("decodes a character that arrived in two pieces", () => {
 		let bytes = bytesOf("中")
 		let seen = withHostReader(
@@ -222,9 +197,8 @@ describe("reading from a host that answers bytes", () => {
 		expect(seen).toBe("中")
 	})
 
-	// A break that arrives as `\r` and then `\n` is still one break: the
-	// `\r` at the end of what has been read is the one character the runtime
-	// can not decide on yet, so it asks the host again before it does.
+	// A `\r` at the end of the buffer may be half a break, so the runtime reads
+	// again before deciding.
 	test("waits for the other half of a Windows break", () => {
 		let seen = withHostReader(
 			chunkedReader([bytesOf("alpha\r"), bytesOf("\nbeta\n")]),
@@ -244,9 +218,8 @@ describe("reading from a host that answers bytes", () => {
 	})
 })
 
-// A browser, where there is no descriptor to read and no `Deno`. It
-// answers the end of the input rather than throwing, exactly as `write` falls
-// back to the console rather than refusing to write.
+// A browser has no descriptor to read and no `Deno`, so reading answers the end
+// of the input rather than throwing.
 describe("reading on a host with no input", () => {
 	test("answers nothing, and the empty String", () => {
 		let host = globalThis as { process?: unknown }

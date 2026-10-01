@@ -23,22 +23,18 @@ const itemOf = (value: unknown) =>
 	(value as { item: { numerator: bigint; denominator: bigint } }).item
 
 describe("remembered lowest terms", () => {
-	// The invariant the whole numeric tower rests on — a Rational HOLDS
-	// what it was built with, and reducing is something the read side does.
-	// Remembering the reduced form must not write it back.
+	// A Rational holds what it was built with, so remembering the reduced form
+	// must not write it back. See "Rational numbers" in
+	// packages/runtime/DEVELOPMENT.md.
 	test("the stored parts stay as they were built", () => {
 		let unreduced = createRational(4n, 2n)
 
 		expect(unreduced.numerator).toBe(4n)
 		expect(unreduced.denominator).toBe(2n)
 
-		// Asking twice, because the first ask is what fills the memory and
-		// the second is what would read a written-back value if one had been.
-		//
-		// The accessors answer INTEGERS, whose parts are canonicalised
-		// into the hybrid representation — a number for anything a double
-		// carries — while the Rational goes on holding the bigints it was built
-		// with, which is what the assertions either side of these are for.
+		// Asked twice: the first ask fills the memory and the second would read
+		// a written-back value. The accessors answer Integers, which hold a small
+		// value as a number.
 		expect(numerator(unreduced).value).toBe(2)
 		expect(denominator(unreduced).value).toBe(1)
 		expect(numerator(unreduced).value).toBe(2)
@@ -73,9 +69,7 @@ describe("remembered lowest terms", () => {
 		}
 	})
 
-	// Printing asks for the reduced form too, so it is the other side of
-	// the same memory — and it has to answer alike whether it asks first or
-	// after an accessor already filled it.
+	// Printing reads the same memory, whether it fills it or an accessor did.
 	test("printing answers alike however often it is asked", () => {
 		let printedFirst = createRational(4n, 2n)
 		let readFirst = createRational(4n, 2n)
@@ -88,9 +82,8 @@ describe("remembered lowest terms", () => {
 		expect(getStringRepresentation(printedFirst)).toBe("2/1")
 		expect(getStringRepresentation(readFirst)).toBe("2/1")
 
-		// The two formatters part company on a whole value: the
-		// structural one above says what a Rational IS, while the two a caller
-		// asks for print `2`, which is text `Rational.parse` reads back.
+		// On a whole value the structural rendering says `2/1`, and `toString`
+		// says `2`, which `Rational.parse` reads back.
 		expect(toStringAs(printedFirst, fraction).value).toBe("2")
 		expect(toStringAs(printedFirst, decimal).value).toBe("2")
 		expect(toStringAs(createRational(1n, 3n), decimal).value).toBe(
@@ -101,11 +94,8 @@ describe("remembered lowest terms", () => {
 		)
 	})
 
-	// The 80-digit cap can cut an expansion before its first significant
-	// digit — every kept digit a zero. The rounded value is the whole part
-	// alone, so it prints as that whole, and never with a minus sign when the
-	// whole is zero: there is no negative zero for `Rational.parse` to read
-	// back.
+	// The 80-digit cap can keep only zeros, so the value prints as its whole
+	// part. A zero whole takes no minus sign, since there is no negative zero.
 	test("an all-zero expansion prints as the whole it rounds to", () => {
 		expect(toStringAs(createRational(-4n, 10n ** 81n), decimal).value).toBe(
 			"0",
@@ -124,9 +114,8 @@ describe("remembered lowest terms", () => {
 		)
 	})
 
-	// `raise` reads the reduced form and builds a NEW Rational off it, so
-	// it is where a shared, mutated parts object would show up as a wrong
-	// answer the second time round.
+	// `raise` builds a new Rational off the remembered parts, so mutating them
+	// would spoil the next answer.
 	test("raising answers alike however often it is asked", () => {
 		let rational = createRational(4n, 2n)
 
@@ -146,9 +135,7 @@ describe("remembered lowest terms", () => {
 		expect(rational.denominator).toBe(2n)
 	})
 
-	// Equality cross-multiplies the RAW parts and never asks for the
-	// reduced form, so a Rational that has been read is equal to exactly what it
-	// was equal to before — including across the two spellings of one value.
+	// Equality cross-multiplies the raw parts and never reads the reduced form.
 	test("what is remembered is invisible", () => {
 		let read = createRational(4n, 2n)
 
@@ -172,20 +159,13 @@ describe("remembered lowest terms", () => {
 	})
 })
 
-// `reduced` is typed code that trusts the Enricher, and nothing in the
-// language can hand it a pair that is not two bigints. A hole in the Enricher
-// once did, and what came of it was not a wrong answer anybody could read: the
-// Euclid loop compared a `NaN` remainder against `0n` forever, and the run
-// stopped responding. The loop asks `b > 0n` for that reason, and this is what
-// says so.
+// `reduced` trusts the Enricher to hand it bigints. On anything else it must
+// answer rather than spin: `greatestCommonDivisor` loops while `b > 0n`, which
+// is false for `NaN`.
 describe("a pair that is no pair of bigints", () => {
-	// Spawned rather than called here, and on a clock. What this is about
-	// is a call that RETURNS — a synchronous loop on the very thread a spec runs
-	// on would take the whole suite down with it instead of failing, and no
-	// timeout a test runner offers can interrupt one that never yields. The
-	// test is given the longer budget of the two, so that a spin is failed by
-	// the spawn's deadline, which names the child, rather than by a runner
-	// saying only that time ran out.
+	// Spawned on a clock, since no runner timeout can interrupt a synchronous
+	// spin on the spec's own thread. The test's budget outlasts the spawn's
+	// deadline, so a spin fails with an error that names the child.
 	test("is reduced to an answer rather than spun on", async () => {
 		let module = import.meta.resolve("../bigRational")
 		let result = await spawnAndWait(
@@ -203,17 +183,13 @@ describe("a pair that is no pair of bigints", () => {
 			{ deadline: 20_000 },
 		)
 
-		// The deadline rejects a spin; this catches a child killed by some
-		// other signal, where `code` is null.
+		// This catches a child killed by another signal, whose `code` is null.
 		expect(result.signal).toBeNull()
 		expect(result.stdout).toContain("answered")
 		expect(result.code).toBe(0)
 	}, 30_000)
 
-	// And the guard is the same question of the bigints the loop is
-	// written for, which is what lets it be free: `b` is an absolute value and
-	// a remainder of one, so `> 0n` and `!== 0n` part company nowhere a
-	// Rational goes.
+	// For bigints `b` is never negative, so `b > 0n` asks what `b !== 0n` would.
 	test("changes nothing about a pair that is one", () => {
 		let cases: Array<[bigint, bigint, bigint, bigint]> = [
 			[12n, 18n, 2n, 3n],

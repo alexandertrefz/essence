@@ -13,19 +13,14 @@ import { getStringRepresentation } from "../Terminal"
 
 const countOf = (value: string) => length(createString(value)).value
 
-// The same text twice — once composed (NFC, one code point for `é`), once
-// decomposed (NFD, `e` followed by a combining acute). They are canonically
-// equivalent, so they hold the same characters, and they are genuinely
-// different code points, which is what makes the test mean anything. Normalised
-// here rather than written as two literals, because an editor, a formatter or a
-// file round trip may quietly compose the decomposed one and leave the test
-// asserting nothing.
+// The same text composed (NFC) and decomposed (NFD): canonically equivalent, but
+// different code points. Normalised here rather than written as literals, since
+// an editor or a formatter may compose the decomposed one.
 const composed = "cafe\u0301".normalize("NFC")
 const decomposed = "cafe\u0301".normalize("NFD")
 
-// A family emoji — four people joined by zero-width joiners, eleven code
-// units, ONE character to a reader — and Germany's flag, two regional
-// indicators making one.
+// A family emoji, four people joined by zero-width joiners in eleven code units,
+// and Germany's flag, two regional indicators. Each is one character.
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
 const flag = "\u{1F1E9}\u{1F1EA}"
 
@@ -37,9 +32,8 @@ describe("counting characters", () => {
 		expect(countOf("\t\n ~")).toBe(4)
 	})
 
-	// The fast path's one exception. CR LF is a SINGLE grapheme cluster,
-	// so counting code units would answer one too many for every line break a
-	// Windows-authored text carries — the String has to be segmented properly.
+	// CR LF is one grapheme cluster, so counting code units would answer one too
+	// many for every Windows line break.
 	test("a carriage return declines the fast path", () => {
 		expect(countOf("a\r\nb")).toBe(3)
 		expect(countOf("\r\n")).toBe(1)
@@ -60,17 +54,10 @@ describe("counting characters", () => {
 		expect(countOf(flag)).toBe(1)
 	})
 
-	// The remembered count has to be the count, however the value was
-	// first asked about — a String segmented by `split` is counted off that
-	// view, and one counted first is not counted again.
+	// `scanned` is counted straight away and `segmented` off the view `split`
+	// leaves. The two routes must agree, and a second ask must repeat the first.
 	test("a String answers alike however often it is asked", () => {
 		for (let value of ["hello", composed, decomposed, family, "a\r\nb"]) {
-			// Two wrappers over the same text, counted by the two routes
-			// there are: one is asked straight away, so its count comes off the
-			// scan where the text qualifies for it, and one is segmented first,
-			// so its count comes off the remembered view. The routes have to
-			// meet, and asking either a second time has to answer what asking
-			// it the first time did.
 			let scanned = createString(value)
 			let segmented = createString(value)
 
@@ -86,9 +73,7 @@ describe("counting characters", () => {
 })
 
 describe("the remembered view", () => {
-	// What every position Method rests on: splitting the same String twice
-	// answers the same characters, and the second answer is not the first one's
-	// array handed out where a caller could change it.
+	// Each answer is a fresh array, so no caller can change the remembered one.
 	test("splitting twice answers alike", () => {
 		let string = createString(`a${family}b`)
 
@@ -129,19 +114,17 @@ describe("the remembered view", () => {
 		expect(ends(string, suffix).value).toBeTrue()
 		expect(ends(string, suffix).value).toBeTrue()
 		expect(ends(string, createString("stem")).value).toBeFalse()
-		// A composed suffix inside a decomposed String — `ends` takes both
-		// sides as the canonical grapheme view, so it matches by canonical
-		// equivalence rather than by code unit.
+		// `ends` compares canonical grapheme views, so a composed suffix matches
+		// inside a decomposed String.
 		expect(
 			ends(createString(decomposed), createString(composed.slice(3)))
 				.value,
 		).toBeTrue()
 	})
 
-	// The whole safety of remembering anything on the value: what is
-	// remembered lives on a Symbol key, which nothing that reads a value can
-	// see. A String that has been measured is the same value as one that has
-	// not — to equality, to printing, and to whoever asks it for its keys.
+	// What a String remembers lives on Symbol keys, which equality, printing and
+	// `Object.keys` never read. See "String characters" in
+	// packages/runtime/DEVELOPMENT.md.
 	test("what is remembered is invisible", () => {
 		let measured = createString(composed)
 
@@ -174,11 +157,9 @@ describe("the remembered view", () => {
 })
 
 describe("reversing", () => {
-	// Three regional indicators segment as a pair and a single —
-	// `🇦🇧, 🇨` — and segmenting the reversed TEXT afresh would re-pair them
-	// as `🇨🇦, 🇧`: characters the original never had. The reversed String
-	// remembers its view instead, so its characters are the original's in the
-	// opposite order.
+	// Three regional indicators segment as `🇦🇧, 🇨`. Segmenting the reversed
+	// text afresh would re-pair them as `🇨🇦, 🇧`, so the reversed String keeps
+	// its view.
 	test("reversal keeps the original's characters", () => {
 		let flags = createString("🇦🇧🇨")
 		let reversed = reverse(flags)
@@ -198,9 +179,6 @@ describe("reversing", () => {
 		}
 	})
 
-	// A piece cut from a reversed String carries the clusters it was cut
-	// into, so its length is counted off them rather than off a fresh
-	// segmentation of the joined text.
 	test("a piece of a reversed String counts its own characters", () => {
 		let reversed = reverse(createString("🇦🇧🇨"))
 		let pieces = split(reversed, createString("🇨"))
