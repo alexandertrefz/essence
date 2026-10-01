@@ -71,3 +71,88 @@ Past that fast path, `dividedMagnitude` still rounds exactly once:
 multiplication can underflow. For `1/2 ** 1020` the quotient `2 ** 64` scales back by `2 ** -1084`, which is `0` as a
 double, while the answer is the normal `8.9e-308`. Stepping keeps every intermediate in range. The loop stops early at
 `0` and at `Infinity`, which no further step changes.
+
+## Bundler plugins
+
+`essence` in `vite-plugin.ts`, `essenceEsbuild` in `esbuild-plugin.ts` and `essenceBun` in `bun-plugin.ts` answer one
+question for three hosts: what a `.es` file compiles to. `plugin-core.ts` answers it once.
+
+A plugin compiles a `.es` file when the bundler asks for its text. What comes back is not a bundle but the graph as
+modules. There is one JavaScript module per `.es` file and the standard library's prelude, and the runtime is imported
+by its package name. The host resolves, shakes and splits all of it as it does its own code.
+
+### One module per file
+
+A build may have two `.es` entries, and a value has to pass between them. Two bundles would hold two copies of the
+runtime and two Type keys. A Choice built by one would go unrecognised in the other's `match`. Served per file,
+the whole app has one module per path, one prelude and one runtime.
+
+This rests on the Rewriter's host target, `EmitTarget`. Under it a file's emitted text depends on the file and the
+project root, never on which entry was compiled. One served Module imports another by a specifier relative to that
+root, so every entry resolves it to the same module. `createCompiler` therefore takes the root from the bundler's
+configuration and canonicalises it, and never derives it from a path being compiled. A second entry that shares a
+graph compiles it again and emits the same text for every shared file.
+
+Under the host target the prelude holds the whole standard library, so its text depends on the compiler alone. One id,
+`PRELUDE_ID`, serves it to the whole build.
+
+### The raw door
+
+A served Module's emitted JavaScript is reached by an id made of `RAW_SCHEME` and its path. The wrapper imports the
+entry's Module by it, and a sibling import resolves to it. The id names no file: the emitted JavaScript exists nowhere
+on disk, and a bundler that read the path would find Essence source. The scheme keeps it apart from every other
+specifier, as the bundler's `essence:` Modules are. A `?raw` import of a `.es` file gets Essence's own values
+under the names the Rewriter emitted. The `bundle` view of the declarations describes them.
+
+### The wrapper
+
+`wrapperFor` writes the module a build imports. It holds the entry's emitted Module behind the raw door, the
+interpreter, and the Descriptor that says how one reads the other. Everything the compiler knew about the boundary is in that
+JSON, so a browser marshals without a compiler. It runs the boundary `loadModule` runs, with the compiler's half
+spent at build time.
+
+The wrapper imports the runtime by the package specifier the served Modules use, and the host resolves both to one
+module. So the Type key the interpreter stamps on values is the key the Module's own Functions read. The interpreter is
+imported by its package name too, `@essence-lang/client/marshal-runtime`, and the host resolves it. A copy the plugin
+resolved itself would bring a second `EssenceRational`, whose values the first copy's `instanceof` refuses.
+
+The bridge imports only the runtime files the boundary needs, as `runtimeBridgeModules` lists them. It asks the
+questions the bridge injected into a `loadModule` bundle asks. A Module whose boundary names no Dictionary brings no
+Dictionary store into the build. One that names no asynchronous work brings none of `Future.ts`. The question
+covers the declared Types as well as the exports. A Dictionary that appears only in an exported `type` still needs its
+door, for a host that marshals against that Type.
+
+The wrapper reads each export when it is evaluated, not on first use. A module's exports are bindings, and JavaScript
+has no lazy `export const`. So a constant with no mapping refuses the whole Module rather than one export. In a build
+that is the better failure: the alternative is a page that renders and then throws somewhere else. It also makes a
+marshalled constant one object for the whole build. `loadModule` builds a fresh value on each read (`defineConstant`),
+so a List a host pushes onto there changes nothing for another reader. The README states the difference under "In a
+bundler".
+
+Every export is bound to a local named `$export_` and its mangled name, and exported under an alias. The wrapper has
+names of its own, such as `bind`, `$raw`, `$module` and one `$runtime_` alias per runtime file. An `export const` of a
+Module's own name could collide with one of them and break the host's build at a line no source has. The alias form
+also spells a name such as `ok?`, so every export takes it. The `$runtime_` and `$export_` prefixes keep the two sets
+apart, and `mangled` maps no two names to one.
+
+`diagnostics: "minimal"` blanks every `shown` in the embedded Descriptor. `shown` is the Type as the compiler printed
+it, which a refusal names. It is most of a Descriptor's bytes and decides nothing, so values cross the same either
+way. `withoutShown` walks the Descriptor by kind rather than blanking every key called `shown`. A Record member, a
+payload member, a Namespace member or an export may itself be called `shown`. Blanking it by name would leave an empty
+string where a Descriptor belongs, and the interpreter would build that member as nothing.
+
+### Stale compiles
+
+`createCompiler` makes one compiler per build. It remembers emitted text: a module per `.es` file and the prelude they
+share. A dev server outlives edits, so the host's watcher tells it which file changed through `invalidate`. Given a
+file, it forgets only what was compiled from a graph that read the file. An app with several entries then recompiles
+only what an edit can change. Given nothing, it forgets everything, as a rebuild in watch mode must, since it names no
+file.
+
+Time is a count of invalidations, not a clock. Each compile records the count it started at, and it is stale once any
+source it read is invalidated after that. A compile that started before an edit read the old sources, however long it
+ran. It can not be stopped, so it finishes, but nothing it emitted is remembered. `compile` awaits it, finds it stale
+and compiles again.
+
+A compile is held as a promise, so a wrapper and its raw door asked for together wait on one compile. A compile that
+failed is dropped at once, since the next request may find the sources fixed.

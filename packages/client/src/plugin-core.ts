@@ -34,46 +34,12 @@ import { type DeclarationView, generateDeclarations } from "./dts"
 import { EssenceBuildError } from "./errors"
 import { mangled, memberName } from "./names"
 
-// Essence inside somebody else's build. A `.es` file is compiled where the
-// bundler asks for its text, and what comes back is not a bundle but the graph
-// as MODULES — one JavaScript module per `.es` file, the standard library's
-// prelude beside them, and the runtime imported by name. The host resolves all
-// of it, shakes it and splits it exactly as it does its own code. There is no
-// artifact on disk and no step to run first.
-//
-// Per FILE rather than per entry, because a build may have two `.es`
-// entries and a value has to be able to pass between them. Two bundles would be
-// two copies of the runtime and two hidden Type keys, so a Choice built by one
-// would silently take the wrong arm in the other's `match`; served this way
-// there is ONE module per path, one prelude and one runtime for the whole app.
-// It rests on the Rewriter's host target — see `EmitTarget` — under which a
-// file's emitted text depends on the file and the project root and never on
-// which entry was compiled.
-//
-// The wrapper is why a build gets JavaScript rather than Essence's own
-// values. It imports the entry's Module, imports the interpreter, and carries
-// the Descriptor the Compiler wrote for this Module — so the boundary a browser
-// runs is the same boundary `loadModule` runs, with the Compiler's half of it
-// already spent at build time. Before the Descriptor existed, marshalling here
-// would have meant shipping the Compiler to a browser to look up what an
-// `Optional<Integer>` is.
-//
-// The unmarshalled Module stays reachable, under `?raw`. What it exports
-// is Essence's own values, under the names the Rewriter emitted them as — see
-// the `bundle` view in `./dts`. A host with its own ideas about the boundary
-// should not have to fight one, and can build the values it needs out of
-// `@essence-lang/runtime` directly, which the build resolves to the very copy
-// those values were built by.
-//
-// `essence` in `./vite-plugin`, `essenceEsbuild` in `./esbuild-plugin`
-// and `essenceBun` in `./bun-plugin` answer one question (what does this `.es`
-// file compile to) for hosts that ask it differently. This module is that
-// question.
+// Essence inside another bundler's build: each `.es` file compiles to a module
+// of its own, beside the prelude and the runtime. The plugins share this. See
+// "Bundler plugins" in DEVELOPMENT.md.
 
-// How much of a Descriptor rides along into the build. `full` keeps every
-// `shown` — the Type as the Compiler printed it — which is what makes a refusal
-// at run time name the Type it refused. `minimal` blanks them: the boundary
-// decides the same way either way, it just stops being able to say what it wanted.
+// How much of a Descriptor goes into the build. `full` keeps each `shown`, the
+// Type a refusal names. `minimal` blanks them, and values cross the same way.
 export type Diagnostics = "full" | "minimal"
 
 export type WrapperOptions = {
@@ -84,52 +50,38 @@ export type PluginOptions = WrapperOptions & {
 	// Where the sources are read from. The default reads disk.
 	host?: ModuleHost
 	optimisation?: OptimiserOptions
-	// Whether a `<Name>.d.es.ts` is written beside each compiled `.es`
-	// file. On by default only while Vite's dev server is serving: a build
-	// writes its output where it was told to, and a file appearing beside a
-	// source is a development convenience.
+	// Whether a `<Name>.d.es.ts` is written beside each compiled `.es` file.
+	// On by default only while Vite's dev server is serving, since a build
+	// writes only where it was told to.
 	declarations?: boolean
 }
 
-// Only `.es`, and only where nothing follows it. A dev server asks for
-// `/src/Main.es?import` and `/src/Main.es?t=1730` as well, which is why the id is
-// cut at the query before it is matched.
+// Only `.es` at the end. A dev server also asks for `/src/Main.es?import` and
+// `/src/Main.es?t=1730`, so an id is cut at its query before it is matched.
 export const ESSENCE_FILE = /\.es$/
 
-// The raw door's own specifier — what the wrapper imports the entry's
-// Module by, what one served Module imports another by, and what a `?raw`
-// import resolves to. Not a file: the emitted JavaScript exists nowhere on
-// disk, and a host bundler that tried to read one would find the Essence
-// source. It is spelled with a scheme for the same reason the Bundler's
-// `essence:` Modules are — nothing else can be spelled like it.
+// The scheme of a served Module's emitted JavaScript, which is no file. See
+// "The raw door" in DEVELOPMENT.md.
 export const RAW_SCHEME = "essence-raw:"
 
-// The standard library's Essence-implemented Methods, which every served
-// Module imports what it names from. ONE id for the whole build: under the host
-// target the prelude holds the whole standard library, so its text is a
-// function of the Compiler alone and every graph the build compiles emits the
-// same one.
+// The standard library's Essence-implemented Methods, one module for the whole
+// build. See "One module per file" in DEVELOPMENT.md.
 export const PRELUDE_ID = "essence-prelude"
 
-// `?raw`, and `?raw&t=1730` — a dev server appends its own query
-// parameters to an id it has already resolved, so the flag is looked for among
-// them rather than at the end.
+// `?raw` and `?raw&t=1730`: a dev server appends its own query parameters to
+// a resolved id, so the flag may stand anywhere among them.
 const RAW_QUERY = /[?&]raw(?:&|$)/
 
-// Where the interpreter is imported from. A bare specifier, resolved by
-// the HOST's bundler rather than by this one: the host has this package
-// installed — it is where the plugin came from — and resolving it ourselves
-// would put a second copy of `EssenceRational` in the build, whose values the
-// first copy's `instanceof` would refuse.
+// The host's bundler resolves the interpreter, so the build holds one copy of
+// `EssenceRational`. See "The wrapper" in DEVELOPMENT.md.
 const MARSHAL_RUNTIME = "@essence-lang/client/marshal-runtime"
 
 export function rawSpecifier(entryPath: string): string {
 	return `${RAW_SCHEME}${entryPath}`
 }
 
-// The file a raw id names, or `null` where the id is not one. A leading
-// `\0` is Rollup's mark for a module no filesystem holds, and it is stripped
-// here so that each plugin can spell its own ids the way its host expects.
+// The file a raw id names, or `null`. A leading `\0` is Rollup's mark for a
+// module no filesystem holds, so each plugin may spell its ids as its host does.
 export function rawFile(id: string): string | null {
 	let specifier = id.startsWith("\0") ? id.slice(1) : id
 
@@ -148,11 +100,8 @@ export function essenceFile(id: string): string | null {
 	return ESSENCE_FILE.test(file) ? file : null
 }
 
-// A specifier one served Module imports another by, as a path. The
-// Rewriter spelled it relative to the ROOT this build compiles under, which is
-// what makes it the same specifier whichever entry emitted it — so resolving it
-// is the same resolution for every entry, and the host holds one module per
-// file. `null` for the prelude, which names no file at all.
+// The file a served Module's import names, resolved against the build's root,
+// or `null` for the prelude. See "One module per file" in DEVELOPMENT.md.
 export function servedFile(source: string, root: string): string | null {
 	if (!source.startsWith(MODULE_SCHEME) || source === PRELUDE_SPECIFIER) {
 		return null
@@ -165,15 +114,9 @@ export function preludeRequested(source: string): boolean {
 	return source === PRELUDE_SPECIFIER
 }
 
-// Where TypeScript looks for the declarations of a file it does not
-// otherwise understand: `Math.es` is declared by `Math.d.es.ts`, under
-// `allowArbitraryExtensions`. Deliberately NOT `Math.es.d.ts`, which is the
-// spelling that reads right and that nothing resolves.
-//
-// The two views can not share one file — they describe two different
-// modules — so the bundle view is written under a name of its own. `?raw` is a
-// specifier TypeScript will not resolve at all, and `Math.raw.es` is the name
-// that reaches `Math.raw.d.es.ts` by the same rule `Math.es` reaches its own.
+// Under `allowArbitraryExtensions` TypeScript declares `Math.es` by
+// `Math.d.es.ts`, and nothing resolves `Math.es.d.ts`. The bundle view describes
+// another module, so it goes to `Math.raw.d.es.ts`, which `Math.raw.es` reaches.
 export function declarationsPath(
 	entryPath: string,
 	view: DeclarationView = "javascript",
@@ -185,94 +128,61 @@ export function declarationsPath(
 }
 
 export type CompiledModule = {
-	// Canonical, and what the Descriptor was described against — which is
-	// also the path the wrapper's raw import spells.
+	// The canonical path the Descriptor was described against and the
+	// wrapper's raw import spells.
 	entryPath: string
-	// What the wrapper marshals by, and what the `javascript` view is
-	// printed from. Both halves of the boundary are this one object.
+	// What the wrapper marshals by and the `javascript` view is printed from.
 	descriptor: ModuleDescriptor
-	// The Types the Module exports under names of their own. Nothing at
-	// run time reads one — they are here for the declarations alone.
+	// The Types the Module exports by name, which only the declarations and the
+	// bridge's door questions read.
 	types: Array<DeclaredType>
-	// Every `.es` source that went into it. A host watching one file would
-	// rebuild for an edit to the entry and sit still for an edit to what the
-	// entry imports.
+	// Every `.es` source that went into it, all of which a host must watch.
 	files: Array<string>
 }
 
-// One file's emitted JavaScript, with the graph it came out of — the
-// latter so that a host asked for this module alone still watches every source
-// a change to which would change it.
+// One file's emitted JavaScript and the sources of the graph it came from,
+// which a host watches even when it asked for this module alone.
 type ServedModule = {
 	code: string
 	files: Array<string>
 }
 
-// One compiler per BUILD, holding what that build has emitted: a module
-// per `.es` file, and the prelude they share. A second entry sharing a graph
-// simply compiles it again — under the host target the bytes for every file
-// they have in common are identical, so the second answer replaces the first
-// with itself.
+// One compiler per build, holding what the build has emitted. See "Stale
+// compiles" in DEVELOPMENT.md.
 export type EssenceCompiler = {
-	// Answered from what this build already compiled where it can be. One
-	// `.es` import is asked for TWICE — once as the wrapper, once as the Module
-	// behind its raw door — and those are two loads of one compile, not two.
+	// Answers from what this build compiled already where it can. A wrapper and
+	// its raw door are two loads of one compile.
 	compile: (entryPath: string) => Promise<CompiledModule>
-	// One file, compiled as part of whatever graph reaches it. A sibling
-	// the host asks for was emitted by the entry's own compile; a file nothing
-	// has compiled yet is compiled as an entry of its own, which under the host
-	// target emits the same text for it either way.
+	// One file's module. A sibling was emitted by its entry's compile, and a file
+	// nothing compiled yet is compiled as an entry, which emits the same text.
 	serve: (filePath: string) => Promise<ServedModule>
 	prelude: () => string
 	declare: (compiled: CompiledModule, view: DeclarationView) => Promise<void>
-	// The one thing a build has to be told rather than asked. What is
-	// remembered here is EMITTED TEXT, and a dev server outlives every edit to
-	// the sources it was emitted from — so a watcher saying a file changed is
-	// what makes the memory stale. Told WHICH file, only what was compiled out
-	// of a graph that reaches it is forgotten: an app with several entries
-	// recompiles the ones the edit can have changed and keeps the rest. Told
-	// nothing, everything is — a rebuild in watch mode has no file to name, and
-	// a build that only ever compiles once calls it at the start and never
-	// again.
+	// Forgets what was compiled from a graph that read the file, or everything
+	// when no file is named.
 	invalidate: (filePath?: string) => void
 }
 
-// What was compiled, and WHEN — as a count of invalidations, not a clock.
-// A compile that started before an edit landed read the sources from before
-// it, however long it took, and what it emitted is stale the moment the edit is
-// reported. It can not be stopped, and it can not be trusted either: it is let
-// finish, its answer is handed to whoever was already waiting on it, and it is
-// remembered nowhere — the next request compiles again.
+// What was compiled, and the count of invalidations it started at.
 type Compiled = CompiledModule & { startedAt: number }
 type Served = ServedModule & { startedAt: number }
 
 export function createCompiler(
 	options: PluginOptions,
-	// The host's project root, which everything this build emits is
-	// spelled relative to. It has to be the same directory for every entry —
-	// that is what makes a shared file one module rather than two — so it comes
-	// from the bundler's own configuration rather than from a path being
-	// compiled.
+	// The host's project root, from the bundler's configuration. Everything the
+	// build emits is spelled relative to it, so it is one directory for every entry.
 	root: string,
 ): EssenceCompiler {
-	// Canonicalised here as well as by the plugins, because everything
-	// this build emits is spelled against it and every path it is looked up by
-	// is canonical — one uncanonical root would spell every Module relative to a
-	// directory no lookup ever names.
+	// Canonical, since every path the build looks up is canonical too.
 	let directory = canonicalPath(root)
 	let target = { mode: "host", root: directory } as const
-	// Keyed by canonical path, so that the same file reached under two
-	// spellings is one module.
+	// Keyed by canonical path, so one file reached by two spellings is one module.
 	let served = new Map<string, Served>()
 	let prelude: string | null = null
-	// The compile itself, held as the PROMISE rather than as its answer,
-	// so that a wrapper and its raw door asked for at the same time wait on one
-	// compile instead of racing into two.
+	// Promises, so a wrapper and its raw door asked for together share a compile.
 	let pending = new Map<string, Promise<Compiled>>()
-	// One count, stepped by every invalidation, and the step each file was
-	// last invalidated at — or every file at once. A compile remembers the count
-	// it started at, and is stale where any source it read was invalidated
-	// after that.
+	// A count stepped by every invalidation, and the step at which each file, or
+	// every file, was last invalidated.
 	let invalidations = 0
 	let allInvalidatedAt = 0
 	let invalidatedAt = new Map<string, number>()
@@ -299,16 +209,14 @@ export function createCompiler(
 			emit: target,
 		})
 
-		// Thrown rather than returned, because a bundler's load hook
-		// has one way to fail and this is it. The message is the report `esc`
-		// prints, which is the thing a developer staring at a failed build
-		// actually needs.
+		// Thrown, since that is how a bundler's load hook fails. The message is
+		// the report `esc` prints.
 		if (containsErrors(result.diagnostics)) {
 			throw new EssenceCompileError(entry, result.diagnosticGroups)
 		}
 
-		// Written down only where nothing it read was edited meanwhile.
-		// The prelude is a function of the Compiler alone and stands.
+		// Remembered only if nothing it read was edited meanwhile. The prelude
+		// depends on the compiler alone and is always kept.
 		let fresh = !stale(startedAt, result.files)
 
 		for (let [specifier, code] of result.sources.sources) {
@@ -334,10 +242,8 @@ export function createCompiler(
 		}
 	}
 
-	// The compile this build holds for the entry, unless what it holds
-	// went stale — before it finished, or since — in which case one more, and
-	// the same question of that. An edit that lands during a compile is not
-	// missed: the compile is awaited, found stale, and replaced.
+	// The entry's compile, compiled again for as long as it comes back stale, so
+	// an edit during a compile is not missed.
 	async function compile(entryPath: string): Promise<CompiledModule> {
 		let entry = canonicalPath(entryPath)
 
@@ -355,8 +261,8 @@ export function createCompiler(
 			try {
 				compiled = await started
 			} catch (error) {
-				// A compile that failed is not held against the next
-				// request — the sources it read may have been fixed since.
+				// A failed compile is dropped, since the sources may be fixed by
+				// the next request.
 				if (pending.get(entry) === started) {
 					pending.delete(entry)
 				}
@@ -382,10 +288,8 @@ export function createCompiler(
 			let module = served.get(file)
 
 			if (module === undefined || stale(module.startedAt, module.files)) {
-				// `compile` answers only with a compile nothing has
-				// invalidated, and such a compile wrote its own entry down —
-				// so the second look can only miss where the first one asked
-				// for something that is not a Module of the graph it names.
+				// A fresh compile records every file of its graph, so a miss
+				// now means the file is not a Module of that graph.
 				await compile(file)
 
 				module = served.get(file)
@@ -423,10 +327,8 @@ export function createCompiler(
 	}
 }
 
-// Written only when the text would change. A dev server compiles on every
-// request, and a file rewritten with its own contents still moves its mtime —
-// which the very watcher that asked for the compile is watching, so writing
-// unconditionally is how a dev server rebuilds forever.
+// Written only when the text changes. A rewrite with the same contents still
+// moves the mtime, which the dev server's watcher would answer with a rebuild.
 async function writeDeclarations(
 	compiled: CompiledModule,
 	view: DeclarationView,
@@ -448,39 +350,14 @@ async function writeDeclarations(
 
 // #region The wrapper
 
-// The Module a host's build actually imports: the entry's own emitted
-// Module behind the raw door, the interpreter beside it, and the Descriptor
-// that says how the one reads the other. Everything the Compiler knew about
-// this Module's boundary is in that JSON — which is what lets a browser marshal
-// without one.
-//
-// The runtime is imported here by the same package specifier the served
-// Modules import it by, and that is the whole of why this works: the host
-// resolves both to ONE module, so the Type key the interpreter stamps values
-// with is the key the Module's own Functions read. Nothing is sniffed and no
-// bridge is injected — the shared import IS the agreement.
-//
-// An export is read HERE, at the wrapper's own evaluation, rather than on
-// first use. A JavaScript module's exports are bindings and an emitted Module's
-// are values: there is no lazy `export const`, so a constant the boundary has no
-// mapping for refuses the Module rather than the one export. In a build that is
-// the better half of the trade — the alternative is a page that renders and then
-// throws somewhere else entirely.
-//
-// And the other half, which is a real cost rather than a preference: a
-// marshalled constant is ONE object for the whole build, where `defineConstant`
-// hands `loadModule` a fresh one per read for the reason stated there — a `List`
-// a host pushes onto changes what every other importer of that Module sees. The
-// two doors deliberately answer differently, and the README says so under "In a
-// bundler"; nothing here can close the gap, because a module's exports are the
-// one thing JavaScript will not let a getter stand behind.
+// The module a build imports: the entry's Module behind the raw door, the
+// interpreter and the Descriptor. Exports are read when it is evaluated. See
+// "The wrapper" in DEVELOPMENT.md.
 export function wrapperFor(
 	entryPath: string,
 	descriptor: ModuleDescriptor,
-	// The Types the Module declares, because the door question is asked of
-	// the WHOLE boundary — a Module whose only Dictionary sits in an exported
-	// `type` publishes it in the declaration file, and a host marshalling
-	// against that Type needs the door the values alone would not have asked for.
+	// The declared Types, since a Dictionary that appears only in an
+	// exported `type` still needs its door.
 	types: ReadonlyArray<DeclaredType>,
 	options: WrapperOptions = {},
 ): string {
@@ -488,11 +365,8 @@ export function wrapperFor(
 		options.diagnostics === "minimal"
 			? withoutShown(descriptor)
 			: descriptor
-	// The same table the injected bridge is written out of, asked the
-	// same questions: a Module whose boundary names no Dictionary imports
-	// neither of the two Functions one crosses through, and so carries none of
-	// the store behind them into the host's build — and a Module that names no
-	// asynchronous work imports none of `Future.ts` either.
+	// Only the runtime files the boundary needs, as for the bridge a
+	// `loadModule` bundle carries.
 	let modules = runtimeBridgeModules({
 		dictionary: carriesDictionary(descriptor, types),
 		future: carriesFuture(descriptor, types),
@@ -529,15 +403,8 @@ export function wrapperFor(
 		"",
 	]
 
-	// Every export is bound to a local of its own and exported UNDER an
-	// alias, rather than declared as `export const <name>`. A Module's export
-	// names are its author's, and this file has names of its own — `bind`,
-	// `$raw`, `$module`, a `$runtime_<File>` per runtime Module — so a Module
-	// exporting any one of them would declare that name twice and fail the
-	// host's build, pointing at a line of a file whose source has no such line.
-	// The alias form was already here for `ok?`, which JavaScript can not spell
-	// at all; every export takes it, so there is one rule rather than one rule
-	// and a trap.
+	// Each export is exported under an alias, so no export name can collide
+	// with this file's own names.
 	for (let name of Object.keys(descriptor.exports)) {
 		let local = `$export_${mangled(name)}`
 
@@ -550,27 +417,14 @@ export function wrapperFor(
 	return `${lines.join("\n")}\n`
 }
 
-// `$runtime_type`, `$runtime_Integer` — and `$export_` for the Module's
-// own names, which is what keeps the two sets apart. `mangled` is injective, so
-// two exports can not reach one local either.
+// `$runtime_type` or `$runtime_Integer`. Export locals start with `$export_`,
+// so the two sets never meet.
 function runtimeAlias(fileName: string): string {
 	return `$runtime_${fileName}`
 }
 
-// Every `shown` blanked, and nothing else touched. What is dropped is what
-// a refusal NAMES — the Type as the Compiler printed it — never what the boundary
-// decides: a value that fits fits either way. It is one string per node of every
-// exported Type's shape, which is most of a Descriptor's bytes and none of its
-// meaning.
-//
-// Walked by KIND rather than filtered by key, because `shown` is also a
-// name a Module may write. A Record member, a Case payload member, a Namespace
-// property or Method or a whole export called `shown` is a field of that name
-// holding a Descriptor, and blanking it by name would leave the boundary reading
-// an empty string where a Descriptor belongs — which no branch of the
-// interpreter matches, so the member is built as nothing and the failure lands
-// somewhere inside the Module. The walk below touches only the field the Type
-// declares.
+// Every `shown` blanked, walked by kind because a member may be called `shown`.
+// See "The wrapper" in DEVELOPMENT.md.
 function withoutShown(descriptor: ModuleDescriptor): ModuleDescriptor {
 	return { exports: eachOf(descriptor.exports, exportWithoutShown) }
 }
@@ -641,9 +495,8 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
 		case "optional":
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
-		// Written out rather than folded into the two above, so that a
-		// kind holding an `of` which arrives later has to be answered here as
-		// well — a node walked as the wrong kind would keep the Type it names.
+		// Every kind with an `of` is listed, since `default` would leave the
+		// Types inside it named.
 		case "future":
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
 		case "started":
@@ -672,9 +525,7 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 	}
 }
 
-// A member carries the flag saying whether the boundary may leave it out
-// beside the Descriptor it holds, so the walk goes through the `of` and the flag
-// rides along untouched.
+// A member's flag saying whether it may be left out is kept as it is.
 function memberWithoutShown(members: Members): Members {
 	return eachOf(members, (member) => ({
 		...member,
