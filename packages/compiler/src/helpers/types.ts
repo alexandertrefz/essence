@@ -2046,10 +2046,8 @@ function agreedDecisions(
 		return pinned ? { type: "Record", members } : stored
 	}
 
-	// Arm by arm and by POSITION, because every candidate came out of the
-	// same `stored` — a Union whose arms were rebuilt still has them in the order
-	// it had them in, and a candidate that is not that Union at all decided
-	// nothing about its arms.
+	// Arm by arm and by position, since every candidate came from the same
+	// `stored`.
 	if (stored.type === "UnionType") {
 		let arms = stored.types
 		let types = arms.map((arm, index) =>
@@ -2076,11 +2074,8 @@ function agreedDecisions(
 
 // #region Protocol Conformance
 
-// A Simple requirement is fulfilled by a Simple Method or by the first
-// matching overload of an Overloaded one — mirroring how invocations resolve
-// their overload. Staticness must agree; the emitted name of the fulfilling
-// Method (with its own overload suffix) and the Method itself are returned, the
-// latter so its own Protocol bounds can be inspected.
+// The Method fulfilling a requirement, with its emitted name: a Simple Method,
+// or the first matching Overload, as a call resolves. Staticness must agree.
 export function findFulfillingMethod(
 	methodName: string,
 	requirement: common.BaseFunction,
@@ -2134,12 +2129,8 @@ export function flattenUnionMembers(
 	return members
 }
 
-// Like `flattenUnionMembers`, except a *named* nested Union (a Choice,
-// `Number`, a named Type Alias, or an applied `Optional<X>`) stays whole.
-// Union-building code uses this so Hovers and Diagnostics keep the name
-// instead of spelling out every member — purely a display concern, since
-// assignability ignores Union names and recurses into nested Unions either
-// way.
+// Like `flattenUnionMembers`, but a named nested Union, such as a Choice or an
+// applied `Optional<X>`, stays whole, so its name is displayed.
 export function unionMembersKeepingNames(
 	type: common.UnionType,
 ): Array<common.Type> {
@@ -2164,32 +2155,16 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null, OUTERMOST)
 }
 
-// Whether `part` says only things `whole` already declares — every member
-// of `part` is a member of `whole`, carrying a value the member's declared Type
-// admits. It is what a `with` right-hand side has to be, and it is not
-// assignability in either direction: `matchesType(whole, part)` asks the
-// opposite question (does `part` answer everything `whole` promises), and
-// `matchesType(part, whole)` reads the member Types the wrong way round.
-//
-// Judged by assignability, not by identity — an update sets a member
-// to a VALUE, and a value of one arm is enough for a Union-typed member,
-// exactly as it is at the Declaration. Deep equality refused `{ c with
-// n = 5 }` against a declared `Integer | String`, and told two spellings
-// of one Union apart.
-//
-// `context` is threaded to the member comparisons so a caller that is
-// INFERRING can ask this — the partial fit of an Argument against a Parameter
-// whose Type is still binding Generics. A caller with nothing to bind passes
-// nothing, which is `matchesType`'s own `null`.
+// Whether every member of `part` is one `whole` declares, at a Type that member
+// admits: what a `with` right-hand side must be. `context` lets an inferring
+// caller ask.
 export function isPartialOf(
 	whole: common.RecordType,
 	part: common.RecordType,
 	context: GenericInferenceContext | null = null,
 ): boolean {
 	for (let [partName, partMemberType] of Object.entries(part.members)) {
-		// `Object.hasOwn` before the read — a member named after one
-		// of `Object.prototype`'s would otherwise be compared against a
-		// JavaScript function the Record does not have.
+		// `Object.hasOwn`, since a member may share a name with `Object.prototype`.
 		if (
 			!Object.hasOwn(whole.members, partName) ||
 			!matchTypes(
@@ -2206,19 +2181,9 @@ export function isPartialOf(
 	return true
 }
 
-// The Type a Record Literal carrying path keys HAS once the default it is
-// merged into has filled the rest in. A member a path key wrote stands for the
-// WHOLE member the merge rebuilds — `{ server.port = 1 }` carries a `server` of
-// Type `Server`, because the callee reads `port` off the Argument and every
-// other member off the default — so that is the Type it answers for one, and
-// every reader of a partial Literal goes on asking the one question it asked
-// before: is this a partial of what the position declares.
-//
-// `null` where there is nothing to answer — a value that is no Record Literal,
-// or one that wrote no path key — and where the merge does not hold: a step the
-// default does not reach into, one the position declares at another Type, or a
-// level whose own members the declared Type refuses. There the Literal is what
-// it says it is, the position turns it away, and the Diagnostic names the path.
+// The Type a Record Literal with path keys has once merged into its default: a
+// member a path key wrote stands for the whole member. Null where it wrote none,
+// or where the merge does not hold and the position refuses it.
 export function mergedRecordType(
 	into: common.Type | common.GenericUse,
 	nesting: common.DefaultNesting | undefined,
@@ -2261,9 +2226,7 @@ function mergedLevelType(
 			continue
 		}
 
-		// `Object.hasOwn` before either read — a member named after one of
-		// `Object.prototype`'s would otherwise find a JavaScript function where
-		// the Record has nothing, and a nesting that names nothing.
+		// `Object.hasOwn`, since a member may share a name with `Object.prototype`.
 		if (
 			!Object.hasOwn(into.members, name) ||
 			!Object.hasOwn(nesting, name)
@@ -2284,11 +2247,8 @@ function mergedLevelType(
 			context,
 		)
 
-		// The level has to be a PARTIAL of the member it merges into,
-		// which is the very question the whole Literal is asked one level up —
-		// every member it writes is one that member declares, at a Type that
-		// member admits. What it leaves out is what the default fills in, and a
-		// default fills in every member of a Record it writes as a Literal.
+		// The level must be a partial of the member it merges into. The default fills
+		// in what it leaves out.
 		if (inner === null || !isPartialOf(declaredType, inner, context)) {
 			return null
 		}
@@ -2299,20 +2259,9 @@ function mergedLevelType(
 	return { type: "Record", members }
 }
 
-// The subsumption order Union building dedupes by — whether `member`
-// says nothing `existing` does not already cover. Assignability alone can not
-// answer that: the Unknown item Type an empty List Literal carries is a
-// wildcard in BOTH directions — `List<Unknown>` accepts `List<Integer>`
-// through the Unknown rule and is accepted by it through the empty-List rule —
-// so the two subsume each other and whichever was collected FIRST would
-// survive. That is right for assignability, an empty List really does fit any
-// List, but as a specificity order it destroys exactly the information the
-// checker needs: `[[], [1]]` would build `List<List<Unknown>>`, a Type that
-// fits every List Type, and `constant broken: List<List<String>> = [[], [1]]`
-// would pass while its reversed spelling is rejected. So when two members
-// accept one another, the one that spells more out wins and the empty List's
-// placeholder yields to the concrete Type beside it — the empty Literal itself
-// stays assignable everywhere, since nothing about `matchesType` changes.
+// Whether `member` says nothing `existing` does not cover, the order a Union
+// dedupes by. Where two members accept each other, the one spelling more out
+// wins, so `[[], [1]]` builds `List<List<Integer>>`, not `List<List<Unknown>>`.
 function subsumesForUnion(existing: common.Type, member: common.Type): boolean {
 	if (!matchesType(existing, member)) {
 		return false
@@ -2321,11 +2270,8 @@ function subsumesForUnion(existing: common.Type, member: common.Type): boolean {
 	return !(isLessSpecific(existing, member) && matchesType(member, existing))
 }
 
-// Whether `left` says strictly less about the same shape than `right` —
-// an Unknown standing where `right` names a Type. ONLY the placeholder an
-// empty List Literal leaves behind is weighed; every other pair reports no
-// difference, so nothing but that one wildcard can change which member of a
-// Union survives.
+// Whether `left` says strictly less about the same shape than `right`: an
+// Unknown where `right` names a Type. No other difference counts.
 function isLessSpecific(left: common.Type, right: common.Type): boolean {
 	if (left.type === "Unknown") {
 		return right.type !== "Unknown"
@@ -2342,10 +2288,7 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 		return isLessSpecific(left.valueType, right.valueType)
 	}
 
-	// Slot-wise, and it takes only ONE slot to say less — a
-	// `Dictionary<Unknown, Integer>` beside a `Dictionary<String, Integer>`
-	// spells less out and yields to it, exactly as the empty List's placeholder
-	// yields to the concrete item Type beside it.
+	// One slot saying less is enough.
 	if (left.type === "Dictionary" && right.type === "Dictionary") {
 		return (
 			isLessSpecific(left.keyType, right.keyType) ||
@@ -2357,19 +2300,8 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 }
 
 // Builds a Union from a list of members. Members that subsume one another
-// collapse (`Integer` alongside `Number` becomes just `Number`), anonymous
-// nested Unions are flattened in, and NAMED ones (`Number`, a Choice, an
-// applied `Optional<X>`, a named Alias) stay whole — their name is their
-// spelling.
-//
-// This used to build a canonical, Optional-SHAPED form: `Nothing` was hoisted
-// to a single top-level member and everything else became one payload member,
-// so that `Integer | Rational | Nothing` came out as
-// `(Integer | Rational) | Nothing` and a Generic bound over `T | Nothing`
-// could bind the payload in one piece. An applied `Optional<X>` even
-// surrendered its own spelling to merge. All of that existed so that a Union's
-// SHAPE could mean "fallible"; a nominal `Optional` says it by name, so the
-// canonical form and the invariant it imposed on every caller are gone.
+// collapse, so `Integer` beside `Number` is `Number`. Anonymous nested Unions are
+// flattened in, and named ones stay whole.
 export function buildUnion(members: Array<common.Type>): common.Type {
 	let distinct: Array<common.Type> = []
 
@@ -2407,14 +2339,8 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	return { type: "UnionType", types: distinct }
 }
 
-// The deduped member list for a Union built from several candidate
-// Types. Anonymous (unnamed, unaliased) nested Unions are exploded so their
-// members merge in; a named nested Union (`Number`, a Choice, a named Alias)
-// stays whole so the result prints by name. A member already subsumed by one
-// present is dropped, and a member that subsumes present ones evicts them — so
-// `Integer` and `Number` collapse to `Number` rather than sitting side by
-// side. The caller decides how to finish: an empty list, a lone member, or
-// `buildUnion` over the rest.
+// The deduped member list `buildUnion` would make, for a caller that finishes
+// the Union itself.
 export function mergeUnionMembers(
 	types: Array<common.Type>,
 ): Array<common.Type> {
@@ -2445,10 +2371,8 @@ export function mergeUnionMembers(
 	return distinct
 }
 
-// The inference-aware form of `matchesType` — the first occurrence of
-// a bindable Generic (in `context.bindableNames`) binds the Type on the
-// other side, every later occurrence checks with the normal assignability
-// rules. Bindings accumulate in `context.bindings`.
+// `matchesType` with a context: a bindable Generic binds on its first occurrence,
+// and later ones are checked. Bindings accumulate in `context.bindings`.
 export function matchesTypeWithBindings(
 	lhs: common.Type,
 	rhs: common.Type,
@@ -2457,22 +2381,12 @@ export function matchesTypeWithBindings(
 	return matchTypes(lhs, rhs, context, OUTERMOST)
 }
 
-// The (lhs, rhs) Case pairs whose members are mid-comparison, keyed by
-// `lhs` identity — a nested Set so a pair is recognised by both halves. Guards
-// the coinductive Case recursion in `matchTypes` against a cyclic payload
-// looping forever; entries are added and removed within a single `matchTypes`
-// call, so the map is empty between top-level matches.
+// The Case pairs being compared, by `lhs` identity, the coinductive guard in
+// `matchTypes`. Empty between top-level matches.
 const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 
-// The Generic names a binding mentions, remembered per Type object. The
-// question is asked of one binding on every later occurrence of its Parameter,
-// so one walk per distinct binding is the whole cost. A remembered answer never
-// misses a name because no edit made in place adds one: filling in a
-// refinement's predicate adds none, and poisoning a refinement into its base
-// can only drop the names the refinement's own spelling carried. Keyed by the
-// binding rather than by the context, because the same Type is bound under
-// many. The answer is almost always the empty Set, which is what makes the
-// chase below free.
+// The Generic names a binding mentions, remembered per Type object. No edit in
+// place adds a name, so a remembered answer stays true.
 const bindingMentionsMemo = new WeakMap<common.Type, Set<common.GenericName>>()
 
 function mentionedGenericNames(binding: common.Type): Set<common.GenericName> {
@@ -2486,27 +2400,13 @@ function mentionedGenericNames(binding: common.Type): Set<common.GenericName> {
 	return remembered
 }
 
-// Whether following a Parameter's binding, and the bindings of everything
-// that binding mentions, leads back to the Parameter itself. THE occurs check,
-// written over the whole binding graph rather than over one edge of it: the
-// plain shape is `Item := List<Item>`, but two Parameters can hold each other
-// instead — `Key := List<Value>` beside `Value := List<Key>` — and a check that
-// only read its own binding waved that pair through and let the matcher chase
-// the pair around forever. Neither cycle stands for any finite Type, so a
-// Parameter caught in one is no longer open to binding.
-//
-// Bounded by the bindable names, which are one invocation's Type Parameters:
-// a handful, and the walk stops at the first binding that mentions nothing.
+// Whether a Parameter's bindings lead back to itself, the occurs check over the
+// whole binding graph. See "Type Parameters" in DEVELOPMENT.md.
 function bindingCyclesBackTo(
 	name: common.GenericName,
 	context: GenericInferenceContext,
 ): boolean {
-	// The answer for very nearly every binding, and worth its own line
-	// because this is asked on EVERY later occurrence of a bound Parameter: a
-	// Type the Arguments produced mentions no Generic at all, so there is
-	// nothing for the walk below to follow. Reading that off the memoised
-	// mention set costs two lookups, where discovering it by walking costs a Set
-	// and a queue per question.
+	// Nearly every binding mentions no Generic, which the memo answers at once.
 	let held = context.bindings.get(name)
 
 	if (held === undefined || mentionedGenericNames(held).size === 0) {
@@ -2540,32 +2440,8 @@ function bindingCyclesBackTo(
 	return false
 }
 
-// Whether a Generic name is still OPEN to binding here — bindable AND not
-// already pinned to a Type that MENTIONS its own name. Such a binding arises
-// when a callee's bindable Generic shares a spelling with the caller's opaque
-// one, and the two are one symbol because Generic identity is by name. The plain
-// case is `ItemType := ItemType`: a Method generic in `ItemType` calling
-// `List.reduce`, whose namespace Generic is also `ItemType`, binds it off the
-// receiver. That pins the callee's Generic to the caller's opaque symbol, so
-// from then on it must behave EXACTLY like an opaque Generic — matching only
-// another occurrence of itself, and falling THROUGH the bindable dispatch so an
-// expected Union can still accept it as a member (the `ItemType` arm of a bound
-// `Result` of `ItemType | String`). Left as "open" it would instead be chased
-// through its own binding forever.
-//
-// The occurs check is the whole rule, not just the `X := X` shape it was
-// first written for, and it is asked of the binding GRAPH — see
-// `bindingCyclesBackTo`. `Item := List<Item>` is the same collision one level
-// down — a `namespace Pairing<infer Item> for { left: Item, right: Item }`
-// reached from a Function whose own Parameter is also spelled `Item`, over a
-// receiver of `{ left: List<Item>, right: List<Item> }`. The FIRST member
-// records the binding, the SECOND re-checks `Item` against it, and chasing
-// `Item` through `List<Item>` never ends. No finite Type satisfies
-// `Item = List<Item>`, so treating the Parameter as the opaque symbol it was
-// pinned to is both terminating and the honest reading; the collision itself is
-// kept from arising in the first place by alpha-renaming a Namespace's Generics
-// before its target is matched, and this is the backstop that holds for every
-// spelling, including ones no rule anticipates.
+// Whether a Generic is still open to binding: bindable, and not bound to a Type
+// that leads back to itself. See "Type Parameters" in DEVELOPMENT.md.
 function isOpenBindable(
 	name: string,
 	context: GenericInferenceContext | null,
@@ -2577,12 +2453,8 @@ function isOpenBindable(
 	return !(context.bindings.has(name) && bindingCyclesBackTo(name, context))
 }
 
-// Whether a Type Parameter already stands for a refinement. A Parameter
-// binds the BASE wherever a value is measured against it, so this is only ever
-// true of one bound from INSIDE a Type — `ItemType` off a
-// `List<NonEmptyList<Integer>>` receiver — or of one an author applied by hand.
-// Either way it is a proof somebody wrote down, and the comparison belongs
-// against it rather than against what it narrows.
+// Whether a Type Parameter is bound to a refinement, bound from inside a Type
+// or applied by hand. Comparisons then go against that proof.
 function refinementBoundTo(
 	type: common.Type,
 	context: GenericInferenceContext | null,
@@ -2594,12 +2466,8 @@ function refinementBoundTo(
 	return context?.bindings.get(type.name)?.type === "Refinement"
 }
 
-// Where in a Type the comparison currently stands. `OUTERMOST` is the
-// whole of what a position asks — an Argument against its Parameter, a value
-// against its Declaration — and `NESTED` is everything reached by going THROUGH
-// a Type: a List's items, a Record's or a Case's members, a signature's
-// Parameters. Only one rule reads it, the refinement unwrapping below, and only
-// the reason it gives there makes the distinction worth carrying.
+// Where the comparison stands: the whole of a position, or inside a Type. Only
+// the refinement rule reads it. See "Refinements" in DEVELOPMENT.md.
 type MatchDepth = "outermost" | "nested"
 
 const OUTERMOST: MatchDepth = "outermost"
@@ -2612,47 +2480,15 @@ function matchTypes(
 	context: GenericInferenceContext | null,
 	depth: MatchDepth,
 ): boolean {
-	// Error Types are poison values — they only occur after a
-	// Diagnostic has already been reported, and match anything in both
-	// directions so that a single mistake does not cascade into
-	// follow-up Diagnostics.
+	// An Error matches anything both ways, so one mistake does not cascade.
 	if (lhs.type === "Error" || rhs.type === "Error") {
 		return true
 	}
 
-	// A checked refinement flows into anything its BASE flows into — the
-	// evidence is simply forgotten, and every value of `NonZeroInteger` is an
-	// Integer. This unwrapping sits ahead of Generic binding below on purpose:
-	// it is what makes a Type Parameter bind the base at the OUTERMOST position,
-	// so `T` inferred from a refined Argument is `Integer` and never
-	// `NonZeroInteger`. That rule is what keeps a Generic standing for a value
-	// the call THREADS from being pinned to evidence the thread does not carry:
-	// a `loop(startingWith nonZero, step …)` whose step answers an ordinary
-	// Integer is a Program that works, and binding `State` to `NonZeroInteger`
-	// off the seed would refuse it.
-	//
-	// A refinement standing INSIDE another Type is a different matter, and
-	// binds as itself. Nobody inferred it there — `List<NonEmptyList<Integer>>`
-	// says what it says because something wrote it down or because a Method
-	// promised it, and the item Type is not a place a later value can widen. So
-	// `groups::firstItem()` answers `Optional<NonEmptyList<Integer>>` and the
-	// proof survives being a Type Argument, while the outermost rule above is
-	// untouched.
-	//
-	// An expected Union is left to decompose FIRST — unwrapping here
-	// would strip the evidence before the Union's own refinement member could
-	// read it, so `NonZeroInteger | String` refused the very `NonZeroInteger`
-	// it names. Each member then faces the intact refinement: a refinement
-	// member by its conjuncts below, any other member through this same
-	// unwrapping one level down.
-	//
-	// And not where the Type Parameter is already BOUND to a refinement,
-	// wherever it stands. There is nothing left to infer there — the Parameter
-	// stands for a proof already, and unwrapping would ask a proven Argument to
-	// fit the base and then refuse it for being proven. It is what a Method
-	// whose Parameter is the item Type meets on a proven item Type:
-	// `groups::append(proven)` and `groups::contains([9])` both hand a
-	// `NonEmptyList<Integer>` to an `ItemType` bound to one.
+	// An actual refinement flows into whatever its base does, before Generic
+	// binding, so an outermost Type Parameter binds the base. Skipped nested, against
+	// a Union, and for a Parameter bound to a refinement. See "Refinements" in
+	// DEVELOPMENT.md.
 	if (
 		rhs.type === "Refinement" &&
 		lhs.type !== "Refinement" &&
@@ -2667,28 +2503,8 @@ function matchTypes(
 		return matchTypes(lhs, rhs.base, context, depth)
 	}
 
-	// The other direction needs the evidence. A refinement is accepted by
-	// a refinement over the same base whose conjuncts INCLUDE its own — proving
-	// more than was asked is proof enough, proving less is no proof at all — and
-	// by nothing else: a bare Integer arriving where `NonZeroInteger` stands is
-	// exactly the mistake the Type exists to name.
-	//
-	// "Include" reads the leaves the other side proves BESIDES the ones it
-	// spells — see `impliedConjunctKeys`. A value proven above zero has been
-	// proven not to be zero, and a Type saying so has to reach the Namespace
-	// that asks for exactly that.
-	//
-	// A Generic that is already BOUND is not "nothing else" — it stands
-	// for whatever it was bound to, and the comparison belongs against that. It
-	// is reached when a Type Parameter has picked a refinement up out of a Type
-	// Argument and the same Parameter comes back round in a flipped position:
-	// `groups::map((inner) { … })` binds `ItemType` to `NonEmptyList<Integer>`
-	// off the receiver, and the lambda's own Parameter — typed from that very
-	// binding — is then measured against `ItemType` with the sides swapped.
-	// Refused here it made the call unresolvable. An UNBOUND Generic still gets
-	// nothing from this side: a refinement does not bind a Type Parameter from
-	// the actual side of a signature, which is the outermost rule above read in
-	// the mirror.
+	// An expected refinement needs a refinement whose proven keys contain its own.
+	// A bound Generic on the actual side is compared through its binding.
 	if (
 		lhs.type === "Refinement" &&
 		!(
@@ -2711,15 +2527,8 @@ function matchTypes(
 		)
 	}
 
-	// Two opaque Generics of the same name are the same Generic and match.
-	// This must NOT short-circuit a Generic still OPEN to binding that happens to
-	// share a name with an opaque one: when a Method forwards to another whose
-	// `infer` generic is spelled identically — `List`'s Methods all bind
-	// `ItemType`, so `firstItem` calling `item(at:)` is `ItemType` matched against
-	// `ItemType` — the open side has to reach `matchGenericUse` below and RECORD
-	// the binding off the receiver's Type argument, not be waved through here with
-	// nothing bound. Once it HAS been bound to its own name it is no longer open,
-	// and this is what recognises the two self-pinned `ItemType`s as identical.
+	// Two same-named Generics match where neither is open. An open one must reach
+	// `matchGenericUse` to record its binding.
 	if (
 		lhs.type === "GenericUse" &&
 		rhs.type === "GenericUse" &&
@@ -2730,9 +2539,7 @@ function matchTypes(
 		return true
 	}
 
-	// Generics can occur on either side — an expected Generic binds the
-	// actual Type, while an actual-side Generic occurs when signatures are
-	// compared (contravariant parameter positions flip the sides).
+	// An open Generic binds on either side, since compared signatures flip sides.
 	if (lhs.type === "GenericUse" && isOpenBindable(lhs.name, context)) {
 		return matchGenericUse(lhs, rhs, context, (binding) =>
 			matchTypes(binding, rhs, context, depth),
@@ -2745,41 +2552,19 @@ function matchTypes(
 		)
 	}
 
-	// An opaque Generic is a symbol of an enclosing definition — as the
-	// expected Type it only accepts itself, which the same-name check above
-	// already covered. As the actual Type it falls through, so that an
-	// expected Union can still accept its own Generic member.
+	// An expected opaque Generic accepts only itself. As the actual Type it falls
+	// through, so an expected Union can accept it as a member.
 	if (lhs.type === "GenericUse") {
 		return false
 	}
 
-	// `Unknown` as the WHOLE expected Type accepts everything, and stays
-	// that way. No author wrote it — `Unknown` is unspellable in Essence — so
-	// the only place it can stand here is an answer the Compiler had nothing
-	// better to give: a `case _` with nothing left to catch
-	// (`resolveWildcardMatcherType`), a member read off a Type that has no such
-	// member (`memberTypeOf`), an Alias whose body could not be resolved
-	// (`aliasBodyType`). Each of those has already been reported or has nothing
-	// to report, and refusing them here would pile a second Diagnostic on top
-	// of every one. Outermost error recovery is the whole of the list: a bare
-	// `Future` or `Started` used to reach here as well, and is refused where it
-	// is written instead, because it was a spelling that minted VALUES of this
-	// Type and no recovery at all.
-	//
-	// The undecided SLOT of a container is a different question and has
-	// its own rules below — the Unknown a `[]` or a `[=]` leaves behind is a
-	// blank waiting to be filled, and a value written into it decides it.
+	// An `Unknown` expected Type is the Compiler's recovery, which no author can
+	// write, so it accepts everything. A container's `Unknown` slot has its own rules.
 	if (lhs.type === "Unknown") {
 		return true
 	}
 
-	// A bare `List` demands nothing of the items, so it accepts every
-	// List. The reverse does NOT hold: a bare `List` PROMISES nothing about
-	// them either, and letting one satisfy a `List<Integer>` would hand a List
-	// of Strings to everything reading Integers out of it. That direction is
-	// what an empty List Literal needs, and it has its own rule below — an
-	// Unknown item Type is a slot nothing has decided, not a decision to hold
-	// anything at all.
+	// A bare `List` accepts every List, but does not satisfy a decided one.
 	if (
 		lhs.type === "GenericList" &&
 		(rhs.type === "GenericList" || rhs.type === "List")
@@ -2788,15 +2573,8 @@ function matchTypes(
 	}
 
 	if (lhs.type === "List" && rhs.type === "List") {
-		// An undecided item Type is a SLOT, and a slot may be READ as
-		// bottom but never WRITTEN into without being decided. Accepting a
-		// decided List here did both at once: `List<Unknown>` took a List of
-		// Strings and remained a `List<Unknown>` afterwards, which fits every
-		// List in turn — so the items came back out as Integers and every
-		// Number Method ran on Strings. Whoever owns the slot decides it before
-		// the question is asked (an assignment, a Record update, the seed of a
-		// Type Parameter); a slot that reaches here still undecided is one
-		// nothing in the Program ever filled, and the write is refused.
+		// An undecided item Type may be read as bottom, but a write must decide it
+		// first. See "Containers and slots" in DEVELOPMENT.md.
 		if (
 			lhs.itemType.type === "Unknown" &&
 			decidesAnUndecidedSlot(rhs.itemType)
@@ -2804,8 +2582,7 @@ function matchTypes(
 			return false
 		}
 
-		// Empty List Literals have an Unknown itemType and
-		// are assignable to any List.
+		// An empty List Literal fits any List.
 		if (rhs.itemType.type === "Unknown") {
 			return true
 		}
@@ -2813,9 +2590,7 @@ function matchTypes(
 		return matchTypes(lhs.itemType, rhs.itemType, context, NESTED)
 	}
 
-	// The bare-container rule again, unchanged by the second slot — a
-	// bare `Dictionary` demands nothing of either, so it accepts every one, and
-	// the reverse direction is the Unknown-slot rule below rather than this one.
+	// A bare `Dictionary` accepts every Dictionary.
 	if (
 		lhs.type === "GenericDictionary" &&
 		(rhs.type === "GenericDictionary" || rhs.type === "Dictionary")
@@ -2824,11 +2599,7 @@ function matchTypes(
 	}
 
 	if (lhs.type === "Dictionary" && rhs.type === "Dictionary") {
-		// The write rule above, asked per slot: an undecided key or value
-		// Type refuses a Dictionary that has decided that slot, and the other
-		// slot has no say in it. Both halves matter — a Dictionary whose keys
-		// were decided and whose values were not still launders its values —
-		// and neither can be answered by the slot beside it.
+		// The write rule per slot: an undecided slot refuses a value that decides it.
 		if (
 			(lhs.keyType.type === "Unknown" &&
 				decidesAnUndecidedSlot(rhs.keyType)) ||
@@ -2838,14 +2609,8 @@ function matchTypes(
 			return false
 		}
 
-		// The empty-List rule applied to each slot SEPARATELY. An empty
-		// Dictionary decides neither, so it is assignable to any Dictionary the
-		// way an empty List Literal is assignable to any List — and a slot that
-		// was decided is still checked, so a `Dictionary<Unknown, Integer>`
-		// fits `Dictionary<String, Integer>` and not `Dictionary<String,
-		// String>`. Reading the two slots together would have made a
-		// half-decided Dictionary either wholly opaque or wholly checked, and
-		// both throw away what the other slot says.
+		// The empty-List rule per slot, so `Dictionary<Unknown, Integer>` fits
+		// `Dictionary<String, Integer>` and not `Dictionary<String, String>`.
 		let keysMatch =
 			rhs.keyType.type === "Unknown" ||
 			matchTypes(lhs.keyType, rhs.keyType, context, NESTED)
@@ -2857,11 +2622,7 @@ function matchTypes(
 		)
 	}
 
-	// Covariant in the one slot, which is the only variance a Future can
-	// have: it is a producer and nothing ever writes a value INTO one. There is
-	// no bare spelling to give a rule of its own — a written `Future` is refused
-	// for the Type Argument it left off — so the slot reaching here still open
-	// is the Compiler's own recovery, and the Unknown rule reads it as one.
+	// Covariant, since nothing writes into a Future.
 	if (lhs.type === "Future" && rhs.type === "Future") {
 		return matchTypes(lhs.valueType, rhs.valueType, context, NESTED)
 	}
@@ -2902,23 +2663,13 @@ function matchTypes(
 		let lhsMembers = orderUnionMembersForMatching(lhs.types, context)
 
 		if (rhs.type === "UnionType") {
-			// An actual Union is assignable when every one of its
-			// members is accepted by some member of the expected Union — the
-			// actual Type must not be able to hold any value the expected
-			// Type can not hold. A whole member is tried first, so a binding
-			// Generic binds a nested Union (a `Labelled<Integer | Rational>`'s
-			// payload) in one piece; only when no single expected member takes
-			// it is a nested actual member decomposed against the whole
-			// expected Union, which makes the nested and the flattened
-			// spelling of the same Union interchangeable.
+			// Every actual member must be accepted by some expected member, trying whole
+			// members before decomposing a nested one. See "Unions" in DEVELOPMENT.md.
 			let matchedWholeMembers = true
 
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
-				// Every candidate is tried from the bindings the ones
-				// BEFORE it earned, never from the wreckage of a candidate that
-				// bound its way down and then failed — see the `else` arm below
-				// for what such leftovers do to the candidates after them.
+				// Each candidate starts from the bindings before it, not a failed one's.
 				let attempt = markBindings(context)
 
 				for (let lhsType of lhsMembers) {
@@ -2942,19 +2693,8 @@ function matchTypes(
 
 			return matchedWholeMembers
 		} else {
-			// Each member is tried on its own. A composite member — a
-			// Record, Case or Function mentioning a bindable Generic — can bind
-			// Generics on its way down and THEN fail, and those bindings are
-			// worth no more than the member that made them: rolled back here,
-			// or they decide the members after it. Matching
-			// `{ left = "hi", right = 5 }` against
-			// `{ left: T, right: String } | { left: String, right: T }` binds
-			// `T := String` off the first member's `left`, fails on its
-			// `right`, and the second member — which matches on its own with
-			// `T := Integer` — was then checked against that leftover `T` and
-			// wrongly rejected, so the same call compiled or not depending on
-			// the order the Union was written in. Whichever member finally
-			// matches keeps the bindings it made.
+			// Each member is tried alone, and a failed member's bindings are rolled back,
+			// so the order a Union was written in decides nothing.
 			let attempt = markBindings(context)
 
 			for (let type of lhsMembers) {
@@ -2969,42 +2709,21 @@ function matchTypes(
 		return false
 	}
 
-	// Cases are nominal — a Case only matches its own Choice's Case of
-	// the same name, never a structurally identical Record (and vice versa).
-	// That identity is the entire point of declaring a Choice. Compared by
-	// `choiceIdentity` rather than by the Choice's written name, so that two
-	// Modules each declaring `choice Result` declare two Types: matched by name
-	// their Cases were interchangeable in both directions, with `is` and `match`
-	// confusing them and no Diagnostic anywhere.
-	// Under generics the tag alone is not enough either: two instantiations of
-	// the same Case (`Step<Integer, …>#Done` vs `Step<String, …>#Done`) share a
-	// tag but must not be interchangeable, so once the tags agree the payload
-	// members are recursed. `typeArguments` are ignored — they are display
-	// spelling; the members decide assignability, and recursing them is also
-	// what routes a bindable Generic member through `matchGenericUse` (the whole
-	// Result inference story).
+	// A Case matches only a Case of the same Choice identity and name, then by its
+	// payload members. `typeArguments` are display only. See "Cases, Records and
+	// Functions" in DEVELOPMENT.md.
 	if (lhs.type === "Case" && rhs.type === "Case") {
 		if (lhs.choice !== rhs.choice || lhs.name !== rhs.name) {
 			return false
 		}
 
-		// The same Case object matches itself in O(1) — every non-generic
-		// Choice's Cases keep their identity through `applyGenericBindings`, so
-		// this is the entire cost for them. It runs before any pair-guard
-		// bookkeeping so that path allocates nothing.
+		// One Case object matches itself at once, without bookkeeping.
 		if (lhs === rhs) {
 			return true
 		}
 
-		// Re-entering the same (lhs, rhs) pair while it is already being
-		// compared is the coinductive hypothesis — assume it holds. A genuine
-		// counterexample would differ at some finite member path, which is
-		// checked before the cycle can close, so assuming the cycle is sound.
-		// No cyclic payload should reach here at all: a recursive Type
-		// declaration, whether it names itself or goes around a cycle of them,
-		// is diagnosed before the hoist and its recursive members resolve to
-		// Error. This stays as the guard that makes matching terminate whatever
-		// a Type turns out to be built from.
+		// A pair already being compared is assumed to hold. A counterexample differs at
+		// a finite member path, so the assumption is sound.
 		let inProgress = activeCasePairs.get(lhs)
 
 		if (inProgress?.has(rhs)) {
@@ -3019,9 +2738,8 @@ function matchTypes(
 		inProgress.add(rhs)
 
 		try {
-			// Cases sharing a tag share a declaration, so their member
-			// name sets are identical — the length check plus the per-name
-			// lookup below assert that strictly rather than trusting it.
+			// Cases sharing a tag share a declaration, so their member names agree, which
+			// this checks rather than trusts.
 			let lhsMemberNames = Object.keys(lhs.members)
 
 			if (lhsMemberNames.length !== Object.keys(rhs.members).length) {
@@ -3057,9 +2775,7 @@ function matchTypes(
 
 	if (lhs.type === "Record" && rhs.type === "Record") {
 		for (let memberName in lhs.members) {
-			// `Object.hasOwn` before the read — a member named after one
-			// of `Object.prototype`'s would otherwise be compared against a
-			// JavaScript function the Record does not have.
+			// `Object.hasOwn`, since a member may share a name with `Object.prototype`.
 			if (!Object.hasOwn(rhs.members, memberName)) {
 				return false
 			}
@@ -3079,20 +2795,9 @@ function matchTypes(
 		return true
 	}
 
-	// A Method NAMED rather than called — `Reader.readsBase`,
-	// `Doubler.double` — is a Function value like any other: its receiver
-	// already stands as the first Parameter of the Type, and it is emitted as a
-	// plain function taking it there. The `SimpleMethod`/`StaticMethod` tag
-	// only records where the signature was written down, and no annotation can
-	// spell either one, so the three are one kind of value here and only the
-	// signature decides.
-	// Interchangeable in BOTH directions, because the tag also travels: an
-	// unannotated `variable read = Reader.readsBase` is DECLARED
-	// `StaticMethod`, and every later assignment to it is measured against
-	// that. Waving the tag through in one direction only would refuse a
-	// Function literal assigned to that Variable while accepting a Method
-	// assigned to the mirrored `variable read = <literal>` — the same Program
-	// compiling or not by which of the two happened to be written first.
+	// A Function, a `SimpleMethod` and a `StaticMethod` are one kind of value,
+	// matched by signature in both directions. A named Method holds its receiver as
+	// the first Parameter.
 	if (
 		(lhs.type === "Function" ||
 			lhs.type === "SimpleMethod" ||

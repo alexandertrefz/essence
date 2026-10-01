@@ -439,3 +439,84 @@ also strips Record names inside applied spellings' Type Arguments and inside Fun
 embedding boundary prints both. `withoutRecordNamesInSignature` serves `printSignature`.
 It keeps identity where nothing changed, and answers a back-edge unstripped. The Enricher refuses a Type that
 names itself, so the guard only keeps the language server from hanging.
+
+## Matching Types
+
+`matchTypes(lhs, rhs, context, depth)` asks whether a value of `rhs` may stand where `lhs` is expected, binding
+the Type Parameters `context` lets it bind. `matchesType` asks without a context. The rules run in a fixed order,
+and the order carries meaning.
+
+An `Error` matches anything in both directions. It only occurs after a Diagnostic, so one mistake does not
+cascade.
+
+### Refinements
+
+A refinement on the actual side flows into anything its base flows into, so a `NonZeroInteger` is an Integer.
+This unwrapping runs before Generic binding, so a Type Parameter at the outermost position binds the base. A
+`loop(startingWith nonZero, step …)` whose step answers an ordinary Integer then works, where binding `State` to
+`NonZeroInteger` off the seed would refuse it. The unwrapping is skipped in three cases:
+
+- Nested, where an open Type Parameter binds the refinement as itself. Nobody inferred a refinement inside a Type,
+  so `groups::firstItem()` on a `List<NonEmptyList<Integer>>` answers `Optional<NonEmptyList<Integer>>`.
+  `MatchDepth` exists for this rule alone.
+- Where the expected Type is a Union, which decomposes first, so `NonZeroInteger | String` meets its refinement
+  member with the proof intact.
+- Where the Type Parameter is bound to a refinement already, as when `groups::append(proven)` hands a
+  `NonEmptyList<Integer>` to an `ItemType` bound to one.
+
+A refinement on the expected side needs evidence. Only a refinement over a matching base whose proven keys,
+`impliedConjunctKeys` included, contain every expected conjunct satisfies it. A bound Type Parameter on the actual
+side is compared through its binding instead. That is how a lambda Parameter typed from `ItemType`'s binding meets
+`ItemType` again with the sides swapped. An unbound one gets nothing, since a refinement never binds a Type
+Parameter from the actual side.
+
+### Type Parameters
+
+Two Generics of one name match when neither is open to binding. An open one must reach `matchGenericUse` and
+record its binding, even against a same-named opaque Generic. `List`'s `firstItem` calls `item(at:)`, and both
+spell their Parameter `ItemType`. An open Generic on either side binds through `matchGenericUse`, since compared
+signatures flip sides. An opaque Generic as the expected Type accepts only itself. As the actual Type it falls
+through, so an expected Union can accept it as a member.
+
+`isOpenBindable` is the occurs check. A Generic stops being open once its binding mentions itself, directly as
+`ItemType := ItemType` or through other bindings as `Key := List<Value>` beside `Value := List<Key>`, which
+`bindingCyclesBackTo` follows. No finite Type satisfies such a binding, so the Parameter then behaves as the
+opaque symbol it was pinned to. Renaming Generics fresh keeps most such collisions from arising, and this check
+holds for any that remain. `mentionedGenericNames` memoises each binding's mentions, and nearly every binding
+mentions none, so the check is cheap.
+
+### Containers and slots
+
+An `Unknown` as the whole expected Type accepts everything. No author can write `Unknown`, so it only stands there
+as the Compiler's recovery, after a Diagnostic or with nothing to report.
+
+An `Unknown` slot inside a container is different: it may be read as bottom, but not written without being
+decided. A `List<Unknown>` refuses a List whose item Type decides the slot. Accepting it would leave the slot
+open to the next write of another Type. The owner of the slot decides it first, by assignment, update or
+seed. In the other direction, an empty List's `List<Unknown>` fits any List. A Dictionary applies both rules to
+each slot separately, so `Dictionary<Unknown, Integer>` fits `Dictionary<String, Integer>` and not
+`Dictionary<String, String>`. A bare `List` or `Dictionary` accepts every List or Dictionary, but does not satisfy
+a decided one. A Future and a Started are covariant in their slot, since nothing writes into one.
+
+### Unions
+
+An actual Union fits where each of its members is accepted by some expected member. A whole member is tried first,
+so a binding Generic binds a nested Union in one piece. Only then is a nested member decomposed against the whole
+expected Union, so the nested and the flattened spelling of one Union are interchangeable. Expected members that
+would bind an unbound Generic are tried last, and each failed member's bindings are rolled back with
+`markBindings` and `restoreBindings`. Without the rollback, a member that bound `T := String` before failing
+would decide the members after it. A call would then compile or not by the order its Union was written in.
+
+### Cases, Records and Functions
+
+A Case matches only a Case of the same Choice identity and name, so two Modules' `choice Result` are two Types.
+Once the tags agree, the payload members are compared, since `Step<Integer, …>#Done` and `Step<String, …>#Done`
+share a tag. `typeArguments` are display only. One Case object matches itself at once, which is the whole cost for
+a non-generic Choice. A pair already being compared is assumed to hold, the coinductive hypothesis, and
+`activeCasePairs` tracks the pairs. A counterexample would differ at a finite member path, so the assumption is
+sound. A Type that names itself is refused before the hoist, so this guard only makes matching terminate.
+
+A Record matches by width: every expected member must be present at a matching Type. A Function, a
+`SimpleMethod` and a `StaticMethod` are one kind of value here, compared by `signatureMatches`, in both
+directions. A Method named rather than called already holds its receiver as its first Parameter, and an
+unannotated `variable read = Reader.readsBase` is declared with that tag.
