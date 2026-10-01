@@ -1,26 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-// Where the standard library's Essence sources live. Resolved off this
-// module's own location rather than the working directory, so `esc` finds them
-// from any cwd. Computed HERE, in the package that owns the files, rather than
-// by a consumer counting `../`s towards them: whoever holds the sources is the
-// one who can answer where they are.
-//
-// Two layouts, because this module is read in two situations that do not
-// look alike. Run from the workspace — `esc`, `esls`, the test suite — it sits
-// in `packages/standard-library/src/` and the sources are its sibling. Run from a BUNDLE
-// it does not: the Language Server inside the VS Code extension is one file,
-// `import.meta.dirname` is wherever that file was written, and the sources have
-// to have been copied next to it. They can not be inlined instead — the loader
-// finds them with `readdirSync`, and no bundler can see through that.
-//
-// This is what the extension shipped broken. `../sources` resolved to a
-// directory that was not there, the loader answered with no sources at all,
-// and the editor then reported every standard library Method as missing —
-// `"hi"::uppercase()` came back as "No Namespace provides Methods for this
-// value". So `build:server` copies the sources beside the bundle, and this
-// finds them there.
+// Where the standard library's Essence sources live, resolved from this module
+// so any working directory works. In the workspace they are the sibling
+// `sources` directory. A bundle, such as the VS Code extension's server, must
+// have them copied beside it, since the loader lists them with `readdirSync`.
 const WORKSPACE_SOURCES = path.resolve(import.meta.dirname, "../sources")
 const BUNDLED_SOURCES = path.resolve(import.meta.dirname, "standard-library")
 
@@ -33,14 +17,8 @@ export type StdlibFile = {
 	sourceText: string
 }
 
-// Sorted, so that the order files are hoisted and enriched in is the
-// same on every machine — hoisting is order-independent by design, but a
-// Diagnostic's file attribution should not depend on directory iteration order.
-//
-// Reading is separated from parsing because parsing needs the Parser,
-// and the Parser is the Compiler. This package holds the `.es` files and knows
-// where they are; what they mean is the Compiler's question. No count here:
-// nothing checks one, and the number went stale across three waves.
+// Sorted, so a Diagnostic's file attribution never depends on directory order.
+// Parsing is the Compiler's job, so this package only reads the files.
 export function readStdlibFiles(): Array<StdlibFile> {
 	let fileNames = existsSync(STDLIB_DIRECTORY)
 		? readdirSync(STDLIB_DIRECTORY)
@@ -48,14 +26,9 @@ export function readStdlibFiles(): Array<StdlibFile> {
 				.sort()
 		: []
 
-	// Loud, because the quiet version of this cost a shipped release.
-	// Answering with no sources is not a degraded standard library, it is no
-	// standard library — every Type and every Method a Program can reach is
-	// declared in these files. What the user then sees is not "the standard
-	// library is missing" but "No Namespace provides Methods for this value"
-	// against `"hi"::uppercase()`, which reads like a bug in their code. There
-	// is no situation where continuing is better than saying which directory
-	// was looked in and stopping.
+	// No sources means no standard library at all, which would surface as
+	// confusing errors in the user's own code. So this stops and names the
+	// directory it searched.
 	if (fileNames.length === 0) {
 		throw new Error(
 			`The standard library is missing: no '.es' sources under '${STDLIB_DIRECTORY}'.\n\n` +

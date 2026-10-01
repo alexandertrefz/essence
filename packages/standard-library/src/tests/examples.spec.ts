@@ -8,11 +8,9 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { STDLIB_DIRECTORY } from "../index"
 
-// The standard library's own `@example` blocks, run the way a reader
-// would run them: `essence test` in the library's own directory. It is a spec
-// of the LIBRARY rather than of the Compiler — what it holds honest is the
-// documentation, so that an example which stopped being true fails a run
-// instead of sitting in hover text saying something that is not so.
+// The standard library's own `@example` blocks, run as a reader would run them:
+// `essence test` in the library's directory. An example that stops being true
+// fails here instead of misleading in hover text.
 
 const essence = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
@@ -24,11 +22,9 @@ const essence = path.resolve(
 	"essence",
 )
 
-// A bundle cache of this spec's own, so a run neither answers out of the
-// developer's cache nor fills it — and a result cache beside it, for the same
-// reason twice over: this run is the STANDARD LIBRARY's own, so an answer left
-// in the developer's store would be replayed by the very next `essence test`
-// they run in this repository.
+// Bundle and result caches of this spec's own, so it neither reads nor fills
+// the developer's. A result left there would be replayed by their next
+// `essence test` in this repository.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-stdlib-examples-"))
 const results = mkdtempSync(path.join(tmpdir(), "essence-stdlib-results-"))
 
@@ -58,8 +54,7 @@ it("runs every example the standard library documents", async () => {
 	expect([answer.code, err]).toEqual([0, err])
 	expect(out).toContain("examples")
 	expect(out).toContain("passed")
-	// A number rather than a name: which Methods carry an example is the
-	// library's business and changes with every one that is written, but a run
-	// that suddenly finds NONE is the wiring having quietly come apart.
+	// A count rather than names, since examples come and go. Finding none
+	// means the wiring broke.
 	expect(out).not.toContain("no tests")
 }, 60_000)
